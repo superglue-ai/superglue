@@ -7,7 +7,7 @@ import { isSelfHealingEnabled, transformAndValidateSchema } from "../utils/tools
 import { evaluateTransform, generateTransformCode } from "../utils/transform.js";
 import { selectStrategy } from "./workflow-strategies.js";
 
-export class WorkflowExecutor implements Workflow {
+export class WorkflowRunner implements Workflow {
   public id: string;
   public steps: ExecutionStep[];
   public finalTransform?: string;

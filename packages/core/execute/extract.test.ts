@@ -1,8 +1,8 @@
 import { AuthType, DecompressionMethod, FileType, HttpMethod } from '@superglue/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { decompressData, parseFile } from '../utils/file.js';
-import { callAxios } from './api/api.js';
 import { callExtract, generateExtractConfig, processFile } from './extract.js';
+import { callAxios } from './http.js';
 // Mock dependencies
 vi.mock('../utils/documentation.js');
 vi.mock('../utils/file.js');

@@ -1,11 +1,11 @@
 import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
 import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
-import { WorkflowExecutor } from "../../execute/workflow-executor.js";
+import { WorkflowRunner } from "../../execute/workflow-runner.js";
 import { Context, Metadata } from '../types.js';
 
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { WorkflowBuilder } from "../../build/workflow-builder.js";
+import { WorkflowBuilder } from "../../generate/workflows.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { parseJSON } from "../../utils/json-parser.js";
 import { logMessage } from "../../utils/logs.js";
@@ -120,7 +120,7 @@ export const executeWorkflowResolver = async (
       );
     }
 
-    const executor = new WorkflowExecutor(workflow, metadata, integrationManagers);
+    const executor = new WorkflowRunner(workflow, metadata, integrationManagers);
     const result = await executor.execute(args.payload, mergedCredentials, args.options);
 
     // Save run to datastore

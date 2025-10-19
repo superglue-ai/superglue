@@ -1,11 +1,11 @@
 import { Integration, Workflow } from "@superglue/client";
 import { Metadata, toJsonSchema } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { LLMMessage } from "../llm/language-model.js";
-import { executeTool } from "../execute/tools.js";
-import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../context/context-prompts.js";
-import { logMessage } from "../utils/logs.js";
 import { getWorkflowBuilderContext } from "../context/context-builders.js";
+import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../context/context-prompts.js";
+import { LLMMessage } from "../llm/language-model.js";
+import { logMessage } from "../utils/logs.js";
+import { executeTool } from "./tools.js";
 
 type ChatMessage = LLMMessage;
 
@@ -87,8 +87,14 @@ export class WorkflowBuilder {
         } else if (!availableIntegrationIds.includes(step.integrationId)) {
           errors.push(`Step ${index + 1} (${step.id}): Invalid integrationId '${step.integrationId}'. Available integrations: ${availableIntegrationIds.join(', ')}`);
         }
-        if (!step.apiConfig?.urlHost) {
-          errors.push(`Step ${index + 1} (${step.id}): Missing URL configuration (urlHost: '${step.apiConfig?.urlHost || 'undefined'}'). Please ensure that all steps correspond to a single API call, or merge this step with the previous one.`);
+        const hasApiConfig = !!(step as any).apiConfig;
+        const hasCodeConfig = !!(step as any).codeConfig;
+        
+        if (!hasApiConfig && !hasCodeConfig) {
+          errors.push(`Step ${index + 1} (${step.id}): Missing configuration. Each step must have either apiConfig (legacy) or codeConfig.`);
+        }
+        if (hasApiConfig && hasCodeConfig) {
+          errors.push(`Step ${index + 1} (${step.id}): Invalid configuration. Step cannot have both apiConfig and codeConfig.`);
         }
       });
     }
@@ -142,8 +148,9 @@ export class WorkflowBuilder {
             steps: builtWorkflow.steps?.map(s => ({
               id: s.id,
               integrationId: s.integrationId,
-              urlHost: s.apiConfig?.urlHost,
-              urlPath: s.apiConfig?.urlPath
+              hasApiConfig: !!(s as any).apiConfig,
+              hasCodeConfig: !!(s as any).codeConfig,
+              codeConfigInstruction: (s as any).codeConfig?.instruction
             }))
           }, null, 2);
 

@@ -8,7 +8,7 @@ import { LanguageModel } from "../llm/language-model.js";
 import { logMessage } from "../utils/logs.js";
 import { applyJsonata, flattenObject, isSelfHealingEnabled, transformAndValidateSchema } from "../utils/tools.js";
 import { generateTransformCode } from "../utils/transform.js";
-import { executeStep } from "./workflow-step.js";
+import { executeStep } from "./workflow-step-runner.js";
 
 export interface ExecutionStrategy {
   execute(
@@ -45,7 +45,7 @@ const directStrategy: ExecutionStrategy = {
     try {
       const apiResponse = await executeStep({
         endpoint: step.apiConfig,
-        payload,
+        inputData: payload,
         credentials,
         options,
         metadata,
@@ -128,7 +128,7 @@ const loopStrategy: ExecutionStrategy = {
         try {
           const apiResponse = await executeStep({
             endpoint: successfulConfig || step.apiConfig,
-            payload: loopPayload,
+            inputData: loopPayload,
             credentials,
             options: {
               ...options,

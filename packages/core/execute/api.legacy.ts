@@ -2,16 +2,16 @@ import { ApiConfig, FileType, PaginationType } from "@superglue/client";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { RequestOptions } from "http";
 import ivm from "isolated-vm";
-import { server_defaults } from "../../default.js";
-import { IntegrationManager } from "../../integrations/integration-manager.js";
-import { LanguageModel, LLMMessage } from "../../llm/language-model.js";
-import { SELF_HEALING_SYSTEM_PROMPT } from "../../context/context-prompts.js";
-import { parseFile } from "../../utils/file.js";
-import { composeUrl, generateId, maskCredentials, replaceVariables, sample } from "../../utils/tools.js";
-import { searchDocumentationToolDefinition, submitToolDefinition } from "../../utils/workflow-tools.js";
-import { executeFTP } from "../ftp/ftp.js";
-import { callPostgres } from "../postgres/postgres.js";
-import { AbortError, ApiCallError, callAxios, checkResponseForErrors, handle2xxStatus, handle429Status, handleErrorStatus } from "./api.js";
+import { SELF_HEALING_SYSTEM_PROMPT } from "../context/context-prompts.js";
+import { server_defaults } from "../default.js";
+import { IntegrationManager } from "../integrations/integration-manager.js";
+import { LanguageModel, LLMMessage } from "../llm/language-model.js";
+import { parseFile } from "../utils/file.js";
+import { composeUrl, generateId, maskCredentials, replaceVariables, sample } from "../utils/tools.js";
+import { searchDocumentationToolDefinition, submitToolDefinition } from "../utils/workflow-tools.js";
+import { callFTP } from "./ftp.js";
+import { AbortError, ApiCallError, callAxios, checkResponseForErrors, handle2xxStatus, handle429Status, handleErrorStatus } from "./http.js";
+import { callPostgres } from "./postgres.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
@@ -119,7 +119,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
     }
 
     if (processedUrlHost.startsWith("ftp://") || processedUrlHost.startsWith("ftps://") || processedUrlHost.startsWith("sftp://")) {
-      return { data: await executeFTP({ operation: endpoint.body, credentials, options }), statusCode: 200, headers: {} };
+      return { data: await callFTP({ operation: endpoint.body, credentials, options }), statusCode: 200, headers: {} };
     }
 
     const processedUrl = composeUrl(processedUrlHost, processedUrlPath);

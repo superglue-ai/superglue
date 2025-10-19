@@ -12,6 +12,7 @@ export const server_defaults = {
     MAX_PAGINATION_REQUESTS: 1000,
     AXIOS_QUICK_RETRY_THRESHOLD_MS: 10000,
     AXIOS_DEFAULT_RETRY_DELAY_MS: 1000,
+    AXIOS_DEFAULT_TIMEOUT_MS: 60000,
     AXIOS_MAX_RATE_LIMIT_WAIT_MS: 60 * 60 * 1000 * 24, // 24 hours is the max wait time for rate limit retries, hardcoded
     CONTEXT: {
         JSON_PREVIEW_DEPTH_LIMIT: 5,

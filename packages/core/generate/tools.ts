@@ -1,5 +1,4 @@
 import { ApiConfig, Integration, RequestOptions } from "@superglue/client";
-import { generateInstructionsDefinition, generateInstructionsImplementation } from "../utils/instructions.js";
 import {
     buildWorkflowImplementation,
     buildWorkflowToolDefinition,
@@ -7,6 +6,7 @@ import {
     searchDocumentationToolImplementation,
     submitToolDefinition
 } from "../utils/workflow-tools.js";
+import { generateInstructionsDefinition, generateInstructionsImplementation } from "./instructions.js";
 
 export interface ToolDefinition {
     name: string;

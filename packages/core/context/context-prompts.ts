@@ -215,6 +215,78 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
 - Complex transformations can be done inline: <<(sourceData) => sourceData.contacts.filter(c => c.active).map(c => c.email).join(',')>>
 </VARIABLES>
 
+<POSTGRES>
+- Postgres format for configCode:
+  * url: Full connection string with database: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>/<<database>>" or "postgresql://..."
+  * method: 'POST'
+  * data: { query: string, params?: any[] } or { query: string, values?: any[] }
+- Use parameterized queries ($1, $2, etc.) to prevent SQL injection
+- Examples:
+  * Simple query:
+    (context) => ({
+      url: \`postgres://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:5432/mydb\`,
+      method: 'POST',
+      data: {
+        query: 'SELECT * FROM users WHERE status = $1',
+        params: [context.inputData.status]
+      }
+    })
+  * Query with multiple parameters:
+    (context) => ({
+      url: \`postgres://\${context.credentials.db_user}:\${context.credentials.db_password}@db.example.com:5432/production\`,
+      method: 'POST',
+      data: {
+        query: 'SELECT * FROM products WHERE category = $1 AND price > $2 ORDER BY name',
+        params: [context.inputData.category, context.inputData.minPrice]
+      }
+    })
+  * Insert with RETURNING:
+    (context) => ({
+      url: \`postgres://\${context.credentials.username}:\${context.credentials.password}@localhost:5432/app\`,
+      method: 'POST',
+      data: {
+        query: 'INSERT INTO orders (customer_id, total) VALUES ($1, $2) RETURNING *',
+        values: [context.inputData.customerId, context.inputData.total]
+      }
+    })
+- Consider multi-step workflows: If you need category names to filter, fetch them in step 1, then query in step 2
+- Join tables when you need related data (e.g., products with category names)
+</POSTGRES>
+
+<FTP_SFTP>
+- FTP/SFTP format for configCode:
+  * url: Full connection URL with credentials and base path
+  * FTP: "ftp://<<username>>:<<password>>@<<hostname>>:21/basepath"
+  * FTPS: "ftps://<<username>>:<<password>>@<<hostname>>:21/basepath"
+  * SFTP: "sftp://<<username>>:<<password>>@<<hostname>>:22/basepath"
+  * method: 'POST'
+  * data: Operation object with 'operation' field and other parameters
+- Supported operations: list, get, put, delete, rename, mkdir, rmdir, exists, stat
+- Examples:
+  * List directory:
+    (context) => ({
+      url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22/base\`,
+      method: 'POST',
+      data: { operation: 'list', path: '/directory' }
+    })
+  * Get file (auto-parses CSV/JSON/XML):
+    (context) => ({
+      url: \`ftp://\${context.credentials.username}:\${context.credentials.password}@ftp.example.com:21\`,
+      method: 'POST',
+      data: { operation: 'get', path: \`/reports/\${context.inputData.filename}\` }
+    })
+  * Upload file:
+    (context) => ({
+      url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22\`,
+      method: 'POST',
+      data: { operation: 'put', path: '/upload.txt', content: context.inputData.fileContent }
+    })
+  * Delete: data: { operation: 'delete', path: '/file.txt' }
+  * Rename: data: { operation: 'rename', path: '/old.txt', newPath: '/new.txt' }
+  * Create dir: data: { operation: 'mkdir', path: '/newfolder' }
+  * Check exists: data: { operation: 'exists', path: '/file.txt' }
+</FTP_SFTP>
+
 <AUTHENTICATION_PATTERNS>
 Always check the documentation for the correct authentication pattern.
 Common authentication patterns are:
@@ -321,27 +393,99 @@ THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
 </FINAL_TRANSFORMATION>
 
 <STEP_CONFIGURATION>
-For each step in the plan, you must:
-1. Search documentation for the specific endpoint
-2. Determine the exact API endpoint URL and HTTP method based on the documentation
-3. Build complete request headers including authentication, content-type, authorization, and any custom headers
-4. Create request bodies with proper structure and data types. Use <<>> tags to reference variables or execute JavaScript expressions
-5. ONLY configure pagination if:
-   - The documentation explicitly describes how pagination works
-   - You know the exact parameter names the API expects
-   - You understand which pagination type to use
-   - Otherwise, leave pagination unconfigured
-6. Do not add hard-coded limit parameters to the request body or URL - use <<>> variables instead
+For each step in the plan, you must generate a configCode function that returns a request config.
 
-JAVASCRIPT EXPRESSIONS:
-Use JavaScript expressions within <<>> tags for any dynamic values:
-- Simple variable access: <<userId>>, <<apiKey>>
-- JavaScript functions require arrow syntax: <<(sourceData) => sourceData.user.name>>
-- Loop item access: Use <<currentItem>> for direct access, or <<(sourceData) => sourceData.currentItem.property>> for specific properties or transformations
-- Array operations: <<(sourceData) => sourceData.users.map(u => u.id)>>
-- Complex transformations: <<(sourceData) => JSON.stringify({ ids: sourceData.fetchUsers.map(u => u.id) })>>
-- Calculations: <<(sourceData) => sourceData.price * 1.2>>
-- Conditional logic: <<(sourceData) => sourceData.type === 'premium' ? 'pro' : 'basic'>>
+The configCode function receives a context parameter with:
+- inputData: merged object containing initial payload fields AND previous step results
+  * Initial payload fields are at the root (e.g., inputData.userId, inputData.date)
+  * Previous step results are accessible by stepId (e.g., inputData.fetchUsers, inputData.getOrders)
+  * For LOOP mode, currentItem is available (e.g., inputData.currentItem)
+- credentials: scoped credentials for this integration only (e.g., credentials.api_key)
+- paginationState: { page, offset, cursor, limit, pageSize } - only when pagination is configured
+
+The function MUST return an object with:
+- url (string): Full URL including protocol and path (https://, http://, postgres://, postgresql://, ftp://, ftps://, sftp://)
+- method (string): HTTP method (GET, POST, PUT, DELETE, PATCH)
+- headers (object, optional): HTTP headers (not used for postgres/ftp)
+- data (any, optional): Request body
+  * For Postgres: { query: string, params: any[] }
+  * For FTP/SFTP: { operation: string, path: string, content?: string, ... }
+- params (object, optional): URL query parameters (HTTP only)
+
+Example configCode WITHOUT pagination:
+(context) => ({
+  url: 'https://api.stripe.com/v1/customers',
+  method: 'POST',
+  headers: {
+    'Authorization': \`Bearer \${context.credentials.api_key}\`,
+    'Content-Type': 'application/json'
+  },
+  data: {
+    email: context.inputData.email,
+    name: context.inputData.name
+  }
+})
+
+Example configCode WITH pagination:
+(context) => ({
+  url: 'https://api.example.com/users',
+  method: 'GET',
+  headers: { 'Authorization': \`Bearer \${context.credentials.api_token}\` },
+  params: {
+    limit: context.paginationState.limit,
+    offset: context.paginationState.offset,
+    status: context.inputData.filterStatus
+  }
+})
+
+Example using previous step results:
+(context) => ({
+  url: \`https://api.example.com/users/\${context.inputData.fetchUserId}/profile\`,
+  method: 'PATCH',
+  headers: { 'Authorization': \`Bearer \${context.credentials.api_token}\` },
+  data: {
+    items: context.inputData.fetchItems.map(item => item.id)
+  }
+})
+
+Example with LOOP mode:
+(context) => ({
+  url: \`https://api.example.com/users/\${context.inputData.currentItem.id}\`,
+  method: 'PATCH',
+  headers: { 'Authorization': \`Bearer \${context.credentials.api_token}\` },
+  data: {
+    status: 'updated',
+    value: context.inputData.currentItem.value * 2
+  }
+})
+
+Example with Postgres:
+(context) => ({
+  url: \`postgres://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:5432/database_name\`,
+  method: 'POST',
+  data: {
+    query: 'SELECT * FROM products WHERE category = $1 AND price > $2',
+    params: [context.inputData.category, context.inputData.minPrice]
+  }
+})
+
+Example with FTP/SFTP:
+(context) => ({
+  url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22/base/path\`,
+  method: 'POST',
+  data: {
+    operation: 'get',
+    path: \`/reports/\${context.inputData.reportName}.csv\`
+  }
+})
+
+IMPORTANT RULES:
+1. The function must be valid JavaScript that can be executed
+2. Access credentials via context.credentials.{credentialName} (already scoped to integration)
+3. Access all data via context.inputData.{fieldOrStepId} (merged payload + previous steps)
+4. Use template literals for dynamic URLs and values
+5. For pagination, use context.paginationState (page, offset, cursor, limit, pageSize)
+6. For loops, access the current item via context.inputData.currentItem
 </STEP_CONFIGURATION>
 
 <TRANSFORMATION_FUNCTIONS>
@@ -359,22 +503,42 @@ For special transformation functions:
   * MUST throw error if expected array is missing rather than returning []. Exceptions can be cases if the instruction is "Get all users" and the API returns an empty array, in which case you should return [].
 - finalTransform: (sourceData) => ({ results: sourceData.processItems })
 
-CRITICAL DATA ACCESS PATTERNS:
-1. Initial payload data: Access directly in <<>> tags
-   - <<date>> (NOT <<payload.date>>)
-   - <<companies>> (NOT <<payload.companies>>)
+CRITICAL DATA ACCESS PATTERNS in configCode:
+1. All input data (payload + previous steps): Access via context.inputData
+   - context.inputData.date (from initial payload)
+   - context.inputData.companies (from initial payload)
+   - context.inputData.getAllContacts (result from step with id "getAllContacts")
+   - context.inputData.fetchUsers.data (nested data from step result)
    
-2. Previous step results: Access via step ID
-   - <<getAllContacts>> (result from step with id "getAllContacts")
-   - <<fetchUsers.data>> (nested data from step result)
+2. Credentials: Access via context.credentials (already scoped to this integration)
+   - context.credentials.api_key
+   - context.credentials.access_token
    
-3. Common mistakes to avoid:
-   - WRONG: <<payload.date>> ❌
-   - RIGHT: <<date>> ✓
-   - WRONG: <<getAllContacts.results.data>> ❌ 
-   - RIGHT: <<getAllContacts>> ✓ (check actual response structure)
+3. Current item in loops: Access via context.inputData.currentItem
+   - context.inputData.currentItem.id
+   - context.inputData.currentItem.name
 </TRANSFORMATION_FUNCTIONS>
 
+<LOOP_EXECUTION>
+When executionMode is "LOOP":
+1. The loopSelector extracts an array from available data: (sourceData) => sourceData.getContacts.results
+2. Each item in the array becomes available as context.inputData.currentItem in the configCode function
+3. Example flow:
+   - loopSelector: (sourceData) => sourceData.getAllContacts.filter(c => c.status === 'active')
+   - configCode: 
+     (context) => ({
+       url: \`https://api.example.com/contacts/\${context.inputData.currentItem.id}/update\`,
+       method: 'PATCH',
+       headers: { 'Authorization': \`Bearer \${context.credentials.api_token}\` },
+       data: {
+         contact: context.inputData.currentItem,
+         updatedBy: context.inputData.userId,
+         doubledValue: context.inputData.currentItem.value * 2,
+         upperName: context.inputData.currentItem.name.toUpperCase()
+       }
+     })
+4. Response data from all iterations is collected into an array
+</LOOP_EXECUTION>
 <PAGINATION_CONFIGURATION>
 Pagination is OPTIONAL. Only configure it if you have verified the exact pagination mechanism from the documentation or know it really well.
 
@@ -385,13 +549,34 @@ BEFORE configuring pagination:
 4. If unsure about ANY aspect, DO NOT configure pagination
 
 When you DO configure pagination:
-1. Set the pagination object with type, pageSize, and stopCondition
-2. Add the exact pagination parameters to queryParams/body/headers as specified in the docs
+1. Set the pagination object with type, pageSize, cursorPath (for cursor-based), and stopCondition
+2. In your configCode function, access pagination state via context.paginationState:
+   - context.paginationState.page (for PAGE_BASED)
+   - context.paginationState.offset (for OFFSET_BASED)
+   - context.paginationState.cursor (for CURSOR_BASED)
+   - context.paginationState.limit or context.paginationState.pageSize
+
+Example with OFFSET_BASED pagination:
+pagination: {
+  type: "OFFSET_BASED",
+  pageSize: "100",
+  stopCondition: "(response, pageInfo) => !response.data.has_more || pageInfo.totalFetched >= 10000"
+}
+configCode: (context) => ({
+  url: 'https://api.example.com/users',
+  method: 'GET',
+  headers: { 'Authorization': \`Bearer \${context.credentials.api_token}\` },
+  params: {
+    offset: context.paginationState.offset,
+    limit: context.paginationState.limit,
+    status: context.inputData.filterStatus
+  }
+})
 
 Common patterns (VERIFY IN DOCS FIRST):
-- OFFSET_BASED: Often uses "offset"/"limit" or "skip"/"limit" or "after"/"limit"
+- OFFSET_BASED: Often uses "offset"/"limit" or "skip"/"limit"
 - PAGE_BASED: Often uses "page"/"per_page" or "page"/"pageSize"
-- CURSOR_BASED: Often uses "cursor"/"limit" or "after"/"limit" with a cursor from response
+- CURSOR_BASED: Often uses "cursor"/"limit" or "after"/"limit" with cursorPath to extract next cursor
 
 ⚠️ WARNING: Incorrect pagination configuration causes infinite loops. When in doubt, leave it unconfigured.
 </PAGINATION_CONFIGURATION>
@@ -497,33 +682,155 @@ CRM platform for managing contacts, deals, and companies. Endpoints: GET /crm/v3
 
 export const SELF_HEALING_SYSTEM_PROMPT = `You are an API configuration and execution agent. Your task is to successfully execute an API call by generating and refining API configurations based on the provided context and any errors encountered. Generate tool calls and their arguments only, do not include any other text unless explictly instructed to.
 
-You have access to two tools:
-1. submit_tool - Submit an API configuration to execute the call and validate the response
-2. search_documentation - Search for specific information in the integration documentation
+<YOUR_TASK>
+Generate a JavaScript function with this signature:
+(context) => ({ url, method, headers, data, params })
 
-<FILE_RESPONSE_HANDLING>
-IMPORTANT: Superglue automatically parses file responses:
-- CSV strings → array of objects with headers as keys
-- JSON strings → parsed objects/arrays
-- XML strings → nested object structure
-- Excel data → {sheetName: [rows]} format
-- If you receive parsed data instead of raw strings, the parsing already happened
-- NEVER attempt to parse these formats manually in transforms
-</FILE_RESPONSE_HANDLING>
+The context parameter contains:
+- context.inputData: merged object with initial payload fields AND previous step results
+  * Access payload fields: context.inputData.userId, context.inputData.email
+  * Access step results: context.inputData.fetchUsers, context.inputData.getOrders
+  * Access loop item: context.inputData.currentItem
+- context.credentials: scoped credentials for this integration only (e.g., context.credentials.api_key)
+- context.paginationState: pagination state when pagination is configured (page, offset, cursor, limit, pageSize)
 
-EXECUTION FLOW:
-1. Analyze the initial error and context to understand what went wrong
-2. Generate a corrected API configuration based on the error and available information
-3. Submit the configuration using submit_tool
-3. If unsuccessful, analyze the new error:
-   - Look at previous attempts and their error messages to find the root cause of the error and fix it
-   - When you need more context and API specific information, always use search_documentation (fast, use often) or search_web (slow, use only when you cant find the information in the documentation)
-   - Generate a new configuration that fixes the error, incorporating your insights from the error analysis
-   - Submit again with submit_tool
+The function MUST return an object with:
+- url (string, required): Full URL including protocol, host, and path
+- method (string, required): HTTP method (GET, POST, PUT, DELETE, PATCH)
+- headers (object, optional): HTTP headers
+- data (any, optional): Request body
+- params (object, optional): URL query parameters
+</YOUR_TASK>
 
-CRITICAL RULES:
-- ALWAYS include a tool call in your response
-- Learn from each error - don't repeat the same mistake
+<EXAMPLES>
+
+Example 1 - Simple GET request:
+(context) => ({
+  url: 'https://api.stripe.com/v1/customers',
+  method: 'GET',
+  headers: {
+    'Authorization': \`Bearer \${context.credentials.api_key}\`,
+    'Content-Type': 'application/json'
+  }
+})
+
+Example 2 - POST with inputData:
+(context) => ({
+  url: 'https://api.example.com/users',
+  method: 'POST',
+  headers: {
+    'Authorization': \`Bearer \${context.credentials.api_token}\`,
+    'Content-Type': 'application/json'
+  },
+  data: {
+    email: context.inputData.email,
+    name: context.inputData.name,
+    timestamp: new Date().toISOString()
+  }
+})
+
+Example 3 - With pagination:
+(context) => ({
+  url: 'https://api.example.com/items',
+  method: 'GET',
+  headers: {
+    'Authorization': \`Bearer \${context.credentials.api_key}\`
+  },
+  params: {
+    limit: context.paginationState.limit,
+    offset: context.paginationState.offset,
+    filter: context.inputData.filterValue
+  }
+})
+
+Example 4 - Using previous step data:
+(context) => ({
+  url: \`https://api.example.com/users/\${context.inputData.getUserId}/profile\`,
+  method: 'PATCH',
+  headers: {
+    'Authorization': \`Bearer \${context.credentials.token}\`
+  },
+  data: {
+    status: 'updated',
+    items: context.inputData.fetchItems.map(item => item.id)
+  }
+})
+
+Example 5 - Loop with currentItem:
+(context) => ({
+  url: \`https://api.example.com/contacts/\${context.inputData.currentItem.id}\`,
+  method: 'PUT',
+  headers: {
+    'Authorization': \`Bearer \${context.credentials.api_key}\`
+  },
+  data: {
+    status: 'processed',
+    value: context.inputData.currentItem.value * 2
+  }
+})
+
+Example 6 - Postgres query:
+(context) => ({
+  url: \`postgres://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:5432/mydb\`,
+  method: 'POST',
+  data: {
+    query: 'SELECT * FROM users WHERE id = $1 AND status = $2',
+    params: [context.inputData.userId, context.inputData.status]
+  }
+})
+
+Example 7 - FTP/SFTP list operation:
+(context) => ({
+  url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22/basepath\`,
+  method: 'POST',
+  data: {
+    operation: 'list',
+    path: context.inputData.directory
+  }
+})
+
+Example 8 - FTP file upload:
+(context) => ({
+  url: \`ftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:21\`,
+  method: 'POST',
+  data: {
+    operation: 'put',
+    path: \`/uploads/\${context.inputData.filename}\`,
+    content: context.inputData.fileContent
+  }
+})
+</EXAMPLES>
+
+<AUTHENTICATION_PATTERNS>
+Common patterns (check documentation):
+- Bearer Token: headers: { 'Authorization': \`Bearer \${context.credentials.token}\` }
+- API Key in header: headers: { 'X-API-Key': context.credentials.api_key }
+- Basic Auth: headers: { 'Authorization': \`Basic \${btoa(context.credentials.username + ':' + context.credentials.password)}\` }
+- OAuth2: headers: { 'Authorization': \`Bearer \${context.credentials.access_token}\` }
+</AUTHENTICATION_PATTERNS>
+
+<DATA_ACCESS>
+1. All input data: context.inputData.{fieldOrStepId}
+   - Initial payload fields: context.inputData.userId, context.inputData.date
+   - Previous step results: context.inputData.fetchUsers, context.inputData.getOrders
+   - Current loop item: context.inputData.currentItem
+2. Credentials: context.credentials.{credential_name} (scoped to this integration only)
+3. Pagination: context.paginationState.{page|offset|cursor|limit|pageSize}
+</DATA_ACCESS>
+
+<IMPORTANT_RULES>
+1. Always use template literals (\`\`) for string interpolation
+2. Return a plain object, not a Promise
+3. The function must be synchronous (no async/await)
+4. All dynamic values must come from the context parameter
+5. Use proper JavaScript syntax - the code will be evaluated with eval()
+6. For nested data access, use optional chaining (?.) for safety
+7. URL must include full protocol (https://, http://, postgres://, postgresql://, ftp://, ftps://, or sftp://)
+8. Method must be uppercase (GET, POST, PUT, DELETE, PATCH)
+9. Always validate that required context data exists before using it
+10. For Postgres: Use postgres:// or postgresql:// protocol, put query and params in data object
+11. For FTP/SFTP: Use ftp://, ftps://, or sftp:// protocol, put operation details in data object
+</IMPORTANT_RULES>
 
 <ERROR_ANALYSIS>
 Understand what each error means:

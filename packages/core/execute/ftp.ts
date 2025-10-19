@@ -1,10 +1,55 @@
 import { RequestOptions } from "@superglue/client";
+import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { Client as FTPClient } from "basic-ftp";
 import * as path from "path";
 import SFTPClient from "ssh2-sftp-client";
 import { URL } from "url";
-import { server_defaults } from "../../default.js";
-import { parseJSON } from "../../utils/json-parser.js";
+import { server_defaults } from "../default.js";
+import { parseJSON } from "../utils/json-parser.js";
+
+export interface FtpExecutorInput {
+    axiosConfig: AxiosRequestConfig;
+    credentials: Record<string, any>;
+    options: RequestOptions;
+}
+
+export interface FtpExecutorResult {
+    data: any;
+    response: AxiosResponse;
+}
+
+export async function executeFtp(input: FtpExecutorInput): Promise<FtpExecutorResult> {
+    const { axiosConfig, credentials, options } = input;
+    
+    const ftpUrl = new URL(axiosConfig.url!);
+    const connectionUrl = `${ftpUrl.protocol}//${ftpUrl.host}${ftpUrl.pathname}`;
+    
+    const operationData = axiosConfig.data || axiosConfig.params || {};
+    const ftpOperation = typeof operationData === 'string' ? JSON.parse(operationData) : operationData;
+    
+    if (ftpOperation.path && !ftpOperation.path.startsWith('ftp') && !ftpOperation.path.startsWith('sftp')) {
+        ftpOperation.path = connectionUrl + (ftpOperation.path.startsWith('/') ? '' : '/') + ftpOperation.path;
+    } else if (!ftpOperation.path) {
+        ftpOperation.path = connectionUrl;
+    }
+    
+    const data = await callFTP({
+        operation: ftpOperation,
+        credentials,
+        options
+    });
+    
+    return {
+        data,
+        response: {
+            data,
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            config: axiosConfig as any
+        } as AxiosResponse
+    };
+}
 
 const SUPPORTED_OPERATIONS = ['list', 'get', 'put', 'delete', 'rename', 'mkdir', 'rmdir', 'exists', 'stat'];
 
@@ -47,7 +92,6 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
   switch (operation.operation) {
     case 'list': {
       const files = await client.list(operation.path || '/');
-      // Return as JSON-friendly format
       return files.map(file => ({
         name: file.name,
         path:  operation.path + (operation.path?.endsWith("/") ? "" : "/") + file.name,
@@ -60,7 +104,6 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
     
     case 'get': {
       if (!operation.path) throw new Error('path required for get operation');
-      // Download to memory and return as string
       const { Writable } = await import('stream');
       const chunks: Buffer[] = [];
       const writeStream = new Writable({
@@ -72,11 +115,9 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
       await client.downloadTo(writeStream, operation.path);
       const content = Buffer.concat(chunks).toString();
       
-      // Try to parse as JSON if possible
       try {
         return parseJSON(content);
       } catch {
-        // If not JSON, return as string
         return content;
       }
     }
@@ -166,7 +207,6 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
   switch (operation.operation) {
     case 'list': {
       const files = await client.list(operation.path || '/');
-      // Return as JSON-friendly format
       return files.map(file => ({
         name: file.name,
         path:  operation.path + (operation.path?.endsWith("/") ? "" : "/") + file.name,
@@ -186,15 +226,12 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
     
     case 'get': {
       if (!operation.path) throw new Error('path required for get operation');
-      // Download to memory and return content
       const buffer = await client.get(operation.path) as Buffer;
       const content = buffer.toString();
       
-      // Try to parse as JSON if possible
       try {
         return parseJSON(content);
       } catch {
-        // If not JSON, return as string
         return content;
       }
     }
@@ -273,7 +310,7 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
   }
 }
 
-export async function executeFTP({operation, credentials, options}: {operation: FTPOperation | string, credentials: Record<string, any>, options: RequestOptions}): Promise<any> {
+export async function callFTP({operation, credentials, options}: {operation: FTPOperation | string, credentials: Record<string, any>, options: RequestOptions}): Promise<any> {
   if (typeof operation === 'string') {
     try {
       operation = JSON.parse(operation) as FTPOperation;
@@ -281,7 +318,7 @@ export async function executeFTP({operation, credentials, options}: {operation: 
       throw new Error(`Invalid JSON in body: ${operation}. Error: ${error}`);
     }
   }
-  // Validate operation
+  
   if (!operation.operation) {
     throw new Error(`Missing 'operation' field in request body. Supported operations are: ${SUPPORTED_OPERATIONS.join(', ')}`);
   }  
@@ -302,7 +339,6 @@ export async function executeFTP({operation, credentials, options}: {operation: 
   do {
     try {
       if (connectionInfo.protocol === 'sftp') {
-        // SFTP Connection
         const sftp = new SFTPClient();
         try {
           await sftp.connect({
@@ -313,12 +349,11 @@ export async function executeFTP({operation, credentials, options}: {operation: 
             privateKey: credentials.privateKey,
             passphrase: credentials.passphrase,
             readyTimeout: timeout,
-            retries: 1, // We handle retries at a higher level
+            retries: 1,
             retry_minTimeout: 1000,
             timeout: timeout
           });
 
-          // Prepend base path if specified
           if (connectionInfo.basePath && operation.path) {
             if (!operation.path.startsWith('/')) {
               operation.path = path.join(connectionInfo.basePath, operation.path);
@@ -333,7 +368,6 @@ export async function executeFTP({operation, credentials, options}: {operation: 
           await sftp.end();
         }
       } else {
-        // FTP/FTPS Connection
         const ftp = new FTPClient(timeout);
         ftp.ftp.verbose = false;
         
@@ -345,11 +379,10 @@ export async function executeFTP({operation, credentials, options}: {operation: 
             password: connectionInfo.password || credentials.password,
             secure: connectionInfo.protocol === 'ftps',
             secureOptions: connectionInfo.protocol === 'ftps' ? {
-              rejectUnauthorized: false // Set to true for production with valid certs
+              rejectUnauthorized: false
             } : undefined
           });
 
-          // Change to base path if specified
           if (connectionInfo.basePath) {
             await ftp.cd(connectionInfo.basePath);
           }
@@ -376,3 +409,4 @@ export async function executeFTP({operation, credentials, options}: {operation: 
     }
   } while (attempts <= maxRetries);
 }
+

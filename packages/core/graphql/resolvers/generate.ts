@@ -1,7 +1,7 @@
 import { Integration } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
-import { executeTool, ToolCall } from "../../execute/tools.js";
-import { InstructionGenerationContext } from "../../utils/instructions.js";
+import { InstructionGenerationContext } from "../../generate/instructions.js";
+import { executeTool, ToolCall } from "../../generate/tools.js";
 import { parseJSON } from "../../utils/json-parser.js";
 import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";

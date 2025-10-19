@@ -1,9 +1,8 @@
-import { HttpMethod } from "@superglue/client";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
-import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../execute/tools.js";
+import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../generate/tools.js";
+import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { logMessage } from "./logs.js";
 
 export const searchDocumentationToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
@@ -78,28 +77,58 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                 integrationId: z.string().describe("REQUIRED: The integration ID for this step (must match one of the available integration IDs)"),
                 executionMode: z.enum(["DIRECT", "LOOP"]).describe("DIRECT for single execution, LOOP for iterating over collections"),
                 loopSelector: z.string().optional().describe("JavaScript function to select items to loop over. Format: (sourceData) => sourceData.items. Only required if executionMode is LOOP"),
-                apiConfig: z.object({
-                    id: z.string().describe("Same as the step ID"),
-                    instruction: z.string().describe("A concise instruction describing WHAT data this API call should retrieve or what action it should perform."),
-                    urlHost: z.string().describe("The base URL host (e.g., https://api.example.com). Must not be empty."),
-                    urlPath: z.string().describe("The API endpoint path (e.g., /v1/users)."),
-                    method: z.enum(Object.values(HttpMethod) as [string, ...string[]]).describe("HTTP method: GET, POST, PUT, DELETE, or PATCH"),
-                    queryParams: z.array(z.object({
-                        key: z.string(),
-                        value: z.string()
-                    })).optional().describe("Query parameters as key-value pairs. If pagination is configured, ensure you have included the right pagination parameters here or in the body."),
-                    headers: z.array(z.object({
-                        key: z.string(),
-                        value: z.string()
-                    })).optional().describe("HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions"),
-                    body: z.string().optional().describe("Request body. Use <<variable>> syntax for dynamic values. If pagination is configured, ensure you have included the right pagination parameters here or in the queryParams."),
+                codeConfig: z.object({
+                    instruction: z.string().optional().describe("A human-readable instruction describing what this step does (for documentation purposes)"),
+                    code: z.string().describe(`JavaScript function that returns an axios request config. Format: (context) => ({ url, method, headers, data, params })
+                
+The context parameter contains:
+- inputData: merged object containing initial payload fields AND previous step results (access via inputData.fieldName or inputData.stepId)
+- credentials: scoped credentials for this integration only
+- paginationState: { page, offset, cursor, limit, pageSize } - only available when pagination is configured
+
+The function MUST return an axios config object with:
+- url (string): Full URL including host and path
+- method (string): HTTP method (GET, POST, PUT, DELETE, PATCH)
+- headers (object, optional): HTTP headers
+- data (any, optional): Request body
+- params (object, optional): URL query parameters
+
+Example without pagination:
+(context) => ({
+  url: 'https://api.example.com/users',
+  method: 'GET',
+  headers: { 'Authorization': \`Bearer \${context.credentials.api_token}\` },
+  params: { id: context.inputData.userId }
+})
+
+Example with pagination:
+(context) => ({
+  url: 'https://api.example.com/users',
+  method: 'GET', 
+  headers: { 'Authorization': \`Bearer \${context.credentials.api_token}\` },
+  params: { 
+    limit: context.paginationState.limit,
+    offset: context.paginationState.offset,
+    status: context.inputData.filterStatus
+  }
+})
+
+Example using previous step data:
+(context) => ({
+  url: \`https://api.example.com/users/\${context.inputData.fetchUserId}/profile\`,
+  method: 'PATCH',
+  headers: { 'Authorization': \`Bearer \${context.credentials.token}\` },
+  data: {
+    items: context.inputData.fetchItems.map(item => item.id)
+  }
+})`),
                     pagination: z.object({
                         type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"]),
-                        pageSize: z.string().describe("Number of items per page (e.g., '50', '100'). Once set, this becomes available as <<limit>> (same as pageSize)."),
-                        cursorPath: z.string().describe("If cursor_based: The path to the cursor in the response. If not, set this to \"\""),
-                        stopCondition: z.string().describe("REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number). response is the axios response object, access response data via response.data. Return true to STOP. E.g. (response, pageInfo) => !response.data.pagination.has_more")
-                    }).optional().describe("OPTIONAL: Only configure if you are using pagination variables in the URL, headers, or body. For OFFSET_BASED, ALWAYS use <<offset>>. If PAGE_BASED, ALWAYS use <<page>>. If CURSOR_BASED, ALWAYS use <<cursor>>.")
-                }).describe("Complete API configuration for this step")
+                        pageSize: z.string().describe("Number of items per page (e.g., '50', '100')"),
+                        cursorPath: z.string().describe("For CURSOR_BASED: JSONPath to the cursor in response (e.g., 'data.next_cursor'). Leave empty for other types."),
+                        stopCondition: z.string().describe("JavaScript function that determines when to stop pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number), limit (string), pageSize (string). Response is the axios response object, access response data via response.data. Return true to STOP pagination. E.g. (response, pageInfo) => !response.data.has_more || pageInfo.totalFetched >= 1000")
+                    }).optional().describe("OPTIONAL: Only include if pagination is needed. When configured, paginationState will be available in the code's context parameter.")
+                }).describe("Code configuration that generates the axios config at runtime")
             })).describe("Array of workflow steps. Can be empty ([]) for transform-only workflows that just process the input payload without API calls"),
             finalTransform: z.string().describe("JavaScript function to transform the final workflow output to match responseSchema. Format: (sourceData) => ({ result: sourceData }). Access step results via sourceData.stepId"),
         }));
@@ -126,18 +155,6 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                 updatedAt: new Date(),
                 steps: generatedWorkflow.steps.map((step: any) => ({
                     ...step,
-                    apiConfig: {
-                        ...step.apiConfig,
-                        queryParams: step.apiConfig.queryParams ?
-                            Object.fromEntries(step.apiConfig.queryParams.map((p: any) => [p.key, p.value])) :
-                            undefined,
-                        headers: step.apiConfig.headers ?
-                            Object.fromEntries(step.apiConfig.headers.map((p: any) => [p.key, p.value])) :
-                            undefined,
-                        id: step.id,
-                        createdAt: new Date(),
-                        updatedAt: new Date()
-                    },
                     responseMapping: "$" // LEGACY: Set default response mapping
                 }))
             };
