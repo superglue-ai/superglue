@@ -6,7 +6,7 @@ import { callExtract, generateExtractConfig, processFile } from './extract.js';
 // Mock dependencies
 vi.mock('../utils/documentation.js');
 vi.mock('../utils/file.js');
-vi.mock('../llm/llm.js', () => {
+vi.mock('../llm/language-model.js', () => {
   return {
     LanguageModel: {
       generateObject: vi.fn().mockResolvedValue({

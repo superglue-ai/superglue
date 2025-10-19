@@ -1,10 +1,9 @@
 import { AuthType, DecompressionMethod, ExtractConfig, FileType, HttpMethod, RequestOptions } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { AxiosRequestConfig } from "axios";
-import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { LanguageModel } from "../llm/llm.js";
+import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
 import { decompressData, parseFile } from "../utils/file.js";
 import { logMessage } from "../utils/logs.js";
@@ -89,7 +88,7 @@ export async function generateExtractConfig(extractConfig: Partial<ExtractConfig
     decompressionMethod: z.enum(Object.values(DecompressionMethod) as [string, ...string[]]).optional(),
     fileType: z.enum(Object.values(FileType) as [string, ...string[]]).optional(),
   }));
-  const messages: ChatCompletionMessageParam[] = [
+  const messages: LLMMessage[] = [
     {
       role: "system",
       content: BUILD_WORKFLOW_SYSTEM_PROMPT

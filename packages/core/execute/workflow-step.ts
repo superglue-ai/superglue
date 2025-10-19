@@ -1,9 +1,8 @@
 import { type ApiConfig, type RequestOptions } from "@superglue/client";
-import OpenAI from "openai";
 import { server_defaults } from "../default.js";
 import { Metadata } from "../graphql/types.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
-import { LanguageModel } from "../llm/llm.js";
+import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
 import { isSelfHealingEnabled, maskCredentials, sample } from "../utils/tools.js";
@@ -65,7 +64,7 @@ ${documentationContext}
       role: "user", content: `<request>${JSON.stringify(endpoint)}</request>
 <api_response>${dataDescription}</api_response>`
     }
-  ] as OpenAI.Chat.ChatCompletionMessageParam[];
+  ] as LLMMessage[];
 
   const response = await LanguageModel.generateObject(
     request,
@@ -98,7 +97,7 @@ export async function executeStep({
   let response: any = null;
   let retryCount = 0;
   let lastError: string | null = null;
-  let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+  let messages: LLMMessage[] = [];
   let success = false;
   let isSelfHealing = isSelfHealingEnabled(options, "api");
 
@@ -108,7 +107,7 @@ export async function executeStep({
   do {
     try {
       if (retryCount > 0 && isSelfHealing) {
-        logMessage('info', `Generating API config for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
+        logMessage('info', `Failed to execute API Call. Self healing the step configuration for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
         const computedApiCallConfig = await generateApiConfig({
           apiConfig: endpoint,
           payload,
@@ -150,7 +149,7 @@ export async function executeStep({
       lastError = maskCredentials(rawErrorString, credentials).slice(0, 2000);
       if (retryCount > 0) {
         messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 4000)}` });
-        logMessage('warn', `API call failed. ${lastError}`, metadata);
+        logMessage('info', `API call failed. Last error: ${lastError}`, metadata);
       }
 
       // hack to get the status code from the error

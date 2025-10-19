@@ -1,10 +1,9 @@
 import { HttpMethod } from "@superglue/client";
-import type { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../execute/tools.js";
-import { LanguageModel } from "../llm/llm.js";
 import { logMessage } from "./logs.js";
 
 export const searchDocumentationToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
@@ -111,7 +110,7 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
             finalMessages.push({
                 role: "user",
                 content: `The previous attempt failed with: "${previousError}". Please fix this issue in your new attempt.`
-            } as ChatCompletionMessageParam);
+            } as LLMMessage);
         }
 
         const { response: generatedWorkflow } = await LanguageModel.generateObject(

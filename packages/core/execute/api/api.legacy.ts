@@ -2,10 +2,9 @@ import { ApiConfig, FileType, PaginationType } from "@superglue/client";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { RequestOptions } from "http";
 import ivm from "isolated-vm";
-import OpenAI from "openai";
 import { server_defaults } from "../../default.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
-import { LanguageModel } from "../../llm/llm.js";
+import { LanguageModel, LLMMessage } from "../../llm/language-model.js";
 import { SELF_HEALING_API_AGENT_PROMPT } from "../../llm/prompts.js";
 import { parseFile } from "../../utils/file.js";
 import { composeUrl, generateId, maskCredentials, replaceVariables, sample } from "../../utils/tools.js";
@@ -386,9 +385,9 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
     payload: Record<string, any>,
     credentials: Record<string, any>,
     retryCount?: number,
-    messages?: OpenAI.Chat.ChatCompletionMessageParam[],
+    messages?: LLMMessage[],
     integrationManager: IntegrationManager,
-  }): Promise<{ config: ApiConfig; messages: OpenAI.Chat.ChatCompletionMessageParam[]; }> {
+  }): Promise<{ config: ApiConfig; messages: LLMMessage[]; }> {
     if (!retryCount) retryCount = 0;
     if (!messages) messages = [];
   

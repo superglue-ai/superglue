@@ -13,15 +13,20 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.25",
+    "@ai-sdk/azure": "^2.0.52",
+    "@ai-sdk/google": "^2.0.20",
+    "@ai-sdk/openai": "^2.0.46",
+    "@anthropic-ai/sdk": "^0.64.0",
     "@superglue/client": "^2.3.52",
+    "ai": "^5.0.76",
     "cron-parser": "^5.3.1",
     "cron-validate": "^1.5.2",
-    "openai": "^4.85.4",
+    "json-schema": "^0.4.0",
     "lodash.isequal": "^4.5.0",
-    "lodash.xor": "^4.5.0",
     "lodash.keys": "^4.2.0",
     "lodash.merge": "^4.6.2",
-    "json-schema": "^0.4.0"
+    "lodash.xor": "^4.5.0"
   },
   "devDependencies": {
     "@types/node": "^20.17.19",

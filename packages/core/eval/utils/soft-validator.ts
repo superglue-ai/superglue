@@ -1,7 +1,7 @@
-import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { parseJSON } from "../../utils/json-parser.js";
 import { logMessage } from '../../utils/logs.js';
 import { sample } from '../../utils/tools.js';
+import { LLMMessage } from '../../llm/language-model.js';
 
 export interface SoftValidationResult {
     success: boolean;
@@ -16,7 +16,7 @@ export async function validateWorkflowResult(
 ): Promise<SoftValidationResult> {
     try {
         // Lazy import to ensure env vars are loaded
-        const { LanguageModel } = await import('../../llm/llm.js');
+        const { LanguageModel } = await import('../../llm/language-model.js');
 
         let actualContent = JSON.stringify(actualResult, null, 2);
         if (actualContent.length > 10000) {
@@ -76,7 +76,7 @@ ${actualContent}
 
 Please validate if the actual result reasonably aligns with the expected criteria. Remember to be lenient and focus on whether the core objective was achieved.`;
 
-        const messages: ChatCompletionMessageParam[] = [
+        const messages: LLMMessage[] = [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
         ];
