@@ -649,7 +649,7 @@ export const toolDefinitions: Record<string, any> = {
           save: false
         });
 
-        logMessage('info', `MCP_UPDATE:build_and_run:TOOL_BUILD_SUCCESS:${JSON.stringify(builtTool)}`, { orgId: orgId });
+        logMessage('debug', `MCP_UPDATE:build_and_run:TOOL_BUILD_SUCCESS:${JSON.stringify(builtTool)}`, { orgId: orgId });
 
         const result = await client.executeWorkflow({
           workflow: builtTool,
@@ -1060,7 +1060,7 @@ BEST PRACTICES:
       tool.inputSchema,
       async (args, extra) => {
         const result = await tool.execute({ ...args, client, orgId }, extra);
-        logMessage('info', `${toolName} executed via MCP`, { orgId: orgId });
+        logMessage('debug', `${toolName} executed via MCP`, { orgId: orgId });
         telemetryClient?.capture({
           distinctId: orgId || sessionId,
           event: "mcp_" + toolName,
