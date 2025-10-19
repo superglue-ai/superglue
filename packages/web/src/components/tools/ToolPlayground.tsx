@@ -864,7 +864,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   );
 
   return (
-    <div className={embedded ? "w-full" : "p-6 max-w-none w-full"} style={{ scrollbarGutter: 'stable both-edges' }}>
+    <div className={embedded ? "w-full" : "p-6 max-w-none w-full"}>
       {!embedded && !hideHeader && (
         <>
           <div className="flex justify-end items-center mb-2">
@@ -882,7 +882,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         </>
       )}
 
-      <div className="w-full overflow-y-auto pr-4" style={{ maxHeight: 'calc(100vh - 140px)' }}>
+      <div className="w-full overflow-y-auto pr-4" style={{ maxHeight: 'calc(100vh - 140px)', scrollbarGutter: 'stable' }}>
         <div className="w-full">
           <div className="space-y-4">
             <div className={embedded ? "" : "mb-4"}>

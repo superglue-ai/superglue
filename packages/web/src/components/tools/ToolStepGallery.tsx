@@ -107,7 +107,7 @@ const SpotlightStepCard = ({
     }, [showOutputSignal]);
 
     return (
-        <Card className="w-full max-w-6xl mx-auto shadow-md bg-accent/10 dark:bg-accent/5 border border-accent/30 dark:border-accent/20 overflow-hidden" style={{ scrollbarGutter: 'stable both-edges' }}>
+        <Card className="w-full max-w-6xl mx-auto shadow-md bg-accent/10 dark:bg-accent/5 border border-accent/30 dark:border-accent/20 overflow-hidden">
             <div className="p-3">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
@@ -157,7 +157,7 @@ const SpotlightStepCard = ({
                     </div>
                 </div>
 
-                <div className="space-y-3" style={{ scrollbarGutter: 'stable both-edges' }}>
+                <div className="space-y-3">
                     <div className="flex items-center justify-between">
                         <Tabs value={activePanel} onValueChange={(v) => setActivePanel(v as 'input' | 'config' | 'output')}>
                             <TabsList className="h-9 p-1 rounded-md">
@@ -175,7 +175,7 @@ const SpotlightStepCard = ({
                         </Tabs>
                     </div>
 
-                    <div className="mt-1" style={{ scrollbarGutter: 'stable both-edges' }}>
+                    <div className="mt-1">
                         {activePanel === 'input' && (
                             <div>
                                 {(() => {
