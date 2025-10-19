@@ -2,7 +2,7 @@ import { RequestOptions, TransformConfig, TransformInputRequest } from "@supergl
 import type { DataStore, Metadata } from "@superglue/shared";
 import prettier from "prettier";
 import { server_defaults } from "../default.js";
-import { LanguageModel, LLMMessage } from "../llm/llm.js";
+import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { PROMPT_JS_TRANSFORM } from "../llm/prompts.js";
 import { logMessage } from "./logs.js";
 import { getObjectContext } from "./context.js";

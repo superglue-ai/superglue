@@ -1,6 +1,6 @@
 import type { SystemModelMessage, UserModelMessage, AssistantModelMessage, ToolModelMessage } from "ai";
 import { ToolCall, ToolCallResult, ToolDefinition } from "../execute/tools.js";
-import { VercelAIModel } from "./vercel-ai-model.js";
+import { AiSdkModel } from "./ai-sdk-model.js";
 
 export type LLMMessage = SystemModelMessage | UserModelMessage | AssistantModelMessage | ToolModelMessage;
 
@@ -64,7 +64,7 @@ export const LanguageModel = {
 
     _getInstance(): LLM {
         if (!_languageModel) {
-            _languageModel = new VercelAIModel();
+            _languageModel = new AiSdkModel();
         }
         return _languageModel;
     }

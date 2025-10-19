@@ -5,10 +5,10 @@ import { google } from "@ai-sdk/google";
 import { initializeAIModel, getModelContextLength } from "@superglue/shared/utils";
 import { server_defaults } from "../default.js";
 import { ToolDefinition } from "../execute/tools.js";
-import { LLM, LLMMessage, LLMObjectResponse, LLMResponse } from "./llm.js";
+import { LLM, LLMMessage, LLMObjectResponse, LLMResponse } from "./language-model.js";
 import { logMessage } from "../utils/logs.js";
 
-export class VercelAIModel implements LLM {
+export class AiSdkModel implements LLM {
   public contextLength: number;
   private model: any;
   private modelId: string;

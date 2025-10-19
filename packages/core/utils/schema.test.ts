@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LanguageModel } from '../llm/llm.js';
+import { LanguageModel } from '../llm/language-model.js';
 import { generateSchema } from './schema.js';
 
 // Update the mock to be more flexible
-vi.mock('../llm/llm.js', () => {
+vi.mock('../llm/language-model.js', () => {
   return {
     LanguageModel: {
       generateObject: vi.fn().mockImplementation(async (messages, _, temperature) => ({

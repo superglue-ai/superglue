@@ -6,7 +6,7 @@
  */
 
 import { server_defaults } from '../default.js';
-import { LanguageModel } from '../llm/llm.js';
+import { LanguageModel } from '../llm/language-model.js';
 import { logMessage } from '../utils/logs.js';
 import { Metadata } from '@superglue/shared';
 

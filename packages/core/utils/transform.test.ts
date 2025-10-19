@@ -1,5 +1,5 @@
 // Mock declarations must come before any imports
-vi.mock('../llm/llm.js', async () => {
+vi.mock('../llm/language-model.js', async () => {
   const mockLLM = {
     generateText: vi.fn(),
     generateObject: vi.fn()
@@ -33,7 +33,7 @@ vi.mock('./tools.js', async (importOriginal) => {
 import { SelfHealingMode, TransformConfig } from '@superglue/client';
 import dotenv from 'dotenv';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LanguageModel } from '../llm/llm.js';
+import { LanguageModel } from '../llm/language-model.js';
 import { transformAndValidateSchema } from './tools.js';
 import { executeTransform } from './transform.js';
 

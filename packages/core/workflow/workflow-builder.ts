@@ -7,7 +7,7 @@ import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { parseJSON } from "../utils/json-parser.js";
 import { logMessage } from "../utils/logs.js";
 import { composeUrl, sample } from "../utils/tools.js";
-import { LLMMessage } from "../llm/llm.js";
+import { LLMMessage } from "../llm/language-model.js";
 
 export class WorkflowBuilder {
   private integrations: Record<string, Integration>;

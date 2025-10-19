@@ -1,7 +1,7 @@
 import { Integration, Workflow } from "@superglue/client";
 import { Metadata, toJsonSchema } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { LLMMessage } from "../llm/llm.js";
+import { LLMMessage } from "../llm/language-model.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { executeTool } from "../execute/tools.js";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";

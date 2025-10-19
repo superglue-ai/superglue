@@ -1,7 +1,7 @@
 import { parseJSON } from "../../utils/json-parser.js";
 import { logMessage } from '../../utils/logs.js';
 import { sample } from '../../utils/tools.js';
-import { LLMMessage } from '../../llm/llm.js';
+import { LLMMessage } from '../../llm/language-model.js';
 
 export interface SoftValidationResult {
     success: boolean;
@@ -16,7 +16,7 @@ export async function validateWorkflowResult(
 ): Promise<SoftValidationResult> {
     try {
         // Lazy import to ensure env vars are loaded
-        const { LanguageModel } = await import('../../llm/llm.js');
+        const { LanguageModel } = await import('../../llm/language-model.js');
 
         let actualContent = JSON.stringify(actualResult, null, 2);
         if (actualContent.length > 10000) {

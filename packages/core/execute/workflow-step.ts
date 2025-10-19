@@ -2,7 +2,7 @@ import { type ApiConfig, type RequestOptions } from "@superglue/client";
 import { server_defaults } from "../default.js";
 import { Metadata } from "../graphql/types.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
-import { LanguageModel, LLMMessage } from "../llm/llm.js";
+import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
 import { isSelfHealingEnabled, maskCredentials, sample } from "../utils/tools.js";

@@ -4,8 +4,8 @@ import { openai } from '@ai-sdk/openai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
 import { initializeAIModel, getModelContextLength } from '@superglue/shared/utils';
-import { LLMMessage } from './llm.js';
-import { VercelAIModel } from './vercel-ai-model.js';
+import { LLMMessage } from './language-model.js';
+import { AiSdkModel } from './ai-sdk-model.js';
 
 vi.mock('ai');
 vi.mock('@ai-sdk/openai');
@@ -13,7 +13,7 @@ vi.mock('@ai-sdk/anthropic');
 vi.mock('@ai-sdk/google');
 vi.mock('@superglue/shared/utils');
 
-describe('VercelAIModel', () => {
+describe('AiSdkModel', () => {
   const mockGenerateText = vi.mocked(generateText);
   const mockTool = vi.mocked(tool);
   const mockJsonSchema = vi.mocked(jsonSchema);
@@ -37,7 +37,7 @@ describe('VercelAIModel', () => {
 
   describe('constructor', () => {
     it('should initialize with default model', () => {
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       
       expect(initializeAIModel).toHaveBeenCalledWith({
         providerEnvVar: 'LLM_PROVIDER',
@@ -48,7 +48,7 @@ describe('VercelAIModel', () => {
     });
 
     it('should initialize with custom model', () => {
-      const model = new VercelAIModel('gpt-4o');
+      const model = new AiSdkModel('gpt-4o');
       
       expect(initializeAIModel).toHaveBeenCalledWith({
         providerEnvVar: 'LLM_PROVIDER',
@@ -60,7 +60,7 @@ describe('VercelAIModel', () => {
 
   describe('generateText', () => {
     it('should generate text response', async () => {
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       mockGenerateText.mockResolvedValue({
         text: 'test response',
         toolCalls: [],
@@ -93,7 +93,7 @@ describe('VercelAIModel', () => {
     });
 
     it('should use custom temperature', async () => {
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       mockGenerateText.mockResolvedValue({
         text: 'test response',
         toolCalls: [],
@@ -112,7 +112,7 @@ describe('VercelAIModel', () => {
 
   describe('generateObject', () => {
     it('should generate object response with submit tool call', async () => {
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       const responseObj = { key: 'value' };
       
       mockGenerateText.mockResolvedValue({
@@ -153,7 +153,7 @@ describe('VercelAIModel', () => {
     });
 
     it('should handle result wrapped in result property', async () => {
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       const responseObj = { key: 'value' };
       
       mockGenerateText.mockResolvedValue({
@@ -179,7 +179,7 @@ describe('VercelAIModel', () => {
     });
 
     it('should handle abort tool call', async () => {
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       
       mockGenerateText.mockResolvedValue({
         text: '',
@@ -204,7 +204,7 @@ describe('VercelAIModel', () => {
     });
 
     it('should handle o-model temperature', async () => {
-      const model = new VercelAIModel('o1-preview');
+      const model = new AiSdkModel('o1-preview');
       
       mockGenerateText.mockResolvedValue({
         text: '',
@@ -234,7 +234,7 @@ describe('VercelAIModel', () => {
 
     it('should add web_search tool for openai provider', async () => {
       process.env.LLM_PROVIDER = 'openai';
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       
       mockGenerateText.mockResolvedValue({
         text: '',
@@ -262,7 +262,7 @@ describe('VercelAIModel', () => {
 
     it('should add web_search tool for anthropic provider', async () => {
       process.env.LLM_PROVIDER = 'anthropic';
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       
       mockGenerateText.mockResolvedValue({
         text: '',
@@ -290,7 +290,7 @@ describe('VercelAIModel', () => {
 
     it('should add web_search tool for gemini provider', async () => {
       process.env.LLM_PROVIDER = 'gemini';
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       
       mockGenerateText.mockResolvedValue({
         text: '',
@@ -317,7 +317,7 @@ describe('VercelAIModel', () => {
     });
 
     it('should handle custom tools', async () => {
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       const customToolExecute = vi.fn().mockResolvedValue({ result: 'custom tool result' });
       
       mockGenerateText.mockResolvedValue({
@@ -356,7 +356,7 @@ describe('VercelAIModel', () => {
     });
 
     it('should handle multi-turn conversation with tool results', async () => {
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       
       mockGenerateText
         .mockResolvedValueOnce({
@@ -396,7 +396,7 @@ describe('VercelAIModel', () => {
     });
 
     it('should clean schema by removing patternProperties and setting strict mode', async () => {
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       
       mockGenerateText.mockResolvedValue({
         text: '',
@@ -425,7 +425,7 @@ describe('VercelAIModel', () => {
     });
 
     it('should wrap array schema in object at root level', async () => {
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       
       mockGenerateText.mockResolvedValue({
         text: '',
@@ -453,7 +453,7 @@ describe('VercelAIModel', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       
       mockGenerateText.mockRejectedValue(new Error('API Error'));
 
@@ -471,7 +471,7 @@ describe('VercelAIModel', () => {
     });
 
     it('should use custom toolChoice', async () => {
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       
       mockGenerateText.mockResolvedValue({
         text: '',
@@ -507,7 +507,7 @@ describe('VercelAIModel', () => {
     });
 
     it('should throw error if no tool calls received', async () => {
-      const model = new VercelAIModel();
+      const model = new AiSdkModel();
       
       mockGenerateText.mockResolvedValue({
         text: 'just text',

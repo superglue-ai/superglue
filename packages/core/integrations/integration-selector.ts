@@ -2,7 +2,7 @@ import { Integration } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { LanguageModel, LLMMessage } from "../llm/llm.js";
+import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { SELECTION_PROMPT } from "../llm/prompts.js";
 import { logMessage } from "../utils/logs.js";
 

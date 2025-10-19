@@ -1,7 +1,7 @@
 import { DataStore } from '../../../datastore/types.js';
 import { logMessage } from '../../../utils/logs.js';
 import { DocumentationSearch } from '../../../documentation/documentation-search.js';
-import { LanguageModel } from '../../../llm/llm.js';
+import { LanguageModel } from '../../../llm/language-model.js';
 import { DocumentationSite } from './doc-eval-fetcher.js';
 import * as fs from 'fs';
 import * as path from 'path';

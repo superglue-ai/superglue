@@ -7,7 +7,7 @@ import { callEndpointLegacyImplementation as callEndpoint, convertBasicAuthToBas
 vi.mock('axios');
 vi.mock('openai');
 vi.mock('../integrations/integration-manager.js');
-vi.mock('../llm/llm.js');
+vi.mock('../llm/language-model.js');
 vi.mock('./logs.js');
 vi.mock('./api.js', async () => {
   const actual = await vi.importActual('./api.js');

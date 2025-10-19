@@ -3,7 +3,7 @@ import { Metadata } from "@superglue/shared";
 import { AxiosRequestConfig } from "axios";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { LanguageModel, LLMMessage } from "../llm/llm.js";
+import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
 import { decompressData, parseFile } from "../utils/file.js";
 import { logMessage } from "../utils/logs.js";
