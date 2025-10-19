@@ -248,7 +248,7 @@ export class AiSdkModel implements LLM {
         messages: updatedMessages
       };
     } catch (error) {
-      logMessage('error', 'Error in Vercel AI generateObject:', error);
+      logMessage('error', `Error in Vercel AI generateObject: ${error}`, { orgId: 'ai-sdk' });
       const updatedMessages = [...messages, {
         role: "assistant" as const,
         content: "Error: Vercel AI API Error: " + (error as any)?.message

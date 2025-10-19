@@ -42,4 +42,4 @@ we're using `.ts` files. while we have to import files with `.js`, the files we 
 Always use version 5 of the Vercel AI SDK
 
 ## Adding NPM Packages/Dependencies
-Never add content to the dependencies part in the package.json file - always nagivate to the folder and use npm add or uninstall or somethign similar. Normally we want to use the latest version.
+Never add content to the dependencies part in the package.json file - always nagivate to the folder and use npm add or uninstall or something similar. Normally we want to use the latest version.
