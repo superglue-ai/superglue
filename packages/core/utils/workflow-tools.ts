@@ -125,8 +125,7 @@ Example using previous step data:
                     pagination: z.object({
                         type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"]),
                         pageSize: z.string().describe("Number of items per page (e.g., '50', '100')"),
-                        cursorPath: z.string().describe("For CURSOR_BASED: JSONPath to the cursor in response (e.g., 'data.next_cursor'). Leave empty for other types."),
-                        stopCondition: z.string().describe("JavaScript function that determines when to stop pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number), limit (string), pageSize (string). Response is the axios response object, access response data via response.data. Return true to STOP pagination. E.g. (response, pageInfo) => !response.data.has_more || pageInfo.totalFetched >= 1000")
+                        handler: z.string().describe("Pagination control handler. Format: (response, pageInfo) => ({ hasMore: boolean, cursor?: any }). Controls pagination flow only - responses are automatically merged. Example: (response, pageInfo) => ({ hasMore: response.data.has_more && pageInfo.totalFetched < 10000, cursor: response.data.next_cursor })")
                     }).optional().describe("OPTIONAL: Only include if pagination is needed. When configured, paginationState will be available in the code's context parameter.")
                 }).describe("Code configuration that generates the axios config at runtime")
             })).describe("Array of workflow steps. Can be empty ([]) for transform-only workflows that just process the input payload without API calls"),

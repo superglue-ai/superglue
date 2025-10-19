@@ -1,6 +1,5 @@
 import { HttpMethod, RequestOptions, SelfHealingMode } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
-import { GraphQLResolveInfo } from "graphql";
 import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
@@ -407,6 +406,53 @@ export function isSelfHealingEnabled(options: RequestOptions | undefined, type: 
     return false;
   }
   return type === "transform" ? (selfHealingMode === SelfHealingMode.ENABLED || selfHealingMode === SelfHealingMode.TRANSFORM_ONLY) : (selfHealingMode === SelfHealingMode.ENABLED || selfHealingMode === SelfHealingMode.REQUEST_ONLY);
+}
+
+export function smartMergeResponses(accumulated: any, newResponse: any): any {
+  // First call - no accumulated data yet
+  if (accumulated === undefined || accumulated === null) {
+    return newResponse;
+  }
+
+  // Both are arrays - concatenate
+  if (Array.isArray(accumulated) && Array.isArray(newResponse)) {
+    return [...accumulated, ...newResponse];
+  }
+
+  // Both are objects (not arrays) - merge properties
+  if (
+    typeof accumulated === 'object' && 
+    typeof newResponse === 'object' && 
+    !Array.isArray(accumulated) && 
+    !Array.isArray(newResponse) &&
+    accumulated !== null &&
+    newResponse !== null
+  ) {
+    const merged: Record<string, any> = { ...accumulated };
+    
+    for (const key in newResponse) {
+      if (Object.prototype.hasOwnProperty.call(newResponse, key)) {
+        // Recursively merge nested structures
+        if (
+          key in merged && 
+          typeof merged[key] === 'object' && 
+          typeof newResponse[key] === 'object' &&
+          merged[key] !== null &&
+          newResponse[key] !== null
+        ) {
+          merged[key] = smartMergeResponses(merged[key], newResponse[key]);
+        } else {
+          // For conflicts or new keys, take the new value
+          merged[key] = newResponse[key];
+        }
+      }
+    }
+    
+    return merged;
+  }
+
+  // Type conflict or primitives - take the most recent value
+  return newResponse;
 }
 
 // Legacy function needs to stay for existing workflow backwards compatibility

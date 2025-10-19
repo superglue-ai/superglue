@@ -6,7 +6,7 @@ import { CodeConfig } from "../generate/config.js";
 import { Metadata } from "../graphql/types.js";
 import { parseFile } from "../utils/file.js";
 import { logMessage } from "../utils/logs.js";
-import { maskCredentials } from "../utils/tools.js";
+import { smartMergeResponses } from "../utils/tools.js";
 import { ApiCallError } from "./http.js";
 import { executeRequest } from "./protocol-executor.js";
 
@@ -78,10 +78,9 @@ export async function executeCodeConfig({
     options: RequestOptions;
     metadata?: Metadata;
 }): Promise<ExecutionResult> {
-    const allResults: any[] = [];
+    let mergedResult: any = null;
     const hasPagination = !!codeConfig.pagination;
-    const hasStopCondition = hasPagination && !!codeConfig.pagination?.stopCondition;
-    const maxRequests = hasStopCondition ? server_defaults.MAX_PAGINATION_REQUESTS : 500;
+    const maxRequests = server_defaults.MAX_PAGINATION_REQUESTS;
     
     const paginationState: PaginationState = {
         page: 1,
@@ -134,38 +133,24 @@ export async function executeCodeConfig({
             };
         }
 
-        if (hasStopCondition) {
-            await handlePaginationWithStopCondition(
-                responseData,
-                lastResponse,
-                paginationState,
-                allResults,
-                codeConfig,
-                axiosConfig,
-                credentials
-            );
-        } else {
-            handleLegacyPagination(
-                responseData,
-                paginationState,
-                allResults,
-                codeConfig.pagination!.pageSize
-            );
-        }
+        // Merge response data
+        mergedResult = smartMergeResponses(mergedResult, responseData);
 
-        if (codeConfig.pagination!.type === "CURSOR_BASED") {
-            const cursorPath = codeConfig.pagination!.cursorPath || 'next_cursor';
-            const nextCursor = extractCursorFromResponse(responseData, cursorPath);
-            updatePaginationState(paginationState, codeConfig.pagination!.type, codeConfig.pagination!.pageSize, nextCursor);
-        } else {
-            updatePaginationState(paginationState, codeConfig.pagination!.type, codeConfig.pagination!.pageSize, null);
-        }
+        await handlePaginationWithHandler(
+            responseData,
+            lastResponse,
+            paginationState,
+            codeConfig
+        );
+
+        // Increment page/offset for pageInfo context in next iteration
+        updatePaginationState(paginationState, codeConfig.pagination!.type, codeConfig.pagination!.pageSize, paginationState.cursor);
 
         paginationState.loopCounter++;
     }
 
     return formatFinalResult(
-        allResults,
+        mergedResult,
         codeConfig.pagination!.type,
         paginationState.cursor,
         lastResponse!
@@ -267,42 +252,6 @@ async function parseResponseData(responseData: any): Promise<any> {
     return responseData;
 }
 
-function extractCursorFromResponse(responseData: any, cursorPath: string): any {
-    const cursorParts = cursorPath.split('.');
-    let cursor = responseData;
-    for (const part of cursorParts) {
-        cursor = cursor?.[part];
-    }
-    return cursor;
-}
-
-function detectPaginationErrors(
-    loopCounter: number,
-    currentResponseHash: string,
-    firstResponseHash: string | null,
-    hasValidData: boolean,
-    currentHasData: boolean,
-    axiosConfig: AxiosRequestConfig,
-    credentials: Record<string, any>,
-    stopCondition: string
-): void {
-    if (loopCounter === 1 && currentResponseHash === firstResponseHash && hasValidData && currentHasData) {
-        const maskedConfig = maskCredentials(JSON.stringify(axiosConfig), credentials);
-        throw new Error(
-            `Pagination configuration error: The first two API requests returned identical responses. ` +
-            `The pagination state is not being applied correctly in your code function. ` +
-            `Config: ${maskedConfig}`
-        );
-    }
-
-    if (loopCounter === 1 && !hasValidData && !currentHasData) {
-        throw new Error(
-            `Stop condition error: The API returned no data on the first request, but the stop condition did not terminate pagination. ` +
-            `Current stop condition: ${stopCondition}`
-        );
-    }
-}
-
 function updatePaginationState(
     paginationState: PaginationState,
     paginationType: string,
@@ -322,100 +271,51 @@ function updatePaginationState(
 }
 
 
-function checkResponseHasData(responseData: any): boolean {
-    if (Array.isArray(responseData)) {
-        return responseData.length > 0;
-    }
-    return responseData && Object.keys(responseData).length > 0;
-}
-
-async function handlePaginationWithStopCondition(
+async function handlePaginationWithHandler(
     responseData: any,
     response: AxiosResponse,
     paginationState: PaginationState,
-    allResults: any[],
-    codeConfig: CodeConfig,
-    axiosConfig: AxiosRequestConfig,
-    credentials: Record<string, any>
+    codeConfig: CodeConfig
 ): Promise<void> {
-    const currentResponseHash = JSON.stringify(responseData);
-    const currentHasData = checkResponseHasData(responseData);
-
-    if (paginationState.loopCounter === 0) {
-        paginationState.firstResponseHash = currentResponseHash;
-        paginationState.hasValidData = currentHasData;
+    // Calculate total fetched by checking the merged result size
+    let totalFetched = 0;
+    if (Array.isArray(responseData)) {
+        totalFetched = paginationState.loopCounter * parseInt(codeConfig.pagination!.pageSize || "50");
     }
 
-    detectPaginationErrors(
-        paginationState.loopCounter,
-        currentResponseHash,
-        paginationState.firstResponseHash,
-        paginationState.hasValidData,
-        currentHasData,
-        axiosConfig,
-        credentials,
-        codeConfig.pagination!.stopCondition
+    const pageInfo = {
+        page: paginationState.page,
+        offset: paginationState.offset,
+        cursor: paginationState.cursor,
+        totalFetched,
+        limit: codeConfig.pagination!.pageSize,
+        pageSize: codeConfig.pagination!.pageSize
+    };
+
+    const handlerResult = await executePaginationHandler(
+        codeConfig.pagination!.handler!,
+        response,
+        pageInfo
     );
 
-    if (paginationState.loopCounter > 1 && currentResponseHash === paginationState.previousResponseHash) {
-        paginationState.hasMore = false;
-    } else {
-        const pageInfo = {
-            page: paginationState.page,
-            offset: paginationState.offset,
-            cursor: paginationState.cursor,
-            totalFetched: allResults.length,
-            limit: codeConfig.pagination!.pageSize,
-            pageSize: codeConfig.pagination!.pageSize
-        };
-
-        const stopEval = await evaluateStopCondition(
-            codeConfig.pagination!.stopCondition,
-            response,
-            pageInfo
+    if (handlerResult.error) {
+        throw new Error(
+            `Pagination handler error: ${handlerResult.error}\n` +
+            `Handler: ${codeConfig.pagination!.handler}`
         );
-
-        if (stopEval.error) {
-            throw new Error(
-                `Pagination stop condition error: ${stopEval.error}\n` +
-                `Stop condition: ${codeConfig.pagination!.stopCondition}`
-            );
-        }
-
-        paginationState.hasMore = !stopEval.shouldStop;
     }
 
-    paginationState.previousResponseHash = currentResponseHash;
-
-    if (Array.isArray(responseData)) {
-        allResults.push(...responseData);
-    } else if (responseData) {
-        allResults.push(responseData);
-    }
-}
-
-function handleLegacyPagination(
-    responseData: any,
-    paginationState: PaginationState,
-    allResults: any[],
-    pageSize: string
-): void {
-    if (Array.isArray(responseData)) {
-        const parsedPageSize = parseInt(pageSize || "50");
-        if (!parsedPageSize || responseData.length < parsedPageSize) {
-            paginationState.hasMore = false;
-        }
-        allResults.push(...responseData);
-    } else if (responseData) {
-        allResults.push(responseData);
-        paginationState.hasMore = false;
-    } else {
-        paginationState.hasMore = false;
+    // Update pagination state
+    paginationState.hasMore = handlerResult.hasMore;
+    
+    // Update cursor if provided (for cursor-based pagination)
+    if (handlerResult.cursor !== undefined) {
+        paginationState.cursor = handlerResult.cursor;
     }
 }
 
 function formatFinalResult(
-    allResults: any[],
+    mergedResult: any,
     paginationType: string,
     cursor: any,
     lastResponse: AxiosResponse
@@ -424,7 +324,7 @@ function formatFinalResult(
         return {
             data: {
                 next_cursor: cursor,
-                ...(Array.isArray(allResults) ? { results: allResults } : allResults)
+                ...(Array.isArray(mergedResult) ? { results: mergedResult } : mergedResult)
             },
             statusCode: lastResponse.status,
             headers: lastResponse.headers as Record<string, any>
@@ -432,47 +332,60 @@ function formatFinalResult(
     }
 
     return {
-        data: allResults.length === 1 ? allResults[0] : allResults,
+        data: mergedResult,
         statusCode: lastResponse.status,
         headers: lastResponse.headers as Record<string, any>
     };
 }
 
-async function evaluateStopCondition(
-    stopConditionCode: string,
+async function executePaginationHandler(
+    handlerCode: string,
     response: AxiosResponse,
     pageInfo: { page: number; offset: number; cursor: any; totalFetched: number; limit: string; pageSize: string }
-): Promise<{ shouldStop: boolean; error?: string }> {
+): Promise<{ hasMore: boolean; cursor?: any; error?: string }> {
     const isolate = new ivm.Isolate({ memoryLimit: 128 });
 
     try {
         const context = await isolate.createContext();
 
-        await context.global.set('responseJSON', JSON.stringify({ data: response.data, headers: response.headers }));
+        await context.global.set('responseJSON', JSON.stringify({ 
+            data: response.data, 
+            headers: response.headers,
+            ...response.data  // Legacy support: allow direct access to response fields
+        }));
         await context.global.set('pageInfoJSON', JSON.stringify(pageInfo));
 
-        const wrappedCode = wrapStopConditionCode(stopConditionCode);
+        const wrappedCode = wrapStopConditionCode(handlerCode);
 
         const script = `
             const response = JSON.parse(responseJSON);
             const pageInfo = JSON.parse(pageInfoJSON);
             const fn = ${wrappedCode};
             const result = fn(response, pageInfo);
-            return Boolean(result);
+            return JSON.stringify(result);
         `;
 
-        const shouldStop = await context.evalClosure(script, [], { timeout: 3000 });
+        const resultJSON = await context.evalClosure(script, [], { timeout: 3000 });
+        const result = JSON.parse(resultJSON as string);
 
-        return { shouldStop: Boolean(shouldStop) };
+        if (!result || typeof result !== 'object') {
+            throw new Error('Handler must return an object with { hasMore, cursor? }');
+        }
+        if (typeof result.hasMore !== 'boolean') {
+            throw new Error('Handler must return hasMore as a boolean');
+        }
+
+        return {
+            hasMore: result.hasMore,
+            cursor: result.cursor
+        };
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         return {
-            shouldStop: true,
-            error: `Stop condition evaluation failed: ${errorMessage}`
+            hasMore: false,
+            error: `Pagination handler evaluation failed: ${errorMessage}`
         };
     } finally {
         disposeIsolate(isolate);
     }
 }
-
-

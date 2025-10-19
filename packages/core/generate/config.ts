@@ -24,8 +24,7 @@ export interface CodeConfig {
     pagination?: {
         type: "OFFSET_BASED" | "PAGE_BASED" | "CURSOR_BASED";
         pageSize: string;
-        cursorPath?: string;
-        stopCondition: string;
+        handler: string;  // "(response, pageInfo) => ({ hasMore, cursor? })"
     };
 }
 
@@ -120,9 +119,31 @@ Must return: { url: string, method: string, headers?: object, data?: any, params
         pagination: z.object({
             type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"]),
             pageSize: z.string(),
-            cursorPath: z.string().optional(),
-            stopCondition: z.string()
-        }).optional().describe("Optional pagination configuration")
+            handler: z.string().describe(`Pagination control handler. Format: (response, pageInfo) => ({ hasMore: boolean, cursor?: any })
+
+The handler receives:
+- response: { data: any, headers: any } - Full API response with direct field access (e.g., response.data.results or response.results)
+- pageInfo: { page: number, offset: number, cursor: any, totalFetched: number, limit: string, pageSize: string }
+
+Must return:
+- hasMore: boolean - Continue pagination?
+- cursor?: any - Next cursor (for cursor-based pagination only)
+
+The responses will be automatically merged using smart merge logic (arrays concatenated, objects joined, conflicts resolved by taking most recent).
+
+Examples:
+1. Check has_more flag with cursor:
+   (response, pageInfo) => ({ hasMore: response.data.has_more, cursor: response.data.next_token })
+
+2. Stop at max items:
+   (response, pageInfo) => ({ hasMore: response.data.items?.length === parseInt(pageInfo.pageSize) && pageInfo.totalFetched < 10000 })
+
+3. Stop when array is smaller than page size:
+   (response, pageInfo) => ({ hasMore: (response.results || []).length >= parseInt(pageInfo.pageSize) })
+
+4. Use API pagination flag:
+   (response, pageInfo) => ({ hasMore: !!response.pagination?.next_page })`)
+        }).optional().describe("Optional pagination configuration with unified handler for all pagination logic.")
     }));
 
     const temperature = Math.min((context.retryCount || 0) * 0.1, 1);

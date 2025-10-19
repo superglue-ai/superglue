@@ -549,18 +549,24 @@ BEFORE configuring pagination:
 4. If unsure about ANY aspect, DO NOT configure pagination
 
 When you DO configure pagination:
-1. Set the pagination object with type, pageSize, cursorPath (for cursor-based), and stopCondition
+1. Set the pagination object with type, pageSize, and handler
 2. In your configCode function, access pagination state via context.paginationState:
    - context.paginationState.page (for PAGE_BASED)
    - context.paginationState.offset (for OFFSET_BASED)
    - context.paginationState.cursor (for CURSOR_BASED)
    - context.paginationState.limit or context.paginationState.pageSize
 
+The handler function receives the full response and must return:
+- hasMore: boolean - Whether to continue pagination
+- cursor?: any - Next cursor (for cursor-based pagination only)
+
+Responses are automatically merged: arrays concatenated, objects merged, conflicts resolved by taking most recent value.
+
 Example with OFFSET_BASED pagination:
 pagination: {
   type: "OFFSET_BASED",
   pageSize: "100",
-  stopCondition: "(response, pageInfo) => !response.data.has_more || pageInfo.totalFetched >= 10000"
+  handler: "(response, pageInfo) => ({ hasMore: response.data.has_more && pageInfo.totalFetched < 10000 })"
 }
 configCode: (context) => ({
   url: 'https://api.example.com/users',
@@ -573,10 +579,43 @@ configCode: (context) => ({
   }
 })
 
+Example with CURSOR_BASED pagination:
+pagination: {
+  type: "CURSOR_BASED",
+  pageSize: "50",
+  handler: "(response, pageInfo) => ({ hasMore: !!response.data.next_cursor, cursor: response.data.next_cursor })"
+}
+configCode: (context) => ({
+  url: 'https://api.example.com/items',
+  method: 'GET',
+  headers: { 'Authorization': \`Bearer \${context.credentials.api_key}\` },
+  params: {
+    cursor: context.paginationState.cursor,
+    limit: context.paginationState.pageSize
+  }
+})
+
+Example with PAGE_BASED pagination and max limit:
+pagination: {
+  type: "PAGE_BASED",
+  pageSize: "100",
+  handler: "(response, pageInfo) => ({ hasMore: (response.results || []).length >= parseInt(pageInfo.pageSize) && pageInfo.totalFetched < 5000 })"
+}
+configCode: (context) => ({
+  url: 'https://api.example.com/data',
+  method: 'GET',
+  params: {
+    page: context.paginationState.page,
+    per_page: context.paginationState.pageSize
+  }
+})
+
 Common patterns (VERIFY IN DOCS FIRST):
 - OFFSET_BASED: Often uses "offset"/"limit" or "skip"/"limit"
 - PAGE_BASED: Often uses "page"/"per_page" or "page"/"pageSize"
-- CURSOR_BASED: Often uses "cursor"/"limit" or "after"/"limit" with cursorPath to extract next cursor
+- CURSOR_BASED: Often uses "cursor"/"limit" or "after"/"limit"
+
+The handler controls pagination flow and implements stopping logic (max items, API flags, etc.). Data merging is automatic.
 
 ⚠️ WARNING: Incorrect pagination configuration causes infinite loops. When in doubt, leave it unconfigured.
 </PAGINATION_CONFIGURATION>
