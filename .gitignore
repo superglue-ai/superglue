@@ -25,4 +25,6 @@ packages/web/public/files
 
 # Agent Evaluation
 packages/core/eval/agent-eval/.data
-packages/core/eval/agent-eval/agent-eval-results.json
+packages/core/eval/agent-eval/results/
+packages/core/eval/agent-eval/agent-eval-config.json
+packages/core/eval/agent-eval/benchmark/agent-eval-benchmark.csv

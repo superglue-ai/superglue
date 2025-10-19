@@ -65,12 +65,12 @@ export interface WorkflowAttempt {
 
 export interface Metrics {
     workflowCount: number;
-    successfulWorkflowCount: number;
-    workflowSuccessRate: number;
-    workflowSelfHealingSuccessRate: number | null; // null if no self-healing attempts exist
-    workflowOneShotSuccessRate: number | null; // null if no one-shot attempts exist
+    workflowSelfHealingSuccessRate: number | null;
+    workflowOneShotSuccessRate: number | null;
     overallAverageBuildTimeMs: number;
     overallAverageExecutionTimeMs: number;
+    oneShotAverageExecutionTimeMs: number | null;
+    selfHealingAverageExecutionTimeMs: number | null;
     workflowMetrics: WorkflowMetrics[];
 }
 
@@ -86,14 +86,23 @@ export interface WorkflowMetrics {
     hadSelfHealingSuccess: boolean;
     oneShotFailuresByReason: FailureCountsByReason;
     selfHealingFailuresByReason: FailureCountsByReason;
+    averageBuildTimeMs: number | null;
+    oneShotAverageExecutionTimeMs: number | null;
+    selfHealingAverageExecutionTimeMs: number | null;
 }
 
 export interface MetricsComparisonResult {
-    workflowSuccessRateDifference: number;
-    workflowSelfHealingSuccessRateDifference: number;
-    workflowOneShotSuccessRateDifference: number;
-    overallAverageBuildTimeMsDifference: number;
-    overallAverageExecutionTimeMsDifference: number;
+    lastRun: MetricsComparison;
+    benchmark: MetricsComparison;
+}
+
+export interface MetricsComparison {
+    workflowSelfHealingSuccessRateDifference: number | null;
+    workflowOneShotSuccessRateDifference: number | null;
+    overallAverageBuildTimeMsDifference: number | null;
+    overallAverageExecutionTimeMsDifference: number | null;
+    oneShotAverageExecutionTimeMsDifference: number | null;
+    selfHealingAverageExecutionTimeMsDifference: number | null;
     workflowMetrics: WorkflowMetricsComparisonResult[];
 }
 

@@ -89,17 +89,32 @@ The evaluation tracks and compares metrics across runs:
 
 ### Tracked Metrics
 
-- **Success Rates**: Overall, one-shot, and self-healing success rates
-- **Performance**: Average build and execution times
-- **Per-Workflow**: Individual workflow success rates and failure reasons
+- **Success Rates**: One-shot and self-healing success rates
+- **Performance**: 
+  - Average build time (overall across all attempts)
+  - Average execution time (separated by one-shot vs self-healing)
+- **Per-Workflow**: Individual workflow success rates, failure reasons, and timing metrics
+
+### CSV Reports
+
+Results are saved as timestamped CSV files in the `results/` folder:
+- Format: `agent-eval-YYYY-MM-DDTHH-mm-ss.csv`
+- Each workflow generates two rows (one-shot and self-healing modes)
+- Columns: workflow_id, workflow_name, mode, total_attempts, total_successful_attempts, total_failed_attempts, has_one_shot_attempts, has_self_healing_attempts, had_one_shot_success, had_self_healing_success, success, avg_build_time_ms, avg_exec_time_ms, failures_build, failures_execution, failures_strict_validation
+
+### Benchmark System
+
+The `benchmark/` folder contains `agent-eval-benchmark.csv` - a baseline for comparison:
+1. Run your evaluation to generate a CSV in `results/`
+2. When satisfied with performance, copy that CSV to `benchmark/agent-eval-benchmark.csv`
+3. Future runs compare against both the last run and the benchmark
 
 ### Metrics Comparison
 
-Results are saved to `agent-eval-results.json` after each run. The metrics comparer automatically:
-
-1. Loads the previous run's metrics
-2. Compares current vs previous results
-3. Shows differences in the console output (green for improvements, red for regressions)
+The console output shows three-way comparison:
+- **Current**: Current run results
+- **vs Last**: Comparison with the most recent run in `results/`
+- **vs Benchmark**: Comparison with the benchmark baseline
 
 **Comparison indicators:**
 - `+X%` / `-X%` for success rate changes

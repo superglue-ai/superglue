@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, access } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { AgentEvalConfig } from "./types.js";
 import { fileURLToPath } from "node:url";
@@ -44,6 +44,12 @@ export async function loadConfig(): Promise<AgentEvalConfig> {
         dirname(fileURLToPath(import.meta.url)),
         "agent-eval-config.json"
     );
+
+    try {
+        await access(configPath);
+    } catch {
+        throw new Error(`Config file not found: ${configPath}`);
+    }
 
     const configContent = await readFile(configPath, "utf-8");
     const rawConfig = JSON.parse(configContent);

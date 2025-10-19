@@ -6,7 +6,6 @@ export class MetricsCalculator {
         const workflowMetrics = this.determineWorkflowMetrics(groupedByWorkflowId);
 
         const workflowCount = workflowMetrics.length;
-        const successfulWorkflowCount = workflowMetrics.filter(w => w.hadOneShotSuccess || w.hadSelfHealingSuccess).length;
 
         const oneShotSuccessfulWorkflows = workflowMetrics.filter(w => w.hadOneShotSuccess).length;
         const hasSuccessfulWorkflowsWithSelfHealing = workflowMetrics.filter(w => w.hadSelfHealingSuccess || w.hadOneShotSuccess).length;
@@ -21,12 +20,12 @@ export class MetricsCalculator {
 
         return {
             workflowCount,
-            successfulWorkflowCount,
-            workflowSuccessRate: workflowCount === 0 ? Number.NaN : successfulWorkflowCount / workflowCount,
             workflowSelfHealingSuccessRate,
             workflowOneShotSuccessRate,
             overallAverageBuildTimeMs: this.calculateAverageBuildTime(workflowAttempts),
             overallAverageExecutionTimeMs: this.calculateAverageExecutionTime(workflowAttempts),
+            oneShotAverageExecutionTimeMs: this.calculateOneShotAverageExecutionTime(workflowAttempts),
+            selfHealingAverageExecutionTimeMs: this.calculateSelfHealingAverageExecutionTime(workflowAttempts),
             workflowMetrics: workflowMetrics,
         };
     }
@@ -39,6 +38,18 @@ export class MetricsCalculator {
     private calculateAverageExecutionTime(workflowAttempts: WorkflowAttempt[]): number {
         if (workflowAttempts.length === 0) return 0;
         return workflowAttempts.reduce((acc, attempt) => acc + attempt.executionTime, 0) / workflowAttempts.length;
+    }
+
+    private calculateOneShotAverageExecutionTime(workflowAttempts: WorkflowAttempt[]): number | null {
+        const oneShotAttempts = workflowAttempts.filter(a => !a.selfHealingEnabled);
+        if (oneShotAttempts.length === 0) return null;
+        return oneShotAttempts.reduce((acc, attempt) => acc + attempt.executionTime, 0) / oneShotAttempts.length;
+    }
+
+    private calculateSelfHealingAverageExecutionTime(workflowAttempts: WorkflowAttempt[]): number | null {
+        const selfHealingAttempts = workflowAttempts.filter(a => a.selfHealingEnabled);
+        if (selfHealingAttempts.length === 0) return null;
+        return selfHealingAttempts.reduce((acc, attempt) => acc + attempt.executionTime, 0) / selfHealingAttempts.length;
     }
 
     private determineWorkflowMetrics(workflowAttemptsByWorkflowId: Record<string, WorkflowAttempt[]>): WorkflowMetrics[] {
@@ -70,6 +81,19 @@ export class MetricsCalculator {
             const workflowId = workflowAttempts[0].workflowConfig.id;
             const workflowName = workflowAttempts[0].workflowConfig.name;
 
+            const oneShotAttempts = workflowAttempts.filter(a => !a.selfHealingEnabled);
+            const selfHealingAttempts = workflowAttempts.filter(a => a.selfHealingEnabled);
+
+            const averageBuildTimeMs = workflowAttempts.length > 0
+                ? workflowAttempts.reduce((acc, a) => acc + a.buildTime, 0) / workflowAttempts.length
+                : null;
+            const oneShotAverageExecutionTimeMs = oneShotAttempts.length > 0
+                ? oneShotAttempts.reduce((acc, a) => acc + a.executionTime, 0) / oneShotAttempts.length
+                : null;
+            const selfHealingAverageExecutionTimeMs = selfHealingAttempts.length > 0
+                ? selfHealingAttempts.reduce((acc, a) => acc + a.executionTime, 0) / selfHealingAttempts.length
+                : null;
+
             return {
                 workflowId,
                 workflowName,
@@ -82,6 +106,9 @@ export class MetricsCalculator {
                 hadSelfHealingSuccess,
                 oneShotFailuresByReason,
                 selfHealingFailuresByReason,
+                averageBuildTimeMs,
+                oneShotAverageExecutionTimeMs,
+                selfHealingAverageExecutionTimeMs,
             };
         });
     }

@@ -9,9 +9,11 @@ import { WorkflowRunnerService } from "./workflow-runner.js";
 import path from "node:path";
 import { config } from "dotenv";
 import { MetricsCalculator } from "./metrics-calculator.js";
-import { JsonReporter } from "./json-reporter.js";
+import { CsvReporter } from "./csv-reporter.js";
 import { MetricsComparer } from "./metrics-comparer.js";
 import { ConsoleReporter } from "./console-reporter.js";
+import { closeAllPools } from "../../execute/postgres/postgres.js";
+import { writeFileSync } from "node:fs";
 
 const envPath = process.cwd().endsWith('packages/core')
   ? path.join(process.cwd(), '../../.env')
@@ -23,10 +25,12 @@ async function main(): Promise<void> {
   const metadata = { orgId: "agent-eval", userId: "system" };
   logMessage("info", "Starting Agent Evaluation...", metadata);
 
+  let store: FileStore | undefined;
+
   try {
     const config = await loadConfig();
     const storePath = join(dirname(fileURLToPath(import.meta.url)), "./.data");
-    const store = new FileStore(storePath);
+    store = new FileStore(storePath);
 
     const integrationSetupService = new IntegrationSetupService(store, config, metadata);
     const integrations = await integrationSetupService.setupIntegrations();
@@ -42,25 +46,27 @@ async function main(): Promise<void> {
     const metricsCalculatorService = new MetricsCalculator();
     const metrics = metricsCalculatorService.calculateMetrics(workflowAttempts);
 
-    const jsonPath = join(dirname(fileURLToPath(import.meta.url)), "./agent-eval-results.json");
-    const jsonReporter = new JsonReporter(jsonPath, metadata);
-    const previousMetrics = jsonReporter.getLatestReport()?.metrics;
+    const baseDir = dirname(fileURLToPath(import.meta.url));
+    
+    const metricsComparer = new MetricsComparer(baseDir);
+    const metricsComparison = metricsComparer.compare(metrics);
 
-    jsonReporter.report(metrics);
-
-    const metricsComparer = new MetricsComparer();
-    const metricsComparison = metricsComparer.compare(metrics, previousMetrics);
+    const csvReporter = new CsvReporter(baseDir, metadata);
+    csvReporter.report(metrics);
     
     const duration = new Date().getTime() - startedAt.getTime();
-    logMessage("info", `Agent Evaluation Completed in ${duration}ms`, metadata);
+    logMessage("info", `Agent Evaluation Completed in ${(duration / 1000).toFixed(1)}s`, metadata);
 
-    await new Promise(resolve => setTimeout(resolve, 1000)); // delay as quick fix
-    ConsoleReporter.report(metrics, metricsComparison,workflowAttempts);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    ConsoleReporter.report(metrics, metricsComparison, workflowAttempts);
   } catch (error) {
     const message = error instanceof Error ? error.stack || error.message : String(error);
     console.error("Agent Eval failed:", message);
     logMessage("error", `Agent Eval failed: ${message}`, metadata);
     process.exitCode = 1;
+  } finally {
+    await closeAllPools();
+    await store?.disconnect();
   }
 }
 
