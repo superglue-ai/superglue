@@ -162,6 +162,8 @@ describe('getWorkflowBuilderContext budget and include combinations', () => {
         openApiSchema: undefined
     } as any;
 
+    process.env.LLM_PROVIDER = 'OPENAI';
+
     it('zero or negative budget returns empty string', () => {
         const input = { integrations: [integration], payload: { x: 1 }, userInstruction: 'Do X' } as any;
         expect(getWorkflowBuilderContext(input, { characterBudget: 0, include: {} } as any)).toBe('');
