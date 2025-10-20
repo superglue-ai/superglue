@@ -3,8 +3,9 @@ import { Metadata } from "@superglue/shared";
 import { AxiosRequestConfig } from "axios";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { getExtractContext } from "../context/context-builders.js";
+import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
-import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
 import { decompressData, parseFile } from "../utils/file.js";
 import { logMessage } from "../utils/logs.js";
 import { composeUrl, replaceVariables } from "../utils/tools.js";
@@ -88,6 +89,7 @@ export async function generateExtractConfig(extractConfig: Partial<ExtractConfig
     decompressionMethod: z.enum(Object.values(DecompressionMethod) as [string, ...string[]]).optional(),
     fileType: z.enum(Object.values(FileType) as [string, ...string[]]).optional(),
   }));
+  const extractPrompt = getExtractContext({ extractConfig: extractConfig as ExtractConfig, documentation, payload, credentials, lastError: lastError }, { characterBudget: LanguageModel.contextLength / 10 });
   const messages: LLMMessage[] = [
     {
       role: "system",
@@ -95,21 +97,7 @@ export async function generateExtractConfig(extractConfig: Partial<ExtractConfig
     },
     {
       role: "user",
-      content:
-        `Generate API configuration for the following:
-
-Instructions: ${extractConfig.instruction}
-
-Base URL: ${composeUrl(extractConfig.urlHost, extractConfig.urlPath)}
-
-Documentation: ${documentation}
-
-Available credential variables: ${Object.keys(credentials || {}).join(", ")}
-Available payload variables: ${Object.keys(payload || {}).join(", ")}
-Example payload: ${JSON.stringify(payload || {})}
-
-${lastError ? `We tried to call the API but it failed with the following error:
-${lastError}` : ''}`
+      content: extractPrompt
     }
   ];
   const { response: generatedConfig } = await LanguageModel.generateObject(messages, schema);

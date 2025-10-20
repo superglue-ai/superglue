@@ -3,7 +3,7 @@ import { Metadata } from "@superglue/shared";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
-import { SELECTION_PROMPT } from "../llm/prompts.js";
+import { FIND_RELEVANT_INTEGRATIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { logMessage } from "../utils/logs.js";
 
 type ChatMessage = LLMMessage;
@@ -57,7 +57,7 @@ ${int.specificInstructions ? `User Instructions for this integration: ${int.spec
         }).join("\n");
 
         const messages: ChatMessage[] = [
-            { role: "system", content: SELECTION_PROMPT },
+            { role: "system", content: FIND_RELEVANT_INTEGRATIONS_SYSTEM_PROMPT },
             {
                 role: "user",
                 content: `
