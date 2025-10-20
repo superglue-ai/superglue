@@ -3,7 +3,7 @@ import { Message } from "@superglue/shared";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { IntegrationManager } from "../integrations/integration-manager.js";
-import { LanguageModel } from "../llm/llm.js";
+import { LanguageModel } from "../llm/language-model.js";
 import { SELF_HEALING_CODE_CONFIG_AGENT_PROMPT } from "../llm/prompts.js";
 import { parseJSON } from "../utils/json-parser.js";
 import { sample } from "../utils/tools.js";

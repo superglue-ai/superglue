@@ -293,7 +293,7 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
           type: stats.isDirectory ? 'directory' : stats.isFile ? 'file' : 'unknown',
           modifyTime: new Date(stats.modifyTime).toISOString(),
           accessTime: new Date(stats.accessTime).toISOString(),
-          mode: stats.mode,
+          mode: stats.mode || '',
           uid: stats.uid,
           gid: stats.gid
         };

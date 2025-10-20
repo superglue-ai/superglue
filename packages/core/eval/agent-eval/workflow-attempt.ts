@@ -1,13 +1,12 @@
-import { Integration, RequestOptions, SelfHealingMode, WorkflowResult } from "@superglue/client";
-import { WorkflowAttempt, WorkflowConfig, WorkflowFailureReason } from "./types.js";
+import { Integration, SelfHealingMode, Workflow, WorkflowResult } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
-import { Workflow } from "@superglue/client";
 import { generateUniqueId } from "@superglue/shared/utils";
-import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { DataStore } from "../../datastore/types.js";
+import { WorkflowRunner } from "../../execute/workflow-runner.js";
+import { WorkflowBuilder } from "../../generate/workflows.js";
+import { IntegrationManager } from "../../integrations/integration-manager.js";
+import { WorkflowAttempt, WorkflowConfig, WorkflowFailureReason } from "./types.js";
 import { isDeepEqual } from "./utils.js";
-import { WorkflowBuilder } from "../../build/workflow-builder.js";
-import { WorkflowExecutor } from "../../execute/workflow-executor.js";
 
 export class SuperglueWorkflowAttemptService {
     constructor(
@@ -107,7 +106,7 @@ export class SuperglueWorkflowAttemptService {
         integrations: Integration[],
         selfHealingEnabled: boolean
     ): Promise<WorkflowResult> {
-        const executor = new WorkflowExecutor(
+        const executor = new WorkflowRunner(
             workflow,
             this.metadata,
             IntegrationManager.fromIntegrations(

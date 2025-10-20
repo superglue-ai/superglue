@@ -1,20 +1,19 @@
-import { loadConfig } from "./config-loader.js";
-import { logMessage } from "../../utils/logs.js";
-import { FileStore } from "../../datastore/filestore.js";
-import { join } from "path";
-import { dirname } from "path";
-import { fileURLToPath } from "node:url";
-import { IntegrationSetupService } from "./integration-setup.js";
-import { WorkflowRunnerService } from "./workflow-runner.js";
-import path from "node:path";
 import { config } from "dotenv";
-import { MetricsCalculator } from "./metrics-calculator.js";
-import { CsvReporter } from "./csv-reporter.js";
-import { MarkdownReporter } from "./markdown-reporter.js";
-import { MetricsComparer } from "./metrics-comparer.js";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "path";
+import { FileStore } from "../../datastore/filestore.js";
+import { closeAllPools } from "../../execute/postgres.js";
+import { logMessage } from "../../utils/logs.js";
+import { loadConfig } from "./config-loader.js";
 import { ConsoleReporter } from "./console-reporter.js";
-import { closeAllPools } from "../../execute/postgres/postgres.js";
+import { CsvReporter } from "./csv-reporter.js";
+import { IntegrationSetupService } from "./integration-setup.js";
 import { JsonReporter } from "./json-reporter.js";
+import { MarkdownReporter } from "./markdown-reporter.js";
+import { MetricsCalculator } from "./metrics-calculator.js";
+import { MetricsComparer } from "./metrics-comparer.js";
+import { WorkflowRunnerService } from "./workflow-runner.js";
 
 const envPath = process.cwd().endsWith('packages/core')
   ? path.join(process.cwd(), '../../.env')
