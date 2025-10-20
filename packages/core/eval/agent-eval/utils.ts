@@ -11,7 +11,7 @@ export function isDeepEqual(expected: any, received: any, allowAdditionalPropert
     }
 
     for (const key of keysExpected) {
-        if (!Object.prototype.hasOwnProperty.call(received, key) || !isDeepEqual(expected[key], received[key])) {
+        if (!Object.prototype.hasOwnProperty.call(received, key) || !isDeepEqual(expected[key], received[key], allowAdditionalProperties)) {
             return false;
         }
     }
