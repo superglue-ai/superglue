@@ -21,8 +21,8 @@ vi.mock('../llm/language-model.js', () => {
   };
 });
 
-vi.mock('./api/api.js', async () => {
-  const actual = await vi.importActual('./api/api.js');
+vi.mock('./http.js', async () => {
+  const actual = await vi.importActual('./http.js');
   return {
     ...actual,
     callAxios: vi.fn()

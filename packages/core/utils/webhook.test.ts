@@ -3,7 +3,7 @@ import { callAxios } from '../execute/http.js';
 import { notifyWebhook } from './webhook.js';
 
 // Mock the callAxios function
-vi.mock('../execute/api/api.js', () => ({
+vi.mock('../execute/http.js', () => ({
   callAxios: vi.fn()
 }));
 
