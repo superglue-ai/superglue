@@ -150,7 +150,7 @@ export class SuperglueWorkflowAttemptService {
         }
 
         if (typeof workflowConfig.expectedData === 'object') {
-            return isDeepEqual(workflowResult.data, workflowConfig.expectedData, workflowConfig.allowAdditionalProperties ?? false);
+            return isDeepEqual(workflowConfig.expectedData, workflowResult.data, workflowConfig.allowAdditionalProperties ?? false);
         }
 
         return false;
