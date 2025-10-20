@@ -297,16 +297,17 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
   slack: {
     name: "slack",
-    apiUrl: "https://api.slack.com",
+    apiUrl: "https://slack.com/api",
     regex: "^.*slack.*$",
     icon: "slack",
-    docsUrl: "https://docs.slack.dev/reference/methods",
+    docsUrl: "https://docs.slack.dev/apis/web-api/",
     openApiUrl: "https://raw.githubusercontent.com/slackapi/slack-api-specs/master/web-api/slack_web_openapi_v2.json",
     preferredAuthType: "oauth",
     oauth: {
       authUrl: "https://slack.com/oauth/v2/authorize",
       tokenUrl: "https://slack.com/api/oauth.v2.access",
-      scopes: "channels:read channels:write channels:history chat:write chat:write.public users:read users:read.email files:read files:write groups:read groups:write im:read im:write mpim:read mpim:write"
+      scopes: "channels:read channels:history chat:write chat:write.public users:read users:read.email files:read files:write groups:read im:read im:write mpim:read",
+      client_id: "7626585708593.9087382641312"
     },
     keywords: [
       "channel",

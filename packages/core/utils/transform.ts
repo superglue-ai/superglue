@@ -96,7 +96,7 @@ export async function generateTransformCode(
   messages?: LLMMessage[]
 ): Promise<{ mappingCode: string; data?: any } | null> {
   try {
-    logMessage('info', "Generating mapping" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
+    logMessage('info', "Generating Transform Code" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
 
     if (!messages || messages?.length === 0) {
       const userPrompt = getTransformContext({ instruction, targetSchema: schema, sourceData: payload }, { characterBudget: LanguageModel.contextLength / 10 });
@@ -182,7 +182,7 @@ export async function evaluateTransform(
 
   } catch (error) {
     const errorMessage = String(error instanceof Error ? error.message : error);
-    logMessage('error', `Error evaluating mapping: ${errorMessage.slice(0, 250)}`, metadata);
+    logMessage('error', `Error evaluating transform: ${errorMessage.slice(0, 250)}`, metadata);
     return { success: false, reason: `Error during evaluation: ${errorMessage}` };
   }
 }
