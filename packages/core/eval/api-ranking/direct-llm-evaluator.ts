@@ -376,35 +376,35 @@
 //         }
 //     }
 
-    /**
-     * Evaluate if the result matches the instruction
-     */
-    private async evaluateResult(
-        result: any,
-        instruction: string,
-        integrations: Integration[]
-    ): Promise<{ success: boolean; reason?: string }> {
-        try {
-            // Load evaluateResponse dynamically
-            const { evaluateStepResponse } = await import('../../generate/step-evaluation.js');
-            const documentation = integrations[0]?.documentation || '';
-            const evaluation = await evaluateStepResponse({
-                endpoint: {instruction} as any,
-                data: result,
-                documentation
-            });
+    // /**
+    //  * Evaluate if the result matches the instruction
+    //  */
+    // private async evaluateResult(
+    //     result: any,
+    //     instruction: string,
+    //     integrations: Integration[]
+    // ): Promise<{ success: boolean; reason?: string }> {
+    //     try {
+    //         // Load evaluateResponse dynamically
+    //         const { evaluateStepResponse } = await import('../../execute/workflow-step.js');
+    //         const documentation = integrations[0]?.documentation || '';
+    //         const evaluation = await evaluateStepResponse({
+    //             data: result,
+    //             endpoint: {instruction} as any,
+    //             documentation
+    //         });
 
-            return {
-                success: evaluation.success,
-                reason: evaluation.shortReason
-            };
-        } catch (error) {
-            return {
-                success: false,
-                reason: `Evaluation failed: ${error instanceof Error ? error.message : String(error)}`
-            };
-        }
-    }
+//             return {
+//                 success: evaluation.success,
+//                 reason: evaluation.shortReason
+//             };
+//         } catch (error) {
+//             return {
+//                 success: false,
+//                 reason: `Evaluation failed: ${error instanceof Error ? error.message : String(error)}`
+//             };
+//         }
+//     }
 
 //     /**
 //      * Validate that required API keys are present

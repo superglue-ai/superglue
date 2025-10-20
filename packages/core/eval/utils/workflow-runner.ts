@@ -219,7 +219,7 @@ export class WorkflowRunner {
         try {
             logMessage('info', `📝 Building workflow ${workflowConfig.name}...`, this.metadata);
 
-            const { WorkflowBuilder } = await import('../../generate/workflows.js');
+            const { WorkflowBuilder } = await import('../../build/workflow-builder.js');
             const builder = new WorkflowBuilder(
                 workflowConfig.instruction,
                 integrations,
@@ -262,14 +262,14 @@ export class WorkflowRunner {
             try {
                 logMessage('info', `🚀 Executing workflow ${workflowConfig.name}...`, this.metadata);
 
-                const { WorkflowRunner } = await import('../../execute/workflow-runner.js');
+                const { WorkflowExecutor } = await import('../../execute/workflow-executor.js');
                 const metadataWithWorkflowId = {
                     ...this.metadata,
                     workflowId: workflowConfig.id,
                     runId: `${workflowConfig.id}-${attemptNumber}`
                 };
 
-                const executor = new WorkflowRunner(
+                const executor = new WorkflowExecutor(
                     workflow,
                     metadataWithWorkflowId,
                     IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId)
