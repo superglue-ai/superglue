@@ -1,6 +1,5 @@
 import { ApiConfig } from "@superglue/client";
-import OpenAI from "openai";
-import { LanguageModel } from "../llm/llm.js";
+import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { getObjectContext } from "../utils/context.js";
 
 export async function evaluateStepResponse({
@@ -57,7 +56,7 @@ export async function evaluateStepResponse({
         role: "user", content: `<request>${JSON.stringify(endpoint)}</request>
   <api_response>${dataDescription}</api_response>`
       }
-    ] as OpenAI.Chat.ChatCompletionMessageParam[];
+    ] as LLMMessage[];
   
     const response = await LanguageModel.generateObject(
       request,
