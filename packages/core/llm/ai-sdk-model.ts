@@ -1,4 +1,4 @@
-import { generateText, jsonSchema, tool } from "ai";
+import { AssistantModelMessage, TextPart, ToolCallPart, ToolResultPart, generateText, jsonSchema, tool } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
@@ -177,11 +177,12 @@ export class AiSdkModel implements LLM {
     const schemaObj = jsonSchema(schema);
     const tools = this.buildTools(schemaObj, customTools, toolContext);
 
+    let conversationMessages: LLMMessage[] = String(messages[0]?.content)?.startsWith("The current date and time is") 
+      ? messages 
+      : [dateMessage, ...messages];
+
     try {
       let finalResult: any = null;
-      let conversationMessages: LLMMessage[] = String(messages[0]?.content)?.startsWith("The current date and time is") 
-        ? messages 
-        : [dateMessage, ...messages];
 
       while (finalResult === null) {
 
@@ -206,30 +207,36 @@ export class AiSdkModel implements LLM {
           }
         }
 
-        // Add assistant message with tool calls to conversation
-        if (result.toolCalls.length > 0 || result.text) {
+        if (result.text.trim().length > 0) {
           conversationMessages.push({
             role: "assistant" as const,
-            content: result.text || "",
-            tool_calls: result.toolCalls.length > 0 ? result.toolCalls.map(tc => ({
-              id: tc.toolCallId,
-              type: "function" as const,
-              function: {
-                name: tc.toolName,
-                arguments: JSON.stringify(tc.input)
-              }
-            })) : undefined
-          } as any);
+            content: [{type: "text", text: result.text} as TextPart],
+          } as LLMMessage);
         }
 
-        // Add tool results to conversation
-        if (result.toolResults.length > 0) {
-          for (const toolResult of result.toolResults) {
-            conversationMessages.push({
-              role: "tool" as const,
-              tool_call_id: toolResult.toolCallId,
-              content: JSON.stringify((toolResult as any).result || toolResult)
-            } as any);
+        for (const toolCall of result.toolCalls) {
+          // if we can find the tool id in the toolResults
+          conversationMessages.push({role: 'assistant', content: [{
+            type: 'tool-call',
+            toolCallId: toolCall.toolCallId,
+            toolName: toolCall.toolName,
+            input: toolCall.input ?? {}
+          } as ToolCallPart]} as AssistantModelMessage);
+          const toolResult = result.toolResults.find(tr => tr.toolCallId === toolCall.toolCallId);
+          if (toolResult) {
+            conversationMessages.push({role: 'tool', content: [{
+              type: 'tool-result',
+              toolCallId: toolResult.toolCallId,
+              toolName: toolResult.toolName,
+              output: {"type": "text", "value": toolResult.output?.toString() ?? ""}
+            } as ToolResultPart]});
+          } else {
+            conversationMessages.push({role: 'tool', content: [{
+              type: 'tool-result',
+              toolCallId: toolCall.toolCallId,
+              toolName: toolCall.toolName,
+              output: {"type": "text", "value": "Tool did not output anything"}
+            } as ToolResultPart]});
           }
         }
 
@@ -252,7 +259,7 @@ export class AiSdkModel implements LLM {
       const updatedMessages = [...messages, {
         role: "assistant" as const,
         content: "Error: Vercel AI API Error: " + (error as any)?.message
-      }];
+      } as LLMMessage];
 
       return {
         response: "Error: Vercel AI API Error: " + error.message,
