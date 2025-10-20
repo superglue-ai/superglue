@@ -919,7 +919,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                       disabled={isSaving}
                       className="h-9 px-5 shadow-md border border-primary/40"
                     >
-                      {isSaving ? "Saving..." : "Save & Complete"}
+                      {isSaving ? "Saving..." : "Save & Deploy"}
                     </Button>
                   </div>
                 )}

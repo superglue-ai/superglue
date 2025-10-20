@@ -1,4 +1,4 @@
-import type { ApiConfig } from "@superglue/client";
+import type { ApiConfig, CodeConfig } from "@superglue/client";
 import { Message } from "@superglue/shared";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -6,25 +6,16 @@ import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel } from "../llm/language-model.js";
 import { SELF_HEALING_CODE_CONFIG_AGENT_PROMPT } from "../llm/prompts.js";
 import { parseJSON } from "../utils/json-parser.js";
-import { sample } from "../utils/tools.js";
+import { composeUrl, sample } from "../utils/tools.js";
 import { BaseToolContext, ToolDefinition, ToolImplementation } from "./tools.js";
 
 export interface ConfigGenerationContext extends BaseToolContext {
-    apiConfig: Partial<ApiConfig>,
+    currentConfig: CodeConfig | ApiConfig,
     inputData: Record<string, any>,
     credentials: Record<string, any>,
     retryCount?: number,
     messages?: Message[],
     integrationManager: IntegrationManager,
-}
-
-export interface CodeConfig {
-    stepInstruction?: string;
-    code: string;
-    pagination?: {
-        type: "OFFSET_BASED" | "PAGE_BASED" | "CURSOR_BASED";
-        handler: string;
-    };
 }
 
 export const generateConfigDefinition: ToolDefinition = {
@@ -43,14 +34,14 @@ export const generateConfigImplementation: ToolImplementation<ConfigGenerationCo
     if (!retryCount) context.retryCount = 0;
     if (!context.messages) context.messages = [];
 
-    const codeConfig = context.apiConfig as any;
+    const codeConfig = context.currentConfig as any;
     const messages = context.messages as Message[];
 
     if (messages.length === 0) {
         const fullDocs = await integrationManager?.getDocumentation();
         const documentation = fullDocs?.content?.length < LanguageModel.contextLength / 4 ?
             fullDocs?.content :
-            await integrationManager?.searchDocumentation(codeConfig?.stepInstruction || '');
+            await integrationManager?.searchDocumentation(codeConfig?.stepInstruction || codeConfig?.instruction || '');
         
         let payloadString = JSON.stringify(inputData || {});
         if (payloadString.length > LanguageModel.contextLength / 10) {
@@ -58,7 +49,7 @@ export const generateConfigImplementation: ToolImplementation<ConfigGenerationCo
         }
 
         const integration = await integrationManager?.getIntegration();
-        const baseUrl = integration ? `${integration.urlHost}${integration.urlPath || ''}` : '';
+        const baseUrl = integration ? composeUrl(integration.urlHost, integration.urlPath) : '';
 
         const userPrompt = `Generate code configuration for the following:
 
@@ -103,7 +94,6 @@ ${payloadString}
     }
 
     const codeConfigSchema = zodToJsonSchema(z.object({
-        stepInstruction: z.string().optional().describe("Human-readable description of what this code does"),
         code: z.string().describe(`JavaScript function that returns request config. Format: (context) => ({ url, method, headers, data, params })
 
 The function receives context with:
@@ -169,16 +159,22 @@ Examples:
     if (!generatedConfig?.code) {
         return {
             success: false,
-            error: 'Failed to generate code configuration'
+            error: 'Failed to generate code configuration',
+            data: {
+                updatedMessages: updatedMessages
+            }
         };
     }
 
     return {
         success: true,
         data: {
-            stepInstruction: generatedConfig.stepInstruction || codeConfig?.stepInstruction,
-            code: generatedConfig.code,
-            pagination: generatedConfig.pagination || codeConfig?.pagination
+            config: {
+                stepInstruction: codeConfig?.stepInstruction,
+                code: generatedConfig.code,
+                pagination: generatedConfig.pagination
+            },
+            updatedMessages: updatedMessages
         }
     };
 };

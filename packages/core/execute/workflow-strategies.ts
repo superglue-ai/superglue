@@ -1,4 +1,4 @@
-import type { ApiConfig, ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
+import type { ApiConfig, CodeConfig, ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
 import { Integration, Metadata } from "@superglue/shared";
 import { getLoopSelectorContext } from "../context/context-builders.js";
 import { LoopSelectorContextInput, LoopSelectorContextOptions } from "../context/context-types.js";
@@ -45,6 +45,7 @@ const directStrategy: ExecutionStrategy = {
     try {
       const apiResponse = await executeStep({
         endpoint: step.apiConfig,
+        codeConfig: step.codeConfig,
         inputData: payload,
         credentials,
         options,
@@ -113,7 +114,8 @@ const loopStrategy: ExecutionStrategy = {
       loopItems = loopItems.slice(0, step.loopMaxIters || server_defaults.DEFAULT_LOOP_MAX_ITERS);
 
       const stepResults: WorkflowStepResult[] = [];
-      let successfulConfig: ApiConfig | null = null;
+      let successfulApiConfig: ApiConfig | null = null;
+      let successfulCodeConfig: CodeConfig | null = null;
 
       for (let i = 0; i < loopItems.length; i++) {
         const currentItem = loopItems[i] || "";
@@ -127,7 +129,8 @@ const loopStrategy: ExecutionStrategy = {
 
         try {
           const apiResponse = await executeStep({
-            endpoint: successfulConfig || step.apiConfig,
+            endpoint: successfulApiConfig || step.apiConfig,
+            codeConfig: successfulCodeConfig || step.codeConfig,
             inputData: loopPayload,
             credentials,
             options: {
@@ -139,9 +142,15 @@ const loopStrategy: ExecutionStrategy = {
           });
 
           if (apiResponse.endpoint) {
-            successfulConfig = apiResponse.endpoint;
-            if (successfulConfig !== step.apiConfig) {
+            successfulApiConfig = apiResponse.endpoint;
+            if (successfulApiConfig !== step.apiConfig) {
               logMessage("debug", `Loop iteration ${i + 1} updated configuration`, metadata);
+            }
+          }
+          if (apiResponse.codeConfig) {
+            successfulCodeConfig = apiResponse.codeConfig;
+            if (successfulCodeConfig !== step.codeConfig) {
+              logMessage("debug", `Loop iteration ${i + 1} updated code configuration`, metadata);
             }
           }
 

@@ -1,8 +1,7 @@
-import { FileType, Integration, RequestOptions } from "@superglue/client";
+import { CodeConfig, FileType, Integration, RequestOptions } from "@superglue/client";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import ivm from "isolated-vm";
 import { server_defaults } from "../default.js";
-import { CodeConfig } from "../generate/config.js";
 import { Metadata } from "../graphql/types.js";
 import { parseFile } from "../utils/file.js";
 import { logMessage } from "../utils/logs.js";

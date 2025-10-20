@@ -1,7 +1,7 @@
-import { type ApiConfig, type RequestOptions } from "@superglue/client";
+import { CodeConfig, type ApiConfig, type RequestOptions } from "@superglue/client";
 import { Message } from "@superglue/shared";
 import { server_defaults } from "../default.js";
-import { type CodeConfig, generateConfigImplementation } from "../generate/config.js";
+import { generateConfigImplementation } from "../generate/config.js";
 import { evaluateStepResponse } from "../generate/step-evaluation.js";
 import { Metadata } from "../graphql/types.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
@@ -44,16 +44,15 @@ export async function executeStep({
 
   // Validate that at least one config type is provided
   if (!codeConfig && !endpoint) {
-    throw new Error("Either codeConfig or endpoint (apiConfig) must be provided");
+    throw new Error("Either codeConfig or apiConfig must be provided");
   }
 
-  // If self healing is enabled, use the retries from the options or the default max of 10 if not specified, otherwise use 1 (no self-healing case)
-  const effectiveMaxRetries = isSelfHealing ? (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES) : 1;
+  // If self healing is enabled, use the retries from the options or the default max of 10 if not specified, otherwise use 0 (no self-healing case)
+  const effectiveMaxRetries = isSelfHealing ? (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES) : 0;
 
   do {
     try {
       if (retryCount > 0 && isSelfHealing) {
-        // Always use new generation for self-healing (works for both config types)
         logMessage('info', `Generating code config (retry ${retryCount})`, metadata);
         const currentConfig = codeConfig || endpoint;
         const result = await generateConfigImplementation({}, {
@@ -66,26 +65,23 @@ export async function executeStep({
           messages,
           integrationManager
         });
-        
+        messages = result.data?.updatedMessages || [];
         if (!result.success || !result.data) {
           throw new Error(result.error || "Failed to generate code config");
         }
         
-        // Always use codeConfig for self-healing (converts legacy on retry)
-        codeConfig = result.data as CodeConfig;
+        codeConfig = result.data?.config as CodeConfig;
       }
 
       const integration = await integrationManager?.getIntegration();
       const integrationId = integration?.id;
-      const scopedCredentials = integrationId 
-        ? Object.entries(credentials)
-            .filter(([key]) => key.startsWith(`${integrationId}_`))
-            .reduce((acc, [key, val]) => ({ ...acc, [key]: val }), {})
-        : credentials;
 
-      // Execute the appropriate config type
-      // If we have codeConfig (either from start or from self-healing conversion), use code executor
       if (codeConfig) {
+        const scopedCredentials = integrationId 
+        ? Object.entries(credentials)
+            .filter(([key]) => key.startsWith(`${integrationId}_`) || !key.includes('_'))
+            .reduce((acc, [key, val]) => ({ ...acc, [key.replace(`${integrationId}_`, '')]: val }), {})
+        : credentials;
         // Scope credentials to only the relevant integration for security
         response = await executeCodeConfig({
           codeConfig,
@@ -100,7 +96,7 @@ export async function executeStep({
         response = await callEndpointLegacyImplementation({ 
           endpoint: endpoint as ApiConfig, 
           payload: inputData, 
-          credentials: scopedCredentials, 
+          credentials: credentials, 
           options 
         });
       }
@@ -151,7 +147,7 @@ export async function executeStep({
       }
     }
     retryCount++;
-  } while (retryCount < effectiveMaxRetries);
+  } while (retryCount <= effectiveMaxRetries);
   
   if (!success) {
     const config = codeConfig || endpoint;

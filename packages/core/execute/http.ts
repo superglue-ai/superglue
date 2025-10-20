@@ -1,7 +1,8 @@
-import { RequestOptions } from "@superglue/client";
+import { FileType, RequestOptions } from "@superglue/client";
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import https from 'https';
 import { server_defaults } from "../default.js";
+import { parseFile } from "../utils/file.js";
 import { parseJSON } from "../utils/json-parser.js";
 import { logMessage } from "../utils/logs.js";
 import { maskCredentials } from "../utils/tools.js";
@@ -23,6 +24,16 @@ export async function executeHttp(input: HttpExecutorInput): Promise<HttpExecuto
     
     const axiosResult = await callAxios(axiosConfig, options);
     const response = axiosResult.response;
+    
+    if (response.data instanceof Buffer) {
+        response.data = await parseFile(response.data, FileType.AUTO);
+    }
+    else if (response.data && (response.data instanceof ArrayBuffer)) {
+        response.data = await parseFile(Buffer.from(response.data), FileType.AUTO);
+    }
+    else if (response.data && typeof response.data === 'string') {
+        response.data = await parseFile(Buffer.from(response.data), FileType.AUTO);
+    }
 
     handleResponseStatus({
         response,
@@ -33,17 +44,7 @@ export async function executeHttp(input: HttpExecutorInput): Promise<HttpExecuto
         lastFailureStatus: axiosResult.lastFailureStatus
     });
 
-    const data = response.data;
-
-    if (response.status >= 200 && response.status <= 205) {
-        try {
-            checkResponseForErrors(data, response.status, { axiosConfig, credentials, payload: inputData });
-        } catch (e: any) {
-            throw new ApiCallError(e?.message || String(e), response.status);
-        }
-    }
-
-    return { data, response };
+    return { data: response.data, response };
 }
 
 function handleResponseStatus(statusHandlerInput: {
@@ -97,16 +98,13 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
         ...config.headers,
     };
 
-    if (["GET", "HEAD", "DELETE", "OPTIONS"].includes(config.method!)) {
+    if (["GET", "HEAD", "DELETE", "OPTIONS"].includes(config.method!) || !config.data) {
         config.data = undefined;
     }
-    else if (config.data && config.data.trim().startsWith("{")) {
+    else if (config.data && typeof config.data === 'string' && config.data.trim().startsWith("{")) {
         try {
             config.data = parseJSON(config.data);
         } catch (error) { }
-    }
-    else if (!config.data) {
-        config.data = undefined;
     }
 
     do {
@@ -227,63 +225,6 @@ function detectHtmlErrorResponse(data: any): { isHtml: boolean; preview?: string
     };
 }
 
-export function checkResponseForErrors(
-    data: any,
-    status: number,
-    ctx: { axiosConfig: AxiosRequestConfig; credentials: Record<string, any>; payload: Record<string, any>; }
-): void {
-    if (!data || typeof data !== 'object') return;
-
-    const d: any = Array.isArray(data) && data.length > 0 ? data[0] : data;
-    if (!d || typeof d !== 'object') return;
-
-    const throwDetected = (reason: string, value?: any) => {
-        const method = (ctx.axiosConfig?.method || 'GET').toString().toUpperCase();
-        const url = String(ctx.axiosConfig?.url || '');
-        const maskedConfig = maskCredentials(JSON.stringify(ctx.axiosConfig || {}), ctx.credentials);
-        const previewSource = JSON.stringify(data);
-        const preview = String(previewSource).slice(0, 2500);
-        const valueStr = value !== undefined ? `='${String(value).slice(0, 120)}'` : '';
-        const message = `${method} ${url} returned ${status} but appears to be an error. Reason: ${reason}${valueStr}\nResponse preview: ${preview}\nconfig: ${maskedConfig}`;
-        throw new ApiCallError(message, status);
-    };
-
-    if (typeof d.code === 'number' && d.code >= 400 && d.code <= 599) {
-        throwDetected(`code`, d.code);
-    }
-    if (typeof d.status === 'number' && d.status >= 400 && d.status <= 599) {
-        throwDetected(`status`, d.status);
-    }
-
-    const errorKeys = new Set(['error', 'errors', 'error_message', 'errormessage', 'failure_reason', 'failure', 'failed']);
-    const maxDepth = 2;
-
-    const traverse = (obj: any, depth: number) => {
-        if (!obj || typeof obj !== 'object') return;
-        for (const key of Object.keys(obj)) {
-            const lower = key.toLowerCase();
-            if (errorKeys.has(lower)) {
-                const v = obj[key];
-                const isNonEmpty = Array.isArray(v)
-                    ? v.length > 0
-                    : (typeof v === 'string')
-                        ? v.trim() !== ''
-                        : (typeof v === 'boolean')
-                            ? v === true
-                            : (v && typeof v === 'object' && Object.keys(v).length > 0);
-                if (isNonEmpty) {
-                    throwDetected(`${key} key detected at depth ${depth}`, typeof v === 'string' ? v : undefined);
-                }
-            }
-            const val = obj[key];
-            if (depth < maxDepth && val && typeof val === 'object') {
-                traverse(val, depth + 1);
-            }
-        }
-    };
-
-    traverse(d, 0);
-}
 
 export type StatusHandlerInput = {
     response: AxiosResponse;
@@ -298,6 +239,7 @@ export function handle2xxStatus(
     input: StatusHandlerInput
 ): StatusHandlerResult {
     const { response, axiosConfig, credentials = {}, payload = {} } = input;
+    
     const htmlCheck = detectHtmlErrorResponse(response?.data);
     if (htmlCheck.isHtml) {
         const url = String(axiosConfig?.url || '');
@@ -305,6 +247,71 @@ export function handle2xxStatus(
         const msg = `Received HTML response instead of expected JSON data from ${maskedUrl}. \n        This usually indicates an error page or invalid endpoint.\nResponse: ${htmlCheck.preview}`;
         return { shouldFail: true, message: msg };
     }
+
+    const data = response.data;
+    if (!data || typeof data !== 'object') {
+        return { shouldFail: false };
+    }
+
+    const d: any = Array.isArray(data) && data.length > 0 ? data[0] : data;
+    if (!d || typeof d !== 'object') {
+        return { shouldFail: false };
+    }
+
+    const buildErrorMessage = (reason: string, value?: any) => {
+        const method = (axiosConfig?.method || 'GET').toString().toUpperCase();
+        const url = String(axiosConfig?.url || '');
+        const maskedConfig = maskCredentials(JSON.stringify(axiosConfig || {}), credentials);
+        const previewSource = JSON.stringify(data);
+        const preview = String(previewSource).slice(0, 2500);
+        const valueStr = value !== undefined ? `='${String(value).slice(0, 120)}'` : '';
+        return `${method} ${url} returned ${response.status} but appears to be an error. Reason: ${reason}${valueStr}\nResponse preview: ${preview}\nconfig: ${maskedConfig}`;
+    };
+
+    if (typeof d.code === 'number' && d.code >= 400 && d.code <= 599) {
+        return { shouldFail: true, message: buildErrorMessage('code', d.code) };
+    }
+    if (typeof d.status === 'number' && d.status >= 400 && d.status <= 599) {
+        return { shouldFail: true, message: buildErrorMessage('status', d.status) };
+    }
+
+    const errorKeys = new Set(['error', 'errors', 'error_message', 'errormessage', 'failure_reason', 'failure', 'failed', 'error message']);
+    const maxDepth = 2;
+
+    const checkForErrors = (obj: any, depth: number): { hasError: boolean; key?: string; value?: any } => {
+        if (!obj || typeof obj !== 'object') return { hasError: false };
+        
+        for (const key of Object.keys(obj)) {
+            const lower = key.toLowerCase();
+            if (errorKeys.has(lower)) {
+                const v = obj[key];
+                const isNonEmpty = Array.isArray(v)
+                    ? v.length > 0
+                    : (typeof v === 'string')
+                        ? v.trim() !== ''
+                        : (typeof v === 'boolean')
+                            ? v === true
+                            : (v && typeof v === 'object' && Object.keys(v).length > 0);
+                
+                if (isNonEmpty) {
+                    return { hasError: true, key: `${key} key detected at depth ${depth}`, value: typeof v === 'string' ? v : undefined };
+                }
+            }
+            
+            const val = obj[key];
+            if (depth < maxDepth && val && typeof val === 'object') {
+                const result = checkForErrors(val, depth + 1);
+                if (result.hasError) return result;
+            }
+        }
+        return { hasError: false };
+    };
+
+    const errorCheck = checkForErrors(d, 0);
+    if (errorCheck.hasError) {
+        return { shouldFail: true, message: buildErrorMessage(errorCheck.key!, errorCheck.value) };
+    }
+
     return { shouldFail: false };
 }
 

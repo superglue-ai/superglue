@@ -200,8 +200,8 @@ export class WorkflowRunner implements Workflow {
         throw new Error("Each step must have an ID");
       }
 
-      if (!step.apiConfig) {
-        throw new Error("Each step must have an API config");
+      if (!step.apiConfig && !step.codeConfig) {
+        throw new Error("Each step must have an API config or code config");
       }
     }
 

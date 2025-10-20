@@ -181,11 +181,18 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       id: toolId,
       steps: steps.map((step: ExecutionStep) => ({
         ...step,
-        apiConfig: {
-          id: step.apiConfig.id || step.id,
-          ...step.apiConfig,
-          pagination: step.apiConfig.pagination || null
-        }
+        ...(step.apiConfig ? {
+          apiConfig: {
+            id: step.apiConfig.id || step.id,
+            ...step.apiConfig,
+            pagination: step.apiConfig.pagination || null
+          }
+        } : {}),
+        ...(step.codeConfig ? {
+          codeConfig: {
+            ...step.codeConfig
+          }
+        } : {})
       })),
       responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
       inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
@@ -326,7 +333,13 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         throw new Error(`Tool with ID "${idToLoad}" not found.`);
       }
       setToolId(tool.id || '');
-      setSteps(tool?.steps?.map(step => ({ ...step, apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } })) || []);
+      setSteps(tool?.steps?.map(step => {
+        return {
+          ...step,
+          ...(step.apiConfig ? { apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } } : {}),
+          ...(step.codeConfig ? { codeConfig: { ...step.codeConfig } } : {})
+        };
+      }) || []);
       setFinalTransform(tool.finalTransform || `(sourceData) => {
         return {
           result: sourceData
@@ -368,10 +381,13 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   useEffect(() => {
     if (initialTool && initialTool.id !== lastToolId) {
       setToolId(initialTool.id || '');
-      setSteps(initialTool.steps?.map(step => ({
-        ...step,
-        apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id }
-      })) || []);
+      setSteps(initialTool.steps?.map(step => {
+        return {
+          ...step,
+          ...(step.apiConfig ? { apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } } : {}),
+          ...(step.codeConfig ? { codeConfig: { ...step.codeConfig } } : {})
+        };
+      }) || []);
       setFinalTransform(initialTool.finalTransform || `(sourceData) => {
   return {
     result: sourceData
@@ -432,11 +448,18 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         // Save the self-healed steps if they exist (from a successful run with self-healing enabled)
         steps: stepsToSave.map((step: ExecutionStep) => ({
           ...step,
-          apiConfig: {
-            id: step.apiConfig.id || step.id,
-            ...step.apiConfig,
-            pagination: step.apiConfig.pagination || null
-          }
+          ...(step.apiConfig ? {
+            apiConfig: {
+              id: step.apiConfig.id || step.id,
+              ...step.apiConfig,
+              pagination: step.apiConfig.pagination || null
+            }
+          } : {}),
+          ...(step.codeConfig ? {
+            codeConfig: {
+              ...step.codeConfig
+            }
+          } : {})
         })),
         // Only save responseSchema if it's explicitly enabled (non-empty string)
         responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
@@ -660,7 +683,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     setSteps(prevSteps =>
       prevSteps.map(step => (step.id === stepId ? {
         ...updatedStep,
-        apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id }
+        ...(updatedStep.apiConfig ? { apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id } } : {}),
+        ...(updatedStep.codeConfig ? { codeConfig: { ...updatedStep.codeConfig } } : {})
       } : step))
     );
 
@@ -680,6 +704,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         loopMaxIters: s.loopMaxIters,
         integrationId: s.integrationId,
         apiConfig: s.apiConfig,
+        codeConfig: s.codeConfig,
       };
       return JSON.stringify(exec);
     } catch {
