@@ -1,11 +1,12 @@
 import type { ApiConfig, ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
 import { Integration, Metadata } from "@superglue/shared";
+import { getLoopSelectorContext } from "../context/context-builders.js";
+import { LoopSelectorContextInput, LoopSelectorContextOptions } from "../context/context-types.js";
 import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel } from "../llm/language-model.js";
-import { getObjectContext } from "../utils/context.js";
 import { logMessage } from "../utils/logs.js";
-import { applyJsonata, flattenObject, transformAndValidateSchema } from "../utils/tools.js";
+import { applyJsonata, flattenObject, isSelfHealingEnabled, transformAndValidateSchema } from "../utils/tools.js";
 import { generateTransformCode } from "../utils/transform.js";
 import { executeStep } from "./workflow-step.js";
 
@@ -91,23 +92,14 @@ const loopStrategy: ExecutionStrategy = {
       loopItems = loopSelectorResult.data;
 
       if (!loopSelectorResult.success || !Array.isArray(loopItems)) {
-        logMessage("error", `No input data found for '${step.id}' - regenerating data selector`, metadata);
+        if (!isSelfHealingEnabled(options, "api")) {
+          throw new Error(`Loop selector for '${step.id}' did not return an array. Check the loop selector code or enable self-healing and re-execute to regenerate automatically.`);
+        }
+        logMessage("error", `Loop selector for '${step.id}' did not return an array. Regenerating loop selector.`, metadata);
 
-        const instruction = `Create a JavaScript function that extracts the array of items to loop over for step: ${step.id}. 
-          
-Step instruction: ${step.apiConfig.instruction}
-
-The function should:
-1. Extract an array of ACTUAL DATA ITEMS (not metadata or property definitions)
-2. Apply any filtering based on the step's instruction
-
-This is the available data in sourceData:
-${getObjectContext(payload, { include: { schema: true, preview: true, samples: false }, characterBudget: LanguageModel.contextLength / 10 })}
-
-The function should return an array of items that this step will iterate over.`;
-
+        const loopPrompt = getLoopSelectorContext( { step: step, payload: payload, instruction: step.apiConfig.instruction }, { characterBudget: LanguageModel.contextLength / 10 });
         const arraySchema = { type: "array", description: "Array of items to iterate over" };
-        const transformResult = await generateTransformCode(arraySchema, payload, instruction, metadata);
+        const transformResult = await generateTransformCode(arraySchema, payload, loopPrompt, metadata);
 
         step.loopSelector = transformResult.mappingCode;
         const retryResult = await transformAndValidateSchema(payload, step.loopSelector, null);
@@ -153,7 +145,7 @@ The function should return an array of items that this step will iterate over.`;
             }
           }
 
-          const rawData = { currentItem: currentItem, ...(typeof apiResponse.data === 'object' ? apiResponse.data : { data: apiResponse.data }) };
+          const rawData = { currentItem: currentItem, data: apiResponse.data, ...(typeof apiResponse.data === 'object' ? apiResponse.data : {}) };
           const transformedData = await applyJsonata(rawData, step.responseMapping); //LEGACY: New workflow strategy will not use response mappings, default to $
 
           stepResults.push({
