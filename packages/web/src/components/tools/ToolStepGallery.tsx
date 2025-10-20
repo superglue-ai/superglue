@@ -33,7 +33,7 @@ interface ToolStepGalleryProps {
     onToolIdChange?: (id: string) => void;
     onInstructionEdit?: () => void;
     onExecuteStep?: (stepIndex: number) => Promise<void>;
-    onFixWorkflow?: (stepIndex: number) => Promise<void>;
+    onFixStep?: (stepIndex: number) => Promise<void>;
     onExecuteAllSteps?: () => Promise<void>;
     onExecuteTransform?: (schema: string, transform: string) => Promise<void>;
     completedSteps?: string[];
@@ -71,7 +71,7 @@ const SpotlightStepCard = ({
     onEdit,
     onRemove,
     onExecuteStep,
-    onFixWorkflow,
+    onFixStep,
     canExecute,
     isExecuting,
     isFixingWorkflow,
@@ -92,7 +92,7 @@ const SpotlightStepCard = ({
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onRemove?: (stepId: string) => void;
     onExecuteStep?: () => Promise<void>;
-    onFixWorkflow?: () => Promise<void>;
+    onFixStep?: () => Promise<void>;
     canExecute?: boolean;
     isExecuting?: boolean;
     isFixingWorkflow?: boolean;
@@ -153,13 +153,13 @@ const SpotlightStepCard = ({
                                 </div>
                             </div>
                         )}
-                        {!readOnly && (onExecuteStep || onFixWorkflow) && (
+                        {!readOnly && (onExecuteStep || onFixStep) && (
                             <>
                                 <span title={!canExecute ? "To enable this button, execute previous steps first" : (isExecuting || isFixingWorkflow) ? "Step is currently executing" : selfHealingEnabled ? "Fix this step with AI" : "Test this step"}>
                                     <Button
                                         size="sm"
                                         variant={selfHealingEnabled ? "default" : "default"}
-                                        onClick={selfHealingEnabled ? onFixWorkflow : onExecuteStep}
+                                        onClick={selfHealingEnabled ? onFixStep : onExecuteStep}
                                         disabled={!canExecute || isExecuting || isFixingWorkflow}
                                     >
                                         {(isExecuting || isFixingWorkflow) ? (
@@ -426,7 +426,7 @@ export function ToolStepGallery({
     onToolIdChange,
     onInstructionEdit,
     onExecuteStep,
-    onFixWorkflow,
+    onFixStep,
     onExecuteAllSteps,
     onExecuteTransform,
     completedSteps = [],
@@ -1009,7 +1009,7 @@ export function ToolStepGallery({
                                 onEdit={!readOnly ? onStepEdit : undefined}
                                 onRemove={!readOnly && currentItem.type === 'step' ? handleRemoveStep : undefined}
                                 onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
-                                onFixWorkflow={onFixWorkflow ? () => onFixWorkflow(activeIndex - 1) : undefined}
+                                onFixStep={onFixStep ? () => onFixStep(activeIndex - 1) : undefined}
                                 canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
                                 isExecuting={isExecutingStep === activeIndex - 1}
                                 isFixingWorkflow={isFixingWorkflow === activeIndex - 1}

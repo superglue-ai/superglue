@@ -718,7 +718,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     prevStepHashesRef.current = currentHashes;
   }, [steps]);
 
-  const handleExecuteStep = async (idx: number) => {
+  const executeStepByIdx = async (idx: number, selfHealing: boolean = false) => {
     try {
       setIsExecutingStep(idx);
       const single = await executeSingleStep(
@@ -730,7 +730,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         idx,
         JSON.parse(payload || '{}'),
         stepResultsMap,  // Pass accumulated results
-        false
+        selfHealing,
       );
       const sid = steps[idx].id;
       const normalized = computeStepOutput(single);
@@ -765,13 +765,12 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
   };
 
-  const handleFixWorkflow = async (idx: number) => {
-    console.log(`Fix Step called for step index: ${idx}`);
-    toast({
-      title: "Fix Step",
-      description: `Attempting to fix step ${steps[idx]?.id || idx} with AI self-healing`,
-    });
-    // TODO: Implement actual self-healing logic here
+  const handleExecuteStep = async (idx: number) => {
+    await executeStepByIdx(idx, false);
+  };
+
+  const handleFixStep = async (idx: number) => {
+    await executeStepByIdx(idx, true);
   };
 
   const handleExecuteTransform = async (schemaStr: string, transformStr: string) => {
@@ -915,7 +914,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   onStepsChange={handleStepsChange}
                   onStepEdit={handleStepEdit}
                   onExecuteStep={handleExecuteStep}
-                  onFixWorkflow={handleFixWorkflow}
+                  onFixStep={handleFixStep}
                   onExecuteTransform={handleExecuteTransform}
                   onFinalTransformChange={setFinalTransform}
                   onResponseSchemaChange={setResponseSchema}
