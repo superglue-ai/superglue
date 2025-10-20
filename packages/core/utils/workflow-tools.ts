@@ -124,8 +124,7 @@ Example using previous step data:
 })`),
                     pagination: z.object({
                         type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"]),
-                        pageSize: z.string().describe("Number of items per page (e.g., '50', '100')"),
-                        handler: z.string().describe("Pagination control handler. Format: (response, pageInfo) => ({ hasMore: boolean, cursor?: any }). Controls pagination flow only - responses are automatically merged. Example: (response, pageInfo) => ({ hasMore: response.data.has_more && pageInfo.totalFetched < 10000, cursor: response.data.next_cursor })")
+                        handler: z.string().describe("Pagination control handler. Format: (response, pageInfo) => ({ hasMore: boolean, resultSize: number, cursor?: any }). Must return resultSize to report items in current page. Receives pageInfo with { page, offset, cursor, totalFetched }. Example: (response, pageInfo) => ({ hasMore: response.data.has_more, resultSize: response.data.items.length, cursor: response.data.next_cursor })")
                     }).optional().describe("OPTIONAL: Only include if pagination is needed. When configured, paginationState will be available in the code's context parameter.")
                 }).describe("Code configuration that generates the axios config at runtime")
             })).describe("Array of workflow steps. Can be empty ([]) for transform-only workflows that just process the input payload without API calls"),

@@ -17,8 +17,6 @@ interface CodeExecutionContext {
         page: number;
         offset: number;
         cursor: any;
-        limit: string;
-        pageSize: string;
     };
 }
 
@@ -28,6 +26,7 @@ interface PaginationState {
     cursor: any;
     hasMore: boolean;
     loopCounter: number;
+    totalFetched: number;
     previousResponseHash: string | null;
     firstResponseHash: string | null;
     hasValidData: boolean;
@@ -88,6 +87,7 @@ export async function executeCodeConfig({
         cursor: null,
         hasMore: true,
         loopCounter: 0,
+        totalFetched: 0,
         previousResponseHash: null,
         firstResponseHash: null,
         hasValidData: false
@@ -102,9 +102,7 @@ export async function executeCodeConfig({
             paginationState: hasPagination ? {
                 page: paginationState.page,
                 offset: paginationState.offset,
-                cursor: paginationState.cursor,
-                limit: codeConfig.pagination!.pageSize,
-                pageSize: codeConfig.pagination!.pageSize
+                cursor: paginationState.cursor
             } : undefined
         };
 
@@ -136,15 +134,21 @@ export async function executeCodeConfig({
         // Merge response data
         mergedResult = smartMergeResponses(mergedResult, responseData);
 
-        await handlePaginationWithHandler(
+        // Handler determines result size and pagination state
+        const handlerResult = await handlePaginationWithHandler(
             responseData,
             lastResponse,
             paginationState,
             codeConfig
         );
 
-        // Increment page/offset for pageInfo context in next iteration
-        updatePaginationState(paginationState, codeConfig.pagination!.type, codeConfig.pagination!.pageSize, paginationState.cursor);
+        // Increment page/offset using result size from handler
+        updatePaginationState(
+            paginationState, 
+            codeConfig.pagination!.type, 
+            String(handlerResult.resultSize || 50), 
+            paginationState.cursor
+        );
 
         paginationState.loopCounter++;
     }
@@ -271,29 +275,52 @@ function updatePaginationState(
 }
 
 
+function generateDefaultHandler(paginationType: string): string {
+    switch (paginationType) {
+        case "OFFSET_BASED":
+        case "PAGE_BASED":
+            // Try to extract array from common paths, fallback to checking if response.data is array
+            return `(response, pageInfo) => {
+                const data = Array.isArray(response.data) ? response.data : 
+                             (response.data?.items || response.data?.results || response.data?.data || []);
+                return { hasMore: data.length > 0, resultSize: data.length };
+            }`;
+        case "CURSOR_BASED":
+            return `(response, pageInfo) => {
+                const data = Array.isArray(response.data) ? response.data :
+                             (response.data?.items || response.data?.results || response.data?.data || []);
+                return { 
+                    hasMore: !!response.data?.next_cursor, 
+                    resultSize: data.length,
+                    cursor: response.data?.next_cursor 
+                };
+            }`;
+        default:
+            return `(response, pageInfo) => {
+                const data = Array.isArray(response.data) ? response.data : [];
+                return { hasMore: data.length > 0, resultSize: data.length };
+            }`;
+    }
+}
+
 async function handlePaginationWithHandler(
     responseData: any,
     response: AxiosResponse,
     paginationState: PaginationState,
     codeConfig: CodeConfig
-): Promise<void> {
-    // Calculate total fetched by checking the merged result size
-    let totalFetched = 0;
-    if (Array.isArray(responseData)) {
-        totalFetched = paginationState.loopCounter * parseInt(codeConfig.pagination!.pageSize || "50");
-    }
-
+): Promise<{ resultSize: number }> {
     const pageInfo = {
         page: paginationState.page,
         offset: paginationState.offset,
         cursor: paginationState.cursor,
-        totalFetched,
-        limit: codeConfig.pagination!.pageSize,
-        pageSize: codeConfig.pagination!.pageSize
+        totalFetched: paginationState.totalFetched || 0
     };
 
+    // Auto-generate handler if not provided
+    const handler = codeConfig.pagination!.handler || generateDefaultHandler(codeConfig.pagination!.type);
+    
     const handlerResult = await executePaginationHandler(
-        codeConfig.pagination!.handler!,
+        handler,
         response,
         pageInfo
     );
@@ -301,17 +328,28 @@ async function handlePaginationWithHandler(
     if (handlerResult.error) {
         throw new Error(
             `Pagination handler error: ${handlerResult.error}\n` +
-            `Handler: ${codeConfig.pagination!.handler}`
+            `Handler: ${handler}`
+        );
+    }
+
+    // Validate resultSize
+    if (typeof handlerResult.resultSize !== 'number' || handlerResult.resultSize < 0) {
+        throw new Error(
+            `Pagination handler must return a valid resultSize (got ${handlerResult.resultSize}). ` +
+            `Handler: ${handler}`
         );
     }
 
     // Update pagination state
     paginationState.hasMore = handlerResult.hasMore;
+    paginationState.totalFetched = (paginationState.totalFetched || 0) + handlerResult.resultSize;
     
     // Update cursor if provided (for cursor-based pagination)
     if (handlerResult.cursor !== undefined) {
         paginationState.cursor = handlerResult.cursor;
     }
+
+    return { resultSize: handlerResult.resultSize };
 }
 
 function formatFinalResult(
@@ -341,8 +379,8 @@ function formatFinalResult(
 async function executePaginationHandler(
     handlerCode: string,
     response: AxiosResponse,
-    pageInfo: { page: number; offset: number; cursor: any; totalFetched: number; limit: string; pageSize: string }
-): Promise<{ hasMore: boolean; cursor?: any; error?: string }> {
+    pageInfo: { page: number; offset: number; cursor: any; totalFetched: number }
+): Promise<{ hasMore: boolean; resultSize: number; cursor?: any; error?: string }> {
     const isolate = new ivm.Isolate({ memoryLimit: 128 });
 
     try {
@@ -369,20 +407,25 @@ async function executePaginationHandler(
         const result = JSON.parse(resultJSON as string);
 
         if (!result || typeof result !== 'object') {
-            throw new Error('Handler must return an object with { hasMore, cursor? }');
+            throw new Error('Handler must return an object with { hasMore, resultSize, cursor? }');
         }
         if (typeof result.hasMore !== 'boolean') {
             throw new Error('Handler must return hasMore as a boolean');
         }
+        if (typeof result.resultSize !== 'number') {
+            throw new Error('Handler must return resultSize as a number');
+        }
 
         return {
             hasMore: result.hasMore,
+            resultSize: result.resultSize,
             cursor: result.cursor
         };
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         return {
             hasMore: false,
+            resultSize: 0,
             error: `Pagination handler evaluation failed: ${errorMessage}`
         };
     } finally {

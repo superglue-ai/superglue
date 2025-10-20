@@ -23,8 +23,7 @@ export interface CodeConfig {
     code: string;
     pagination?: {
         type: "OFFSET_BASED" | "PAGE_BASED" | "CURSOR_BASED";
-        pageSize: string;
-        handler: string;  // "(response, pageInfo) => ({ hasMore, cursor? })"
+        handler: string;
     };
 }
 
@@ -118,31 +117,45 @@ Must return: { url: string, method: string, headers?: object, data?: any, params
 - For FTP/SFTP: data = { operation: string, path: string, content?: string, ... }`),
         pagination: z.object({
             type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"]),
-            pageSize: z.string(),
-            handler: z.string().describe(`Pagination control handler. Format: (response, pageInfo) => ({ hasMore: boolean, cursor?: any })
-
+            handler: z.string().describe(`Pagination control handler. Format: (response, pageInfo) => ({ hasMore: boolean, resultSize: number, cursor?: any })
+            
 The handler receives:
-- response: { data: any, headers: any } - Full API response with direct field access (e.g., response.data.results or response.results)
-- pageInfo: { page: number, offset: number, cursor: any, totalFetched: number, limit: string, pageSize: string }
+- response: { data: any, headers: any } - Full API response with direct field access
+- pageInfo: { page, offset, cursor, totalFetched }
+  - totalFetched: total items accumulated so far (from previous pages)
 
 Must return:
 - hasMore: boolean - Continue pagination?
+- resultSize: number - Number of items in THIS page (used to increment offset and totalFetched)
 - cursor?: any - Next cursor (for cursor-based pagination only)
 
-The responses will be automatically merged using smart merge logic (arrays concatenated, objects joined, conflicts resolved by taking most recent).
+Responses are automatically merged: arrays concatenated, objects joined, conflicts resolved by taking most recent.
 
 Examples:
-1. Check has_more flag with cursor:
-   (response, pageInfo) => ({ hasMore: response.data.has_more, cursor: response.data.next_token })
+1. Extract array from nested path:
+   (response, pageInfo) => ({ 
+     hasMore: response.data.has_more,
+     resultSize: (response.data.items || []).length 
+   })
 
 2. Stop at max items:
-   (response, pageInfo) => ({ hasMore: response.data.items?.length === parseInt(pageInfo.pageSize) && pageInfo.totalFetched < 10000 })
+   (response, pageInfo) => ({ 
+     hasMore: response.data.items.length > 0 && pageInfo.totalFetched < 10000,
+     resultSize: response.data.items.length
+   })
 
-3. Stop when array is smaller than page size:
-   (response, pageInfo) => ({ hasMore: (response.results || []).length >= parseInt(pageInfo.pageSize) })
+3. Cursor-based with array extraction:
+   (response, pageInfo) => ({ 
+     hasMore: !!response.data.next_cursor,
+     resultSize: (response.data.results || []).length,
+     cursor: response.data.next_cursor
+   })
 
-4. Use API pagination flag:
-   (response, pageInfo) => ({ hasMore: !!response.pagination?.next_page })`)
+4. Direct array response:
+   (response, pageInfo) => ({ 
+     hasMore: response.data.length >= 100 && pageInfo.totalFetched < 5000,
+     resultSize: response.data.length
+   })`)
         }).optional().describe("Optional pagination configuration with unified handler for all pagination logic.")
     }));
 

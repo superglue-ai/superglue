@@ -549,24 +549,26 @@ BEFORE configuring pagination:
 4. If unsure about ANY aspect, DO NOT configure pagination
 
 When you DO configure pagination:
-1. Set the pagination object with type, pageSize, and handler
+1. Set the pagination object with type and handler
 2. In your configCode function, access pagination state via context.paginationState:
    - context.paginationState.page (for PAGE_BASED)
    - context.paginationState.offset (for OFFSET_BASED)
    - context.paginationState.cursor (for CURSOR_BASED)
-   - context.paginationState.limit or context.paginationState.pageSize
 
-The handler function receives the full response and must return:
+The handler function must return:
 - hasMore: boolean - Whether to continue pagination
+- resultSize: number - Number of items in THIS page (handler extracts this from response)
 - cursor?: any - Next cursor (for cursor-based pagination only)
+
+Handler receives pageInfo with:
+- totalFetched: total items accumulated from all previous pages
+- page, offset, cursor: current pagination state
 
 Responses are automatically merged: arrays concatenated, objects merged, conflicts resolved by taking most recent value.
 
-Example with OFFSET_BASED pagination:
+Example with OFFSET_BASED pagination (minimal - uses auto-generated handler):
 pagination: {
-  type: "OFFSET_BASED",
-  pageSize: "100",
-  handler: "(response, pageInfo) => ({ hasMore: response.data.has_more && pageInfo.totalFetched < 10000 })"
+  type: "OFFSET_BASED"
 }
 configCode: (context) => ({
   url: 'https://api.example.com/users',
@@ -574,16 +576,14 @@ configCode: (context) => ({
   headers: { 'Authorization': \`Bearer \${context.credentials.api_token}\` },
   params: {
     offset: context.paginationState.offset,
-    limit: context.paginationState.limit,
-    status: context.inputData.filterStatus
+    limit: 100
   }
 })
 
-Example with CURSOR_BASED pagination:
+Example with CURSOR_BASED pagination (custom handler for nested data):
 pagination: {
   type: "CURSOR_BASED",
-  pageSize: "50",
-  handler: "(response, pageInfo) => ({ hasMore: !!response.data.next_cursor, cursor: response.data.next_cursor })"
+  handler: "(response, pageInfo) => ({ hasMore: !!response.data.next_cursor, resultSize: (response.data.items || []).length, cursor: response.data.next_cursor })"
 }
 configCode: (context) => ({
   url: 'https://api.example.com/items',
@@ -591,22 +591,21 @@ configCode: (context) => ({
   headers: { 'Authorization': \`Bearer \${context.credentials.api_key}\` },
   params: {
     cursor: context.paginationState.cursor,
-    limit: context.paginationState.pageSize
+    limit: 50
   }
 })
 
 Example with PAGE_BASED pagination and max limit:
 pagination: {
   type: "PAGE_BASED",
-  pageSize: "100",
-  handler: "(response, pageInfo) => ({ hasMore: (response.results || []).length >= parseInt(pageInfo.pageSize) && pageInfo.totalFetched < 5000 })"
+  handler: "(response, pageInfo) => ({ hasMore: response.data.results.length > 0 && pageInfo.totalFetched < 5000, resultSize: response.data.results.length })"
 }
 configCode: (context) => ({
   url: 'https://api.example.com/data',
   method: 'GET',
   params: {
     page: context.paginationState.page,
-    per_page: context.paginationState.pageSize
+    per_page: 100
   }
 })
 

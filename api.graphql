@@ -85,6 +85,7 @@ type RunResult {
 
 type Pagination {
   type: PaginationType!
+  handler: String
   pageSize: String
   cursorPath: String
   stopCondition: String
@@ -178,13 +179,6 @@ enum UpsertMode {
   CREATE
   UPDATE
   UPSERT
-}
-
-input PaginationInput {
-  type: PaginationType!
-  pageSize: String
-  cursorPath: String
-  stopCondition: String
 }
 
 input ApiInput {
@@ -341,7 +335,7 @@ type ExecutionStep {
 }
 
 input CodeConfigInput {
-  instruction: String
+  stepInstruction: String
   code: String!
   pagination: PaginationInput
 }
@@ -363,6 +357,7 @@ input PaginationInput {
   pageSize: String
   cursorPath: String
   stopCondition: String
+  handler: String
 }
 
 type Workflow implements BaseConfig {
