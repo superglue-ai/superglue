@@ -33,6 +33,7 @@
     "test-no-watch": "vitest run --exclude '**/tests/integration.test.ts'",
     "test:coverage": "vitest run --coverage --exclude '**/tests/integration.test.ts'",
     "test:workflow": "vitest run -t ApiWorkflowOrchestrator-dog",
+    "test:agent-eval": "tsx eval/agent-eval/run-agent-eval.ts",
     "test:integration": "NODE_OPTIONS='--max-old-space-size=12000' vitest run eval/integration-testing/integration.test.ts",
     "generate-ranking": "tsc && node --max-old-space-size=12288 --expose-gc dist/eval/api-ranking/generate-api-ranking.js"
   },
