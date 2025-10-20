@@ -23,6 +23,7 @@ const WorkflowConfigSchema = z.object({
     instruction: z.string(),
     integrationIds: z.array(z.string()).min(1),
     expectedData: z.any().optional(),
+    allowAdditionalProperties: z.boolean().optional(),
     payload: z.any().optional(),
 });
 
