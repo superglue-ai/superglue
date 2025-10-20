@@ -3,6 +3,8 @@ import { Card } from '@/src/components/ui/card';
 import { Input } from '@/src/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
+import { Label } from '@/src/components/ui/label';
+import { Switch } from '@/src/components/ui/switch';
 import { canExecuteStep } from '@/src/lib/client-utils';
 import { downloadJson } from '@/src/lib/download-utils';
 import { type UploadedFileInfo } from '@/src/lib/file-utils';
@@ -31,6 +33,7 @@ interface ToolStepGalleryProps {
     onToolIdChange?: (id: string) => void;
     onInstructionEdit?: () => void;
     onExecuteStep?: (stepIndex: number) => Promise<void>;
+    onFixStep?: (stepIndex: number) => Promise<void>;
     onExecuteAllSteps?: () => Promise<void>;
     onExecuteTransform?: (schema: string, transform: string) => Promise<void>;
     completedSteps?: string[];
@@ -38,6 +41,7 @@ interface ToolStepGalleryProps {
     integrations?: Integration[];
     isExecuting?: boolean;
     isExecutingStep?: number;
+    isFixingWorkflow?: number;
     isExecutingTransform?: boolean;
     currentExecutingStepIndex?: number;
     transformResult?: any;
@@ -55,6 +59,8 @@ interface ToolStepGalleryProps {
     isProcessingFiles?: boolean;
     totalFileSize?: number;
     filePayloads?: Record<string, any>;
+    stepSelfHealingEnabled?: boolean;
+    onStepSelfHealingChange?: (enabled: boolean) => void;
 }
 
 const SpotlightStepCard = ({
@@ -65,15 +71,19 @@ const SpotlightStepCard = ({
     onEdit,
     onRemove,
     onExecuteStep,
+    onFixStep,
     canExecute,
     isExecuting,
+    isFixingWorkflow,
     isGlobalExecuting,
     currentExecutingStepIndex,
     integrations,
     readOnly,
     failedSteps = [],
     showOutputSignal,
-    onConfigEditingChange
+    onConfigEditingChange,
+    selfHealingEnabled,
+    onSelfHealingChange
 }: {
     step: any;
     stepIndex: number;
@@ -82,8 +92,10 @@ const SpotlightStepCard = ({
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onRemove?: (stepId: string) => void;
     onExecuteStep?: () => Promise<void>;
+    onFixStep?: () => Promise<void>;
     canExecute?: boolean;
     isExecuting?: boolean;
+    isFixingWorkflow?: boolean;
     isGlobalExecuting?: boolean;
     currentExecutingStepIndex?: number;
     integrations?: Integration[];
@@ -92,6 +104,8 @@ const SpotlightStepCard = ({
     stepResultsMap?: Record<string, any>;
     showOutputSignal?: number;
     onConfigEditingChange?: (editing: boolean) => void;
+    selfHealingEnabled?: boolean;
+    onSelfHealingChange?: (enabled: boolean) => void;
 }) => {
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
@@ -107,7 +121,7 @@ const SpotlightStepCard = ({
     }, [showOutputSignal]);
 
     return (
-        <Card className="w-full max-w-6xl mx-auto shadow-md bg-accent/10 dark:bg-accent/5 border border-accent/30 dark:border-accent/20 overflow-hidden" style={{ scrollbarGutter: 'stable both-edges' }}>
+        <Card className="w-full max-w-6xl mx-auto shadow-md bg-accent/10 dark:bg-accent/5 border border-accent/30 dark:border-accent/20 overflow-hidden">
             <div className="p-3">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
@@ -120,28 +134,48 @@ const SpotlightStepCard = ({
                         )}
                     </div>
                     <div className="flex items-center gap-2">
-                        {!readOnly && onExecuteStep && (
+                        {!readOnly && onSelfHealingChange && (
+                            <div className="flex items-center gap-2 mr-2">
+                                <Label htmlFor={`selfHealing-${step.id}`} className="text-xs flex items-center gap-1">
+                                    <span>Self-healing</span>
+                                </Label>
+                                <div className="flex items-center">
+                                    <Switch 
+                                        className="custom-switch" 
+                                        id={`selfHealing-${step.id}`} 
+                                        checked={selfHealingEnabled ?? false} 
+                                        onCheckedChange={onSelfHealingChange}
+                                        disabled={isExecuting || isFixingWorkflow}
+                                    />
+                                    <div className="ml-1 flex items-center">
+                                        <HelpTooltip text="Enable self-healing mode. When enabled, the button becomes 'Fix Step' which attempts to auto-fix step configuration issues." />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {!readOnly && (onExecuteStep || onFixStep) && (
                             <>
-                                <span title={!canExecute ? "To enable this button, execute previous steps first" : isExecuting ? "Step is currently executing" : "Test this step (no self-healing)"}>
+                                <span title={!canExecute ? "To enable this button, execute previous steps first" : (isExecuting || isFixingWorkflow) ? "Step is currently executing" : selfHealingEnabled ? "Fix this step with AI" : "Test this step"}>
                                     <Button
                                         size="sm"
-                                        onClick={onExecuteStep}
-                                        disabled={!canExecute || isExecuting}
+                                        variant={selfHealingEnabled ? "default" : "default"}
+                                        onClick={selfHealingEnabled ? onFixStep : onExecuteStep}
+                                        disabled={!canExecute || isExecuting || isFixingWorkflow}
                                     >
-                                        {isExecuting ? (
+                                        {(isExecuting || isFixingWorkflow) ? (
                                             <>
                                                 <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                                                Running...
+                                                {selfHealingEnabled ? "Fixing..." : "Running..."}
                                             </>
                                         ) : (
                                             <>
                                                 <Play className="h-3 w-3 mr-1" />
-                                                Run Step
+                                                 "Run Step"
                                             </>
                                         )}
                                     </Button>
                                 </span>
-                                <HelpTooltip text="Executes this step configuration directly without instruction validation or self-healing. Only works if all previous steps have completed successfully." />
+                                <HelpTooltip text={selfHealingEnabled ? "Attempts to fix this step using AI self-healing. Only works if all previous steps have completed successfully." : "Executes this step configuration directly. Only works if all previous steps have completed successfully."} />
                             </>
                         )}
                         {!readOnly && onRemove && (
@@ -157,7 +191,7 @@ const SpotlightStepCard = ({
                     </div>
                 </div>
 
-                <div className="space-y-3" style={{ scrollbarGutter: 'stable both-edges' }}>
+                <div className="space-y-3">
                     <div className="flex items-center justify-between">
                         <Tabs value={activePanel} onValueChange={(v) => setActivePanel(v as 'input' | 'config' | 'output')}>
                             <TabsList className="h-9 p-1 rounded-md">
@@ -175,7 +209,7 @@ const SpotlightStepCard = ({
                         </Tabs>
                     </div>
 
-                    <div className="mt-1" style={{ scrollbarGutter: 'stable both-edges' }}>
+                    <div className="mt-1">
                         {activePanel === 'input' && (
                             <div>
                                 {(() => {
@@ -392,6 +426,7 @@ export function ToolStepGallery({
     onToolIdChange,
     onInstructionEdit,
     onExecuteStep,
+    onFixStep,
     onExecuteAllSteps,
     onExecuteTransform,
     completedSteps = [],
@@ -399,6 +434,7 @@ export function ToolStepGallery({
     integrations,
     isExecuting,
     isExecutingStep,
+    isFixingWorkflow,
     isExecutingTransform,
     currentExecutingStepIndex,
     transformResult,
@@ -415,7 +451,9 @@ export function ToolStepGallery({
     onFileRemove,
     isProcessingFiles,
     totalFileSize,
-    filePayloads
+    filePayloads,
+    stepSelfHealingEnabled,
+    onStepSelfHealingChange
 }: ToolStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
     const [windowWidth, setWindowWidth] = useState(1200);
@@ -632,7 +670,7 @@ export function ToolStepGallery({
         setIsAddStepDialogOpen(true);
     };
 
-    const handleConfirmInsertStep = (stepId: string) => {
+    const handleConfirmInsertStep = (stepId: string, instruction: string) => {
         if (pendingInsertIndex === null || !onStepsChange) return;
 
         const newStep = {
@@ -640,7 +678,7 @@ export function ToolStepGallery({
             name: '',
             apiConfig: {
                 id: stepId,
-                instruction: '',
+                instruction: instruction,
                 urlHost: '',
                 urlPath: '',
                 method: 'GET',
@@ -971,8 +1009,10 @@ export function ToolStepGallery({
                                 onEdit={!readOnly ? onStepEdit : undefined}
                                 onRemove={!readOnly && currentItem.type === 'step' ? handleRemoveStep : undefined}
                                 onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
+                                onFixStep={onFixStep ? () => onFixStep(activeIndex - 1) : undefined}
                                 canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
                                 isExecuting={isExecutingStep === activeIndex - 1}
+                                isFixingWorkflow={isFixingWorkflow === activeIndex - 1}
                                 isGlobalExecuting={!!(isExecuting || isExecutingTransform)}
                                 currentExecutingStepIndex={currentExecutingStepIndex}
                                 integrations={integrations}
@@ -980,6 +1020,8 @@ export function ToolStepGallery({
                                 failedSteps={failedSteps}
                                 showOutputSignal={showStepOutputSignal}
                                 onConfigEditingChange={setIsConfiguratorEditing}
+                                selfHealingEnabled={stepSelfHealingEnabled}
+                                onSelfHealingChange={onStepSelfHealingChange}
                             />
                         )
                     )}

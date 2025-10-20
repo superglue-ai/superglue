@@ -18,7 +18,7 @@ import { useEffect, useState } from 'react';
 interface AddStepDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onConfirm: (stepId: string) => void;
+    onConfirm: (stepId: string, instruction: string) => void;
     onConfirmTool?: (steps: ExecutionStep[]) => void;
     existingStepIds: string[];
     defaultId?: string;
@@ -33,6 +33,7 @@ export function AddStepDialog({
     defaultId
 }: AddStepDialogProps) {
     const [stepId, setStepId] = useState(defaultId || '');
+    const [instruction, setInstruction] = useState('');
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState<'scratch' | 'tool'>('scratch');
     const [tools, setTools] = useState<Tool[]>([]);
@@ -49,6 +50,7 @@ export function AddStepDialog({
     useEffect(() => {
         if (open && defaultId) {
             setStepId(defaultId);
+            setInstruction('');
             setError('');
         }
     }, [open, defaultId]);
@@ -75,6 +77,7 @@ export function AddStepDialog({
     const handleOpenChange = (newOpen: boolean) => {
         if (!newOpen) {
             setError('');
+            setInstruction('');
             setSelectedToolId(null);
             setActiveTab('scratch');
             setSearchQuery('');
@@ -104,7 +107,7 @@ export function AddStepDialog({
             return;
         }
         
-        onConfirm(trimmedId);
+        onConfirm(trimmedId, instruction.trim());
         setError('');
     };
 
@@ -155,12 +158,6 @@ export function AddStepDialog({
                                     setStepId(e.target.value);
                                     setError('');
                                 }}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        handleConfirmScratch();
-                                    }
-                                }}
                                 placeholder="e.g., fetch_users"
                                 className={cn(error && "border-destructive")}
                                 autoFocus
@@ -168,6 +165,25 @@ export function AddStepDialog({
                             {error && (
                                 <p className="text-sm text-destructive">{error}</p>
                             )}
+                        </div>
+                        <div className="space-y-2">
+                            <label htmlFor="step-instruction" className="text-sm font-medium">
+                                Instruction
+                            </label>
+                            <Input
+                                id="step-instruction"
+                                value={instruction}
+                                onChange={(e) => {
+                                    setInstruction(e.target.value);
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleConfirmScratch();
+                                    }
+                                }}
+                                placeholder="e.g., Fetch all users from the API"
+                            />
                         </div>
                     </TabsContent>
                     

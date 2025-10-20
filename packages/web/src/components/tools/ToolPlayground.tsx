@@ -132,6 +132,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   }, [embedded, initialInstruction]);
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(externalSelfHealingEnabled ?? true);
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
+  const [isFixingWorkflow, setIsFixingWorkflow] = useState<number | undefined>(undefined);
+  const [stepSelfHealingEnabled, setStepSelfHealingEnabled] = useState(false);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndex] = useState<number | undefined>(undefined);
   const [isStopping, setIsStopping] = useState(false);
   // Single source of truth for stopping across modes (embedded/standalone)
@@ -716,9 +718,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     prevStepHashesRef.current = currentHashes;
   }, [steps]);
 
-  const handleExecuteStep = async (idx: number) => {
+  const executeStepByIdx = async (idx: number, selfHealing: boolean = false) => {
     try {
-      // mark testing state for indicator without freezing entire UI
       setIsExecutingStep(idx);
       const single = await executeSingleStep(
         client,
@@ -729,7 +730,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         idx,
         JSON.parse(payload || '{}'),
         stepResultsMap,  // Pass accumulated results
-        false
+        selfHealing,
       );
       const sid = steps[idx].id;
       const normalized = computeStepOutput(single);
@@ -762,6 +763,14 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     } finally {
       setIsExecutingStep(undefined);
     }
+  };
+
+  const handleExecuteStep = async (idx: number) => {
+    await executeStepByIdx(idx, false);
+  };
+
+  const handleFixStep = async (idx: number) => {
+    await executeStepByIdx(idx, true);
   };
 
   const handleExecuteTransform = async (schemaStr: string, transformStr: string) => {
@@ -864,7 +873,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   );
 
   return (
-    <div className={embedded ? "w-full" : "p-6 max-w-none w-full"} style={{ scrollbarGutter: 'stable both-edges' }}>
+    <div className={embedded ? "w-full" : "p-6 max-w-none w-full"}>
       {!embedded && !hideHeader && (
         <>
           <div className="flex justify-end items-center mb-2">
@@ -882,7 +891,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         </>
       )}
 
-      <div className="w-full overflow-y-auto pr-4" style={{ maxHeight: 'calc(100vh - 140px)' }}>
+      <div className="w-full overflow-y-auto pr-4" style={{ maxHeight: 'calc(100vh - 140px)', scrollbarGutter: 'stable' }}>
         <div className="w-full">
           <div className="space-y-4">
             <div className={embedded ? "" : "mb-4"}>
@@ -905,6 +914,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   onStepsChange={handleStepsChange}
                   onStepEdit={handleStepEdit}
                   onExecuteStep={handleExecuteStep}
+                  onFixStep={handleFixStep}
                   onExecuteTransform={handleExecuteTransform}
                   onFinalTransformChange={setFinalTransform}
                   onResponseSchemaChange={setResponseSchema}
@@ -914,6 +924,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   integrations={integrations}
                   isExecuting={loading}
                   isExecutingStep={isExecutingStep}
+                  isFixingWorkflow={isFixingWorkflow}
                   isExecutingTransform={isExecutingTransform as any}
                   currentExecutingStepIndex={currentExecutingStepIndex}
                   completedSteps={completedSteps}
@@ -932,6 +943,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   isProcessingFiles={isProcessingFiles}
                   totalFileSize={totalFileSize}
                   filePayloads={filePayloads}
+                  stepSelfHealingEnabled={stepSelfHealingEnabled}
+                  onStepSelfHealingChange={setStepSelfHealingEnabled}
                 />
               )}
             </div>

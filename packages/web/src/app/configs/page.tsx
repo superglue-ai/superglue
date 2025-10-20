@@ -41,7 +41,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/
 import EmptyStateActions from '@/src/components/utils/EmptyStateActions';
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import { ApiConfig, ExtractConfig, Integration, SuperglueClient, Workflow as Tool, TransformConfig } from '@superglue/client';
-import { Blocks, Calendar, Check, Copy, Filter, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2, Zap } from "lucide-react";
+import { Calendar, Check, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2, Zap } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React from 'react';
 import type { SimpleIcon } from 'simple-icons';
@@ -226,13 +226,6 @@ const ConfigTable = () => {
     router.push(`/runs/${id}`);
   };
 
-  const handleEditTool = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    // Navigate to the tool page, passing the ID as a query param
-    // The tool page should be updated to potentially load based on this param
-    router.push(`/tools/${encodeURIComponent(id)}`);
-  };
-
   const handlePlayTool = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     // Navigate to the tool page, passing the ID. The user can then run it.
@@ -261,28 +254,7 @@ const ConfigTable = () => {
           deletePromise = superglueClient.deleteTransformation(configToDelete.id);
           break;
         case 'tool':
-          // Manual fetch for deleting tool
-          deletePromise = fetch(`${config.superglueEndpoint}`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${config.superglueApiKey}`,
-            },
-            body: JSON.stringify({
-              query: `
-                mutation DeleteTool($id: ID!) {
-                  deleteTool(id: $id)
-                }
-              `,
-              variables: { id: configToDelete.id },
-            }),
-          }).then(async response => {
-            const json = await response.json();
-            if (!response.ok || json.errors) {
-              throw new Error(`Failed to delete tool: ${json.errors?.[0]?.message || response.statusText}`);
-            }
-            return json.data.deleteTool;
-          });
+          deletePromise = superglueClient.deleteWorkflow(configToDelete.id);
           break;
         default:
           console.error('Unknown config type for deletion:', (configToDelete as any)?.type);
@@ -291,12 +263,12 @@ const ConfigTable = () => {
 
       await deletePromise;
 
+      const deletedId = configToDelete.id;
       setConfigToDelete(null);
-      // Optimization: remove locally instead of full refresh? For simplicity, refresh:
-      refreshConfigs();
+      setAllConfigs(prev => prev.filter(c => c.id !== deletedId));
+      setTotal(prev => prev - 1);
     } catch (error) {
       console.error('Error deleting config:', error);
-      // Add user feedback, e.g., toast notification
     }
   };
 
@@ -558,7 +530,7 @@ const ConfigTable = () => {
                                 <TooltipProvider key={integrationId}>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
-                                      <Blocks className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                                      <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                                     </TooltipTrigger>
                                     <TooltipContent>
                                       <p>{integration.id}</p>
