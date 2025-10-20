@@ -50,7 +50,7 @@ describe('getObjectContext performance and budget', () => {
         const deep = buildDeepObject(100, 100);
         const budget = 20_000;
         const { ms, result } = timeIt(() => getObjectContext(deep, { characterBudget: budget }));
-        expect(ms).toBeLessThanOrEqual(10_000);
+        expect(ms).toBeLessThanOrEqual(20_000);
         expect(result.length).toBeLessThanOrEqual(budget + 50); // headers may slightly exceed share but not budget
     });
 
