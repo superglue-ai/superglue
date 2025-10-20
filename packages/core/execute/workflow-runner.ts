@@ -4,7 +4,7 @@ import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { logMessage } from "../utils/logs.js";
 import { isSelfHealingEnabled, transformAndValidateSchema } from "../utils/tools.js";
-import { evaluateTransform, generateTransformCode } from "../utils/transform.js";
+import { evaluateMapping, generateTransformCode } from "../utils/transform.js";
 import { selectStrategy } from "./workflow-strategies.js";
 
 export class WorkflowRunner implements Workflow {
@@ -120,7 +120,7 @@ export class WorkflowRunner implements Workflow {
           }
 
           if (options?.testMode) {
-            const testResult = await evaluateTransform(
+            const testResult = await evaluateMapping(
               finalResult.data,
               currentFinalTransform,
               rawStepData,

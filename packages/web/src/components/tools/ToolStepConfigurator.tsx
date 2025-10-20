@@ -7,7 +7,7 @@ import { downloadJson } from '@/src/lib/download-utils';
 import { ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, isEmptyData, MAX_DISPLAY_LINES, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { Integration, SuperglueClient } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
-import { ArrowDown, Check, Copy, Download, Edit, Globe, RotateCw } from 'lucide-react';
+import { ArrowDown, Copy, Download, Globe, RotateCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from "../ui/badge";
 import { Button } from '../ui/button';
@@ -39,8 +39,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
     const [headersError, setHeadersError] = useState(false);
     const [queryParamsError, setQueryParamsError] = useState(false);
     const [copied, setCopied] = useState(false);
-    const [isEditingInstruction, setIsEditingInstruction] = useState(false);
-    const [instructionCopied, setInstructionCopied] = useState(false);
 
     const config = useConfig();
     const { toast } = useToast();
@@ -406,76 +404,25 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                     <Label className="text-xs">Mode</Label>
                                     <HelpTooltip text="DIRECT: Execute once with input data. LOOP: Execute multiple times iterating over an array from previous steps." />
                                 </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    <div>
-                                        <div className="flex items-center justify-between">
-                                            <Label className="text-xs flex items-center gap-1">
-                                                Step Instruction
-                                                <HelpTooltip text="AI-generated instruction for this step. This describes what the step does and how it should behave." />
-                                            </Label>
-                                            {!isEditingInstruction && (
-                                                <div className="flex items-center gap-1">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6"
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(step.apiConfig.instruction || '');
-                                                            setInstructionCopied(true);
-                                                            setTimeout(() => setInstructionCopied(false), 1500);
-                                                        }}
-                                                        disabled={disabled || !step.apiConfig.instruction}
-                                                        title="Copy instruction"
-                                                    >
-                                                        {instructionCopied ? (
-                                                            <Check className="h-3 w-3 text-green-600" />
-                                                        ) : (
-                                                            <Copy className="h-3 w-3" />
-                                                        )}
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6"
-                                                        onClick={() => setIsEditingInstruction(true)}
-                                                        disabled={disabled}
-                                                        title="Edit instruction"
-                                                    >
-                                                        <Edit className="h-3 w-3" />
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </div>
-                                        {isEditingInstruction ? (
-                                            <Textarea 
-                                                value={step.apiConfig.instruction || ''} 
-                                                onChange={(e) => handleImmediateEdit((s) => ({ 
-                                                    ...s, 
-                                                    apiConfig: { 
-                                                        ...s.apiConfig, 
-                                                        instruction: e.target.value 
-                                                    } 
-                                                }))} 
-                                                onBlur={() => setIsEditingInstruction(false)}
-                                                className="text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" 
-                                                placeholder="Describe what this step should do..."
-                                                disabled={disabled}
-                                                autoFocus
-                                            />
-                                        ) : (
-                                            <div className="text-xs mt-1 p-3 rounded-md border bg-muted/30 min-h-[5rem] whitespace-pre-wrap">
-                                                {step.apiConfig.instruction || (
-                                                    <span className="text-muted-foreground italic">Describe what this step should do...</span>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <div className="flex-1">
-                                            <Label className="text-xs flex items-center gap-1">
-                                                Integration
-                                                <HelpTooltip text="Select an integration to link this step to. This will pre-fill the API configuration with the integration's base URL and credentials." />
+                                <Select value={step.executionMode} onValueChange={(value) => { if (disabled) return; handleImmediateEdit((s) => ({ ...s, executionMode: value })); }}>
+                                    <SelectTrigger className="h-9 w-28 mt-1" disabled={disabled}>
+                                        <SelectValue placeholder="Mode" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="DIRECT">DIRECT</SelectItem>
+                                        <SelectItem value="LOOP">LOOP</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        {step.codeConfig ? (
+                            <>
+                                <div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+                                        <div>
+                                            <Label className="text-xs flex items-center gap-1 mb-1">
+                                                Configuration Code
+                                                <HelpTooltip text="Function that returns { url, method, headers, data, params }. Has access to context.inputData, context.credentials, and context.paginationState." />
                                             </Label>
                                             <JavaScriptCodeEditor
                                                 value={step.codeConfig.code || ''}
