@@ -170,7 +170,7 @@ const SpotlightStepCard = ({
                                         ) : (
                                             <>
                                                 <Play className="h-3 w-3 mr-1" />
-                                                {selfHealingEnabled ? "Fix Step" : "Run Step"}
+                                                 "Run Step"
                                             </>
                                         )}
                                     </Button>
