@@ -19,6 +19,7 @@ export interface WorkflowConfig {
     instruction: string;
     integrationIds: string[];
     expectedData?: any;
+    allowAdditionalProperties?: boolean;
     payload?: any;
 }
 

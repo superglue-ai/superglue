@@ -1,15 +1,17 @@
-export function isDeepEqual(a: any, b: any): boolean {
-    if (a === b) return true;
-    if (a == null || b == null) return false;
-    if (typeof a !== "object" || typeof b !== "object") return false;
+export function isDeepEqual(expected: any, received: any, allowAdditionalProperties: boolean = false): boolean {
+    if (expected === received) return true;
+    if (expected == null || received == null) return false;
+    if (typeof expected !== "object" || typeof received !== "object") return false;
 
-    const keysA = Object.keys(a);
-    const keysB = Object.keys(b);
+    const keysExpected = Object.keys(expected);
+    const keysReceived = Object.keys(received);
 
-    if (keysA.length !== keysB.length) return false;
+    if (!allowAdditionalProperties) {
+        if (keysExpected.length !== keysReceived.length) return false;
+    }
 
-    for (const key of keysA) {
-        if (!Object.prototype.hasOwnProperty.call(b, key) || !isDeepEqual(a[key], b[key])) {
+    for (const key of keysExpected) {
+        if (!Object.prototype.hasOwnProperty.call(received, key) || !isDeepEqual(expected[key], received[key], allowAdditionalProperties)) {
             return false;
         }
     }
