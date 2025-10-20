@@ -150,7 +150,7 @@ export class WorkflowBuilder {
               integrationId: s.integrationId,
               hasApiConfig: !!(s as any).apiConfig,
               hasCodeConfig: !!(s as any).codeConfig,
-              codeConfigInstruction: (s as any).codeConfig?.instruction
+              codeConfigInstruction: (s as any).codeConfig?.stepInstruction
             }))
           }, null, 2);
 

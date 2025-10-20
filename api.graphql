@@ -323,7 +323,7 @@ type TenantInfo {
 }
 
 type CodeConfig {
-  instruction: String
+  stepInstruction: String
   code: String!
   pagination: Pagination
 }

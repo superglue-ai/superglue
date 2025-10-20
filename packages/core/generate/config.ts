@@ -19,7 +19,7 @@ export interface ConfigGenerationContext extends BaseToolContext {
 }
 
 export interface CodeConfig {
-    instruction?: string;
+    stepInstruction?: string;
     code: string;
     pagination?: {
         type: "OFFSET_BASED" | "PAGE_BASED" | "CURSOR_BASED";
@@ -51,7 +51,7 @@ export const generateConfigImplementation: ToolImplementation<ConfigGenerationCo
         const fullDocs = await integrationManager?.getDocumentation();
         const documentation = fullDocs?.content?.length < LanguageModel.contextLength / 4 ?
             fullDocs?.content :
-            await integrationManager?.searchDocumentation(codeConfig?.instruction || '');
+            await integrationManager?.searchDocumentation(codeConfig?.stepInstruction || '');
         
         let payloadString = JSON.stringify(inputData || {});
         if (payloadString.length > LanguageModel.contextLength / 10) {
@@ -64,7 +64,7 @@ export const generateConfigImplementation: ToolImplementation<ConfigGenerationCo
         const userPrompt = `Generate code configuration for the following:
 
 <instruction>
-${codeConfig?.instruction || 'Execute API call'}
+${codeConfig?.stepInstruction || 'Execute API call'}
 </instruction>
 
 <user_provided_information>
@@ -104,7 +104,7 @@ ${payloadString}
     }
 
     const codeConfigSchema = zodToJsonSchema(z.object({
-        instruction: z.string().optional().describe("Human-readable description of what this code does"),
+        stepInstruction: z.string().optional().describe("Human-readable description of what this code does"),
         code: z.string().describe(`JavaScript function that returns request config. Format: (context) => ({ url, method, headers, data, params })
 
 The function receives context with:
@@ -163,7 +163,7 @@ Examples:
     return {
         success: true,
         data: {
-            instruction: generatedConfig.instruction || codeConfig?.instruction,
+            stepInstruction: generatedConfig.stepInstruction || codeConfig?.stepInstruction,
             code: generatedConfig.code,
             pagination: generatedConfig.pagination || codeConfig?.pagination
         }

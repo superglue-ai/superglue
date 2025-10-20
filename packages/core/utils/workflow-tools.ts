@@ -78,7 +78,7 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                 executionMode: z.enum(["DIRECT", "LOOP"]).describe("DIRECT for single execution, LOOP for iterating over collections"),
                 loopSelector: z.string().optional().describe("JavaScript function to select items to loop over. Format: (sourceData) => sourceData.items. Only required if executionMode is LOOP"),
                 codeConfig: z.object({
-                    instruction: z.string().optional().describe("A human-readable instruction describing what this step does (for documentation purposes)"),
+                    stepInstruction: z.string().optional().describe("A human-readable instruction describing what this step does (for documentation purposes)"),
                     code: z.string().describe(`JavaScript function that returns an axios request config. Format: (context) => ({ url, method, headers, data, params })
                 
 The context parameter contains:
@@ -201,87 +201,6 @@ export const searchDocumentationToolDefinition: ToolDefinition = {
     execute: searchDocumentationToolImplementation
 };
 
-export const submitToolDefinition: ToolDefinition = {
-    name: "submit_tool",
-    description: "Submit an API configuration to execute the API call. The tool will make the request, validate the response against the instruction, and return success or detailed error information.",
-    arguments: {
-        type: "object",
-        properties: {
-            apiConfig: {
-                type: "object",
-                description: "Complete API configuration to execute",
-                properties: {
-                    urlHost: {
-                        type: "string",
-                        description: "The base URL host (e.g., https://api.example.com) or database connection string (e.g., postgres://<<user>>:<<password>>@<<hostname>>:<<port>>)"
-                    },
-                    urlPath: {
-                        type: "string",
-                        description: "The API endpoint URL path or database name for Postgres. Use <<variable>> syntax for dynamic values or JavaScript expressions."
-                    },
-                    method: {
-                        type: "string",
-                        enum: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-                        description: "HTTP method"
-                    },
-                    queryParams: {
-                        type: "array",
-                        description: "Query parameters as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions.",
-                        items: {
-                            type: "object",
-                            properties: {
-                                key: { type: "string" },
-                                value: { type: "string" }
-                            },
-                            required: ["key", "value"]
-                        }
-                    },
-                    headers: {
-                        type: "array",
-                        description: "HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions",
-                        items: {
-                            type: "object",
-                            properties: {
-                                key: { type: "string" },
-                                value: { type: "string" }
-                            },
-                            required: ["key", "value"]
-                        }
-                    },
-                    body: {
-                        type: "string",
-                        description: "Request body formatted as JSON string. Use <<variable>> syntax for dynamic values or JavaScript expressions"
-                    },
-                    pagination: {
-                        type: "object",
-                        description: "OPTIONAL: Only configure if you have verified the exact pagination mechanism from the API documentation. For OFFSET_BASED, ALWAYS use <<offset>>. If PAGE_BASED, ALWAYS use <<page>>. If CURSOR_BASED, ALWAYS use <<cursor>> in the URL, headers, or body.",
-                        properties: {
-                            type: {
-                                type: "string",
-                                enum: ["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"],
-                                description: "The type of pagination the API uses."
-                            },
-                            pageSize: {
-                                type: "string",
-                                description: "Number of items per page (e.g., '50', '100'). Once set, this becomes available as <<limit>> (same as pageSize)."
-                            },
-                            cursorPath: {
-                                type: "string",
-                                description: "If cursor_based: The path to the cursor in the response. If not, leave empty."
-                            },
-                            stopCondition: {
-                                type: "string",
-                                description: "REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Return true to STOP."
-                            }
-                        }
-                    }
-                },
-                required: ["urlHost", "urlPath", "method"]
-            }
-        },
-        required: ["apiConfig"]
-    }
-};
 
 export const buildWorkflowToolDefinition: ToolDefinition = {
     name: "build_workflow",

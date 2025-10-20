@@ -114,7 +114,7 @@ export async function executeStep({
 
       // Check if response is valid
       if (retryCount > 0 && isSelfHealing || options.testMode) {
-        const instruction = codeConfig?.instruction || endpoint?.instruction;
+        const instruction = codeConfig?.stepInstruction || endpoint?.instruction;
         const result = await evaluateStepResponse({
           data: response.data,
           endpoint: endpoint || { instruction } as ApiConfig,

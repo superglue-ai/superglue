@@ -3,8 +3,7 @@ import {
     buildWorkflowImplementation,
     buildWorkflowToolDefinition,
     searchDocumentationToolDefinition,
-    searchDocumentationToolImplementation,
-    submitToolDefinition
+    searchDocumentationToolImplementation
 } from "../utils/workflow-tools.js";
 import { generateInstructionsDefinition, generateInstructionsImplementation } from "./instructions.js";
 
@@ -71,7 +70,6 @@ const toolRegistry: Record<string, ToolImplementation<any>> = {
 export const allToolDefinitions = [
     generateInstructionsDefinition,
     searchDocumentationToolDefinition,
-    submitToolDefinition,
     buildWorkflowToolDefinition
 ];
 
