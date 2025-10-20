@@ -216,7 +216,6 @@ export class AiSdkModel implements LLM {
 
         for (const toolCall of result.toolCalls) {
           // if we can find the tool id in the toolResults
-          
           conversationMessages.push({role: 'assistant', content: [{
             type: 'tool-call',
             toolCallId: toolCall.toolCallId,
