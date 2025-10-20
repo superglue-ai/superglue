@@ -14,6 +14,7 @@ import { MarkdownReporter } from "./markdown-reporter.js";
 import { MetricsComparer } from "./metrics-comparer.js";
 import { ConsoleReporter } from "./console-reporter.js";
 import { closeAllPools } from "../../execute/postgres/postgres.js";
+import { JsonReporter } from "./json-reporter.js";
 
 const envPath = process.cwd().endsWith('packages/core')
   ? path.join(process.cwd(), '../../.env')
@@ -51,12 +52,17 @@ async function main(): Promise<void> {
     const metricsComparer = new MetricsComparer(baseDir);
     const metricsComparison = metricsComparer.compare(metrics);
 
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('Z')[0];
+
     const csvReporter = new CsvReporter(baseDir, metadata);
-    csvReporter.report(metrics);
+    csvReporter.report(timestamp, metrics);
     
     const markdownReporter = new MarkdownReporter(baseDir, metadata);
-    markdownReporter.report(metrics, metricsComparison, workflowAttempts);
+    markdownReporter.report(timestamp, metrics, metricsComparison, workflowAttempts);
     
+    const jsonReporter = new JsonReporter(baseDir, metadata);
+    jsonReporter.reportAttempts(timestamp, workflowAttempts);
+
     const duration = new Date().getTime() - startedAt.getTime();
     logMessage("info", `Agent Evaluation Completed in ${(duration / 1000).toFixed(1)}s`, metadata);
 
