@@ -14,12 +14,11 @@ export class MarkdownReporter {
     this.resultsDir = join(baseDir, "results");
   }
 
-  public report(metrics: Metrics, metricsComparison?: MetricsComparisonResult, attempts?: WorkflowAttempt[]): string {
+  public report(timestamp: string, metrics: Metrics, metricsComparison?: MetricsComparisonResult, attempts?: WorkflowAttempt[]): string {
     if (!existsSync(this.resultsDir)) {
       mkdirSync(this.resultsDir, { recursive: true });
     }
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('Z')[0];
     const filename = `agent-eval-${timestamp}.md`;
     const filepath = join(this.resultsDir, filename);
 
