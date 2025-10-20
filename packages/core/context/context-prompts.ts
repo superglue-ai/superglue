@@ -1072,3 +1072,6 @@ When the instruction specifies exact field names or conditions, trust the instru
 Focus on data accuracy and completeness of the mapping logic, and adherence to the instruction if provided.
 Be particularly lenient with arrays and filtered data since the samples may not contain all relevant records.
 Return { success: true, reason: "Mapping follows instruction and appears logically sound" } unless you find definitive errors in the code logic itself.`
+
+// Alias for backward compatibility
+export const SELF_HEALING_CODE_CONFIG_AGENT_PROMPT = SELF_HEALING_SYSTEM_PROMPT;

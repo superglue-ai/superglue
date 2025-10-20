@@ -1,6 +1,6 @@
 import { ApiConfig } from "@superglue/client";
+import { getObjectContext } from "../context/context-builders.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
-import { getObjectContext } from "../utils/context.js";
 
 export async function evaluateStepResponse({
     data,

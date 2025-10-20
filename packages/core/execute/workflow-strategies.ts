@@ -3,7 +3,7 @@ import { Integration, Metadata } from "@superglue/shared";
 import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel } from "../llm/language-model.js";
-import { getObjectContext } from "../utils/context.js";
+import { getObjectContext } from "../context/context-builders.js";
 import { logMessage } from "../utils/logs.js";
 import { applyJsonata, flattenObject, transformAndValidateSchema } from "../utils/tools.js";
 import { generateTransformCode } from "../utils/transform.js";

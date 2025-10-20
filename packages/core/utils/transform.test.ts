@@ -13,7 +13,7 @@ vi.mock('./transform.js', async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
     ...actual,
-    evaluateMapping: vi.fn().mockResolvedValue({ success: true, reason: "mocked" }),
+    evaluateTransform: vi.fn().mockResolvedValue({ success: true, reason: "mocked" }),
   };
 });
 

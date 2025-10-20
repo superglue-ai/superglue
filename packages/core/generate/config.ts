@@ -4,7 +4,7 @@ import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel } from "../llm/language-model.js";
-import { SELF_HEALING_CODE_CONFIG_AGENT_PROMPT } from "../llm/prompts.js";
+import { SELF_HEALING_CODE_CONFIG_AGENT_PROMPT } from "../context/context-prompts.js";
 import { parseJSON } from "../utils/json-parser.js";
 import { composeUrl, sample } from "../utils/tools.js";
 import { BaseToolContext, ToolDefinition, ToolImplementation } from "./tools.js";

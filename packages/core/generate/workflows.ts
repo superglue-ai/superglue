@@ -1,10 +1,10 @@
 import { Integration, Workflow } from "@superglue/client";
 import { Metadata, toJsonSchema } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { getObjectContext } from "../context/context-builders.js";
+import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { LLMMessage } from "../llm/language-model.js";
-import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../llm/prompts.js";
-import { getObjectContext } from "../utils/context.js";
 import { logMessage } from "../utils/logs.js";
 import { composeUrl } from "../utils/tools.js";
 import { executeTool } from "./tools.js";

@@ -58,7 +58,7 @@ export async function executeStep({
         const result = await generateConfigImplementation({}, {
           runId: metadata.runId,
           orgId: metadata.orgId,
-          apiConfig: currentConfig as any,
+          currentConfig,
           inputData,
           credentials,
           retryCount,
