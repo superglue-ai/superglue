@@ -132,6 +132,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   }, [embedded, initialInstruction]);
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(externalSelfHealingEnabled ?? true);
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
+  const [isFixingWorkflow, setIsFixingWorkflow] = useState<number | undefined>(undefined);
+  const [stepSelfHealingEnabled, setStepSelfHealingEnabled] = useState(false);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndex] = useState<number | undefined>(undefined);
   const [isStopping, setIsStopping] = useState(false);
   // Single source of truth for stopping across modes (embedded/standalone)
@@ -718,7 +720,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
   const handleExecuteStep = async (idx: number) => {
     try {
-      // mark testing state for indicator without freezing entire UI
       setIsExecutingStep(idx);
       const single = await executeSingleStep(
         client,
@@ -762,6 +763,15 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     } finally {
       setIsExecutingStep(undefined);
     }
+  };
+
+  const handleFixWorkflow = async (idx: number) => {
+    console.log(`Fix Step called for step index: ${idx}`);
+    toast({
+      title: "Fix Step",
+      description: `Attempting to fix step ${steps[idx]?.id || idx} with AI self-healing`,
+    });
+    // TODO: Implement actual self-healing logic here
   };
 
   const handleExecuteTransform = async (schemaStr: string, transformStr: string) => {
@@ -905,6 +915,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   onStepsChange={handleStepsChange}
                   onStepEdit={handleStepEdit}
                   onExecuteStep={handleExecuteStep}
+                  onFixWorkflow={handleFixWorkflow}
                   onExecuteTransform={handleExecuteTransform}
                   onFinalTransformChange={setFinalTransform}
                   onResponseSchemaChange={setResponseSchema}
@@ -914,6 +925,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   integrations={integrations}
                   isExecuting={loading}
                   isExecutingStep={isExecutingStep}
+                  isFixingWorkflow={isFixingWorkflow}
                   isExecutingTransform={isExecutingTransform as any}
                   currentExecutingStepIndex={currentExecutingStepIndex}
                   completedSteps={completedSteps}
@@ -932,6 +944,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   isProcessingFiles={isProcessingFiles}
                   totalFileSize={totalFileSize}
                   filePayloads={filePayloads}
+                  stepSelfHealingEnabled={stepSelfHealingEnabled}
+                  onStepSelfHealingChange={setStepSelfHealingEnabled}
                 />
               )}
             </div>

@@ -301,9 +301,19 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             Step Instruction
                                             <HelpTooltip text="AI-generated instruction for this step. This describes what the step does and how it should behave." />
                                         </Label>
-                                        <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded mt-1">
-                                            {step.apiConfig.instruction || <span className="italic">No instruction provided</span>}
-                                        </div>
+                                        <Textarea 
+                                            value={step.apiConfig.instruction || ''} 
+                                            onChange={(e) => handleImmediateEdit((s) => ({ 
+                                                ...s, 
+                                                apiConfig: { 
+                                                    ...s.apiConfig, 
+                                                    instruction: e.target.value 
+                                                } 
+                                            }))} 
+                                            className="text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" 
+                                            placeholder="Describe what this step should do..."
+                                            disabled={disabled}
+                                        />
                                     </div>
                                     <div className="flex gap-2">
                                         <div className="flex-1">
