@@ -304,6 +304,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     openApiUrl: "https://raw.githubusercontent.com/slackapi/slack-api-specs/master/web-api/slack_web_openapi_v2.json",
     preferredAuthType: "oauth",
     oauth: {
+      grant_type: "authorization_code",
       authUrl: "https://slack.com/oauth/v2/authorize",
       tokenUrl: "https://slack.com/api/oauth.v2.access",
       scopes: "channels:read channels:history chat:write chat:write.public users:read users:read.email files:read files:write groups:read im:read im:write mpim:read",

@@ -1,4 +1,5 @@
 import { ExtendedSuperglueClient, OAuthState } from '@/src/lib/oauth-utils';
+import axios from 'axios';
 import { NextRequest, NextResponse } from 'next/server';
 
 const OAUTH_STATE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
@@ -22,39 +23,35 @@ async function exchangeCodeForToken(
     if (!clientId || !clientSecret) {
         throw new Error('[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth client credentials not configured for authorization code flow');
     }
-    
-    let response: Response;
+
     try {
-        response = await fetch(tokenUrl, {
-            method: 'POST',
+        const response = await axios.post(tokenUrl, new URLSearchParams({
+            grant_type: 'authorization_code',
+            code,
+            client_id: clientId,
+            client_secret: clientSecret,
+            redirect_uri: redirectUri,
+            ...(state ? { state } : {}),
+        }), {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json',
-            },
-            body: new URLSearchParams({
-                grant_type: 'authorization_code',
-                code,
-                client_id: clientId,
-                client_secret: clientSecret,
-                redirect_uri: redirectUri,
-                ...(state ? { state } : {}),
-            }),
+            }
         });
+
+        return response.data;
     } catch (error) {
+        if (axios.isAxiosError(error)) {
+            if (error.response) {
+                const errorData = typeof error.response.data === 'string'
+                    ? error.response.data.slice(0, 500)
+                    : JSON.stringify(error.response.data).slice(0, 500);
+                throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth provider rejected token exchange (HTTP ${error.response.status}). Provider response: ${errorData}`);
+            }
+            throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] Failed to reach OAuth provider token endpoint at ${tokenUrl}: ${error.message}`);
+        }
         const errMsg = error instanceof Error ? error.message : 'Network error';
         throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] Failed to reach OAuth provider token endpoint at ${tokenUrl}: ${errMsg}`);
-    }
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth provider rejected token exchange (HTTP ${response.status}). Provider response: ${errorText.slice(0, 500)}`);
-    }
-
-    try {
-        return response.json();
-    } catch (error) {
-        const responseText = await response.text();
-        throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth provider returned invalid JSON response. Expected JSON with access_token, but received: ${responseText.slice(0, 500)}. This usually means the token_url is incorrect or the provider is not returning a proper OAuth token response.`);
     }
 }
 
@@ -66,36 +63,32 @@ async function exchangeClientCredentialsForToken(
     if (!clientId || !clientSecret) {
         throw new Error('[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth client credentials not configured for client credentials flow');
     }
-    
-    let response: Response;
+
     try {
-        response = await fetch(tokenUrl, {
-            method: 'POST',
+        const response = await axios.post(tokenUrl, new URLSearchParams({
+            grant_type: 'client_credentials',
+            client_id: clientId,
+            client_secret: clientSecret,
+        }), {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json',
-            },
-            body: new URLSearchParams({
-                grant_type: 'client_credentials',
-                client_id: clientId,
-                client_secret: clientSecret,
-            }),
+            }
         });
+
+        return response.data;
     } catch (error) {
+        if (axios.isAxiosError(error)) {
+            if (error.response) {
+                const errorData = typeof error.response.data === 'string'
+                    ? error.response.data.slice(0, 500)
+                    : JSON.stringify(error.response.data).slice(0, 500);
+                throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth provider rejected token exchange for client credentials flow (HTTP ${error.response.status}). Provider response: ${errorData}`);
+            }
+            throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] Failed to reach OAuth provider token endpoint at ${tokenUrl}: ${error.message}`);
+        }
         const errMsg = error instanceof Error ? error.message : 'Network error';
         throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] Failed to reach OAuth provider token endpoint at ${tokenUrl}: ${errMsg}`);
-    }
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth provider rejected token exchange for client credentials flow (HTTP ${response.status}). Provider response: ${errorText.slice(0, 500)}`);
-    }
-
-    const responseText = await response.text();
-    try {
-        return JSON.parse(responseText);
-    } catch (error) {
-        throw new Error(`[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth provider returned invalid JSON response. Expected JSON with access_token, but received: ${responseText.slice(0, 500)}. This usually means the token_url is incorrect or the provider is not returning a proper OAuth token response.`);
     }
 }
 
@@ -216,10 +209,10 @@ export async function GET(request: NextRequest) {
     }
 
     if ((!code && grantTypeParam !== 'client_credentials') || !state) {
-        const errorMsg = !code 
+        const errorMsg = !code
             ? '[OAUTH_STAGE:CALLBACK] No authorization code received from OAuth provider. The user may have denied access or the OAuth provider did not redirect properly.'
             : '[OAUTH_STAGE:CALLBACK] No state parameter received from OAuth provider. This indicates a malformed OAuth callback.';
-        
+
         return NextResponse.redirect(
             buildRedirectUrl(origin, '/integrations', {
                 error: !code ? 'no_code' : 'no_state',
@@ -258,7 +251,10 @@ export async function GET(request: NextRequest) {
         const { access_token, refresh_token, ...additionalFields } = tokenData;
 
         if (!access_token) {
-            throw new Error('[OAUTH_STAGE:TOKEN_VALIDATION] No access_token field in OAuth provider response. The provider may require different OAuth configuration or the token_url may be incorrect.');
+            console.error('[OAUTH_DEBUG] Token data received from provider:', JSON.stringify(tokenData, null, 2));
+            console.error('[OAUTH_DEBUG] Token URL:', token_url);
+            console.error('[OAUTH_DEBUG] Integration ID:', integrationId);
+            throw new Error(`[OAUTH_STAGE:TOKEN_VALIDATION] No access_token field in OAuth provider response. The provider may require different OAuth configuration or the token_url may be incorrect: ${JSON.stringify(tokenData, null, 2)}`);
         }
 
         // Package the tokens for the frontend to handle
