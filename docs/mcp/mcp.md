@@ -94,55 +94,43 @@ Instead of building separate MCP tools for each API, superglue provides one powe
 
 ## Available MCP Tools
 
-The superglue MCP server provides these tools to your agent:
+The superglue MCP server provides two focused tools:
 
 <AccordionGroup>
-  <Accordion title="superglue_find_integrations" icon="search">
-    **Purpose:** Discover available integrations for your task
+  <Accordion title="superglue_find_relevant_tools" icon="search">
+    **Purpose:** Search for your pre-built superglue tools
 
     **Usage:**
 
-    > "Find integrations for social media posting"
+    > "Find my Slack notification tools"
 
-    **What it does:** Returns available integrations like Twitter, LinkedIn, Facebook with their capability descriptions.
+    **What it does:** Searches through your saved workflows and returns relevant tool IDs with their instructions and integrations.
+
+    **Returns:** Tool metadata including ID, instruction, steps, and integrations used.
   </Accordion>
-  <Accordion title="superglue_build_and_run_workflow" icon="play">
-    **Purpose:** Build and execute workflows in natural language
+  <Accordion title="superglue_execute_tool" icon="play">
+    **Purpose:** Execute a saved tool by ID
 
     **Usage:**
 
-    > "Get my latest Stripe transactions and create a summary report"
+    > "Run tool send-slack-alert with payload {channel: 'alerts', message: 'Test'}"
 
-    **What it does:** Creates the workflow, handles authentication, executes API calls, and returns formatted results.
-  </Accordion>
-  <Accordion title="superglue_save_workflow" icon="save">
-    **Purpose:** Save successful workflows for reuse
+    **What it does:** Executes the tool and returns only the result data or error message.
 
-    **Usage:**
-
-    > "Save this workflow as 'daily-stripe-report'"
-
-    **What it does:** Persists the workflow for future execution with the same reliability.
-  </Accordion>
-  <Accordion title="superglue_execute_workflow" icon="refresh">
-    **Purpose:** Run previously saved workflows
-
-    **Usage:**
-
-    > "Run the daily-stripe-report workflow"
-
-    **What it does:** Executes the saved workflow with current data.
-  </Accordion>
-  <Accordion title="superglue_create_integration" icon="plus">
-    **Purpose:** Add new integrations on-the-fly
-
-    **Usage:**
-
-    > "Connect to my company's internal API at api.company.com"
-
-    **What it does:** Adds new API integrations with credentials and documentation.
+    **Returns:** Clean execution results - just `{success, data}` or `{success, error}`. No workflow metadata.
   </Accordion>
 </AccordionGroup>
+
+<Note>
+**Building New Tools**
+
+MCP only executes existing tools. Create new tools via:
+- [superglue UI](https://app.superglue.cloud)
+- [Client SDK](/agent-builders/sdk-integration) 
+- Direct GraphQL API calls
+
+Once saved, tools are automatically available through MCP.
+</Note>
 
 ## Agent Framework Integration
 
@@ -211,96 +199,80 @@ For coding assistants, use the same configuration in your MCP settings:
 
 ## Example Agent Conversations
 
-<video autoPlay muted loop playsInline className="w-full aspect-video" src="https://superglue.cloud/files/hubspot.mp4" />
-
 <Tabs>
-  <Tab title="Data Analysis">
-    **Human:** "Analyze my business performance across Stripe, HubSpot, and Google Analytics"
+  <Tab title="Finding and Running Tools">
+    **Human:** "Find my GitHub to Slack Integration tools"
 
-    **Agent:** "I'll help you analyze your business performance across those platforms. Let me gather the data from each source and create a comprehensive analysis.
+    **Agent:** "Let me search for your GitHub to Slack Integration tools..."
 
-    First, let me find the available integrations..."
+    _[Agent uses superglue_find_relevant_tools with searchTerms: "github slack integration"]_
 
-    _[Agent uses superglue_find_integrations]_
+    "I found 1 Pokemon tool:
+    - **github-pr-to-slack-channel**: Sends a notification into the pr channel containing a summary of open PRs.
+    
+    Would you like me to run it?"
 
-    "Great\! I can see you have Stripe, HubSpot, and Google Analytics connected. Now I'll build a workflow to gather data from all three sources..."
+    **Human:** "Yes, run it"
 
-    _[Agent uses superglue_build_and_run_workflow]_
+    **Agent:** _[Agent uses superglue_execute_tool with id: "github-pr-to-slack-channel"]_
 
-    "Here's your business performance analysis: [detailed results with revenue trends, lead conversion, traffic patterns]"
+
   </Tab>
-  <Tab title="Multi-Step Workflow">
-    **Human:** "When someone subscribes to my Stripe plan, add them to HubSpot and send a Slack notification"
+  <Tab title="Data Pipeline Execution">
+    **Human:** "Run my daily revenue report"
 
-    **Agent:** "I'll create an automated workflow that triggers when someone subscribes. Let me build this integration...
+    **Agent:** _[Agent uses superglue_find_relevant_tools with searchTerms: "revenue report"]_
 
-    _[Agent uses superglue_build_and_run_workflow with webhook setup]_
+    "I found your 'stripe-daily-revenue' tool. Running it now..."
 
-    This workflow will:
+    _[Agent uses superglue_execute_tool with id: "stripe-daily-revenue"]_
 
-    1. Monitor Stripe for new subscriptions
-    2. Automatically add new subscribers to HubSpot as contacts
-    3. Send a formatted Slack notification to your team
-
-    Would you like me to save this workflow for ongoing use?"
+    "Today's revenue summary:
+    - Gross Revenue: $12,450
+    - Fees: $412
+    - Net Revenue: $12,038
+    - New Customers: 23"
   </Tab>
-  <Tab title="Custom Integration">
-    **Human:** "Connect to my company's internal inventory API and get current stock levels"
+  <Tab title="Parameterized Execution">
+    **Human:** "Get all Stripe customers created in the last 7 days"
 
-    **Agent:** "I'll need to add your internal API as a new integration first. Let me set that up...
+    **Agent:** _[Agent uses superglue_find_relevant_tools with searchTerms: "stripe customers"]_
 
-    _[Agent uses superglue_create_integration]_
+    "I found your 'fetch-stripe-customers' tool. Let me run it with a 7-day filter..."
 
-    I've added your inventory API. What authentication does it require? API key, OAuth, or something else?"
+    _[Agent uses superglue_execute_tool with payload: {days: 7}]_
 
-    **Human:** "It uses an API key in the Authorization header"
-
-    **Agent:** "Perfect\! Now let me fetch your current stock levels...
-
-    _[Agent uses superglue_build_and_run_workflow]_
-
-    Here are your current stock levels: [formatted inventory data]"
+    "Found 15 new customers in the last 7 days: [customer list]"
   </Tab>
 </Tabs>
 
 ## Best Practices
 
 <CardGroup cols={2}>
-  <Card title="Be Specific" icon="target">
-    **Good:** "Get Stripe customers created in the last 7 days with email and subscription status"
+  <Card title="Build Tools First" icon="wrench">
+    Create and test tools in the [superglue UI](https://app.superglue.cloud) or via SDK before using them in MCP.
 
-    **Better:** "Get active Stripe customers created in the last 7 days, include email, name, subscription status, and MRR"
+    Tools built through the UI benefit from visual debugging, documentation search, and step-by-step testing.
   </Card>
-  <Card title="Use Response Schemas" icon="code">
-    When building workflows, you can specify the output format:
+  <Card title="Use Descriptive IDs" icon="tag">
+    Name your tools clearly so agents can find them easily:
 
-    ```json
-    {
-      "type": "object",  
-      "properties": {
-        "customers": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "email": {"type": "string"},
-              "mrr": {"type": "number"}
-            }
-          }
-        }
-      }
-    }
-    ```
+    **Good:** `fetch-active-users`
+    
+    **Better:** `fetch-hubspot-active-users-last-30-days`
   </Card>
-  <Card title="Add context" icon="shield">
-    You can improve the performance of your agent by adding context to the workflow:
+  <Card title="Search Smart" icon="search">
+    Use specific search terms to find the right tool:
 
-    > "You need to get an auth token first before each request to get the data."
+    **Broad:** `*` (returns all tools)
+    
+    **Focused:** `slack notifications`, `stripe revenue`, `hubspot contacts`
   </Card>
-  <Card title="Save Successful Workflows" icon="save">
-    When a workflow works well, save it for reuse:
-
-    > "This worked perfectly\! Save it as 'weekly-revenue-report' so I can run it regularly."
+  <Card title="Handle Large Results" icon="database">
+    Results over 20K chars are truncated. If you need full data:
+    
+    - Build tools with aggregation/filtering in the workflow
+    - Use the SDK directly for large data exports
   </Card>
 </CardGroup>
 
