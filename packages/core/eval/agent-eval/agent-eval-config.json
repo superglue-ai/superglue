@@ -1,0 +1,2015 @@
+{
+  "integrations": [
+    {
+      "id": "clickup",
+      "name": "ClickUp",
+      "urlHost": "https://api.clickup.com",
+      "urlPath": "/api",
+      "documentationUrl": "https://developer.clickup.com/reference/getauthorizeduser",
+      "openApiUrl": "https://developer.clickup.com/openapi/clickup-api-v2-reference.json",
+      "credentials": {
+        "api_token": ""
+      },
+      "description": "Project management Software",
+      "keywords": []
+    },
+    {
+      "id": "stripe",
+      "name": "Stripe",
+      "urlHost": "https://api.stripe.com",
+      "urlPath": "/v1",
+      "documentationUrl": "https://stripe.com/docs/api",
+      "openApiUrl": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json",
+      "credentials": {
+        "api_key": ""
+      },
+      "description": "Payment processing and subscription management",
+      "keywords": [
+        "customers",
+        "charges",
+        "payment_intents",
+        "products",
+        "prices",
+        "subscriptions",
+        "invoices",
+        "balance_transactions",
+        "refunds",
+        "checkout_sessions",
+        "line_items",
+        "payment_methods",
+        "issuers",
+        "plans",
+        "setup_intents",
+        "payouts",
+        "transfers",
+        "balance",
+        "users",
+        "emails"
+      ]
+    },
+    {
+      "id": "airtable",
+      "name": "Airtable",
+      "urlHost": "https://api.airtable.com",
+      "urlPath": "/v0",
+      "documentationUrl": "https://airtable.com/developers/web/api/introduction",
+      "credentials": {
+        "api_key": ""
+      },
+      "description": "Airtable API",
+      "keywords": [
+        "bases",
+        "tables",
+        "records",
+        "fields",
+        "views",
+        "formulas",
+        "attachments",
+        "comments",
+        "collaborators",
+        "metadata",
+        "schemas",
+        "api key",
+        "key"
+      ]
+    },
+    {
+      "id": "clockify",
+      "name": "Clockify",
+      "urlHost": "https://api.clockify.me",
+      "urlPath": "/api/v1",
+      "documentationUrl": "https://docs.clockify.me/",
+      "credentials": {
+        "api_key": ""
+      },
+      "description": "Clockify API",
+      "keywords": [
+        "time entries",
+        "projects",
+        "workspaces",
+        "users",
+        "tags",
+        "clients",
+        "estimates",
+        "invoices",
+        "payments"
+      ]
+    },
+    {
+      "id": "typeform",
+      "name": "Typeform",
+      "urlHost": "https://api.typeform.com/",
+      "urlPath": "",
+      "documentationUrl": "https://www.typeform.com/developers/get-started/",
+      "credentials": {
+        "personal_access_token": ""
+      },
+      "description": "Typeform API",
+      "keywords": [
+        "forms",
+        "responses",
+        "questions",
+        "fields",
+        "themes",
+        "images",
+        "workspaces",
+        "logic jumps",
+        "hidden fields",
+        "variables",
+        "calculations",
+        "insights",
+        "reports",
+        "oauth"
+      ]
+    },
+    {
+      "id": "confluence",
+      "name": "Confluence",
+      "urlHost": "https://superglue-evals.atlassian.net",
+      "urlPath": "/wiki/rest/api",
+      "documentationUrl": "https://docs.atlassian.com/atlassian-confluence/REST/6.6.0/",
+      "openApiUrl": "https://developer.atlassian.com/cloud/confluence/swagger.json",
+      "credentials": {
+        "email": "",
+        "api_token": ""
+      },
+      "description": "Confluence API",
+      "keywords": [
+        "spaces",
+        "pages",
+        "content",
+        "attachments",
+        "comments",
+        "labels",
+        "templates",
+        "blueprints",
+        "macros",
+        "restrictions",
+        "versions",
+        "ancestors",
+        "descendants",
+        "children",
+        "oauth"
+      ]
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "urlHost": "https://api.github.com",
+      "urlPath": "",
+      "documentationUrl": "https://docs.github.com/en/rest",
+      "openApiUrl": "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json",
+      "credentials": {
+        "api_token": ""
+      },
+      "description": "Github API",
+      "keywords": [
+        "repositories",
+        "issues",
+        "pull_requests",
+        "commits",
+        "branches",
+        "tags",
+        "releases",
+        "deployments",
+        "check_runs",
+        "actions_artifacts",
+        "organizations",
+        "packages",
+        "collaborators",
+        "gists",
+        "milestones"
+      ]
+    },
+    {
+      "id": "linear",
+      "name": "Linear",
+      "urlHost": "https://api.linear.app/graphql",
+      "urlPath": "",
+      "documentationUrl": "https://linear.app/developers",
+      "credentials": {
+        "access_token": ""
+      },
+      "description": "Linear API",
+      "keywords": [
+        "issues",
+        "projects",
+        "cycles",
+        "teams",
+        "users",
+        "comments",
+        "labels",
+        "milestones",
+        "roadmaps",
+        "workflows",
+        "states",
+        "graphql",
+        "mutations",
+        "queries",
+        "api key"
+      ]
+    },
+    {
+      "id": "jira",
+      "name": "JIRA",
+      "urlHost": "https://superglue-team-test.atlassian.net",
+      "urlPath": "rest/api/3",
+      "documentationUrl": "https://developer.atlassian.com/cloud/jira/platform/rest/v3",
+      "openApiUrl": "https://developer.atlassian.com/cloud/jira/platform/swagger-v3.json",
+      "credentials": {
+        "email": "",
+        "api_token": ""
+      },
+      "description": "JIRA project management API",
+      "keywords": [
+        "issues",
+        "projects",
+        "boards",
+        "sprints",
+        "epics",
+        "users",
+        "workflows",
+        "fields",
+        "components",
+        "versions",
+        "priorities",
+        "statuses",
+        "comments",
+        "attachments",
+        "jql",
+        "query",
+        "search",
+        "oauth"
+      ]
+    },
+    {
+      "id": "trello",
+      "name": "Trello",
+      "urlHost": "https://api.trello.com",
+      "urlPath": "",
+      "documentationUrl": "https://developer.atlassian.com/cloud/trello/rest",
+      "openApiUrl": "https://developer.atlassian.com/cloud/trello/swagger.v3.json",
+      "icon": "trello",
+      "credentials": {
+        "api_key": "",
+        "api_token": ""
+      },
+      "description": "Trello API",
+      "keywords": [
+        "boards",
+        "lists",
+        "cards",
+        "members",
+        "labels",
+        "checklists",
+        "attachments",
+        "comments",
+        "actions",
+        "organizations",
+        "teams",
+        "power-ups",
+        "custom fields",
+        "stickers",
+        "api key"
+      ]
+    },
+    {
+      "id": "hubspot",
+      "name": "HubSpot",
+      "urlHost": "https://api.hubapi.com",
+      "urlPath": "/crm/v3",
+      "documentationUrl": "https://developers.hubspot.com/docs/api/overview",
+      "openApiUrl": "https://api.hubspot.com/public/api/spec/v1/specs",
+      "credentials": {
+        "private_app_token": ""
+      },
+      "description": "Customer relationship management API",
+      "keywords": [
+        "contacts",
+        "companies",
+        "deals",
+        "tickets",
+        "line_items",
+        "products",
+        "associations",
+        "memberships"
+      ]
+    },
+    {
+      "id": "attio",
+      "name": "Attio",
+      "urlHost": "https://api.attio.com/v2",
+      "urlPath": "",
+      "documentationUrl": "https://docs.attio.com/rest-api/overview",
+      "openApiUrl": "https://api.attio.com/openapi/api",
+      "credentials": {
+        "api_token": ""
+      },
+      "description": "Modern CRM with OpenAPI specification",
+      "keywords": [
+        "people",
+        "objects",
+        "records",
+        "lists",
+        "entries",
+        "workspace_members",
+        "notes",
+        "tasks",
+        "threads",
+        "comments",
+        "sorts",
+        "api_slug",
+        "attribute_type",
+        "record_id",
+        "workspace_id",
+        "object_id"
+      ]
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "urlHost": "https://api.slack.com",
+      "urlPath": "",
+      "documentationUrl": "https://api.slack.com/docs",
+      "openApiUrl": "https://raw.githubusercontent.com/slackapi/slack-api-specs/master/web-api/slack_web_openapi_v2.json",
+      "credentials": {
+        "bot_token": ""
+      },
+      "description": "Slack API",
+      "keywords": [
+        "channel",
+        "conversation",
+        "user",
+        "file",
+        "event",
+        "message",
+        "workflow_step",
+        "workflow_published",
+        "workflow_step_execute",
+        "usergroup",
+        "im",
+        "mpim",
+        "group",
+        "check_run",
+        "apps_permissions_resource"
+      ]
+    },
+    {
+      "id": "postgres-lego",
+      "name": "LEGO Database",
+      "urlHost": "",
+      "urlPath": "",
+      "documentationUrl": "",
+      "credentials": {
+        "connection_string": ""
+      },
+      "description": "PostgreSQL LEGO database for testing",
+      "keywords": [
+        "database",
+        "sql",
+        "postgres",
+        "postgresql",
+        "api key",
+        "tables"
+      ]
+    },
+    {
+      "id": "timbuk2-shopify",
+      "name": "Timbuk2-shopify",
+      "urlHost": "https://www.timbuk2.com",
+      "urlPath": "/products.json",
+      "documentationUrl": "https://shopify.dev/docs/api/ajax/reference/product",
+      "credentials": {},
+      "description": "Public Shopify API demo",
+      "keywords": [
+        "products",
+        "variants",
+        "collections",
+        "customers",
+        "orders",
+        "fulfillments",
+        "inventory_items",
+        "inventory_levels",
+        "metafields",
+        "price_rules",
+        "discount_codes",
+        "shipping_zones",
+        "locations",
+        "gift_cards",
+        "product_images"
+      ]
+    },
+    {
+      "id": "asana",
+      "name": "Asana",
+      "urlHost": "https://app.asana.com/api",
+      "urlPath": "",
+      "documentationUrl": "https://developers.asana.com/docs",
+      "openApiUrl": "https://raw.githubusercontent.com/Asana/openapi/master/defs/asana_oas.yaml",
+      "credentials": {
+        "personal_access_token": ""
+      },
+      "description": "Asana API",
+      "keywords": [
+        "tasks",
+        "projects",
+        "workspaces",
+        "teams",
+        "portfolios",
+        "goals",
+        "sections",
+        "tags",
+        "custom fields",
+        "stories",
+        "attachments",
+        "followers",
+        "assignee",
+        "due dates",
+        "query",
+        "search",
+        "api key"
+      ]
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "urlHost": "https://api.openai.com",
+      "urlPath": "",
+      "documentationUrl": "https://platform.openai.com/docs/api-reference/introduction",
+      "openApiUrl": "https://app.stainless.com/api/spec/documented/openai/openapi.documented.yml",
+      "credentials": {
+        "api_key": ""
+      },
+      "keywords": [
+        "completions",
+        "chat",
+        "models",
+        "embeddings",
+        "images",
+        "audio",
+        "files",
+        "fine-tuning",
+        "assistants",
+        "threads",
+        "messages",
+        "runs",
+        "moderation",
+        "usage",
+        "api key"
+      ]
+    },
+    {
+      "id": "tele2-ftp",
+      "name": "Tele2 FTP Speedtest",
+      "urlHost": "http://speedtest.tele2.net",
+      "urlPath": "",
+      "documentationUrl": "http://speedtest.tele2.net/",
+      "credentials": {},
+      "keywords": [
+        "ftp",
+        "speedtest",
+        "download",
+        "upload",
+        "files",
+        "performance",
+        "bandwidth"
+      ]
+    },
+    {
+      "id": "berkshire-hathaway-letter",
+      "name": "Berkshire Hathaway Letter",
+      "urlHost": "https://www.berkshirehathaway.com",
+      "urlPath": "/letters/2024ltr.pdf",
+      "documentationUrl": "https://www.berkshirehathaway.com/letters/2024ltr.pdf",
+      "credentials": {},
+      "description": "Berkshire Hathaway 2024 shareholder letter",
+      "keywords": [
+        "letter",
+        "shareholder",
+        "letter",
+        "shareholder",
+        "pdf"
+      ]
+    },
+    {
+      "id": "sec-gov",
+      "name": "SEC EDGAR",
+      "urlHost": "https://www.sec.gov",
+      "urlPath": "/cgi-bin/browse-edgar",
+      "documentationUrl": "https://www.sec.gov/edgar/searchedgar/companysearch.html",
+      "credentials": {},
+      "description": "U.S. Securities and Exchange Commission EDGAR database",
+      "keywords": [
+        "filings",
+        "companies",
+        "forms",
+        "10-K",
+        "10-Q",
+        "8-K",
+        "CIK",
+        "submissions",
+        "securities",
+        "financial reports",
+        "public companies"
+      ]
+    },
+    {
+      "id": "jina-reader",
+      "name": "Jina Reader API",
+      "urlHost": "https://r.jina.ai",
+      "urlPath": "",
+      "documentationUrl": "https://jina.ai/reader",
+      "credentials": {},
+      "description": "Jina AI Reader API for converting web pages to clean markdown",
+      "keywords": [
+        "reader",
+        "markdown",
+        "web scraping",
+        "html to markdown",
+        "content extraction",
+        "web crawler",
+        "clean text",
+        "article extraction"
+      ]
+    }
+  ],
+  "workflows": [
+    {
+      "id": "clickup-task-list",
+      "name": "ClickUp Task List",
+      "type": "retrieval",
+      "instruction": "Get all tasks from the ClickUp task list. I want the final output to be a JSON object with the following structure: { \"tasks\": [ { \"name\": \"Task 1\", \"description\": \"Task 1 description\" } ]",
+      "integrationIds": ["clickup"],
+      "payload": {
+        "listId": "901516361522"
+      },
+      "expectedData": {
+        "tasks": [
+          {
+            "name": "First Task",
+            "description": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua."
+          }
+        ]
+      }
+    },
+    {
+      "id": "clickup-all-lists",
+      "name": "ClickUp All Lists",
+      "type": "retrieval",
+      "instruction": "Get all lists of all workspaces in ClickUp. Including Lists located in Folders and in Spaces. Return an object of this shape: { lists: Array<{ id: string, name: string, content: string, due_date: string | null, start_date: string | null }> }. Dates should have the format YYYY-MM-DD.",
+      "integrationIds": ["clickup"],
+      "payload": {},
+      "expectedData": {
+        "lists": [
+          {
+            "id": "901516249723",
+            "name": "Projekt 1",
+            "content": "Project one's text",
+            "due_date": "2025-11-06",
+            "start_date": "2025-10-15"
+          },
+          {
+            "id": "901516249722",
+            "name": "Projekt 2",
+            "content": "",
+            "due_date": null,
+            "start_date": null
+          },
+          {
+            "id": "901516361522",
+            "name": "Test",
+            "content": "",
+            "due_date": null,
+            "start_date": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "clickup-all-comments-and-replies",
+      "name": "ClickUp All Comments and Replies",
+      "type": "retrieval",
+      "instruction": "Get all comments and and for each comment its sub-comments for the task with the given taskId. Be aware that you need to iterate over the comments and get the sub-comments for each comment using another API call. Return an object of this shape: { comments: Array<{ id: string, authorId: string, authorName: string, text: string, parentCommentId: string | null, createdAt: string }> }. Convert the create date to YYYY-MM-DD.",
+      "integrationIds": ["clickup"],
+      "payload": {
+        "taskId": "86c5y6t56"
+      },
+      "expectedData": {
+        "comments": [
+          {
+            "id": "90150163803004",
+            "authorId": "242688065",
+            "authorName": "Max Mustermann",
+            "text": "Second comment without replies\n",
+            "parentCommentId": null,
+            "createdAt": "2025-10-14"
+          },
+          {
+            "id": "90150163802974",
+            "authorId": "242688065",
+            "authorName": "Max Mustermann",
+            "text": "One comment\n",
+            "parentCommentId": null,
+            "createdAt": "2025-10-14"
+          },
+          {
+            "id": "90150163802992",
+            "authorId": "242688065",
+            "authorName": "Max Mustermann",
+            "text": "Sub comment\n",
+            "parentCommentId": "90150163802974",
+            "createdAt": "2025-10-14"
+          }
+        ]
+      }
+    },
+    {
+      "id": "clockify-time-entries",
+      "name": "Clockify Time Entries",
+      "type": "retrieval",
+      "instruction": "Get all time entries for the authenticated user. I want the final output to be a JSON object with the following structure: { timeEntries: [{id: string,description: string, duration: number, // duration in MS }]}",
+      "integrationIds": ["clockify"],
+      "payload": {},
+      "expectedData": {
+        "timeEntries": [
+          {
+            "id": "68eaecf2a76c246ccca9f7ff",
+            "description": "Buchhaltung",
+            "duration": 3300000
+          },
+          {
+            "id": "68eaed76c0a1d045ac1d72b1",
+            "description": "Beratungsgespräch",
+            "duration": 3600000
+          },
+          {
+            "id": "68eaed55a76c246ccca9f9b7",
+            "description": "Beratungsgespräch",
+            "duration": 3600000
+          }
+        ]
+      }
+    },
+    {
+      "id": "clockify-projects",
+      "name": "Clockify Projects",
+      "type": "retrieval",
+      "instruction": "Get all projects for the authenticated user's active workspace. I want the final output to be a JSON object with the following structure: { projects: [{id: string, name: string, note: string, billable: boolean, hourlyRate?: number, hourlyRateCurrency?: string }]}. ",
+      "integrationIds": ["clockify"],
+      "payload": {},
+      "expectedData": {
+        "projects": [
+          {
+            "id": "68eaed6cf78d45743dec5b43",
+            "name": "Buchhaltung 2025",
+            "note": "Some notes",
+            "billable": false,
+            "hourlyRate": 0,
+            "hourlyRateCurrency": "USD"
+          },
+          {
+            "id": "68eaed36c0a1d045ac1d6fbc",
+            "name": "Marketing Project X",
+            "note": "",
+            "billable": true,
+            "hourlyRate": 8000,
+            "hourlyRateCurrency": "USD"
+          }
+        ]
+      }
+    },
+    {
+      "id": "clockify-projects-all-workspaces",
+      "name": "Clockify Projects All Workspaces",
+      "type": "retrieval",
+      "instruction": "Get all projects the authenticated user has access to. I want the final output to be a JSON object with the following structure: { projects: [{id: string, name: string, note: string, billable: boolean, hourlyRate?: number, hourlyRateCurrency?: string }]}. ",
+      "integrationIds": ["clockify"],
+      "payload": {},
+      "expectedData": {
+        "projects": [
+          {
+            "id": "68eaed6cf78d45743dec5b43",
+            "name": "Buchhaltung 2025",
+            "note": "Some notes",
+            "billable": false,
+            "hourlyRate": 0,
+            "hourlyRateCurrency": "USD"
+          },
+          {
+            "id": "68eaed36c0a1d045ac1d6fbc",
+            "name": "Marketing Project X",
+            "note": "",
+            "billable": true,
+            "hourlyRate": 8000,
+            "hourlyRateCurrency": "USD"
+          }
+        ]
+      }
+    },
+    {
+      "id": "typeform-get-all-forms",
+      "name": "Typeform Get All Forms",
+      "type": "retrieval",
+      "instruction": "Get all forms with responses (question and answer) for the authenticated user. I want the final output to be a JSON object with the following structure: { forms: [{id: string, name: string, responses: Array<{id: string, answers: Array<{question: string, answer: string}>, submittedAt: number // unix timestamp}>, createdAt: number // unix timestamp }], total: number}. Please make sure to include the questions and answers for each response.",
+      "integrationIds": ["typeform"],
+      "payload": {},
+      "expectedData": {
+        "forms": [
+          {
+            "id": "lyyDJUcC",
+            "name": "Coffee Shop Applications",
+            "responses": [
+              {
+                "id": "zrf8owa8sa9aq94pd6rmdzrf8ow4jewu",
+                "answers": [
+                  {
+                    "question": "What is your full name?",
+                    "answer": "Peter Mustermann"
+                  },
+                  {
+                    "question": "Which position are you applying for?",
+                    "answer": "Cashier"
+                  },
+                  {
+                    "question": "Please share a brief overview of your work experience.",
+                    "answer": "Peter's text"
+                  },
+                  {
+                    "question": "Why would you like to work at our coffee shop?",
+                    "answer": "Random text"
+                  }
+                ],
+                "submittedAt": 1760610533
+              },
+              {
+                "id": "gpau4osqcuahhim7hngpauukv3090uf6",
+                "answers": [
+                  {
+                    "question": "What is your full name?",
+                    "answer": "Max Mustermann"
+                  },
+                  {
+                    "question": "What is your email address?",
+                    "answer": "evals@superglue.ai"
+                  },
+                  {
+                    "question": "Which position are you applying for?",
+                    "answer": "Barista"
+                  },
+                  {
+                    "question": "Please share a brief overview of your work experience.",
+                    "answer": "Test Text here"
+                  },
+                  {
+                    "question": "Why would you like to work at our coffee shop?",
+                    "answer": "Some text here"
+                  }
+                ],
+                "submittedAt": 1760610498
+              }
+            ],
+            "createdAt": 1760610392
+          },
+          {
+            "id": "OB4nenxi",
+            "name": "Just empty",
+            "responses": [],
+            "createdAt": 1760229402
+          }
+        ],
+        "total": 2
+      }
+    },
+    {
+      "id": "typeform-get-form-by-id",
+      "name": "Typeform Get Form By Id",
+      "type": "retrieval",
+      "instruction": "Get the form with the given id. I want the final output to be a JSON object with the following structure: {id: string, name: string, responses: Array<{id: string, answers: Array<{question: string, answer: string}>, submittedAt: number // unix timestamp}>, createdAt: number // unix timestamp }. Please make sure to include the questions and answers for each response.",
+      "integrationIds": ["typeform"],
+      "payload": {
+        "formId": "lyyDJUcC"
+      },
+      "expectedData": {
+        "id": "lyyDJUcC",
+        "name": "Coffee Shop Applications",
+        "responses": [
+          {
+            "id": "zrf8owa8sa9aq94pd6rmdzrf8ow4jewu",
+            "answers": [
+              {
+                "question": "What is your full name?",
+                "answer": "Peter Mustermann"
+              },
+              {
+                "question": "Which position are you applying for?",
+                "answer": "Cashier"
+              },
+              {
+                "question": "Please share a brief overview of your work experience.",
+                "answer": "Peter's text"
+              },
+              {
+                "question": "Why would you like to work at our coffee shop?",
+                "answer": "Random text"
+              }
+            ],
+            "submittedAt": 1760610533
+          }
+        ],
+        "createdAt": 1760610392
+      }
+    },
+    {
+      "id": "typeform-get-all-workspaces",
+      "name": "Typeform Get All Workspaces",
+      "type": "retrieval",
+      "instruction": "Get all workspaces for the authenticated user. I want the final output to be a JSON object with the following structure: { workspaces: [{id: string, name: string, numberOfForms: number}] }.",
+      "integrationIds": ["typeform"],
+      "payload": {},
+      "expectedData": {
+        "workspaces": [
+          {
+            "id": "QDctaF",
+            "name": "My workspace",
+            "numberOfForms": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "confluence-get-all-spaces",
+      "name": "Confluence Get All Spaces",
+      "type": "retrieval",
+      "instruction": "Get all spaces for the authenticated user. I want the final output to be a JSON object with the following structure: { spaces: [{id: number, type: string, name: string, archived: boolean}] }. Please use /wiki/rest/api/... not  rest/api/v2/...",
+      "integrationIds": ["confluence"],
+      "payload": {},
+      "expectedData": {
+        "spaces": [
+          {
+            "id": 294916,
+            "type": "knowledge_base",
+            "name": "Docs",
+            "archived": false
+          },
+          {
+            "id": 196611,
+            "type": "personal",
+            "name": "Max Mustermann",
+            "archived": false
+          },
+          {
+            "id": 98312,
+            "type": "onboarding",
+            "name": "Projektmanagement",
+            "archived": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "confluence-get-page-content",
+      "name": "Confluence Get Page Content",
+      "type": "retrieval",
+      "instruction": "Get the content of the page with the given id. I want the final output to be a JSON object with the following structure: { content: string }. ",
+      "integrationIds": ["confluence"],
+      "payload": {
+        "pageId": "163855"
+      },
+      "expectedData": {
+        "content": "<p>Intern Onboarding …</p>"
+      }
+    },
+    {
+      "id": "confluence-get-all-pages-of-space",
+      "name": "Confluence Get All Pages Of Space",
+      "type": "retrieval",
+      "instruction": "Get all pages for the given space id. I want the final output to be a JSON object with the following structure: { pages: [{id: string, title: string, content: string}] }. ",
+      "integrationIds": ["confluence"],
+      "payload": {
+        "spaceId": "294916"
+      },
+      "expectedData": {
+        "pages": [
+          {
+            "id": "163848",
+            "title": "Company Guidelines",
+            "content": "<p>Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut</p>"
+          },
+          {
+            "id": "295032",
+            "title": "Docs",
+            "content": "<p>Overview Page</p>"
+          },
+          {
+            "id": "163855",
+            "title": "Interns",
+            "content": "<p>Intern Onboarding …</p>"
+          },
+          {
+            "id": "295094",
+            "title": "IT Service Desk",
+            "content": "<p>Text about the IT Service Desk</p>"
+          }
+        ]
+      }
+    },
+    {
+      "id": "github-list-repos",
+      "name": "GitHub List Repositories",
+      "type": "retrieval",
+      "instruction": "List all repositories for the authenticated user. I want the final output to be a JSON object with the following structure: { repositories: [{id: number, name: string, isPublic: boolean}] }. ",
+      "integrationIds": ["github"],
+      "payload": {},
+      "expectedData": {
+        "repositories": [
+          {
+            "id": 1074517465,
+            "name": "congenial-tribble",
+            "isPublic": false
+          },
+          {
+            "id": 1074517568,
+            "name": "expert-octo-doodle",
+            "isPublic": false
+          },
+          {
+            "id": 1074520812,
+            "name": "strapi-cloud-template-blog-4b5423dbba",
+            "isPublic": true
+          },
+          {
+            "id": 1074517305,
+            "name": "Test1",
+            "isPublic": false
+          },
+          {
+            "id": 1074517689,
+            "name": "vigilant-octo-lamp",
+            "isPublic": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "github-get-user",
+      "name": "GitHub Get User",
+      "type": "retrieval",
+      "instruction": "Get the user information for the authenticated user. I want the final output to be a JSON object with the following structure: { user: {id: number, username: string, profilePictureUrl: string | null, url: string, createdAt: string } }. ",
+      "integrationIds": ["github"],
+      "payload": {},
+      "expectedData": {
+        "user": {
+          "id": 237506962,
+          "username": "Evals304",
+          "profilePictureUrl": "https://avatars.githubusercontent.com/u/237506962?v=4",
+          "url": "https://github.com/Evals304",
+          "createdAt": "2025-10-12T00:13:19Z"
+        }
+      }
+    },
+    {
+      "id": "github-get-user-pull-requests",
+      "name": "GitHub Get User's Pull Requests",
+      "type": "retrieval",
+      "instruction": "Get all pull requests for the authenticated user. I want the final output to be a JSON object with the following structure: { pullRequests: [{id: number, title: string, url: string, updatedAt: string, createdAt: string }] }. ",
+      "integrationIds": ["github"],
+      "payload": {},
+      "expectedData": {
+        "pullRequests": [
+          {
+            "id": 3527944071,
+            "title": "Test something",
+            "url": "https://github.com/Evals304/congenial-tribble/pull/1",
+            "updatedAt": "2025-10-18T01:46:27Z",
+            "createdAt": "2025-10-18T01:46:27Z"
+          },
+          {
+            "id": 3527943775,
+            "title": "Update README.md",
+            "url": "https://github.com/Evals304/vigilant-octo-lamp/pull/1",
+            "updatedAt": "2025-10-18T01:45:59Z",
+            "createdAt": "2025-10-18T01:45:59Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "linear-get-all-issues",
+      "name": "Linear Get All Issues",
+      "type": "retrieval",
+      "instruction": "Get all issues. I want the final output to be a JSON object with the following structure: { issues: [{id: string, title: string }] }. ",
+      "integrationIds": ["linear"],
+      "payload": {},
+      "expectedData": {
+        "issues": [
+          {
+            "id": "91d119b6-8c91-436e-9986-0198cf30cd8e",
+            "title": "Third"
+          },
+          {
+            "id": "4ba8526b-40b1-42cb-9cd4-9b273ed82eb7",
+            "title": "Second"
+          },
+          {
+            "id": "ba4a3f19-45af-4597-b165-bb2cd37aa0ec",
+            "title": "First"
+          }
+        ]
+      }
+    },
+    {
+      "id": "linear-get-issue-by-id",
+      "name": "Linear Get Issue By Id",
+      "type": "retrieval",
+      "instruction": "Get the issue with the given id. I want the final output to be a JSON object with the following structure: { issue: {id: string, title: string }] }. ",
+      "integrationIds": ["linear"],
+      "payload": {
+        "issueId": "91d119b6-8c91-436e-9986-0198cf30cd8e"
+      },
+      "expectedData": {
+        "issue": {
+          "id": "91d119b6-8c91-436e-9986-0198cf30cd8e",
+          "title": "Third"
+        }
+      }
+    },
+    {
+      "id": "linear-get-all-projects",
+      "name": "Linear Get All Projects",
+      "type": "retrieval",
+      "instruction": "Get all projects. I want the final output to be a JSON object with the following structure: { projects: [{id: string, name: string }] }. ",
+      "integrationIds": ["linear"],
+      "payload": {},
+      "expectedData": {
+        "projects": [
+          {
+            "id": "7c811f73-677a-4040-80be-0ff374f951b2",
+            "name": "Empty 2"
+          },
+          {
+            "id": "fb067dcf-0867-4fbb-b409-4565411015f2",
+            "name": "Empty1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "postgres-lego-inventory-analysis",
+      "name": "Postgres LEGO Inventory Analysis",
+      "type": "retrieval",
+      "instruction": "Query the LEGO database to find all LEGO themes. Please use the pagination payload to get the next page of results. I want the final output to be a JSON object with the following structure: { themes: [{id: string, name: string}]}. ",
+      "integrationIds": ["postgres-lego"],
+      "payload": {
+        "page": 2,
+        "pageSize": 10
+      },
+      "expectedData": {
+        "themes": [
+          {
+            "id": "11",
+            "name": "Off-Road"
+          },
+          {
+            "id": "12",
+            "name": "Race"
+          },
+          {
+            "id": "13",
+            "name": "Riding Cycle"
+          },
+          {
+            "id": "14",
+            "name": "Robot"
+          },
+          {
+            "id": "15",
+            "name": "Traffic"
+          },
+          {
+            "id": "16",
+            "name": "RoboRiders"
+          },
+          {
+            "id": "17",
+            "name": "Speed Slammers"
+          },
+          {
+            "id": "18",
+            "name": "Star Wars"
+          },
+          {
+            "id": "19",
+            "name": "Supplemental"
+          },
+          {
+            "id": "20",
+            "name": "Throwbot Slizer"
+          }
+        ]
+      }
+    },
+    {
+      "id": "postgres-lego-get-colors",
+      "name": "Postgres LEGO Get Colors",
+      "type": "retrieval",
+      "instruction": "Get all colors from the LEGO database. I want the final output to be a JSON object with the following structure: { colors: string[] }. ",
+      "integrationIds": ["postgres-lego"],
+      "payload": {},
+      "expectedData": {
+        "colors": [
+          "Unknown",
+          "Black",
+          "Blue",
+          "Green",
+          "Dark Turquoise",
+          "Red",
+          "Dark Pink",
+          "Brown",
+          "Light Gray",
+          "Dark Gray",
+          "Light Blue",
+          "Bright Green",
+          "Light Turquoise",
+          "Salmon",
+          "Pink",
+          "Yellow",
+          "White",
+          "Light Green",
+          "Light Yellow",
+          "Tan",
+          "Light Violet",
+          "Glow In Dark Opaque",
+          "Purple",
+          "Dark Blue-Violet",
+          "Orange",
+          "Magenta",
+          "Lime",
+          "Dark Tan",
+          "Bright Pink",
+          "Medium Lavender",
+          "Lavender",
+          "Trans-Black IR Lens",
+          "Trans-Dark Blue",
+          "Trans-Green",
+          "Trans-Bright Green",
+          "Trans-Red",
+          "Trans-Black",
+          "Trans-Light Blue",
+          "Trans-Neon Green",
+          "Trans-Very Lt Blue",
+          "Trans-Dark Pink",
+          "Trans-Yellow",
+          "Trans-Clear",
+          "Trans-Purple",
+          "Trans-Neon Yellow",
+          "Trans-Neon Orange",
+          "Chrome Antique Brass",
+          "Chrome Blue",
+          "Chrome Green",
+          "Chrome Pink",
+          "Chrome Black",
+          "Very Light Orange",
+          "Light Purple",
+          "Reddish Brown",
+          "Light Bluish Gray",
+          "Dark Bluish Gray",
+          "Medium Blue",
+          "Medium Green",
+          "Speckle Black-Copper",
+          "Speckle DBGray-Silver",
+          "Light Pink",
+          "Light Flesh",
+          "Milky White",
+          "Metallic Silver",
+          "Metallic Green",
+          "Metallic Gold",
+          "Medium Dark Flesh",
+          "Dark Purple",
+          "Dark Flesh",
+          "Royal Blue",
+          "Flesh",
+          "Light Salmon",
+          "Violet",
+          "Blue-Violet",
+          "Glitter Trans-Dark Pink",
+          "Medium Lime",
+          "Glitter Trans-Clear",
+          "Aqua",
+          "Light Lime",
+          "Light Orange",
+          "Glitter Trans-Purple",
+          "Speckle Black-Silver",
+          "Speckle Black-Gold",
+          "Copper",
+          "Pearl Light Gray",
+          "Metal Blue",
+          "Pearl Light Gold",
+          "Trans-Medium Blue",
+          "Pearl Dark Gray",
+          "Pearl Very Light Gray",
+          "Very Light Bluish Gray",
+          "Yellowish Green",
+          "Flat Dark Gold",
+          "Flat Silver",
+          "Trans-Orange",
+          "Pearl White",
+          "Bright Light Orange",
+          "Bright Light Blue",
+          "Rust",
+          "Bright Light Yellow",
+          "Trans-Pink",
+          "Sky Blue",
+          "Trans-Light Purple",
+          "Dark Blue",
+          "Dark Green",
+          "Glow In Dark Trans",
+          "Pearl Gold",
+          "Dark Brown",
+          "Maersk Blue",
+          "Dark Red",
+          "Dark Azure",
+          "Medium Azure",
+          "Light Aqua",
+          "Olive Green",
+          "Chrome Gold",
+          "Sand Red",
+          "Medium Dark Pink",
+          "Earth Orange",
+          "Sand Purple",
+          "Sand Green",
+          "Sand Blue",
+          "Chrome Silver",
+          "Fabuland Brown",
+          "Medium Orange",
+          "Dark Orange",
+          "Very Light Gray",
+          "Glow in Dark White",
+          "Medium Violet",
+          "Glitter Trans-Neon Green",
+          "Glitter Trans-Light Blue",
+          "Trans Flame Yellowish Orange",
+          "Trans Fire Yellow",
+          "Trans Light Royal Blue",
+          "Reddish Lilac",
+          "[No Color]"
+        ]
+      }
+    },
+    {
+      "id": "postgres-lego-get-ranked-themes",
+      "name": "Postgres LEGO Get Ranked Themes",
+      "type": "retrieval",
+      "instruction": "Return the top 20 most used LEGO themes from the database, ranked by number of sets (setCount) in each theme, descending. Output: { themes: [{ name: string, setCount: number }] }.",
+      "integrationIds": ["postgres-lego"],
+      "payload": {},
+      "expectedData": {
+        "themes": [
+          {
+            "name": "Gear",
+            "setCount": 246
+          },
+          {
+            "name": "Supplemental",
+            "setCount": 240
+          },
+          {
+            "name": "Duplo",
+            "setCount": 219
+          },
+          {
+            "name": "City",
+            "setCount": 216
+          },
+          {
+            "name": "Friends",
+            "setCount": 192
+          },
+          {
+            "name": "Ninjago",
+            "setCount": 191
+          },
+          {
+            "name": "Service Packs",
+            "setCount": 185
+          },
+          {
+            "name": "Technic",
+            "setCount": 172
+          },
+          {
+            "name": "Creator",
+            "setCount": 148
+          },
+          {
+            "name": "Technic",
+            "setCount": 140
+          },
+          {
+            "name": "Basic Set",
+            "setCount": 134
+          },
+          {
+            "name": "Key Chain",
+            "setCount": 132
+          },
+          {
+            "name": "Bulk Bricks",
+            "setCount": 125
+          },
+          {
+            "name": "Star Wars Episode 4/5/6",
+            "setCount": 118
+          },
+          {
+            "name": "Basic",
+            "setCount": 106
+          },
+          {
+            "name": "Star Wars",
+            "setCount": 105
+          },
+          {
+            "name": "Police",
+            "setCount": 103
+          },
+          {
+            "name": "Soccer",
+            "setCount": 102
+          },
+          {
+            "name": "Supplemental",
+            "setCount": 99
+          },
+          {
+            "name": "Star Wars",
+            "setCount": 97
+          }
+        ]
+      }
+    },
+    {
+      "id": "timbuk2-product-analysis",
+      "name": "Timbuk2 Product Analysis",
+      "description": "Tests pagination",
+      "type": "retrieval",
+      "instruction": "Get all products from Timbuk2. Please make sure you get all products by using page and limit. I want the final output to be a JSON object with the following structure: { products: string[] }. ",
+      "integrationIds": ["timbuk2-shopify"],
+      "payload": {},
+      "expectedData": {
+        "products": [
+          "Non-Repairable Return",
+          "Non-Repairable Recycle",
+          "Non-Payment Return",
+          "Non-Payment Recycle",
+          "Flight Crossbody Sling Bag",
+          "Flight Crossbody Satchel",
+          "Flight Convertible Tote Backpack",
+          "Flight Backpack",
+          "Flight Classic Messenger Bag",
+          "Miles Chest Pack",
+          "Water Resistant Tuck Backpack",
+          "Water Resistant Prospect Backpack",
+          "Water Resistant Mini Prospect Backpack",
+          "Water Resistant Division Backpack",
+          "Castle Crossbody Sling",
+          "Stark Messenger Bag",
+          "Spirit Laptop Backpack",
+          "Spark Mini Pack",
+          "Flight Classic Messenger Bag",
+          "Replacement Product",
+          "Water-Resistant Alcatraz Backpack",
+          "Reflective Alcatraz Backpack",
+          "Eco Ripstop Alcatraz Backpack",
+          "Eco Cordura Alcatraz Backpack",
+          "Flight Crossbody Sling Bag",
+          "Flight Crossbody Satchel",
+          "Flight Convertible Tote Backpack",
+          "Flight Backpack",
+          "Custom Classic Messenger Bag",
+          "Classic Messenger Bag",
+          "Wingman Travel Backpack Duffel",
+          "Custom Strap Pad",
+          "Classic Messenger Bag",
+          "Custom Classic Messenger Bag",
+          "Warranty Recycle",
+          "Luggage Roller Skate Wheel Assembly",
+          "Luggage Roller Skate Wheel",
+          "Quick Attach Thin SR Buckle",
+          "Quick Attach Tensionlock",
+          "Quick Attach Nemo Buckle Male",
+          "Canvas Shop Tote Bag",
+          "Canvas Shop Tote Bag",
+          "Utility Organization Pouch",
+          "Utility Laptop Sleeve",
+          "Closer Laptop Briefcase",
+          "Stealth Folio Organizer",
+          "Scholar Convertible Tote Backpack",
+          "Parkside Laptop Backpack 2.0",
+          "Custom Alcatraz Laptop Backpack",
+          "Packable Travel Tote",
+          "Custom Prospect Laptop Backpack",
+          "Custom Mini Prospect Backpack",
+          "Custom Division Laptop Backpack",
+          "Custom Tuck Backpack",
+          "Catapult Sling",
+          "Custom Tuck Backpack",
+          "Authority Laptop Backpack Deluxe",
+          "Transit Dopp Kit",
+          "Commute Messenger Bag 2.0",
+          "Spirit Laptop Backpack",
+          "Tuck Laptop Backpack",
+          "Tuck Laptop Backpack",
+          "Tandem Pannier",
+          "Transit Dopp Kit",
+          "Slacker Chest Pack",
+          "Vapor Sling Crossbody Bag",
+          "Muttmover Luxe Backpack",
+          "Wingman Travel Backpack Duffel",
+          "Agent Crossbody Bag",
+          "Packable Travel Tote",
+          "Vapor Convertible Tote Backpack",
+          "Hero Laptop Backpack",
+          "Scholar Convertible Tote Backpack",
+          "Stealth Folio Organizer",
+          "Tuck Laptop Backpack",
+          "Scheme Convertible Briefcase Backpack",
+          "Scheme Convertible Briefcase Backpack",
+          "Lane Commuter Backpack",
+          "Slacker Chest Pack",
+          "Player Duffel Bag",
+          "Player Duffel Bag",
+          "Closer Laptop Briefcase",
+          "Commute Messenger Bag 2.0",
+          "Never Check Expandable Backpack",
+          "Magnetic Clip Set",
+          "Never Check Expandable Backpack",
+          "Division Laptop Backpack Deluxe",
+          "Rogue Laptop Backpack 2.0",
+          "Quik Attach Stealth Male Clip",
+          "Spire Laptop Backpack 2.0",
+          "Division Laptop Backpack Deluxe",
+          "Spark Micro Pack",
+          "Parkside Laptop Backpack 2.0",
+          "Foundry Pack",
+          "Rascal Belt Bag",
+          "Custom Division Laptop Backpack",
+          "Impulse Travel Backpack",
+          "Q Laptop Backpack 2.0",
+          "Q Laptop Backpack 2.0",
+          "Especial Stash Messenger Bag",
+          "Especial Scope Expandable Backpack",
+          "$35 Repair Fee",
+          "Repair Fee Waived",
+          "$25 Repair Fee",
+          "3 Way Accessory Case",
+          "Reflector Tail",
+          "Standard Pannier Bracket",
+          "Standard Cam Buckle Female",
+          "Authority Laptop Backpack Deluxe",
+          "Foundry Pack",
+          "Copilot Luggage Roller",
+          "Custom Alcatraz Laptop Backpack",
+          "Custom Prospect Laptop Backpack",
+          "Custom Mini Prospect Backpack",
+          "eGift Card",
+          "Parker Commuter Backpack",
+          "Clark Commuter Backpack",
+          "Robin Commuter Backpack",
+          "Pannier System Type T",
+          "Roller Extending Handle",
+          "Standard CAM Buckle Male",
+          "Single Gate Keeper",
+          "Day Pack Puller",
+          "Universal Shoulder Strap",
+          "Sternum Straps for Backpacks",
+          "Bag Silencer Strips",
+          "Cross Strap Without Clips",
+          "Cross Strap With Clips",
+          "Male Stealth",
+          "Male Clip",
+          "Female Clip",
+          "Quick Attach Stealth Female",
+          "Triangle Hook",
+          "Classic Cam Buckle Male",
+          "Super Strap Pad",
+          "Copilot Luggage Roller",
+          "Stealth Folio Organizer"
+        ]
+      }
+    },
+    {
+      "id": "timbuk2-get-public-vendors",
+      "name": "Timbuk2 Get Public Vendors",
+      "description": "Tests pagination and deduplication since vendors are only found as fields on products; extraction and uniqueness must be computed client-side. Without `Please make sure you get all products by using page and limit.` it would not work.",
+      "type": "retrieval",
+      "instruction": "Get all unique publicly available vendors from Timbuk2. Please make sure you get all products by using page and limit. I want the final output to be a JSON object with the following structure: { vendors: string[] }. ",
+      "integrationIds": ["timbuk2-shopify"],
+      "payload": {},
+      "expectedData": {
+        "vendors": [
+          "Timbuk2-Timbuk2",
+          "Timbuk2-Corporate",
+          "Timbuk2-Sale",
+          "Timbuk2-Corporate-Sale"
+        ]
+      }
+    },
+    {
+      "id": "timbuk2-get-newest-products",
+      "name": "Timbuk2 Get 10 Newest Products",
+      "description": "Tests pagination and deduplication since vendors are only found as fields on products; extraction and uniqueness must be computed client-side. Without `Please make sure you get all products by using page and limit.` it would not work.",
+      "type": "retrieval",
+      "instruction": "Get the 10 newest products from Timbuk2. Please make sure you get all products by using page and limit. I want the final output to be a JSON object with the following structure: { products: [{title: string, updated_at: string}] }. ",
+      "integrationIds": ["timbuk2-shopify"],
+      "payload": {},
+      "expectedData": {
+        "products": [
+          {
+            "title": "Non-Repairable Return",
+            "updated_at": "2025-10-19T14:22:18-07:00"
+          },
+          {
+            "title": "Non-Repairable Recycle",
+            "updated_at": "2025-10-19T14:22:18-07:00"
+          },
+          {
+            "title": "Non-Payment Return",
+            "updated_at": "2025-10-19T14:22:18-07:00"
+          },
+          {
+            "title": "Non-Payment Recycle",
+            "updated_at": "2025-10-19T14:22:18-07:00"
+          },
+          {
+            "title": "Flight Crossbody Sling Bag",
+            "updated_at": "2025-10-19T14:22:18-07:00"
+          },
+          {
+            "title": "Flight Crossbody Satchel",
+            "updated_at": "2025-10-19T14:22:18-07:00"
+          },
+          {
+            "title": "Flight Convertible Tote Backpack",
+            "updated_at": "2025-10-19T14:22:18-07:00"
+          },
+          {
+            "title": "Flight Backpack",
+            "updated_at": "2025-10-19T14:22:18-07:00"
+          },
+          {
+            "title": "Flight Classic Messenger Bag",
+            "updated_at": "2025-10-19T14:22:18-07:00"
+          },
+          {
+            "title": "Miles Chest Pack",
+            "updated_at": "2025-10-19T14:22:18-07:00"
+          }
+        ]
+      }
+    },
+    {
+      "id": "stripe-get-customers",
+      "name": "Stripe Get Customers",
+      "description": "This tests pagination. It usually fails because of nested structure.",
+      "type": "retrieval",
+      "instruction": "Get all customers from Stripe. I want the final output to be a JSON object with the following structure: { customers: string[] // person names }. The data is at sourceData.getAllProducts.results[0].data, not sourceData.getAllProducts.data. Update the finalTransform to access sourceData.getAllProducts.results and flatten the .data arrays from each result.",
+      "integrationIds": ["stripe"],
+      "payload": {},
+      "expectedData": {
+        "customers": [
+          "Daniel Miller",
+          "Olivia Taylor",
+          "Charlotte Brown",
+          "Mia Johnson",
+          "Sophia Lee",
+          "Daniel Williams",
+          "Jane Smith",
+          "Daniel Thomas",
+          "David Rodriguez",
+          "Matthew Williams",
+          "Sophia Davis",
+          "Olivia Williams",
+          "Sarah Lee",
+          "Sophia Taylor",
+          "John Johnson",
+          "Olivia Taylor",
+          "Sophia Jackson",
+          "Mia Rodriguez",
+          "Michael Rodriguez",
+          "Olivia Wilson",
+          "Robert Anderson",
+          "William Garcia",
+          "David Davis",
+          "Matthew Jackson",
+          "Daniel Taylor",
+          "Isabella Lopez",
+          "Matthew Brown",
+          "James Williams",
+          "James Garcia",
+          "Emily Moore",
+          "Sophia Hernandez",
+          "James Miller",
+          "Emma Taylor",
+          "Sophia Martinez",
+          "Daniel Smith",
+          "Olivia Anderson",
+          "William Miller",
+          "William Jones",
+          "Matthew Lee",
+          "Daniel Miller",
+          "Ava Brown",
+          "James Thomas",
+          "Joseph Taylor",
+          "Joseph Martinez",
+          "Matthew Anderson",
+          "Christopher Martinez",
+          "Isabella Johnson",
+          "David Lee",
+          "Robert Smith",
+          "Emma Taylor",
+          "David Anderson",
+          "Christopher Brown",
+          "James Wilson",
+          "Sophia Taylor",
+          "Michael Davis",
+          "Jane Anderson",
+          "Daniel Lopez",
+          "Charlotte Moore",
+          "John Williams",
+          "Sarah Martinez",
+          "Jane Thomas",
+          "Sarah Thomas",
+          "James Williams",
+          "William Wilson",
+          "John Miller",
+          "David Lee",
+          "William Brown",
+          "Sarah Hernandez",
+          "Sophia Brown",
+          "Emma Smith",
+          "Charlotte Martin",
+          "Joseph Lee",
+          "Charlotte Martin",
+          "Joseph Anderson",
+          "James Lee",
+          "Emma Wilson",
+          "Ava Hernandez",
+          "Emma Moore",
+          "John Moore",
+          "Michael Jackson",
+          "David Anderson",
+          "Mia Lopez",
+          "Christopher Davis",
+          "Sarah Rodriguez",
+          "Matthew Davis",
+          "Ava Moore",
+          "John Lopez",
+          "Emma Garcia",
+          "David Taylor",
+          "Robert Davis",
+          "Daniel Wilson",
+          "Emma Lee",
+          "Sophia Martin",
+          "Olivia Moore",
+          "Olivia Jackson",
+          "Mia Martinez",
+          "David Brown",
+          "James Johnson",
+          "Matthew Lee",
+          "Ava Wilson",
+          "William Smith",
+          "Sarah Smith",
+          "Daniel Johnson",
+          "John Smith",
+          "Sophia Jackson",
+          "James Williams",
+          "Jane Thomas",
+          "Olivia Lee",
+          "Joseph Taylor",
+          "Jane Garcia",
+          "Emma Martinez",
+          "Matthew Lopez",
+          "Charlotte Taylor",
+          "Sophia Thomas",
+          "Mia Brown",
+          "Sarah Martin",
+          "Christopher Moore",
+          "Joseph Wilson",
+          "Emma Wilson",
+          "Ava Martinez",
+          "John Lee",
+          "Sophia Jones",
+          "Robert Miller",
+          "Matthew Jones",
+          "Jane Rodriguez",
+          "Sarah Rodriguez",
+          "Isabella Lopez",
+          "David Johnson",
+          "Matthew Hernandez",
+          "Sarah Rodriguez",
+          "Joseph Wilson",
+          "Joseph Martinez",
+          "Charlotte Hernandez",
+          "Christopher Davis",
+          "Joseph Anderson",
+          "Sarah Martin",
+          "Emily Jones",
+          "Robert Thomas",
+          "Ava Anderson",
+          "Isabella Hernandez",
+          "Michael Thomas",
+          "Christopher Martin",
+          "Christopher Garcia",
+          "Joseph Brown",
+          "James Jones",
+          "Mia Garcia",
+          "Isabella Moore",
+          "James Miller",
+          "Joseph Hernandez",
+          "Robert Wilson",
+          "Mia Johnson",
+          "Matthew Lee",
+          "Daniel Lee",
+          "John Taylor",
+          "Jane Wilson",
+          "William Martin",
+          "Michael Williams",
+          "David Anderson",
+          "Michael Taylor",
+          "Daniel Lopez",
+          "John Miller",
+          "Daniel Hernandez",
+          "Joseph Taylor",
+          "Charlotte Lee",
+          "Michael Martinez",
+          "Isabella Johnson",
+          "Olivia Anderson",
+          "David Johnson",
+          "Michael Lee",
+          "Daniel Lee",
+          "Emily Lee",
+          "Michael Smith",
+          "William Rodriguez",
+          "Ava Anderson",
+          "Isabella Davis",
+          "Charlotte Jackson",
+          "John Taylor",
+          "Ava Garcia",
+          "Daniel Lopez",
+          "Robert Rodriguez",
+          "Christopher Rodriguez",
+          "Ava Miller",
+          "Matthew Miller",
+          "Isabella Martinez",
+          "Jane Lee",
+          "Matthew Johnson",
+          "Michael Moore",
+          "Matthew Lopez",
+          "Matthew Lopez",
+          "William Moore",
+          "Christopher Martinez",
+          "David Moore",
+          "Ava Martinez",
+          "Jane Martinez",
+          "Michael Lee",
+          "Ava Williams",
+          "David Martin",
+          "Sophia Thomas",
+          "Jane Williams",
+          "James Rodriguez",
+          "Hans GmbH",
+          "Peter GmbH"
+        ]
+      }
+    },
+    {
+      "id": "stripe-calculate-revenue",
+      "name": "Stripe Calculate Revenue",
+      "description": "This usually fails because of nested structure.",
+      "type": "retrieval",
+      "instruction": "Calculate the total revenue from Stripe. I want the final output to be a JSON object with the following structure: { gross_revenue: number, fees: number, net_revenue: number }. The data is at sourceData.getAllProducts.results[0].data, not sourceData.getAllProducts.data. Update the finalTransform to access sourceData.getAllProducts.results and flatten the .data arrays from each result.",
+      "integrationIds": ["stripe"],
+      "payload": {},
+      "expectedData": {
+        "gross_revenue": 5,
+        "fees": 0.74,
+        "net_revenue": 4.26
+      }
+    },
+    {
+      "id": "stripe-get-all-products",
+      "name": "Stripe Get Products",
+      "description": "This tests pagination. It usually fails because of nested structure.",
+      "type": "retrieval",
+      "instruction": "Get all products from Stripe. I want the final output to be a JSON object with the following structure: { products: string[] }. The data is at sourceData.getAllProducts.results[0].data, not sourceData.getAllProducts.data. Update the finalTransform to access sourceData.getAllProducts.results and flatten the .data arrays from each result.",
+      "integrationIds": ["stripe"],
+      "payload": {},
+      "expectedData": {
+        "products": [
+          {
+            "id": "prod_TGbk1E8pRkHR51",
+            "object": "product",
+            "active": true,
+            "created": 1760910770,
+            "updated": 1760910770,
+            "name": "Superglue Cap"
+          },
+          {
+            "id": "prod_TGbjqL1f2Rqqkv",
+            "object": "product",
+            "active": true,
+            "created": 1760910683,
+            "updated": 1760910683,
+            "name": "Superglue T-Shirt"
+          },
+          {
+            "id": "prod_TGbixpbyW32QWP",
+            "object": "product",
+            "active": true,
+            "created": 1760910671,
+            "updated": 1760910671,
+            "name": "Superglue Coffee Mug"
+          }
+        ]
+      }
+    },
+    {
+      "id": "attio-get-15-oldest-people",
+      "name": "Attio Get 15 Oldest People",
+      "description": "",
+      "type": "retrieval",
+      "instruction": "Get 15 people from Attio and sort them by created at, oldest first. I want the final output to be a JSON object with the following structure: { people: string[] }. ",
+      "integrationIds": ["attio"],
+      "payload": {},
+      "expectedData": {
+        "people": [
+          "Isabella Davis",
+          "Mia Miller",
+          "Ava Martinez",
+          "Evelyn Martinez",
+          "Henry Brown",
+          "Amelia Brown",
+          "James Taylor",
+          "Evelyn Jones",
+          "Alexander Moore",
+          "Benjamin Davis",
+          "Benjamin Wilson",
+          "Noah Williams",
+          "James Lopez",
+          "Sophia Miller",
+          "Olivia Martinez"
+        ]
+      }
+    },
+    {
+      "id": "attio-get-person-by-id",
+      "name": "Attio Get Person",
+      "description": "",
+      "type": "retrieval",
+      "instruction": "Get the person with the given id from Attio. I want the final output to be a JSON object with the following structure: { person: { name: string, email: string, job_title: string } }. ",
+      "integrationIds": ["attio"],
+      "payload": {
+        "id": "004e6660-3d14-42ef-9d2d-b1f0167209aa"
+      },
+      "expectedData": {
+        "person": {
+          "name": "Olivia Jackson",
+          "email": "olivia.jackson@yahoo.com",
+          "job_title": "Business Analyst"
+        }
+      }
+    },
+    {
+      "id": "attio-people-no-email",
+      "name": "Attio People No Email",
+      "type": "retrieval",
+      "instruction": "Retrieve all people records from Attio CRM that have an empty email address. Return their names and created_at. Output JSON: { \"people\": [ { \"name\": string, \"created_at\": string } ] }.",
+      "integrationIds": ["attio"],
+      "payload": {},
+      "expectedData": {
+        "people": [
+          {
+            "name": "Hans Peter",
+            "created_at": "2025-10-20T00:09:59.640000000Z"
+          },
+          {
+            "name": "Max Mustermann",
+            "created_at": "2025-10-20T00:10:13.447000000Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "openai-structured-output-name-age",
+      "name": "OpenAI Structured Output Name and Age",
+      "type": "retrieval",
+      "instruction": "Call the OpenAI API with an unstructured list of 5 people's names and ages: 'Sarah is 28 years old, Mike 35, Emma age 22, David is 41, and Chris who is 19'. Ask OpenAI to return this data in a structured format with the people sorted alphabetically by name. Use structured output or response_format to enforce the schema. The final transform should propagate the result from the OpenAI request. Output JSON: { \"people\": Array<{ \"name\": string, \"age\": number }> }. Make sure the workflow output by the final transform is exactly this JSON object.",
+      "integrationIds": ["openai"],
+      "payload": {},
+      "expectedData": {
+        "people": [
+          {
+            "name": "Chris",
+            "age": 19
+          },
+          {
+            "name": "David",
+            "age": 41
+          },
+          {
+            "name": "Emma",
+            "age": 22
+          },
+          {
+            "name": "Mike",
+            "age": 35
+          },
+          {
+            "name": "Sarah",
+            "age": 28
+          }
+        ]
+      }
+    },
+    {
+      "id": "openai-pdf-analysis-with-input-retrieval",
+      "name": "OpenAI PDF Analysis with Input Retrieval",
+      "type": "retrieval",
+      "instruction": "Call the OpenAI API to analyze a PDF file. First, make a request to the responses API endpoint with a file attachment pointing to this PDF: https://arxiv.org/pdf/2501.14426 and add exactly this prompt: Please provide a one sentence summary of this paper. Then, make a second call to the OpenAI input_items endpoint using the response ID from the first request to retrieve what inputs were provided to that request. The final output should be a list of the content from the second request, showing the inputs that were provided to the first OpenAI request. Final Transform Output JSON: { \"content\": Array<{ \"type\": string, (\"text\": string) | (\"file_url\": string) }> }.",
+      "integrationIds": ["openai"],
+      "payload": {},
+      "expectedData": {
+        "content": [
+          {
+            "type": "input_text",
+            "text": "Please provide a 1-sentence summary of this paper."
+          },
+          {
+            "type": "input_file",
+            "file_url": "https://arxiv.org/pdf/2501.14426"
+          }
+        ]
+      }
+    },
+    {
+      "id": "postgres-lego-openai-table-extraction",
+      "name": "PostgreSQL+OpenAI Structured Output",
+      "type": "retrieval",
+      "instruction": "First, query the LEGO PostgreSQL database to get the table schema information. You can use a query like SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' to get all table names. Then, send this schema information to OpenAI and ask it to extract and return a structured output containing only a list of table names. Use OpenAI's structured output feature or response_format to force the output to match the exact schema with a table_names array. Output JSON: { \"table_names\": string[] }. Make sure the final workflow output by the final transform also has this schema: { \"table_names\": string[] }.",
+      "integrationIds": ["postgres-lego", "openai"],
+      "payload": {},
+      "expectedData": {
+        "table_names": [
+          "lego_colors",
+          "lego_inventories",
+          "lego_inventory_parts",
+          "lego_inventory_sets",
+          "lego_part_categories",
+          "lego_parts",
+          "lego_sets",
+          "lego_themes"
+        ]
+      }
+    },
+    {
+      "id": "tele2-http-download-verification",
+      "name": "Tele2 HTTP Download",
+      "type": "retrieval",
+      "instruction": "Download the 10MB.zip file from the Tele2 FTP speedtest service at http://speedtest.tele2.net/10MB.zip. After the download completes, verify that the file exists and was successfully downloaded. In the final transform, check if the file is present and return a status object indicating success if the file exists, otherwise return failure. Output JSON: { \"status\": \"success\" | \"failure\", \"file\": string }.",
+      "integrationIds": ["tele2-ftp"],
+      "payload": {},
+      "expectedData": {
+        "status": "success",
+        "file": "10GB.zip"
+      }
+    },
+    {
+      "id": "tele2-ftp-upload-berkshire-letter",
+      "name": "Tele2 FTP Upload Berkshire Letter",
+      "type": "retrieval",
+      "instruction": "First, download the Berkshire Hathaway 2024 shareholder letter PDF from https://www.berkshirehathaway.com/letters/2024ltr.pdf. Then, upload this downloaded file to the Tele2 FTP speedtest server at ftp://speedtest.tele2.net/upload/. The upload directory automatically removes files after upload completes. In the final transform, return a status object indicating success if the upload worked, otherwise return failure. Output JSON: { \"status\": \"success\" | \"failure\" }.",
+      "integrationIds": ["tele2-ftp", "berkshire-hathaway-letter"],
+      "payload": {},
+      "expectedData": {
+        "status": "success"
+      }
+    },
+    {
+      "id": "sec-jina-markdown-conversion",
+      "name": "SEC Filing to Markdown via Jina Reader",
+      "type": "retrieval",
+      "instruction": "This workflow has 2 steps. Step 1: Read the SEC EDGAR filing HTML from https://www.sec.gov/ix?doc=/Archives/edgar/data/0000040987/000119312525195442/d28129d8k.htm. Step 2: Call Jina's Reader API (https://r.jina.ai/) to convert the page content to markdown. When calling Jina's API, prepend 'https://r.jina.ai/' to the SEC URL and add the header 'x-respond-with: markdown' to get the response as markdown format. Make sure to retrieve the markdown content from the response. In the final transform, check if the markdown content is present and properly formatted. Return status 'success' if markdown is retrieved successfully, otherwise return 'failure'. Output JSON: { \"status\": \"success\" | \"failure\" }.",
+      "integrationIds": ["sec-gov", "jina-reader"],
+      "payload": {},
+      "expectedData": {
+        "status": "success"
+      }
+    }
+  ],
+  "enabledWorkflows":"all",
+  "settings": {
+    "runOneShotMode": true,
+    "runSelfHealingMode": true,
+    "attemptsEachMode": 5
+  }
+}
