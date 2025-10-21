@@ -77,12 +77,15 @@ export function initializeAIModel(options?: {
             if (process.env.AZURE_API_VERSION) {
                 azureOptions.apiVersion = process.env.AZURE_API_VERSION;
             }
+            if (process.env.AZURE_USE_DEPLOYMENT_BASED_URLS) {
+                azureOptions.useDeploymentBasedUrls = process.env.AZURE_USE_DEPLOYMENT_BASED_URLS;
+            }
             provider = createAzure(azureOptions);
             modelId = process.env.AZURE_MODEL || defaultModel;
             break;
         }
         default:
-            throw new Error(`Invalid provider: ${providerType}. Must be one of: ANTHROPIC, OPENAI, OPENAI_LEGACY, GEMINI, AZURE`);
+            throw new Error(`Invalid provider: ${providerType}. Must be one of: anthropic, openai, gemini, azure`);
     }
 
     return provider(modelId);

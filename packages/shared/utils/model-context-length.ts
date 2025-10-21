@@ -65,21 +65,20 @@ export function getModelContextLength(modelId: string): number {
 }
 
 export function getConfiguredModelContextLength(): number {
-  const provider = process.env.LLM_PROVIDER?.toUpperCase();
+  const provider = process.env.LLM_PROVIDER?.toLowerCase();
   let modelId: string | undefined;
 
   switch (provider) {
-    case 'ANTHROPIC':
+    case 'anthropic':
       modelId = process.env.ANTHROPIC_MODEL;
       break;
-    case 'OPENAI':
-    case 'OPENAI_LEGACY':
+    case 'openai':
       modelId = process.env.OPENAI_MODEL;
       break;
-    case 'GEMINI':
+    case 'gemini':
       modelId = process.env.GEMINI_MODEL;
       break;
-    case 'AZURE':
+    case 'azure':
       modelId = process.env.AZURE_MODEL;
       break;
   }
