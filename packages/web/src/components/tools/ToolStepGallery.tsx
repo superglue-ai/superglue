@@ -136,17 +136,17 @@ const SpotlightStepCard = ({
                             <>
                                 <span title={!canExecute ? "Execute previous steps first" : (isExecuting || isFixingWorkflow) ? "Step is executing..." : selfHealingEnabled ? "Fix this step with AI" : "Test this step"}>
                                     <Button
-                                        size="icon"
                                         variant="ghost"
                                         onClick={selfHealingEnabled ? onFixStep : onExecuteStep}
                                         disabled={!canExecute || isExecuting || isFixingWorkflow}
-                                        className="h-8 w-8"
+                                        className="h-8 px-3 gap-2"
                                     >
                                         {(isExecuting || isFixingWorkflow) ? (
                                             <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                                         ) : (
                                             <Play className="h-3 w-3" />
                                         )}
+                                        <span className="text-sm">Run Step</span>
                                     </Button>
                                 </span>
                                 <HelpTooltip text={selfHealingEnabled ? "Attempts to fix this step using AI auto-repair. Only works if all previous steps have completed successfully." : "Executes this step configuration directly. Only works if all previous steps have completed successfully."} />

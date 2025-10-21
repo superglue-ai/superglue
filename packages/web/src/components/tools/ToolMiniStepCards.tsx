@@ -311,7 +311,7 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
     }, [value, placeholder, readOnly]);
     const jsonHtml = usePrismHighlight(displayValue, 'json', 60);
     return (
-        <div className={cn("relative rounded-lg border shadow-sm", readOnly ? "bg-muted/30 border-dashed" : "bg-background border")}>
+        <div className={cn("relative rounded-lg border shadow-sm", readOnly ? "bg-muted/30" : "bg-background")}>
             {overlay && (<div className="absolute top-1 right-1 z-10 flex items-center gap-1">{overlay}</div>)}
             {bottomRightOverlay && (<div className="absolute bottom-1 right-1 z-10 flex items-center gap-1">{bottomRightOverlay}</div>)}
             {!overlay && (<div className="absolute top-1 right-1 z-10"><CopyButton text={value || placeholder} /></div>)}
@@ -445,9 +445,13 @@ export const PayloadSpotlight = ({
                 className="hidden"
             />
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2 mb-3 h-8">
-                    <TabsTrigger value="payload" className="text-xs">Payload JSON</TabsTrigger>
-                    <TabsTrigger value="schema" className="text-xs">Input Schema</TabsTrigger>
+                <TabsList className="h-9 p-1 rounded-md mb-3">
+                    <TabsTrigger value="payload" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                        <FileJson className="h-4 w-4" /> Payload JSON
+                    </TabsTrigger>
+                    <TabsTrigger value="schema" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                        <Code2 className="h-4 w-4" /> Input Schema
+                    </TabsTrigger>
                 </TabsList>
                 <TabsContent value="payload" className="mt-3 space-y-3">
                     {!readOnly && onFilesUpload && uploadedFiles.length > 0 && (
@@ -669,10 +673,16 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
                     </div>
                 </div>
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className="grid w-full grid-cols-3 mb-3">
-                        <TabsTrigger value="inputs">Step Inputs</TabsTrigger>
-                        <TabsTrigger value="transform">Transform Code</TabsTrigger>
-                        <TabsTrigger value="schema">Response Schema</TabsTrigger>
+                    <TabsList className="h-9 p-1 rounded-md mb-3">
+                        <TabsTrigger value="inputs" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                            <FileJson className="h-4 w-4" /> Step Inputs
+                        </TabsTrigger>
+                        <TabsTrigger value="transform" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                            <Code2 className="h-4 w-4" /> Transform Code
+                        </TabsTrigger>
+                        <TabsTrigger value="schema" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                            <Package className="h-4 w-4" /> Response Schema
+                        </TabsTrigger>
                     </TabsList>
                     <TabsContent value="inputs" className="mt-2">
                         {(() => {
@@ -737,27 +747,39 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
     if (isTransform) {
         const isCompleted = completedSteps.includes('__final_transform__');
         const isFailed = failedSteps.includes('__final_transform__');
-        const getBorderColor = () => {
-            if (isTesting || isRunningAll) return "border-l-amber-500 animate-pulse";
-            if (isFailed) return "border-l-red-500";
-            if (isCompleted) return "border-l-green-500";
-            return "border-l-gray-400";
+        const isRunning = isTesting || isRunningAll;
+        const getStatusInfo = () => {
+            if (isRunning) return { text: "Running", color: "text-amber-600 dark:text-amber-400" };
+            if (isFailed) return { text: "Failed", color: "text-red-600 dark:text-red-400" };
+            if (isCompleted) return { text: "✓ Completed", color: "text-muted-foreground" };
+            return { text: "Pending", color: "text-gray-500 dark:text-gray-400" };
         };
+        const statusInfo = getStatusInfo();
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
                 <Card className={cn(
                     isActive ? "p-3 w-[180px] h-[110px]" : "p-3 w-[180px] h-[100px]",
-                    "flex-shrink-0 border-l-4",
+                    "flex-shrink-0",
                     isActive && "ring-2 ring-primary shadow-lg",
-                    isLastCard && !hasTransformCompleted && "rounded-r-2xl bg-gradient-to-bl from-purple-500/5 to-transparent",
-                    getBorderColor()
+                    isLastCard && !hasTransformCompleted && "rounded-r-2xl bg-gradient-to-bl from-purple-500/5 to-transparent"
                 )}>
-                    <div className="h-full flex flex-col items-center justify-center leading-tight">
-                        <div className="p-2 rounded-full bg-purple-500/10">
-                            <Code2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    <div className="h-full flex flex-col items-center justify-between leading-tight">
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                            <div className="p-2 rounded-full bg-purple-500/10">
+                                <Code2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                            </div>
+                            <span className="text-[11px] font-semibold mt-1.5">Final Transform</span>
+                            <span className="text-[9px] text-muted-foreground">JavaScript</span>
                         </div>
-                        <span className="text-[11px] font-semibold mt-1.5">Final Transform</span>
-                        <span className="text-[9px] text-muted-foreground">JavaScript</span>
+                        <div className="flex items-center gap-1 mt-1">
+                            {isRunning && (
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                </span>
+                            )}
+                            <span className={cn("text-[9px] font-medium", statusInfo.color)}>{statusInfo.text}</span>
+                        </div>
                     </div>
                 </Card>
             </div>
@@ -768,16 +790,21 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
                 <Card className={cn(
                     isActive ? "p-3 w-[180px] h-[110px]" : "p-3 w-[180px] h-[100px]",
-                    "flex-shrink-0 border-l-4 border-l-green-500",
+                    "flex-shrink-0",
                     isActive && "ring-2 ring-primary shadow-lg",
                     isLastCard && "rounded-r-2xl"
                 )}>
-                    <div className="flex flex-col items-center justify-center h-full leading-tight">
-                        <div className="p-2 rounded-full bg-green-500/10">
-                            <FileJson className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <div className="flex flex-col items-center justify-between h-full leading-tight">
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                            <div className="p-2 rounded-full bg-green-500/10">
+                                <FileJson className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            </div>
+                            <span className="text-[11px] font-semibold mt-1.5">Tool Result</span>
+                            <span className="text-[9px] text-muted-foreground">JSON</span>
                         </div>
-                        <span className="text-[11px] font-semibold mt-1.5">Tool Result</span>
-                        <span className="text-[9px] text-muted-foreground">JSON</span>
+                        <div className="flex items-center gap-1 mt-1">
+                            <span className="text-[9px] font-medium text-muted-foreground">✓ Completed</span>
+                        </div>
                     </div>
                 </Card>
             </div>
@@ -786,12 +813,15 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
     const method = step.apiConfig?.method || 'GET';
     const isCompleted = stepId ? completedSteps.includes(stepId) : false;
     const isFailed = stepId ? failedSteps.includes(stepId) : false;
-    const getBorderColor = () => {
-        if (isTesting || (isRunningAll && stepId)) return "border-l-amber-500 animate-pulse";
-        if (isFailed) return "border-l-red-500";
-        if (isCompleted) return "border-l-green-500";
-        return "border-l-gray-400";
+    const isRunning = isTesting || (isRunningAll && stepId);
+    
+    const getStatusInfo = () => {
+        if (isRunning) return { text: "Running", color: "text-amber-600 dark:text-amber-400" };
+        if (isFailed) return { text: "Failed", color: "text-red-600 dark:text-red-400" };
+        if (isCompleted) return { text: "✓ Completed", color: "text-muted-foreground" };
+        return { text: "Pending", color: "text-gray-500 dark:text-gray-400" };
     };
+    const statusInfo = getStatusInfo();
     
     // Find matching integration for this step
     const linkedIntegration = integrations?.find(integration => {
@@ -806,40 +836,40 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
         <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick}>
             <Card className={cn(
                 isActive ? "p-3 w-[180px] h-[110px]" : "p-3 w-[180px] h-[100px]",
-                "flex-shrink-0 border-l-4",
-                isActive && "ring-2 ring-primary shadow-lg",
-                getBorderColor()
+                "flex-shrink-0",
+                isActive && "ring-2 ring-primary shadow-lg"
             )}>
                 <div className="h-full flex flex-col relative">
-                    <div className="absolute top-0 left-0 flex items-center h-5">
-                        <span className={cn(
-                            "text-[10px] px-1.5 py-0.5 rounded font-medium",
-                            method === 'GET' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-                            method === 'POST' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-                            method === 'PUT' && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-                            method === 'DELETE' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-                            !['GET', 'POST', 'PUT', 'DELETE'].includes(method) && "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400"
-                        )}>{method}</span>
-                    </div>
                     {step?.executionMode === 'LOOP' && (
                         <div className="absolute top-0 right-0 flex items-center h-5">
                             <RotateCw className="h-3 w-3 text-muted-foreground" aria-label="Loop step" />
                         </div>
                     )}
-                    <div className="flex flex-col items-center justify-center h-full leading-tight">
-                        <div className="p-2 rounded-full bg-white dark:bg-gray-100 border border-border/50">
-                            {simpleIcon ? (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill={`#${simpleIcon.hex}`} className="flex-shrink-0">
-                                    <path d={simpleIcon.path} />
-                                </svg>
-                            ) : (
-                                <Globe className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex-1 flex flex-col items-center justify-between leading-tight">
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                            <div className="p-2 rounded-full bg-white dark:bg-gray-100 border border-border/50">
+                                {simpleIcon ? (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill={`#${simpleIcon.hex}`} className="flex-shrink-0">
+                                        <path d={simpleIcon.path} />
+                                    </svg>
+                                ) : (
+                                    <Globe className="h-4 w-4 text-muted-foreground" />
+                                )}
+                            </div>
+                            <span className="text-[11px] font-semibold mt-1.5">{step.id || `Step ${index}`}</span>
+                            {linkedIntegration && (
+                                <span className="text-[9px] text-muted-foreground">{linkedIntegration.id}</span>
                             )}
                         </div>
-                        <span className="text-[11px] font-semibold mt-1.5">{step.id || `Step ${index}`}</span>
-                        {linkedIntegration && (
-                            <span className="text-[9px] text-muted-foreground">{linkedIntegration.id}</span>
-                        )}
+                        <div className="flex items-center gap-1 mt-1">
+                            {isRunning && (
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                </span>
+                            )}
+                            <span className={cn("text-[9px] font-medium", statusInfo.color)}>{statusInfo.text}</span>
+                        </div>
                     </div>
                 </div>
             </Card>
