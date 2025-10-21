@@ -721,7 +721,7 @@ export function ToolStepGallery({
     return (
         <div className="flex flex-col h-full">
             {/* Fixed header section */}
-            <div className="flex-shrink-0 space-y-3 mb-6">
+            <div className="flex-shrink-0 space-y-1.5 mb-6">
                 <div className="flex items-center justify-center gap-3 flex-wrap">
                     <div className="flex items-center gap-3 min-w-0 w-full">
                         {(onToolIdChange || typeof toolId !== 'undefined') && (
