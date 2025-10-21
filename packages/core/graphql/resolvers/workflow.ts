@@ -5,7 +5,7 @@ import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { WorkflowBuilder } from "../../build/workflow-builder.js";
 import { WorkflowExecutor } from "../../execute/workflow-executor.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
-import { ToolSelector } from "../../integrations/tool-selector.js";
+import { ToolSelector } from "../../execute/tool-selector.js";
 import { parseJSON } from "../../utils/json-parser.js";
 import { logMessage } from "../../utils/logs.js";
 import { replaceVariables } from "../../utils/tools.js";
