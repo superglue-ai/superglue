@@ -12,10 +12,10 @@ import { type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, cn, isEmptyData, MAX_DISPLAY_LINES, MAX_DISPLAY_SIZE, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { Integration } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
-import { ChevronLeft, ChevronRight, Database, Download, FileJson, Package, Play, Plus, Settings, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Database, Download, FileJson, Package, Play, Plus, Settings, Trash2, Wand2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { AddStepDialog } from './AddStepDialog';
-import { CopyButton, FinalResultsCard, FinalTransformMiniStepCard, InstructionDisplay, JsonCodeEditor, MiniStepCard, PayloadMiniStepCard } from './ToolMiniStepCards';
+import { CopyButton, FinalTransformMiniStepCard, InstructionDisplay, JsonCodeEditor, MiniStepCard, PayloadMiniStepCard } from './ToolMiniStepCards';
 import { ToolStepConfigurator } from './ToolStepConfigurator';
 
 interface ToolStepGalleryProps {
@@ -132,16 +132,16 @@ const SpotlightStepCard = ({
                         )}
                     </div>
                     <div className="flex items-center gap-2">
-                        {!readOnly && (onExecuteStep || onFixStep) && (
+                        {!readOnly && onExecuteStep && (
                             <>
-                                <span title={!canExecute ? "Execute previous steps first" : (isExecuting || isFixingWorkflow) ? "Step is executing..." : selfHealingEnabled ? "Fix this step with AI" : "Test this step"}>
+                                <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Run this single step"}>
                                     <Button
                                         variant="ghost"
-                                        onClick={selfHealingEnabled ? onFixStep : onExecuteStep}
+                                        onClick={onExecuteStep}
                                         disabled={!canExecute || isExecuting || isFixingWorkflow}
                                         className="h-8 px-3 gap-2"
                                     >
-                                        {(isExecuting || isFixingWorkflow) ? (
+                                        {isExecuting ? (
                                             <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                                         ) : (
                                             <Play className="h-3 w-3" />
@@ -149,7 +149,27 @@ const SpotlightStepCard = ({
                                         <span className="text-sm">Run Step</span>
                                     </Button>
                                 </span>
-                                <HelpTooltip text={selfHealingEnabled ? "Attempts to fix this step using AI auto-repair. Only works if all previous steps have completed successfully." : "Executes this step configuration directly. Only works if all previous steps have completed successfully."} />
+                                {/* <HelpTooltip text="Executes this step configuration directly. Only works if all previous steps have completed successfully." /> */}
+                            </>
+                        )}
+                        {!readOnly && onFixStep && (
+                            <>
+                                <span title={!canExecute ? "Execute previous steps first" : isFixingWorkflow ? "Step is self-healing..." : "Run and fix this step with AI"}>
+                                    <Button
+                                        variant="ghost"
+                                        onClick={onFixStep}
+                                        disabled={!canExecute || isExecuting || isFixingWorkflow}
+                                        className="h-8 px-3 gap-2"
+                                    >
+                                        {isFixingWorkflow ? (
+                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                        ) : (
+                                            <Wand2 className="h-3 w-3" />
+                                        )}
+                                        {/* <span className="text-sm">Fix Step</span> */}
+                                    </Button>
+                                </span>
+                                {/* <HelpTooltip text="Attempts to fix this step using AI auto-repair. Only works if all previous steps have completed successfully." /> */}
                             </>
                         )}
                         {!readOnly && onRemove && (
@@ -176,7 +196,7 @@ const SpotlightStepCard = ({
                                     <Settings className="h-4 w-4" /> Step Config
                                 </TabsTrigger>
                                 <TabsTrigger value="output" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
-                                    <Package className="h-4 w-4" /> Step Output
+                                    <Package className="h-4 w-4" /> Step Result
                                 </TabsTrigger>
 
                             </TabsList>
@@ -316,12 +336,12 @@ const SpotlightStepCard = ({
                                                             <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
                                                             <span className="text-xs">Currently running...</span>
                                                         </div>
-                                                        <p className="text-[10px]">Step outputs will be shown shortly</p>
+                                                        <p className="text-[10px]">Step results will be shown shortly</p>
                                                     </div>
                                                 ) : (
                                                     <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
-                                                        <div className="text-xs mb-1">No output yet</div>
-                                                        <p className="text-[10px]">Run this step to see outputs</p>
+                                                        <div className="text-xs mb-1">No result yet</div>
+                                                        <p className="text-[10px]">Run this step to see results</p>
                                                     </div>
                                                 )
                                             ) : (
@@ -348,8 +368,8 @@ const SpotlightStepCard = ({
                                                                         variant="ghost"
                                                                         size="icon"
                                                                         className="h-6 w-6"
-                                                                        onClick={() => downloadJson(stepResult, `step_${step.id}_output.json`)}
-                                                                        title="Download step output as JSON"
+                                                                        onClick={() => downloadJson(stepResult, `step_${step.id}_result.json`)}
+                                                                        title="Download step result as JSON"
                                                                     >
                                                                         <Download className="h-3 w-3" />
                                                                     </Button>
@@ -582,7 +602,6 @@ export function ToolStepGallery({
         }, {})
         : stepResults;
 
-    // Keep transform visible, append Tool Result when completed
     const hasTransformCompleted = completedSteps.includes('__final_transform__') && (transformResult || finalResult);
     
     const toolItems = [
@@ -602,13 +621,8 @@ export function ToolStepGallery({
             type: 'transform',
             data: { transform: finalTransform, responseSchema },
             stepResult: finalResult,
-            evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length - 1)
-        }] : []),
-        ...(hasTransformCompleted ? [{
-            type: 'final',
-            data: { result: transformResult || finalResult },
-            stepResult: transformResult || finalResult,
-            evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length)
+            evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length - 1),
+            hasTransformCompleted
         }] : [])
     ];
 
@@ -931,7 +945,6 @@ export function ToolStepGallery({
                                                                 stepId={item.type === 'step' ? item.data.id : undefined}
                                                                 isPayload={item.type === 'payload'}
                                                                 isTransform={item.type === 'transform'}
-                                                                isFinal={item.type === 'final'}
                                                                 isRunningAll={isExecuting && currentExecutingStepIndex === (globalIdx - 1)}
                                                                 isTesting={
                                                                     item.type === 'step' ? isExecutingStep === (globalIdx - 1) :
@@ -1047,10 +1060,7 @@ export function ToolStepGallery({
                                 canExecute={steps.every((s: any) => completedSteps.includes(s.id))}
                                 transformResult={transformResult || finalResult}
                                 stepInputs={currentItem.evolvingPayload}
-                            />
-                        ) : currentItem.type === 'final' ? (
-                            <FinalResultsCard
-                                result={currentItem.data.result}
+                                hasTransformCompleted={hasTransformCompleted}
                             />
                         ) : (
                             <SpotlightStepCard
