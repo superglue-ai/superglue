@@ -146,7 +146,7 @@ const SpotlightStepCard = ({
                                         ) : (
                                             <Play className="h-3 w-3" />
                                         )}
-                                        <span className="text-sm">Run Step</span>
+                                        <span className="font-medium text-[13px]">Run Step</span>
                                     </Button>
                                 </span>
                                 {/* <HelpTooltip text="Executes this step configuration directly. Only works if all previous steps have completed successfully." /> */}
@@ -161,12 +161,12 @@ const SpotlightStepCard = ({
                                         disabled={!canExecute || isExecuting || isFixingWorkflow}
                                         className="h-8 px-3 gap-2"
                                     >
-                                        {isFixingWorkflow ? (
+                                        {isFixingWorkflow || isExecuting ? (
                                             <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                                         ) : (
                                             <Wand2 className="h-3 w-3" />
                                         )}
-                                        {/* <span className="text-sm">Fix Step</span> */}
+                                        <span className="font-medium text-[13px]">Fix Step</span>
                                     </Button>
                                 </span>
                                 {/* <HelpTooltip text="Attempts to fix this step using AI auto-repair. Only works if all previous steps have completed successfully." /> */}
