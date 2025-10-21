@@ -73,7 +73,19 @@ export class ToolSelector {
                 selectionSchema
             );
 
-            if (rawSelection && rawSelection.suggestedTools && Array.isArray(rawSelection.suggestedTools)) {
+            //if (rawSelection && rawSelection.suggestedTools && Array.isArray(rawSelection.suggestedTools)) {
+            if (!rawSelection || !rawSelection.suggestedTools || !Array.isArray(rawSelection.suggestedTools)) {
+                logMessage('warn', "Tool selection returned an unexpected format. Returning all available tools as fallback.", this.metadata);
+                return tools.map(tool => ({
+                    id: tool.id,
+                    instruction: tool.instruction,
+                    steps: tool.steps.map(s => ({
+                        integrationId: s.integrationId,
+                        instruction: s.apiConfig?.instruction
+                    })),
+                    reason: "Selection failed, but this tool is available for use"
+                }));
+            }
                 const suggestions = rawSelection.suggestedTools
                     .map(suggestion => {
                         const tool = tools.find(t => t.id === suggestion.id);
@@ -106,19 +118,6 @@ export class ToolSelector {
                 }
 
                 return suggestions;
-            }
-
-            logMessage('warn', "Tool selection returned an unexpected format. Returning all available tools as fallback.", this.metadata);
-            return tools.map(tool => ({
-                id: tool.id,
-                instruction: tool.instruction,
-                steps: tool.steps.map(s => ({
-                    integrationId: s.integrationId,
-                    instruction: s.apiConfig?.instruction
-                })),
-                reason: "Selection failed, but this tool is available for use"
-            }));
-
         } catch (error) {
             logMessage('error', `Error during tool selection: ${error}`, this.metadata);
             logMessage('info', 'Returning all available tools as fallback due to selection error.', this.metadata);

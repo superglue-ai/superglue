@@ -440,7 +440,6 @@ For SOAP requests:
 </SOAP>
 `;
 
-
 export const FIND_RELEVANT_INTEGRATIONS_SYSTEM_PROMPT = `
 You are an expert AI assistant responsible for selecting the correct integrations to use based on a user's instruction and documentation provided for each integration. Your goal is to analyze the user's request and choose the most relevant integrations from a given list.
 
