@@ -1,0 +1,57 @@
+workflow_id,workflow_name,mode,total_attempts,total_successful_attempts,total_failed_attempts,has_one_shot_attempts,has_self_healing_attempts,had_one_shot_success,had_self_healing_success,success,avg_build_time_ms,avg_exec_time_ms,failures_build,failures_execution,failures_strict_validation
+"clickup-task-list","ClickUp Task List",one-shot,5,4,1,true,false,true,false,true,9893.80,828.20,0,1,0
+"clickup-all-lists","ClickUp All Lists",one-shot,5,4,1,true,false,true,false,true,19127.80,2014.40,0,1,0
+"clickup-all-comments-and-replies","ClickUp All Comments and Replies",one-shot,10,0,10,true,true,false,false,false,16074.70,2126.80,0,5,0
+"clickup-all-comments-and-replies","ClickUp All Comments and Replies",self-healing,10,0,10,true,true,false,false,false,16074.70,199018.40,0,5,0
+"clockify-time-entries","Clockify Time Entries",one-shot,5,2,3,true,false,true,false,true,12797.20,1458.60,0,2,1
+"clockify-projects","Clockify Projects",one-shot,5,5,0,true,false,true,false,true,10389.20,1647.80,0,0,0
+"clockify-projects-all-workspaces","Clockify Projects All Workspaces",one-shot,10,0,10,true,true,false,false,false,10715.00,805.40,0,5,0
+"clockify-projects-all-workspaces","Clockify Projects All Workspaces",self-healing,10,0,10,true,true,false,false,false,10715.00,8195.60,0,0,5
+"typeform-get-all-forms","Typeform Get All Forms",one-shot,5,1,4,true,false,true,false,true,22999.60,1492.80,0,0,4
+"typeform-get-form-by-id","Typeform Get Form By Id",one-shot,10,0,10,true,true,false,false,false,20464.90,1032.80,0,0,5
+"typeform-get-form-by-id","Typeform Get Form By Id",self-healing,10,0,10,true,true,false,false,false,20464.90,714.00,0,0,5
+"typeform-get-all-workspaces","Typeform Get All Workspaces",one-shot,5,5,0,true,false,true,false,true,15520.20,1014.00,0,0,0
+"confluence-get-all-spaces","Confluence Get All Spaces",one-shot,5,5,0,true,false,true,false,true,9447.20,509.40,0,0,0
+"confluence-get-page-content","Confluence Get Page Content",one-shot,5,5,0,true,false,true,false,true,8057.80,655.40,0,0,0
+"confluence-get-all-pages-of-space","Confluence Get All Pages Of Space",one-shot,10,0,10,true,true,false,false,false,10307.60,413.80,0,5,0
+"confluence-get-all-pages-of-space","Confluence Get All Pages Of Space",self-healing,10,0,10,true,true,false,false,false,10307.60,37050.20,0,0,5
+"github-list-repos","GitHub List Repositories",one-shot,5,5,0,true,false,true,false,true,11973.80,594.80,0,0,0
+"github-get-user","GitHub Get User",one-shot,5,5,0,true,false,true,false,true,9331.40,372.00,0,0,0
+"github-get-user-pull-requests","GitHub Get User's Pull Requests",one-shot,5,5,0,true,false,true,false,true,9001.80,457.00,0,0,0
+"linear-get-all-issues","Linear Get All Issues",one-shot,10,0,10,true,true,false,false,false,12487.90,2391.80,0,5,0
+"linear-get-all-issues","Linear Get All Issues",self-healing,10,0,10,true,true,false,false,false,12487.90,11928.60,0,0,5
+"linear-get-issue-by-id","Linear Get Issue By Id",one-shot,10,5,5,true,true,false,true,false,8210.50,1922.40,0,5,0
+"linear-get-issue-by-id","Linear Get Issue By Id",self-healing,10,5,5,true,true,false,true,true,8210.50,10739.80,0,0,0
+"linear-get-all-projects","Linear Get All Projects",one-shot,10,4,6,true,true,false,true,false,8045.50,1686.20,0,5,0
+"linear-get-all-projects","Linear Get All Projects",self-healing,10,4,6,true,true,false,true,true,8045.50,16028.80,0,0,1
+"postgres-lego-inventory-analysis","Postgres LEGO Inventory Analysis",one-shot,10,3,7,true,true,false,true,false,6899.60,1065.00,0,5,0
+"postgres-lego-inventory-analysis","Postgres LEGO Inventory Analysis",self-healing,10,3,7,true,true,false,true,true,6899.60,19576.00,0,0,2
+"postgres-lego-get-colors","Postgres LEGO Get Colors",one-shot,10,5,5,true,true,false,true,false,5465.20,1089.20,0,5,0
+"postgres-lego-get-colors","Postgres LEGO Get Colors",self-healing,10,5,5,true,true,false,true,true,5465.20,26306.20,0,0,0
+"postgres-lego-get-ranked-themes","Postgres LEGO Get Ranked Themes",one-shot,10,2,8,true,true,false,true,false,6790.30,1286.60,0,5,0
+"postgres-lego-get-ranked-themes","Postgres LEGO Get Ranked Themes",self-healing,10,2,8,true,true,false,true,true,6790.30,27353.20,0,0,3
+"timbuk2-product-analysis","Timbuk2 Product Analysis",one-shot,5,4,1,true,false,true,false,true,7639.80,662.80,0,0,1
+"timbuk2-get-public-vendors","Timbuk2 Get Public Vendors",one-shot,5,1,4,true,false,true,false,true,12982.40,766.20,0,0,4
+"timbuk2-get-newest-products","Timbuk2 Get 10 Newest Products",one-shot,10,0,10,true,true,false,false,false,7568.80,335.20,0,0,5
+"timbuk2-get-newest-products","Timbuk2 Get 10 Newest Products",self-healing,10,0,10,true,true,false,false,false,7568.80,526.20,0,0,5
+"stripe-get-customers","Stripe Get Customers",one-shot,10,0,10,true,true,false,false,false,10529.10,605.40,0,0,5
+"stripe-get-customers","Stripe Get Customers",self-healing,10,0,10,true,true,false,false,false,10529.10,293.20,0,0,5
+"stripe-calculate-revenue","Stripe Calculate Revenue",one-shot,5,2,3,true,false,true,false,true,16115.80,594.00,0,0,3
+"stripe-get-all-products","Stripe Get Products",one-shot,10,0,10,true,true,false,false,false,9538.10,396.60,0,0,5
+"stripe-get-all-products","Stripe Get Products",self-healing,10,0,10,true,true,false,false,false,9538.10,305.60,0,0,5
+"attio-get-15-oldest-people","Attio Get 15 Oldest People",one-shot,10,0,10,true,true,false,false,false,10314.30,3020.60,0,0,5
+"attio-get-15-oldest-people","Attio Get 15 Oldest People",self-healing,10,0,10,true,true,false,false,false,10314.30,550.40,0,0,5
+"attio-get-person-by-id","Attio Get Person",one-shot,10,1,9,true,true,false,true,false,10891.30,2915.60,0,5,0
+"attio-get-person-by-id","Attio Get Person",self-healing,10,1,9,true,true,false,true,true,10891.30,105629.00,0,0,4
+"attio-people-no-email","Attio People No Email",one-shot,10,0,10,true,true,false,false,false,16972.80,1429.60,0,5,0
+"attio-people-no-email","Attio People No Email",self-healing,10,0,10,true,true,false,false,false,16972.80,287859.20,0,4,1
+"openai-structured-output-name-age","OpenAI Structured Output Name and Age",one-shot,5,5,0,true,false,true,false,true,14734.20,1954.40,0,0,0
+"openai-pdf-analysis-with-input-retrieval","OpenAI PDF Analysis with Input Retrieval",one-shot,10,0,10,true,true,false,false,false,14049.80,1906.80,0,5,0
+"openai-pdf-analysis-with-input-retrieval","OpenAI PDF Analysis with Input Retrieval",self-healing,10,0,10,true,true,false,false,false,14049.80,824822.40,0,5,0
+"postgres-lego-openai-table-extraction","PostgreSQL+OpenAI Structured Output",one-shot,10,4,6,true,true,false,true,false,13160.90,3233.40,0,5,0
+"postgres-lego-openai-table-extraction","PostgreSQL+OpenAI Structured Output",self-healing,10,4,6,true,true,false,true,true,13160.90,26150.00,0,0,1
+"tele2-http-download-verification","Tele2 HTTP Download",one-shot,10,0,10,true,true,false,false,false,8107.40,0.60,0,5,0
+"tele2-http-download-verification","Tele2 HTTP Download",self-healing,10,0,10,true,true,false,false,false,8107.40,32155.00,0,5,0
+"tele2-ftp-upload-berkshire-letter","Tele2 FTP Upload Berkshire Letter",one-shot,10,0,10,true,true,false,false,false,12899.50,135.20,0,5,0
+"tele2-ftp-upload-berkshire-letter","Tele2 FTP Upload Berkshire Letter",self-healing,10,0,10,true,true,false,false,false,12899.50,44126.00,0,5,0
+"sec-jina-markdown-conversion","SEC Filing to Markdown via Jina Reader",one-shot,5,1,4,true,false,true,false,true,18248.60,646.80,0,1,3
