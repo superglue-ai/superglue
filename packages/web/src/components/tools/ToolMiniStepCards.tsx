@@ -5,9 +5,10 @@ import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { downloadJson } from '@/src/lib/download-utils';
 import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon, getSimpleIcon, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { Integration } from '@superglue/client';
 import { inferJsonSchema } from '@superglue/shared';
-import { Check, Code2, Copy, Download, Eye, FileJson, Package, Play, RotateCw, Upload, X } from 'lucide-react';
+import { Check, Code2, Copy, Download, Eye, FileJson, Globe, Package, Play, RotateCw, Upload, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-json';
@@ -169,27 +170,24 @@ export const FinalResultsCard = ({ result }: { result: any }) => {
     };
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
-            <div className="p-6">
+            <div className="p-3">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                         <Package className="h-4 w-4 text-muted-foreground" />
-                        <h3 className="text-lg font-semibold">Final Result</h3>
+                        <h3 className="text-lg font-semibold">Tool Result</h3>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-muted-foreground">{bytes.toLocaleString()} bytes</span>
                         {!isPending && (
                             <>
-                                <div className="flex items-center gap-1">
-                                    <span className="text-[11px] text-muted-foreground">Copy Result</span>
-                                    <button
-                                        onClick={handleCopy}
-                                        className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors bg-background/60 backdrop-blur"
-                                        title="Copy full result data"
-                                        type="button"
-                                    >
-                                        {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
-                                    </button>
-                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={handleCopy}
+                                    title="Copy result"
+                                >
+                                    {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+                                </Button>
                                 <Button
                                     variant="ghost"
                                     size="icon"
@@ -587,15 +585,13 @@ export const PayloadMiniStepCard = ({
 }) => {
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
-            <div className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                        <h3 className="text-base font-semibold">Initial Payload</h3>
+            <div className="p-3">
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <h3 className="text-lg font-semibold">Initial Payload</h3>
                     </div>
-                    <div className="mt-1 text-muted-foreground">
-                        <HelpTooltip text="Payload is the JSON input to tool execution. Editing here does NOT save values to the tool; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
-                    </div>
+                    <HelpTooltip text="Payload is the JSON input to tool execution. Editing here does NOT save values to the tool; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
                 </div>
                 <PayloadSpotlight
                     payloadText={payloadText}
@@ -645,21 +641,32 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
             <div className="p-3">
                 <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                        <div className="p-1.5 bg-muted rounded-lg"><Code2 className="h-5 w-5 text-muted-foreground" /></div>
-                        <div>
-                            <h3 className="text-lg font-semibold">Final Transformation</h3>
-                            <span className="text-xs text-muted-foreground">JavaScript Transform & Response Schema</span>
-                        </div>
+                    <div className="flex items-center gap-2">
+                        <Code2 className="h-4 w-4 text-muted-foreground" />
+                        <h3 className="text-lg font-semibold">Final Transform</h3>
                     </div>
-                    {!readOnly && onExecuteTransform && (
-                        <div className="flex items-center gap-2">
-                            <Button size="sm" onClick={handleExecuteTransform} disabled={!canExecute || isExecutingTransform} title={!canExecute ? "Execute all steps first" : isExecutingTransform ? "Transform is executing..." : "Test final transform"}>
-                                {isExecutingTransform ? (<><div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />Running...</>) : (<><Play className="h-3 w-3 mr-1" />Run Transform</>)}
-                            </Button>
-                            <HelpTooltip text="Executes the final transform script with step results as input. If a response schema is enabled, the output will be validated against it." />
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {!readOnly && onExecuteTransform && (
+                            <>
+                                <span title={!canExecute ? "Execute all steps first" : isExecutingTransform ? "Transform is executing..." : "Test final transform"}>
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={handleExecuteTransform}
+                                        disabled={!canExecute || isExecutingTransform}
+                                        className="h-8 w-8"
+                                    >
+                                        {isExecutingTransform ? (
+                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                        ) : (
+                                            <Play className="h-3 w-3" />
+                                        )}
+                                    </Button>
+                                </span>
+                                <HelpTooltip text="Executes the final transform script with step results as input. If a response schema is enabled, the output will be validated against it." />
+                            </>
+                        )}
+                    </div>
                 </div>
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList className="grid w-full grid-cols-3 mb-3">
@@ -706,15 +713,22 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
     );
 };
 
-export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload = false, isTransform = false, isFinal = false, isRunningAll = false, isTesting = false, completedSteps = [], failedSteps = [] }: { step: any; index: number; isActive: boolean; onClick: () => void; stepId?: string | null; isPayload?: boolean; isTransform?: boolean; isFinal?: boolean; isRunningAll?: boolean; isTesting?: boolean; completedSteps?: string[]; failedSteps?: string[]; }) => {
+export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload = false, isTransform = false, isFinal = false, isRunningAll = false, isTesting = false, completedSteps = [], failedSteps = [], isFirstCard = false, isLastCard = false, integrations = [], hasTransformCompleted = false }: { step: any; index: number; isActive: boolean; onClick: () => void; stepId?: string | null; isPayload?: boolean; isTransform?: boolean; isFinal?: boolean; isRunningAll?: boolean; isTesting?: boolean; completedSteps?: string[]; failedSteps?: string[]; isFirstCard?: boolean; isLastCard?: boolean; integrations?: Integration[]; hasTransformCompleted?: boolean; }) => {
     if (isPayload) {
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
-                <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
+                <Card className={cn(
+                    isActive ? "p-3 w-[180px] h-[110px]" : "p-3 w-[180px] h-[100px]",
+                    "flex-shrink-0",
+                    isActive && "ring-2 ring-primary shadow-lg",
+                    isFirstCard && "rounded-l-2xl bg-gradient-to-br from-primary/5 to-transparent"
+                )}>
                     <div className="flex flex-col items-center justify-center h-full leading-tight">
-                        <Package className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-[11px] font-medium mt-0.5">Initial Payload</span>
-                        <span className="text-[10px] text-muted-foreground -mt-0.5">JSON</span>
+                        <div className="p-2 rounded-full bg-primary/10">
+                            <Play className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="text-[11px] font-semibold mt-1.5">Start</span>
+                        <span className="text-[9px] text-muted-foreground">Tool Payload</span>
                     </div>
                 </Card>
             </div>
@@ -723,31 +737,27 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
     if (isTransform) {
         const isCompleted = completedSteps.includes('__final_transform__');
         const isFailed = failedSteps.includes('__final_transform__');
-        const getStatusDotColor = () => {
-            if (isTesting || isRunningAll) return "bg-yellow-500 animate-pulse";
-            if (isFailed) return "bg-red-500";
-            if (isCompleted) return "bg-green-500";
-            return "bg-gray-400";
-        };
-        const getStatusLabel = () => {
-            if (isTesting || isRunningAll) return "Running...";
-            if (isFailed) return "Failed";
-            if (isCompleted) return "Completed";
-            return "Pending";
+        const getBorderColor = () => {
+            if (isTesting || isRunningAll) return "border-l-amber-500 animate-pulse";
+            if (isFailed) return "border-l-red-500";
+            if (isCompleted) return "border-l-green-500";
+            return "border-l-gray-400";
         };
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
-                <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
-                    <div className="h-full flex flex-col justify-between">
-                        <div className="flex-1 min-h-0 flex flex-col items-center justify-center leading-tight">
-                            <Code2 className="h-5 w-5 text-muted-foreground" />
-                            <span className="text-[11px] font-medium mt-0.5">Final Transform</span>
-                            <span className="text-[10px] text-muted-foreground -mt-0.5">JavaScript</span>
+                <Card className={cn(
+                    isActive ? "p-3 w-[180px] h-[110px]" : "p-3 w-[180px] h-[100px]",
+                    "flex-shrink-0 border-l-4",
+                    isActive && "ring-2 ring-primary shadow-lg",
+                    isLastCard && !hasTransformCompleted && "rounded-r-2xl bg-gradient-to-bl from-purple-500/5 to-transparent",
+                    getBorderColor()
+                )}>
+                    <div className="h-full flex flex-col items-center justify-center leading-tight">
+                        <div className="p-2 rounded-full bg-purple-500/10">
+                            <Code2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                         </div>
-                        <div className="flex items-center gap-1.5 mt-2">
-                            <div className={cn("w-2 h-2 rounded-full transition-all", getStatusDotColor())} />
-                            <span className="text-xs text-muted-foreground">{getStatusLabel()}</span>
-                        </div>
+                        <span className="text-[11px] font-semibold mt-1.5">Final Transform</span>
+                        <span className="text-[9px] text-muted-foreground">JavaScript</span>
                     </div>
                 </Card>
             </div>
@@ -756,61 +766,80 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
     if (isFinal) {
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
-                <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
+                <Card className={cn(
+                    isActive ? "p-3 w-[180px] h-[110px]" : "p-3 w-[180px] h-[100px]",
+                    "flex-shrink-0 border-l-4 border-l-green-500",
+                    isActive && "ring-2 ring-primary shadow-lg",
+                    isLastCard && "rounded-r-2xl"
+                )}>
                     <div className="flex flex-col items-center justify-center h-full leading-tight">
-                        <FileJson className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-[11px] font-medium mt-0.5">Tool Result</span>
-                        <span className="text-[10px] text-muted-foreground -mt-0.5">JSON</span>
+                        <div className="p-2 rounded-full bg-green-500/10">
+                            <FileJson className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        </div>
+                        <span className="text-[11px] font-semibold mt-1.5">Tool Result</span>
+                        <span className="text-[9px] text-muted-foreground">JSON</span>
                     </div>
                 </Card>
             </div>
         );
     }
     const method = step.apiConfig?.method || 'GET';
-    const methodTextColor = method === 'GET'
-        ? "text-blue-700 dark:text-blue-400"
-        : method === 'POST'
-            ? "text-green-700 dark:text-green-400"
-            : method === 'PUT'
-                ? "text-yellow-700 dark:text-yellow-400"
-                : method === 'DELETE'
-                    ? "text-red-700 dark:text-red-400"
-                    : "text-gray-700 dark:text-gray-400";
-    const url = `${step.apiConfig?.urlHost || ''}${step.apiConfig?.urlPath || ''}`.trim() || 'No URL';
     const isCompleted = stepId ? completedSteps.includes(stepId) : false;
     const isFailed = stepId ? failedSteps.includes(stepId) : false;
-    const getStatusDotColor = () => {
-        if (isTesting || (isRunningAll && stepId)) return "bg-yellow-500 animate-pulse";
-        if (isFailed) return "bg-red-500";
-        if (isCompleted) return "bg-green-500";
-        return "bg-gray-400";
+    const getBorderColor = () => {
+        if (isTesting || (isRunningAll && stepId)) return "border-l-amber-500 animate-pulse";
+        if (isFailed) return "border-l-red-500";
+        if (isCompleted) return "border-l-green-500";
+        return "border-l-gray-400";
     };
-    const getStatusLabel = () => {
-        if (isTesting || (isRunningAll && stepId)) return "Running...";
-        if (isFailed) return "Failed";
-        if (isCompleted) return "Completed";
-        return "Pending";
-    };
+    
+    // Find matching integration for this step
+    const linkedIntegration = integrations?.find(integration => {
+        if (step.integrationId && integration.id === step.integrationId) return true;
+        return step.apiConfig?.urlHost && integration.urlHost && step.apiConfig.urlHost.includes(integration.urlHost.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, ''));
+    });
+    
+    const iconName = linkedIntegration ? getIntegrationIcon(linkedIntegration) : null;
+    const simpleIcon = iconName ? getSimpleIcon(iconName) : null;
+    
     return (
         <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick}>
-            <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
-                <div className="h-full flex flex-col justify-between">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-start text-sm font-semibold">{index}</div>
-                        <div className="flex items-center gap-1.5">
-                            {step?.executionMode === 'LOOP' && (
-                                <RotateCw className="h-3.5 w-3.5 text-muted-foreground" aria-label="Loop step" />
-                            )}
-                            <span className={cn("text-xs px-2 py-1 rounded font-medium", method === 'GET' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", method === 'POST' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", method === 'PUT' && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", method === 'DELETE' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", !['GET', 'POST', 'PUT', 'DELETE'].includes(method) && "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400")}>{method}</span>
+            <Card className={cn(
+                isActive ? "p-3 w-[180px] h-[110px]" : "p-3 w-[180px] h-[100px]",
+                "flex-shrink-0 border-l-4",
+                isActive && "ring-2 ring-primary shadow-lg",
+                getBorderColor()
+            )}>
+                <div className="h-full flex flex-col relative">
+                    <div className="absolute top-0 left-0 flex items-center h-5">
+                        <span className={cn(
+                            "text-[10px] px-1.5 py-0.5 rounded font-medium",
+                            method === 'GET' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+                            method === 'POST' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+                            method === 'PUT' && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+                            method === 'DELETE' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+                            !['GET', 'POST', 'PUT', 'DELETE'].includes(method) && "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400"
+                        )}>{method}</span>
+                    </div>
+                    {step?.executionMode === 'LOOP' && (
+                        <div className="absolute top-0 right-0 flex items-center h-5">
+                            <RotateCw className="h-3 w-3 text-muted-foreground" aria-label="Loop step" />
                         </div>
-                    </div>
-                    <div className="flex-1 min-h-0">
-                        <p className="text-sm font-semibold truncate">{step.id || `Step ${index}`}</p>
-                        <p className="text-xs text-muted-foreground truncate">{url}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-2">
-                        <div className={cn("w-2 h-2 rounded-full transition-all", getStatusDotColor())} />
-                        <span className="text-xs text-muted-foreground">{getStatusLabel()}</span>
+                    )}
+                    <div className="flex flex-col items-center justify-center h-full leading-tight">
+                        <div className="p-2 rounded-full bg-white dark:bg-gray-100 border border-border/50">
+                            {simpleIcon ? (
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill={`#${simpleIcon.hex}`} className="flex-shrink-0">
+                                    <path d={simpleIcon.path} />
+                                </svg>
+                            ) : (
+                                <Globe className="h-4 w-4 text-muted-foreground" />
+                            )}
+                        </div>
+                        <span className="text-[11px] font-semibold mt-1.5">{step.id || `Step ${index}`}</span>
+                        {linkedIntegration && (
+                            <span className="text-[9px] text-muted-foreground">{linkedIntegration.id}</span>
+                        )}
                     </div>
                 </div>
             </Card>
@@ -819,4 +848,5 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
 };
 
 export { truncateForDisplay, truncateLines };
+
 

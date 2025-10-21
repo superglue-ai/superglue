@@ -5,6 +5,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { Label } from '@/src/components/ui/label';
 import { Switch } from '@/src/components/ui/switch';
+import { Badge } from '@/src/components/ui/badge';
 import { canExecuteStep } from '@/src/lib/client-utils';
 import { downloadJson } from '@/src/lib/download-utils';
 import { type UploadedFileInfo } from '@/src/lib/file-utils';
@@ -118,9 +119,9 @@ const SpotlightStepCard = ({
     }, [showOutputSignal]);
 
     return (
-        <Card className="w-full max-w-6xl mx-auto shadow-md bg-accent/10 dark:bg-accent/5 border border-accent/30 dark:border-accent/20 overflow-hidden">
+        <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50 overflow-hidden">
             <div className="p-3">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                         <Database className="h-4 w-4 text-muted-foreground" />
                         <h3 className="text-lg font-semibold">
@@ -133,7 +134,7 @@ const SpotlightStepCard = ({
                     <div className="flex items-center gap-2">
                         {!readOnly && (onExecuteStep || onFixStep) && (
                             <>
-                                <span title={!canExecute ? "To enable this button, execute previous steps first" : (isExecuting || isFixingWorkflow) ? "Step is currently executing" : selfHealingEnabled ? "Fix this step with AI" : "Test this step"}>
+                                <span title={!canExecute ? "Execute previous steps first" : (isExecuting || isFixingWorkflow) ? "Step is executing..." : selfHealingEnabled ? "Fix this step with AI" : "Test this step"}>
                                     <Button
                                         size="icon"
                                         variant="ghost"
@@ -156,6 +157,7 @@ const SpotlightStepCard = ({
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => onRemove(step.id)}
+                                className="h-8 w-8"
                             >
                                 <Trash2 className="h-4 w-4" />
                             </Button>
@@ -437,6 +439,8 @@ export function ToolStepGallery({
     const [defaultStepId, setDefaultStepId] = useState('');
     const [pendingInsertIndex, setPendingInsertIndex] = useState<number | null>(null);
     const isConfiguratorEditingRef = useRef<boolean>(false);
+    const [hiddenLeftCount, setHiddenLeftCount] = useState(0);
+    const [hiddenRightCount, setHiddenRightCount] = useState(0);
     useEffect(() => {
         isConfiguratorEditingRef.current = isConfiguratorEditing;
     }, [isConfiguratorEditing]);
@@ -578,6 +582,9 @@ export function ToolStepGallery({
         }, {})
         : stepResults;
 
+    // Keep transform visible, append Tool Result when completed
+    const hasTransformCompleted = completedSteps.includes('__final_transform__') && (transformResult || finalResult);
+    
     const toolItems = [
         {
             type: 'payload',
@@ -597,12 +604,12 @@ export function ToolStepGallery({
             stepResult: finalResult,
             evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length - 1)
         }] : []),
-        {
+        ...(hasTransformCompleted ? [{
             type: 'final',
             data: { result: transformResult || finalResult },
             stepResult: transformResult || finalResult,
             evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length)
-        }
+        }] : [])
     ];
 
     const currentItem = toolItems[activeIndex];
@@ -703,6 +710,34 @@ export function ToolStepGallery({
         setActiveIndex(steps.length > 0 ? 1 : 0);
     }, []);
 
+    // Keyboard navigation with arrow keys
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Only handle if not typing in an input/textarea/contenteditable
+            if (e.target instanceof HTMLInputElement || 
+                e.target instanceof HTMLTextAreaElement ||
+                (e.target as HTMLElement).isContentEditable) {
+                return;
+            }
+            
+            // Don't navigate when editing step config
+            if (isConfiguratorEditing) {
+                return;
+            }
+            
+            if (e.key === 'ArrowLeft' && activeIndex > 0) {
+                e.preventDefault();
+                handleNavigation('prev');
+            } else if (e.key === 'ArrowRight' && activeIndex < toolItems.length - 1) {
+                e.preventDefault();
+                handleNavigation('next');
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [activeIndex, toolItems.length, isConfiguratorEditing]);
+
     useEffect(() => {
         if (navigateToFinalSignal) {
             navigateToIndex(toolItems.length - 1);
@@ -786,16 +821,26 @@ export function ToolStepGallery({
             <div className="flex-1 overflow-y-auto pr-4" style={{ scrollbarGutter: 'stable' }}>
                 <div className="space-y-6">
                 <div className="flex items-center gap-0">
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleNavigation('prev')}
-                        disabled={activeIndex === 0}
-                        className="shrink-0 h-9 w-9"
-                        title="Previous"
-                    >
-                        <ChevronLeft className="h-4 w-4" />
-                    </Button>
+                    <div className="relative">
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleNavigation('prev')}
+                            disabled={activeIndex === 0}
+                            className="shrink-0 h-9 w-9"
+                            title="Previous"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        {hiddenLeftCount > 0 && (
+                            <Badge 
+                                variant="default" 
+                                className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center bg-primary text-primary-foreground"
+                            >
+                                {hiddenLeftCount}
+                            </Badge>
+                        )}
+                    </div>
 
                     <div className="flex-1 overflow-hidden px-0">
                         <div className="relative">
@@ -813,7 +858,7 @@ export function ToolStepGallery({
                                     const totalCards = toolItems.length;
                                     let startIdx = 0;
                                     let endIdx = totalCards;
-                                    const CARD_WIDTH = 228; // px (matches card classes above)
+                                    const CARD_WIDTH = 180; // px (matches card classes)
                                     const ARROW_WIDTH = 24; // px (ChevronRight ~20px, add buffer)
                                     const GUTTER = 16; // px (doubled spacing)
                                     const SAFE_MARGIN = 12; // px extra space to avoid clipping
@@ -829,8 +874,7 @@ export function ToolStepGallery({
                                         }
                                     }
 
-                                    // Always be slightly conservative to avoid cramping at any breakpoint
-                                    cardsToShow = Math.max(1, cardsToShow - 1);
+                                    cardsToShow = Math.max(1, cardsToShow);
 
                                     if (totalCards <= cardsToShow) {
                                         // Show all cards if we have fewer than cardsToShow
@@ -846,6 +890,12 @@ export function ToolStepGallery({
                                     const visibleIndices = visibleItems.map((_, i) => startIdx + i);
                                     const hasHiddenLeft = startIdx > 0;
                                     const hasHiddenRight = endIdx < totalCards;
+                                    const hiddenLeft = startIdx;
+                                    const hiddenRight = totalCards - endIdx;
+                                    
+                                    // Update state for badges (use ref to avoid re-render loop)
+                                    if (hiddenLeft !== hiddenLeftCount) setHiddenLeftCount(hiddenLeft);
+                                    if (hiddenRight !== hiddenRightCount) setHiddenRightCount(hiddenRight);
                                     const sepWidth = ARROW_WIDTH + GUTTER;
                                     const edgeWidth = sepWidth;
                                     const count = Math.max(1, visibleItems.length);
@@ -890,6 +940,10 @@ export function ToolStepGallery({
                                                                 }
                                                                 completedSteps={completedSteps}
                                                                 failedSteps={failedSteps}
+                                                                isFirstCard={globalIdx === 0}
+                                                                isLastCard={globalIdx === totalCards - 1}
+                                                                integrations={integrations}
+                                                                hasTransformCompleted={hasTransformCompleted}
                                                             />
                                                         </div>
                                                         {showArrow && (
@@ -927,16 +981,26 @@ export function ToolStepGallery({
                         </div>
                     </div>
 
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleNavigation('next')}
-                        disabled={activeIndex === toolItems.length - 1}
-                        className="shrink-0 h-9 w-9"
-                        title="Next"
-                    >
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
+                    <div className="relative">
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleNavigation('next')}
+                            disabled={activeIndex === toolItems.length - 1}
+                            className="shrink-0 h-9 w-9"
+                            title="Next"
+                        >
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        {hiddenRightCount > 0 && (
+                            <Badge 
+                                variant="default" 
+                                className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center bg-primary text-primary-foreground"
+                            >
+                                {hiddenRightCount}
+                            </Badge>
+                        )}
+                    </div>
                 </div>
 
                 <div className="flex justify-center items-center gap-2">

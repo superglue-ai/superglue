@@ -873,10 +873,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   );
 
   return (
-    <div className={embedded ? "w-full h-full" : "p-6 max-w-none w-full h-screen flex flex-col"}>
+    <div className={embedded ? "w-full h-full" : "pt-2 px-6 pb-6 max-w-none w-full h-screen flex flex-col"}>
       {!embedded && !hideHeader && (
         <>
-          <div className="flex justify-end items-center mb-2 flex-shrink-0">
+          <div className="flex justify-end items-center mb-1 flex-shrink-0">
             <Button
               variant="ghost"
               size="icon"
