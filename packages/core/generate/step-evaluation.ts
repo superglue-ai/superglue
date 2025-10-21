@@ -1,19 +1,18 @@
-import { ApiConfig } from "@superglue/client";
 import { getEvaluateStepResponseContext } from "../context/context-builders.js";
 import { EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 
 export async function evaluateStepResponse({
   data,
-  endpoint,
+  stepConfig,
   docSearchResultsForStepInstruction
 }: {
   data: any,
-  endpoint: ApiConfig,
+  stepConfig: string,
   docSearchResultsForStepInstruction?: string
 }): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
 
-  const evaluateStepResponsePrompt = getEvaluateStepResponseContext({ data, endpoint, docSearchResultsForStepInstruction }, { characterBudget: LanguageModel.contextLength / 10 });
+  const evaluateStepResponsePrompt = getEvaluateStepResponseContext({ data, stepConfig, docSearchResultsForStepInstruction }, { characterBudget: LanguageModel.contextLength / 10 });
 
   const request = [
     {

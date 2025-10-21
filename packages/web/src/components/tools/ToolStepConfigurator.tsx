@@ -7,7 +7,7 @@ import { downloadJson } from '@/src/lib/download-utils';
 import { ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, isEmptyData, MAX_DISPLAY_LINES, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { Integration, SuperglueClient } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
-import { ArrowDown, Copy, Download, Globe, RotateCw } from 'lucide-react';
+import { ArrowDown, Check, Copy, Download, Edit, Globe, RotateCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from "../ui/badge";
 import { Button } from '../ui/button';
@@ -38,7 +38,8 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
     const [queryParamsText, setQueryParamsText] = useState('');
     const [headersError, setHeadersError] = useState(false);
     const [queryParamsError, setQueryParamsError] = useState(false);
-    const [copied, setCopied] = useState(false);
+    const [isEditingInstruction, setIsEditingInstruction] = useState(false);
+    const [instructionCopied, setInstructionCopied] = useState(false);
 
     const config = useConfig();
     const { toast } = useToast();
@@ -183,14 +184,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         return step.apiConfig?.urlHost && integration.urlHost && step.apiConfig.urlHost.includes(integration.urlHost.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, ''));
     });
 
-    // Debug logging
-    useEffect(() => {
-        console.log('[ToolStepConfigurator] Step:', step.id);
-        console.log('[ToolStepConfigurator] Has codeConfig?', !!step.codeConfig, step.codeConfig);
-        console.log('[ToolStepConfigurator] Has apiConfig?', !!step.apiConfig, step.apiConfig);
-        console.log('[ToolStepConfigurator] Full step:', step);
-    }, [step]);
-
     const LOOP_ITEMS_DEBOUNCE_MS = 400;
     const [loopItemsViewMode, setLoopItemsViewMode] = useState<'preview' | 'schema'>('preview');
     const [loopItems, setLoopItems] = useState<any[] | null>(null);
@@ -256,18 +249,8 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
     }, [step.executionMode, step.loopSelector, step.loopMaxIters, stepInput]);
 
     // Evaluate code config when it exists
-    useEffect(() => {
-        console.log('[CodeConfig Eval] Triggered', {
-            hasCodeConfig: !!step.codeConfig,
-            codeConfigCode: step.codeConfig?.code,
-            hasStepInput: !!stepInput,
-            isStepInputEmpty: isEmptyData(stepInput),
-            linkedIntegration: linkedIntegration?.id,
-            stepInput
-        });
-        
+    useEffect(() => {        
         if (!step.codeConfig) {
-            console.log('[CodeConfig Eval] No codeConfig, clearing result');
             setCodeConfigResult(null);
             setCodeConfigError(null);
             return;
@@ -282,10 +265,8 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
             setIsCodeConfigEvaluating(true);
             try {
                 const code = step.codeConfig?.code;
-                console.log('[CodeConfig Eval] Code to evaluate:', code);
                 
                 if (!code || typeof code !== 'string') {
-                    console.log('[CodeConfig Eval] No valid code string');
                     setCodeConfigResult(null);
                     setCodeConfigError('No code config defined');
                 } else {
@@ -300,26 +281,19 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                         paginationState: {}
                     };
                     
-                    console.log('[CodeConfig Eval] Context:', context);
-                    console.log('[CodeConfig Eval] Function body:', body);
-                    
                     // eslint-disable-next-line no-new-func
                     const fn = new Function('context', body);
                     const result = fn(context);
-                    
-                    console.log('[CodeConfig Eval] Result:', result);
                     
                     if (result && typeof result === 'object') {
                         setCodeConfigResult(result);
                         setCodeConfigError(null);
                     } else {
-                        console.log('[CodeConfig Eval] Result is not a valid object');
                         setCodeConfigResult(null);
                         setCodeConfigError('Code config did not return a valid config object');
                     }
                 }
             } catch (err: any) {
-                console.error('[CodeConfig Eval] Error:', err);
                 setCodeConfigResult(null);
                 setCodeConfigError(err?.message ? String(err.message) : 'Error evaluating code config');
             } finally {
@@ -361,13 +335,77 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                 <CardContent className="space-y-3 text-sm">
                     <div className="space-y-2">
                         <div>
-                            <Label className="text-xs flex items-center gap-1">
-                                Step Instruction
-                                <HelpTooltip text="AI-generated instruction for this step. This describes what the step does and how it should behave." />
-                            </Label>
-                            <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded mt-1">
-                                {step.codeConfig?.stepInstruction || step.apiConfig?.instruction || <span className="italic">No instruction provided</span>}
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs flex items-center gap-1">
+                                    Step Instruction
+                                    <HelpTooltip text="AI-generated instruction for this step. This describes what the step does and how it should behave." />
+                                </Label>
+                                {!isEditingInstruction && (
+                                    <div className="flex items-center gap-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6"
+                                            onClick={() => {
+                                                const instructionText = step.codeConfig?.stepInstruction || step.apiConfig?.instruction || '';
+                                                navigator.clipboard.writeText(instructionText);
+                                                setInstructionCopied(true);
+                                                setTimeout(() => setInstructionCopied(false), 1500);
+                                            }}
+                                            disabled={disabled || !(step.codeConfig?.stepInstruction || step.apiConfig?.instruction)}
+                                            title="Copy instruction"
+                                        >
+                                            {instructionCopied ? (
+                                                <Check className="h-3 w-3 text-green-600" />
+                                            ) : (
+                                                <Copy className="h-3 w-3" />
+                                            )}
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6"
+                                            onClick={() => setIsEditingInstruction(true)}
+                                            disabled={disabled}
+                                            title="Edit instruction"
+                                        >
+                                            <Edit className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
+                            {isEditingInstruction ? (
+                                <Textarea 
+                                    value={step.codeConfig?.stepInstruction || step.apiConfig?.instruction || ''} 
+                                    onChange={(e) => handleImmediateEdit((s) => {
+                                        if (s.codeConfig) {
+                                            return {
+                                                ...s,
+                                                codeConfig: {
+                                                    ...s.codeConfig,
+                                                    stepInstruction: e.target.value
+                                                }
+                                            };
+                                        }
+                                        return {
+                                            ...s, 
+                                            apiConfig: { 
+                                                ...s.apiConfig, 
+                                                instruction: e.target.value 
+                                            }
+                                        };
+                                    })} 
+                                    onBlur={() => setIsEditingInstruction(false)}
+                                    className="text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" 
+                                    placeholder="Describe what this step should do..."
+                                    disabled={disabled}
+                                    autoFocus
+                                />
+                            ) : (
+                                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded mt-1">
+                                    {step.codeConfig?.stepInstruction || step.apiConfig?.instruction || <span className="italic">No instruction provided</span>}
+                                </div>
+                            )}
                         </div>
                         <div className="flex gap-2">
                             <div className="flex-1">

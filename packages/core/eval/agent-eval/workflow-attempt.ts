@@ -3,7 +3,7 @@ import { Metadata } from "@superglue/shared";
 import { generateUniqueId } from "@superglue/shared/utils";
 import { DataStore } from "../../datastore/types.js";
 import { WorkflowRunner } from "../../execute/workflow-runner.js";
-import { WorkflowBuilder } from "../../generate/workflows.js";
+import { WorkflowBuilder } from "../../generate/workflow.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { WorkflowAttempt, WorkflowConfig, WorkflowFailureReason } from "./types.js";
 import { isDeepEqual } from "./utils.js";

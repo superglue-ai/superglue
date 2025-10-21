@@ -1,5 +1,6 @@
 import { CodeConfig, type ApiConfig, type RequestOptions } from "@superglue/client";
 import { Message } from "@superglue/shared";
+import { AxiosRequestConfig } from "axios";
 import { server_defaults } from "../default.js";
 import { generateConfigImplementation } from "../generate/config.js";
 import { evaluateStepResponse } from "../generate/step-evaluation.js";
@@ -9,7 +10,7 @@ import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
 import { isSelfHealingEnabled, maskCredentials } from "../utils/tools.js";
 import { callEndpointLegacyImplementation } from "./api.legacy.js";
-import { executeCodeConfig } from "./execute.js";
+import { executeCodeConfig, ExecutionResult } from "./execute.js";
 import { AbortError, ApiCallError } from "./http.js";
 
 export async function executeStep({
@@ -33,9 +34,9 @@ export async function executeStep({
   endpoint?: ApiConfig;
   codeConfig?: CodeConfig;
   statusCode: number;
-  headers: Record<string, any>;
+  request: AxiosRequestConfig;
 }> {
-  let response: any = null;
+  let response: ExecutionResult = null;
   let retryCount = 0;
   let lastError: string | null = null;
   let messages: Message[] = [];
@@ -113,7 +114,7 @@ export async function executeStep({
         const instruction = codeConfig?.stepInstruction || endpoint?.instruction;
         const result = await evaluateStepResponse({
           data: response.data,
-          endpoint: endpoint,
+          stepConfig: codeConfig || endpoint,
           docSearchResultsForStepInstruction: await integrationManager?.searchDocumentation(instruction)
         });
         success = result.success;
@@ -137,10 +138,8 @@ export async function executeStep({
         logMessage('warn', `API call failed. ${lastError}`, metadata);
       }
 
-      // hack to get the status code from the error
       if (!response?.statusCode) {
-        response = response || {};
-        response.statusCode = error instanceof ApiCallError ? error.statusCode : 500;
+        response = { ...response, statusCode: error instanceof ApiCallError ? error.statusCode : 500 };
       }
       if (error instanceof AbortError) {
         break;
@@ -163,6 +162,6 @@ export async function executeStep({
     endpoint, 
     codeConfig,
     statusCode: response?.statusCode, 
-    headers: response?.headers 
+    request: response?.request 
   };
 }

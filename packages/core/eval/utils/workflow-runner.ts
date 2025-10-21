@@ -219,7 +219,7 @@ export class WorkflowRunner {
         try {
             logMessage('info', `📝 Building workflow ${workflowConfig.name}...`, this.metadata);
 
-            const { WorkflowBuilder } = await import('../../generate/workflows.js');
+            const { WorkflowBuilder } = await import('../../generate/workflow.js');
             const builder = new WorkflowBuilder(
                 workflowConfig.instruction,
                 integrations,

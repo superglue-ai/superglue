@@ -5,7 +5,8 @@ import ivm from "isolated-vm";
 import { server_defaults } from "../default.js";
 import { parseFile } from "../utils/file.js";
 import { composeUrl, maskCredentials, replaceVariables } from "../utils/tools.js";
-import { callFTP } from "./ftp.js";
+import { ExecutionResult } from "./execute.js";
+import { callFTP, FTPOperation } from "./ftp.js";
 import { ApiCallError, callAxios, handle2xxStatus, handle429Status, handleErrorStatus } from "./http.js";
 import { callPostgres } from "./postgres.js";
 
@@ -24,7 +25,7 @@ export function convertBasicAuthToBase64(headerValue: string) {
     return headerValue;
   }
   
-export async function callEndpointLegacyImplementation({ endpoint, payload, credentials, options }: { endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<{ data: any; statusCode: number; headers: Record<string, any>; }> {
+export async function callEndpointLegacyImplementation({ endpoint, payload, credentials, options }: { endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<ExecutionResult> {
     const allVariables = { ...payload, ...credentials };
   
     let allResults = [];
@@ -109,12 +110,14 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
         const body = typeof processedBody === 'string' ? JSON.parse(processedBody) : processedBody;
         const query = body.query;
         const params = body.params || body.values;
-        
-        return { data: await callPostgres({ connectionString, query, params, credentials, options }), statusCode: 200, headers: {} };
+        const request  = { method: "POST", url: connectionString, headers: processedHeaders, data: processedBody, params: processedQueryParams };
+        return { data: await callPostgres({ connectionString, query, params, credentials, options }), statusCode: 200, request: request };
       }
   
       if (processedUrlHost.startsWith("ftp://") || processedUrlHost.startsWith("ftps://") || processedUrlHost.startsWith("sftp://")) {
-        return { data: await callFTP({ operation: endpoint.body, credentials, options }), statusCode: 200, headers: {} };
+        const url = composeUrl(processedUrlHost, processedUrlPath);
+        const operation: FTPOperation = { path: url, ...JSON.parse(endpoint.body) };
+        return { data: await callFTP({ operation, credentials, options }), statusCode: 200, request: { method: "POST", url: url, headers: processedHeaders, data: operation, params: processedQueryParams } };
       }
   
       const processedUrl = composeUrl(processedUrlHost, processedUrlPath);
@@ -294,14 +297,14 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
           ...(Array.isArray(allResults) ? { results: allResults } : allResults)
         },
         statusCode: lastResponse.status,
-        headers: lastResponse.headers
+        request: lastResponse.config
       };
     }
   
     return {
       data: allResults?.length === 1 ? allResults[0] : allResults,
       statusCode: lastResponse.status,
-      headers: lastResponse.headers
+      request: lastResponse.config
     };
   }
   

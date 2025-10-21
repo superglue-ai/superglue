@@ -31,10 +31,10 @@ interface PaginationState {
     hasValidData: boolean;
 }
 
-interface ExecutionResult {
+export interface ExecutionResult {
     data: any;
     statusCode: number;
-    headers: Record<string, any>;
+    request: AxiosRequestConfig;
 }
 
 function validateGeneratedUrl(axiosConfig: AxiosRequestConfig, integration?: Integration, metadata?: Metadata): void {
@@ -126,7 +126,7 @@ export async function executeCodeConfig({
             return {
                 data: responseData,
                 statusCode: lastResponse.status,
-                headers: lastResponse.headers as Record<string, any>
+                request: axiosConfig
             };
         }
 
@@ -364,14 +364,14 @@ function formatFinalResult(
                 ...(Array.isArray(mergedResult) ? { results: mergedResult } : mergedResult)
             },
             statusCode: lastResponse.status,
-            headers: lastResponse.headers as Record<string, any>
+            request: lastResponse.config as AxiosRequestConfig
         };
     }
 
     return {
         data: mergedResult,
         statusCode: lastResponse.status,
-        headers: lastResponse.headers as Record<string, any>
+        request: lastResponse.config as AxiosRequestConfig
     };
 }
 

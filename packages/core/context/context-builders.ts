@@ -115,20 +115,11 @@ function buildIntegrationContext(integration: Integration, opts: IntegrationCont
         integration.openApiSchema
     );
 
-    const xml_opening_tag = `<${integration.id}>`;
-    const urlSection = '<base_url>: ' + composeUrl(integration.urlHost, integration.urlPath) + '</base_url>';
-    const specificInstructionsSection = '<instructions>: ' + (integration.specificInstructions?.length > 0 ? integration.specificInstructions : "No specific instructions provided.") + '</instructions>';
-    const xml_closing_tag = `</${integration.id}>`;
+    const xml_opening_tag = `<${integration.id}>\n`;
+    const urlSection = '<base_url>: ' + composeUrl(integration.urlHost, integration.urlPath) + '</base_url>\n';
+    const specificInstructionsSection = integration.specificInstructions?.length > 0 ? "<instructions>: " + integration.specificInstructions + "</instructions>\n" : "";
+    const xml_closing_tag = `</${integration.id}>\n`;
     return xml_opening_tag + '\n' + [urlSection, specificInstructionsSection, authSection, paginationSection, generalDocSection].filter(Boolean).join('\n').slice(0, budget - xml_opening_tag.length - xml_closing_tag.length) + '\n' + xml_closing_tag;
-}
-
-function buildAvailableVariableContext(payload: any, integrations: Integration[]): string {
-    const availableVariables = [
-        ...integrations.flatMap(int => Object.keys(int.credentials || {}).map(k => `<<${int.id}_${k}>>`)),
-        ...Object.keys(payload || {}).map(k => `<<${k}>>`)
-    ].join(", ");
-
-    return availableVariables || 'No variables available'
 }
 
 export function getWorkflowBuilderContext(input: WorkflowBuilderContextInput, options: WorkflowBuilderContextOptions): string {
@@ -138,11 +129,10 @@ export function getWorkflowBuilderContext(input: WorkflowBuilderContextInput, op
 
     const prompt_start = `Build a complete workflow to fulfill the user's request.`;
     const userInstructionContext = options.include.userInstruction ? `<instruction>${input.userInstruction}</instruction>` : '';
-    const availableVariablesContext = options.include?.availableVariablesContext ? `<available_variables>${buildAvailableVariableContext(input.payload, input.integrations)}</available_variables>` : '';
-    const payloadContext = options.include?.payloadContext ? `<workflow_input>${getObjectContext(input.payload, { include: { schema: true, preview: false, samples: true }, characterBudget: budget * 0.5 })}</workflow_input>` : '';
+    const payloadContext = options.include?.payloadContext ? `<workflow_input>${getObjectContext(input.payload, { include: { schema: true, preview: true, samples: true }, characterBudget: budget * 0.5 })}</workflow_input>` : '';
     const integrationContext = options.include?.integrationContext ? `<available_integrations_and_documentation>${hasIntegrations ? input.integrations.map(int => buildIntegrationContext(int, { characterBudget: budget })).join('\n') : 'No integrations provided. Build a transform-only workflow using finalTransform to process the payload data.'}</available_integrations_and_documentation>` : '';
     const prompt_end = hasIntegrations ? 'Ensure that the final output matches the instruction and you use ONLY the available integration ids.' : 'Since no integrations are available, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.';
-    const prompt = prompt_start + '\n' + ([userInstructionContext, integrationContext, availableVariablesContext, payloadContext].filter(Boolean).join('\n')).slice(0, budget - prompt_start.length - prompt_end.length) + '\n' + prompt_end;
+    const prompt = prompt_start + '\n' + ([userInstructionContext, payloadContext, integrationContext].filter(Boolean).join('\n')).slice(0, budget - prompt_start.length - prompt_end.length) + '\n' + prompt_end;
     return prompt;
 }
 
@@ -179,7 +169,7 @@ export function getEvaluateStepResponseContext(input: EvaluateStepResponseContex
 
     const prompt_start = `Evaluate the response returned by the step and return { success: true, shortReason: "", refactorNeeded: false } if the data in the response aligns with the instruction. If the data does not align with the instruction, return { success: false, shortReason: "reason why it does not align", refactorNeeded: false }.`;
     const dataContext = `<step_response>${getObjectContext(input.data, { include: { schema: true, preview: true, samples: false }, characterBudget: budget * 0.9 })}</step_response>`;
-    const endpointContext = `<step_config>${JSON.stringify(input.endpoint)}</step_config>`;
+    const endpointContext = `<step_config>${JSON.stringify(input.stepConfig)}</step_config>`;
     const docSearchResultsForStepInstructionContext = `<doc_search_results_for_step_instruction>${input.docSearchResultsForStepInstruction}</doc_search_results_for_step_instruction>`;
     const prompt = prompt_start + '\n' + ([dataContext, endpointContext, docSearchResultsForStepInstructionContext].filter(Boolean).join('\n')).slice(0, budget - prompt_start.length);
     return prompt;

@@ -1,8 +1,9 @@
 "use client";
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
+import { useFileUpload } from '@/src/hooks/use-file-upload';
 import { executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
-import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput } from "@/src/lib/utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
 import { Loader2, X } from "lucide-react";
@@ -89,18 +90,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   );
   const [payload, setPayload] = useState<string>(initialPayload || '{}');
 
-  // File upload state - use parent's if provided (embedded), otherwise use local
-  const [localUploadedFiles, setLocalUploadedFiles] = useState<UploadedFileInfo[]>([]);
-  const [localTotalFileSize, setLocalTotalFileSize] = useState(0);
-  const [localIsProcessingFiles, setLocalIsProcessingFiles] = useState(false);
-  const [localFilePayloads, setLocalFilePayloads] = useState<Record<string, any>>({});
-
-  // Use parent state if available, otherwise use local state
-  const uploadedFiles = parentUploadedFiles || localUploadedFiles;
-  const totalFileSize = parentTotalFileSize ?? localTotalFileSize;
-  const isProcessingFiles = parentIsProcessingFiles ?? localIsProcessingFiles;
-  const filePayloads = parentFilePayloads || localFilePayloads;
-
   useEffect(() => {
     if (initialPayload !== undefined) {
       setPayload(initialPayload);
@@ -132,6 +121,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   }, [embedded, initialInstruction]);
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(externalSelfHealingEnabled ?? true);
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
+  const [isFixingWorkflow, setIsFixingWorkflow] = useState<number | undefined>(undefined);
+  const [stepSelfHealingEnabled, setStepSelfHealingEnabled] = useState(false);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndex] = useState<number | undefined>(undefined);
   const [isStopping, setIsStopping] = useState(false);
   // Single source of truth for stopping across modes (embedded/standalone)
@@ -204,100 +195,30 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     apiKey: config.superglueApiKey,
   }), [config.superglueEndpoint, config.superglueApiKey]);
 
+  // File upload hook for local (non-embedded) mode
+  const localFileUpload = useFileUpload(client);
+
+  // Use parent state if available (embedded), otherwise use local state
+  const uploadedFiles = parentUploadedFiles || localFileUpload.uploadedFiles;
+  const totalFileSize = parentTotalFileSize ?? localFileUpload.totalFileSize;
+  const isProcessingFiles = parentIsProcessingFiles ?? localFileUpload.isProcessingFiles;
+  const filePayloads = parentFilePayloads || localFileUpload.filePayloads;
+
   // Unified file upload handlers
   const handleFilesUpload = async (files: File[]) => {
-    // Use parent handler if available, otherwise handle locally
+    // Use parent handler if available, otherwise use local hook
     if (parentOnFilesUpload) {
       return parentOnFilesUpload(files);
     }
-
-    // Local handling for non-embedded mode
-    setLocalIsProcessingFiles(true);
-
-    try {
-      const newSize = files.reduce((sum, f) => sum + f.size, 0);
-      if (localTotalFileSize + newSize > MAX_TOTAL_FILE_SIZE) {
-        toast({
-          title: 'Size limit exceeded',
-          description: `Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE)}`,
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      const existingKeys = localUploadedFiles.map(f => f.key);
-      const newFiles: UploadedFileInfo[] = [];
-
-      for (const file of files) {
-        try {
-          const baseKey = sanitizeFileName(file.name);
-          const key = generateUniqueKey(baseKey, [...existingKeys, ...newFiles.map(f => f.key)]);
-
-          const fileInfo: UploadedFileInfo = {
-            name: file.name,
-            size: file.size,
-            key,
-            status: 'processing'
-          };
-          newFiles.push(fileInfo);
-          setLocalUploadedFiles(prev => [...prev, fileInfo]);
-
-          const extractResult = await client.extract({
-            file: file
-          });
-
-          if (!extractResult.success) {
-            throw new Error(extractResult.error || 'Failed to extract data');
-          }
-          const parsedData = extractResult.data;
-          setLocalFilePayloads(prev => ({ ...prev, [key]: parsedData }));
-          existingKeys.push(key);
-
-          setLocalUploadedFiles(prev => prev.map(f =>
-            f.key === key ? { ...f, status: 'ready' } : f
-          ));
-
-        } catch (error: any) {
-          const fileInfo = newFiles.find(f => f.name === file.name);
-          if (fileInfo) {
-            setLocalUploadedFiles(prev => prev.map(f =>
-              f.key === fileInfo.key
-                ? { ...f, status: 'error', error: error.message }
-                : f
-            ));
-          }
-
-          toast({
-            title: 'File processing failed',
-            description: `Failed to parse ${file.name}: ${error.message}`,
-            variant: 'destructive'
-          });
-        }
-      }
-      setLocalTotalFileSize(prev => prev + newSize);
-
-    } finally {
-      setLocalIsProcessingFiles(false);
-    }
+    return localFileUpload.handleFilesUpload(files);
   };
 
   const handleFileRemove = (key: string) => {
-    // Use parent handler if available
+    // Use parent handler if available, otherwise use local hook
     if (parentOnFileRemove) {
       return parentOnFileRemove(key);
     }
-
-    // Local handling
-    const fileToRemove = localUploadedFiles.find(f => f.key === key);
-    if (!fileToRemove) return;
-
-    setLocalFilePayloads(prev => {
-      const newPayloads = { ...prev };
-      delete newPayloads[key];
-      return newPayloads;
-    });
-    setLocalUploadedFiles(prev => prev.filter(f => f.key !== key));
-    setLocalTotalFileSize(prev => Math.max(0, prev - fileToRemove.size));
+    return localFileUpload.handleFileRemove(key);
   };
 
 
@@ -741,9 +662,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     prevStepHashesRef.current = currentHashes;
   }, [steps]);
 
-  const handleExecuteStep = async (idx: number) => {
+  const executeStepByIdx = async (idx: number, selfHealing: boolean = false) => {
     try {
-      // mark testing state for indicator without freezing entire UI
       setIsExecutingStep(idx);
       const single = await executeSingleStep(
         client,
@@ -754,7 +674,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         idx,
         JSON.parse(payload || '{}'),
         stepResultsMap,  // Pass accumulated results
-        false
+        selfHealing
       );
       const sid = steps[idx].id;
       const normalized = computeStepOutput(single);
@@ -788,6 +708,14 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setIsExecutingStep(undefined);
     }
   };
+  const handleExecuteStep = async (idx: number) => {
+    await executeStepByIdx(idx, false);
+  };
+
+  const handleFixStep = async (idx: number) => {
+    await executeStepByIdx(idx, true);
+  };
+
 
   const handleExecuteTransform = async (schemaStr: string, transformStr: string) => {
     try {
@@ -889,7 +817,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   );
 
   return (
-    <div className={embedded ? "w-full" : "p-6 max-w-none w-full"} style={{ scrollbarGutter: 'stable both-edges' }}>
+    <div className={embedded ? "w-full" : "p-6 max-w-none w-full"}>
       {!embedded && !hideHeader && (
         <>
           <div className="flex justify-end items-center mb-2">
@@ -930,6 +858,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   onStepsChange={handleStepsChange}
                   onStepEdit={handleStepEdit}
                   onExecuteStep={handleExecuteStep}
+                  onFixStep={handleFixStep}
                   onExecuteTransform={handleExecuteTransform}
                   onFinalTransformChange={setFinalTransform}
                   onResponseSchemaChange={setResponseSchema}
@@ -939,6 +868,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   integrations={integrations}
                   isExecuting={loading}
                   isExecutingStep={isExecutingStep}
+                  isFixingWorkflow={isFixingWorkflow}
                   isExecutingTransform={isExecutingTransform as any}
                   currentExecutingStepIndex={currentExecutingStepIndex}
                   completedSteps={completedSteps}
@@ -957,6 +887,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   isProcessingFiles={isProcessingFiles}
                   totalFileSize={totalFileSize}
                   filePayloads={filePayloads}
+                  stepSelfHealingEnabled={stepSelfHealingEnabled}
+                  onStepSelfHealingChange={setStepSelfHealingEnabled}
                 />
               )}
             </div>

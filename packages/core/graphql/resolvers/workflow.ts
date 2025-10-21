@@ -5,7 +5,7 @@ import { WorkflowRunner } from "../../execute/workflow-runner.js";
 import { Context, Metadata } from '../types.js';
 
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { WorkflowBuilder } from "../../generate/workflows.js";
+import { WorkflowBuilder } from "../../generate/workflow.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { parseJSON } from "../../utils/json-parser.js";
 import { logMessage } from "../../utils/logs.js";
