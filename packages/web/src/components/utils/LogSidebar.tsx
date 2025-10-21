@@ -168,8 +168,8 @@ export function LogSidebar() {
             <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               {hasNewLogs && !isExpanded && (
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500" />
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: '#FFA500' }} />
+                  <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: '#FFA500' }} />
                 </span>
               )}
               Logs

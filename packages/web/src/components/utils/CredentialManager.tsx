@@ -127,7 +127,7 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="shrink-0 h-7 w-7 text-destructive"
+                      className="shrink-0 h-7 w-7"
                       onClick={() => removeCredential(index)}
                     >
                       <Trash2 className="h-3 w-3" />

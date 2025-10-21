@@ -5,9 +5,10 @@ import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { downloadJson } from '@/src/lib/download-utils';
 import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon, getSimpleIcon, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { Integration } from '@superglue/client';
 import { inferJsonSchema } from '@superglue/shared';
-import { Check, Code2, Copy, Download, Eye, FileJson, Package, Play, RotateCw, Upload, X } from 'lucide-react';
+import { Check, Code2, Copy, Download, Eye, FileJson, Globe, Package, Play, RotateCw, Settings, Upload, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-json';
@@ -80,33 +81,47 @@ export const CopyButton = ({ text, getData }: { text?: string; getData?: () => a
 export const InstructionDisplay = ({ instruction, onEdit, showEditButton = true }: { instruction: string; onEdit?: () => void; showEditButton?: boolean; }) => {
     const [showFull, setShowFull] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [isTruncated, setIsTruncated] = useState(false);
+    const textRef = useRef<HTMLParagraphElement>(null);
+    
     const handleCopy = () => {
         navigator.clipboard.writeText(instruction);
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
     };
+
+    const normalizedText = instruction.replace(/\n/g, ' ');
+
+    useEffect(() => {
+        if (textRef.current) {
+            const element = textRef.current;
+            setIsTruncated(element.scrollHeight > element.clientHeight);
+        }
+    }, [normalizedText]);
+    
     return (
         <>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-md border max-w-full overflow-hidden h-[36px]">
-                <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <p className="text-sm text-muted-foreground font-medium">Instruction:</p>
-                    <p className="text-sm font-mono text-foreground truncate flex-1">{instruction}</p>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                    {instruction.length > 160 && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowFull(true)} title="View full instruction">
-                            <Eye className="h-3 w-3" />
+            <div className="max-w-[75%]">
+                <div className="flex items-baseline gap-2 mb-1">
+                    <h3 className="font-bold text-[13px]">Tool Instruction:</h3>
+                    <div className="flex items-center gap-1">
+                        {isTruncated && (
+                            <Button variant="ghost" size="icon" className="h-[13px] w-[13px] p-0 mr-2" onClick={() => setShowFull(true)} title="View full instruction">
+                                <Eye className="h-2.5 w-2.5" />
+                            </Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-[5px] w-[5px] p-0" onClick={handleCopy} title="Copy instruction">
+                            {copied ? <Check size={9} className="scale-[0.8]" /> : <Copy size={9} className="scale-[0.8]" />}
                         </Button>
-                    )}
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopy} title="Copy">
-                        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                    </Button>
-                    {onEdit && showEditButton && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onEdit} title="Edit">
-                            <X className="h-3 w-3" />
-                        </Button>
-                    )}
+
+                    </div>
                 </div>
+                <p 
+                    ref={textRef}
+                    className="text-[13px] text-muted-foreground line-clamp-2"
+                >
+                    {normalizedText}
+                </p>
             </div>
             {showFull && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowFull(false)}>
@@ -134,76 +149,6 @@ export const InstructionDisplay = ({ instruction, onEdit, showEditButton = true 
     );
 };
 
-export const FinalResultsCard = ({ result }: { result: any }) => {
-    const [copied, setCopied] = useState(false);
-    const isPending = result === undefined;
-    const displayData = isPending ? { value: '', truncated: false } : truncateForDisplay(result);
-    const fullJson = result !== undefined ? JSON.stringify(result, null, 2) : '';
-    const bytes = isPending ? 0 : new Blob([fullJson]).size;
-    const isEmpty = !isPending && isEmptyData(fullJson);
-    const handleCopy = () => {
-        navigator.clipboard.writeText(fullJson);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-    };
-    const handleDownload = () => {
-        downloadJson(result, 'tool_final_result.json');
-    };
-    return (
-        <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
-            <div className="p-6">
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                        <h3 className="text-lg font-semibold">Final Result</h3>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-muted-foreground">{bytes.toLocaleString()} bytes</span>
-                        {!isPending && (
-                            <>
-                                <div className="flex items-center gap-1">
-                                    <span className="text-[11px] text-muted-foreground">Copy Result</span>
-                                    <button
-                                        onClick={handleCopy}
-                                        className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors bg-background/60 backdrop-blur"
-                                        title="Copy full result data"
-                                        type="button"
-                                    >
-                                        {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
-                                    </button>
-                                </div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={handleDownload}
-                                    title="Download as JSON"
-                                >
-                                    <Download className="h-3 w-3" />
-                                </Button>
-                            </>
-                        )}
-                    </div>
-                </div>
-                <div className="relative">
-                    {isPending ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                            <Package className="h-8 w-8 mb-2 opacity-50" />
-                            <p className="text-sm">No results yet</p>
-                            <p className="text-xs mt-1">Run the tool or test the transform to see results</p>
-                        </div>
-                    ) : (
-                        <>
-                            <JsonCodeEditor value={displayData.value} readOnly minHeight="220px" maxHeight="420px" />
-                            {isEmpty && (<div className="mt-2 text-xs text-amber-700 dark:text-amber-300">⚠ No data returned. Is this expected?</div>)}
-                            {displayData.truncated && (<div className="mt-2 text-xs text-amber-600 dark:text-amber-300">Preview truncated for display performance. Use copy button to get full data.</div>)}
-                        </>
-                    )}
-                </div>
-            </div>
-        </Card>
-    );
-};
 
 export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = false, minHeight = '200px', maxHeight = '350px', showCopy = true, resizable = false, isTransformEditor = false, autoFormatOnMount = true }: { value: string; onChange?: (value: string) => void; readOnly?: boolean; minHeight?: string; maxHeight?: string; showCopy?: boolean; resizable?: boolean; isTransformEditor?: boolean; autoFormatOnMount?: boolean; }) => {
     const [currentHeight, setCurrentHeight] = useState(maxHeight);
@@ -295,7 +240,7 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
     }, [value, placeholder, readOnly]);
     const jsonHtml = usePrismHighlight(displayValue, 'json', 60);
     return (
-        <div className={cn("relative rounded-lg border shadow-sm", readOnly ? "bg-muted/30 border-dashed" : "bg-background border")}>
+        <div className={cn("relative rounded-lg border shadow-sm", readOnly ? "bg-muted/30" : "bg-background")}>
             {overlay && (<div className="absolute top-1 right-1 z-10 flex items-center gap-1">{overlay}</div>)}
             {bottomRightOverlay && (<div className="absolute bottom-1 right-1 z-10 flex items-center gap-1">{bottomRightOverlay}</div>)}
             {!overlay && (<div className="absolute top-1 right-1 z-10"><CopyButton text={value || placeholder} /></div>)}
@@ -429,9 +374,13 @@ export const PayloadSpotlight = ({
                 className="hidden"
             />
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2 mb-3 h-8">
-                    <TabsTrigger value="payload" className="text-xs">Payload JSON</TabsTrigger>
-                    <TabsTrigger value="schema" className="text-xs">Input Schema</TabsTrigger>
+                <TabsList className="h-9 p-1 rounded-md mb-3">
+                    <TabsTrigger value="payload" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                        <FileJson className="h-4 w-4" /> Payload JSON
+                    </TabsTrigger>
+                    <TabsTrigger value="schema" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                        <Code2 className="h-4 w-4" /> Input Schema
+                    </TabsTrigger>
                 </TabsList>
                 <TabsContent value="payload" className="mt-3 space-y-3">
                     {!readOnly && onFilesUpload && uploadedFiles.length > 0 && (
@@ -569,15 +518,13 @@ export const PayloadMiniStepCard = ({
 }) => {
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
-            <div className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                        <h3 className="text-base font-semibold">Initial Payload</h3>
+            <div className="p-3">
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <h3 className="text-lg font-semibold">Tool Payload</h3>
                     </div>
-                    <div className="mt-1 text-muted-foreground">
-                        <HelpTooltip text="Payload is the JSON input to tool execution. Editing here does NOT save values to the tool; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
-                    </div>
+                    <HelpTooltip text="Payload is the JSON input to tool execution. Editing here does NOT save values to the tool; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
                 </div>
                 <PayloadSpotlight
                     payloadText={payloadText}
@@ -597,15 +544,23 @@ export const PayloadMiniStepCard = ({
 };
 
 const MAX_DISPLAY_LINES = 3000;
-export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransformChange, onResponseSchemaChange, readOnly, onExecuteTransform, isExecutingTransform, canExecute, transformResult, stepInputs }: { transform?: string; responseSchema?: string; onTransformChange?: (value: string) => void; onResponseSchemaChange?: (value: string) => void; readOnly?: boolean; onExecuteTransform?: (schema: string, transform: string) => void; isExecutingTransform?: boolean; canExecute?: boolean; transformResult?: any; stepInputs?: any; }) => {
+export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransformChange, onResponseSchemaChange, readOnly, onExecuteTransform, isExecutingTransform, canExecute, transformResult, stepInputs, hasTransformCompleted }: { transform?: string; responseSchema?: string; onTransformChange?: (value: string) => void; onResponseSchemaChange?: (value: string) => void; readOnly?: boolean; onExecuteTransform?: (schema: string, transform: string) => void; isExecutingTransform?: boolean; canExecute?: boolean; transformResult?: any; stepInputs?: any; hasTransformCompleted?: boolean; }) => {
     const [activeTab, setActiveTab] = useState('transform');
     const [localTransform, setLocalTransform] = useState(transform || '');
     const [localSchema, setLocalSchema] = useState(responseSchema || '');
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
+    const [outputViewMode, setOutputViewMode] = useState<'preview' | 'schema'>('preview');
     const [schemaInitialized, setSchemaInitialized] = useState(false);
     useEffect(() => { setLocalTransform(transform || ''); }, [transform]);
     useEffect(() => { if (!schemaInitialized) { setLocalSchema(responseSchema || ''); setSchemaInitialized(true); } }, [responseSchema, schemaInitialized]);
     useEffect(() => { const handleTabChange = () => { if (onTransformChange && localTransform !== transform) onTransformChange(localTransform); if (onResponseSchemaChange && localSchema !== responseSchema) onResponseSchemaChange(localSchema); }; handleTabChange(); }, [activeTab]);
+    
+    // Switch to output tab when transform completes
+    useEffect(() => {
+        if (hasTransformCompleted) {
+            setActiveTab('output');
+        }
+    }, [hasTransformCompleted]);
     const handleTransformChange = (value: string) => { setLocalTransform(value); };
     const handleSchemaChange = (value: string | null) => {
         if (value === null || value === '') {
@@ -627,27 +582,49 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
             <div className="p-3">
                 <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                        <div className="p-1.5 bg-muted rounded-lg"><Code2 className="h-5 w-5 text-muted-foreground" /></div>
-                        <div>
-                            <h3 className="text-lg font-semibold">Final Transformation</h3>
-                            <span className="text-xs text-muted-foreground">JavaScript Transform & Response Schema</span>
-                        </div>
+                    <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <h3 className="text-lg font-semibold">Tool Result</h3>
                     </div>
-                    {!readOnly && onExecuteTransform && (
-                        <div className="flex items-center gap-2">
-                            <Button size="sm" onClick={handleExecuteTransform} disabled={!canExecute || isExecutingTransform} title={!canExecute ? "Execute all steps first" : isExecutingTransform ? "Transform is executing..." : "Test final transform"}>
-                                {isExecutingTransform ? (<><div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />Running...</>) : (<><Play className="h-3 w-3 mr-1" />Run Transform</>)}
-                            </Button>
-                            <HelpTooltip text="Executes the final transform script with step results as input. If a response schema is enabled, the output will be validated against it." />
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {!readOnly && onExecuteTransform && (
+                            <>
+                                <span title={!canExecute ? "Execute all steps first" : isExecutingTransform ? "Transform is executing..." : "Test final transform"}>
+                                    <Button
+                                        variant="ghost"
+                                        onClick={handleExecuteTransform}
+                                        disabled={!canExecute || isExecutingTransform}
+                                        className="h-8 px-3 gap-2"
+                                    >
+                                        {isExecutingTransform ? (
+                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                        ) : (
+                                            <Play className="h-3 w-3" />
+                                        )}
+                                        <span className="font-medium text-[13px]">Run Transform Code</span>
+                                    </Button>
+                                </span>
+                                <HelpTooltip text="Executes the final transform script with step results as input. If a result schema is enabled, the output will be validated against it." />
+                            </>
+                        )}
+                    </div>
                 </div>
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className="grid w-full grid-cols-3 mb-3">
-                        <TabsTrigger value="inputs">Step Inputs</TabsTrigger>
-                        <TabsTrigger value="transform">Transform Code</TabsTrigger>
-                        <TabsTrigger value="schema">Response Schema</TabsTrigger>
+                    <TabsList className="h-9 p-1 rounded-md mb-3">
+                        <TabsTrigger value="inputs" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                            <FileJson className="h-4 w-4" /> Step Inputs
+                        </TabsTrigger>
+                        <TabsTrigger value="transform" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                            <Code2 className="h-4 w-4" /> Transform Code
+                        </TabsTrigger>
+                        <TabsTrigger value="schema" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                            <Settings className="h-4 w-4" /> Result Schema
+                        </TabsTrigger>
+                        {hasTransformCompleted && (
+                            <TabsTrigger value="output" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm" style={{ backgroundColor: '#FFA500', color: '#000' }}>
+                                <Package className="h-4 w-4" /> Tool Result
+                            </TabsTrigger>
+                        )}
                     </TabsList>
                     <TabsContent value="inputs" className="mt-2">
                         {(() => {
@@ -682,21 +659,67 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
                             <JsonSchemaEditor value={localSchema || ''} onChange={handleSchemaChange} isOptional={true} showModeToggle={true} />
                         </div>
                     </TabsContent>
+                    {hasTransformCompleted && (
+                        <TabsContent value="output" className="mt-2">
+                            {(() => {
+                                const isPending = transformResult === undefined;
+                                let outputString = '';
+                                let isTruncated = false;
+                                if (!isPending) {
+                                    if (outputViewMode === 'schema') {
+                                        const schemaObj = inferJsonSchema(transformResult || {});
+                                        outputString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
+                                    } else {
+                                        const displayData = truncateForDisplay(transformResult);
+                                        outputString = displayData.value;
+                                        isTruncated = displayData.truncated;
+                                    }
+                                }
+                                const fullJson = transformResult !== undefined ? JSON.stringify(transformResult, null, 2) : '';
+                                const bytes = transformResult === undefined ? 0 : new Blob([fullJson]).size;
+                                const isEmpty = !isPending && isEmptyData(fullJson);
+                                return (
+                                    <>
+                                        {isPending ? (
+                                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border rounded-lg">
+                                                <Package className="h-8 w-8 mb-2 opacity-50" />
+                                                <p className="text-sm">No result yet</p>
+                                                <p className="text-xs mt-1">Run the tool or test the transform to see results</p>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <JsonCodeEditor value={outputString} readOnly minHeight="150px" maxHeight="250px" resizable={true} overlay={<div className="flex items-center gap-2"><Tabs value={outputViewMode} onValueChange={(v) => setOutputViewMode(v as 'preview' | 'schema')} className="w-auto"><TabsList className="h-6 rounded-md"><TabsTrigger value="preview" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Preview</TabsTrigger><TabsTrigger value="schema" className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md">Schema</TabsTrigger></TabsList></Tabs><span className="text-[10px] text-muted-foreground">{bytes.toLocaleString()} bytes</span><CopyButton text={outputString} /><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => downloadJson(transformResult, 'tool_result.json')} title="Download tool result as JSON"><Download className="h-3 w-3" /></Button></div>} />
+                                                {isEmpty && (<div className="mt-2 text-xs text-amber-700 dark:text-amber-300">⚠ No data returned. Is this expected?</div>)}
+                                                {isTruncated && outputViewMode === 'preview' && (<div className="mt-2 text-xs text-amber-600 dark:text-amber-300">Preview truncated for display performance. Use copy button to get full data.</div>)}
+                                            </>
+                                        )}
+                                    </>
+                                );
+                            })()}
+                        </TabsContent>
+                    )}
                 </Tabs>
             </div>
         </Card>
     );
 };
 
-export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload = false, isTransform = false, isFinal = false, isRunningAll = false, isTesting = false, completedSteps = [], failedSteps = [] }: { step: any; index: number; isActive: boolean; onClick: () => void; stepId?: string | null; isPayload?: boolean; isTransform?: boolean; isFinal?: boolean; isRunningAll?: boolean; isTesting?: boolean; completedSteps?: string[]; failedSteps?: string[]; }) => {
+export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload = false, isTransform = false, isRunningAll = false, isTesting = false, completedSteps = [], failedSteps = [], isFirstCard = false, isLastCard = false, integrations = [], hasTransformCompleted = false }: { step: any; index: number; isActive: boolean; onClick: () => void; stepId?: string | null; isPayload?: boolean; isTransform?: boolean; isRunningAll?: boolean; isTesting?: boolean; completedSteps?: string[]; failedSteps?: string[]; isFirstCard?: boolean; isLastCard?: boolean; integrations?: Integration[]; hasTransformCompleted?: boolean; }) => {
     if (isPayload) {
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
-                <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
+                <Card className={cn(
+                    isActive ? "p-3 w-[180px] h-[110px]" : "p-3 w-[180px] h-[100px]",
+                    "flex-shrink-0",
+                    isActive && "ring-2 ring-primary shadow-lg",
+                    isFirstCard && "rounded-l-2xl bg-gradient-to-br from-primary/5 to-transparent"
+                )}>
                     <div className="flex flex-col items-center justify-center h-full leading-tight">
-                        <Package className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-[11px] font-medium mt-0.5">Initial Payload</span>
-                        <span className="text-[10px] text-muted-foreground -mt-0.5">JSON</span>
+                        <div className="p-2 rounded-full bg-primary/10">
+                            <Play className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="text-[11px] font-semibold mt-1.5">Start</span>
+                        <span className="text-[9px] text-muted-foreground">Tool Payload</span>
                     </div>
                 </Card>
             </div>
@@ -705,94 +728,109 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
     if (isTransform) {
         const isCompleted = completedSteps.includes('__final_transform__');
         const isFailed = failedSteps.includes('__final_transform__');
-        const getStatusDotColor = () => {
-            if (isTesting || isRunningAll) return "bg-yellow-500 animate-pulse";
-            if (isFailed) return "bg-red-500";
-            if (isCompleted) return "bg-green-500";
-            return "bg-gray-400";
+        const isRunning = isTesting || isRunningAll;
+        const getStatusInfo = () => {
+            if (isRunning) return { text: "Running", color: "text-amber-600 dark:text-amber-400" };
+            if (isFailed) return { text: "Failed", color: "text-red-600 dark:text-red-400" };
+            if (isCompleted) return { text: "✓ Completed", color: "text-muted-foreground" };
+            return { text: "Pending", color: "text-gray-500 dark:text-gray-400" };
         };
-        const getStatusLabel = () => {
-            if (isTesting || isRunningAll) return "Running...";
-            if (isFailed) return "Failed";
-            if (isCompleted) return "Completed";
-            return "Pending";
-        };
+        const statusInfo = getStatusInfo();
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
-                <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
-                    <div className="h-full flex flex-col justify-between">
-                        <div className="flex-1 min-h-0 flex flex-col items-center justify-center leading-tight">
-                            <Code2 className="h-5 w-5 text-muted-foreground" />
-                            <span className="text-[11px] font-medium mt-0.5">Final Transform</span>
-                            <span className="text-[10px] text-muted-foreground -mt-0.5">JavaScript</span>
+                <Card className={cn(
+                    isActive ? "p-3 w-[180px] h-[110px]" : "p-3 w-[180px] h-[100px]",
+                    "flex-shrink-0",
+                    isActive && "ring-2 ring-primary shadow-lg",
+                    isLastCard && !hasTransformCompleted && "rounded-r-2xl bg-gradient-to-bl from-purple-500/5 to-transparent"
+                )}>
+                    <div className="h-full flex flex-col items-center justify-between leading-tight">
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                            <div className="p-2 rounded-full bg-purple-500/10">
+                                <Package className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                            </div>
+                            <span className="text-[11px] font-semibold mt-1.5">Tool Result</span>
+                            <span className="text-[9px] text-muted-foreground">Transform</span>
                         </div>
-                        <div className="flex items-center gap-1.5 mt-2">
-                            <div className={cn("w-2 h-2 rounded-full transition-all", getStatusDotColor())} />
-                            <span className="text-xs text-muted-foreground">{getStatusLabel()}</span>
+                        <div className="flex items-center gap-1 mt-1">
+                            {isRunning && (
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                </span>
+                            )}
+                            <span className={cn("text-[9px] font-medium", statusInfo.color)}>{statusInfo.text}</span>
                         </div>
-                    </div>
-                </Card>
-            </div>
-        );
-    }
-    if (isFinal) {
-        return (
-            <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
-                <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
-                    <div className="flex flex-col items-center justify-center h-full leading-tight">
-                        <FileJson className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-[11px] font-medium mt-0.5">Tool Result</span>
-                        <span className="text-[10px] text-muted-foreground -mt-0.5">JSON</span>
                     </div>
                 </Card>
             </div>
         );
     }
     const method = step.apiConfig?.method || 'GET';
-    const methodTextColor = method === 'GET'
-        ? "text-blue-700 dark:text-blue-400"
-        : method === 'POST'
-            ? "text-green-700 dark:text-green-400"
-            : method === 'PUT'
-                ? "text-yellow-700 dark:text-yellow-400"
-                : method === 'DELETE'
-                    ? "text-red-700 dark:text-red-400"
-                    : "text-gray-700 dark:text-gray-400";
-    const url = `${step.apiConfig?.urlHost || ''}${step.apiConfig?.urlPath || ''}`.trim() || 'No URL';
     const isCompleted = stepId ? completedSteps.includes(stepId) : false;
     const isFailed = stepId ? failedSteps.includes(stepId) : false;
-    const getStatusDotColor = () => {
-        if (isTesting || (isRunningAll && stepId)) return "bg-yellow-500 animate-pulse";
-        if (isFailed) return "bg-red-500";
-        if (isCompleted) return "bg-green-500";
-        return "bg-gray-400";
+    const isRunning = isTesting || (isRunningAll && stepId);
+    
+    const getStatusInfo = () => {
+        if (isRunning) return { text: "Running", color: "text-amber-600 dark:text-amber-400" };
+        if (isFailed) return { text: "Failed", color: "text-red-600 dark:text-red-400" };
+        if (isCompleted) return { text: "✓ Completed", color: "text-muted-foreground" };
+        return { text: "Pending", color: "text-gray-500 dark:text-gray-400" };
     };
-    const getStatusLabel = () => {
-        if (isTesting || (isRunningAll && stepId)) return "Running...";
-        if (isFailed) return "Failed";
-        if (isCompleted) return "Completed";
-        return "Pending";
-    };
+    const statusInfo = getStatusInfo();
+    
+    // Find matching integration for this step
+    const linkedIntegration = integrations?.find(integration => {
+        if (step.integrationId && integration.id === step.integrationId) return true;
+        return step.apiConfig?.urlHost && integration.urlHost && step.apiConfig.urlHost.includes(integration.urlHost.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, ''));
+    });
+    
+    const iconName = linkedIntegration ? getIntegrationIcon(linkedIntegration) : null;
+    const simpleIcon = iconName ? getSimpleIcon(iconName) : null;
+    
     return (
         <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick}>
-            <Card className={cn(isActive ? "p-4 w-[228px] h-[130px]" : "p-4 w-[228px] h-[120px]", "flex-shrink-0", isActive && "ring-2 ring-primary shadow-lg")}>
-                <div className="h-full flex flex-col justify-between">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-start text-sm font-semibold">{index}</div>
-                        <div className="flex items-center gap-1.5">
-                            {step?.executionMode === 'LOOP' && (
-                                <RotateCw className="h-3.5 w-3.5 text-muted-foreground" aria-label="Loop step" />
-                            )}
-                            <span className={cn("text-xs px-2 py-1 rounded font-medium", method === 'GET' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", method === 'POST' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", method === 'PUT' && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", method === 'DELETE' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", !['GET', 'POST', 'PUT', 'DELETE'].includes(method) && "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400")}>{method}</span>
+            <Card className={cn(
+                isActive ? "p-3 w-[180px] h-[110px]" : "p-3 w-[180px] h-[100px]",
+                "flex-shrink-0",
+                isActive && "ring-2 ring-primary shadow-lg"
+            )}>
+                <div className="h-full flex flex-col relative">
+                    <div className="absolute top-0 left-0 flex items-center h-5">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-primary/10 text-primary">
+                            {index}
+                        </span>
+                    </div>
+                    {step?.executionMode === 'LOOP' && (
+                        <div className="absolute top-0 right-0 flex items-center h-5">
+                            <RotateCw className="h-3 w-3 text-muted-foreground" aria-label="Loop step" />
                         </div>
-                    </div>
-                    <div className="flex-1 min-h-0">
-                        <p className="text-sm font-semibold truncate">{step.id || `Step ${index}`}</p>
-                        <p className="text-xs text-muted-foreground truncate">{url}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-2">
-                        <div className={cn("w-2 h-2 rounded-full transition-all", getStatusDotColor())} />
-                        <span className="text-xs text-muted-foreground">{getStatusLabel()}</span>
+                    )}
+                    <div className="flex-1 flex flex-col items-center justify-between leading-tight">
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                            <div className="p-2 rounded-full bg-white dark:bg-gray-100 border border-border/50">
+                                {simpleIcon ? (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill={`#${simpleIcon.hex}`} className="flex-shrink-0">
+                                        <path d={simpleIcon.path} />
+                                    </svg>
+                                ) : (
+                                    <Globe className="h-4 w-4 text-muted-foreground" />
+                                )}
+                            </div>
+                            <span className="text-[11px] font-semibold mt-1.5">{step.id || `Step ${index}`}</span>
+                            {linkedIntegration && (
+                                <span className="text-[9px] text-muted-foreground">{linkedIntegration.id}</span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-1 mt-1">
+                            {isRunning && (
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                </span>
+                            )}
+                            <span className={cn("text-[9px] font-medium", statusInfo.color)}>{statusInfo.text}</span>
+                        </div>
                     </div>
                 </div>
             </Card>
@@ -801,4 +839,5 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
 };
 
 export { truncateForDisplay, truncateLines };
+
 

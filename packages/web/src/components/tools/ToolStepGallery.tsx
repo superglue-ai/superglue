@@ -5,16 +5,17 @@ import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { Label } from '@/src/components/ui/label';
 import { Switch } from '@/src/components/ui/switch';
+import { Badge } from '@/src/components/ui/badge';
 import { canExecuteStep } from '@/src/lib/client-utils';
 import { downloadJson } from '@/src/lib/download-utils';
 import { type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, cn, isEmptyData, MAX_DISPLAY_LINES, MAX_DISPLAY_SIZE, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { Integration } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
-import { ChevronLeft, ChevronRight, Database, Download, FileJson, Package, Play, Plus, Settings, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Database, Download, FileJson, Package, Play, Plus, Settings, Trash2, Wand2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { AddStepDialog } from './AddStepDialog';
-import { CopyButton, FinalResultsCard, FinalTransformMiniStepCard, InstructionDisplay, JsonCodeEditor, MiniStepCard, PayloadMiniStepCard } from './ToolMiniStepCards';
+import { CopyButton, FinalTransformMiniStepCard, InstructionDisplay, JsonCodeEditor, MiniStepCard, PayloadMiniStepCard } from './ToolMiniStepCards';
 import { ToolStepConfigurator } from './ToolStepConfigurator';
 
 interface ToolStepGalleryProps {
@@ -60,7 +61,6 @@ interface ToolStepGalleryProps {
     totalFileSize?: number;
     filePayloads?: Record<string, any>;
     stepSelfHealingEnabled?: boolean;
-    onStepSelfHealingChange?: (enabled: boolean) => void;
 }
 
 const SpotlightStepCard = ({
@@ -83,7 +83,6 @@ const SpotlightStepCard = ({
     showOutputSignal,
     onConfigEditingChange,
     selfHealingEnabled,
-    onSelfHealingChange
 }: {
     step: any;
     stepIndex: number;
@@ -105,7 +104,6 @@ const SpotlightStepCard = ({
     showOutputSignal?: number;
     onConfigEditingChange?: (editing: boolean) => void;
     selfHealingEnabled?: boolean;
-    onSelfHealingChange?: (enabled: boolean) => void;
 }) => {
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
@@ -121,9 +119,9 @@ const SpotlightStepCard = ({
     }, [showOutputSignal]);
 
     return (
-        <Card className="w-full max-w-6xl mx-auto shadow-md bg-accent/10 dark:bg-accent/5 border border-accent/30 dark:border-accent/20 overflow-hidden">
+        <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50 overflow-hidden">
             <div className="p-3">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                         <Database className="h-4 w-4 text-muted-foreground" />
                         <h3 className="text-lg font-semibold">
@@ -134,48 +132,44 @@ const SpotlightStepCard = ({
                         )}
                     </div>
                     <div className="flex items-center gap-2">
-                        {!readOnly && onSelfHealingChange && (
-                            <div className="flex items-center gap-2 mr-2">
-                                <Label htmlFor={`selfHealing-${step.id}`} className="text-xs flex items-center gap-1">
-                                    <span>Self-healing</span>
-                                </Label>
-                                <div className="flex items-center">
-                                    <Switch 
-                                        className="custom-switch" 
-                                        id={`selfHealing-${step.id}`} 
-                                        checked={selfHealingEnabled ?? false} 
-                                        onCheckedChange={onSelfHealingChange}
-                                        disabled={isExecuting || isFixingWorkflow}
-                                    />
-                                    <div className="ml-1 flex items-center">
-                                        <HelpTooltip text="Enable self-healing mode. When enabled, the button becomes 'Fix Step' which attempts to auto-fix step configuration issues." />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        {!readOnly && (onExecuteStep || onFixStep) && (
+                        {!readOnly && onExecuteStep && (
                             <>
-                                <span title={!canExecute ? "To enable this button, execute previous steps first" : (isExecuting || isFixingWorkflow) ? "Step is currently executing" : selfHealingEnabled ? "Fix this step with AI" : "Test this step"}>
+                                <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Run this single step"}>
                                     <Button
-                                        size="sm"
-                                        variant={selfHealingEnabled ? "default" : "default"}
-                                        onClick={selfHealingEnabled ? onFixStep : onExecuteStep}
+                                        variant="ghost"
+                                        onClick={onExecuteStep}
                                         disabled={!canExecute || isExecuting || isFixingWorkflow}
+                                        className="h-8 px-3 gap-2"
                                     >
-                                        {(isExecuting || isFixingWorkflow) ? (
-                                            <>
-                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                                                {selfHealingEnabled ? "Fixing..." : "Running..."}
-                                            </>
+                                        {isExecuting ? (
+                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                                         ) : (
-                                            <>
-                                                <Play className="h-3 w-3 mr-1" />
-                                                 "Run Step"
-                                            </>
+                                            <Play className="h-3 w-3" />
                                         )}
+                                        <span className="font-medium text-[13px]">Run Step</span>
                                     </Button>
                                 </span>
-                                <HelpTooltip text={selfHealingEnabled ? "Attempts to fix this step using AI self-healing. Only works if all previous steps have completed successfully." : "Executes this step configuration directly. Only works if all previous steps have completed successfully."} />
+                                {/* <HelpTooltip text="Executes this step configuration directly. Only works if all previous steps have completed successfully." /> */}
+                            </>
+                        )}
+                        {!readOnly && onFixStep && (
+                            <>
+                                <span title={!canExecute ? "Execute previous steps first" : isFixingWorkflow ? "Step is self-healing..." : "Run and fix this step with AI"}>
+                                    <Button
+                                        variant="ghost"
+                                        onClick={onFixStep}
+                                        disabled={!canExecute || isExecuting || isFixingWorkflow}
+                                        className="h-8 px-3 gap-2"
+                                    >
+                                        {isFixingWorkflow ? (
+                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                        ) : (
+                                            <Wand2 className="h-3 w-3" />
+                                        )}
+                                        <span className="font-medium text-[13px]">Fix Step</span>
+                                    </Button>
+                                </span>
+                                {/* <HelpTooltip text="Attempts to fix this step using AI auto-repair. Only works if all previous steps have completed successfully." /> */}
                             </>
                         )}
                         {!readOnly && onRemove && (
@@ -183,7 +177,7 @@ const SpotlightStepCard = ({
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => onRemove(step.id)}
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                className="h-8 w-8"
                             >
                                 <Trash2 className="h-4 w-4" />
                             </Button>
@@ -202,7 +196,7 @@ const SpotlightStepCard = ({
                                     <Settings className="h-4 w-4" /> Step Config
                                 </TabsTrigger>
                                 <TabsTrigger value="output" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
-                                    <Package className="h-4 w-4" /> Step Output
+                                    <Package className="h-4 w-4" /> Step Result
                                 </TabsTrigger>
 
                             </TabsList>
@@ -342,12 +336,12 @@ const SpotlightStepCard = ({
                                                             <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
                                                             <span className="text-xs">Currently running...</span>
                                                         </div>
-                                                        <p className="text-[10px]">Step outputs will be shown shortly</p>
+                                                        <p className="text-[10px]">Step results will be shown shortly</p>
                                                     </div>
                                                 ) : (
                                                     <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
-                                                        <div className="text-xs mb-1">No output yet</div>
-                                                        <p className="text-[10px]">Run this step to see outputs</p>
+                                                        <div className="text-xs mb-1">No result yet</div>
+                                                        <p className="text-[10px]">Run this step to see results</p>
                                                     </div>
                                                 )
                                             ) : (
@@ -374,8 +368,8 @@ const SpotlightStepCard = ({
                                                                         variant="ghost"
                                                                         size="icon"
                                                                         className="h-6 w-6"
-                                                                        onClick={() => downloadJson(stepResult, `step_${step.id}_output.json`)}
-                                                                        title="Download step output as JSON"
+                                                                        onClick={() => downloadJson(stepResult, `step_${step.id}_result.json`)}
+                                                                        title="Download step result as JSON"
                                                                     >
                                                                         <Download className="h-3 w-3" />
                                                                     </Button>
@@ -452,8 +446,7 @@ export function ToolStepGallery({
     isProcessingFiles,
     totalFileSize,
     filePayloads,
-    stepSelfHealingEnabled,
-    onStepSelfHealingChange
+    stepSelfHealingEnabled
 }: ToolStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
     const [windowWidth, setWindowWidth] = useState(1200);
@@ -466,6 +459,8 @@ export function ToolStepGallery({
     const [defaultStepId, setDefaultStepId] = useState('');
     const [pendingInsertIndex, setPendingInsertIndex] = useState<number | null>(null);
     const isConfiguratorEditingRef = useRef<boolean>(false);
+    const [hiddenLeftCount, setHiddenLeftCount] = useState(0);
+    const [hiddenRightCount, setHiddenRightCount] = useState(0);
     useEffect(() => {
         isConfiguratorEditingRef.current = isConfiguratorEditing;
     }, [isConfiguratorEditing]);
@@ -607,6 +602,8 @@ export function ToolStepGallery({
         }, {})
         : stepResults;
 
+    const hasTransformCompleted = completedSteps.includes('__final_transform__') && (transformResult || finalResult);
+    
     const toolItems = [
         {
             type: 'payload',
@@ -624,14 +621,9 @@ export function ToolStepGallery({
             type: 'transform',
             data: { transform: finalTransform, responseSchema },
             stepResult: finalResult,
-            evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length - 1)
-        }] : []),
-        {
-            type: 'final',
-            data: { result: transformResult || finalResult },
-            stepResult: transformResult || finalResult,
-            evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length)
-        }
+            evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length - 1),
+            hasTransformCompleted
+        }] : [])
     ];
 
     const currentItem = toolItems[activeIndex];
@@ -732,6 +724,34 @@ export function ToolStepGallery({
         setActiveIndex(steps.length > 0 ? 1 : 0);
     }, []);
 
+    // Keyboard navigation with arrow keys
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Only handle if not typing in an input/textarea/contenteditable
+            if (e.target instanceof HTMLInputElement || 
+                e.target instanceof HTMLTextAreaElement ||
+                (e.target as HTMLElement).isContentEditable) {
+                return;
+            }
+            
+            // Don't navigate when editing step config
+            if (isConfiguratorEditing) {
+                return;
+            }
+            
+            if (e.key === 'ArrowLeft' && activeIndex > 0) {
+                e.preventDefault();
+                handleNavigation('prev');
+            } else if (e.key === 'ArrowRight' && activeIndex < toolItems.length - 1) {
+                e.preventDefault();
+                handleNavigation('next');
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [activeIndex, toolItems.length, isConfiguratorEditing]);
+
     useEffect(() => {
         if (navigateToFinalSignal) {
             navigateToIndex(toolItems.length - 1);
@@ -748,37 +768,50 @@ export function ToolStepGallery({
     }, [showStepOutputSignal, focusStepId]);
 
     return (
-        <div className="space-y-6">
-            <div className="space-y-3">
+        <div className="flex flex-col h-full">
+            {/* Fixed header section */}
+            <div className="flex-shrink-0 space-y-1.5 mb-6">
                 <div className="flex items-center justify-center gap-3 flex-wrap">
                     <div className="flex items-center gap-3 min-w-0 w-full">
                         {(onToolIdChange || typeof toolId !== 'undefined') && (
-                            <div className="flex w-full items-center justify-between gap-3">
-                                <div className="flex items-center gap-3 px-3 py-1.5 bg-muted/50 rounded-md border h-[36px]">
-                                    <span className="text-sm text-muted-foreground">Tool ID:</span>
-                                    <Input
-                                        key={isEditingToolId ? 'editing' : localToolId}
-                                        ref={toolIdInputRef}
-                                        defaultValue={localToolId}
-                                        onFocus={() => { setIsEditingToolId(true); liveToolIdRef.current = toolIdInputRef.current?.value ?? localToolId; }}
-                                        onChange={(e) => { liveToolIdRef.current = e.target.value; }}
-                                        onBlur={commitToolIdIfChanged}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                commitToolIdIfChanged();
-                                            } else if (e.key === 'Escape') {
-                                                if (toolIdInputRef.current) {
-                                                    toolIdInputRef.current.value = toolId ?? '';
+                            <div className="flex w-full items-center justify-between gap-3 mb-2">
+                                <div className="flex items-center gap-3 flex-1">
+                                    {isEditingToolId ? (
+                                        <input
+                                            key="editing"
+                                            ref={toolIdInputRef}
+                                            defaultValue={localToolId}
+                                            onChange={(e) => { liveToolIdRef.current = e.target.value; }}
+                                            onBlur={commitToolIdIfChanged}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    commitToolIdIfChanged();
+                                                } else if (e.key === 'Escape') {
+                                                    if (toolIdInputRef.current) {
+                                                        toolIdInputRef.current.value = toolId ?? '';
+                                                    }
+                                                    liveToolIdRef.current = toolId ?? '';
+                                                    setLocalToolId(toolId ?? '');
+                                                    setIsEditingToolId(false);
                                                 }
-                                                liveToolIdRef.current = toolId ?? '';
-                                                setLocalToolId(toolId ?? '');
-                                                setIsEditingToolId(false);
-                                            }
-                                        }}
-                                        className="h-5 font-mono text-sm w-[200px] md:w-[280px] border-0 bg-transparent p-0 focus:ring-0"
-                                        readOnly={readOnly || !onToolIdChange}
-                                    />
+                                            }}
+                                            className="text-2xl font-bold border-0 bg-transparent p-0 h-auto focus:ring-0 focus:outline-none min-w-0 flex-1 w-full"
+                                            autoFocus
+                                        />
+                                    ) : (
+                                        <h1 
+                                            className="text-2xl font-bold cursor-pointer hover:text-primary/80 transition-colors"
+                                            onClick={() => {
+                                                if (!readOnly && onToolIdChange) {
+                                                    setIsEditingToolId(true);
+                                                    liveToolIdRef.current = localToolId;
+                                                }
+                                            }}
+                                        >
+                                            {localToolId || 'Untitled Tool'}
+                                        </h1>
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {headerActions ?? null}
@@ -796,18 +829,32 @@ export function ToolStepGallery({
                         />
                     </div>
                 )}
+            </div>
 
+            {/* Scrollable content section */}
+            <div className="flex-1 overflow-y-auto pr-4" style={{ scrollbarGutter: 'stable' }}>
+                <div className="space-y-6">
                 <div className="flex items-center gap-0">
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleNavigation('prev')}
-                        disabled={activeIndex === 0}
-                        className="shrink-0 h-9 w-9"
-                        title="Previous"
-                    >
-                        <ChevronLeft className="h-4 w-4" />
-                    </Button>
+                    <div className="relative">
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleNavigation('prev')}
+                            disabled={activeIndex === 0}
+                            className="shrink-0 h-9 w-9"
+                            title="Previous"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        {hiddenLeftCount > 0 && (
+                            <Badge 
+                                variant="default" 
+                                className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center bg-primary text-primary-foreground"
+                            >
+                                {hiddenLeftCount}
+                            </Badge>
+                        )}
+                    </div>
 
                     <div className="flex-1 overflow-hidden px-0">
                         <div className="relative">
@@ -825,7 +872,7 @@ export function ToolStepGallery({
                                     const totalCards = toolItems.length;
                                     let startIdx = 0;
                                     let endIdx = totalCards;
-                                    const CARD_WIDTH = 228; // px (matches card classes above)
+                                    const CARD_WIDTH = 180; // px (matches card classes)
                                     const ARROW_WIDTH = 24; // px (ChevronRight ~20px, add buffer)
                                     const GUTTER = 16; // px (doubled spacing)
                                     const SAFE_MARGIN = 12; // px extra space to avoid clipping
@@ -841,8 +888,7 @@ export function ToolStepGallery({
                                         }
                                     }
 
-                                    // Always be slightly conservative to avoid cramping at any breakpoint
-                                    cardsToShow = Math.max(1, cardsToShow - 1);
+                                    cardsToShow = Math.max(1, cardsToShow);
 
                                     if (totalCards <= cardsToShow) {
                                         // Show all cards if we have fewer than cardsToShow
@@ -858,6 +904,12 @@ export function ToolStepGallery({
                                     const visibleIndices = visibleItems.map((_, i) => startIdx + i);
                                     const hasHiddenLeft = startIdx > 0;
                                     const hasHiddenRight = endIdx < totalCards;
+                                    const hiddenLeft = startIdx;
+                                    const hiddenRight = totalCards - endIdx;
+                                    
+                                    // Update state for badges (use ref to avoid re-render loop)
+                                    if (hiddenLeft !== hiddenLeftCount) setHiddenLeftCount(hiddenLeft);
+                                    if (hiddenRight !== hiddenRightCount) setHiddenRightCount(hiddenRight);
                                     const sepWidth = ARROW_WIDTH + GUTTER;
                                     const edgeWidth = sepWidth;
                                     const count = Math.max(1, visibleItems.length);
@@ -893,7 +945,6 @@ export function ToolStepGallery({
                                                                 stepId={item.type === 'step' ? item.data.id : undefined}
                                                                 isPayload={item.type === 'payload'}
                                                                 isTransform={item.type === 'transform'}
-                                                                isFinal={item.type === 'final'}
                                                                 isRunningAll={isExecuting && currentExecutingStepIndex === (globalIdx - 1)}
                                                                 isTesting={
                                                                     item.type === 'step' ? isExecutingStep === (globalIdx - 1) :
@@ -902,6 +953,10 @@ export function ToolStepGallery({
                                                                 }
                                                                 completedSteps={completedSteps}
                                                                 failedSteps={failedSteps}
+                                                                isFirstCard={globalIdx === 0}
+                                                                isLastCard={globalIdx === totalCards - 1}
+                                                                integrations={integrations}
+                                                                hasTransformCompleted={hasTransformCompleted}
                                                             />
                                                         </div>
                                                         {showArrow && (
@@ -939,16 +994,26 @@ export function ToolStepGallery({
                         </div>
                     </div>
 
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleNavigation('next')}
-                        disabled={activeIndex === toolItems.length - 1}
-                        className="shrink-0 h-9 w-9"
-                        title="Next"
-                    >
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
+                    <div className="relative">
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleNavigation('next')}
+                            disabled={activeIndex === toolItems.length - 1}
+                            className="shrink-0 h-9 w-9"
+                            title="Next"
+                        >
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        {hiddenRightCount > 0 && (
+                            <Badge 
+                                variant="default" 
+                                className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center bg-primary text-primary-foreground"
+                            >
+                                {hiddenRightCount}
+                            </Badge>
+                        )}
+                    </div>
                 </div>
 
                 <div className="flex justify-center items-center gap-2">
@@ -995,10 +1060,7 @@ export function ToolStepGallery({
                                 canExecute={steps.every((s: any) => completedSteps.includes(s.id))}
                                 transformResult={transformResult || finalResult}
                                 stepInputs={currentItem.evolvingPayload}
-                            />
-                        ) : currentItem.type === 'final' ? (
-                            <FinalResultsCard
-                                result={currentItem.data.result}
+                                hasTransformCompleted={hasTransformCompleted}
                             />
                         ) : (
                             <SpotlightStepCard
@@ -1021,10 +1083,10 @@ export function ToolStepGallery({
                                 showOutputSignal={showStepOutputSignal}
                                 onConfigEditingChange={setIsConfiguratorEditing}
                                 selfHealingEnabled={stepSelfHealingEnabled}
-                                onSelfHealingChange={onStepSelfHealingChange}
                             />
                         )
                     )}
+                </div>
                 </div>
             </div>
 

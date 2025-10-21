@@ -198,15 +198,15 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
       if (!saved) throw new Error('Failed to save tool');
 
       toast({
-        title: 'Tool saved',
-        description: `"${saved.id}" saved successfully`
+        title: 'Tool published',
+        description: `"${saved.id}" published successfully`
       });
 
       setCurrentTool(saved);
       setStep('success');
     } catch (e: any) {
       toast({
-        title: 'Error saving tool',
+        title: 'Error publishing tool',
         description: e.message || 'Unknown error',
         variant: 'destructive'
       });
@@ -880,7 +880,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-2 mr-2">
                       <Label htmlFor="wcs-selfHealing" className="text-xs flex items-center gap-1">
-                        <span>Self-healing</span>
+                        <span>auto-repair</span>
                       </Label>
                       <div className="flex items-center">
                         <Switch
@@ -890,7 +890,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                           onCheckedChange={setSelfHealingEnabled}
                         />
                         <div className="ml-1 flex items-center">
-                          <HelpTooltip text="Enable self-healing during execution. Slower, but can auto-fix failures in tool steps and transformation code." />
+                          <HelpTooltip text="Enable auto-repair during execution. Slower, but can auto-fix failures in tool steps and transformation code." />
                         </div>
                       </div>
                     </div>
@@ -919,7 +919,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                       disabled={isSaving}
                       className="h-9 px-5 shadow-md border border-primary/40"
                     >
-                      {isSaving ? "Saving..." : "Save & Complete"}
+                      {isSaving ? "Publishing..." : "Publish"}
                     </Button>
                   </div>
                 )}
