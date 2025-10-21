@@ -601,7 +601,7 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
                                         ) : (
                                             <Play className="h-3 w-3" />
                                         )}
-                                        <span className="font-medium text-[13px]">Generate Tool Result</span>
+                                        <span className="font-medium text-[13px]">Run Transform Code</span>
                                     </Button>
                                 </span>
                                 <HelpTooltip text="Executes the final transform script with step results as input. If a result schema is enabled, the output will be validated against it." />
