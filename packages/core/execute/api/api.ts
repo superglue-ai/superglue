@@ -53,7 +53,7 @@ export interface CallAxiosResult {
           decompress: true, // Ensure gzip/deflate responses are decompressed
           httpsAgent: new https.Agent({
             rejectUnauthorized: false,
-            
+            keepAlive: false,
           })
         });
         const durationMs = Date.now() - startTs;
