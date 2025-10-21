@@ -591,17 +591,17 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
                             <>
                                 <span title={!canExecute ? "Execute all steps first" : isExecutingTransform ? "Transform is executing..." : "Test final transform"}>
                                     <Button
-                                        size="icon"
                                         variant="ghost"
                                         onClick={handleExecuteTransform}
                                         disabled={!canExecute || isExecutingTransform}
-                                        className="h-8 w-8"
+                                        className="h-8 px-3 gap-2"
                                     >
                                         {isExecutingTransform ? (
                                             <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                                         ) : (
                                             <Play className="h-3 w-3" />
                                         )}
+                                        <span className="font-medium text-[13px]">Generate Tool Result</span>
                                     </Button>
                                 </span>
                                 <HelpTooltip text="Executes the final transform script with step results as input. If a result schema is enabled, the output will be validated against it." />
