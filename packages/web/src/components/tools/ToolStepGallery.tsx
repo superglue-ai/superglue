@@ -60,7 +60,6 @@ interface ToolStepGalleryProps {
     totalFileSize?: number;
     filePayloads?: Record<string, any>;
     stepSelfHealingEnabled?: boolean;
-    onStepSelfHealingChange?: (enabled: boolean) => void;
 }
 
 const SpotlightStepCard = ({
@@ -83,7 +82,6 @@ const SpotlightStepCard = ({
     showOutputSignal,
     onConfigEditingChange,
     selfHealingEnabled,
-    onSelfHealingChange
 }: {
     step: any;
     stepIndex: number;
@@ -105,7 +103,6 @@ const SpotlightStepCard = ({
     showOutputSignal?: number;
     onConfigEditingChange?: (editing: boolean) => void;
     selfHealingEnabled?: boolean;
-    onSelfHealingChange?: (enabled: boolean) => void;
 }) => {
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
@@ -134,48 +131,24 @@ const SpotlightStepCard = ({
                         )}
                     </div>
                     <div className="flex items-center gap-2">
-                        {!readOnly && onSelfHealingChange && (
-                            <div className="flex items-center gap-2 mr-2">
-                                <Label htmlFor={`selfHealing-${step.id}`} className="text-xs flex items-center gap-1">
-                                    <span>Self-healing</span>
-                                </Label>
-                                <div className="flex items-center">
-                                    <Switch 
-                                        className="custom-switch" 
-                                        id={`selfHealing-${step.id}`} 
-                                        checked={selfHealingEnabled ?? false} 
-                                        onCheckedChange={onSelfHealingChange}
-                                        disabled={isExecuting || isFixingWorkflow}
-                                    />
-                                    <div className="ml-1 flex items-center">
-                                        <HelpTooltip text="Enable self-healing mode. When enabled, the button becomes 'Fix Step' which attempts to auto-fix step configuration issues." />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                         {!readOnly && (onExecuteStep || onFixStep) && (
                             <>
                                 <span title={!canExecute ? "To enable this button, execute previous steps first" : (isExecuting || isFixingWorkflow) ? "Step is currently executing" : selfHealingEnabled ? "Fix this step with AI" : "Test this step"}>
                                     <Button
-                                        size="sm"
-                                        variant={selfHealingEnabled ? "default" : "default"}
+                                        size="icon"
+                                        variant="ghost"
                                         onClick={selfHealingEnabled ? onFixStep : onExecuteStep}
                                         disabled={!canExecute || isExecuting || isFixingWorkflow}
+                                        className="h-8 w-8"
                                     >
                                         {(isExecuting || isFixingWorkflow) ? (
-                                            <>
-                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                                                {selfHealingEnabled ? "Fixing..." : "Running..."}
-                                            </>
+                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                                         ) : (
-                                            <>
-                                                <Play className="h-3 w-3 mr-1" />
-                                                 "Run Step"
-                                            </>
+                                            <Play className="h-3 w-3" />
                                         )}
                                     </Button>
                                 </span>
-                                <HelpTooltip text={selfHealingEnabled ? "Attempts to fix this step using AI self-healing. Only works if all previous steps have completed successfully." : "Executes this step configuration directly. Only works if all previous steps have completed successfully."} />
+                                <HelpTooltip text={selfHealingEnabled ? "Attempts to fix this step using AI auto-repair. Only works if all previous steps have completed successfully." : "Executes this step configuration directly. Only works if all previous steps have completed successfully."} />
                             </>
                         )}
                         {!readOnly && onRemove && (
@@ -183,7 +156,6 @@ const SpotlightStepCard = ({
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => onRemove(step.id)}
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             >
                                 <Trash2 className="h-4 w-4" />
                             </Button>
@@ -452,8 +424,7 @@ export function ToolStepGallery({
     isProcessingFiles,
     totalFileSize,
     filePayloads,
-    stepSelfHealingEnabled,
-    onStepSelfHealingChange
+    stepSelfHealingEnabled
 }: ToolStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
     const [windowWidth, setWindowWidth] = useState(1200);
@@ -748,37 +719,50 @@ export function ToolStepGallery({
     }, [showStepOutputSignal, focusStepId]);
 
     return (
-        <div className="space-y-6">
-            <div className="space-y-3">
+        <div className="flex flex-col h-full">
+            {/* Fixed header section */}
+            <div className="flex-shrink-0 space-y-3 mb-6">
                 <div className="flex items-center justify-center gap-3 flex-wrap">
                     <div className="flex items-center gap-3 min-w-0 w-full">
                         {(onToolIdChange || typeof toolId !== 'undefined') && (
-                            <div className="flex w-full items-center justify-between gap-3">
-                                <div className="flex items-center gap-3 px-3 py-1.5 bg-muted/50 rounded-md border h-[36px]">
-                                    <span className="text-sm text-muted-foreground">Tool ID:</span>
-                                    <Input
-                                        key={isEditingToolId ? 'editing' : localToolId}
-                                        ref={toolIdInputRef}
-                                        defaultValue={localToolId}
-                                        onFocus={() => { setIsEditingToolId(true); liveToolIdRef.current = toolIdInputRef.current?.value ?? localToolId; }}
-                                        onChange={(e) => { liveToolIdRef.current = e.target.value; }}
-                                        onBlur={commitToolIdIfChanged}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                commitToolIdIfChanged();
-                                            } else if (e.key === 'Escape') {
-                                                if (toolIdInputRef.current) {
-                                                    toolIdInputRef.current.value = toolId ?? '';
+                            <div className="flex w-full items-center justify-between gap-3 mb-2">
+                                <div className="flex items-center gap-3 flex-1">
+                                    {isEditingToolId ? (
+                                        <input
+                                            key="editing"
+                                            ref={toolIdInputRef}
+                                            defaultValue={localToolId}
+                                            onChange={(e) => { liveToolIdRef.current = e.target.value; }}
+                                            onBlur={commitToolIdIfChanged}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    commitToolIdIfChanged();
+                                                } else if (e.key === 'Escape') {
+                                                    if (toolIdInputRef.current) {
+                                                        toolIdInputRef.current.value = toolId ?? '';
+                                                    }
+                                                    liveToolIdRef.current = toolId ?? '';
+                                                    setLocalToolId(toolId ?? '');
+                                                    setIsEditingToolId(false);
                                                 }
-                                                liveToolIdRef.current = toolId ?? '';
-                                                setLocalToolId(toolId ?? '');
-                                                setIsEditingToolId(false);
-                                            }
-                                        }}
-                                        className="h-5 font-mono text-sm w-[200px] md:w-[280px] border-0 bg-transparent p-0 focus:ring-0"
-                                        readOnly={readOnly || !onToolIdChange}
-                                    />
+                                            }}
+                                            className="text-2xl font-bold border-0 bg-transparent p-0 h-auto focus:ring-0 focus:outline-none min-w-0 flex-1 w-full"
+                                            autoFocus
+                                        />
+                                    ) : (
+                                        <h1 
+                                            className="text-2xl font-bold cursor-pointer hover:text-primary/80 transition-colors"
+                                            onClick={() => {
+                                                if (!readOnly && onToolIdChange) {
+                                                    setIsEditingToolId(true);
+                                                    liveToolIdRef.current = localToolId;
+                                                }
+                                            }}
+                                        >
+                                            {localToolId || 'Untitled Tool'}
+                                        </h1>
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {headerActions ?? null}
@@ -796,7 +780,11 @@ export function ToolStepGallery({
                         />
                     </div>
                 )}
+            </div>
 
+            {/* Scrollable content section */}
+            <div className="flex-1 overflow-y-auto pr-4" style={{ scrollbarGutter: 'stable' }}>
+                <div className="space-y-6">
                 <div className="flex items-center gap-0">
                     <Button
                         variant="outline"
@@ -1021,10 +1009,10 @@ export function ToolStepGallery({
                                 showOutputSignal={showStepOutputSignal}
                                 onConfigEditingChange={setIsConfiguratorEditing}
                                 selfHealingEnabled={stepSelfHealingEnabled}
-                                onSelfHealingChange={onStepSelfHealingChange}
                             />
                         )
                     )}
+                </div>
                 </div>
             </div>
 

@@ -356,29 +356,28 @@ html.dark {
 
   .btn-success,
   .btn[variant="success"] {
-    background-color: #22c55e !important;
-    color: #fff !important;
+    background-color: #FFA500 !important;
+    color: #000 !important;
     border: none !important;
     transition: background 0.2s, color 0.2s;
   }
 
   .btn-success:hover:not(:disabled),
   .btn[variant="success"]:hover:not(:disabled) {
-    background-color: #16a34a !important;
-    /* emerald-600 */
-    color: #fff !important;
+    background-color: #FFD700 !important;
+    color: #000 !important;
   }
 
   .dark .btn-success,
   .dark .btn[variant="success"] {
-    background-color: #22c55e !important;
-    color: #fff !important;
+    background-color: #FFA500 !important;
+    color: #000 !important;
   }
 
   .dark .btn-success:hover:not(:disabled),
   .dark .btn[variant="success"]:hover:not(:disabled) {
-    background-color: #16a34a !important;
-    color: #fff !important;
+    background-color: #FFD700 !important;
+    color: #000 !important;
   }
 }
 
@@ -405,8 +404,7 @@ html.dark {
 
 .switch-on,
 .custom-switch[data-state="checked"] {
-  background-color: #22c55e !important;
-  /* ON: #22c55e (emerald-500) */
+  background-color: #FFA500 !important;
 }
 
 .switch-off,

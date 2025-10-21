@@ -163,7 +163,6 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost"
-                      className="text-destructive"
                       size="icon"
                       onClick={(e) => handleScheduleDelete(e, schedule.id)}>
                       <Trash2 className="h-4 w-4" />

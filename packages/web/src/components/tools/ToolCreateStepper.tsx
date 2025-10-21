@@ -880,7 +880,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-2 mr-2">
                       <Label htmlFor="wcs-selfHealing" className="text-xs flex items-center gap-1">
-                        <span>Self-healing</span>
+                        <span>auto-repair</span>
                       </Label>
                       <div className="flex items-center">
                         <Switch
@@ -890,7 +890,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                           onCheckedChange={setSelfHealingEnabled}
                         />
                         <div className="ml-1 flex items-center">
-                          <HelpTooltip text="Enable self-healing during execution. Slower, but can auto-fix failures in tool steps and transformation code." />
+                          <HelpTooltip text="Enable auto-repair during execution. Slower, but can auto-fix failures in tool steps and transformation code." />
                         </div>
                       </div>
                     </div>

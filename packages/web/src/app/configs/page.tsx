@@ -661,7 +661,6 @@ const ConfigTable = () => {
                             <TooltipTrigger asChild>
                               <Button
                                 variant="ghost"
-                                className="text-destructive"
                                 size="icon"
                                 onClick={(e) => {
                                   e.stopPropagation();

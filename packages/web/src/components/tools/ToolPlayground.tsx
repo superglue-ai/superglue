@@ -5,7 +5,7 @@ import { executeFinalTransform, executeSingleStep, executeToolStepByStep, genera
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput } from "@/src/lib/utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
-import { Loader2, X } from "lucide-react";
+import { Loader2, Play, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -133,7 +133,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(externalSelfHealingEnabled ?? true);
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
   const [isFixingWorkflow, setIsFixingWorkflow] = useState<number | undefined>(undefined);
-  const [stepSelfHealingEnabled, setStepSelfHealingEnabled] = useState(false);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndex] = useState<number | undefined>(undefined);
   const [isStopping, setIsStopping] = useState(false);
   // Single source of truth for stopping across modes (embedded/standalone)
@@ -553,7 +552,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           if (effectiveSelfHealing) {
             toast({
               title: "Tool configuration updated",
-              description: "Self-healing has modified the tool configuration to fix issues.",
+              description: "auto-repair has modified the tool configuration to fix issues.",
             });
           }
         }
@@ -833,12 +832,12 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     <div className="flex items-center gap-2">
       <div className="flex items-center gap-2 mr-2">
         <Label htmlFor="selfHealing-top" className="text-xs flex items-center gap-1">
-          <span>Self-healing</span>
+          <span>auto-repair</span>
         </Label>
         <div className="flex items-center">
           <Switch className="custom-switch" id="selfHealing-top" checked={selfHealingEnabled} onCheckedChange={handleSelfHealingChange} />
           <div className="ml-1 flex items-center">
-            <HelpTooltip text="Enable self-healing during execution. Slower, but can auto-fix failures in tool steps and transformation code." />
+            <HelpTooltip text="Enable auto-repair during execution. Slower, but can auto-fix failures in tool steps and transformation code." />
           </div>
         </div>
       </div>
@@ -858,7 +857,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
           className="h-9 px-4"
         >
-          Test Tool
+          <Play className="h-4 w-4 fill-current" strokeWidth="3px" strokeLinejoin="round" strokeLinecap="round" />
+          Preview
         </Button>
       )}
       <Button
@@ -867,16 +867,16 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         disabled={saving || loading}
         className="h-9 px-5 shadow-md border border-primary/40"
       >
-        {saving ? "Saving Tool..." : "Save Tool"}
+        {saving ? "Publishing..." : "Publish"}
       </Button>
     </div>
   );
 
   return (
-    <div className={embedded ? "w-full" : "p-6 max-w-none w-full"}>
+    <div className={embedded ? "w-full h-full" : "p-6 max-w-none w-full h-screen flex flex-col"}>
       {!embedded && !hideHeader && (
         <>
-          <div className="flex justify-end items-center mb-2">
+          <div className="flex justify-end items-center mb-2 flex-shrink-0">
             <Button
               variant="ghost"
               size="icon"
@@ -887,14 +887,13 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <h1 className="text-2xl font-bold mb-3 flex-shrink-0">Run and Edit Tool</h1>
         </>
       )}
 
-      <div className="w-full overflow-y-auto pr-4" style={{ maxHeight: 'calc(100vh - 140px)', scrollbarGutter: 'stable' }}>
-        <div className="w-full">
-          <div className="space-y-4">
-            <div className={embedded ? "" : "mb-4"}>
+      <div className="w-full flex-1 overflow-hidden">
+        <div className="w-full h-full">
+          <div className="h-full">
+            <div className={embedded ? "h-full" : "h-full"}>
               {loading && steps.length === 0 && !instructions ? (
                 <div className="flex items-center justify-center py-20">
                   <div className="flex flex-col items-center gap-3">
@@ -943,8 +942,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   isProcessingFiles={isProcessingFiles}
                   totalFileSize={totalFileSize}
                   filePayloads={filePayloads}
-                  stepSelfHealingEnabled={stepSelfHealingEnabled}
-                  onStepSelfHealingChange={setStepSelfHealingEnabled}
+                  stepSelfHealingEnabled={selfHealingEnabled}
                 />
               )}
             </div>
