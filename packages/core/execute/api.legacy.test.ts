@@ -1,16 +1,16 @@
 import { ApiConfig, HttpMethod, PaginationType, SelfHealingMode } from '@superglue/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
-import { isSelfHealingEnabled } from '../../utils/tools.js';
-import * as api from './api.js';
+import { isSelfHealingEnabled } from '../utils/tools.js';
 import { callEndpointLegacyImplementation as callEndpoint, convertBasicAuthToBase64 } from './api.legacy.js';
+import * as api from './http.js';
 
 vi.mock('axios');
 vi.mock('openai');
 vi.mock('../integrations/integration-manager.js');
 vi.mock('../llm/language-model.js');
 vi.mock('./logs.js');
-vi.mock('./api.js', async () => {
-  const actual = await vi.importActual('./api.js');
+vi.mock('./http.js', async () => {
+  const actual = await vi.importActual('./http.js');
   return {
     ...(actual as Object),
     callAxios: vi.fn()

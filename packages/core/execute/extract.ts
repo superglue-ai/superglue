@@ -9,7 +9,7 @@ import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { decompressData, parseFile } from "../utils/file.js";
 import { logMessage } from "../utils/logs.js";
 import { composeUrl, replaceVariables } from "../utils/tools.js";
-import { callAxios } from "./api/api.js";
+import { callAxios } from "./http.js";
 
 
 export async function callExtract(extract: ExtractConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata?: Metadata): Promise<any> {

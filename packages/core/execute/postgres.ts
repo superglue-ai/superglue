@@ -1,11 +1,54 @@
-import { ApiConfig, RequestOptions } from "@superglue/client";
+import { RequestOptions } from "@superglue/client";
+import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { Pool, PoolConfig } from 'pg';
-import { server_defaults } from "../../default.js";
-import { parseJSON } from "../../utils/json-parser.js";
-import { composeUrl, replaceVariables } from "../../utils/tools.js";
+import { server_defaults } from "../default.js";
+import { replaceVariables } from "../utils/tools.js";
 
+export interface PostgresExecutorInput {
+    axiosConfig: AxiosRequestConfig;
+    inputData: Record<string, any>;
+    credentials: Record<string, any>;
+    options: RequestOptions;
+}
 
-// Pool cache management
+export interface PostgresExecutorResult {
+    data: any;
+    response: AxiosResponse;
+}
+
+export async function executePostgres(input: PostgresExecutorInput): Promise<PostgresExecutorResult> {
+    const { axiosConfig, inputData, credentials, options } = input;
+    
+    const url = new URL(axiosConfig.url || '');
+    const connectionString = `${url.protocol}//${url.host}${url.pathname}`;
+    
+    const body = typeof axiosConfig.data === 'string' 
+        ? JSON.parse(axiosConfig.data) 
+        : axiosConfig.data || {};
+    
+    const query = body.query;
+    const params = body.params || body.values;
+    
+    const data = await callPostgres({
+        connectionString,
+        query,
+        params,
+        credentials,
+        options
+    });
+    
+    return {
+        data,
+        response: {
+            data,
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            config: axiosConfig as any
+        } as AxiosResponse
+    };
+}
+
 interface PoolCacheEntry {
   pool: Pool;
   lastUsed: number;
@@ -14,7 +57,6 @@ interface PoolCacheEntry {
 
 const poolCache = new Map<string, PoolCacheEntry>();
 
-// Start cleanup interval
 let cleanupInterval: NodeJS.Timeout | null = null;
 
 function startCleanupInterval() {
@@ -29,7 +71,6 @@ function startCleanupInterval() {
       }
     }, server_defaults.POSTGRES.POOL_CLEANUP_INTERVAL);
     
-    // Prevent the interval from keeping the process alive
     if (cleanupInterval.unref) {
       cleanupInterval.unref();
     }
@@ -47,15 +88,13 @@ function getOrCreatePool(connectionString: string, poolConfig: PoolConfig): Pool
   
   const pool = new Pool({
     ...poolConfig,
-    max: 10, // Maximum number of clients in the pool
-    idleTimeoutMillis: server_defaults.POSTGRES.DEFAULT_TIMEOUT, // How long a client can sit idle before being removed
-    connectionTimeoutMillis: 5000, // How long to wait for a connection
+    max: 10,
+    idleTimeoutMillis: server_defaults.POSTGRES.DEFAULT_TIMEOUT,
+    connectionTimeoutMillis: 5000,
   });
   
-  // Add error handler to prevent unhandled errors
   pool.on('error', (err) => {
     console.error('Unexpected pool error:', err);
-    // Remove from cache if pool has an error
     poolCache.delete(cacheKey);
   });
   
@@ -65,13 +104,11 @@ function getOrCreatePool(connectionString: string, poolConfig: PoolConfig): Pool
     connectionString
   });
   
-  // Start cleanup interval if not already running
   startCleanupInterval();
   
   return pool;
 }
 
-// Graceful shutdown function
 export async function closeAllPools(): Promise<void> {
   if (cleanupInterval) {
     clearInterval(cleanupInterval);
@@ -87,55 +124,44 @@ export async function closeAllPools(): Promise<void> {
 }
 
 function sanitizeDatabaseName(connectionString: string): string {
-  // First remove any trailing slashes
   let cleanUrl = connectionString.replace(/\/+$/, '');
 
-  // Now find the last '/' to get the database name
   const lastSlashIndex = cleanUrl.lastIndexOf('/');
   if (lastSlashIndex === -1) return cleanUrl;
 
   const baseUrl = cleanUrl.substring(0, lastSlashIndex + 1);
   const dbName = cleanUrl.substring(lastSlashIndex + 1);
 
-  // Clean the database name of invalid characters
   const cleanDbName = dbName
-    .replace(/[^a-zA-Z0-9_$-]/g, '') // Keep only valid chars
-    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+    .replace(/[^a-zA-Z0-9_$-]/g, '')
+    .replace(/^-+|-+$/g, '');
 
   return baseUrl + cleanDbName;
 }
 
-export async function callPostgres({endpoint, payload, credentials, options}: {endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions}): Promise<any> {
-  const requestVars = { ...payload, ...credentials };
-  let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
-  connectionString = sanitizeDatabaseName(connectionString);
+export async function callPostgres({connectionString, query, params, credentials, options}: {connectionString: string, query: string, params?: any[], credentials: Record<string, any>, options: RequestOptions}): Promise<any> {
+  const requestVars = credentials;
+  let finalConnectionString = await replaceVariables(connectionString, requestVars);
+  finalConnectionString = sanitizeDatabaseName(finalConnectionString);
   
-  let bodyParsed: any;
-  try {
-    bodyParsed = parseJSON(await replaceVariables(endpoint.body, requestVars));
-  } catch (error) {
-    throw new Error(`Invalid JSON in body: ${error.message} for body: ${JSON.stringify(endpoint.body)}`);
-  }
-  const queryText = bodyParsed.query;
-  const queryParams = bodyParsed.params || bodyParsed.values; // Support both 'params' and 'values' keys
+  const queryText = await replaceVariables(query, requestVars);
+  const queryParams = params
 
   const poolConfig: PoolConfig = {
-    connectionString,
+    connectionString: finalConnectionString,
     statement_timeout: options?.timeout || server_defaults.POSTGRES.DEFAULT_TIMEOUT,
-    ssl: connectionString.includes('sslmode=') || connectionString.includes('localhost') === false 
+    ssl: finalConnectionString.includes('sslmode=') || finalConnectionString.includes('localhost') === false 
       ? { rejectUnauthorized: false }
       : false
   };
 
-  // Get or create pool from cache
-  const pool = getOrCreatePool(connectionString, poolConfig);
+  const pool = getOrCreatePool(finalConnectionString, poolConfig);
   let attempts = 0;
   const maxRetries = options?.retries || server_defaults.POSTGRES.DEFAULT_RETRIES;
 
   do {
     try {
       
-      // Use parameterized query if params are provided, otherwise fall back to simple query
       const result = queryParams 
         ? await pool.query(queryText, queryParams)
         : await pool.query(queryText);
@@ -159,3 +185,4 @@ export async function callPostgres({endpoint, payload, credentials, options}: {e
     }
   } while (attempts <= maxRetries);
 }
+

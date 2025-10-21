@@ -1,5 +1,5 @@
-import type { SystemModelMessage, UserModelMessage, AssistantModelMessage, ToolModelMessage } from "ai";
-import { ToolCall, ToolCallResult, ToolDefinition } from "../execute/tools.js";
+import type { AssistantModelMessage, SystemModelMessage, ToolModelMessage, UserModelMessage } from "ai";
+import { ToolCall, ToolCallResult, ToolDefinition } from "../generate/tools.js";
 import { AiSdkModel } from "./ai-sdk-model.js";
 
 export type LLMMessage = SystemModelMessage | UserModelMessage | AssistantModelMessage | ToolModelMessage;

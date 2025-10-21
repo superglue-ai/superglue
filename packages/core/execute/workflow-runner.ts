@@ -7,7 +7,7 @@ import { isSelfHealingEnabled, transformAndValidateSchema } from "../utils/tools
 import { evaluateTransform, generateTransformCode } from "../utils/transform.js";
 import { selectStrategy } from "./workflow-strategies.js";
 
-export class WorkflowExecutor implements Workflow {
+export class WorkflowRunner implements Workflow {
   public id: string;
   public steps: ExecutionStep[];
   public finalTransform?: string;
@@ -200,8 +200,8 @@ export class WorkflowExecutor implements Workflow {
         throw new Error("Each step must have an ID");
       }
 
-      if (!step.apiConfig) {
-        throw new Error("Each step must have an API config");
+      if (!step.apiConfig && !step.codeConfig) {
+        throw new Error("Each step must have an API config or code config");
       }
     }
 

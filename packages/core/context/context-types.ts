@@ -1,7 +1,4 @@
-import { Integration, JSONSchema } from "@superglue/client";
-import { ExtractConfig } from "@superglue/client";
-import { ExecutionStep } from "@superglue/client";
-import { ApiConfig } from "@superglue/client";
+import { ExecutionStep, ExtractConfig, Integration, JSONSchema } from "@superglue/client";
 
 export type ObjectContextOptions = {
     characterBudget: number;
@@ -62,7 +59,7 @@ export type LoopSelectorContextOptions = {
 
 export type EvaluateStepResponseContextInput = {
     data: any;
-    endpoint: ApiConfig;
+    stepConfig: string;
     docSearchResultsForStepInstruction: string;
 };
 

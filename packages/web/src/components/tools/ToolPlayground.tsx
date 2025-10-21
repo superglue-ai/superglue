@@ -1,8 +1,9 @@
 "use client";
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
+import { useFileUpload } from '@/src/hooks/use-file-upload';
 import { executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
-import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput } from "@/src/lib/utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
 import { Loader2, X } from "lucide-react";
@@ -89,18 +90,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   );
   const [payload, setPayload] = useState<string>(initialPayload || '{}');
 
-  // File upload state - use parent's if provided (embedded), otherwise use local
-  const [localUploadedFiles, setLocalUploadedFiles] = useState<UploadedFileInfo[]>([]);
-  const [localTotalFileSize, setLocalTotalFileSize] = useState(0);
-  const [localIsProcessingFiles, setLocalIsProcessingFiles] = useState(false);
-  const [localFilePayloads, setLocalFilePayloads] = useState<Record<string, any>>({});
-
-  // Use parent state if available, otherwise use local state
-  const uploadedFiles = parentUploadedFiles || localUploadedFiles;
-  const totalFileSize = parentTotalFileSize ?? localTotalFileSize;
-  const isProcessingFiles = parentIsProcessingFiles ?? localIsProcessingFiles;
-  const filePayloads = parentFilePayloads || localFilePayloads;
-
   useEffect(() => {
     if (initialPayload !== undefined) {
       setPayload(initialPayload);
@@ -181,11 +170,18 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       id: toolId,
       steps: steps.map((step: ExecutionStep) => ({
         ...step,
-        apiConfig: {
-          id: step.apiConfig.id || step.id,
-          ...step.apiConfig,
-          pagination: step.apiConfig.pagination || null
-        }
+        ...(step.apiConfig ? {
+          apiConfig: {
+            id: step.apiConfig.id || step.id,
+            ...step.apiConfig,
+            pagination: step.apiConfig.pagination || null
+          }
+        } : {}),
+        ...(step.codeConfig ? {
+          codeConfig: {
+            ...step.codeConfig
+          }
+        } : {})
       })),
       responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
       inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
@@ -199,100 +195,30 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     apiKey: config.superglueApiKey,
   }), [config.superglueEndpoint, config.superglueApiKey]);
 
+  // File upload hook for local (non-embedded) mode
+  const localFileUpload = useFileUpload(client);
+
+  // Use parent state if available (embedded), otherwise use local state
+  const uploadedFiles = parentUploadedFiles || localFileUpload.uploadedFiles;
+  const totalFileSize = parentTotalFileSize ?? localFileUpload.totalFileSize;
+  const isProcessingFiles = parentIsProcessingFiles ?? localFileUpload.isProcessingFiles;
+  const filePayloads = parentFilePayloads || localFileUpload.filePayloads;
+
   // Unified file upload handlers
   const handleFilesUpload = async (files: File[]) => {
-    // Use parent handler if available, otherwise handle locally
+    // Use parent handler if available, otherwise use local hook
     if (parentOnFilesUpload) {
       return parentOnFilesUpload(files);
     }
-
-    // Local handling for non-embedded mode
-    setLocalIsProcessingFiles(true);
-
-    try {
-      const newSize = files.reduce((sum, f) => sum + f.size, 0);
-      if (localTotalFileSize + newSize > MAX_TOTAL_FILE_SIZE) {
-        toast({
-          title: 'Size limit exceeded',
-          description: `Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE)}`,
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      const existingKeys = localUploadedFiles.map(f => f.key);
-      const newFiles: UploadedFileInfo[] = [];
-
-      for (const file of files) {
-        try {
-          const baseKey = sanitizeFileName(file.name);
-          const key = generateUniqueKey(baseKey, [...existingKeys, ...newFiles.map(f => f.key)]);
-
-          const fileInfo: UploadedFileInfo = {
-            name: file.name,
-            size: file.size,
-            key,
-            status: 'processing'
-          };
-          newFiles.push(fileInfo);
-          setLocalUploadedFiles(prev => [...prev, fileInfo]);
-
-          const extractResult = await client.extract({
-            file: file
-          });
-
-          if (!extractResult.success) {
-            throw new Error(extractResult.error || 'Failed to extract data');
-          }
-          const parsedData = extractResult.data;
-          setLocalFilePayloads(prev => ({ ...prev, [key]: parsedData }));
-          existingKeys.push(key);
-
-          setLocalUploadedFiles(prev => prev.map(f =>
-            f.key === key ? { ...f, status: 'ready' } : f
-          ));
-
-        } catch (error: any) {
-          const fileInfo = newFiles.find(f => f.name === file.name);
-          if (fileInfo) {
-            setLocalUploadedFiles(prev => prev.map(f =>
-              f.key === fileInfo.key
-                ? { ...f, status: 'error', error: error.message }
-                : f
-            ));
-          }
-
-          toast({
-            title: 'File processing failed',
-            description: `Failed to parse ${file.name}: ${error.message}`,
-            variant: 'destructive'
-          });
-        }
-      }
-      setLocalTotalFileSize(prev => prev + newSize);
-
-    } finally {
-      setLocalIsProcessingFiles(false);
-    }
+    return localFileUpload.handleFilesUpload(files);
   };
 
   const handleFileRemove = (key: string) => {
-    // Use parent handler if available
+    // Use parent handler if available, otherwise use local hook
     if (parentOnFileRemove) {
       return parentOnFileRemove(key);
     }
-
-    // Local handling
-    const fileToRemove = localUploadedFiles.find(f => f.key === key);
-    if (!fileToRemove) return;
-
-    setLocalFilePayloads(prev => {
-      const newPayloads = { ...prev };
-      delete newPayloads[key];
-      return newPayloads;
-    });
-    setLocalUploadedFiles(prev => prev.filter(f => f.key !== key));
-    setLocalTotalFileSize(prev => Math.max(0, prev - fileToRemove.size));
+    return localFileUpload.handleFileRemove(key);
   };
 
 
@@ -326,7 +252,13 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         throw new Error(`Tool with ID "${idToLoad}" not found.`);
       }
       setToolId(tool.id || '');
-      setSteps(tool?.steps?.map(step => ({ ...step, apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } })) || []);
+      setSteps(tool?.steps?.map(step => {
+        return {
+          ...step,
+          ...(step.apiConfig ? { apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } } : {}),
+          ...(step.codeConfig ? { codeConfig: { ...step.codeConfig } } : {})
+        };
+      }) || []);
       setFinalTransform(tool.finalTransform || `(sourceData) => {
         return {
           result: sourceData
@@ -368,10 +300,13 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   useEffect(() => {
     if (initialTool && initialTool.id !== lastToolId) {
       setToolId(initialTool.id || '');
-      setSteps(initialTool.steps?.map(step => ({
-        ...step,
-        apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id }
-      })) || []);
+      setSteps(initialTool.steps?.map(step => {
+        return {
+          ...step,
+          ...(step.apiConfig ? { apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } } : {}),
+          ...(step.codeConfig ? { codeConfig: { ...step.codeConfig } } : {})
+        };
+      }) || []);
       setFinalTransform(initialTool.finalTransform || `(sourceData) => {
   return {
     result: sourceData
@@ -432,11 +367,18 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         // Save the self-healed steps if they exist (from a successful run with self-healing enabled)
         steps: stepsToSave.map((step: ExecutionStep) => ({
           ...step,
-          apiConfig: {
-            id: step.apiConfig.id || step.id,
-            ...step.apiConfig,
-            pagination: step.apiConfig.pagination || null
-          }
+          ...(step.apiConfig ? {
+            apiConfig: {
+              id: step.apiConfig.id || step.id,
+              ...step.apiConfig,
+              pagination: step.apiConfig.pagination || null
+            }
+          } : {}),
+          ...(step.codeConfig ? {
+            codeConfig: {
+              ...step.codeConfig
+            }
+          } : {})
         })),
         // Only save responseSchema if it's explicitly enabled (non-empty string)
         responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
@@ -660,7 +602,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     setSteps(prevSteps =>
       prevSteps.map(step => (step.id === stepId ? {
         ...updatedStep,
-        apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id }
+        ...(updatedStep.apiConfig ? { apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id } } : {}),
+        ...(updatedStep.codeConfig ? { codeConfig: { ...updatedStep.codeConfig } } : {})
       } : step))
     );
 
@@ -680,6 +623,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         loopMaxIters: s.loopMaxIters,
         integrationId: s.integrationId,
         apiConfig: s.apiConfig,
+        codeConfig: s.codeConfig,
       };
       return JSON.stringify(exec);
     } catch {
@@ -730,7 +674,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         idx,
         JSON.parse(payload || '{}'),
         stepResultsMap,  // Pass accumulated results
-        selfHealing,
+        selfHealing
       );
       const sid = steps[idx].id;
       const normalized = computeStepOutput(single);
@@ -764,7 +708,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setIsExecutingStep(undefined);
     }
   };
-
   const handleExecuteStep = async (idx: number) => {
     await executeStepByIdx(idx, false);
   };
@@ -772,6 +715,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const handleFixStep = async (idx: number) => {
     await executeStepByIdx(idx, true);
   };
+
 
   const handleExecuteTransform = async (schemaStr: string, transformStr: string) => {
     try {
@@ -891,7 +835,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         </>
       )}
 
-      <div className="w-full overflow-y-auto pr-4" style={{ maxHeight: 'calc(100vh - 140px)', scrollbarGutter: 'stable' }}>
+      <div className="w-full overflow-y-auto pr-4">
         <div className="w-full">
           <div className="space-y-4">
             <div className={embedded ? "" : "mb-4"}>

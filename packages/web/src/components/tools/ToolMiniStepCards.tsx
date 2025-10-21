@@ -205,7 +205,7 @@ export const FinalResultsCard = ({ result }: { result: any }) => {
     );
 };
 
-export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = false, minHeight = '200px', maxHeight = '350px', showCopy = true, resizable = false, isTransformEditor = false, autoFormatOnMount = true }: { value: string; onChange?: (value: string) => void; readOnly?: boolean; minHeight?: string; maxHeight?: string; showCopy?: boolean; resizable?: boolean; isTransformEditor?: boolean; autoFormatOnMount?: boolean; }) => {
+export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = false, minHeight = '200px', maxHeight = '100%', showCopy = true, resizable = false, isTransformEditor = false, autoFormatOnMount = true }: { value: string; onChange?: (value: string) => void; readOnly?: boolean; minHeight?: string; maxHeight?: string; showCopy?: boolean; resizable?: boolean; isTransformEditor?: boolean; autoFormatOnMount?: boolean; }) => {
     const [currentHeight, setCurrentHeight] = useState(maxHeight);
     const effectiveHeight = resizable ? currentHeight : maxHeight;
     const [hasFormatted, setHasFormatted] = useState(false);
@@ -274,13 +274,13 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
                 </div>
             </div>
             <style>{`
-                .js-code-editor .token.property { color: rgb(156, 163, 175); }
-                .js-code-editor .token.string { color: rgb(134, 239, 172); }
-                .js-code-editor .token.function { color: rgb(147, 197, 253); }
-                .js-code-editor .token.boolean, .js-code-editor .token.number { color: rgb(251, 191, 36); }
-                .js-code-editor .token.punctuation, .js-code-editor .token.operator { color: rgb(148, 163, 184); }
-                .js-code-editor .token.keyword { color: rgb(244, 114, 182); }
-                .js-code-editor .token.comment { color: rgb(100, 116, 139); font-style: italic; }
+                .js-code-editor .token.property { color: rgb(96, 165, 250); }
+                .js-code-editor .token.string { color: rgb(19, 161, 71); }
+                .js-code-editor .token.function { color: rgb(59, 130, 246); }
+                .js-code-editor .token.boolean, .js-code-editor .token.number { color: rgb(192, 125, 9); }
+                .js-code-editor .token.punctuation, .js-code-editor .token.operator { color: rgb(168, 179, 192); }
+                .js-code-editor .token.keyword { color: rgb(236, 72, 153); }
+                .js-code-editor .token.comment { color: rgb(107, 114, 128); font-style: italic; }
             `}</style>
         </div>
     );

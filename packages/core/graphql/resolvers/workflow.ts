@@ -1,15 +1,14 @@
 import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
 import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
-import { WorkflowExecutor } from "../../execute/workflow-executor.js";
+import { WorkflowRunner } from "../../execute/workflow-runner.js";
 import { Context, Metadata } from '../types.js';
 
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { WorkflowBuilder } from "../../build/workflow-builder.js";
+import { WorkflowBuilder } from "../../generate/workflow.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { parseJSON } from "../../utils/json-parser.js";
 import { logMessage } from "../../utils/logs.js";
-import { replaceVariables } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
@@ -102,25 +101,13 @@ export const executeWorkflowResolver = async (
       await Promise.all(integrationManagers.map(i => i.refreshTokenIfNeeded()));
       const integrations = await Promise.all(integrationManagers.map(i => i.getIntegration()));
       const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrations);
-
-      // Process args.credentials with variable replacement
-      const processedCredentials = await Promise.all(
-        Object.entries(args.credentials || {}).map(async ([key, value]) => {
-          return {
-            [key]: await replaceVariables(String(value), integrationCreds)
-          };
-        })
-      );
-
-      // Merge all credential objects
-      mergedCredentials = Object.assign(
-        {},
-        integrationCreds,
-        ...processedCredentials
-      );
+      mergedCredentials = {
+        ...(integrationCreds || {}),
+        ...mergedCredentials
+      };
     }
 
-    const executor = new WorkflowExecutor(workflow, metadata, integrationManagers);
+    const executor = new WorkflowRunner(workflow, metadata, integrationManagers);
     const result = await executor.execute(args.payload, mergedCredentials, args.options);
 
     // Save run to datastore
@@ -190,7 +177,7 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
 
     // for each step, make sure that the apiConfig has an id. if not, set it to the step id
     workflow.steps.forEach((step: any) => {
-      if (!step.apiConfig.id) {
+      if (step.apiConfig && !step.apiConfig.id) {
         step.apiConfig.id = step.id;
       }
     });
@@ -227,7 +214,7 @@ export const getWorkflowResolver = async (_: unknown, { id }: { id: string }, co
     }
     // for each step, make sure that the apiConfig has an id. if not, set it to the step id
     workflow.steps.forEach((step: any) => {
-      if (!step.apiConfig.id) {
+      if (step.apiConfig && !step.apiConfig.id) {
         step.apiConfig.id = step.id;
       }
     });

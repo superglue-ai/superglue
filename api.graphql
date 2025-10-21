@@ -85,6 +85,7 @@ type RunResult {
 
 type Pagination {
   type: PaginationType!
+  handler: String
   pageSize: String
   cursorPath: String
   stopCondition: String
@@ -178,13 +179,6 @@ enum UpsertMode {
   CREATE
   UPDATE
   UPSERT
-}
-
-input PaginationInput {
-  type: PaginationType!
-  pageSize: String
-  cursorPath: String
-  stopCondition: String
 }
 
 input ApiInput {
@@ -322,9 +316,16 @@ type TenantInfo {
   emailEntrySkipped: Boolean!
 }
 
+type CodeConfig {
+  stepInstruction: String
+  code: String!
+  pagination: Pagination
+}
+
 type ExecutionStep {
   id: String!
-  apiConfig: ApiConfig!
+  apiConfig: ApiConfig
+  codeConfig: CodeConfig
   integrationId: ID
   executionMode: String # DIRECT | LOOP
   loopSelector: JSONata
@@ -333,15 +334,30 @@ type ExecutionStep {
   responseMapping: JSONata
 }
 
+input CodeConfigInput {
+  stepInstruction: String
+  code: String!
+  pagination: PaginationInput
+}
+
 input ExecutionStepInput {
   id: String!
-  apiConfig: ApiInput!
+  apiConfig: ApiInput
+  codeConfig: CodeConfigInput
   integrationId: ID
   executionMode: String # DIRECT | LOOP
   loopSelector: JSONata
   loopMaxIters: Int
   inputMapping: JSONata
   responseMapping: JSONata
+}
+
+input PaginationInput {
+  type: PaginationType!
+  pageSize: String
+  cursorPath: String
+  stopCondition: String
+  handler: String
 }
 
 type Workflow implements BaseConfig {
@@ -475,8 +491,15 @@ type Mutation {
   ): Integration!
   deleteIntegration(id: ID!): Boolean!
 
-  cacheOauthClientCredentials(clientCredentialsUid: String!, clientId: String!, clientSecret: String!): Boolean!
-  getOAuthClientCredentials(templateId: ID, clientCredentialsUid: String): OAuthClientCredentials!
+  cacheOauthClientCredentials(
+    clientCredentialsUid: String!
+    clientId: String!
+    clientSecret: String!
+  ): Boolean!
+  getOAuthClientCredentials(
+    templateId: ID
+    clientCredentialsUid: String
+  ): OAuthClientCredentials!
 }
 
 type Subscription {

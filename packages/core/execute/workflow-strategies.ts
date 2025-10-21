@@ -1,14 +1,13 @@
-import type { ApiConfig, ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
+import type { ApiConfig, CodeConfig, ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
 import { Integration, Metadata } from "@superglue/shared";
 import { getLoopSelectorContext } from "../context/context-builders.js";
-import { LoopSelectorContextInput, LoopSelectorContextOptions } from "../context/context-types.js";
 import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel } from "../llm/language-model.js";
 import { logMessage } from "../utils/logs.js";
 import { applyJsonata, flattenObject, isSelfHealingEnabled, transformAndValidateSchema } from "../utils/tools.js";
 import { generateTransformCode } from "../utils/transform.js";
-import { executeStep } from "./workflow-step.js";
+import { executeStep } from "./workflow-step-runner.js";
 
 export interface ExecutionStrategy {
   execute(
@@ -45,7 +44,8 @@ const directStrategy: ExecutionStrategy = {
     try {
       const apiResponse = await executeStep({
         endpoint: step.apiConfig,
-        payload,
+        codeConfig: step.codeConfig,
+        inputData: payload,
         credentials,
         options,
         metadata,
@@ -95,9 +95,9 @@ const loopStrategy: ExecutionStrategy = {
         if (!isSelfHealingEnabled(options, "api")) {
           throw new Error(`Loop selector for '${step.id}' did not return an array. Check the loop selector code or enable self-healing and re-execute to regenerate automatically.`);
         }
-        logMessage("error", `Loop selector for '${step.id}' did not return an array. Regenerating loop selector.`, metadata);
-
-        const loopPrompt = getLoopSelectorContext( { step: step, payload: payload, instruction: step.apiConfig.instruction }, { characterBudget: LanguageModel.contextLength / 10 });
+        logMessage("warn", `Loop selector for '${step.id}' did not return an array. Regenerating loop selector.`, metadata);
+        const instruction = step.codeConfig ? step.codeConfig.stepInstruction : step.apiConfig?.instruction;
+        const loopPrompt = getLoopSelectorContext( { step, payload, instruction }, { characterBudget: LanguageModel.contextLength / 10 });
         const arraySchema = { type: "array", description: "Array of items to iterate over" };
         const transformResult = await generateTransformCode(arraySchema, payload, loopPrompt, metadata);
 
@@ -113,7 +113,8 @@ const loopStrategy: ExecutionStrategy = {
       loopItems = loopItems.slice(0, step.loopMaxIters || server_defaults.DEFAULT_LOOP_MAX_ITERS);
 
       const stepResults: WorkflowStepResult[] = [];
-      let successfulConfig: ApiConfig | null = null;
+      let successfulApiConfig: ApiConfig | null = null;
+      let successfulCodeConfig: CodeConfig | null = null;
 
       for (let i = 0; i < loopItems.length; i++) {
         const currentItem = loopItems[i] || "";
@@ -127,8 +128,9 @@ const loopStrategy: ExecutionStrategy = {
 
         try {
           const apiResponse = await executeStep({
-            endpoint: successfulConfig || step.apiConfig,
-            payload: loopPayload,
+            endpoint: successfulApiConfig || step.apiConfig,
+            codeConfig: successfulCodeConfig || step.codeConfig,
+            inputData: loopPayload,
             credentials,
             options: {
               ...options,
@@ -139,9 +141,15 @@ const loopStrategy: ExecutionStrategy = {
           });
 
           if (apiResponse.endpoint) {
-            successfulConfig = apiResponse.endpoint;
-            if (successfulConfig !== step.apiConfig) {
+            successfulApiConfig = apiResponse.endpoint;
+            if (successfulApiConfig !== step.apiConfig) {
               logMessage("debug", `Loop iteration ${i + 1} updated configuration`, metadata);
+            }
+          }
+          if (apiResponse.codeConfig) {
+            successfulCodeConfig = apiResponse.codeConfig;
+            if (successfulCodeConfig !== step.codeConfig) {
+              logMessage("debug", `Loop iteration ${i + 1} updated code configuration`, metadata);
             }
           }
 
