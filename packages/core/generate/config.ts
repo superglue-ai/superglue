@@ -2,11 +2,12 @@ import type { ApiConfig, CodeConfig } from "@superglue/client";
 import { Message } from "@superglue/shared";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { getObjectContext } from "../context/context-builders.js";
 import { SELF_HEALING_CODE_CONFIG_AGENT_PROMPT } from "../context/context-prompts.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel } from "../llm/language-model.js";
 import { parseJSON } from "../utils/json-parser.js";
-import { composeUrl, sample } from "../utils/tools.js";
+import { composeUrl } from "../utils/tools.js";
 import { BaseToolContext, ToolDefinition, ToolImplementation } from "./tools.js";
 
 export interface ConfigGenerationContext extends BaseToolContext {
@@ -39,14 +40,12 @@ export const generateConfigImplementation: ToolImplementation<ConfigGenerationCo
 
     if (messages.length === 0) {
         const fullDocs = await integrationManager?.getDocumentation();
+        const instruction = codeConfig?.stepInstruction || codeConfig?.instruction || 'Execute API call';
         const documentation = fullDocs?.content?.length < LanguageModel.contextLength / 4 ?
-            fullDocs?.content :
-            await integrationManager?.searchDocumentation(codeConfig?.stepInstruction || codeConfig?.instruction || '');
+          fullDocs?.content :
+          await integrationManager?.searchDocumentation(instruction);  
         
-        let payloadString = JSON.stringify(inputData || {});
-        if (payloadString.length > LanguageModel.contextLength / 10) {
-            payloadString = JSON.stringify(sample(inputData || {}, 5)).slice(0, LanguageModel.contextLength / 10);
-        }
+        let inputString = getObjectContext(inputData, { include: { schema: true, preview: true, samples: false }, characterBudget: LanguageModel.contextLength / 10 });
 
         const integration = await integrationManager?.getIntegration();
         const baseUrl = integration ? composeUrl(integration.urlHost, integration.urlPath) : '';
@@ -54,13 +53,20 @@ export const generateConfigImplementation: ToolImplementation<ConfigGenerationCo
         const userPrompt = `Generate code configuration for the following:
 
 <instruction>
-${codeConfig?.stepInstruction || 'Execute API call'}
+${instruction}
 </instruction>
 
 <user_provided_information>
 ${baseUrl ? `Base URL: ${baseUrl}` : ''}
 ${codeConfig?.code ? `Previous code attempt:\n${codeConfig.code}` : ''}
 ${codeConfig?.pagination ? `Pagination config: ${JSON.stringify(codeConfig.pagination, null, 2)}` : ''}
+${codeConfig.headers ? `Headers: ${JSON.stringify(codeConfig.headers)}` : ""}
+${codeConfig.queryParams ? `Query Params: ${JSON.stringify(codeConfig.queryParams)}` : ""}
+${codeConfig.body ? `Body: ${JSON.stringify(codeConfig.body)}` : ''}
+${codeConfig.authentication ? `Authentication: ${codeConfig.authentication}` : ''}
+${codeConfig.dataPath ? `Data Path: ${codeConfig.dataPath}` : ''}
+${codeConfig.pagination ? `Pagination: ${JSON.stringify(codeConfig.pagination)}` : ''}
+${codeConfig.method ? `Method: ${codeConfig.method}` : ''}
 </user_provided_information>
 
 <integration_instructions>  
@@ -75,12 +81,8 @@ ${documentation || 'No documentation available'}
 ${Object.keys(credentials || {}).map(v => `context.credentials.${v}`).join(", ")}
 </available_credentials>
 
-<available_input_data_fields>
-${Object.keys(inputData || {}).map(v => `context.inputData.${v}`).join(", ")}
-</available_input_data_fields>
-
 <example_input_data_values>
-${payloadString}
+${inputString}
 </example_input_data_values>`;
 
         messages.push({
@@ -149,7 +151,7 @@ Examples:
         }).optional().describe("Optional pagination configuration with unified handler for all pagination logic.")
     }));
 
-    const temperature = Math.min((context.retryCount || 0) * 0.1, 1);
+    const temperature = Math.min((context.retryCount || 0) * 0.1, 0.8);
     const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(
         messages,
         codeConfigSchema,
