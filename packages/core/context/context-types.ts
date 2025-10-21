@@ -1,4 +1,4 @@
-import { Integration, JSONSchema } from "@superglue/client";
+import { Integration, JSONSchema, Workflow } from "@superglue/client";
 import { ExtractConfig } from "@superglue/client";
 import { ExecutionStep } from "@superglue/client";
 import { ApiConfig } from "@superglue/client";
@@ -89,5 +89,27 @@ export type EvaluateTransformContextInput = {
 };
 
 export type EvaluateTransformContextOptions = {
+    characterBudget: number;
+};
+
+export type FindRelevantIntegrationsContextInput = {
+    searchTerms: string;
+    availableIntegrations: Integration[];
+};
+
+export type FindRelevantIntegrationsContextOptions = {
+    characterBudget: number;
+};
+
+export type FindRelevantToolsContextInput = {
+    searchTerms: string;
+    availableTools: Workflow[];
+};
+
+export type FindRelevantToolsContextOptions = {
+    characterBudget: number;
+};
+
+export type BuildToolContextOptions = {
     characterBudget: number;
 };

@@ -18,6 +18,7 @@ import {
   buildWorkflowResolver,
   deleteWorkflowResolver,
   executeWorkflowResolver,
+  findRelevantToolsResolver,
   getWorkflowResolver,
   listWorkflowsResolver,
   upsertWorkflowResolver
@@ -41,6 +42,7 @@ export const resolvers = {
     getIntegration: getIntegrationResolver,
     listIntegrations: listIntegrationsResolver,
     findRelevantIntegrations: findRelevantIntegrationsResolver,
+    findRelevantTools: findRelevantToolsResolver,
     listWorkflowSchedules: listWorkflowSchedulesResolver,
   },
   Mutation: {

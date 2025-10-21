@@ -72,5 +72,8 @@ export const server_defaults = {
     LLM: {
         REQUEST_TIMEOUT_MS: 120000, // 120 seconds per LLM API request
         MAX_INTERNAL_RETRIES: 0,
+    },
+    MCP: {
+        TOOL_EXECUTION_RESULT_CHARACTER_LIMIT: 20000,
     }
 }

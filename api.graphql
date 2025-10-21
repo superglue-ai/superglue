@@ -294,6 +294,11 @@ type SuggestedIntegration {
   integration: Integration!
 }
 
+type SuggestedTool {
+  reason: String!
+  tool: Workflow!
+}
+
 type Query {
   listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
   listApis(limit: Int = 10, offset: Int = 0): ApiList!
@@ -302,6 +307,7 @@ type Query {
   listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
   listIntegrations(limit: Int = 10, offset: Int = 0): IntegrationList!
   findRelevantIntegrations(instruction: String): [SuggestedIntegration!]
+  findRelevantTools(query: String): [SuggestedTool!]
 
   getRun(id: ID!): RunResult
   getApi(id: ID!): ApiConfig

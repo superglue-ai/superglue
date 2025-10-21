@@ -1,9 +1,9 @@
-import { Integration } from '@superglue/client';
+import { Integration, Workflow } from '@superglue/client';
 import { server_defaults } from '../default.js';
 import { DocumentationSearch } from '../documentation/documentation-search.js';
 import { composeUrl } from '../utils/tools.js';
 import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
-import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions } from './context-types.js';
+import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, FindRelevantIntegrationsContextInput, FindRelevantIntegrationsContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions, FindRelevantToolsContextInput, FindRelevantToolsContextOptions, BuildToolContextOptions } from './context-types.js';
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
@@ -131,6 +131,16 @@ function buildAvailableVariableContext(payload: any, integrations: Integration[]
     return availableVariables || 'No variables available'
 }
 
+function buildToolContext(tool: Workflow, opts: BuildToolContextOptions): string {
+    const budget = Math.max(0, opts.characterBudget | 0);
+
+    const toolOpeningTag = `<${tool.id}>`;
+    const toolInstructionContext = `<tool_instruction>${tool.instruction}</tool_instruction>`;
+    const integrationsUsedByToolStepsContext = `<integrations_used_in_tool_steps>${tool.steps.map(step => step.integrationId).join(', ')}</integrations_used_in_tool_steps>`;;
+    const toolClosingTag = `</${tool.id}>`;
+    return toolOpeningTag + '\n' + [toolInstructionContext, integrationsUsedByToolStepsContext].filter(Boolean).join('\n').slice(0, budget - toolOpeningTag.length - toolClosingTag.length) + '\n' + toolClosingTag;
+}
+
 export function getWorkflowBuilderContext(input: WorkflowBuilderContextInput, options: WorkflowBuilderContextOptions): string {
     const budget = Math.max(0, options.characterBudget | 0);
     if (budget === 0) return '';
@@ -208,6 +218,30 @@ export function getEvaluateTransformContext(input: EvaluateTransformContextInput
     const transformCodeContext = `<transform_code>${input.transformCode}</transform_code>`;
     const promptEnd = `Please evaluate the transformation based on the criteria in the system prompt, considering that samples may not show all data values present in the full dataset.`;
     const prompt = promptStart + '\n' + ([targetSchemaContext, sourceDataContext, transformedDataContext, transformCodeContext].filter(Boolean).join('\n')).slice(0, budget - promptStart.length - promptEnd.length) + '\n' + promptEnd;
+    return prompt;
+}
+
+export function getFindRelevantIntegrationsContext(input: FindRelevantIntegrationsContextInput, options: FindRelevantIntegrationsContextOptions): string {
+    const budget = Math.max(0, options.characterBudget | 0);
+    if (budget === 0) return '';
+
+    const promptStart = `Based on the search terms, select the most relevant integrations from the following list.`
+    const searchTermsContext = `<search_terms>${input.searchTerms}</search_terms>`;
+    const availableIntegrationsContext = `<availableIntegrations>${input.availableIntegrations.map(int => buildIntegrationContext(int, { characterBudget: 1500, include: { authContext: false, paginationContext: false, generalContext: true } })).join('\n')}</availableIntegrations>`;
+    const promptEnd = `Return a JSON object conforming to the schema, containing a list of suggested integration IDs no longer than 10 in order of relevance and a brief reason for each selection. If no integrations are relevant, return an empty list.`
+    const prompt = promptStart + '\n' + ([searchTermsContext, availableIntegrationsContext].filter(Boolean).join('\n')).slice(0, budget - promptStart.length - promptEnd.length) + '\n' + promptEnd;
+    return prompt;
+}
+
+export function getFindRelevantToolsContext(input: FindRelevantToolsContextInput, options: FindRelevantToolsContextOptions): string {
+    const budget = Math.max(0, options.characterBudget | 0);
+    if (budget === 0) return '';
+
+    const promptStart = `Based on the search terms, select the most relevant tools from the following list.`
+    const searchTermsContext = `<search_terms>${input.searchTerms}</search_terms>`;
+    const availableToolsContext = `<available_tools>${input.availableTools.map(tool => buildToolContext(tool, { characterBudget: 1500 })).join('\n')}</available_tools>`;
+    const promptEnd = `Return a JSON object conforming to the schema, containing a list of suggested tool IDs no longer than 10 in order of relevance and a brief reason for each selection. If no tools are relevant, return an empty list.`
+    const prompt = promptStart + '\n' + ([searchTermsContext, availableToolsContext].filter(Boolean).join('\n')).slice(0, budget - promptStart.length - promptEnd.length) + '\n' + promptEnd;
     return prompt;
 }
 

@@ -451,6 +451,18 @@ You are an expert AI assistant responsible for selecting the correct integration
 - Pay close attention to the 'Integration ID' to differentiate between similar integrations or different versions of the same integration.
 - If no integrations are relevant to the instruction, return an empty list.
 - Do not make assumptions about API or integration functionality that is not explicitly mentioned in the documentation.
+</CONTEXT>`;
+
+export const FIND_RELEVANT_TOOLS_SYSTEM_PROMPT = `
+You are an expert AI assistant responsible for selecting the most relevant saved tools based on search terms. Your goal is to analyze the search query and choose the most relevant tools from the available list.
+
+<CONTEXT>
+- Carefully read the search terms to understand what the user is looking for.
+- Review the tool instructions and integrations used to identify each tool's purpose.
+- Pay close attention to the 'Tool ID' to differentiate between similar tools.
+- If no tools are relevant to the search terms, return an empty list.
+- Match based on keywords in the tool instruction and integration IDs used.
+- Prioritize exact matches over partial matches.
 </CONTEXT>
 
 <EXAMPLE_INPUT>
