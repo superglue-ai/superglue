@@ -294,9 +294,16 @@ type SuggestedIntegration {
   integration: Integration!
 }
 
+type ToolStep {
+  integrationId: String
+  instruction: String
+}
+
 type SuggestedTool {
+  id: ID!
+  instruction: String
+  steps: [ToolStep!]!
   reason: String!
-  tool: Workflow!
 }
 
 type Query {
@@ -306,8 +313,8 @@ type Query {
   listExtracts(limit: Int = 10, offset: Int = 0): ExtractList!
   listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
   listIntegrations(limit: Int = 10, offset: Int = 0): IntegrationList!
-  findRelevantIntegrations(instruction: String): [SuggestedIntegration!]
-  findRelevantTools(query: String): [SuggestedTool!]
+  findRelevantIntegrations(searchTerms: String): [SuggestedIntegration!]
+  findRelevantTools(searchTerms: String): [SuggestedTool!]
 
   getRun(id: ID!): RunResult
   getApi(id: ID!): ApiConfig

@@ -10,11 +10,11 @@ import { z } from 'zod';
 import { validateToken } from '../auth/auth.js';
 import { logMessage } from "../utils/logs.js";
 import { sessionId, telemetryClient } from "../utils/telemetry.js";
-import { truncateToolExecutionResult, validateWorkflowExecutionArgs } from "./mcp-server-utils.js";
+import { validateWorkflowExecutionArgs } from "./mcp-server-utils.js";
 
 // MCP Tool Input Schemas (tool-centric)
 export const FindRelevantToolsInputSchema = {
-  query: z.string().describe("The natural language search query to find relevant tools"),
+  searchTerms: z.string().describe("The natural language search query to find relevant tools"),
 };
 
 export const ExecuteToolInputSchema = {
@@ -64,15 +64,30 @@ export const toolDefinitions: Record<string, any> = {
         const result: ToolResult = await args.client.executeWorkflow({
           id: args.id,
           payload: args.payload,
-          options: { selfHealing: SelfHealingMode.DISABLED }
+          options: { selfHealing: SelfHealingMode.DISABLED },
+          verbose: false
         });
 
-        const toolResultAsString = truncateToolExecutionResult(result);
-        
+        if (!result.success) {
+          return {
+            success: false,
+            error: result.error || 'Unknown error'
+          };
+        }
+
+        const dataStr = JSON.stringify(result.data);
+        const limit = 20000;
+
+        if (dataStr.length <= limit) {
+          return {
+            success: true,
+            data: result.data
+          };
+        }
+
         return {
           success: true,
-          result: toolResultAsString,
-          usage_tip: "Tool results may be truncated for very large results."
+          data: `[TRUNCATED: Result exceeded ${limit} characters (original size: ${dataStr.length} chars). Showing first ${limit} characters]\n\n${dataStr.slice(0, limit)}`
         };
       } catch (error: any) {
         return {
@@ -86,29 +101,30 @@ export const toolDefinitions: Record<string, any> = {
   superglue_find_relevant_tools: {
     description: `
     <use_case>
-      Finds relevant superglue tools based on a natural language search query.
+      Finds relevant superglue tools based on natural language search terms.
     </use_case>
 
     <important_notes>
-      - This tool is for finding relevant superglue tools based on a natural language search query.
-      - The tool will return a list of superglue tool IDs that match the search query.
-      - The tool will return a list of all superglue tool IDs if no search query is provided, or if there are no matches for the search query.
+      - This tool is for finding relevant superglue tools based on natural language search terms.
+      - The tool will return a list of superglue tool IDs that match the search terms.
+      - The tool will return a list of all superglue tool IDs if no search terms are provided, or if there are no matches for the search terms.
+      - Use '*' as a wildcard to find all tools.
     </important_notes>
     `,
     inputSchema: FindRelevantToolsInputSchema,
     execute: async (args: any & { client: SuperglueClient; orgId: string; }, request) => {
-      
+
       try {
-        const result = await args.client.listWorkflows({ query: args.query });
+        const result = await args.client.findRelevantTools(args.searchTerms);
         return {
           success: true,
-          result: result,
+          tools: result,
         };
       } catch (error: any) {
         return {
           success: false,
           error: error.message,
-          suggestion: "Check that the query is valid and that the tools exist"
+          suggestion: "Check that the query is valid"
         };
       }
     },

@@ -10,7 +10,12 @@ import { logMessage } from "../utils/logs.js";
 type ChatMessage = LLMMessage;
 
 export interface SuggestedTool {
-    tool: Workflow;
+    id: string;
+    instruction?: string;
+    steps: Array<{
+        integrationId?: string;
+        instruction?: string;
+    }>;
     reason: string;
 }
 
@@ -33,7 +38,12 @@ export class ToolSelector {
         if (!query || query.trim() === "" || query.trim() === "*" || query.trim() === "all") {
             logMessage('info', 'No specific query provided, returning all available tools.', this.metadata);
             return tools.map(tool => ({
-                tool,
+                id: tool.id,
+                instruction: tool.instruction,
+                steps: tool.steps.map(s => ({
+                    integrationId: s.integrationId,
+                    instruction: s.apiConfig?.instruction
+                })),
                 reason: "Available tool (no specific query provided)"
             }));
         }
@@ -71,7 +81,12 @@ export class ToolSelector {
                             return null;
                         }
                         return {
-                            tool,
+                            id: tool.id,
+                            instruction: tool.instruction,
+                            steps: tool.steps.map(s => ({
+                                integrationId: s.integrationId,
+                                instruction: s.apiConfig?.instruction
+                            })),
                             reason: suggestion.reason
                         };
                     })
@@ -80,7 +95,12 @@ export class ToolSelector {
                 if (suggestions.length === 0) {
                     logMessage('info', 'Tool selector returned no specific tools. Returning all available tools as a fallback.', this.metadata);
                     return tools.map(tool => ({
-                        tool,
+                        id: tool.id,
+                        instruction: tool.instruction,
+                        steps: tool.steps.map(s => ({
+                            integrationId: s.integrationId,
+                            instruction: s.apiConfig?.instruction
+                        })),
                         reason: "No specific match found for your query, but this tool is available for use"
                     }));
                 }
@@ -90,7 +110,12 @@ export class ToolSelector {
 
             logMessage('warn', "Tool selection returned an unexpected format. Returning all available tools as fallback.", this.metadata);
             return tools.map(tool => ({
-                tool,
+                id: tool.id,
+                instruction: tool.instruction,
+                steps: tool.steps.map(s => ({
+                    integrationId: s.integrationId,
+                    instruction: s.apiConfig?.instruction
+                })),
                 reason: "Selection failed, but this tool is available for use"
             }));
 
@@ -98,7 +123,12 @@ export class ToolSelector {
             logMessage('error', `Error during tool selection: ${error}`, this.metadata);
             logMessage('info', 'Returning all available tools as fallback due to selection error.', this.metadata);
             return tools.map(tool => ({
-                tool,
+                id: tool.id,
+                instruction: tool.instruction,
+                steps: tool.steps.map(s => ({
+                    integrationId: s.integrationId,
+                    instruction: s.apiConfig?.instruction
+                })),
                 reason: "Selection failed due to error, but this tool is available for use"
             }));
         }

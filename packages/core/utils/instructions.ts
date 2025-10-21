@@ -1,9 +1,9 @@
 import type { Integration } from "@superglue/client";
-import { LanguageModel, LLMMessage } from "../llm/language-model.js";
+import { GENERATE_INSTRUCTIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { BaseToolContext, ToolDefinition, ToolImplementation } from "../execute/tools.js";
+import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { parseJSON } from "./json-parser.js";
-import { GENERATE_INSTRUCTIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
 
 // Extend context to include integrations
 export interface InstructionGenerationContext extends BaseToolContext {
@@ -34,7 +34,7 @@ export const generateInstructionsImplementation: ToolImplementation<InstructionG
   const integrationSummaries = integrations.map(integration => {
     // Use DocumentationSearch to intelligently truncate documentation
     // Focus on getting started, authentication, and basic operations
-    const documentationSearch = new DocumentationSearch({orgId: context.orgId});
+    const documentationSearch = new DocumentationSearch({ orgId: context.orgId });
     const truncatedDocs = integration.documentation
       ? documentationSearch.extractRelevantSections(
         integration.documentation,

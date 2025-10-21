@@ -3,9 +3,9 @@ import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegr
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { WorkflowBuilder } from "../../build/workflow-builder.js";
+import { ToolSelector } from "../../execute/tool-selector.js";
 import { WorkflowExecutor } from "../../execute/workflow-executor.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
-import { ToolSelector } from "../../execute/tool-selector.js";
 import { parseJSON } from "../../utils/json-parser.js";
 import { logMessage } from "../../utils/logs.js";
 import { replaceVariables } from "../../utils/tools.js";
@@ -257,18 +257,17 @@ export const listWorkflowsResolver = async (
 
 export const findRelevantToolsResolver = async (
   _: unknown,
-  { query }: { query?: string },
+  { searchTerms }: { searchTerms?: string },
   context: Context,
   info: GraphQLResolveInfo,
 ) => {
-
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
     const allTools = await context.datastore.listWorkflows({ limit: 1000, offset: 0, orgId: context.orgId });
     const tools = allTools.items || [];
 
     const selector = new ToolSelector(metadata);
-    return await selector.select(query, tools);
+    return await selector.select(searchTerms, tools);
   } catch (error) {
     logMessage('error', `Error finding relevant tools: ${String(error)}`, { orgId: context.orgId });
     return [];

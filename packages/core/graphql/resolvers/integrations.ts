@@ -142,19 +142,19 @@ export const deleteIntegrationResolver = async (
 
 export const findRelevantIntegrationsResolver = async (
   _: any,
-  { instruction }: { instruction?: string },
+  { searchTerms }: { searchTerms?: string },
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  const logInstruction = instruction ? `instruction: ${instruction}` : 'no instruction (returning all integrations)';
-  logMessage('info', `Finding relevant integrations for ${logInstruction}`, { orgId: context.orgId });
+  const logSearchTerms = searchTerms ? `searchTerms: ${searchTerms}` : 'no searchTerms (returning all integrations)';
+  logMessage('info', `Finding relevant integrations for ${logSearchTerms}`, { orgId: context.orgId });
 
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
     const allIntegrations = await context.datastore.listIntegrations({ limit: 1000, offset: 0, includeDocs: false, orgId: context.orgId });
 
     const selector = new IntegrationSelector(metadata);
-    return await selector.select(instruction, allIntegrations.items || []);
+    return await selector.select(searchTerms, allIntegrations.items || []);
   } catch (error) {
     logMessage('error', `Error finding relevant integrations: ${String(error)}`, { orgId: context.orgId });
     return [];

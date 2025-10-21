@@ -17,7 +17,7 @@ export function validateWorkflowExecutionArgs(args: any) {
         errors.push("Options parameter is not supported via MCP. Remove the options field from your request.");
     }
 
-    const allowedKeys = ['id', 'payload'];
+    const allowedKeys= ['id', 'payload', 'client', 'orgId'];;
     const extraKeys = Object.keys(args).filter(k => !allowedKeys.includes(k));
     if (extraKeys.length > 0) {
         errors.push(`Unexpected parameters: ${extraKeys.join(', ')}. Only 'id' and 'payload' are allowed.`);
