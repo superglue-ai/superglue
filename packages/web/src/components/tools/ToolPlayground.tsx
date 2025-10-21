@@ -457,14 +457,14 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         setToolId(savedTool.id);
 
         toast({
-          title: "Tool saved",
-          description: `"${savedTool.id}" saved successfully`,
+          title: "Tool published",
+          description: `"${savedTool.id}" published successfully`,
         });
       }
     } catch (error: any) {
       console.error("Error saving tool:", error);
       toast({
-        title: "Error saving tool",
+        title: "Error publishing tool",
         description: error.message,
         variant: "destructive",
       });

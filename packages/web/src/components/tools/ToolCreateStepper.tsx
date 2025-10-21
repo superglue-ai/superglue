@@ -198,15 +198,15 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
       if (!saved) throw new Error('Failed to save tool');
 
       toast({
-        title: 'Tool saved',
-        description: `"${saved.id}" saved successfully`
+        title: 'Tool published',
+        description: `"${saved.id}" published successfully`
       });
 
       setCurrentTool(saved);
       setStep('success');
     } catch (e: any) {
       toast({
-        title: 'Error saving tool',
+        title: 'Error publishing tool',
         description: e.message || 'Unknown error',
         variant: 'destructive'
       });
@@ -919,7 +919,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                       disabled={isSaving}
                       className="h-9 px-5 shadow-md border border-primary/40"
                     >
-                      {isSaving ? "Saving..." : "Save & Complete"}
+                      {isSaving ? "Publishing..." : "Publish"}
                     </Button>
                   </div>
                 )}
