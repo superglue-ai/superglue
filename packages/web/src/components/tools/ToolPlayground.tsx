@@ -455,11 +455,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           throw new Error("Failed to save tool");
         }
         setToolId(savedTool.id);
-
-        toast({
-          title: "Tool published",
-          description: `"${savedTool.id}" published successfully`,
-        });
       }
     } catch (error: any) {
       console.error("Error saving tool:", error);
@@ -535,13 +530,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         effectiveSelfHealing,
         () => stopSignalRef.current
       );
-
-      if (state.interrupted) {
-        toast({
-          title: "Tool interrupted",
-          description: `Stopped at step ${Math.min(state.currentStepIndex + 1, tool.steps.length)} (${tool.steps[state.currentStepIndex]?.id || 'n/a'})`,
-        });
-      }
 
       // Always update steps with returned configuration (API may normalize/update even without self-healing)
       if (state.currentTool.steps) {
@@ -804,10 +792,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         setStepResultsMap(prev => ({ ...prev, ['__final_transform__']: result.data }));
         setFinalPreviewResult(result.data);
         setNavigateToFinalSignal(Date.now());
-        toast({
-          title: "Transform executed successfully",
-          description: "Final transform completed",
-        });
       } else {
         setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
         setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
