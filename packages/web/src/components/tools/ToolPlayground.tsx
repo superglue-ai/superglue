@@ -707,7 +707,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
   const executeStepByIdx = async (idx: number, selfHealing: boolean = false) => {
     try {
-      setIsExecutingStep(idx);
+      if (selfHealing) {
+        setIsFixingWorkflow(idx);
+      } else {
+        setIsExecutingStep(idx);
+      }
       const single = await executeSingleStep(
         client,
         {
@@ -749,6 +753,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       }
     } finally {
       setIsExecutingStep(undefined);
+      setIsFixingWorkflow(undefined);
     }
   };
 

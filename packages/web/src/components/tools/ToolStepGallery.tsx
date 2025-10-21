@@ -161,7 +161,7 @@ const SpotlightStepCard = ({
                                         disabled={!canExecute || isExecuting || isFixingWorkflow}
                                         className="h-8 px-3 gap-2"
                                     >
-                                        {isFixingWorkflow || isExecuting ? (
+                                        {isFixingWorkflow ? (
                                             <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                                         ) : (
                                             <Wand2 className="h-3 w-3" />
