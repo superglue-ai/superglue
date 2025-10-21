@@ -113,8 +113,8 @@ export async function executeStep({
         const instruction = codeConfig?.stepInstruction || endpoint?.instruction;
         const result = await evaluateStepResponse({
           data: response.data,
-          endpoint: endpoint || { instruction } as ApiConfig,
-          documentation: await integrationManager?.searchDocumentation(instruction || '')
+          endpoint: endpoint,
+          docSearchResultsForStepInstruction: await integrationManager?.searchDocumentation(instruction)
         });
         success = result.success;
         if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));

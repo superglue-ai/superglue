@@ -78,7 +78,7 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                 executionMode: z.enum(["DIRECT", "LOOP"]).describe("DIRECT for single execution, LOOP for iterating over collections"),
                 loopSelector: z.string().optional().describe("JavaScript function to select items to loop over. Format: (sourceData) => sourceData.items. Only required if executionMode is LOOP"),
                 codeConfig: z.object({
-                    stepInstruction: z.string().optional().describe("A human-readable instruction describing what this step does (for documentation purposes)"),
+                    stepInstruction: z.string().optional().describe("A human-readable instruction describing what this step does and what the call should do and return."),
                     code: z.string().describe(`JavaScript function that returns an axios request config. Format: (context) => ({ url, method, headers, data, params })
                 
 The context parameter contains:
