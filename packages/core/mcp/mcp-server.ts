@@ -175,18 +175,6 @@ BEST PRACTICES:
   const authResult = await validateToken(apiKey);
   const orgId = authResult.orgId;
 
-  // Subscribe to server logs and forward to MCP client
-  const logHandler = (logEntry: LogEntry) => {
-    // Only send logs that match this user's org ID
-    if (logEntry.orgId === orgId || (!logEntry.orgId && !orgId)) {
-      mcpServer.server.sendLoggingMessage({
-        level: String(logEntry.level).toLowerCase() as any,
-        data: logEntry.message,
-        logger: "superglue-server"
-      });
-    }
-  };
-
   // Register static tools only
   for (const toolName of Object.keys(toolDefinitions)) {
     const tool = toolDefinitions[toolName];
