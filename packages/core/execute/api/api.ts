@@ -14,7 +14,10 @@ export interface CallAxiosResult {
 
   const httpsAgent = new https.Agent({
     rejectUnauthorized: server_defaults.AXIOS.REJECT_UNAUTHORIZED,
-    keepAlive: process.env.AXIOS_KEEP_ALIVE !== 'false'
+    keepAlive: process.env.AXIOS_KEEP_ALIVE !== 'false',
+    maxSockets: server_defaults.AXIOS.MAX_SOCKETS,
+    maxFreeSockets: server_defaults.AXIOS.MAX_FREE_SOCKETS,
+    timeout: server_defaults.AXIOS.TIMEOUT,
   });
   
   export async function callAxios(config: AxiosRequestConfig, options: RequestOptions): Promise<CallAxiosResult> {
