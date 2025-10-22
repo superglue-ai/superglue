@@ -10,9 +10,17 @@ export const server_defaults = {
     MAX_TRANSFORMATION_RETRIES: 10,
     DEFAULT_LOOP_MAX_ITERS: 1000,
     MAX_PAGINATION_REQUESTS: 1000,
-    AXIOS_QUICK_RETRY_THRESHOLD_MS: 10000,
-    AXIOS_DEFAULT_RETRY_DELAY_MS: 1000,
-    AXIOS_MAX_RATE_LIMIT_WAIT_MS: 60 * 60 * 1000 * 24, // 24 hours is the max wait time for rate limit retries, hardcoded
+    AXIOS: {
+        MAX_QUICK_RETRIES: 1,
+        QUICK_RETRY_THRESHOLD_MS: 10000,
+        DEFAULT_RETRY_DELAY_MS: 1000,
+        MAX_RATE_LIMIT_WAIT_MS: 60 * 60 * 1000 * 24, // 24 hours is the max wait time for rate limit retries, hardcoded
+        REJECT_UNAUTHORIZED: false,
+        KEEP_ALIVE: false,
+        MAX_SOCKETS: 10,
+        MAX_FREE_SOCKETS: 2,
+        TIMEOUT: 30000,
+    },
     CONTEXT: {
         JSON_PREVIEW_DEPTH_LIMIT: 5,
         JSON_PREVIEW_ARRAY_LIMIT: 5,
