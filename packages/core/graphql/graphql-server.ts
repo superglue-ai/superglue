@@ -11,10 +11,10 @@ import http from 'http';
 import { WebSocketServer } from 'ws';
 import { authMiddleware, extractTokenFromExpressRequest, validateToken } from '../auth/auth.js';
 import { DataStore } from '../datastore/types.js';
-import { resolvers, typeDefs } from './graphql.js';
 import { mcpHandler } from '../mcp/mcp-server.js';
 import { logMessage } from "../utils/logs.js";
 import { createTelemetryPlugin, telemetryMiddleware } from '../utils/telemetry.js';
+import { resolvers, typeDefs } from './graphql.js';
 
 export const DEFAULT_QUERY = `
 query Query {
@@ -104,7 +104,7 @@ export async function startGraphqlServer(datastore: DataStore) {
   app.use(express.json({ limit: '1024mb' }));
   app.use(authMiddleware);
   app.use(telemetryMiddleware);
-  app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 1 }));
+  app.use(graphqlUploadExpress({ maxFileSize: 1000000000, maxFiles: 1 }));
 
   app.post('/mcp', mcpHandler);
   app.get('/mcp', mcpHandler);
