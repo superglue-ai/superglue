@@ -47,11 +47,41 @@ import React from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 
+const getCacheKey = (apiKey: string) => {
+  const hash = apiKey.split('').reduce((acc, char) => {
+    return ((acc << 5) - acc) + char.charCodeAt(0) | 0;
+  }, 0);
+  return `superglue-tools-cache-${Math.abs(hash)}`;
+};
+
+const loadCachedData = (apiKey: string) => {
+  try {
+    const cached = localStorage.getItem(getCacheKey(apiKey));
+    if (!cached) return null;
+    return JSON.parse(cached);
+  } catch (error) {
+    console.error('Error loading cached data:', error);
+    return null;
+  }
+};
+
+const saveCacheData = (apiKey: string, configs: any[], integrations: any[]) => {
+  try {
+    localStorage.setItem(getCacheKey(apiKey), JSON.stringify({
+      configs,
+      integrations,
+      timestamp: Date.now()
+    }));
+  } catch (error) {
+    console.error('Error saving cache data:', error);
+  }
+};
+
 const ConfigTable = () => {
   const router = useRouter();
   const [allConfigs, setAllConfigs] = React.useState<(ApiConfig | ExtractConfig | Tool | TransformConfig)[]>([]);
   const [configs, setConfigs] = React.useState<(ApiConfig | ExtractConfig | Tool | TransformConfig)[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(0);
   const [pageSize] = React.useState(20);
@@ -93,7 +123,6 @@ const ConfigTable = () => {
   const refreshConfigs = React.useCallback(async () => {
     setShowConfigStepper(false);
     setIsRefreshing(true);
-    setLoading(true);
     try {
       const superglueClient = new SuperglueClient({
         endpoint: config.superglueEndpoint,
@@ -125,6 +154,8 @@ const ConfigTable = () => {
       setAllConfigs(combinedConfigs);
       setTotal(combinedConfigs.length);
       setPage(0);
+      
+      saveCacheData(config.superglueApiKey, combinedConfigs, integrationsData.items);
     } catch (error) {
       console.error('Error fetching configs:', error);
     } finally {
@@ -134,8 +165,14 @@ const ConfigTable = () => {
   }, [config.superglueEndpoint, config.superglueApiKey]);
 
   React.useEffect(() => {
+    const cachedData = loadCachedData(config.superglueApiKey);
+    if (cachedData) {
+      setAllConfigs(cachedData.configs);
+      setIntegrations(cachedData.integrations);
+      setTotal(cachedData.configs.length);
+    }
     refreshConfigs();
-  }, [refreshConfigs]);
+  }, [refreshConfigs, config.superglueApiKey]);
 
   React.useEffect(() => {
     const filtered = allConfigs.filter(config => {
@@ -448,7 +485,7 @@ const ConfigTable = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {loading && allConfigs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-24 text-center">
                   <Loader2 className="h-6 w-6 animate-spin text-foreground inline-block" />
