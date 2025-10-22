@@ -3,7 +3,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolResult, isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { SelfHealingMode, SuperglueClient, WorkflowResult as ToolResult } from '@superglue/client';
-import { LogEntry } from "@superglue/shared";
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
