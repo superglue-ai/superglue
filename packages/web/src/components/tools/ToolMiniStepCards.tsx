@@ -106,11 +106,11 @@ export const InstructionDisplay = ({ instruction, onEdit, showEditButton = true 
                     <h3 className="font-bold text-[13px]">Tool Instruction:</h3>
                     <div className="flex items-center gap-1">
                         {isTruncated && (
-                            <Button variant="ghost" size="icon" className="h-[13px] w-[13px] p-0 mr-2" onClick={() => setShowFull(true)} title="View full instruction">
+                            <Button variant="ghost" size="icon" className="h-[16px] w-[16px] p-0 mr-2" onClick={() => setShowFull(true)} title="View full instruction">
                                 <Eye className="h-2.5 w-2.5" />
                             </Button>
                         )}
-                        <Button variant="ghost" size="icon" className="h-[5px] w-[5px] p-0" onClick={handleCopy} title="Copy instruction">
+                        <Button variant="ghost" size="icon" className="h-[16px] w-[16px] p-0" onClick={handleCopy} title="Copy instruction">
                             {copied ? <Check size={9} className="scale-[0.8]" /> : <Copy size={9} className="scale-[0.8]" />}
                         </Button>
 
@@ -817,7 +817,7 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
                                     <Globe className="h-4 w-4 text-muted-foreground" />
                                 )}
                             </div>
-                            <span className="text-[11px] font-semibold mt-1.5">{step.id || `Step ${index}`}</span>
+                            <span className="text-[11px] font-semibold mt-1.5 truncate max-w-[140px]" title={step.id || `Step ${index}`}>{step.id || `Step ${index}`}</span>
                             {linkedIntegration && (
                                 <span className="text-[9px] text-muted-foreground">{linkedIntegration.id}</span>
                             )}
