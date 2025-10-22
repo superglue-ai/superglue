@@ -9,7 +9,7 @@ import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimple
 import { Integration, IntegrationInput, SuperglueClient, Workflow as Tool, UpsertMode } from '@superglue/client';
 import { integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { ArrowRight, Check, Clock, Globe, Key, Loader2, Pencil, Plus, X } from 'lucide-react';
+import { ArrowRight, Check, Clock, Globe, Key, Loader2, Pencil, Plus, Send, Upload, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -101,6 +101,12 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
+  // New state for redesigned prompt step
+  const [showPayloadSection, setShowPayloadSection] = useState(false);
+  const [showResponseSchemaSection, setShowResponseSchemaSection] = useState(false);
+  const [responseSchema, setResponseSchema] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const client = useMemo(() => new ExtendedSuperglueClient({
     endpoint: superglueConfig.superglueEndpoint,
     apiKey: superglueConfig.superglueApiKey,
@@ -128,6 +134,10 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
   useEffect(() => {
     if (step === 'prompt') {
       setCurrentTool(null);
+      // Lazy load suggestions when entering prompt step
+      if (selectedIntegrationIds.length > 0 && suggestions.length === 0) {
+        handleGenerateInstructions();
+      }
     }
 
     if (step !== 'prompt') {
@@ -242,15 +252,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
     const currentIndex = steps.indexOf(step);
 
     if (step === 'integrations') {
-
-      if (selectedIntegrationIds.length > 0) {
-        setIsGeneratingSuggestions(true);
-        try {
-          await handleGenerateInstructions();
-        } finally {
-          setIsGeneratingSuggestions(false);
-        }
-      }
+      // Suggestions will be loaded lazily when entering prompt step
       setStep(steps[currentIndex + 1]);
     } else if (step === 'prompt') {
       const errors: Record<string, boolean> = {};
@@ -459,6 +461,65 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
     setTotalFileSize(prev => Math.max(0, prev - fileToRemove.size));
   };
 
+  const handleSendPrompt = async () => {
+    const errors: Record<string, boolean> = {};
+    if (!instruction.trim()) errors.instruction = true;
+    try {
+      JSON.parse(payload || '{}');
+    } catch {
+      errors.payload = true;
+    }
+
+    setValidationErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please fix the errors below before continuing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsBuilding(true);
+    try {
+      const parsedPayload = JSON.parse(payload || '{}');
+      const effectivePayload = { ...parsedPayload, ...filePayloads };
+      const response = await client.buildWorkflow({
+        instruction: instruction,
+        payload: effectivePayload,
+        integrationIds: selectedIntegrationIds,
+        save: false
+      });
+      if (!response) {
+        throw new Error('Failed to build tool');
+      }
+      setCurrentTool(response);
+      setStep('review');
+    } catch (error: any) {
+      console.error('Error building tool:', error);
+      toast({
+        title: 'Error Building Tool',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBuilding(false);
+    }
+  };
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInstruction(e.target.value);
+    if (e.target.value.trim()) {
+      setValidationErrors(prev => ({ ...prev, instruction: false }));
+    }
+    
+    // Auto-expand textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full p-6">
       <div className="flex-none mb-4">
@@ -483,7 +544,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="overflow-y-auto px-1 min-h-0">
+        <div className="overflow-y-auto px-1 min-h-0" style={{ scrollbarGutter: 'stable' }}>
           {step === 'integrations' && (
             <div className="space-y-4">
               <div className="mb-4 flex items-center justify-between gap-4">
@@ -775,6 +836,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
             </div>
           )}
 
+          {/* OLD PROMPT STEP - COMMENTED OUT
           {step === 'prompt' && (
             <div className="space-y-4">
               <div className="space-y-2">
@@ -851,6 +913,297 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                 </div>
                 {validationErrors.payload && (
                   <p className="text-xs text-destructive mt-1">Invalid JSON format</p>
+                )}
+              </div>
+            </div>
+          )}
+          */}
+
+          {/* NEW REDESIGNED PROMPT STEP */}
+          {step === 'prompt' && (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-full max-w-2xl mx-auto space-y-4">
+                <div className="text-center mb-6">
+                  <h2 className="text-xl font-medium text-foreground">
+                    What should your tool do for you?
+                  </h2>
+                </div>
+
+                {/* Chat-like instruction input with send button */}
+                <div className="relative">
+                  <Textarea
+                    ref={textareaRef}
+                    id="instruction"
+                    value={instruction}
+                    onChange={handleTextareaChange}
+                    placeholder="Describe what you want this tool to achieve..."
+                    className={cn(
+                      "resize-none pr-14 rounded-2xl scrollbar-thin scrollbar-thumb-rounded bg-card",
+                      validationErrors.instruction && inputErrorStyles
+                    )}
+                    rows={1}
+                    style={{ 
+                      maxHeight: '200px', 
+                      overflowY: instruction.split('\n').length > 8 ? 'auto' : 'hidden',
+                      scrollbarGutter: 'stable'
+                    }}
+                  />
+                  {/* Send button positioned to the right inside textarea */}
+                  <Button
+                    size="icon"
+                    onClick={handleSendPrompt}
+                    disabled={isBuilding || !instruction.trim()}
+                    className="absolute bottom-2 right-2 h-8 w-8 rounded-full"
+                  >
+                    {isBuilding ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                {validationErrors.instruction && (
+                  <p className="text-sm text-destructive text-center">Tool instruction is required</p>
+                )}
+
+                {/* Settings section below textarea - only show when there's text */}
+                {instruction.trim() && (
+                <div className="space-y-3 mt-4">
+                  {/* Horizontal settings buttons - smaller and centered */}
+                  <div className="flex gap-2 justify-center">
+                    <button
+                      onClick={() => {
+                        if (showResponseSchemaSection) setShowResponseSchemaSection(false);
+                        setShowPayloadSection(!showPayloadSection);
+                      }}
+                      className={cn(
+                        "text-xs px-3 py-1.5 rounded-full transition-all border animate-fade-in",
+                        showPayloadSection && "border-primary/50",
+                        (() => {
+                          const trimmedPayload = payload.trim();
+                          const hasFiles = uploadedFiles.length > 0;
+                          
+                          // Check if payload is empty or just {}
+                          const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
+                          
+                          if (isEmptyPayload && !hasFiles) {
+                            return "hover:bg-accent/50 border-border text-muted-foreground";
+                          }
+                          
+                          // Check if JSON is valid
+                          if (!isEmptyPayload) {
+                            try {
+                              JSON.parse(trimmedPayload);
+                              // Valid JSON
+                              return "bg-[#FFD700] border-[#FFA500] text-foreground";
+                            } catch {
+                              // Invalid JSON
+                              return "bg-red-100 dark:bg-red-950/30 border-red-500 text-red-700 dark:text-red-400";
+                            }
+                          }
+                          
+                          // Has files but no payload
+                          return "bg-[#FFD700] border-[#FFA500] text-foreground";
+                        })()
+                      )}
+                      style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}
+                    >
+                      {(() => {
+                        const trimmedPayload = payload.trim();
+                        const hasFiles = uploadedFiles.length > 0;
+                        const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
+                        
+                        if (isEmptyPayload && !hasFiles) {
+                          return 'No Tool Inputs';
+                        }
+                        
+                        if (!isEmptyPayload) {
+                          try {
+                            JSON.parse(trimmedPayload);
+                            return 'Tool input configured';
+                          } catch {
+                            return 'Malformatted input';
+                          }
+                        }
+                        
+                        return 'Tool input configured';
+                      })()}
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        if (showPayloadSection) setShowPayloadSection(false);
+                        setShowResponseSchemaSection(!showResponseSchemaSection);
+                      }}
+                      className={cn(
+                        "text-xs px-3 py-1.5 rounded-full transition-all border animate-fade-in",
+                        showResponseSchemaSection && "border-primary/50",
+                        responseSchema 
+                          ? "bg-[#FFD700] border-[#FFA500] text-foreground" 
+                          : "hover:bg-accent/50 border-border text-muted-foreground"
+                      )}
+                      style={{ animationDelay: '150ms', animationFillMode: 'backwards' }}
+                    >
+                      {responseSchema ? 'Response schema configured' : 'No response schema enforced'}
+                    </button>
+                  </div>
+
+                  {/* Expanded sections */}
+                  {showPayloadSection && (
+                    <div className="space-y-3 border rounded-lg p-4 bg-card animate-fade-in" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
+                        <div className="space-y-2">
+                          <h4 className="font-medium text-sm">Payload JSON</h4>
+                          <Textarea
+                            value={payload}
+                            onChange={(e) => {
+                              setPayload(e.target.value);
+                              try {
+                                JSON.parse(e.target.value || '{}');
+                                setValidationErrors(prev => ({ ...prev, payload: false }));
+                              } catch {
+                                setValidationErrors(prev => ({ ...prev, payload: true }));
+                              }
+                            }}
+                            placeholder="{}"
+                            className={cn("font-mono text-xs min-h-[150px]", validationErrors.payload && inputErrorStyles)}
+                          />
+                          {validationErrors.payload && (
+                            <p className="text-xs text-destructive">Invalid JSON format</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <h4 className="font-medium text-sm">Upload Files</h4>
+                          <input
+                            type="file"
+                            multiple
+                            accept=".json,.csv,.txt,.xml,.xlsx,.xls"
+                            onChange={async (e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (files.length > 0) {
+                                await handleFilesUpload(files);
+                              }
+                              e.target.value = '';
+                            }}
+                            className="hidden"
+                            id="file-upload-new"
+                          />
+                          {uploadedFiles.length > 0 && (
+                            <div className="space-y-2 mb-3">
+                              {uploadedFiles.map(file => {
+                                const getFileTypeInfo = (filename: string) => {
+                                  const ext = filename.toLowerCase().split('.').pop() || '';
+                                  switch (ext) {
+                                    case 'json': return { color: 'text-blue-600', bgColor: 'bg-blue-50', icon: '{}' };
+                                    case 'csv': return { color: 'text-green-600', bgColor: 'bg-green-50', icon: '▤' };
+                                    case 'xml': return { color: 'text-orange-600', bgColor: 'bg-orange-50', icon: '<>' };
+                                    case 'xlsx':
+                                    case 'xls': return { color: 'text-emerald-600', bgColor: 'bg-emerald-50', icon: '⊞' };
+                                    default: return { color: 'text-gray-600', bgColor: 'bg-gray-50', icon: '📄' };
+                                  }
+                                };
+                                const fileInfo = getFileTypeInfo(file.name);
+                                return (
+                                  <div
+                                    key={file.key}
+                                    className={cn(
+                                      "flex items-center justify-between px-3 py-2 rounded-md",
+                                      file.status === 'error' ? "bg-destructive/10" : fileInfo.bgColor
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span className={cn("font-mono text-sm", fileInfo.color)}>
+                                        {fileInfo.icon}
+                                      </span>
+                                      <div>
+                                        <div className="text-xs font-medium">{file.name}</div>
+                                        <div className="text-[10px] text-muted-foreground">
+                                          {file.status === 'processing' ? 'Parsing...' : 
+                                           file.status === 'error' ? file.error :
+                                           `${formatBytes(file.size)} • ${file.key}`}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    {file.status !== 'processing' && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={() => handleFileRemove(file.key)}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => document.getElementById('file-upload-new')?.click()}
+                            disabled={isProcessingFiles}
+                            className="w-full"
+                          >
+                            {isProcessingFiles ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4 mr-2" />
+                                Select Files
+                              </>
+                            )}
+                          </Button>
+                          <div className="text-xs text-muted-foreground text-center">
+                            {formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                  {showResponseSchemaSection && (
+                    <div className="border rounded-lg p-4 bg-card animate-fade-in" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
+                      <h4 className="font-medium text-sm mb-2">Response Schema JSON</h4>
+                      <Textarea
+                        value={responseSchema}
+                        onChange={(e) => setResponseSchema(e.target.value)}
+                        placeholder='{\n  "type": "object",\n  "properties": {\n    ...\n  }\n}'
+                        className="font-mono text-xs min-h-[150px]"
+                      />
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Optional JSON Schema to validate the tool's response
+                      </p>
+                    </div>
+                  )}
+                </div>
+                )}
+
+                {/* Suggested prompts with animation - only show when textarea is empty */}
+                {suggestions.length > 0 && !instruction.trim() && (
+                  <div className="space-y-2 mt-4">
+                    <p className="text-sm text-muted-foreground text-center">Suggested prompts:</p>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {suggestions.map((suggestion, index) => (
+                        <Button
+                          key={index}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setInstruction(suggestion)}
+                          className="text-sm h-auto py-2 px-4 font-normal animate-fade-in"
+                          style={{
+                            animationDelay: `${index * 150}ms`,
+                            animationFillMode: 'backwards'
+                          }}
+                        >
+                          {suggestion}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -984,7 +1337,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
           Back
         </Button>
         <div className="flex gap-2">
-          {step !== 'review' && step !== 'success' && (
+          {step !== 'review' && step !== 'success' && step !== 'prompt' && (
             <Button
               onClick={handleNext}
               disabled={
