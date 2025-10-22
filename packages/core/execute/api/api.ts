@@ -11,12 +11,17 @@ export interface CallAxiosResult {
     retriesAttempted: number;
     lastFailureStatus?: number;
   }
+
+  const httpsAgent = new https.Agent({
+    rejectUnauthorized: server_defaults.AXIOS.REJECT_UNAUTHORIZED,
+    keepAlive: process.env.AXIOS_KEEP_ALIVE !== 'false'
+  });
   
   export async function callAxios(config: AxiosRequestConfig, options: RequestOptions): Promise<CallAxiosResult> {
     let retryCount = 0;
-    const maxRetries = options?.retries ?? 1;
-    const delay = options?.retryDelay || server_defaults.AXIOS_DEFAULT_RETRY_DELAY_MS;
-    const maxRateLimitWaitMs = server_defaults.AXIOS_MAX_RATE_LIMIT_WAIT_MS;
+    const maxRetries = options?.retries ?? server_defaults.AXIOS.MAX_QUICK_RETRIES;
+    const delay = options?.retryDelay || server_defaults.AXIOS.DEFAULT_RETRY_DELAY_MS;
+    const maxRateLimitWaitMs = server_defaults.AXIOS.MAX_RATE_LIMIT_WAIT_MS;
     let rateLimitRetryCount = 0;
     let totalRateLimitWaitTime = 0;
     let lastFailureStatus: number | undefined;
@@ -51,10 +56,7 @@ export interface CallAxiosResult {
           maxContentLength: Infinity, // No limit on response size
           maxBodyLength: Infinity, // No limit on response body size
           decompress: true, // Ensure gzip/deflate responses are decompressed
-          httpsAgent: new https.Agent({
-            rejectUnauthorized: false,
-            keepAlive: false,
-          })
+          httpsAgent
         });
         const durationMs = Date.now() - startTs;
   
@@ -94,7 +96,7 @@ export interface CallAxiosResult {
           response.data = Buffer.from(response.data);
         }
         if (response.status < 200 || response.status >= 300) {
-          if (response.status !== 429 && retryCount < maxRetries && durationMs < server_defaults.AXIOS_QUICK_RETRY_THRESHOLD_MS) {
+          if (response.status !== 429 && retryCount < maxRetries && durationMs < server_defaults.AXIOS.QUICK_RETRY_THRESHOLD_MS) {
             lastFailureStatus = response.status;
             retryCount++;
             await new Promise(resolve => setTimeout(resolve, delay));
