@@ -83,7 +83,7 @@ export class WorkflowBuilder {
         },
         { arrays: { mode: 'all' }, required: true }
       );
-      this.inputSchema = convertRequiredToArray(rawSchema) as unknown as JSONSchema;
+      this.inputSchema = convertRequiredToArray(rawSchema) as JSONSchema;
     } catch (error) {
       logMessage('error', `Error during payload parsing: ${error}`, this.metadata);
       throw new Error(`Error during payload parsing: ${error}`);
