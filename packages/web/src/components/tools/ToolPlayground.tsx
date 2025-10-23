@@ -13,6 +13,7 @@ import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { ToolStepGallery } from "./ToolStepGallery";
+import { Validator } from "jsonschema";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -137,6 +138,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [isStopping, setIsStopping] = useState(false);
   // Single source of truth for stopping across modes (embedded/standalone)
   const stopSignalRef = useRef<boolean>(false);
+  const [isPayloadValid, setIsPayloadValid] = useState<boolean>(true);
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (externalSelfHealingEnabled !== undefined) {
@@ -197,6 +200,60 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     endpoint: config.superglueEndpoint,
     apiKey: config.superglueApiKey,
   }), [config.superglueEndpoint, config.superglueApiKey]);
+
+  // Extract payload schema from full input schema
+  const extractPayloadSchema = (fullInputSchema: string | null): any | null => {
+    if (!fullInputSchema || fullInputSchema.trim() === '') {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(fullInputSchema);
+      if (parsed && typeof parsed === 'object' && parsed.properties && parsed.properties.payload) {
+        return parsed.properties.payload;
+      }
+      return parsed;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  // Validate payload against extracted schema
+  const validatePayload = (payloadText: string, schemaText: string | null): boolean => {
+    const payloadSchema = extractPayloadSchema(schemaText);
+    
+    // If schema is null/disabled, payload is always valid
+    if (!payloadSchema) {
+      return true;
+    }
+
+    try {
+      const payloadData = JSON.parse(payloadText || '{}');
+      const validator = new Validator();
+      const result = validator.validate(payloadData, payloadSchema);
+      return result.valid;
+    } catch (e) {
+      // Invalid JSON or validation error - consider invalid
+      return false;
+    }
+  };
+
+  // Debounced validation effect
+  useEffect(() => {
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current);
+    }
+
+    validationTimeoutRef.current = setTimeout(() => {
+      const isValid = validatePayload(payload, inputSchema);
+      setIsPayloadValid(isValid);
+    }, 300);
+
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+    };
+  }, [payload, inputSchema]);
 
   // Unified file upload handlers
   const handleFilesUpload = async (files: File[]) => {
@@ -843,7 +900,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         <Button
           variant="success"
           onClick={() => executeTool()}
-          disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
+          disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform || !isPayloadValid}
           className="h-9 px-4"
         >
           <Play className="h-4 w-4 fill-current" strokeWidth="3px" strokeLinejoin="round" strokeLinecap="round" />
@@ -932,6 +989,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   totalFileSize={totalFileSize}
                   filePayloads={filePayloads}
                   stepSelfHealingEnabled={selfHealingEnabled}
+                  isPayloadValid={isPayloadValid}
+                  extractPayloadSchema={extractPayloadSchema}
                 />
               )}
             </div>

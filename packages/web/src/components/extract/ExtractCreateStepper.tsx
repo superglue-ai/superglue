@@ -183,7 +183,7 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
       }
     }
 
-    const steps: StepperStep[] = ['basic', 'try_and_output', 'success']
+    const steps: StepperStep[] = ['basic', 'try_and_output', 'publish']
     const currentIndex = steps.indexOf(step)
     if (currentIndex < steps.length - 1) {
       setStep(steps[currentIndex + 1])
@@ -191,7 +191,7 @@ export function ExtractCreateStepper({ open, onOpenChange, extractId: initialExt
   }
 
   const handleBack = () => {
-    const steps: StepperStep[] = ['basic', 'try_and_output', 'success']
+    const steps: StepperStep[] = ['basic', 'try_and_output', 'publish']
     const currentIndex = steps.indexOf(step)
     if (currentIndex > 0) {
       setStep(steps[currentIndex - 1])
@@ -511,9 +511,9 @@ if (transformResult?.success) {
           <DialogHeader>
             <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
               <DialogTitle>
-                {step === 'success' ? 'Configuration Complete!' : 'Create New Document Configuration'}
+                {step === 'publish' ? 'Configuration Complete!' : 'Create New Document Configuration'}
               </DialogTitle>
-              {!step.includes('success') && (
+              {!step.includes('publish') && (
                 <Button
                   variant="outline"
                   className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
@@ -758,7 +758,7 @@ if (transformResult?.success) {
             </div>
           )}
 
-          {step === 'success' && (
+          {step === 'publish' && (
             <div className="space-y-4 h-full">
               <p className="text-m font-medium">Done!</p>
               <p className="text-sm font-medium">Your extraction is complete. You can now download the results or use the code examples below.</p>
@@ -864,7 +864,7 @@ if (transformResult?.success) {
         </div>
 
         <div className="flex-none mt-2 sm:mt-4 flex flex-col lg:flex-row gap-2 justify-between">
-          {step === 'success' ? (
+          {step === 'publish' ? (
             <>
               <Button
                 variant="outline"

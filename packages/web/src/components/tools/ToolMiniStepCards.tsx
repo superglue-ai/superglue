@@ -292,7 +292,8 @@ export const PayloadSpotlight = ({
     uploadedFiles = [],
     onFileRemove,
     isProcessingFiles = false,
-    totalFileSize = 0
+    totalFileSize = 0,
+    extractPayloadSchema
 }: {
     payloadText: string;
     inputSchema?: string | null;
@@ -304,6 +305,7 @@ export const PayloadSpotlight = ({
     onFileRemove?: (fileName: string) => void;
     isProcessingFiles?: boolean;
     totalFileSize?: number;
+    extractPayloadSchema?: (schema: string | null) => any | null;
 }) => {
     const [activeTab, setActiveTab] = useState('payload');
     const [localPayload, setLocalPayload] = useState<string>(payloadText || '');
@@ -479,8 +481,27 @@ export const PayloadSpotlight = ({
                 </TabsContent>
                 <TabsContent value="schema" className="mt-3">
                     <JsonSchemaEditor
-                        value={localInputSchema}
-                        onChange={handleSchemaChange}
+                        value={extractPayloadSchema && localInputSchema ? JSON.stringify(extractPayloadSchema(localInputSchema), null, 2) : localInputSchema}
+                        onChange={(value) => {
+                            // When user edits, we need to wrap it back in the full schema structure
+                            if (value && value.trim() !== '') {
+                                try {
+                                    const payloadSchema = JSON.parse(value);
+                                    const fullSchema = {
+                                        type: 'object',
+                                        properties: {
+                                            payload: payloadSchema
+                                        }
+                                    };
+                                    handleSchemaChange(JSON.stringify(fullSchema, null, 2));
+                                } catch (e) {
+                                    // If parsing fails, just pass through
+                                    handleSchemaChange(value);
+                                }
+                            } else {
+                                handleSchemaChange(value);
+                            }
+                        }}
                         isOptional={true}
                         showModeToggle={true}
                     />
@@ -503,7 +524,8 @@ export const PayloadMiniStepCard = ({
     uploadedFiles,
     onFileRemove,
     isProcessingFiles,
-    totalFileSize
+    totalFileSize,
+    extractPayloadSchema
 }: {
     payloadText: string;
     inputSchema?: string | null;
@@ -515,14 +537,15 @@ export const PayloadMiniStepCard = ({
     onFileRemove?: (key: string) => void;
     isProcessingFiles?: boolean;
     totalFileSize?: number;
+    extractPayloadSchema?: (schema: string | null) => any | null;
 }) => {
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
             <div className="p-3">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                        <h3 className="text-lg font-semibold">Tool Payload</h3>
+                        <FileJson className="h-4 w-4 text-muted-foreground" />
+                        <h3 className="text-lg font-semibold">Tool Input</h3>
                     </div>
                     <HelpTooltip text="Payload is the JSON input to tool execution. Editing here does NOT save values to the tool; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
                 </div>
@@ -537,6 +560,7 @@ export const PayloadMiniStepCard = ({
                     onFileRemove={onFileRemove}
                     isProcessingFiles={isProcessingFiles}
                     totalFileSize={totalFileSize}
+                    extractPayloadSchema={extractPayloadSchema}
                 />
             </div>
         </Card>
@@ -704,7 +728,34 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
     );
 };
 
-export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload = false, isTransform = false, isRunningAll = false, isTesting = false, completedSteps = [], failedSteps = [], isFirstCard = false, isLastCard = false, integrations = [], hasTransformCompleted = false }: { step: any; index: number; isActive: boolean; onClick: () => void; stepId?: string | null; isPayload?: boolean; isTransform?: boolean; isRunningAll?: boolean; isTesting?: boolean; completedSteps?: string[]; failedSteps?: string[]; isFirstCard?: boolean; isLastCard?: boolean; integrations?: Integration[]; hasTransformCompleted?: boolean; }) => {
+const getStatusInfo = (isRunning: boolean, isFailed: boolean, isCompleted: boolean) => {
+    if (isRunning) return { 
+        text: "Running", 
+        color: "text-amber-600 dark:text-amber-400",
+        dotColor: "bg-amber-600 dark:bg-amber-400",
+        animate: true
+    };
+    if (isFailed) return { 
+        text: "Failed", 
+        color: "text-red-600 dark:text-red-400",
+        dotColor: "bg-red-600 dark:bg-red-400",
+        animate: false
+    };
+    if (isCompleted) return { 
+        text: "Completed", 
+        color: "text-muted-foreground",
+        dotColor: "bg-green-600 dark:bg-green-400",
+        animate: false
+    };
+    return { 
+        text: "Pending", 
+        color: "text-gray-500 dark:text-gray-400",
+        dotColor: "bg-gray-500 dark:bg-gray-400",
+        animate: false
+    };
+};
+
+export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload = false, isTransform = false, isRunningAll = false, isTesting = false, completedSteps = [], failedSteps = [], isFirstCard = false, isLastCard = false, integrations = [], hasTransformCompleted = false, isPayloadValid = true }: { step: any; index: number; isActive: boolean; onClick: () => void; stepId?: string | null; isPayload?: boolean; isTransform?: boolean; isRunningAll?: boolean; isTesting?: boolean; completedSteps?: string[]; failedSteps?: string[]; isFirstCard?: boolean; isLastCard?: boolean; integrations?: Integration[]; hasTransformCompleted?: boolean; isPayloadValid?: boolean; }) => {
     if (isPayload) {
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
@@ -714,12 +765,22 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
                     isActive && "ring-2 ring-primary shadow-lg",
                     isFirstCard && "rounded-l-2xl bg-gradient-to-br from-primary/5 to-transparent"
                 )}>
-                    <div className="flex flex-col items-center justify-center h-full leading-tight">
-                        <div className="p-2 rounded-full bg-primary/10">
-                            <Play className="h-4 w-4 text-primary" />
+                    <div className="h-full flex flex-col items-center justify-between leading-tight">
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                            <div className="p-2 rounded-full bg-primary/10">
+                                <Play className="h-4 w-4 text-primary" />
+                            </div>
+                            <span className="text-[11px] font-semibold mt-1.5">Start</span>
+                            <span className="text-[9px] text-muted-foreground">Tool Input</span>
                         </div>
-                        <span className="text-[11px] font-semibold mt-1.5">Start</span>
-                        <span className="text-[9px] text-muted-foreground">Tool Payload</span>
+                        <div className="flex items-center gap-1 mt-1">
+                        {!isPayloadValid && (
+                            <span className="text-[9px] font-medium text-amber-600 dark:text-amber-400">Tool Input Needed</span>
+                        )}
+                        {isPayloadValid && (
+                            <span className="text-[9px] font-medium text-muted-foreground">Good to go</span>
+                        )}
+                        </div>
                     </div>
                 </Card>
             </div>
@@ -729,13 +790,7 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
         const isCompleted = completedSteps.includes('__final_transform__');
         const isFailed = failedSteps.includes('__final_transform__');
         const isRunning = isTesting || isRunningAll;
-        const getStatusInfo = () => {
-            if (isRunning) return { text: "Running", color: "text-amber-600 dark:text-amber-400" };
-            if (isFailed) return { text: "Failed", color: "text-red-600 dark:text-red-400" };
-            if (isCompleted) return { text: "✓ Completed", color: "text-muted-foreground" };
-            return { text: "Pending", color: "text-gray-500 dark:text-gray-400" };
-        };
-        const statusInfo = getStatusInfo();
+        const statusInfo = getStatusInfo(isRunning, isFailed, isCompleted);
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
                 <Card className={cn(
@@ -746,38 +801,31 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
                 )}>
                     <div className="h-full flex flex-col items-center justify-between leading-tight">
                         <div className="flex-1 flex flex-col items-center justify-center">
-                            <div className="p-2 rounded-full bg-purple-500/10">
-                                <Package className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                            <div className="p-2 rounded-full bg-primary/10">
+                                <Package className="h-4 w-4 text-primary" />
                             </div>
                             <span className="text-[11px] font-semibold mt-1.5">Tool Result</span>
                             <span className="text-[9px] text-muted-foreground">Transform</span>
                         </div>
                         <div className="flex items-center gap-1 mt-1">
-                            {isRunning && (
-                                <span className="relative flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                                </span>
-                            )}
-                            <span className={cn("text-[9px] font-medium", statusInfo.color)}>{statusInfo.text}</span>
+                            <span className={cn("text-[9px] font-medium flex items-center gap-1", statusInfo.color)}>
+                                <span className={cn(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    statusInfo.dotColor,
+                                    statusInfo.animate && "animate-pulse"
+                                )} />
+                                {statusInfo.text}
+                            </span>
                         </div>
                     </div>
                 </Card>
             </div>
         );
     }
-    const method = step.apiConfig?.method || 'GET';
     const isCompleted = stepId ? completedSteps.includes(stepId) : false;
     const isFailed = stepId ? failedSteps.includes(stepId) : false;
-    const isRunning = isTesting || (isRunningAll && stepId);
-    
-    const getStatusInfo = () => {
-        if (isRunning) return { text: "Running", color: "text-amber-600 dark:text-amber-400" };
-        if (isFailed) return { text: "Failed", color: "text-red-600 dark:text-red-400" };
-        if (isCompleted) return { text: "✓ Completed", color: "text-muted-foreground" };
-        return { text: "Pending", color: "text-gray-500 dark:text-gray-400" };
-    };
-    const statusInfo = getStatusInfo();
+    const isRunning = isTesting || (isRunningAll && !!stepId);
+    const statusInfo = getStatusInfo(isRunning, isFailed, isCompleted);
     
     // Find matching integration for this step
     const linkedIntegration = integrations?.find(integration => {
@@ -823,13 +871,14 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
                             )}
                         </div>
                         <div className="flex items-center gap-1 mt-1">
-                            {isRunning && (
-                                <span className="relative flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                                </span>
-                            )}
-                            <span className={cn("text-[9px] font-medium", statusInfo.color)}>{statusInfo.text}</span>
+                            <span className={cn("text-[9px] font-medium flex items-center gap-1", statusInfo.color)}>
+                                <span className={cn(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    statusInfo.dotColor,
+                                    statusInfo.animate && "animate-pulse"
+                                )} />
+                                {statusInfo.text}
+                            </span>
                         </div>
                     </div>
                 </div>

@@ -282,7 +282,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
       }
     }
 
-    const steps: StepperStep[] = ['basic', 'try_and_output', 'success']
+    const steps: StepperStep[] = ['basic', 'try_and_output', 'publish']
     const currentIndex = steps.indexOf(step)
     if (currentIndex < steps.length - 1) {
       setStep(steps[currentIndex + 1])
@@ -290,7 +290,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
   }
 
   const handleBack = () => {
-    const steps: StepperStep[] = ['basic', 'try_and_output', 'success']
+    const steps: StepperStep[] = ['basic', 'try_and_output', 'publish']
     const currentIndex = steps.indexOf(step)
     if (currentIndex > 0) {
       setStep(steps[currentIndex - 1])
@@ -544,7 +544,7 @@ const result = await superglue.call({
       <div className="flex-none mb-4">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
           <h1 className="text-2xl font-semibold">
-            {step === 'success' ? 'Configuration Complete!' : 'Create New API Configuration'}
+            {step === 'publish' ? 'Configuration Complete!' : 'Create New API Configuration'}
           </h1>
           <div className="flex items-center gap-2">
             {!step.includes('success') && (
@@ -717,7 +717,7 @@ const result = await superglue.call({
           </div>
         )}
 
-        {step === 'success' && (
+        {step === 'publish' && (
           <div className="space-y-4 h-full">
             <p className="text-m font-medium">Done!</p>
             <p className="text-sm font-medium">You can now call the endpoint from your app. The call is proxied to the targeted endpoint without AI inbewteen. Predictable and millisecond latency.</p>
@@ -779,7 +779,7 @@ const result = await superglue.call({
       </div>
 
       <div className="flex-none mt-2 sm:mt-4 flex flex-col lg:flex-row gap-2 justify-between">
-        {step === 'success' ? (
+        {step === 'publish' ? (
           <>
             <Button
               variant="outline"

@@ -660,12 +660,13 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                   disabled={readOnly}
                   onBlur={onBlur}
                   className={cn(
-                    "font-mono text-xs w-full min-h-full border-0 border-transparent outline-none focus:outline-none focus-visible:outline-0 ring-0 focus:ring-0 focus-visible:ring-0"
+                    "font-mono text-xs w-full h-full border-0 border-transparent outline-none focus:outline-none focus-visible:outline-0 ring-0 focus:ring-0 focus-visible:ring-0"
                   )}
-                  textareaClassName="border-0 border-transparent focus:border-0 focus:border-transparent outline-none focus:outline-none focus-visible:outline-0 ring-0 focus:ring-0 focus-visible:ring-0"
+                  textareaClassName="border-0 border-transparent focus:border-0 focus:border-transparent outline-none focus:outline-none focus-visible:outline-0 ring-0 focus:ring-0 focus-visible:ring-0 h-full"
                   style={{
                     fontFamily: 'var(--font-mono)',
-                    minHeight: '100%',
+                    minHeight: '128px',
+                    height: '100%',
                     outline: 'none',
                     boxShadow: 'none',
                     border: '0',

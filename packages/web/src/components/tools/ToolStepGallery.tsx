@@ -61,6 +61,8 @@ interface ToolStepGalleryProps {
     totalFileSize?: number;
     filePayloads?: Record<string, any>;
     stepSelfHealingEnabled?: boolean;
+    isPayloadValid?: boolean;
+    extractPayloadSchema?: (schema: string | null) => any | null;
 }
 
 const SpotlightStepCard = ({
@@ -446,7 +448,9 @@ export function ToolStepGallery({
     isProcessingFiles,
     totalFileSize,
     filePayloads,
-    stepSelfHealingEnabled
+    stepSelfHealingEnabled,
+    isPayloadValid = true,
+    extractPayloadSchema
 }: ToolStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
     const [windowWidth, setWindowWidth] = useState(1200);
@@ -957,6 +961,7 @@ export function ToolStepGallery({
                                                                 isLastCard={globalIdx === totalCards - 1}
                                                                 integrations={integrations}
                                                                 hasTransformCompleted={hasTransformCompleted}
+                                                                isPayloadValid={isPayloadValid}
                                                             />
                                                         </div>
                                                         {showArrow && (
@@ -1047,6 +1052,7 @@ export function ToolStepGallery({
                                 onFileRemove={onFileRemove}
                                 isProcessingFiles={isProcessingFiles}
                                 totalFileSize={totalFileSize}
+                                extractPayloadSchema={extractPayloadSchema}
                             />
                         ) : currentItem.type === 'transform' ? (
                             <FinalTransformMiniStepCard
@@ -1072,7 +1078,7 @@ export function ToolStepGallery({
                                 onRemove={!readOnly && currentItem.type === 'step' ? handleRemoveStep : undefined}
                                 onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
                                 onFixStep={onFixStep ? () => onFixStep(activeIndex - 1) : undefined}
-                                canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
+                                canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap) && (activeIndex !== 1 || isPayloadValid)}
                                 isExecuting={isExecutingStep === activeIndex - 1}
                                 isFixingWorkflow={isFixingWorkflow === activeIndex - 1}
                                 isGlobalExecuting={!!(isExecuting || isExecutingTransform)}
