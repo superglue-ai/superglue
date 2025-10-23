@@ -5,7 +5,7 @@ import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin
 import { makeExecutableSchema } from '@graphql-tools/schema';
 import cors from 'cors';
 import express from 'express';
-import { graphqlUploadExpress } from 'graphql-upload-minimal';
+import { graphqlUploadExpress } from 'graphql-upload-ts';
 import { useServer } from 'graphql-ws/use/ws';
 import http from 'http';
 import { WebSocketServer } from 'ws';
@@ -104,8 +104,10 @@ export async function startGraphqlServer(datastore: DataStore) {
   app.use(express.json({ limit: '1024mb' }));
   app.use(authMiddleware);
   app.use(telemetryMiddleware);
-  app.use(graphqlUploadExpress({ maxFileSize: 1000000000, maxFiles: 1 }));
-
+  app.use(graphqlUploadExpress({ 
+    maxFileSize: 1000000000, 
+    maxFiles: 1,
+  }));
   app.post('/mcp', mcpHandler);
   app.get('/mcp', mcpHandler);
   app.delete('/mcp', mcpHandler);
