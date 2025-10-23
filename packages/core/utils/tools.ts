@@ -4,15 +4,17 @@ import { GraphQLResolveInfo } from "graphql";
 import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
-import { HttpMethodEnum } from "../mcp/mcp-server.js";
 import { parseJSON } from "./json-parser.js";
 import { injectVMHelpersIndividually } from "./vm-helpers.js";
+import { z } from "zod";
 
 export interface TransformResult {
   success: boolean;
   data?: any;
   error?: string;
 }
+
+export const HttpMethodEnum = z.enum(["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]);
 
 export async function applyJsonata(data: any, expr: string): Promise<any> {
   if (!expr) {

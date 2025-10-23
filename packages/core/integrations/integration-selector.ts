@@ -2,13 +2,13 @@ import { Integration } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { LanguageModel, LLMMessage } from "../llm/language-model.js";
+import { getFindRelevantIntegrationsContext } from "../context/context-builders.js";
 import { FIND_RELEVANT_INTEGRATIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
+import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { logMessage } from "../utils/logs.js";
 
 type ChatMessage = LLMMessage;
 
-// Define the structure for a suggested integration
 export interface SuggestedIntegration {
     integration: Integration;
     reason: string;
@@ -25,13 +25,12 @@ export class IntegrationSelector {
         instruction: string | undefined,
         integrations: Integration[]
     ): Promise<SuggestedIntegration[]> {
-        // Handle case where no integrations are available
+
         if (!integrations || integrations.length === 0) {
             logMessage('info', 'No integrations available for selection.', this.metadata);
             return [];
         }
 
-        // Handle empty/undefined instruction or special cases like "*" or "all"
         if (!instruction || instruction.trim() === "" || instruction.trim() === "*" || instruction.trim() === "all") {
             logMessage('info', 'No specific instruction provided, returning all available integrations.', this.metadata);
             return integrations.map(int => ({
@@ -47,30 +46,11 @@ export class IntegrationSelector {
             })).describe("A list of integrations that are relevant to the user's request.")
         }));
 
-        const integrationDescriptions = integrations.map(int => {
-            return `
----
-Integration ID: ${int.id} ${int.name ? int.name : ""}
-Documentation Summary: ${int.documentation?.slice(0, 1000)}
-${int.specificInstructions ? `User Instructions for this integration: ${int.specificInstructions}\n` : ''}
-`;
-        }).join("\n");
-
         const messages: ChatMessage[] = [
             { role: "system", content: FIND_RELEVANT_INTEGRATIONS_SYSTEM_PROMPT },
             {
                 role: "user",
-                content: `
-Based on the user's instruction, select the most relevant integrations from the following list.
-
-User Instruction:
-"${instruction}"
-
-Available Integrations:
-${integrationDescriptions}
-
-Return a JSON object conforming to the schema, containing a list of suggested integration IDs no longer than 10 in order of relevance and a brief reason for each selection. If no integrations are relevant, return an empty list.
-`
+                content: getFindRelevantIntegrationsContext({ searchTerms: instruction, availableIntegrations: integrations }, { characterBudget: LanguageModel.contextLength / 10 })
             }
         ];
 

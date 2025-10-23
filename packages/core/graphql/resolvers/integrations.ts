@@ -2,12 +2,12 @@ import { Integration } from '@superglue/client';
 import { Context, findMatchingIntegration, integrations, Metadata } from "@superglue/shared";
 import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
+import { PostgresService } from '../../datastore/postgres.js';
 import { server_defaults } from '../../default.js';
-import { IntegrationSelector } from '../../integrations/integration-selector.js';
 import { DocumentationFetcher } from '../../documentation/documentation-fetching.js';
+import { IntegrationSelector } from '../../integrations/integration-selector.js';
 import { logMessage } from '../../utils/logs.js';
 import { composeUrl } from '../../utils/tools.js';
-import { PostgresService } from '../../datastore/postgres.js';
 
 export const listIntegrationsResolver = async (
   _: any,
@@ -103,10 +103,10 @@ export const upsertIntegrationResolver = async (
     if (mode === 'CREATE') {
       // If we are creating the integration, and we are on postgres datastore, and there is a template documentation, we copy it to the users integration
       const [doesTemplateDocumentationExists, templateName] = templateDocumentationExists(input, context);
-      if(doesTemplateDocumentationExists) {
+      if (doesTemplateDocumentationExists) {
         logMessage('debug', `Copying template documentation for template '${templateName}' to user integration '${input.id}'`, { orgId: context.orgId });
         const success = await context.datastore.copyTemplateDocumentationToUserIntegration({ templateId: templateName, userIntegrationId: input.id, orgId: context.orgId });
-        if(!success) {
+        if (!success) {
           logMessage('warn', `No Template Documentation found for template ${templateName} to copy to user integration ${input.id}`, { orgId: context.orgId });
           // set shouldFetchDoc to true to trigger a fetch
           shouldFetchDoc = true;
@@ -142,19 +142,19 @@ export const deleteIntegrationResolver = async (
 
 export const findRelevantIntegrationsResolver = async (
   _: any,
-  { instruction }: { instruction?: string },
+  { searchTerms }: { searchTerms?: string },
   context: Context,
   info: GraphQLResolveInfo
 ) => {
-  const logInstruction = instruction ? `instruction: ${instruction}` : 'no instruction (returning all integrations)';
-  logMessage('info', `Finding relevant integrations for ${logInstruction}`, { orgId: context.orgId });
+  const logSearchTerms = searchTerms ? `searchTerms: ${searchTerms}` : 'no searchTerms (returning all integrations)';
+  logMessage('info', `Finding relevant integrations for ${logSearchTerms}`, { orgId: context.orgId });
 
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
     const allIntegrations = await context.datastore.listIntegrations({ limit: 1000, offset: 0, includeDocs: false, orgId: context.orgId });
 
     const selector = new IntegrationSelector(metadata);
-    return await selector.select(instruction, allIntegrations.items || []);
+    return await selector.select(searchTerms, allIntegrations.items || []);
   } catch (error) {
     logMessage('error', `Error finding relevant integrations: ${String(error)}`, { orgId: context.orgId });
     return [];
@@ -287,7 +287,7 @@ function shouldTriggerDocFetch(input: Integration, context: Context, existingInt
   }
 
   const docUrlChanged = input.documentationUrl !== existingIntegration.documentationUrl;
-  const hostChanged = input.urlHost!== existingIntegration.urlHost;
+  const hostChanged = input.urlHost !== existingIntegration.urlHost;
   const pathChanged = input.urlPath !== existingIntegration.urlPath;
   const hasRelevantChanges = docUrlChanged || hostChanged || pathChanged;
 

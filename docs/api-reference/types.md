@@ -144,13 +144,30 @@ type Integration {
 
 ### SuggestedIntegration
 
-AI-suggested integration based on natural language instruction.
+AI-suggested integration based on natural language search terms.
 
 ```graphql
 type SuggestedIntegration {
-  id: String!                       # Integration identifier
+  integration: Integration!         # Full integration object
   reason: String!                   # Why this integration is relevant
-  savedCredentials: [String!]!      # Available credential keys
+}
+```
+
+### SuggestedTool
+
+AI-suggested tool (workflow) based on natural language search terms.
+
+```graphql
+type ToolStep {
+  integrationId: String             # Integration used in this step
+  instruction: String               # Step-level instruction
+}
+
+type SuggestedTool {
+  id: ID!                           # Tool identifier
+  instruction: String               # What the tool does
+  steps: [ToolStep!]!               # Steps and integrations used
+  reason: String!                   # Why this tool matches the search
 }
 ```
 
