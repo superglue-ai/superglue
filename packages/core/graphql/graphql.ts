@@ -1,4 +1,4 @@
-import { GraphQLUpload } from "graphql-upload-minimal";
+import { GraphQLUpload } from 'graphql-upload-ts';
 import fs from "node:fs";
 import { callResolver } from "./resolvers/call.js";
 import { deleteApiResolver, deleteExtractResolver, deleteTransformResolver } from "./resolvers/delete.js";
