@@ -1,10 +1,6 @@
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
-import { Input } from '@/src/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { Label } from '@/src/components/ui/label';
-import { Switch } from '@/src/components/ui/switch';
 import { Badge } from '@/src/components/ui/badge';
 import { canExecuteStep } from '@/src/lib/client-utils';
 import { downloadJson } from '@/src/lib/download-utils';
@@ -84,7 +80,6 @@ const SpotlightStepCard = ({
     failedSteps = [],
     showOutputSignal,
     onConfigEditingChange,
-    selfHealingEnabled,
 }: {
     step: any;
     stepIndex: number;
@@ -105,7 +100,6 @@ const SpotlightStepCard = ({
     stepResultsMap?: Record<string, any>;
     showOutputSignal?: number;
     onConfigEditingChange?: (editing: boolean) => void;
-    selfHealingEnabled?: boolean;
 }) => {
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
@@ -725,7 +719,7 @@ export function ToolStepGallery({
     };
 
     useEffect(() => {
-        setActiveIndex(steps.length > 0 ? 1 : 0);
+        setActiveIndex(steps.length > 0 && isPayloadValid ? 1 : 0);
     }, []);
 
     // Keyboard navigation with arrow keys
@@ -1088,7 +1082,6 @@ export function ToolStepGallery({
                                 failedSteps={failedSteps}
                                 showOutputSignal={showStepOutputSignal}
                                 onConfigEditingChange={setIsConfiguratorEditing}
-                                selfHealingEnabled={stepSelfHealingEnabled}
                             />
                         )
                     )}
