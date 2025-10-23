@@ -9,6 +9,46 @@ import { getWorkflowBuilderContext } from "../context/context-builders.js";
 
 type ChatMessage = LLMMessage;
 
+function convertRequiredToArray(schema: any): any {
+  if (!schema || typeof schema !== 'object') {
+    return schema;
+  }
+
+  if (Array.isArray(schema)) {
+    return schema.map(item => convertRequiredToArray(item));
+  }
+
+  const result: any = { ...schema };
+  delete result.required;
+
+  if (result.properties && typeof result.properties === 'object') {
+    const requiredFields: string[] = [];
+    const newProperties: any = {};
+
+    for (const [key, value] of Object.entries(result.properties)) {
+      const fieldSchema: any = value;
+      if (fieldSchema && typeof fieldSchema === 'object' && fieldSchema.required === true) {
+        requiredFields.push(key);
+        const { required, ...rest } = fieldSchema;
+        newProperties[key] = convertRequiredToArray(rest);
+      } else {
+        newProperties[key] = convertRequiredToArray(fieldSchema);
+      }
+    }
+
+    result.properties = newProperties;
+    if (requiredFields.length > 0) {
+      result.required = requiredFields;
+    }
+  }
+
+  if (result.items) {
+    result.items = convertRequiredToArray(result.items);
+  }
+
+  return result;
+}
+
 export class WorkflowBuilder {
   private integrations: Record<string, Integration>;
   private instruction: string;
@@ -36,13 +76,14 @@ export class WorkflowBuilder {
       const credentials = Object.values(integrations).reduce((acc, int) => {
         return { ...acc, ...Object.entries(int.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${int.id}_${name}`]: value }), {}) };
       }, {});
-      this.inputSchema = toJsonSchema(
+      const rawSchema = toJsonSchema(
         {
           payload: this.initialPayload,
           credentials: credentials
         },
-        { arrays: { mode: 'all' }, }
-      ) as unknown as JSONSchema;
+        { arrays: { mode: 'all' }, required: true }
+      );
+      this.inputSchema = convertRequiredToArray(rawSchema) as unknown as JSONSchema;
     } catch (error) {
       logMessage('error', `Error during payload parsing: ${error}`, this.metadata);
       throw new Error(`Error during payload parsing: ${error}`);
