@@ -9,7 +9,7 @@ import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimple
 import { Integration, IntegrationInput, SuperglueClient, Workflow as Tool, UpsertMode } from '@superglue/client';
 import { integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { ArrowRight, Check, Clock, FileJson, FileInput, FileWarning, Globe, Key, Loader2, Pencil, Plus, Send, Upload, X } from 'lucide-react';
+import { ArrowRight, Check, Clock, FileJson, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Upload, Wrench, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -21,6 +21,7 @@ import { Switch } from '../ui/switch';
 import { Textarea } from '../ui/textarea';
 import { DocStatus } from '../utils/DocStatusSpinner';
 import { HelpTooltip } from '../utils/HelpTooltip';
+import JsonSchemaEditor from '../utils/JsonSchemaEditor';
 import { StepIndicator, TOOL_CREATE_STEPS } from '../utils/StepIndicator';
 import { ToolCreateSuccess } from './ToolCreateSuccess';
 import { PayloadSpotlight } from './ToolMiniStepCards';
@@ -106,6 +107,9 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
   const [showFileUploadSection, setShowFileUploadSection] = useState(false);
   const [showResponseSchemaSection, setShowResponseSchemaSection] = useState(false);
   const [responseSchema, setResponseSchema] = useState('');
+  const [inputSchema, setInputSchema] = useState<string | null>(null);
+  const [enforceInputSchema, setEnforceInputSchema] = useState(true);
+  const [inputSchemaMode, setInputSchemaMode] = useState<'current' | 'custom'>('current');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const client = useMemo(() => new ExtendedSuperglueClient({
@@ -938,8 +942,8 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                   </h2>
                 </div>
 
-                {/* Chat-like instruction input with send button */}
-                <div className="relative">
+                {/* Chat-like instruction input with send button and settings */}
+                <div className="relative border rounded-2xl bg-card p-4">
                   <Textarea
                     ref={textareaRef}
                     id="instruction"
@@ -947,7 +951,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                     onChange={handleTextareaChange}
                     placeholder="Describe what you want this tool to achieve..."
                     className={cn(
-                      "resize-none pr-14 rounded-2xl scrollbar-thin scrollbar-thumb-rounded bg-card",
+                      "resize-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 scrollbar-thin scrollbar-thumb-rounded min-h-[80px]",
                       validationErrors.instruction && inputErrorStyles
                     )}
                     rows={1}
@@ -957,54 +961,37 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                       scrollbarGutter: 'stable'
                     }}
                   />
-                  {/* Send button positioned to the right inside textarea */}
-                  <Button
-                    size="icon"
-                    onClick={handleSendPrompt}
-                    disabled={isBuilding || !instruction.trim()}
-                    className="absolute bottom-2 right-2 h-8 w-8 rounded-full"
-                  >
-                    {isBuilding ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-                {validationErrors.instruction && (
-                  <p className="text-sm text-destructive text-center">Tool instruction is required</p>
-                )}
 
-                {/* Settings buttons - always show */}
-                <div className="flex gap-3 justify-center mt-4">
-                    <button
+                  {/* Settings buttons on left, send button on right */}
+                  <div className="flex justify-between items-center gap-2 mt-3">
+                    <div className="flex gap-2">
+                      <button
                       onClick={() => {
                         if (showFileUploadSection) setShowFileUploadSection(false);
                         if (showResponseSchemaSection) setShowResponseSchemaSection(false);
                         setShowPayloadSection(!showPayloadSection);
                       }}
                       className={cn(
-                        "text-sm px-4 py-2 rounded-full transition-all animate-fade-in flex items-center gap-2",
+                        "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
                         (() => {
                           const trimmedPayload = payload.trim();
                           const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
                           
                           if (isEmptyPayload) {
-                            return "border-2 border-[#FFA500] text-foreground hover:bg-[#FFA500]/10";
+                            return "border border-border text-muted-foreground hover:bg-accent/50";
                           }
                           
                           // Check if JSON is valid
                           try {
                             JSON.parse(trimmedPayload);
                             // Valid JSON - filled
-                            return "bg-[#FFD700] border-2 border-[#FFA500] text-foreground";
+                            return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
                           } catch {
                             // Invalid JSON
-                            return "bg-red-100 dark:bg-red-950/30 border-2 border-red-500 text-red-700 dark:text-red-400";
+                            return "bg-red-100 dark:bg-red-950/30 border border-red-500 text-red-700 dark:text-red-400";
                           }
                         })()
                       )}
-                      style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}
                     >
                       <FileJson className="h-4 w-4" />
                       {(() => {
@@ -1031,14 +1018,13 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                         setShowFileUploadSection(!showFileUploadSection);
                       }}
                       className={cn(
-                        "text-sm px-4 py-2 rounded-full transition-all animate-fade-in flex items-center gap-2",
+                        "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
                         uploadedFiles.length > 0
-                          ? "bg-[#FFD700] border-2 border-[#FFA500] text-foreground"
-                          : "border-2 border-[#FFA500] text-foreground hover:bg-[#FFA500]/10"
+                          ? "bg-[#FFD700]/40 border border-[#FFA500] text-foreground"
+                          : "border border-border text-muted-foreground hover:bg-accent/50"
                       )}
-                      style={{ animationDelay: '150ms', animationFillMode: 'backwards' }}
                     >
-                      <FileInput className="h-4 w-4" />
+                      <Paperclip className="h-4 w-4" />
                       {uploadedFiles.length > 0 ? `File Tool Input Attached (${uploadedFiles.length})` : 'Attach File Tool Input'}
                     </button>
                     
@@ -1047,27 +1033,68 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                         if (showPayloadSection) setShowPayloadSection(false);
                         if (showFileUploadSection) setShowFileUploadSection(false);
                         setShowResponseSchemaSection(!showResponseSchemaSection);
+                        if (!showResponseSchemaSection && !responseSchema) {
+                          setResponseSchema('{"type":"object","properties":{}}');
+                        }
                       }}
                       className={cn(
-                        "text-sm px-4 py-2 rounded-full transition-all animate-fade-in flex items-center gap-2",
+                        "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
                         responseSchema 
-                          ? "bg-[#FFD700] border-2 border-[#FFA500] text-foreground" 
-                          : "border-2 border-[#FFA500] text-foreground hover:bg-[#FFA500]/10"
+                          ? "bg-[#FFD700]/40 border border-[#FFA500] text-foreground" 
+                          : "border border-border text-muted-foreground hover:bg-accent/50"
                       )}
-                      style={{ animationDelay: '300ms', animationFillMode: 'backwards' }}
                     >
                       <FileWarning className="h-4 w-4" />
                       {responseSchema ? 'Tool Result Schema Defined' : 'Enforce Tool Result Schema'}
                     </button>
+                    </div>
+
+                    {/* Build button on the right */}
+                    <Button
+                      onClick={handleSendPrompt}
+                      disabled={isBuilding || !instruction.trim()}
+                      className="h-8 px-4 rounded-full flex-shrink-0 flex items-center gap-2"
+                      title="Build Tool"
+                    >
+                      {isBuilding ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Building...
+                        </>
+                      ) : (
+                        <>
+                          <Wrench className="h-4 w-4" />
+                          Build
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
+                {validationErrors.instruction && (
+                  <p className="text-sm text-destructive text-center mt-2">Tool instruction is required</p>
+                )}
 
                 {/* Expanded sections - show below buttons */}
                 {showPayloadSection && (
                   <div className="space-y-3 border rounded-lg p-4 bg-card animate-fade-in mt-3" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
-                    <div className="space-y-2">
-                      <h4 className="font-medium text-sm">JSON Tool Input</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-sm">JSON Tool Input</h4>
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="enforce-input-schema" className="text-xs cursor-pointer">
+                            Enforce Input Schema
+                          </Label>
+                          <Switch
+                            id="enforce-input-schema"
+                            checked={enforceInputSchema}
+                            onCheckedChange={setEnforceInputSchema}
+                            className="custom-switch"
+                          />
+                        </div>
+                      </div>
+
                       <Textarea
-                        value={payload}
+                        value={payload || '{}'}
                         onChange={(e) => {
                           setPayload(e.target.value);
                           try {
@@ -1082,6 +1109,54 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                       />
                       {validationErrors.payload && (
                         <p className="text-xs text-destructive">Invalid JSON format</p>
+                      )}
+
+                      {/* Input Schema section - only show when enforcement is enabled */}
+                      {enforceInputSchema && (
+                        <div className="space-y-3 pt-3 border-t">
+                          <h4 className="font-medium text-sm">Enforced Tool Input Schema</h4>
+                          
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setInputSchemaMode('current')}
+                              className={cn(
+                                "flex-1 text-xs px-3 py-2 rounded-md transition-all border",
+                                inputSchemaMode === 'current'
+                                  ? "bg-primary/10 border-primary text-foreground"
+                                  : "border-border text-muted-foreground hover:bg-accent/50"
+                              )}
+                            >
+                              Use schema generated from tool input
+                            </button>
+                            <button
+                              onClick={() => {
+                                setInputSchemaMode('custom');
+                                if (!inputSchema) {
+                                  setInputSchema('{"type":"object","properties":{}}');
+                                }
+                              }}
+                              className={cn(
+                                "flex-1 text-xs px-3 py-2 rounded-md transition-all border",
+                                inputSchemaMode === 'custom'
+                                  ? "bg-primary/10 border-primary text-foreground"
+                                  : "border-border text-muted-foreground hover:bg-accent/50"
+                              )}
+                            >
+                              Use custom schema
+                            </button>
+                          </div>
+
+                          {inputSchemaMode === 'custom' && (
+                            <div className="space-y-2">
+                              <JsonSchemaEditor
+                                value={inputSchema}
+                                onChange={setInputSchema}
+                                isOptional={false}
+                                showModeToggle={true}
+                              />
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1156,27 +1231,29 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                           })}
                         </div>
                       )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => document.getElementById('file-upload-new')?.click()}
-                        disabled={isProcessingFiles}
-                        className="w-full"
-                      >
-                        {isProcessingFiles ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Processing...
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="h-4 w-4 mr-2" />
-                            Select Files
-                          </>
-                        )}
-                      </Button>
-                      <div className="text-xs text-muted-foreground text-center">
-                        {formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE)}
+                      <div className="flex flex-col items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => document.getElementById('file-upload-new')?.click()}
+                          disabled={isProcessingFiles}
+                          className="w-48"
+                        >
+                          {isProcessingFiles ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <Paperclip className="h-4 w-4 mr-2" />
+                              Select Files
+                            </>
+                          )}
+                        </Button>
+                        <div className="text-xs text-muted-foreground text-center">
+                          {formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE)}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1184,15 +1261,15 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
 
                 {showResponseSchemaSection && (
                   <div className="border rounded-lg p-4 bg-card animate-fade-in mt-3" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
-                    <h4 className="font-medium text-sm mb-2">Response Schema JSON</h4>
-                    <Textarea
-                      value={responseSchema}
-                      onChange={(e) => setResponseSchema(e.target.value)}
-                      placeholder='{\n  "type": "object",\n  "properties": {\n    ...\n  }\n}'
-                      className="font-mono text-xs min-h-[150px]"
+                    <h4 className="font-medium text-sm mb-3">Tool Result Schema</h4>
+                    <JsonSchemaEditor
+                      value={responseSchema || null}
+                      onChange={(value) => setResponseSchema(value || '')}
+                      isOptional={true}
+                      showModeToggle={true}
                     />
                     <p className="text-xs text-muted-foreground mt-2">
-                      Optional JSON Schema to validate the tool's response
+                      Define a JSON Schema to validate the tool's response
                     </p>
                   </div>
                 )}
@@ -1200,7 +1277,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                 {/* Suggested prompts with animation - only show when textarea is empty and no section is expanded */}
                 {suggestions.length > 0 && !instruction.trim() && !showPayloadSection && !showFileUploadSection && !showResponseSchemaSection && (
                   <div className="space-y-2 mt-4">
-                    <p className="text-sm text-muted-foreground text-center">Suggested prompts:</p>
+                    <p className="text-sm text-muted-foreground text-center">Suggestedions:</p>
                     <div className="flex flex-wrap gap-2 justify-center">
                       {suggestions.map((suggestion, index) => (
                         <Button
