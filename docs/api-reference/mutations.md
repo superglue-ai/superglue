@@ -216,6 +216,100 @@ Deletes a workflow configuration. Returns `true` if successful.
   </Tab>
 </Tabs>
 
+### upsertWorkflowSchedule
+
+Creates or updates a workflow schedule for recurring execution.
+
+**Parameters:**
+- `schedule`: WorkflowScheduleInput! - Schedule configuration (required)
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    mutation UpsertWorkflowSchedule($schedule: WorkflowScheduleInput!) {
+      upsertWorkflowSchedule(schedule: $schedule) {
+        id
+        workflowId
+        cronExpression
+        timezone
+        enabled
+        payload
+        options
+        lastRunAt
+        nextRunAt
+        createdAt
+        updatedAt
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    // Create a new schedule - runs daily at 2 AM Eastern Time
+    const dailySchedule = await client.upsertWorkflowSchedule({
+      workflowId: "customer-sync-workflow",
+      cronExpression: "0 2 * * *",
+      timezone: "America/New_York",
+      enabled: true,
+      payload: { 
+        syncMode: "incremental" 
+      },
+      options: { 
+        selfHealing: "ENABLED"
+      }
+    });
+
+    // Hourly sync during business hours (9 AM - 5 PM, Monday-Friday)
+    const businessHoursSchedule = await client.upsertWorkflowSchedule({
+      workflowId: "realtime-data-sync",
+      cronExpression: "0 9-17 * * 1-5",
+      timezone: "America/Los_Angeles",
+      enabled: true
+    });
+
+    // Every 15 minutes
+    const frequentSchedule = await client.upsertWorkflowSchedule({
+      workflowId: "quick-polling-workflow",
+      cronExpression: "*/15 * * * *",
+      timezone: "UTC",
+      enabled: true
+    });
+
+    // Update existing schedule (disable it)
+    const updated = await client.upsertWorkflowSchedule({
+      id: "existing-schedule-id",
+      enabled: false
+    });
+
+    // Update cron expression (runs weekly on Monday at 9 AM)
+    const weeklySchedule = await client.upsertWorkflowSchedule({
+      id: "existing-schedule-id",
+      cronExpression: "0 9 * * 1",
+      timezone: "Europe/London"
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### deleteWorkflowSchedule
+
+Deletes a workflow schedule. Returns `true` if successful.
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    mutation DeleteWorkflowSchedule($id: ID!) {
+      deleteWorkflowSchedule(id: $id)
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const success = await client.deleteWorkflowSchedule("schedule-id");
+    ```
+  </Tab>
+</Tabs>
+
 ### upsertIntegration
 
 Creates or updates an integration configuration. Integrations represent connections to external APIs or databases.
