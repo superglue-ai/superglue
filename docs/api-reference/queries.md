@@ -162,6 +162,57 @@ Returns a paginated list of integration configurations.
   </Tab>
 </Tabs>
 
+### listWorkflowSchedules
+
+Returns all schedules for a specific workflow.
+
+**Parameters:**
+- `workflowId`: String! - The workflow ID to list schedules for (required)
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    query ListWorkflowSchedules($workflowId: String!) {
+      listWorkflowSchedules(workflowId: $workflowId) {
+        id
+        workflowId
+        cronExpression
+        timezone
+        enabled
+        payload
+        options
+        lastRunAt
+        nextRunAt
+        createdAt
+        updatedAt
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    const schedules = await client.listWorkflowSchedules("workflow-id");
+    
+    // Example response:
+    // [
+    //   {
+    //     id: "schedule-1",
+    //     workflowId: "workflow-id",
+    //     cronExpression: "0 2 * * *",
+    //     timezone: "America/New_York",
+    //     enabled: true,
+    //     payload: { customParam: "value" },
+    //     options: { timeout: 30000 },
+    //     lastRunAt: "2025-10-23T06:00:00Z",
+    //     nextRunAt: "2025-10-24T06:00:00Z",
+    //     createdAt: "2025-10-01T10:00:00Z",
+    //     updatedAt: "2025-10-23T06:00:00Z"
+    //   }
+    // ]
+    ```
+  </Tab>
+</Tabs>
+
 ## Get Operations
 
 ### getRun

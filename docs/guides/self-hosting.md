@@ -80,9 +80,12 @@ WEB_PORT=3001
 AUTH_TOKEN=your-secret-token
 
 # Controls whether the workflow scheduler should run alongside Superglue.
+# The scheduler polls for due workflow schedules every 30 seconds and executes them.
 # ⚠️ Important: Only enable this on a single instance. 
 # Running multiple schedulers (e.g. in production or when using the same DB) 
-# can cause conflicts.
+# will cause duplicate workflow executions (no distributed locking).
+# Set to 'true' to enable, 'false' to disable.
+# See the Workflow Scheduling guide for more details: /guides/scheduling
 START_SCHEDULER_SERVER=false
 
 

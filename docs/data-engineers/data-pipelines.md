@@ -222,16 +222,15 @@ const incrementalSyncWorkflow = await superglue.buildWorkflow({
   }
 });
 
-// Run every 15 minutes
-const scheduler = new WorkflowScheduler({
-  workflows: [
-    {
-      id: "incremental-contact-sync",
-      schedule: "*/15 * * * *", // Every 15 minutes
-      workflow: incrementalSyncWorkflow
-    }
-  ]
+// Schedule to run every 15 minutes
+await superglue.upsertWorkflowSchedule({
+  workflowId: incrementalSyncWorkflow.id,
+  cronExpression: "*/15 * * * *",
+  timezone: "UTC",
+  enabled: true
 });
+
+// For complete scheduling guide, see: /guides/scheduling
 ```
 
 ### Delta Detection Pattern

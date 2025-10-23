@@ -103,6 +103,59 @@ type Workflow implements BaseConfig {
 }
 ```
 
+### WorkflowSchedule
+
+Configuration for scheduled workflow execution. Workflows can be executed on a recurring schedule using cron expressions.
+
+```graphql
+type WorkflowSchedule {
+  id: ID!
+  workflowId: String!               # ID of the workflow to execute
+  cronExpression: String!           # Cron expression (5-field: minute hour day month weekday)
+  timezone: String!                 # IANA timezone (e.g., "America/New_York", "UTC", "Europe/London")
+  enabled: Boolean!                 # Whether the schedule is active
+  payload: JSON                     # Input data to pass to workflow execution
+  options: JSON                     # Execution options (timeout, retries, etc.)
+  lastRunAt: DateTime               # Timestamp of last execution
+  nextRunAt: DateTime!              # Calculated next execution time (in UTC)
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input WorkflowScheduleInput {
+  id: ID                            # Schedule ID (for updates only)
+  workflowId: ID                    # Workflow ID (required for new schedules)
+  cronExpression: String            # Cron expression (required for new schedules)
+  timezone: String                  # IANA timezone (required for new schedules)
+  enabled: Boolean                  # Enable or disable the schedule
+  payload: JSON                     # Input data for workflow execution
+  options: JSON                     # Execution options
+}
+```
+
+**Cron Expression Format:**
+- Uses standard 5-field cron syntax: `minute hour day month weekday`
+- Minute: 0-59
+- Hour: 0-23
+- Day: 1-31
+- Month: 1-12
+- Weekday: 0-6 (Sunday to Saturday)
+- Supports ranges (`1-5`), lists (`1,3,5`), and steps (`*/15`)
+- Does NOT support seconds or years
+
+**Common Examples:**
+- `0 2 * * *` - Daily at 2:00 AM
+- `0 * * * *` - Every hour
+- `*/15 * * * *` - Every 15 minutes
+- `0 9-17 * * 1-5` - Every hour from 9 AM to 5 PM, Monday to Friday
+- `0 0 * * 0` - Weekly on Sunday at midnight
+
+**Timezone Handling:**
+- All schedules require a valid IANA timezone
+- Next run times are calculated in the specified timezone
+- Times are stored in UTC internally
+- The scheduler polls every 30 seconds to check for due schedules
+
 ### ExecutionStep
 
 Individual step within a workflow.
