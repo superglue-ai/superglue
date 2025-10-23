@@ -839,7 +839,10 @@ export function ToolStepGallery({
                             size="icon"
                             onClick={() => handleNavigation('prev')}
                             disabled={activeIndex === 0}
-                            className="shrink-0 h-9 w-9"
+                            className={cn(
+                                "shrink-0 h-9 w-9",
+                                hiddenLeftCount > 0 && !isPayloadValid && "ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30 animate-pulse"
+                            )}
                             title="Previous"
                         >
                             <ChevronLeft className="h-4 w-4" />
@@ -847,7 +850,10 @@ export function ToolStepGallery({
                         {hiddenLeftCount > 0 && (
                             <Badge 
                                 variant="default" 
-                                className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center bg-primary text-primary-foreground"
+                                className={cn(
+                                    "absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center",
+                                    !isPayloadValid ? "bg-amber-500 text-white" : "bg-primary text-primary-foreground"
+                                )}
                             >
                                 {hiddenLeftCount}
                             </Badge>
@@ -956,6 +962,7 @@ export function ToolStepGallery({
                                                                 integrations={integrations}
                                                                 hasTransformCompleted={hasTransformCompleted}
                                                                 isPayloadValid={isPayloadValid}
+                                                                payloadData={item.type === 'payload' ? workingPayload : undefined}
                                                             />
                                                         </div>
                                                         {showArrow && (
