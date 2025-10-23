@@ -372,7 +372,6 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
         });
         setSuggestions([]);
       }
-      
     } catch (error: any) {
       toast({
         title: 'Error Generating Suggestions',
@@ -1193,7 +1192,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                 {/* Suggested prompts with animation - only show when textarea is empty and no section is expanded */}
                 {suggestions.length > 0 && !instruction.trim() && !showPayloadSection && !showFileUploadSection && !showResponseSchemaSection && (
                   <div className="space-y-2 mt-4">
-                    <p className="text-sm text-muted-foreground text-center">Suggestedions:</p>
+                    <p className="text-sm text-muted-foreground text-center">Suggestions</p>
                     <div className="flex flex-wrap gap-2 justify-center">
                       {suggestions.map((suggestion, index) => (
                         <Button
