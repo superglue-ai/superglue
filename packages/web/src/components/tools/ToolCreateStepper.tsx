@@ -261,56 +261,8 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
   };
 
   const handleNext = async () => {
-    const steps: ToolCreateStep[] = ['integrations', 'build', 'run', 'publish'];
-    const currentIndex = steps.indexOf(step);
-
     if (step === 'integrations') {
-      // Suggestions will be loaded lazily when entering prompt step
-      setStep(steps[currentIndex + 1]);
-    } else if (step === 'build') {
-      const errors: Record<string, boolean> = {};
-      if (!instruction.trim()) errors.instruction = true;
-      try {
-        JSON.parse(payload || '{}');
-      } catch {
-        errors.payload = true;
-      }
-
-      setValidationErrors(errors);
-
-      if (Object.keys(errors).length > 0) {
-        toast({
-          title: 'Validation Error',
-          description: 'Please fix the errors below before continuing.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      setIsBuilding(true);
-      try {
-        const parsedPayload = JSON.parse(payload || '{}');
-        const effectivePayload = { ...parsedPayload, ...filePayloads };
-        const response = await client.buildWorkflow({
-          instruction: instruction,
-          payload: effectivePayload,
-          integrationIds: selectedIntegrationIds,
-          save: false
-        });
-        if (!response) {
-          throw new Error('Failed to build tool');
-        }
-        setCurrentTool(response);
-        setStep(steps[currentIndex + 1]);
-      } catch (error: any) {
-        console.error('Error building tool:', error);
-        toast({
-          title: 'Error Building Tool',
-          description: error.message,
-          variant: 'destructive',
-        });
-      } finally {
-        setIsBuilding(false);
-      }
+      setStep('build');
     } else if (step === 'publish') {
       if (onComplete) {
         onComplete();
