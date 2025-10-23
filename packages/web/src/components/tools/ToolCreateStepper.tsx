@@ -1222,7 +1222,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                         disabled={isSaving || isExecuting}
                         className="h-9 px-4"
                       >
-                        Run Tool
+                        Run All Steps
                       </Button>
                     )}
                     <Button

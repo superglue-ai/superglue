@@ -951,7 +951,7 @@ export function ToolStepGallery({
                                                                 isTransform={item.type === 'transform'}
                                                                 isRunningAll={isExecuting && currentExecutingStepIndex === (globalIdx - 1)}
                                                                 isTesting={
-                                                                    item.type === 'step' ? isExecutingStep === (globalIdx - 1) :
+                                                                    item.type === 'step' ? (isExecutingStep === (globalIdx - 1) || isFixingWorkflow === (globalIdx - 1)) :
                                                                         item.type === 'transform' ? isExecutingTransform :
                                                                             false
                                                                 }
