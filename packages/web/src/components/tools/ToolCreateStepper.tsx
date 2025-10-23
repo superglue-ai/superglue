@@ -501,6 +501,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
         instruction: instruction,
         payload: effectivePayload,
         integrationIds: selectedIntegrationIds,
+        responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
         save: false
       });
       if (!response) {
@@ -950,9 +951,6 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                         if (showPayloadSection) setShowPayloadSection(false);
                         if (showFileUploadSection) setShowFileUploadSection(false);
                         setShowResponseSchemaSection(!showResponseSchemaSection);
-                        if (!showResponseSchemaSection && !responseSchema) {
-                          setResponseSchema('{"type":"object","properties":{}}');
-                        }
                       }}
                       className={cn(
                         "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
@@ -1059,6 +1057,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                                   : "border-border text-muted-foreground hover:bg-accent/50"
                               )}
                             >
+                              {/* This does not do anything at the moment. The Workflow builder does not support input schemas.*/}
                               Use custom schema
                             </button>
                           </div>

@@ -70,9 +70,11 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
 }) => {
   const [isCodeMode, setIsCodeMode] = React.useState(forceCodeMode || false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
-  const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(() => {
-    if (!isOptional) return true;
-    return value !== null && value !== '' && value !== undefined;
+  const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(() => {    
+    if (!isOptional) {
+      return true;
+    }
+    return value !== null && value !== '' && value !== undefined && value !== '{}' && value !== '{"type":"object","properties":{}}';
   });
 
   React.useEffect(() => {
@@ -95,7 +97,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
 
   React.useEffect(() => {
     if (isOptional) {
-      const shouldBeEnabled = value !== null && value !== '' && value !== undefined;
+      const shouldBeEnabled = value !== null && value !== '' && value !== undefined && value !== '{}' && value !== '{"type":"object","properties":{}}';
       if (shouldBeEnabled !== localIsEnabled) {
         setLocalIsEnabled(shouldBeEnabled);
       }
