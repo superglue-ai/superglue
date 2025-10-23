@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { useToast } from '@/src/hooks/use-toast';
 import { downloadJson } from '@/src/lib/download-utils';
-import { ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, isEmptyData, MAX_DISPLAY_LINES, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, MAX_DISPLAY_LINES, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { Integration, SuperglueClient } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
 import { ArrowDown, Check, Copy, Download, Edit, Globe, RotateCw } from 'lucide-react';
@@ -204,11 +204,15 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
             setLoopItemsError(null);
             return;
         }
-        if (!stepInput || isEmptyData(stepInput)) {
+        
+        // Check if there's a loop selector configured
+        const sel = step?.loopSelector;
+        if (!sel || typeof sel !== 'string') {
             setLoopItems(null);
             setLoopItemsError(null);
             return;
         }
+        
         if (lastEvalTimerRef.current) {
             window.clearTimeout(lastEvalTimerRef.current);
             lastEvalTimerRef.current = null;
@@ -217,24 +221,19 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         const t = window.setTimeout(() => {
             setIsLoopItemsEvaluating(true);
             try {
-                const sel = step?.loopSelector;
-                if (!sel || typeof sel !== 'string') {
-                    setLoopItems(null);
-                    setLoopItemsError('No loop selector configured');
+                const raw = ensureSourceDataArrowFunction(sel).trim();
+                const stripped = raw.replace(/;\s*$/, '');
+                const body = `const __selector = (${stripped});\nreturn __selector(sourceData);`;
+                // eslint-disable-next-line no-new-func
+                const fn = new Function('sourceData', body);
+                // Evaluate even with empty stepInput - loop selector might return hardcoded values
+                const out = fn(stepInput || {});
+                if (Array.isArray(out)) {
+                    setLoopItems(out);
+                    setLoopItemsError(null);
                 } else {
-                    const raw = ensureSourceDataArrowFunction(sel).trim();
-                    const stripped = raw.replace(/;\s*$/, '');
-                    const body = `const __selector = (${stripped});\nreturn __selector(sourceData);`;
-                    // eslint-disable-next-line no-new-func
-                    const fn = new Function('sourceData', body);
-                    const out = fn(stepInput || {});
-                    if (Array.isArray(out)) {
-                        setLoopItems(out);
-                        setLoopItemsError(null);
-                    } else {
-                        setLoopItems(null);
-                        setLoopItemsError('Loop selector did not return an array');
-                    }
+                    setLoopItems(null);
+                    setLoopItemsError('Loop selector did not return an array');
                 }
             } catch (err: any) {
                 setLoopItems(null);
@@ -274,11 +273,23 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                     const stripped = raw.replace(/;\s*$/, '');
                     const body = `const __configFn = (${stripped});\nreturn __configFn(context);`;
                     
-                    // Build context object - always provide context even if stepInput is empty
+                    // Build context object
+                    let contextInputData = stepInput || {};
+                    
+                    // In LOOP mode, add currentItem from first loop item (mirroring backend behavior)
+                    if (step.executionMode === 'LOOP' && loopItems && Array.isArray(loopItems) && loopItems.length > 0) {
+                        const currentItem = loopItems[0];
+                        contextInputData = {
+                            ...contextInputData,
+                            currentItem: currentItem
+                        };
+                    }
+                    
                     const context = {
-                        inputData: stepInput || {},
+                        inputData: contextInputData,
                         credentials: linkedIntegration?.credentials || {},
-                        paginationState: {}
+                        paginationState: {},
+                        loopItems: loopItems || []
                     };
                     
                     // eslint-disable-next-line no-new-func
@@ -303,7 +314,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         lastCodeConfigEvalTimerRef.current = t as unknown as number;
         return () => { if (lastCodeConfigEvalTimerRef.current) { window.clearTimeout(lastCodeConfigEvalTimerRef.current); lastCodeConfigEvalTimerRef.current = null; } };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [step.codeConfig, stepInput, linkedIntegration]);
+    }, [step.codeConfig, stepInput, linkedIntegration, step.executionMode, loopItems]);
 
     return (
         <div className="flex flex-col items-center">
@@ -460,13 +471,13 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                         <div>
                                             <Label className="text-xs flex items-center gap-1 mb-1">
                                                 Configuration Code
-                                                <HelpTooltip text="Function that returns { url, method, headers, data, params }. Has access to context.inputData, context.credentials, and context.paginationState." />
+                                                <HelpTooltip text="Function that returns { url, method, headers, data, params }. Has access to context.inputData, context.credentials, context.paginationState, and context.loopItems. In LOOP mode, context.inputData.currentItem contains the current loop item." />
                                             </Label>
                                             <JavaScriptCodeEditor
                                                 value={step.codeConfig.code || ''}
                                                 onChange={(val) => handleImmediateEdit((s) => ({ ...s, codeConfig: { ...s.codeConfig, code: val } }))}
                                                 readOnly={disabled}
-                                                minHeight="200px"
+                                                minHeight="300px"
                                                 maxHeight="300px"
                                                 resizable={true}
                                                 isTransformEditor={false}
@@ -476,23 +487,23 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                         <div>
                                             <Label className="text-xs flex items-center gap-1 mb-1">
                                                 Evaluated Config
-                                                <HelpTooltip text="Live preview of the axios config object returned by your code when evaluated with the current step input." />
+                                                <HelpTooltip text="Live preview of the axios config object returned by your code when evaluated with the current step input. In LOOP mode, evaluates using the first loop item as context.inputData.currentItem. Access via context.loopItems, context.inputData, and context.credentials." />
                                                 {isCodeConfigEvaluating && (
                                                     <div className="ml-1 h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/70 border-t-transparent" />
                                                 )}
                                             </Label>
                                             <div className="relative rounded-lg border font-mono shadow-sm bg-muted/30 overflow-hidden h-[calc(300px-0rem)]">
-                                                <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
+                                                <div className="absolute top-1 right-1 z-10 flex items-center gap-1">
                                                     {!codeConfigError && codeConfigResult && (
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
                                                                 <Button 
                                                                     variant="ghost" 
                                                                     size="icon" 
-                                                                    className="h-6 w-6 bg-background/80 hover:bg-background" 
+                                                                    className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors bg-background/60 backdrop-blur" 
                                                                     title="Copy options"
                                                                 >
-                                                                    <Copy className="h-3 w-3" />
+                                                                    <Copy className="h-2 w-2" />
                                                                 </Button>
                                                             </DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end">
@@ -739,7 +750,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 value={step.loopSelector || ''}
                                                 onChange={(val) => handleImmediateEdit((s) => ({ ...s, loopSelector: val }))}
                                                 readOnly={disabled}
-                                                minHeight="150px"
+                                                minHeight="300px"
                                                 maxHeight="300px"
                                                 resizable={true}
                                                 isTransformEditor={false}
@@ -749,18 +760,12 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                         <div>
                                             <Label className="text-xs flex items-center gap-1 mb-1">
                                                 Loop Items (JSON)
-                                                <HelpTooltip text="Evaluates the loop selector against the step input. The resulting array drives LOOP execution (one run per item). During execution, sourceData.currentItem equals the current item." />
+                                                <HelpTooltip text="Evaluates the loop selector against the step input (or empty object if no input). The resulting array drives LOOP execution (one run per item). During execution, sourceData.currentItem equals the current item." />
                                                 {isLoopItemsEvaluating && (
                                                     <div className="ml-1 h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/70 border-t-transparent" />
                                                 )}
                                             </Label>
-                                            {(!stepInput || isEmptyData(stepInput)) ? (
-                                                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
-                                                    <div className="text-xs mb-1">No input yet</div>
-                                                    <p className="text-[10px]">Run previous step to see loop items</p>
-                                                </div>
-                                            ) : (
-                                                <JsonCodeEditor
+                                            <JsonCodeEditor
                                                     value={(() => {
                                                         if (loopItemsError) return JSON.stringify({ error: loopItemsError }, null, 2);
                                                         if (loopItemsViewMode === 'schema') {
@@ -771,7 +776,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                         return displayData.value;
                                                     })()}
                                                     readOnly={true}
-                                                    minHeight="150px"
+                                                    minHeight="300px"
                                                     maxHeight="300px"
                                                     resizable={true}
                                                     placeholder="[]"
@@ -808,7 +813,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                         </div>
                                                     ) : undefined}
                                                 />
-                                            )}
                                         </div>
                                     </div>
                                 </div>

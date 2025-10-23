@@ -53,6 +53,14 @@ export async function executeStep({
 
   do {
     try {
+      const integration = await integrationManager?.getIntegration();
+      const integrationId = integration?.id;
+      const scopedCredentials = integrationId 
+      ? Object.entries(credentials)
+          .filter(([key]) => key.startsWith(`${integrationId}_`) || !key.includes('_'))
+          .reduce((acc, [key, val]) => ({ ...acc, [key.replace(`${integrationId}_`, '')]: val }), {})
+      : credentials;
+
       if (retryCount > 0 && isSelfHealing) {
         logMessage('info', `Generating code config (retry ${retryCount})`, metadata);
         const currentConfig = codeConfig || endpoint;
@@ -61,7 +69,7 @@ export async function executeStep({
           orgId: metadata.orgId,
           currentConfig,
           inputData,
-          credentials,
+          credentials: scopedCredentials,
           retryCount,
           messages,
           integrationManager
@@ -74,15 +82,7 @@ export async function executeStep({
         codeConfig = result.data?.config as CodeConfig;
       }
 
-      const integration = await integrationManager?.getIntegration();
-      const integrationId = integration?.id;
-
       if (codeConfig) {
-        const scopedCredentials = integrationId 
-        ? Object.entries(credentials)
-            .filter(([key]) => key.startsWith(`${integrationId}_`) || !key.includes('_'))
-            .reduce((acc, [key, val]) => ({ ...acc, [key.replace(`${integrationId}_`, '')]: val }), {})
-        : credentials;
         // Scope credentials to only the relevant integration for security
         response = await executeCodeConfig({
           codeConfig,
@@ -111,14 +111,15 @@ export async function executeStep({
 
       // Check if response is valid
       if (retryCount > 0 && isSelfHealing || options.testMode) {
+        const stepConfigString = `<step_config>${JSON.stringify(codeConfig || endpoint)}</step_config>\n<generated_config>${JSON.stringify(response.request)}</generated_config>`;
         const instruction = codeConfig?.stepInstruction || endpoint?.instruction;
         const result = await evaluateStepResponse({
           data: response.data,
-          stepConfig: codeConfig || endpoint,
+          stepConfigString,
           docSearchResultsForStepInstruction: await integrationManager?.searchDocumentation(instruction)
         });
         success = result.success;
-        if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
+        if (!result.success) throw new Error(result?.shortReason.slice(0, 2000) + " " + JSON.stringify(response.data).slice(0, 1000) + " for request: " + JSON.stringify(response.request).slice(0, 1000));
       }
       else {
         success = true;
@@ -132,7 +133,7 @@ export async function executeStep({
         messages.push({ 
           id: `retry-${retryCount}`,
           role: "user", 
-          content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 4000)}`,
+          content: `There was an error with the configuration, please fix: ${rawErrorString}`,
           timestamp: new Date()
         });
         logMessage('warn', `API call failed. ${lastError}`, metadata);

@@ -88,7 +88,7 @@ export const callResolver = async (
       success: true,
       config: config,
       statusCode: callResult?.statusCode,
-      headers: callResult?.headers,
+      headers: callResult?.request.headers,
       startedAt,
       completedAt: new Date(),
     };

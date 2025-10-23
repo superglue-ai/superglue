@@ -33,14 +33,8 @@ export class WorkflowBuilder {
     this.metadata = metadata;
     this.responseSchema = responseSchema;
     try {
-      const credentials = Object.values(integrations).reduce((acc, int) => {
-        return { ...acc, ...Object.entries(int.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${int.id}_${name}`]: value }), {}) };
-      }, {});
       this.inputSchema = toJsonSchema(
-        {
-          payload: this.initialPayload,
-          credentials: credentials
-        },
+        this.initialPayload,
         { arrays: { mode: 'all' }, }
       ) as unknown as JSONSchema;
     } catch (error) {

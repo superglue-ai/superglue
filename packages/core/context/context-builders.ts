@@ -92,34 +92,41 @@ function buildIntegrationContext(integration: Integration, opts: IntegrationCont
     const generalSectionSize = opts.tuning?.documentationMaxChars ?? server_defaults.CONTEXT.INTEGRATIONS.GENERAL_SECTION_SIZE_CHARS;
 
     const docSearch = new DocumentationSearch((undefined as any));
-    const authSection = docSearch.extractRelevantSections(
+    const authSection = "<authentication_context>" + docSearch.extractRelevantSections(
         integration.documentation,
         "authentication authorization key token bearer basic oauth credentials",
         authMaxSections,
         authSectionSize,
         integration.openApiSchema
-    );
-
-    const paginationSection = docSearch.extractRelevantSections(
+    ) + "</authentication_context>";
+    const paginationSection = "<pagination_context>" +  docSearch.extractRelevantSections(
         integration.documentation,
         "pagination page offset cursor limit per_page pageSize after next previous paging paginated results list",
         paginationMaxSections,
         paginationSectionSize,
         integration.openApiSchema
-    );
-    const generalDocSection = docSearch.extractRelevantSections(
+    ) + "</pagination_context>";
+    const generalDocSection = "<general_context>" + docSearch.extractRelevantSections(
         integration.documentation,
         "reference object endpoints methods properties values fields enums search query filter list create update delete get put post patch",
         generalMaxSections,
         generalSectionSize,
         integration.openApiSchema
-    );
+    ) + "</general_context>";
 
     const xml_opening_tag = `<${integration.id}>\n`;
     const urlSection = '<base_url>: ' + composeUrl(integration.urlHost, integration.urlPath) + '</base_url>\n';
-    const specificInstructionsSection = integration.specificInstructions?.length > 0 ? "<instructions>: " + integration.specificInstructions + "</instructions>\n" : "";
+    const credentialsSection = '<credentials>' + Object.keys(integration.credentials || {}).map(key => `context.credentials.${key}`).join(", ") + '</credentials>\n';
+    const specificInstructionsSection = integration.specificInstructions?.length > 0 ? "<integration_context>: " + integration.specificInstructions + "</integration_context>\n" : "";
     const xml_closing_tag = `</${integration.id}>\n`;
-    return xml_opening_tag + '\n' + [urlSection, specificInstructionsSection, authSection, paginationSection, generalDocSection].filter(Boolean).join('\n').slice(0, budget - xml_opening_tag.length - xml_closing_tag.length) + '\n' + xml_closing_tag;
+    return xml_opening_tag + '\n' + [
+        urlSection, 
+        specificInstructionsSection, 
+        credentialsSection, 
+        authSection, 
+        paginationSection, 
+        generalDocSection
+    ].filter(Boolean).join('\n').slice(0, budget - xml_opening_tag.length - xml_closing_tag.length) + '\n' + xml_closing_tag;
 }
 
 export function getWorkflowBuilderContext(input: WorkflowBuilderContextInput, options: WorkflowBuilderContextOptions): string {

@@ -18,14 +18,6 @@ CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
    - Extracting nested data: response.data?.items || []
    - Combining multiple sources: { ...sourceData.step1, ...sourceData.step2 }
 
-3. For LOOP execution contexts:
-   - currentItem is available directly in the payload
-   - For simple access: use <<currentItem>> to access the entire item
-   - For transformations or complex operations: use <<(sourceData) => sourceData.currentItem...>>
-   - Example: if currentItem = { id: 123, name: "test" }:
-     * Simple access: <<currentItem>> returns the whole object
-     * With transformations: <<(sourceData) => sourceData.currentItem.id * 2>> or <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>
-
 Requirements:
 - Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
 - Return statement is REQUIRED - the function must return the transformed data
@@ -138,12 +130,12 @@ Further:
 - Never make assumptions or guesses about the data you need to fetch. Always fetch all prerequisites first - this is the most common failure mode.
 - Be aware that the user might not be specific about the data they want to fetch. They might say "get all leads" but they might mean "get all people in my crm that have a certain status".
 - Make sure you really really understand the structure of the available data, and fetch prerequisites first.
-- Each step must correspond to a single API call (no compound operations)
+- Each step MUST correspond to a single API call (no compound operations). Do NOT create steps that only return static data or transform existing data - embed that logic in loopSelector, configCode, or finalTransform instead. For example, if the instruction mentions "Fortune 10 companies" or similar lists, embed the list directly in the loopSelector of the API call step, not as a separate step.
 - Choose the appropriate integration for each step based on the provided documentation
 - Assign descriptive stepIds in camelCase that indicate the purpose of the step
 - Make absolutely sure that each step can be achieved with a single API call (or a loop of the same call)
 - Aggregation, grouping, sorting, filtering is covered by a separate final transformation and does not need to be added as a dedicated step. However, if the API supports e.g. filtering when retrieving, this should be part of the retrieval step, just do not add an extra one.
-- For pure data transformation tasks with no API calls, the workflow may have no steps with a final transformation only
+- For pure data transformation tasks with no API calls needed, the workflow may have ZERO steps with a final transformation only
 - Step instructions should DESCRIBE what data to retrieve, and how the response should be structured, without prescribing a rigid response structure.
 - The API's actual response structure will be discovered during execution - don't prescribe it
 </STEP_CREATION>
@@ -187,37 +179,60 @@ Set the execution mode to either:
 Important: Avoid using LOOP mode for potentially very large data objects. If you need to process many items (e.g., thousands of records), prefer batch operations or APIs that can handle multiple items in a single call. Individual loops over large datasets can result in performance issues and API rate limits.
 </EXECUTION_MODES>
 
-<VARIABLES>
-- Use <<variable>> syntax to access variables directly (no JS just plain variables) OR execute JavaScript expressions formatted as <<(sourceData) => sourceData.variable>>:
-   Basic variable access:
-   e.g. https://api.example.com/v1/items?api_key=<<integrationId_api_key>>
-   e.g. headers: {
-        "Authorization": "Bearer <<integrationId_access_token>>"
-   }
-   e.g. headers: {
-        "Authorization": "Basic <<integrationId_username>>:<<integrationId_password>>"
-   }
-   
-   JavaScript expressions:
-   e.g. body: { "userIds": <<(sourceData) => JSON.stringify(sourceData.users.map(u => u.id))>> }
-   e.g. body: { "message_in_base64": <<(sourceData) => { const message = 'Hello World'; return btoa(message) }>> }
-   e.g. body: { "timestamp": "<<(sourceData) => new Date().toISOString()>>", "count": <<(sourceData) => sourceData.items.length>> }
-   e.g. urlPath: /api/<<(sourceData) => sourceData.version || 'v1'>>/users
-   e.g. queryParams: { "active": "<<(sourceData) => sourceData.includeInactive ? 'all' : 'true'>>" }
-   
-- Note: For Basic Authentication, format as "Basic <<integrationId_username>>:<<integrationId_password>>" and the system will automatically convert it to Base64.
-- Headers provided starting with 'x-' are probably headers.
-- Credentials are prefixed with integration ID: <<integrationId_credentialName>>
-- Don't hardcode pagination values like limits in URLs or bodies - use <<>> variables when pagination is configured
-- Access previous step results via sourceData.stepId (e.g., sourceData.fetchUsers)
-- Access initial payload via sourceData (e.g., sourceData.userId)
-- Access uploaded files via sourceData (e.g., sourceData.uploadedFile.csvData)
-- Complex transformations can be done inline: <<(sourceData) => sourceData.contacts.filter(c => c.active).map(c => c.email).join(',')>>
-</VARIABLES>
+<CODE_CONFIGURATION>
+All API configurations use JavaScript code functions that receive a context object with credentials, inputData, and sourceData.
+The function must return an object with url/method/headers/data/params.
+
+Basic structure:
+(context) => ({
+  url: \`https://api.example.com/v1/items?api_key=\${context.credentials.api_key}\`,
+  method: 'GET',
+  headers: {
+    "Authorization": \`Bearer \${context.credentials.access_token}\`
+  }
+})
+
+Accessing data:
+- context.credentials: Integration credentials (e.g., context.credentials.api_key, context.credentials.username)
+- context.inputData: Data from loop iterations or previous step transformations (e.g., context.inputData.userId)
+- context.sourceData: All previous step results and initial payload (e.g., context.sourceData.fetchUsers)
+
+Static data embedding (don't create separate steps for this):
+(context) => ({
+  url: 'https://api.example.com/products',
+  method: 'POST',
+  data: {
+    categories: ['electronics', 'books', 'clothing'],
+    filters: { status: 'active', type: 'premium' }
+  }
+})
+
+Dynamic data and transformations:
+(context) => ({
+  url: \`https://api.example.com/v\${context.inputData.version || '1'}/users\`,
+  method: 'POST',
+  headers: {
+    "Content-Type": "application/json"
+  },
+  data: {
+    userIds: context.inputData.users.map(u => u.id),
+    timestamp: new Date().toISOString(),
+    count: context.inputData.items.length,
+    active: context.inputData.includeInactive ? 'all' : 'true'
+  }
+})
+
+Notes:
+- For Basic Authentication, construct header as: \`Basic \${btoa(\`\${context.credentials.username}:\${context.credentials.password}\`)}\`
+- Headers starting with 'x-' are typically custom headers
+- Access previous step results via context.sourceData.stepId (e.g., context.sourceData.fetchUsers)
+- Access initial payload via context.sourceData (e.g., context.sourceData.userId)
+- Access loop item via context.inputData.currentItem
+</CODE_CONFIGURATION>
 
 <POSTGRES>
 - Postgres format for configCode:
-  * url: Full connection string with database: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>/<<database>>" or "postgresql://..."
+  * url: Full connection string with database: \`postgres://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:\${context.credentials.port}/\${context.credentials.database}\` or "postgresql://..."
   * method: 'POST'
   * data: { query: string, params?: any[] } or { query: string, values?: any[] }
 - Use parameterized queries ($1, $2, etc.) to prevent SQL injection
@@ -256,9 +271,9 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
 <FTP_SFTP>
 - FTP/SFTP format for configCode:
   * url: Full connection URL with credentials and base path
-  * FTP: "ftp://<<username>>:<<password>>@<<hostname>>:21/basepath"
-  * FTPS: "ftps://<<username>>:<<password>>@<<hostname>>:21/basepath"
-  * SFTP: "sftp://<<username>>:<<password>>@<<hostname>>:22/basepath"
+  * FTP: \`ftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:21/basepath\`
+  * FTPS: \`ftps://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:21/basepath\`
+  * SFTP: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22/basepath\`
   * method: 'POST'
   * data: Operation object with 'operation' field and other parameters
 - Supported operations: list, get, put, delete, rename, mkdir, rmdir, exists, stat
@@ -290,9 +305,9 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
 <AUTHENTICATION_PATTERNS>
 Always check the documentation for the correct authentication pattern.
 Common authentication patterns are:
-- Bearer Token: headers: { "Authorization": "Bearer <<access_token>>" }
-- API Key in header: headers: { "X-API-Key": "<<api_key>>" }
-- Basic Auth: headers: { "Authorization": "Basic <<username>>:<<password>>" }
+- Bearer Token: headers: { "Authorization": \`Bearer \${context.credentials.access_token}\` }
+- API Key in header: headers: { "X-API-Key": context.credentials.api_key }
+- Basic Auth: headers: { "Authorization": \`Basic \${btoa(\`\${context.credentials.username}:\${context.credentials.password}\`)}\` }
 - OAuth: Follow the specific OAuth flow documented for the integration.
 
 IMPORTANT: Modern APIs (HubSpot, Stripe, etc.) mostly expect authentication in headers, NOT query parameters. Only use query parameter authentication if explicitly required by the documentation.
@@ -301,19 +316,35 @@ IMPORTANT: Modern APIs (HubSpot, Stripe, etc.) mostly expect authentication in h
 <LOOP_EXECUTION>
 When executionMode is "LOOP":
 1. The loopSelector extracts an array from available data: (sourceData) => sourceData.getContacts.results
-2. Each item in the array becomes available as currentItem in the loop context.
+2. Each item in the array becomes available as context.inputData.currentItem in the loop context.
 3. CURRENTITEM ACCESS:
-   - For direct access to the whole item: use <<currentItem>>
-   - For transformations or specific properties with operations: use <<(sourceData) => sourceData.currentItem.propertyName>>
+   - Access the whole item: context.inputData.currentItem
+   - Access properties: context.inputData.currentItem.propertyName
+   - Transform: context.inputData.currentItem.value * 2
 4. Example flow:
    - loopSelector: (sourceData) => sourceData.getAllContacts.filter(c => c.status === 'active')
-   - URL: /contacts/<<currentItem>>/update (if currentItem is an ID string)
-   - Body: {"contact": <<currentItem>>, "updatedBy": "<<userId>>"}
-   - Or with transformations: {"doubledValue": <<(sourceData) => sourceData.currentItem.value * 2>>, "upperName": <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>}
+   - Example step config:
+     (context) => ({
+       url: \`https://api.example.com/contacts/\${context.inputData.currentItem}/update\`,  // if currentItem is an ID string
+       method: 'PUT',
+       data: {
+         contact: context.inputData.currentItem,
+         updatedBy: context.sourceData.userId
+       }
+     })
+   - Or with transformations:
+     (context) => ({
+       url: 'https://api.example.com/process',
+       method: 'POST',
+       data: {
+         doubledValue: context.inputData.currentItem.value * 2,
+         upperName: context.inputData.currentItem.name.toUpperCase()
+       }
+     })
 5. Previous loop step results structure:
-   - sourceData.<loop_step_id> is an array of objects, one per loop iteration
+   - context.sourceData.<loop_step_id> is an array of objects, one per loop iteration
    - Each element has: { currentItem: <the loop item>, data: <API response data for that item> }
-   - Use this to access results from earlier loop steps, e.g. sourceData.myLoopStep[0].data or sourceData.myLoopStep.map(x => x.currentItem)
+   - Use this to access results from earlier loop steps, e.g. context.sourceData.myLoopStep[0].data or context.sourceData.myLoopStep.map(x => x.currentItem)
 6. Empty loop selector arrays:
    - IMPORTANT: NEVER throw an error when the loop selector returns an empty array.
 </LOOP_EXECUTION>
@@ -332,14 +363,16 @@ CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
    - Combining multiple sources: { ...sourceData.step1, ...sourceData.step2 }
 
 3. For LOOP execution contexts:
-   - currentItem is available directly in the payload and refers to the currently executing step's loop item
+   - currentItem is available via context.inputData.currentItem in API configs and refers to the currently executing step's loop item
+   - In transformation functions (loopSelector, input transforms, final transforms), currentItem is available directly as a function parameter
    - previous loop step results are available in sourceData.<loop_step_id>, where <loop_step_id> is the id of the previous loop step and refers to the array of objects returned by the loop selector
-   - For simple access: use <<currentItem>> to access the entire item
-   - For transformations or complex operations: use <<(sourceData) => sourceData.currentItem...>>
+   - In API config code: use context.inputData.currentItem to access the entire item
+   - In transformation functions: use currentItem directly or sourceData.currentItem
    - Example: if currentItem = { id: 123, name: "test" }:
-     * Simple access: <<currentItem>> returns the whole object
-     * With transformations: <<(sourceData) => sourceData.currentItem.id>> or <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>
-     * Access previous loop step results: <<(sourceData) => sourceData.myLoopStep[0].data>> or <<(sourceData) => sourceData.myLoopStep.map(x => x.currentItem)>>
+     * In API config: context.inputData.currentItem returns the whole object
+     * Access properties: context.inputData.currentItem.id or context.inputData.currentItem.name.toUpperCase()
+     * In transforms: currentItem.id or sourceData.currentItem.name.toUpperCase()
+     * Access previous loop step results: sourceData.myLoopStep[0].data or sourceData.myLoopStep.map(x => x.currentItem)
 
 Requirements:
 - Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
@@ -486,22 +519,18 @@ IMPORTANT RULES:
 4. Use template literals for dynamic URLs and values
 5. For pagination, use context.paginationState (page, offset, cursor, limit, pageSize)
 6. For loops, access the current item via context.inputData.currentItem
+
+ANTI-PATTERN - Never create steps that return static lists:
+WRONG: Step 1 returns ['Apple', 'Microsoft', 'Amazon', ...] → Step 2 uses that list
+RIGHT: Step 1 has loopSelector: (sourceData) => ['Apple', 'Microsoft', 'Amazon', ...] and makes API calls for each
+
+Example - "Get stock info for Fortune 10 companies":
+loopSelector: (sourceData) => ['Apple', 'Microsoft', 'Alphabet', 'Amazon', 'Nvidia', 'Meta', 'Tesla', 'Berkshire Hathaway', 'Visa', 'JPMorgan']
+configCode: (context) => ({ url: \`https://api.stocks.com/quote/\${context.inputData.currentItem}\`, method: 'GET', ... })
 </STEP_CONFIGURATION>
 
 <TRANSFORMATION_FUNCTIONS>
 All transformations must be valid JavaScript expressions or arrow functions.
-
-For data access in <<>> tags:
-- Simple variables: <<userId>>, <<apiKey>>
-- Initial payload fields: <<date>>, <<companies>>
-- Previous step results: <<fetchUsers>>, <<getProducts.data>>
-- Complex expressions: <<(sourceData) => sourceData.users.filter(u => u.active).map(u => u.id)>>
-- Current item in loops: <<currentItem>> for the whole item, or use arrow functions for transformations: <<(sourceData) => sourceData.currentItem.id>>
-
-For special transformation functions:
-- loopSelector: (sourceData) => sourceData.fetchUsers.users
-  * MUST throw error if expected array is missing rather than returning []. Exceptions can be cases if the instruction is "Get all users" and the API returns an empty array, in which case you should return [].
-- finalTransform: (sourceData) => ({ results: sourceData.processItems })
 
 CRITICAL DATA ACCESS PATTERNS in configCode:
 1. All input data (payload + previous steps): Access via context.inputData
@@ -517,6 +546,17 @@ CRITICAL DATA ACCESS PATTERNS in configCode:
 3. Current item in loops: Access via context.inputData.currentItem
    - context.inputData.currentItem.id
    - context.inputData.currentItem.name
+
+4. Pagination state: Access via context.paginationState (when pagination is configured)
+   - context.paginationState.page
+   - context.paginationState.offset
+   - context.paginationState.cursor
+   - context.paginationState.limit
+
+For transformation functions (loopSelector, finalTransform):
+- loopSelector: (sourceData) => sourceData.fetchUsers.users
+  * MUST throw error if expected array is missing rather than returning []. Exceptions can be cases if the instruction is "Get all users" and the API returns an empty array, in which case you should return [].
+- finalTransform: (sourceData) => ({ results: sourceData.processItems })
 </TRANSFORMATION_FUNCTIONS>
 
 <LOOP_EXECUTION>
@@ -620,39 +660,50 @@ The handler controls pagination flow and implements stopping logic (max items, A
 </PAGINATION_CONFIGURATION>
 
 <POSTGRES>
-- You can use the following format to access a postgres database: urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>", urlPath: "<<database>>", body: {query: "<<query>>"}
+- Postgres format: url includes full connection string with database
 - Note that the connection string and database name may be part of the connection string, or not provided at all, or only be provided in the instruction. Look at the input variables and instructions to come up with a best guess.
 - Consider that you might need additional information from tables to process the instruction. E.g. if a user asks for a list of products, you might need to join the products table with the categories table to get the category name and filter on that.
 - In case the query is unclear (user asks for all products that are in a category but you are unsure what the exact category names are), get all category names in step 1 and then create the actual query in step 2.
-- Use parameterized queries for safer and more efficient execution, you can also use <<>> tags to access variables:
-  * body: {query: "SELECT * FROM users WHERE id = $1 AND status = $2", params: [123, "<<(sourceData) => sourceData.status>>"]}
-  * body: {query: "INSERT INTO products (name, price) VALUES ($1, $2) RETURNING *", values: ["Widget", <<(sourceData) => sourceData.price * 1.2>>]}
+- Use parameterized queries for safer and more efficient execution:
+  * Example: (context) => ({
+      url: \`postgres://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:5432/\${context.credentials.database}\`,
+      method: 'POST',
+      data: {
+        query: 'SELECT * FROM users WHERE id = $1 AND status = $2',
+        params: [context.inputData.userId, context.inputData.status]
+      }
+    })
   * Parameters prevent SQL injection and improve performance
   * Use $1, $2, $3, etc. as placeholders in the query
   * Provide values in the params or values array in the same order
-  * Always wrap js string results in quotes like so: {"name": "<<(sourceData) => sourceData.name>>"}
 </POSTGRES>
 
 <FTP_SFTP>
-- You can use the following format to access FTP/SFTP servers:
-  * FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"
-  * FTPS (secure FTP): urlHost: "ftps://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"
-  * SFTP (SSH FTP): urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/basepath"
+- FTP/SFTP format: url includes protocol, credentials, hostname, and port
 - The body must contain a JSON object with an 'operation' field specifying the action to perform
 - Supported operations are: list, get, put, delete, rename, mkdir, rmdir, exists, stat
 - Examples:
-  * List directory: body: {"operation": "list", "path": "/directory"}
-  * Get file (returns content as JSON if possible): body: {"operation": "get", "path": "/file.json"}
-  * Upload file: body: {"operation": "put", "path": "/upload.txt", "content": "<<fileContent>>"}
-  * Delete file: body: {"operation": "delete", "path": "/file.txt"}
-  * Rename/move: body: {"operation": "rename", "path": "/old.txt", "newPath": "/new.txt"}
-  * Create directory: body: {"operation": "mkdir", "path": "/newfolder"}
-  * Remove directory: body: {"operation": "rmdir", "path": "/folder"}
-  * Check existence: body: {"operation": "exists", "path": "/file.txt"}
-  * Get file stats: body: {"operation": "stat", "path": "/file.txt"}
+  * List directory: (context) => ({
+      url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22/basepath\`,
+      method: 'POST',
+      data: { operation: 'list', path: '/directory' }
+    })
+  * Get file (auto-parses CSV/JSON/XML): (context) => ({
+      url: \`ftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:21\`,
+      method: 'POST',
+      data: { operation: 'get', path: \`/reports/\${context.inputData.filename}\` }
+    })
+  * Upload file: (context) => ({
+      url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22\`,
+      method: 'POST',
+      data: { operation: 'put', path: '/upload.txt', content: context.inputData.fileContent }
+    })
+  * Delete: data: { operation: 'delete', path: '/file.txt' }
+  * Rename: data: { operation: 'rename', path: '/old.txt', newPath: '/new.txt' }
+  * Create dir: data: { operation: 'mkdir', path: '/newfolder' }
+  * Check exists: data: { operation: 'exists', path: '/file.txt' }
 - All file operations return JSON responses
 - The 'get' operation automatically parses files and returns the parsed data
-- Path variables can use <<>> syntax: {"operation": "get", "path": "/<<folder>>/<<filename>>"}
 </FTP_SFTP>
 
 <SOAP>
@@ -884,12 +935,12 @@ Understand what each error means:
 <COMMON_ERRORS>
 1. Using non-existent variables:
    - ERROR: "undefined" in URL or response means the variable doesn't exist
-   - CHECK: Is <<variableName>> in the available variables list?
-   - FIX: Find the correct variable name from the list
+   - CHECK: Is context.inputData.variableName or context.credentials.variableName available?
+   - FIX: Find the correct variable name from the available context data
 
 2. Loop context variables:
-   - WRONG: <<currentItem.name.toUpperCase()>> (mixing code/properties without arrow functions)
-   - RIGHT: <<currentItem>> for whole item, or <<(sourceData) => sourceData.currentItem.id>>, <<(sourceData) => sourceData.currentItem.name.toUpperCase()>> for properties/transformations
+   - WRONG: Accessing properties directly without checking existence
+   - RIGHT: context.inputData.currentItem for whole item, context.inputData.currentItem.id for properties, use optional chaining (context.inputData.currentItem?.name) for safety
 
 3. Response evaluation failures:
    - This means the API call worked but returned data that doesn't match your instruction (e.g. empty array when you expected a list of items)
@@ -897,52 +948,67 @@ Understand what each error means:
 </COMMON_ERRORS>
 
 
-<VARIABLES>
-Use variables in the API configuration with <<variable>> syntax and wrap JavaScript expressions in (sourceData) => ... or as a plain variable if in the payload:
-- e.g. urlPath: https://api.example.com/v1/users/<<userId>>
-- e.g. headers: { "Authorization": "Bearer <<access_token>>" }
-- e.g. body: { "userIds": <<(sourceData) => JSON.stringify(sourceData.users.map(u => u.id))>> }
-- e.g. body: { "message_in_base64": <<(sourceData) => { const message = 'Hello World'; return btoa(message) }>> }
-- e.g. body: { "timestamp": "<<(sourceData) => new Date().toISOString()>>", "count": <<(sourceData) => sourceData.items.length>> }
-- e.g. urlPath: /api/<<(sourceData) => sourceData.version || 'v1'>>/users
-- e.g. queryParams: { "active": "<<(sourceData) => sourceData.includeInactive ? 'all' : 'true'>>" }
+<DATA_ACCESS>
+Use the context object in your configCode function to access all data:
 
-For Basic Auth: "Basic <<username>>:<<password>>" (auto-converts to Base64)
+1. Input data (payload + previous steps): context.inputData.{fieldOrStepId}
+   - e.g. url: \`https://api.example.com/v1/users/\${context.inputData.userId}\`
+   - e.g. data: { userIds: context.inputData.users.map(u => u.id) }
+   - e.g. data: { timestamp: new Date().toISOString(), count: context.inputData.items.length }
+   - e.g. url: \`https://api.example.com/v\${context.inputData.version || '1'}/users\`
+   - e.g. params: { active: context.inputData.includeInactive ? 'all' : 'true' }
+
+2. Credentials: context.credentials.{credentialName}
+   - e.g. headers: { "Authorization": \`Bearer \${context.credentials.access_token}\` }
+   - e.g. headers: { "X-API-Key": context.credentials.api_key }
+
+3. Current item in loops: context.inputData.currentItem
+   - e.g. url: \`https://api.example.com/items/\${context.inputData.currentItem.id}\`
+   - e.g. data: { value: context.inputData.currentItem.value * 2 }
+
+4. Pagination state: context.paginationState (when pagination is configured)
+   - e.g. params: { offset: context.paginationState.offset, limit: context.paginationState.limit }
+
+For Basic Auth: headers: { "Authorization": \`Basic \${btoa(\`\${context.credentials.username}:\${context.credentials.password}\`)}\` }
 Headers starting with 'x-' are likely custom headers
-ALWAYS verify variables exist in the available list before using them
-For json bodies, always wrap js string results in quotes like so: {"name": "<<(sourceData) => sourceData.name>>"}
-</VARIABLES>
+ALWAYS verify variables exist in context before using them
+Use template literals for string interpolation
+</DATA_ACCESS>
 
 <AUTHENTICATION>
 Common patterns (check documentation for specifics):
-- Bearer Token: Use authentication: "HEADER" with Authorization: "Bearer <<token>>"
-- API Key in header: Use authentication: "HEADER" with header like "X-API-Key: <<api_key>>"
-- API Key in URL: Use authentication: "QUERY_PARAM" with the key in queryParams
-- Basic Auth: Use authentication: "HEADER" with Authorization: "Basic <<username>>:<<password>>"
-- OAuth2: Use authentication: "OAUTH2"
-- No authentication: Use authentication: "NONE"
+- Bearer Token: headers: { 'Authorization': \`Bearer \${context.credentials.token}\` }
+- API Key in header: headers: { 'X-API-Key': context.credentials.api_key }
+- API Key in URL: params: { api_key: context.credentials.api_key }
+- Basic Auth: headers: { 'Authorization': \`Basic \${btoa(\`\${context.credentials.username}:\${context.credentials.password}\`)}\` }
+- OAuth2: headers: { 'Authorization': \`Bearer \${context.credentials.access_token}\` }
 
-Most modern APIs use HEADER authentication type with different header formats.
+Most modern APIs use headers for authentication.
 </AUTHENTICATION>
 
 <POSTGRES>
 Correct PostgreSQL configuration:
-- urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"
-- urlPath: "<<database_name>>"
-- body: {query: "postgres statement", params: ["some string", true]} // Recommended: parameterized query, do not forget to wrap params in quotes uf they are strings.
-- body: {query: "SELECT * FROM users WHERE age > $1", params: [<<(sourceData) => sourceData.age>>, "<<(sourceData) => sourceData.name>>"]}
-- body: {query: "INSERT INTO logs (message, level) VALUES ($1, $2)", params: ["Error occurred", "<<error_level>>"]}
+- url: Full connection string including database
+- method: 'POST'
+- data: {query: "postgres statement", params: ["some string", true]}
+- Example: (context) => ({
+    url: \`postgres://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:5432/\${context.credentials.database}\`,
+    method: 'POST',
+    data: {
+      query: 'SELECT * FROM users WHERE age > $1 AND name = $2',
+      params: [context.inputData.age, context.inputData.name]
+    }
+  })
 
 ALWAYS USE PARAMETERIZED QUERIES:
 - Use $1, $2, $3, etc. as placeholders in the query string
 - Provide corresponding values in params array
-- Example: {query: "SELECT * FROM users WHERE id = $1 AND status = $2", params: [userId, "active"]}
+- Example: {query: "SELECT * FROM users WHERE id = $1 AND status = $2", params: [context.inputData.userId, "active"]}
 - Benefits: Prevents SQL injection, better performance, cleaner code
-- The params/values array can contain static values or dynamic expressions using <<>> syntax
+- The params/values array can contain static values or dynamic expressions from context
 
 Common errors:
-- Duplicate or missing postgres:// prefixes in urlHost 
-- Duplicate or missing prefixes in urlPath (pay special attention to both error sources when using variables, and try removing or adding prefixes in case they are missing/present in the variables)
+- Duplicate or missing postgres:// prefixes in url 
 - Database not found: Try to extract from connection string or infer from user instruction
 - Incorrect table or column names, make sure to use the ones provided in previous explorative steps rather than guessing table or column names
 - INSERT has more target columns than expressions for query: if there is a mismatch between query params (insert v1, v2), placeholders ($1, $2, etc.), and args. Align them carefully. 
@@ -951,29 +1017,38 @@ Common errors:
 
 <FTP_SFTP>
 Correct FTP/SFTP configuration:
-- FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"
-- FTPS: urlHost: "ftps://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"  
-- SFTP: urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/basepath"
-- body: Must be a JSON object with 'operation' field
+- url: Full connection URL with protocol, credentials, hostname, and port
+- method: 'POST'
+- data: Must be a JSON object with 'operation' field
+- Example FTP: (context) => ({
+    url: \`ftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:21\`,
+    method: 'POST',
+    data: { operation: 'list', path: '/directory' }
+  })
+- Example SFTP: (context) => ({
+    url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22\`,
+    method: 'POST',
+    data: { operation: 'get', path: \`/reports/\${context.inputData.filename}\` }
+  })
 
 SUPPORTED OPERATIONS:
-- list: {"operation": "list", "path": "/directory"} - Returns array of file/directory info
-- get: {"operation": "get", "path": "/file.txt"} - Returns file content (auto-parses JSON)
-- put: {"operation": "put", "path": "/file.txt", "content": "data"} - Uploads content
-- delete: {"operation": "delete", "path": "/file.txt"} - Deletes file
-- rename: {"operation": "rename", "path": "/old.txt", "newPath": "/new.txt"} - Renames/moves
-- mkdir: {"operation": "mkdir", "path": "/newfolder"} - Creates directory
-- rmdir: {"operation": "rmdir", "path": "/folder"} - Removes directory
-- exists: {"operation": "exists", "path": "/file.txt"} - Checks if file exists
-- stat: {"operation": "stat", "path": "/file.txt"} - Gets file metadata
+- list: {operation: "list", path: "/directory"} - Returns array of file/directory info
+- get: {operation: "get", path: "/file.txt"} - Returns file content (auto-parses JSON/CSV/XML)
+- put: {operation: "put", path: "/file.txt", content: context.inputData.fileContent} - Uploads content
+- delete: {operation: "delete", path: "/file.txt"} - Deletes file
+- rename: {operation: "rename", path: "/old.txt", newPath: "/new.txt"} - Renames/moves
+- mkdir: {operation: "mkdir", path: "/newfolder"} - Creates directory
+- rmdir: {operation: "rmdir", path: "/folder"} - Removes directory
+- exists: {operation: "exists", path: "/file.txt"} - Checks if file exists
+- stat: {operation: "stat", path: "/file.txt"} - Gets file metadata
 
 Common errors:
 - Permission denied in root. This is a common security setting. Try the upload subdirectory instead.
-- Missing 'operation' field in body: Always include the operation type
+- Missing 'operation' field in data: Always include the operation type
 - Unsupported operation: Only use the 9 operations listed above
 - Missing required fields: 'get' needs 'path', 'put' needs 'path' and 'content', 'rename' needs 'path' and 'newPath'
-- Incorrect protocol in URL: Ensure ftp://, ftps://, or sftp:// prefix matches the server type
-- Path issues: Paths are relative to the base path in urlPath or absolute from root
+- Incorrect protocol in url: Ensure ftp://, ftps://, or sftp:// prefix matches the server type
+- Path issues: Paths are relative to the base path or absolute from root
 </FTP_SFTP>
 
 <SOAP>
@@ -985,10 +1060,13 @@ For SOAP requests:
 
 <PAGINATION>
 When pagination is configured:
-- Variables become available: <<page>>, <<offset>>, <<limit>>, <<cursor>>
-- Don't hardcode limits - use the variables
-- Use "OFFSET_BASED", "PAGE_BASED", or "CURSOR_BASED" for the type.
-- stopCondition is required and controls when to stop fetching pages
+- Access pagination state via context.paginationState
+- context.paginationState.page (for PAGE_BASED)
+- context.paginationState.offset (for OFFSET_BASED)
+- context.paginationState.cursor (for CURSOR_BASED)
+- context.paginationState.limit (page size)
+- Don't hardcode pagination values - always use context.paginationState
+- Example: params: { offset: context.paginationState.offset, limit: context.paginationState.limit }
 </PAGINATION>
 
 <DOCUMENTATION_SEARCH>

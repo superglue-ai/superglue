@@ -4,11 +4,11 @@ import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 
 export async function evaluateStepResponse({
   data,
-  stepConfig,
+  stepConfigString: stepConfig,
   docSearchResultsForStepInstruction
 }: {
   data: any,
-  stepConfig: string,
+  stepConfigString: string,
   docSearchResultsForStepInstruction?: string
 }): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
 

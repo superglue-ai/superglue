@@ -73,17 +73,17 @@ ${codeConfig.method ? `Method: ${codeConfig.method}` : ''}
 ${integration?.specificInstructions || 'None'}
 </integration_instructions>
 
-<documentation>
-${documentation || 'No documentation available'}
-</documentation>
-
 <available_credentials>
 ${Object.keys(credentials || {}).map(v => `context.credentials.${v}`).join(", ")}
 </available_credentials>
 
 <example_input_data_values>
 ${inputString}
-</example_input_data_values>`;
+</example_input_data_values>
+
+<documentation>
+${documentation || 'No documentation available'}
+</documentation>`;
 
         messages.push({
             role: "system",

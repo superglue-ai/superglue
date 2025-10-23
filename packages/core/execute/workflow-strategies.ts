@@ -5,7 +5,7 @@ import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel } from "../llm/language-model.js";
 import { logMessage } from "../utils/logs.js";
-import { applyJsonata, flattenObject, isSelfHealingEnabled, transformAndValidateSchema } from "../utils/tools.js";
+import { applyJsonata, isSelfHealingEnabled, transformAndValidateSchema } from "../utils/tools.js";
 import { generateTransformCode } from "../utils/transform.js";
 import { executeStep } from "./workflow-step-runner.js";
 
@@ -122,8 +122,7 @@ const loopStrategy: ExecutionStrategy = {
 
         const loopPayload: Record<string, any> = {
           ...payload,
-          currentItem: currentItem,
-          ...flattenObject(currentItem, 'currentItem')
+          currentItem: currentItem
         };
 
         try {

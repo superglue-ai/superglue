@@ -266,10 +266,10 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
                                     <span>Code will be auto-wrapped with (sourceData) =&gt; {'{'} ... {'}'} when executed</span>
                                 </div>
                             )}
-                            <Editor value={displayValue} onValueChange={handleChange} highlight={() => jsHtml} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" textareaId="transform-editor" placeholder="(sourceData) => { return sourceData; }" style={{ background: 'transparent', lineHeight: '18px', minHeight: '100px', whiteSpace: 'pre' }} />
+                            <Editor value={displayValue} onValueChange={handleChange} highlight={() => jsHtml} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px] !min-h-full" textareaClassName="outline-none focus:outline-none" textareaId="transform-editor" placeholder="(sourceData) => { return sourceData; }" style={{ background: 'transparent', lineHeight: '18px', minHeight: '100px', whiteSpace: 'pre' }} />
                         </>
                     ) : (
-                        <Editor value={value || ''} onValueChange={onChange || (() => { })} highlight={() => jsHtml} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent', lineHeight: '18px', whiteSpace: 'pre' }} />
+                        <Editor value={value || ''} onValueChange={onChange || (() => { })} highlight={() => jsHtml} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px] !min-h-full" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent', lineHeight: '18px', whiteSpace: 'pre' }} />
                     )}
                 </div>
             </div>
@@ -295,7 +295,7 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
     }, [value, placeholder, readOnly]);
     const jsonHtml = usePrismHighlight(displayValue, 'json', 60);
     return (
-        <div className={cn("relative rounded-lg border shadow-sm", readOnly ? "bg-muted/30 border-dashed" : "bg-background border")}>
+        <div className={cn("relative rounded-lg border shadow-sm", readOnly ? "bg-muted/30" : "bg-background")}>
             {overlay && (<div className="absolute top-1 right-1 z-10 flex items-center gap-1">{overlay}</div>)}
             {bottomRightOverlay && (<div className="absolute bottom-1 right-1 z-10 flex items-center gap-1">{bottomRightOverlay}</div>)}
             {!overlay && (<div className="absolute top-1 right-1 z-10"><CopyButton text={value || placeholder} /></div>)}
@@ -310,8 +310,8 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
                     document.addEventListener('mouseup', handleMouseUp);
                 }} />
             )}
-            <div className={cn("p-3 pr-10 overflow-auto", readOnly ? "cursor-not-allowed" : "cursor-text")} style={{ maxHeight: resizable ? currentHeight : maxHeight, scrollbarGutter: 'stable both-edges' }}>
-                <Editor value={displayValue} onValueChange={onChange || (() => { })} highlight={() => jsonHtml} padding={0} disabled={readOnly} className="font-mono text-xs" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent' }} />
+            <div className={cn("p-3 pr-10 overflow-auto h-[300px]", readOnly ? "cursor-not-allowed" : "cursor-text")} style={{ maxHeight: resizable ? currentHeight : maxHeight, scrollbarGutter: 'stable both-edges' }}>
+                <Editor value={displayValue} onValueChange={onChange || (() => { })} highlight={() => jsonHtml} padding={0} disabled={readOnly} className="font-mono text-xs !min-h-full" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent' }} />
             </div>
         </div>
     );
