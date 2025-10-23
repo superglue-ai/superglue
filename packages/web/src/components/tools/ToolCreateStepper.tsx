@@ -9,7 +9,7 @@ import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimple
 import { Integration, IntegrationInput, SuperglueClient, Workflow as Tool, UpsertMode } from '@superglue/client';
 import { integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { ArrowRight, Check, Clock, Globe, Key, Loader2, Pencil, Plus, Send, Upload, X } from 'lucide-react';
+import { ArrowRight, Check, Clock, FileJson, FileInput, FileWarning, Globe, Key, Loader2, Pencil, Plus, Send, Upload, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -26,7 +26,7 @@ import { ToolCreateSuccess } from './ToolCreateSuccess';
 import { PayloadSpotlight } from './ToolMiniStepCards';
 import ToolPlayground, { ToolPlaygroundHandle } from './ToolPlayground';
 
-type ToolCreateStep = 'integrations' | 'prompt' | 'review' | 'success';
+type ToolCreateStep = 'integrations' | 'build' | 'run' | 'publish';
 
 interface ToolCreateStepperProps {
   onComplete?: () => void;
@@ -103,6 +103,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
 
   // New state for redesigned prompt step
   const [showPayloadSection, setShowPayloadSection] = useState(false);
+  const [showFileUploadSection, setShowFileUploadSection] = useState(false);
   const [showResponseSchemaSection, setShowResponseSchemaSection] = useState(false);
   const [responseSchema, setResponseSchema] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -132,18 +133,26 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
 
 
   useEffect(() => {
-    if (step === 'prompt') {
+    if (step === 'build') {
       setCurrentTool(null);
       // Lazy load suggestions when entering prompt step
-      if (selectedIntegrationIds.length > 0 && suggestions.length === 0) {
+      if (selectedIntegrationIds.length > 0) {
         handleGenerateInstructions();
       }
     }
 
-    if (step !== 'prompt') {
+    if (step !== 'build') {
       setValidationErrors({});
     }
   }, [step]);
+
+  // Regenerate suggestions when selected integrations change
+  useEffect(() => {
+    if (step === 'build' && selectedIntegrationIds.length > 0) {
+      setSuggestions([]); // Clear old suggestions first
+      handleGenerateInstructions();
+    }
+  }, [selectedIntegrationIds, step]);
 
   const highlightJson = (code: string) => {
     return Prism.highlight(code, Prism.languages.json, 'json');
@@ -213,7 +222,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
       });
 
       setCurrentTool(saved);
-      setStep('success');
+      setStep('publish');
     } catch (e: any) {
       toast({
         title: 'Error publishing tool',
@@ -248,13 +257,13 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
   };
 
   const handleNext = async () => {
-    const steps: ToolCreateStep[] = ['integrations', 'prompt', 'review', 'success'];
+    const steps: ToolCreateStep[] = ['integrations', 'build', 'run', 'publish'];
     const currentIndex = steps.indexOf(step);
 
     if (step === 'integrations') {
       // Suggestions will be loaded lazily when entering prompt step
       setStep(steps[currentIndex + 1]);
-    } else if (step === 'prompt') {
+    } else if (step === 'build') {
       const errors: Record<string, boolean> = {};
       if (!instruction.trim()) errors.instruction = true;
       try {
@@ -298,7 +307,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
       } finally {
         setIsBuilding(false);
       }
-    } else if (step === 'success') {
+    } else if (step === 'publish') {
       if (onComplete) {
         onComplete();
       } else {
@@ -308,7 +317,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
   };
 
   const handleBack = () => {
-    const steps: ToolCreateStep[] = ['integrations', 'prompt', 'review', 'success'];
+    const steps: ToolCreateStep[] = ['integrations', 'build', 'run', 'publish'];
     const currentIndex = steps.indexOf(step);
     if (step === 'integrations') {
       router.push('/configs');
@@ -494,7 +503,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
         throw new Error('Failed to build tool');
       }
       setCurrentTool(response);
-      setStep('review');
+      setStep('run');
     } catch (error: any) {
       console.error('Error building tool:', error);
       toast({
@@ -525,7 +534,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
       <div className="flex-none mb-4">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
           <h1 className="text-2xl font-semibold">
-            {step === 'success' ? 'Tool Created!' : 'Create New Tool'}
+            {step === 'publish' ? 'Tool Created!' : 'Create New Tool'}
           </h1>
           <div className="flex items-center gap-2">
             <Button
@@ -920,10 +929,10 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
           */}
 
           {/* NEW REDESIGNED PROMPT STEP */}
-          {step === 'prompt' && (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-full max-w-2xl mx-auto space-y-4">
-                <div className="text-center mb-6">
+          {step === 'build' && (
+            <div className="flex items-start justify-center pt-8">
+              <div className="w-full max-w-3xl mx-auto space-y-4">
+                <div className="text-center mb-4">
                   <h2 className="text-xl font-medium text-foreground">
                     What should your tool do for you?
                   </h2>
@@ -966,224 +975,230 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                   <p className="text-sm text-destructive text-center">Tool instruction is required</p>
                 )}
 
-                {/* Settings section below textarea - only show when there's text */}
-                {instruction.trim() && (
-                <div className="space-y-3 mt-4">
-                  {/* Horizontal settings buttons - smaller and centered */}
-                  <div className="flex gap-2 justify-center">
+                {/* Settings buttons - always show */}
+                <div className="flex gap-3 justify-center mt-4">
                     <button
                       onClick={() => {
+                        if (showFileUploadSection) setShowFileUploadSection(false);
                         if (showResponseSchemaSection) setShowResponseSchemaSection(false);
                         setShowPayloadSection(!showPayloadSection);
                       }}
                       className={cn(
-                        "text-xs px-3 py-1.5 rounded-full transition-all border animate-fade-in",
-                        showPayloadSection && "border-primary/50",
+                        "text-sm px-4 py-2 rounded-full transition-all animate-fade-in flex items-center gap-2",
                         (() => {
                           const trimmedPayload = payload.trim();
-                          const hasFiles = uploadedFiles.length > 0;
-                          
-                          // Check if payload is empty or just {}
                           const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
                           
-                          if (isEmptyPayload && !hasFiles) {
-                            return "hover:bg-accent/50 border-border text-muted-foreground";
+                          if (isEmptyPayload) {
+                            return "border-2 border-[#FFA500] text-foreground hover:bg-[#FFA500]/10";
                           }
                           
                           // Check if JSON is valid
-                          if (!isEmptyPayload) {
-                            try {
-                              JSON.parse(trimmedPayload);
-                              // Valid JSON
-                              return "bg-[#FFD700] border-[#FFA500] text-foreground";
-                            } catch {
-                              // Invalid JSON
-                              return "bg-red-100 dark:bg-red-950/30 border-red-500 text-red-700 dark:text-red-400";
-                            }
+                          try {
+                            JSON.parse(trimmedPayload);
+                            // Valid JSON - filled
+                            return "bg-[#FFD700] border-2 border-[#FFA500] text-foreground";
+                          } catch {
+                            // Invalid JSON
+                            return "bg-red-100 dark:bg-red-950/30 border-2 border-red-500 text-red-700 dark:text-red-400";
                           }
-                          
-                          // Has files but no payload
-                          return "bg-[#FFD700] border-[#FFA500] text-foreground";
                         })()
                       )}
                       style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}
                     >
+                      <FileJson className="h-4 w-4" />
                       {(() => {
                         const trimmedPayload = payload.trim();
-                        const hasFiles = uploadedFiles.length > 0;
                         const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
                         
-                        if (isEmptyPayload && !hasFiles) {
-                          return 'No Tool Inputs';
+                        if (isEmptyPayload) {
+                          return 'Attach JSON Tool Input';
                         }
                         
-                        if (!isEmptyPayload) {
-                          try {
-                            JSON.parse(trimmedPayload);
-                            return 'Tool input configured';
-                          } catch {
-                            return 'Malformatted input';
-                          }
+                        try {
+                          JSON.parse(trimmedPayload);
+                          return 'JSON Tool Input Attached';
+                        } catch {
+                          return 'Malformatted JSON';
                         }
-                        
-                        return 'Tool input configured';
                       })()}
                     </button>
                     
                     <button
                       onClick={() => {
                         if (showPayloadSection) setShowPayloadSection(false);
-                        setShowResponseSchemaSection(!showResponseSchemaSection);
+                        if (showResponseSchemaSection) setShowResponseSchemaSection(false);
+                        setShowFileUploadSection(!showFileUploadSection);
                       }}
                       className={cn(
-                        "text-xs px-3 py-1.5 rounded-full transition-all border animate-fade-in",
-                        showResponseSchemaSection && "border-primary/50",
-                        responseSchema 
-                          ? "bg-[#FFD700] border-[#FFA500] text-foreground" 
-                          : "hover:bg-accent/50 border-border text-muted-foreground"
+                        "text-sm px-4 py-2 rounded-full transition-all animate-fade-in flex items-center gap-2",
+                        uploadedFiles.length > 0
+                          ? "bg-[#FFD700] border-2 border-[#FFA500] text-foreground"
+                          : "border-2 border-[#FFA500] text-foreground hover:bg-[#FFA500]/10"
                       )}
                       style={{ animationDelay: '150ms', animationFillMode: 'backwards' }}
                     >
-                      {responseSchema ? 'Response schema configured' : 'No response schema enforced'}
+                      <FileInput className="h-4 w-4" />
+                      {uploadedFiles.length > 0 ? `File Tool Input Attached (${uploadedFiles.length})` : 'Attach File Tool Input'}
                     </button>
-                  </div>
-
-                  {/* Expanded sections */}
-                  {showPayloadSection && (
-                    <div className="space-y-3 border rounded-lg p-4 bg-card animate-fade-in" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
-                        <div className="space-y-2">
-                          <h4 className="font-medium text-sm">Payload JSON</h4>
-                          <Textarea
-                            value={payload}
-                            onChange={(e) => {
-                              setPayload(e.target.value);
-                              try {
-                                JSON.parse(e.target.value || '{}');
-                                setValidationErrors(prev => ({ ...prev, payload: false }));
-                              } catch {
-                                setValidationErrors(prev => ({ ...prev, payload: true }));
-                              }
-                            }}
-                            placeholder="{}"
-                            className={cn("font-mono text-xs min-h-[150px]", validationErrors.payload && inputErrorStyles)}
-                          />
-                          {validationErrors.payload && (
-                            <p className="text-xs text-destructive">Invalid JSON format</p>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <h4 className="font-medium text-sm">Upload Files</h4>
-                          <input
-                            type="file"
-                            multiple
-                            accept=".json,.csv,.txt,.xml,.xlsx,.xls"
-                            onChange={async (e) => {
-                              const files = Array.from(e.target.files || []);
-                              if (files.length > 0) {
-                                await handleFilesUpload(files);
-                              }
-                              e.target.value = '';
-                            }}
-                            className="hidden"
-                            id="file-upload-new"
-                          />
-                          {uploadedFiles.length > 0 && (
-                            <div className="space-y-2 mb-3">
-                              {uploadedFiles.map(file => {
-                                const getFileTypeInfo = (filename: string) => {
-                                  const ext = filename.toLowerCase().split('.').pop() || '';
-                                  switch (ext) {
-                                    case 'json': return { color: 'text-blue-600', bgColor: 'bg-blue-50', icon: '{}' };
-                                    case 'csv': return { color: 'text-green-600', bgColor: 'bg-green-50', icon: '▤' };
-                                    case 'xml': return { color: 'text-orange-600', bgColor: 'bg-orange-50', icon: '<>' };
-                                    case 'xlsx':
-                                    case 'xls': return { color: 'text-emerald-600', bgColor: 'bg-emerald-50', icon: '⊞' };
-                                    default: return { color: 'text-gray-600', bgColor: 'bg-gray-50', icon: '📄' };
-                                  }
-                                };
-                                const fileInfo = getFileTypeInfo(file.name);
-                                return (
-                                  <div
-                                    key={file.key}
-                                    className={cn(
-                                      "flex items-center justify-between px-3 py-2 rounded-md",
-                                      file.status === 'error' ? "bg-destructive/10" : fileInfo.bgColor
-                                    )}
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <span className={cn("font-mono text-sm", fileInfo.color)}>
-                                        {fileInfo.icon}
-                                      </span>
-                                      <div>
-                                        <div className="text-xs font-medium">{file.name}</div>
-                                        <div className="text-[10px] text-muted-foreground">
-                                          {file.status === 'processing' ? 'Parsing...' : 
-                                           file.status === 'error' ? file.error :
-                                           `${formatBytes(file.size)} • ${file.key}`}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    {file.status !== 'processing' && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6"
-                                        onClick={() => handleFileRemove(file.key)}
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => document.getElementById('file-upload-new')?.click()}
-                            disabled={isProcessingFiles}
-                            className="w-full"
-                          >
-                            {isProcessingFiles ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Processing...
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="h-4 w-4 mr-2" />
-                                Select Files
-                              </>
-                            )}
-                          </Button>
-                          <div className="text-xs text-muted-foreground text-center">
-                            {formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE)}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                  {showResponseSchemaSection && (
-                    <div className="border rounded-lg p-4 bg-card animate-fade-in" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
-                      <h4 className="font-medium text-sm mb-2">Response Schema JSON</h4>
-                      <Textarea
-                        value={responseSchema}
-                        onChange={(e) => setResponseSchema(e.target.value)}
-                        placeholder='{\n  "type": "object",\n  "properties": {\n    ...\n  }\n}'
-                        className="font-mono text-xs min-h-[150px]"
-                      />
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Optional JSON Schema to validate the tool's response
-                      </p>
-                    </div>
-                  )}
+                    
+                    <button
+                      onClick={() => {
+                        if (showPayloadSection) setShowPayloadSection(false);
+                        if (showFileUploadSection) setShowFileUploadSection(false);
+                        setShowResponseSchemaSection(!showResponseSchemaSection);
+                      }}
+                      className={cn(
+                        "text-sm px-4 py-2 rounded-full transition-all animate-fade-in flex items-center gap-2",
+                        responseSchema 
+                          ? "bg-[#FFD700] border-2 border-[#FFA500] text-foreground" 
+                          : "border-2 border-[#FFA500] text-foreground hover:bg-[#FFA500]/10"
+                      )}
+                      style={{ animationDelay: '300ms', animationFillMode: 'backwards' }}
+                    >
+                      <FileWarning className="h-4 w-4" />
+                      {responseSchema ? 'Tool Result Schema Defined' : 'Enforce Tool Result Schema'}
+                    </button>
                 </div>
+
+                {/* Expanded sections - show below buttons */}
+                {showPayloadSection && (
+                  <div className="space-y-3 border rounded-lg p-4 bg-card animate-fade-in mt-3" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm">JSON Tool Input</h4>
+                      <Textarea
+                        value={payload}
+                        onChange={(e) => {
+                          setPayload(e.target.value);
+                          try {
+                            JSON.parse(e.target.value || '{}');
+                            setValidationErrors(prev => ({ ...prev, payload: false }));
+                          } catch {
+                            setValidationErrors(prev => ({ ...prev, payload: true }));
+                          }
+                        }}
+                        placeholder="{}"
+                        className={cn("font-mono text-xs min-h-[150px]", validationErrors.payload && inputErrorStyles)}
+                      />
+                      {validationErrors.payload && (
+                        <p className="text-xs text-destructive">Invalid JSON format</p>
+                      )}
+                    </div>
+                  </div>
                 )}
 
-                {/* Suggested prompts with animation - only show when textarea is empty */}
-                {suggestions.length > 0 && !instruction.trim() && (
+                {showFileUploadSection && (
+                  <div className="space-y-3 border rounded-lg p-4 bg-card animate-fade-in mt-3" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm">File Tool Input</h4>
+                      <input
+                        type="file"
+                        multiple
+                        accept=".json,.csv,.txt,.xml,.xlsx,.xls"
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files || []);
+                          if (files.length > 0) {
+                            await handleFilesUpload(files);
+                          }
+                          e.target.value = '';
+                        }}
+                        className="hidden"
+                        id="file-upload-new"
+                      />
+                      {uploadedFiles.length > 0 && (
+                        <div className="space-y-2 mb-3">
+                          {uploadedFiles.map(file => {
+                            const getFileTypeInfo = (filename: string) => {
+                              const ext = filename.toLowerCase().split('.').pop() || '';
+                              switch (ext) {
+                                case 'json': return { color: 'text-blue-600', bgColor: 'bg-blue-50', icon: '{}' };
+                                case 'csv': return { color: 'text-green-600', bgColor: 'bg-green-50', icon: '▤' };
+                                case 'xml': return { color: 'text-orange-600', bgColor: 'bg-orange-50', icon: '<>' };
+                                case 'xlsx':
+                                case 'xls': return { color: 'text-emerald-600', bgColor: 'bg-emerald-50', icon: '⊞' };
+                                default: return { color: 'text-gray-600', bgColor: 'bg-gray-50', icon: '📄' };
+                              }
+                            };
+                            const fileInfo = getFileTypeInfo(file.name);
+                            return (
+                              <div
+                                key={file.key}
+                                className={cn(
+                                  "flex items-center justify-between px-3 py-2 rounded-md",
+                                  file.status === 'error' ? "bg-destructive/10" : fileInfo.bgColor
+                                )}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className={cn("font-mono text-sm", fileInfo.color)}>
+                                    {fileInfo.icon}
+                                  </span>
+                                  <div>
+                                    <div className="text-xs font-medium">{file.name}</div>
+                                    <div className="text-[10px] text-muted-foreground">
+                                      {file.status === 'processing' ? 'Parsing...' : 
+                                       file.status === 'error' ? file.error :
+                                       `${formatBytes(file.size)} • ${file.key}`}
+                                    </div>
+                                  </div>
+                                </div>
+                                {file.status !== 'processing' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => handleFileRemove(file.key)}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => document.getElementById('file-upload-new')?.click()}
+                        disabled={isProcessingFiles}
+                        className="w-full"
+                      >
+                        {isProcessingFiles ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Select Files
+                          </>
+                        )}
+                      </Button>
+                      <div className="text-xs text-muted-foreground text-center">
+                        {formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {showResponseSchemaSection && (
+                  <div className="border rounded-lg p-4 bg-card animate-fade-in mt-3" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
+                    <h4 className="font-medium text-sm mb-2">Response Schema JSON</h4>
+                    <Textarea
+                      value={responseSchema}
+                      onChange={(e) => setResponseSchema(e.target.value)}
+                      placeholder='{\n  "type": "object",\n  "properties": {\n    ...\n  }\n}'
+                      className="font-mono text-xs min-h-[150px]"
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Optional JSON Schema to validate the tool's response
+                    </p>
+                  </div>
+                )}
+
+                {/* Suggested prompts with animation - only show when textarea is empty and no section is expanded */}
+                {suggestions.length > 0 && !instruction.trim() && !showPayloadSection && !showFileUploadSection && !showResponseSchemaSection && (
                   <div className="space-y-2 mt-4">
                     <p className="text-sm text-muted-foreground text-center">Suggested prompts:</p>
                     <div className="flex flex-wrap gap-2 justify-center">
@@ -1208,7 +1223,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
               </div>
             </div>
           )}
-          {step === 'review' && currentTool && (
+          {step === 'run' && currentTool && (
             <div className="w-full">
               <ToolPlayground
                 ref={playgroundRef}
@@ -1218,7 +1233,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                 initialInstruction={instruction}
                 integrations={integrations}
                 onSave={handleSaveTool}
-                onInstructionEdit={() => setStep('prompt')}
+                onInstructionEdit={() => setStep('build')}
                 selfHealingEnabled={selfHealingEnabled}
                 onSelfHealingChange={setSelfHealingEnabled}
                 shouldStopExecution={shouldStopExecution}
@@ -1279,7 +1294,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
               />
             </div>
           )}
-          {step === 'success' && currentTool && (
+          {step === 'publish' && currentTool && (
             <div className="space-y-4">
               <p className="text-lg font-medium">
                 Tool{' '}
@@ -1337,7 +1352,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
           Back
         </Button>
         <div className="flex gap-2">
-          {step !== 'review' && step !== 'success' && step !== 'prompt' && (
+          {step !== 'run' && step !== 'publish' && step !== 'build' && (
             <Button
               onClick={handleNext}
               disabled={

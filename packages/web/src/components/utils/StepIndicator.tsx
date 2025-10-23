@@ -1,8 +1,8 @@
 import { cn } from '@/src/lib/utils';
 import { Check } from 'lucide-react';
 
-export type StepperStep = 'basic' | 'try_and_output' | 'success'
-export type ToolCreateStep = 'integrations' | 'prompt' | 'review' | 'success';
+export type StepperStep = 'basic' | 'try_and_output' | 'publish'
+export type ToolCreateStep = 'integrations' | 'build' | 'run' | 'publish';
 
 interface StepConfig {
   id: StepperStep | ToolCreateStep
@@ -19,7 +19,7 @@ export const API_CREATE_STEPS: StepConfig[] = [
     title: 'Try It!'
   },
   {
-    id: 'success',
+    id: 'publish',
     title: 'Complete'
   }
 ]
@@ -30,16 +30,16 @@ export const TOOL_CREATE_STEPS: StepConfig[] = [
     title: 'Integrations'
   },
   {
-    id: 'prompt',
-    title: 'Prompt'
+    id: 'build',
+    title: 'Build'
   },
   {
-    id: 'review',
-    title: 'Review'
+    id: 'run',
+    title: 'Run'
   },
   {
-    id: 'success',
-    title: 'Complete'
+    id: 'publish',
+    title: 'Publish'
   }
 ]
 
