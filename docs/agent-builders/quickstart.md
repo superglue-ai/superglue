@@ -5,7 +5,7 @@ description: "Get your AI agents connected to any API in under 30 seconds"
 
 ## What superglue Does for You
 
-superglue acts as a **universal MCP tool** that gives your agents reliable access to any API or database. Instead of building custom tools for each integration, your agent gets one powerful tool that can connect to anything.
+superglue acts as an **MCP-based tool router** that gives your agents reliable access to your pre-built tools with full control.
 
 ## 30-Second Setup
 
@@ -62,20 +62,20 @@ superglue acts as a **universal MCP tool** that gives your agents reliable acces
       **Self-hosting?** Skip the API key and [deploy locally](/guides/self-hosting) instead.
     </Tip>
   </Step>
-  <Step title="Test with Your First Workflow">
+  <Step title="Test with Your Pre-built Tools">
     <Tabs>
       <Tab title="Via MCP">
-        Create a custom [GitHub API key](https://github.com/settings/personal-access-tokens/new) for superglue.
-
         In Claude Desktop or your agent framework:
 
-        > "Use superglue to get the latest issues from the GitHub repository microsoft/vscode and summarize the top 3. My api key is ...."
+        > "Show me all of my superglue Google Calendar tools"
 
-        That's it\! superglue will automatically handle the GitHub API integration.
+        superglue will automatically provide an overview and description of your superglue GitHub tools.
 
-        Alternatively, you can use an API that does not need any authentication:
+        > "Run my Google Calendar meeting summary tool"
+        
+        That's it\! superglue will execute your built tool and route results into your agent framework.
 
-        > "Use superglue to get all products from https://timbuk2.com/products.json."
+        You will be able to do this with any integration and any tool set up on superglue.
       </Tab>
       <Tab title="Via SDK">
         ```typescript
@@ -112,16 +112,11 @@ superglue acts as a **universal MCP tool** that gives your agents reliable acces
 ## How It Works for Agents
 
 <CardGroup cols={2}>
-  <Card title="Build & Run Combined" icon="zap">
-    With MCP, building and running workflows happens in one step. Just describe
-    what you want in natural language.
+  <Card title="Find Relevant Tools" icon="tool">
+    The superglue MCP will automatically retrieve your pre-built tools based on a natural language query.
   </Card>
-  <Card title="Automatic Error Handling" icon="shield">
-    superglue handles authentication, rate limits, retries, and data
-    transformation automatically.
-  </Card>
-  <Card title="Any API or Database" icon="database">
-    Works with REST, GraphQL, SQL databases, even SOAP/XML - anything with an endpoint.
+  <Card title="Execute Tool" icon="zap">
+    Will execute your pre-built tool with an optional payload of tool inputs based on the agent's instructions.
   </Card>
   <Card title="Reliable & Deterministic" icon="check">
     Built for production agent workflows with consistent, predictable results.

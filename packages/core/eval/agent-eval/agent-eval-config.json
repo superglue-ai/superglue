@@ -531,6 +531,61 @@
         "clean text",
         "article extraction"
       ]
+    },
+    {
+      "id": "open-brewery-db",
+      "name": "Open Brewery DB",
+      "urlHost": "https://api.openbrewerydb.org",
+      "urlPath": "/v1",
+      "documentationUrl": "https://www.openbrewerydb.org/documentation",
+      "credentials": {},
+      "description": "Public API for brewery data across the United States",
+      "keywords": [
+        "breweries",
+        "brewery",
+        "beer",
+        "state",
+        "city",
+        "search",
+        "pagination"
+      ]
+    },
+    {
+      "id": "openalex",
+      "name": "OpenAlex",
+      "urlHost": "https://api.openalex.org",
+      "urlPath": "",
+      "documentationUrl": "https://docs.openalex.org",
+      "credentials": {},
+      "description": "Open catalog of scholarly papers, authors, institutions, and more",
+      "keywords": [
+        "works",
+        "authors",
+        "institutions",
+        "publications",
+        "research",
+        "papers"
+      ]
+    },
+    {
+      "id": "punkapi",
+      "name": "PunkAPI",
+      "urlHost": "https://punkapi.online",
+      "urlPath": "/v3",
+      "documentationUrl": "https://publicapis.io/punk-api",
+      "credentials": {},
+      "description": "BrewDog's DIY Dog beer catalogue API with detailed recipes and information",
+      "keywords": [
+        "beer",
+        "brewery",
+        "brewdog",
+        "recipe",
+        "hops",
+        "malt",
+        "ingredients",
+        "abv",
+        "ibu"
+      ]
     }
   ],
   "workflows": [
@@ -2003,6 +2058,151 @@
       "payload": {},
       "expectedData": {
         "status": "success"
+      }
+    },
+    {
+      "id": "brewery-db-california-count",
+      "name": "Open Brewery DB - California Brewery Count",
+      "description": "Fetch all breweries in California and return total count",
+      "type": "retrieval",
+      "instruction": "Count all breweries in California using the Open Brewery DB API. Return a JSON object with this structure: { total_brewery_count: number }",
+      "integrationIds": [
+        "open-brewery-db"
+      ],
+      "payload": {},
+      "expectedData": {
+        "total_brewery_count": 919
+      }
+    },
+    {
+      "id": "openalex-fetch-1000-works-2025",
+      "name": "OpenAlex - Fetch 1000 Works from 2025",
+      "description": "Fetch exactly 1000 scholarly works published in 2025 using pagination",
+      "type": "retrieval",
+      "instruction": "Fetch exactly 1000 works published in 2025 from the OpenAlex API. Filter by publication_year:2025. Return a JSON object with this structure: { total_fetched: number, publication_year: number}> }",
+      "integrationIds": [
+        "openalex"
+      ],
+      "payload": {},
+      "expectedData": {
+        "total_fetched": 1000,
+        "publication_year": 2025
+      }
+    },
+    {
+      "id": "openalex-pagination-1000-works-2025",
+      "name": "OpenAlex - Pagination 1000 Works from 2025",
+      "description": "Fetch exactly 1000 scholarly works published in 2025 using pagination with a reminder to use pagination",
+      "type": "retrieval",
+      "instruction": "Fetch exactly 1000 works published in 2025 from the OpenAlex API. Remember to use pagination and configure it correctly. Return a JSON object with this structure: { total_fetched: number, publication_year: number}> }",
+      "integrationIds": [
+        "openalex"
+      ],
+      "payload": {},
+      "expectedData": {
+        "total_fetched": 1000,
+        "publication_year": 2025
+      }
+    },
+    {
+      "id": "punkapi-fetch-all-beers",
+      "name": "PunkAPI - Fetch All Beers",
+      "description": "Fetch all BrewDog beers from the catalogue",
+      "type": "retrieval",
+      "instruction": "Fetch all beers from the BrewDog PunkAPI catalogue. Return a JSON object with this structure: { total_count: number, first_beer_name: string, last_beer_name: string }.",
+      "integrationIds": [
+        "punkapi"
+      ],
+      "payload": {},
+      "expectedData": {
+        "total_count": 415,
+        "first_beer_name": "Punk IPA 2007 - 2010",
+        "last_beer_name": "Aplomb Bomb"
+      }
+    },
+    {
+      "id": "punkapi-fetch-all-beers-with-pagination-reminder",
+      "name": "PunkAPI - Fetch All Beers With Pagination Reminder",
+      "description": "Fetch all BrewDog beers from the catalogue with a reminder to use pagination",
+      "type": "retrieval",
+      "instruction": "Fetch all beers from the BrewDog PunkAPI catalogue. Remember to use pagination. Return a JSON object with this structure: { total_count: number, first_beer_name: string, last_beer_name: string }.",
+      "integrationIds": [
+        "punkapi"
+      ],
+      "payload": {},
+      "expectedData": {
+        "total_count": 415,
+        "first_beer_name": "Punk IPA 2007 - 2010",
+        "last_beer_name": "Aplomb Bomb"
+      }
+    },
+    {
+      "id": "slack-post-eval-message",
+      "name": "Slack Post Eval Message",
+      "description": "Post a message to the evals channel",
+      "type": "action",
+      "instruction": "Post a message into the evals channel with the message 'Hi, this is the superglue bot running some evals'",
+      "integrationIds": [
+        "slack"
+      ],
+      "payload": {},
+      "expectedData": {
+        "ok": true,
+        "channel": ""
+      }
+    },
+    {
+      "id": "slack-list-non-sg-channels",
+      "name": "Slack List Non-SG Channels",
+      "description": "List all channels whose name doesn't start with sg-",
+      "type": "retrieval",
+      "instruction": "List all public and private channels in the workspace whose name does not start with 'sg-'. Return a JSON object with this structure: { channel_count: number, channels: Array<{id: string, name: string, is_private: boolean}> }",
+      "integrationIds": [
+        "slack"
+      ],
+      "payload": {},
+      "expectedData": {}
+    },
+    {
+      "id": "slack-get-last-20-messages",
+      "name": "Slack Get Last 20 Messages",
+      "description": "Retrieve exactly 20 messages from all-superglue channel",
+      "type": "retrieval",
+      "instruction": "Retrieve the last 20 messages from the all-superglue channel. Return a JSON object with this structure: { message_count: number, messages: Array<{type: string, ts: string, text: string}> }. The message_count must equal the number of messages retrieved.",
+      "integrationIds": [
+        "slack"
+      ],
+      "payload": {},
+      "expectedData": {
+        "message_count": 20
+      }
+    },
+    {
+      "id": "slack-get-all-messages",
+      "name": "Slack Get All Messages",
+      "description": "Retrieve exactly 1005 messages from the evals channel",
+      "type": "retrieval",
+      "instruction": "Retrieve exactly 1005 messages from the evals channel. Return a JSON object with this structure: { message_count: number }. The message_count must equal the number of messages retrieved.",
+      "integrationIds": [
+        "slack"
+      ],
+      "payload": {},
+      "expectedData": {
+        "message_count": 1005
+      }
+    },
+    {
+      "id": "slack-get-all-messages-with-pagination-reminder",
+      "name": "Slack Get All Messages",
+      "description": "Retrieve exactly 1005 messages from the evals channel with a reminder to use pagination",
+      "type": "retrieval",
+      "instruction": "Retrieve exactly 1005 messages from the evals channel. Remember to use pagination. Return a JSON object with this structure: { message_count: number }. The message_count must equal the number of messages retrieved.",
+      "integrationIds": [
+        "slack"
+      ],
+      "payload": {},
+      "expectedData": {
+        "message_count": 1005
       }
     }
   ],

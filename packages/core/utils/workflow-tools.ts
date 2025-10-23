@@ -1,9 +1,9 @@
 import { HttpMethod } from "@superglue/client";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../execute/tools.js";
+import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { logMessage } from "./logs.js";
 
 export const searchDocumentationToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
@@ -30,7 +30,7 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
         }
 
         // Use DocumentationSearch for targeted search
-        const documentationSearch = new DocumentationSearch({orgId: context.orgId});
+        const documentationSearch = new DocumentationSearch({ orgId: context.orgId });
         const searchResults = documentationSearch.extractRelevantSections(
             integration.documentation,
             query,

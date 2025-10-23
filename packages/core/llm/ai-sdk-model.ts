@@ -1,12 +1,12 @@
-import { AssistantModelMessage, TextPart, ToolCallPart, ToolResultPart, generateText, jsonSchema, tool } from "ai";
-import { openai } from "@ai-sdk/openai";
 import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
-import { initializeAIModel, getModelContextLength } from "@superglue/shared/utils";
+import { openai } from "@ai-sdk/openai";
+import { getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
+import { AssistantModelMessage, TextPart, ToolCallPart, ToolResultPart, generateText, jsonSchema, tool } from "ai";
 import { server_defaults } from "../default.js";
 import { ToolDefinition } from "../execute/tools.js";
-import { LLM, LLMMessage, LLMObjectResponse, LLMResponse } from "./language-model.js";
 import { logMessage } from "../utils/logs.js";
+import { LLM, LLMMessage, LLMObjectResponse, LLMResponse } from "./language-model.js";
 
 export class AiSdkModel implements LLM {
   public contextLength: number;
@@ -167,7 +167,7 @@ export class AiSdkModel implements LLM {
 
     // Clean schema: remove patternProperties, minItems/maxItems, set strict/additionalProperties
     schema = this.cleanSchema(schema);
-    
+
     // Handle O-model temperature
     let temperatureToUse: number | undefined = temperature;
     if (this.modelId.startsWith('o')) {
@@ -177,8 +177,8 @@ export class AiSdkModel implements LLM {
     const schemaObj = jsonSchema(schema);
     const tools = this.buildTools(schemaObj, customTools, toolContext);
 
-    let conversationMessages: LLMMessage[] = String(messages[0]?.content)?.startsWith("The current date and time is") 
-      ? messages 
+    let conversationMessages: LLMMessage[] = String(messages[0]?.content)?.startsWith("The current date and time is")
+      ? messages
       : [dateMessage, ...messages];
 
     try {
@@ -210,33 +210,39 @@ export class AiSdkModel implements LLM {
         if (result.text.trim().length > 0) {
           conversationMessages.push({
             role: "assistant" as const,
-            content: [{type: "text", text: result.text} as TextPart],
+            content: [{ type: "text", text: result.text } as TextPart],
           } as LLMMessage);
         }
 
         for (const toolCall of result.toolCalls) {
           // if we can find the tool id in the toolResults
-          conversationMessages.push({role: 'assistant', content: [{
-            type: 'tool-call',
-            toolCallId: toolCall.toolCallId,
-            toolName: toolCall.toolName,
-            input: toolCall.input ?? {}
-          } as ToolCallPart]} as AssistantModelMessage);
-          const toolResult = result.toolResults.find(tr => tr.toolCallId === toolCall.toolCallId);
-          if (toolResult) {
-            conversationMessages.push({role: 'tool', content: [{
-              type: 'tool-result',
-              toolCallId: toolResult.toolCallId,
-              toolName: toolResult.toolName,
-              output: {"type": "text", "value": toolResult.output?.toString() ?? ""}
-            } as ToolResultPart]});
-          } else {
-            conversationMessages.push({role: 'tool', content: [{
-              type: 'tool-result',
+          conversationMessages.push({
+            role: 'assistant', content: [{
+              type: 'tool-call',
               toolCallId: toolCall.toolCallId,
               toolName: toolCall.toolName,
-              output: {"type": "text", "value": "Tool did not output anything"}
-            } as ToolResultPart]});
+              input: toolCall.input ?? {}
+            } as ToolCallPart]
+          } as AssistantModelMessage);
+          const toolResult = result.toolResults.find(tr => tr.toolCallId === toolCall.toolCallId);
+          if (toolResult) {
+            conversationMessages.push({
+              role: 'tool', content: [{
+                type: 'tool-result',
+                toolCallId: toolResult.toolCallId,
+                toolName: toolResult.toolName,
+                output: { "type": "text", "value": toolResult.output?.toString() ?? "" }
+              } as ToolResultPart]
+            });
+          } else {
+            conversationMessages.push({
+              role: 'tool', content: [{
+                type: 'tool-result',
+                toolCallId: toolCall.toolCallId,
+                toolName: toolCall.toolName,
+                output: { "type": "text", "value": "Tool did not output anything" }
+              } as ToolResultPart]
+            });
           }
         }
 

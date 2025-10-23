@@ -1,16 +1,16 @@
 import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
 import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
-import { WorkflowExecutor } from "../../execute/workflow-executor.js";
-import { Context, Metadata } from '../types.js';
-
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { WorkflowBuilder } from "../../build/workflow-builder.js";
+import { ToolSelector } from "../../execute/tool-selector.js";
+import { WorkflowExecutor } from "../../execute/workflow-executor.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { parseJSON } from "../../utils/json-parser.js";
 import { logMessage } from "../../utils/logs.js";
 import { replaceVariables } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
+import { Context, Metadata } from '../types.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -252,6 +252,25 @@ export const listWorkflowsResolver = async (
   } catch (error) {
     logMessage('error', "Error listing workflows: " + String(error), { orgId: context.orgId });
     throw error;
+  }
+};
+
+export const findRelevantToolsResolver = async (
+  _: unknown,
+  { searchTerms }: { searchTerms?: string },
+  context: Context,
+  info: GraphQLResolveInfo,
+) => {
+  try {
+    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
+    const allTools = await context.datastore.listWorkflows({ limit: 1000, offset: 0, orgId: context.orgId });
+    const tools = allTools.items || [];
+
+    const selector = new ToolSelector(metadata);
+    return await selector.select(searchTerms, tools);
+  } catch (error) {
+    logMessage('error', `Error finding relevant tools: ${String(error)}`, { orgId: context.orgId });
+    return [];
   }
 };
 
