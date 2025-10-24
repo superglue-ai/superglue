@@ -6,6 +6,7 @@ import SFTPClient from "ssh2-sftp-client";
 import { URL } from "url";
 import { server_defaults } from "../default.js";
 import { parseJSON } from "../utils/json-parser.js";
+import { composeUrl } from "../utils/tools.js";
 
 export interface FtpExecutorInput {
     axiosConfig: AxiosRequestConfig;
@@ -22,33 +23,33 @@ export async function executeFtp(input: FtpExecutorInput): Promise<FtpExecutorRe
     const { axiosConfig, credentials, options } = input;
     
     const ftpUrl = new URL(axiosConfig.url!);
-    const connectionUrl = `${ftpUrl.protocol}//${ftpUrl.host}${ftpUrl.pathname}`;
+    const credentialsString = `${ftpUrl.username || credentials.username || credentials.user}:${ftpUrl.password || credentials.password}@`;
+    const connectionUrl = `${ftpUrl.protocol}//${credentialsString !== ":@" ? credentialsString : ""}${ftpUrl.host}`;
     
     const operationData = axiosConfig.data || axiosConfig.params || {};
     const ftpOperation = typeof operationData === 'string' ? JSON.parse(operationData) : operationData;
+    ftpOperation.path = composeUrl(connectionUrl, ftpOperation.path);
     
-    if (ftpOperation.path && !ftpOperation.path.startsWith('ftp') && !ftpOperation.path.startsWith('sftp')) {
-        ftpOperation.path = connectionUrl + (ftpOperation.path.startsWith('/') ? '' : '/') + ftpOperation.path;
-    } else if (!ftpOperation.path) {
-        ftpOperation.path = connectionUrl;
-    }
-    
+    try {
     const data = await callFTP({
         operation: ftpOperation,
-        credentials,
-        options
-    });
+            credentials,
+            options
+        });    
+        return {
+          data,
+          response: {
+              data,
+              status: 200,
+              statusText: 'OK',
+              headers: {},
+              config: axiosConfig as any
+          } as AxiosResponse
+      };
+    } catch (error) {
+        throw new Error(`FTP error: ${error} for config ${JSON.stringify(axiosConfig)}`);
+    }
     
-    return {
-        data,
-        response: {
-            data,
-            status: 200,
-            statusText: 'OK',
-            headers: {},
-            config: axiosConfig as any
-        } as AxiosResponse
-    };
 }
 
 const SUPPORTED_OPERATIONS = ['list', 'get', 'put', 'delete', 'rename', 'mkdir', 'rmdir', 'exists', 'stat'];
@@ -59,6 +60,8 @@ export interface FTPOperation {
   content?: string | Buffer;
   newPath?: string;
   recursive?: boolean;
+  privateKey?: string;
+  passphrase?: string;
 }
 
 function parseConnectionUrl(urlString: string): {
@@ -67,7 +70,7 @@ function parseConnectionUrl(urlString: string): {
   port: number;
   username?: string;
   password?: string;
-  basePath?: string;
+  targetPath: string;
 } {
   const url = new URL(urlString);
   const protocol = url.protocol.replace(':', '') as 'ftp' | 'ftps' | 'sftp';
@@ -84,7 +87,7 @@ function parseConnectionUrl(urlString: string): {
     port: url.port ? parseInt(url.port) : defaultPorts[protocol],
     username: url.username || undefined,
     password: url.password || undefined,
-    basePath: url.pathname && url.pathname !== '/' ? url.pathname : undefined
+    targetPath: url.pathname && url.pathname !== '/' ? url.pathname : '/'
   };
 }
 
@@ -310,7 +313,7 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
   }
 }
 
-export async function callFTP({operation, credentials, options}: {operation: FTPOperation | string, credentials: Record<string, any>, options: RequestOptions}): Promise<any> {
+export async function callFTP({operation, options}: {operation: FTPOperation | string, credentials: Record<string, any>, options: RequestOptions}): Promise<any> {
   if (typeof operation === 'string') {
     try {
       operation = JSON.parse(operation) as FTPOperation;
@@ -332,81 +335,57 @@ export async function callFTP({operation, credentials, options}: {operation: FTP
   
   const connectionInfo = parseConnectionUrl(operation.path);
 
-  let attempts = 0;
   const maxRetries = options?.retries || server_defaults.FTP.DEFAULT_RETRIES;
   const timeout = options?.timeout || server_defaults.FTP.DEFAULT_TIMEOUT;
 
-  do {
-    try {
-      if (connectionInfo.protocol === 'sftp') {
-        const sftp = new SFTPClient();
-        try {
-          await sftp.connect({
-            host: connectionInfo.host,
-            port: connectionInfo.port,
-            username: connectionInfo.username || credentials.username,
-            password: connectionInfo.password || credentials.password,
-            privateKey: credentials.privateKey,
-            passphrase: credentials.passphrase,
-            readyTimeout: timeout,
-            retries: 1,
-            retry_minTimeout: 1000,
-            timeout: timeout
-          });
+  try {
+    if (connectionInfo.protocol === 'sftp') {
+      const sftp = new SFTPClient();
+      try {
+        await sftp.connect({
+          host: connectionInfo.host,
+          port: connectionInfo.port,
+          username: connectionInfo.username,
+          password: connectionInfo.password,
+          privateKey: operation.privateKey,
+          passphrase: operation.passphrase,
+          readyTimeout: timeout,
+          retries: maxRetries,
+          retry_minTimeout: 1000,
+          timeout: timeout
+        });
 
-          if (connectionInfo.basePath && operation.path) {
-            if (!operation.path.startsWith('/')) {
-              operation.path = path.join(connectionInfo.basePath, operation.path);
-            }
-          } else if (connectionInfo.basePath && !operation.path) {
-            operation.path = connectionInfo.basePath;
-          }
-
-          const result = await executeSFTPOperation(sftp, operation);
-          return result;
-        } finally {
-          await sftp.end();
-        }
-      } else {
-        const ftp = new FTPClient(timeout);
-        ftp.ftp.verbose = false;
-        
-        try {
-          await ftp.access({
-            host: connectionInfo.host,
-            port: connectionInfo.port,
-            user: connectionInfo.username || credentials.username,
-            password: connectionInfo.password || credentials.password,
-            secure: connectionInfo.protocol === 'ftps',
-            secureOptions: connectionInfo.protocol === 'ftps' ? {
-              rejectUnauthorized: false
-            } : undefined
-          });
-
-          if (connectionInfo.basePath) {
-            await ftp.cd(connectionInfo.basePath);
-          }
-
-          const result = await executeFTPOperation(ftp, operation);
-          return result;
-        } finally {
-          ftp.close();
-        }
+        operation.path = connectionInfo.targetPath;
+        const result = await executeSFTPOperation(sftp, operation);
+        return result;
+      } finally {
+        await sftp.end();
       }
-    } catch (error) {
-      attempts++;
+    } else {
+      const ftp = new FTPClient(timeout);
+      ftp.ftp.verbose = false;
+      
+      try {
+        await ftp.access({
+          host: connectionInfo.host,
+          port: connectionInfo.port,
+          user: connectionInfo.username,
+          password: connectionInfo.password,
+          secure: connectionInfo.protocol === 'ftps',
+          secureOptions: connectionInfo.protocol === 'ftps' ? {
+            rejectUnauthorized: false
+          } : undefined
+        });
 
-      if (attempts > maxRetries) {
-        if (error instanceof Error) {
-          const errorContext = ` for operation: ${JSON.stringify(operation)}`;
-          throw new Error(`${connectionInfo.protocol.toUpperCase()} error: ${error.message}${errorContext}`);
-        }
-        throw new Error(`Unknown ${connectionInfo.protocol.toUpperCase()} error occurred`);
+        operation.path = connectionInfo.targetPath;
+        const result = await executeFTPOperation(ftp, operation);
+        return result;
+      } finally {
+        ftp.close();
       }
-
-      const retryDelay = options?.retryDelay || server_defaults.FTP.DEFAULT_RETRY_DELAY;
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
     }
-  } while (attempts <= maxRetries);
+  } catch (error) {
+    throw new Error(`FTP error: ${error}`);
+  }
 }
 

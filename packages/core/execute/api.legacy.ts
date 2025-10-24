@@ -111,7 +111,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
         const query = body.query;
         const params = body.params || body.values;
         const request  = { method: "POST", url: connectionString, headers: processedHeaders, data: processedBody, params: processedQueryParams };
-        return { data: await callPostgres({ connectionString, query, params, credentials, options }), statusCode: 200, request: request };
+        return { data: await callPostgres({ connectionString, query, params, options }), statusCode: 200, request: request };
       }
   
       if (processedUrlHost.startsWith("ftp://") || processedUrlHost.startsWith("ftps://") || processedUrlHost.startsWith("sftp://")) {

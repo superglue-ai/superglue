@@ -12,7 +12,22 @@ CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
    - Previous step results accessed by stepId (e.g., sourceData.getAllContacts, sourceData.fetchUsers)
    - DO NOT use sourceData.payload - initial payload is merged at root level
 
-2. Common workflow patterns:
+2. PAGINATION HANDLING:
+   - When a step uses pagination, results are AUTOMATICALLY MERGED before reaching the transform
+   - sourceData.stepId contains the MERGED result, NOT an array of pages
+   - Access paginated data directly: sourceData.stepId.data.items (single object, not array of page objects)
+   - NEVER iterate over sourceData.stepId as if it's an array of pages
+   - Example CORRECT: sourceData.getAllIssues.data.issues.nodes
+   - Example WRONG: sourceData.getAllIssues.map(page => page.data.data.issues.nodes)
+
+3. ERROR HANDLING FOR SELF-HEALING:
+   - Use optional chaining ONLY for truly optional fields
+   - For required data paths, access directly (e.g., sourceData.stepId.data.items) without excessive ?.
+   - Let the code throw errors on missing required data so self-healing can fix it
+   - WRONG: sourceData.step?.data?.data?.items || [] (masks structure errors)
+   - RIGHT: sourceData.step.data.items || [] (throws if structure is wrong, triggers self-healing)
+
+4. Common workflow patterns:
    - Filtering arrays: contacts.filter(c => !excludeList.includes(c.company))
    - Mapping data: items.map(item => ({ id: item.id, name: item.name }))
    - Extracting nested data: response.data?.items || []
@@ -22,9 +37,11 @@ Requirements:
 - Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
 - Return statement is REQUIRED - the function must return the transformed data
 - Pure function - no side effects or external dependencies
-- Handle missing/null data gracefully with optional chaining (?.) and defaults - BUT - throw when expected and required data is missing so superglue can self heal
+- Use optional chaining (?.) ONLY for truly optional fields - don't mask structure errors with excessive ?.
+- For required data paths, throw errors on missing data so self-healing can fix incorrect assumptions
 - Validate arrays with Array.isArray() before using array methods
-- Return appropriate defaults when data is missing
+- WRONG: sourceData.step?.data?.data?.items || [] (silently returns empty array on wrong structure)
+- RIGHT: sourceData.step.data.items || [] (throws if 'data' doesn't exist, triggering self-healing)
 
 COMMON WORKFLOW TRANSFORMATIONS:
 
@@ -59,6 +76,17 @@ COMMON WORKFLOW TRANSFORMATIONS:
     success: true,
     count: results.length,
     data: results
+  };
+}
+\`\`\`
+
+4. Final transform with paginated data (results already merged):
+\`\`\`javascript
+(sourceData) => {
+  // Paginated results are already merged - access directly, NOT as array of pages
+  const allIssues = sourceData.getAllIssues.data.issues.nodes || [];
+  return {
+    issues: allIssues.map(issue => ({ id: issue.id, title: issue.title }))
   };
 }
 \`\`\`
@@ -123,7 +151,7 @@ When present, these user instructions should take priority and be carefully foll
 </INTEGRATION_INSTRUCTIONS>
 
 <STEP_CREATION>
-1. [Important] Fetch ALL prerequisites like available projects you can query, available entities / object types you can access, available categories you can filter on, etc. 
+1. [CRITICAL] Fetch ALL prerequisites like available projects you can query, available entities / object types you can access, available categories you can filter on, etc. 
 2. Plan the actual steps to fulfill the instruction.
 
 Further:
@@ -232,9 +260,11 @@ Notes:
 
 <POSTGRES>
 - Postgres format for configCode:
-  * url: Full connection string with database: \`postgres://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:\${context.credentials.port}/\${context.credentials.database}\` or "postgresql://..."
-  * method: 'POST'
-  * data: { query: string, params?: any[] } or { query: string, values?: any[] }
+  * url: MUST be the full connection string including username and password: \`postgres://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:\${context.credentials.port}/\${context.credentials.database}\` or "postgresql://..."
+  * method: MUST be 'POST'
+  * data: MUST be an object with { query: string, params?: any[] } or { query: string, values?: any[] }
+    - query: The SQL statement (required)
+    - params or values: Array of parameter values (optional)
 - Use parameterized queries ($1, $2, etc.) to prevent SQL injection
 - Examples:
   * Simple query:
@@ -255,7 +285,7 @@ Notes:
         params: [context.inputData.category, context.inputData.minPrice]
       }
     })
-  * Insert with RETURNING:
+  * Insert with RETURNING (note: params or values can be used interchangeably):
     (context) => ({
       url: \`postgres://\${context.credentials.username}:\${context.credentials.password}@localhost:5432/app\`,
       method: 'POST',
@@ -270,29 +300,32 @@ Notes:
 
 <FTP_SFTP>
 - FTP/SFTP format for configCode:
-  * url: Full connection URL with credentials and base path
-  * FTP: \`ftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:21/basepath\`
-  * FTPS: \`ftps://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:21/basepath\`
-  * SFTP: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22/basepath\`
-  * method: 'POST'
-  * data: Operation object with 'operation' field and other parameters
+  * url: MUST be the full connection URL including username and password
+  * FTP: \`ftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:21/\`
+  * FTPS: \`ftps://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:21/\`
+  * SFTP: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22/\`
+  * method: MUST be 'POST'
+  * data: MUST be an object with { operation: string, path: string, ...other params }
+    - operation: The FTP operation (required)
+    - path: Simple file/directory path starting with / (required for most operations, NOT a full URL)
+    - other params: content, newPath, recursive, etc. depending on operation
 - Supported operations: list, get, put, delete, rename, mkdir, rmdir, exists, stat
 - Examples:
   * List directory:
     (context) => ({
-      url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22/base\`,
+      url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22/\`,
       method: 'POST',
       data: { operation: 'list', path: '/directory' }
     })
   * Get file (auto-parses CSV/JSON/XML):
     (context) => ({
-      url: \`ftp://\${context.credentials.username}:\${context.credentials.password}@ftp.example.com:21\`,
+      url: \`ftp://\${context.credentials.username}:\${context.credentials.password}@ftp.example.com:21/\`,
       method: 'POST',
       data: { operation: 'get', path: \`/reports/\${context.inputData.filename}\` }
     })
   * Upload file:
     (context) => ({
-      url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22\`,
+      url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22/\`,
       method: 'POST',
       data: { operation: 'put', path: '/upload.txt', content: context.inputData.fileContent }
     })
@@ -356,13 +389,29 @@ CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
    - Previous step results accessed by stepId (e.g., sourceData.getAllContacts, sourceData.fetchUsers)
    - DO NOT use sourceData.payload - initial payload is merged at root level
 
-2. Common workflow patterns:
+2. Pagination handling on variable access:
+   - When a step uses pagination, results are AUTOMATICALLY MERGED before reaching the final transform
+   - sourceData.stepId contains the MERGED result, NOT an array of pages
+   - Access paginated data directly: sourceData.stepId.data.items (single object, not array of page objects)
+   - NEVER iterate over sourceData.stepId as if it's an array of pages
+   - Example CORRECT: sourceData.getAllIssues.data.issues.nodes
+   - Example WRONG: sourceData.getAllIssues.map(page => page.data.data.issues.nodes)
+   - The pagination merging happens automatically before your transform runs
+
+3. ERROR HANDLING FOR SELF-HEALING:
+   - Use optional chaining (?.) ONLY for truly optional fields
+   - For required data paths, access directly without excessive ?. to let errors surface
+   - Let the code throw errors on missing required data so self-healing can fix it
+   - WRONG: sourceData.step?.data?.data?.items || [] (masks structure errors)
+   - RIGHT: sourceData.step.data.items || [] (throws if structure is wrong, triggers self-healing)
+
+4. Common workflow patterns:
    - Filtering arrays: contacts.filter(c => !excludeList.includes(c.company))
    - Mapping data: items.map(item => ({ id: item.id, name: item.name }))
    - Extracting nested data: response.data?.items || []
    - Combining multiple sources: { ...sourceData.step1, ...sourceData.step2 }
 
-3. For LOOP execution contexts:
+5. For LOOP execution contexts:
    - currentItem is available via context.inputData.currentItem in API configs and refers to the currently executing step's loop item
    - In transformation functions (loopSelector, input transforms, final transforms), currentItem is available directly as a function parameter
    - previous loop step results are available in sourceData.<loop_step_id>, where <loop_step_id> is the id of the previous loop step and refers to the array of objects returned by the loop selector
@@ -378,9 +427,11 @@ Requirements:
 - Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
 - Return statement is REQUIRED - the function must return the transformed data
 - Pure function - no side effects or external dependencies
-- Handle missing/null data gracefully with optional chaining (?.) and defaults - BUT - throw when expected and required data is missing so superglue can self heal
+- Use optional chaining (?.) ONLY for truly optional fields - don't mask structure errors with excessive ?.
+- For required data paths, throw errors on missing data so self-healing can fix incorrect assumptions
 - Validate arrays with Array.isArray() before using array methods
-- Return appropriate defaults when data is missing
+- WRONG: sourceData.step?.data?.data?.items || [] (silently returns empty array on wrong structure)
+- RIGHT: sourceData.step.data.items || [] (throws if 'data' doesn't exist, triggering self-healing)
 
 COMMON WORKFLOW TRANSFORMATIONS:
 
@@ -417,6 +468,17 @@ COMMON WORKFLOW TRANSFORMATIONS:
 }
 \`\`\`
 
+4. Final transform with paginated data:
+\`\`\`javascript
+(sourceData) => {
+  // Paginated results are already merged - access directly, NOT as array of pages
+  const allIssues = sourceData.getAllIssues.data.issues.nodes || [];
+  return {
+    issues: allIssues.map(issue => ({ id: issue.id, title: issue.title }))
+  };
+}
+\`\`\`
+
 Return your answer in the following JSON format:
 {
   "mappingCode": "(sourceData) => { return { id: sourceData.id }; }"
@@ -438,11 +500,12 @@ The configCode function receives a context parameter with:
 
 The function MUST return an object with:
 - url (string): Full URL including protocol and path (https://, http://, postgres://, postgresql://, ftp://, ftps://, sftp://)
+  * For Postgres: MUST include username and password in connection string
 - method (string): HTTP method (GET, POST, PUT, DELETE, PATCH)
 - headers (object, optional): HTTP headers (not used for postgres/ftp)
 - data (any, optional): Request body
-  * For Postgres: { query: string, params: any[] }
-  * For FTP/SFTP: { operation: string, path: string, content?: string, ... }
+  * For Postgres: { query: string, params?: any[] } or { query: string, values?: any[] }
+  * For FTP/SFTP: { operation: string, path: string, content?: string, ... } where path is a simple path like '/file.txt', NOT a full URL
 - params (object, optional): URL query parameters (HTTP only)
 
 Example configCode WITHOUT pagination:
@@ -604,8 +667,6 @@ Handler receives pageInfo with:
 - totalFetched: total items accumulated from all previous pages
 - page, offset, cursor: current pagination state
 
-Responses are automatically merged: arrays concatenated, objects merged, conflicts resolved by taking most recent value.
-
 Example with OFFSET_BASED pagination (minimal - uses auto-generated handler):
 pagination: {
   type: "OFFSET_BASED"
@@ -660,8 +721,10 @@ The handler controls pagination flow and implements stopping logic (max items, A
 </PAGINATION_CONFIGURATION>
 
 <POSTGRES>
-- Postgres format: url includes full connection string with database
-- Note that the connection string and database name may be part of the connection string, or not provided at all, or only be provided in the instruction. Look at the input variables and instructions to come up with a best guess.
+- Postgres format: 
+  * url: MUST be the full connection string including username and password
+  * method: MUST be 'POST'
+  * data: MUST be { query: string, params?: any[] } or { query: string, values?: any[] }
 - Consider that you might need additional information from tables to process the instruction. E.g. if a user asks for a list of products, you might need to join the products table with the categories table to get the category name and filter on that.
 - In case the query is unclear (user asks for all products that are in a category but you are unsure what the exact category names are), get all category names in step 1 and then create the actual query in step 2.
 - Use parameterized queries for safer and more efficient execution:
@@ -679,22 +742,25 @@ The handler controls pagination flow and implements stopping logic (max items, A
 </POSTGRES>
 
 <FTP_SFTP>
-- FTP/SFTP format: url includes protocol, credentials, hostname, and port
-- The body must contain a JSON object with an 'operation' field specifying the action to perform
+- FTP/SFTP format: 
+  * url: MUST include protocol (ftp://, ftps://, sftp://), username, password, hostname, and port
+  * method: MUST be 'POST'
+  * data: MUST be { operation: string, path: string, ...other params }
+- CRITICAL: The 'path' field must be a simple path like '/file.txt', NOT a full URL with protocol and credentials
 - Supported operations are: list, get, put, delete, rename, mkdir, rmdir, exists, stat
 - Examples:
   * List directory: (context) => ({
-      url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22/basepath\`,
+      url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22/\`,
       method: 'POST',
       data: { operation: 'list', path: '/directory' }
     })
   * Get file (auto-parses CSV/JSON/XML): (context) => ({
-      url: \`ftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:21\`,
+      url: \`ftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:21/\`,
       method: 'POST',
       data: { operation: 'get', path: \`/reports/\${context.inputData.filename}\` }
     })
   * Upload file: (context) => ({
-      url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22\`,
+      url: \`sftp://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:22/\`,
       method: 'POST',
       data: { operation: 'put', path: '/upload.txt', content: context.inputData.fileContent }
     })
@@ -988,9 +1054,11 @@ Most modern APIs use headers for authentication.
 
 <POSTGRES>
 Correct PostgreSQL configuration:
-- url: Full connection string including database
-- method: 'POST'
-- data: {query: "postgres statement", params: ["some string", true]}
+- url: MUST be the full connection string including username and password
+- method: MUST be 'POST'
+- data: MUST be an object with {query: "SQL statement", params?: [values]} or {query: "SQL statement", values?: [values]}
+  * query: The SQL statement (required)
+  * params or values: Array of parameter values (optional, can be used interchangeably)
 - Example: (context) => ({
     url: \`postgres://\${context.credentials.username}:\${context.credentials.password}@\${context.credentials.hostname}:5432/\${context.credentials.database}\`,
     method: 'POST',
@@ -1002,7 +1070,7 @@ Correct PostgreSQL configuration:
 
 ALWAYS USE PARAMETERIZED QUERIES:
 - Use $1, $2, $3, etc. as placeholders in the query string
-- Provide corresponding values in params array
+- Provide corresponding values in params or values array
 - Example: {query: "SELECT * FROM users WHERE id = $1 AND status = $2", params: [context.inputData.userId, "active"]}
 - Benefits: Prevents SQL injection, better performance, cleaner code
 - The params/values array can contain static values or dynamic expressions from context

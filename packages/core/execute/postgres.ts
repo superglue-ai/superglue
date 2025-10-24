@@ -2,7 +2,6 @@ import { RequestOptions } from "@superglue/client";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { Pool, PoolConfig } from 'pg';
 import { server_defaults } from "../default.js";
-import { replaceVariables } from "../utils/tools.js";
 
 export interface PostgresExecutorInput {
     axiosConfig: AxiosRequestConfig;
@@ -17,10 +16,7 @@ export interface PostgresExecutorResult {
 }
 
 export async function executePostgres(input: PostgresExecutorInput): Promise<PostgresExecutorResult> {
-    const { axiosConfig, inputData, credentials, options } = input;
-    
-    const url = new URL(axiosConfig.url || '');
-    const connectionString = `${url.protocol}//${url.host}${url.pathname}`;
+    const { axiosConfig, options } = input;
     
     const body = typeof axiosConfig.data === 'string' 
         ? JSON.parse(axiosConfig.data) 
@@ -30,10 +26,9 @@ export async function executePostgres(input: PostgresExecutorInput): Promise<Pos
     const params = body.params || body.values;
     
     const data = await callPostgres({
-        connectionString,
+        connectionString: axiosConfig.url,
         query,
         params,
-        credentials,
         options
     });
     
@@ -139,32 +134,22 @@ function sanitizeDatabaseName(connectionString: string): string {
   return baseUrl + cleanDbName;
 }
 
-export async function callPostgres({connectionString, query, params, credentials, options}: {connectionString: string, query: string, params?: any[], credentials: Record<string, any>, options: RequestOptions}): Promise<any> {
-  const requestVars = credentials;
-  let finalConnectionString = await replaceVariables(connectionString, requestVars);
-  finalConnectionString = sanitizeDatabaseName(finalConnectionString);
-  
-  const queryText = await replaceVariables(query, requestVars);
-  const queryParams = params
-
+export async function callPostgres({connectionString, query, params, options}: {connectionString: string, query: string, params?: any[], options: RequestOptions}): Promise<any> {  
   const poolConfig: PoolConfig = {
-    connectionString: finalConnectionString,
+    connectionString: connectionString,
     statement_timeout: options?.timeout || server_defaults.POSTGRES.DEFAULT_TIMEOUT,
-    ssl: finalConnectionString.includes('sslmode=') || finalConnectionString.includes('localhost') === false 
+    ssl: connectionString.includes('sslmode=') || connectionString.includes('localhost') === false 
       ? { rejectUnauthorized: false }
       : false
   };
 
-  const pool = getOrCreatePool(finalConnectionString, poolConfig);
+  const pool = getOrCreatePool(connectionString, poolConfig);
   let attempts = 0;
   const maxRetries = options?.retries || server_defaults.POSTGRES.DEFAULT_RETRIES;
 
   do {
     try {
-      
-      const result = queryParams 
-        ? await pool.query(queryText, queryParams)
-        : await pool.query(queryText);
+      const result = await pool.query(query, params)
         return result.rows;
     } catch (error) {
       
@@ -172,9 +157,9 @@ export async function callPostgres({connectionString, query, params, credentials
 
       if (attempts > maxRetries) {
         if (error instanceof Error) {
-          const errorContext = queryParams 
-            ? ` for query: ${queryText} with params: ${JSON.stringify(queryParams)}`
-            : ` for query: ${queryText}`;
+          const errorContext = params 
+            ? ` for query: ${query} with params: ${JSON.stringify(params)}`
+            : ` for query: ${query}`;
           throw new Error(`PostgreSQL error: ${error.message}${errorContext}`);
         }
         throw new Error('Unknown PostgreSQL error occurred');

@@ -122,7 +122,8 @@ export async function executeCodeConfig({
         lastResponse = result.response;
         let responseData = await parseResponseData(result.data);
 
-        if (!hasPagination) {
+        // when the two response are the same we should return
+        if (!hasPagination || JSON.stringify(mergedResult) == JSON.stringify(responseData)) {
             return {
                 data: responseData,
                 statusCode: lastResponse.status,
@@ -170,7 +171,14 @@ function createMaskedContext(context: CodeExecutionContext): Record<string, any>
     };
 }
 
+function sanitizeCode(code: string): string {
+    // Remove trailing commas after closing parentheses/braces that would cause syntax errors
+    // Match patterns like "})" followed by comma and optional whitespace at the end
+    return code.trim().replace(/(\}\s*\))\s*,\s*$/g, '$1');
+}
+
 function wrapStopConditionCode(code: string): string {
+    code = sanitizeCode(code);
     if (code.startsWith("return")) {
         return `(response, pageInfo) => { ${code} }`;
     }
@@ -181,6 +189,7 @@ function wrapStopConditionCode(code: string): string {
 }
 
 function wrapCodeFunction(code: string): string {
+    code = sanitizeCode(code);
     if (!code.trim().startsWith('(context)')) {
         return `(context) => ${code}`;
     }

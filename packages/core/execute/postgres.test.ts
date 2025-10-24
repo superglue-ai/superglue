@@ -44,7 +44,7 @@ describe('PostgreSQL Utilities', () => {
       mockPoolQuery.mockResolvedValueOnce({ rows: mockRows });
 
       const options: RequestOptions = {};
-      const result = await callPostgres({ connectionString, query, params: undefined, credentials: mockCredentials, options: options });
+      const result = await callPostgres({ connectionString, query, params: undefined, options: options });
 
       expect(result).toEqual(mockRows);
       
@@ -65,7 +65,7 @@ describe('PostgreSQL Utilities', () => {
       mockPoolQuery.mockRejectedValue(new Error(errorMessage));
 
       const options: RequestOptions = {};
-      await expect(callPostgres({ connectionString, query, params: undefined, credentials: mockCredentials, options: options }))
+      await expect(callPostgres({ connectionString, query, params: undefined, options: options }))
         .rejects.toThrow(`PostgreSQL error: ${errorMessage} for query: SELECT * FROM users`);
 
       expect(mockPoolQuery).toHaveBeenCalledWith('SELECT * FROM users');
@@ -78,7 +78,7 @@ describe('PostgreSQL Utilities', () => {
       mockPoolQuery.mockRejectedValue(new Error(errorMessage));
 
       const options: RequestOptions = {};
-      await expect(callPostgres({ connectionString, query: paramQuery, params, credentials: mockCredentials, options: options }))
+      await expect(callPostgres({ connectionString, query: paramQuery, params, options: options }))
         .rejects.toThrow(`PostgreSQL error: ${errorMessage} for query: SELECT * FROM users WHERE id = $1 with params: [999]`);
     });
 
@@ -86,7 +86,7 @@ describe('PostgreSQL Utilities', () => {
       const options: RequestOptions = {};
       mockPoolQuery.mockResolvedValueOnce({ rows: [] });
         
-      await callPostgres({ connectionString, query, params: undefined, credentials: mockCredentials, options: options });
+      await callPostgres({ connectionString, query, params: undefined, options: options });
 
       expect(vi.mocked(Pool)).toHaveBeenCalledWith({
         connectionString: 'postgres://testuser:testpass@localhost:5432/testdb',
@@ -105,7 +105,7 @@ describe('PostgreSQL Utilities', () => {
       mockPoolQuery.mockResolvedValueOnce({ rows: mockRows });
 
       const options: RequestOptions = {};
-      const result = await callPostgres({ connectionString, query: paramQuery, params, credentials: mockCredentials, options: options });
+      const result = await callPostgres({ connectionString, query: paramQuery, params, options: options });
 
       expect(result).toEqual(mockRows);
       expect(mockPoolQuery).toHaveBeenCalledWith('SELECT * FROM users WHERE id = $1', [999]);
@@ -118,7 +118,7 @@ describe('PostgreSQL Utilities', () => {
       mockPoolQuery.mockResolvedValueOnce({ rows: mockRows });
 
       const options: RequestOptions = {};
-      const result = await callPostgres({ connectionString, query: paramQuery, params, credentials: mockCredentials, options: options });
+      const result = await callPostgres({ connectionString, query: paramQuery, params, options: options });
 
       expect(result).toEqual(mockRows);
       expect(mockPoolQuery).toHaveBeenCalledWith('SELECT * FROM users WHERE id = $1', [999]);
@@ -130,7 +130,7 @@ describe('PostgreSQL Utilities', () => {
         .mockRejectedValueOnce(new Error('First failure'))
         .mockResolvedValueOnce({ rows: [{ success: true }] });
 
-      const result = await callPostgres({ connectionString, query, params: undefined, credentials: mockCredentials, options: options });
+      const result = await callPostgres({ connectionString, query, params: undefined, options: options });
 
       expect(result).toEqual([{ success: true }]);
       expect(mockPoolQuery).toHaveBeenCalledTimes(2);
@@ -142,7 +142,7 @@ describe('PostgreSQL Utilities', () => {
         .mockRejectedValueOnce(new Error('First failure'))
         .mockRejectedValueOnce(new Error('Second failure'));
 
-      await expect(callPostgres({ connectionString, query, params: undefined, credentials: mockCredentials, options: options }))
+      await expect(callPostgres({ connectionString, query, params: undefined, options: options }))
         .rejects.toThrow(`PostgreSQL error: Second failure for query: SELECT * FROM users`);
 
       expect(mockPoolQuery).toHaveBeenCalledTimes(2);
@@ -153,7 +153,7 @@ describe('PostgreSQL Utilities', () => {
       const options: RequestOptions = { timeout: customTimeout };
       mockPoolQuery.mockResolvedValueOnce({ rows: [] });
         
-      await callPostgres({ connectionString, query, params: undefined, credentials: mockCredentials, options: options });
+      await callPostgres({ connectionString, query, params: undefined, options: options });
 
       expect(vi.mocked(Pool)).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -165,9 +165,9 @@ describe('PostgreSQL Utilities', () => {
     it('should cache connection pools', async () => {
       mockPoolQuery.mockResolvedValue({ rows: [] });
 
-      await callPostgres({ connectionString, query, params: undefined, credentials: mockCredentials, options: {} });
+      await callPostgres({ connectionString, query, params: undefined, options: {} });
       
-      await callPostgres({ connectionString, query, params: undefined, credentials: mockCredentials, options: {} });
+      await callPostgres({ connectionString, query, params: undefined, options: {} });
 
       expect(vi.mocked(Pool)).toHaveBeenCalledTimes(1);
     });
@@ -176,7 +176,7 @@ describe('PostgreSQL Utilities', () => {
       const dirtyConnectionString = 'postgres://{user}:{password}@{host}:{port}/{database}///';
       mockPoolQuery.mockResolvedValueOnce({ rows: [{ result: 1 }] });
 
-      await callPostgres({ connectionString: dirtyConnectionString, query, params: undefined, credentials: mockCredentials, options: {} });
+      await callPostgres({ connectionString: dirtyConnectionString, query, params: undefined, options: {} });
 
       expect(vi.mocked(Pool)).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -187,7 +187,7 @@ describe('PostgreSQL Utilities', () => {
 
     it('should remove pool from cache on error', async () => {
       mockPoolQuery.mockResolvedValueOnce({ rows: [] });
-      await callPostgres({ connectionString, query, params: undefined, credentials: mockCredentials, options: {} });
+      await callPostgres({ connectionString, query, params: undefined, options: {} });
 
       const errorHandler = mockPoolOn.mock.calls.find(call => call[0] === 'error')?.[1];
       expect(errorHandler).toBeDefined();
@@ -198,7 +198,7 @@ describe('PostgreSQL Utilities', () => {
 
       vi.clearAllMocks();
       mockPoolQuery.mockResolvedValueOnce({ rows: [] });
-      await callPostgres({ connectionString, query, params: undefined, credentials: mockCredentials, options: {} });
+      await callPostgres({ connectionString, query, params: undefined, options: {} });
 
       expect(vi.mocked(Pool)).toHaveBeenCalledTimes(1);
     });
@@ -206,11 +206,10 @@ describe('PostgreSQL Utilities', () => {
     it('should create separate pools for different connection strings', async () => {
       mockPoolQuery.mockResolvedValue({ rows: [] });
       
-      await callPostgres({ connectionString, query, params: undefined, credentials: mockCredentials, options: {} });
+      await callPostgres({ connectionString, query, params: undefined, options: {} });
       
       const connectionString2 = 'postgres://user2:pass2@host2/db2';
-      const credentials2 = { user: 'user2', password: 'pass2', host: 'host2', database: 'db2', table: 'users' };
-      await callPostgres({ connectionString: connectionString2, query, params: undefined, credentials: credentials2, options: {} });
+      await callPostgres({ connectionString: connectionString2, query, params: undefined, options: {} });
 
       expect(vi.mocked(Pool)).toHaveBeenCalledTimes(2);
     });
@@ -220,11 +219,10 @@ describe('PostgreSQL Utilities', () => {
     it('should close all pools and clear cache', async () => {
       mockPoolQuery.mockResolvedValue({ rows: [] });
       
-      await callPostgres({ connectionString, query, params: undefined, credentials: mockCredentials, options: {} });
+      await callPostgres({ connectionString, query, params: undefined, options: {} });
       
       const connectionString2 = 'postgres://user2:pass2@host2/db2';
-      const credentials2 = { user: 'user2', password: 'pass2', host: 'host2', database: 'db2', table: 'users' };
-      await callPostgres({ connectionString: connectionString2, query, params: undefined, credentials: credentials2, options: {} });
+      await callPostgres({ connectionString: connectionString2, query, params: undefined, options: {} });
 
       await closeAllPools();
 
@@ -235,7 +233,7 @@ describe('PostgreSQL Utilities', () => {
       mockPoolQuery.mockResolvedValue({ rows: [] });
       mockPoolEnd.mockRejectedValue(new Error('Close error'));
       
-      await callPostgres({ connectionString, query, params: undefined, credentials: mockCredentials, options: {} });
+      await callPostgres({ connectionString, query, params: undefined, options: {} });
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       await closeAllPools();

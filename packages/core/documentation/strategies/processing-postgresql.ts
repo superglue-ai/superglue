@@ -26,7 +26,7 @@ FROM information_schema.columns
 WHERE table_schema = 'public'
 ORDER BY table_name, ordinal_position;`;
 
-      const schemaResponse = await callPostgres({ connectionString, query, params: undefined, credentials, options: {} });
+      const schemaResponse = await callPostgres({ connectionString, query, params: undefined, options: {} });
       logMessage('info', `PostgreSQL Documentation Fetch: Schema retrieved ${schemaResponse.length} rows`, metadata);
       if (!schemaResponse) return null;
       return `${content ? `<DOCUMENTATION>\n${content}\n</DOCUMENTATION>\n` : ""}<DB_SCHEMA>\n${JSON.stringify(schemaResponse, null, 2)}\n</DB_SCHEMA>`;
