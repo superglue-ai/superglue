@@ -67,9 +67,12 @@ export class SuperglueToolAttemptService {
                 return attempt;
             }
 
+            // Execution succeeded - tool ran and returned data
+            attempt.executionSuccess = true;
+
+            // Now validate the returned data
             const validationResult = await this.validationService.validate(toolConfig, workflowResult);
             attempt.validationResult = validationResult;
-            attempt.executionSuccess = validationResult.passed;
             attempt.status = this.validationService.determineStatus(attempt);
 
             return attempt;

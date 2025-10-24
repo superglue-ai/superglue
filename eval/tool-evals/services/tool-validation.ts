@@ -28,6 +28,7 @@ export class ToolValidationService {
         let functionError: string | undefined;
         let functionPassed = false;
 
+        // Run validation function if provided and not skipped
         if (!skipFunction && toolConfig.validationFunction) {
             try {
                 await this.runValidationFunction(toolConfig, workflowResult);
@@ -35,20 +36,31 @@ export class ToolValidationService {
             } catch (error) {
                 functionError = error instanceof Error ? error.message : String(error);
             }
+        } else if (skipFunction) {
+            // Function was skipped - treat as "not passed" to trigger LLM
+            functionPassed = false;
+        } else {
+            // No validation function at all - treat as passed
+            functionPassed = true;
         }
 
-        if (functionPassed) {
+        // If function passed, we're done - no need for LLM
+        if (functionPassed && !skipFunction && toolConfig.validationFunction) {
             return {
                 passed: true,
+                functionPassed: true,
             };
         }
 
+        // Function failed or was skipped - ask LLM
         const llmResult = await this.runLLMJudge(toolConfig, workflowResult, functionError);
 
+        // Overall passed = LLM says "passes"
         const passed = llmResult.judgment === "passes";
 
         return {
             passed,
+            functionPassed,
             functionError,
             llmJudgment: llmResult.judgment,
             llmReason: llmResult.reason,

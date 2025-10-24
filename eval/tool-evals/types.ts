@@ -63,7 +63,8 @@ export enum AttemptStatus {
 }
 
 export interface ValidationResult {
-    passed: boolean;
+    passed: boolean; // Overall validation passed (function passed OR LLM says "passes")
+    functionPassed: boolean; // Did the validation function pass?
     functionError?: string;
     llmJudgment?: 'passes' | 'partial' | 'failed';
     llmReason?: string;

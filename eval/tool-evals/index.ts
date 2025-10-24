@@ -60,7 +60,7 @@ async function main(): Promise<void> {
     const markdownReporter = new MarkdownReporter(baseDir, metadata);
     markdownReporter.report(timestamp, metrics, metricsComparison, toolAttempts);
     
-    const jsonReporter = new JsonReporter(baseDir, metadata);
+    const jsonReporter = new JsonReporter(baseDir, metadata, config.settings.attemptsEachMode);
     jsonReporter.reportAttempts(timestamp, toolAttempts);
 
     const duration = new Date().getTime() - startedAt.getTime();

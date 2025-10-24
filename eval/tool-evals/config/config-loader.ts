@@ -50,7 +50,7 @@ const AgentEvalConfigSchema = z.object({
 export async function loadConfig(): Promise<AgentEvalConfig> {
     const configPath = join(
         dirname(fileURLToPath(import.meta.url)),
-        "../data/agent-eval-config.json"
+        "../tool-eval-config.json"
     );
 
     try {

@@ -8,7 +8,7 @@ Automated testing framework for Superglue's tool builder and executor across mul
 
 1. **Set up config**
 
-   Edit your config file at `data/agent-eval-config.json`
+   Edit your config file at `tool-eval-config.json`
 
 2. **Add credentials**
 
@@ -35,6 +35,7 @@ Automated testing framework for Superglue's tool builder and executor across mul
 tool-evals/
 ├── index.ts              # Main entry point
 ├── types.ts              # Shared type definitions
+├── tool-eval-config.json # Configuration file
 ├── config/               # Configuration loading
 │   └── config-loader.ts
 ├── services/             # Core business logic
@@ -50,8 +51,7 @@ tool-evals/
 │   └── markdown-reporter.ts
 ├── utils/                # Utility functions
 │   └── utils.ts
-└── data/                 # Config files and outputs
-    ├── agent-eval-config.json
+└── data/                 # Outputs
     ├── benchmark/
     └── results/
 ```
@@ -60,7 +60,7 @@ tool-evals/
 
 ### Config File Structure
 
-The `data/agent-eval-config.json` defines integrations and tools:
+The `tool-eval-config.json` defines integrations and tools:
 
 ```json
 {
