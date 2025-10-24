@@ -9,7 +9,7 @@ import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimple
 import { Integration, IntegrationInput, SuperglueClient, Workflow as Tool, UpsertMode } from '@superglue/client';
 import { integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { ArrowRight, Check, Clock, FileJson, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Upload, Wrench, X } from 'lucide-react';
+import { ArrowRight, Check, Clock, File, FileCode, FileJson, FileSpreadsheet, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Upload, Wrench, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -18,6 +18,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
+import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
 import { DocStatus } from '../utils/DocStatusSpinner';
 import { HelpTooltip } from '../utils/HelpTooltip';
@@ -839,6 +840,10 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                         if (showFileUploadSection) setShowFileUploadSection(false);
                         if (showResponseSchemaSection) setShowResponseSchemaSection(false);
                         setShowPayloadSection(!showPayloadSection);
+                        if (!showPayloadSection && payload.trim() === '') {
+                          setPayload('{}');
+                          setValidationErrors(prev => ({ ...prev, payload: false }));
+                        }
                       }}
                       className={cn(
                         "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
@@ -856,8 +861,8 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                             // Valid JSON - filled
                             return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
                           } catch {
-                            // Invalid JSON
-                            return "bg-red-100 dark:bg-red-950/30 border border-red-500 text-red-700 dark:text-red-400";
+                            // Invalid JSON - same styling as filled
+                            return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
                           }
                         })()
                       )}
@@ -875,7 +880,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                           JSON.parse(trimmedPayload);
                           return 'JSON Tool Input Attached';
                         } catch {
-                          return 'Malformatted JSON';
+                          return 'Invalid Input JSON';
                         }
                       })()}
                     </button>
@@ -883,6 +888,10 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                     <button
                       onClick={() => {
                         if (showPayloadSection) setShowPayloadSection(false);
+                        if (!showPayloadSection && payload.trim() === '') {
+                          setPayload('{}');
+                          setValidationErrors(prev => ({ ...prev, payload: false }));
+                        }
                         if (showResponseSchemaSection) setShowResponseSchemaSection(false);
                         setShowFileUploadSection(!showFileUploadSection);
                       }}
@@ -900,6 +909,10 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                     <button
                       onClick={() => {
                         if (showPayloadSection) setShowPayloadSection(false);
+                        if (!showPayloadSection && payload.trim() === '') {
+                          setPayload('{}');
+                          setValidationErrors(prev => ({ ...prev, payload: false }));
+                        }
                         if (showFileUploadSection) setShowFileUploadSection(false);
                         setShowResponseSchemaSection(!showResponseSchemaSection);
                       }}
@@ -960,61 +973,51 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                       </div>
 
                       <Textarea
-                        value={payload || '{}'}
+                        value={payload}
                         onChange={(e) => {
                           setPayload(e.target.value);
                           try {
-                            JSON.parse(e.target.value || '{}');
+                            JSON.parse(e.target.value || '');
                             setValidationErrors(prev => ({ ...prev, payload: false }));
                           } catch {
                             setValidationErrors(prev => ({ ...prev, payload: true }));
                           }
                         }}
-                        placeholder="{}"
+                        placeholder=""
                         className={cn("font-mono text-xs min-h-[150px]", validationErrors.payload && inputErrorStyles)}
                       />
-                      {validationErrors.payload && (
-                        <p className="text-xs text-destructive">Invalid JSON format</p>
-                      )}
+
 
                       {/* Input Schema section - only show when enforcement is enabled */}
                       {enforceInputSchema && (
                         <div className="space-y-3 pt-3 border-t">
                           <h4 className="font-medium text-sm">Enforced Tool Input Schema</h4>
                           
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setInputSchemaMode('current')}
-                              className={cn(
-                                "flex-1 text-xs px-3 py-2 rounded-md transition-all border",
-                                inputSchemaMode === 'current'
-                                  ? "bg-primary/10 border-primary text-foreground"
-                                  : "border-border text-muted-foreground hover:bg-accent/50"
-                              )}
-                            >
-                              Use schema generated from tool input
-                            </button>
-                            <button
-                              onClick={() => {
-                                setInputSchemaMode('custom');
-                                if (!inputSchema) {
-                                  setInputSchema('{"type":"object","properties":{}}');
-                                }
-                              }}
-                              className={cn(
-                                "flex-1 text-xs px-3 py-2 rounded-md transition-all border",
-                                inputSchemaMode === 'custom'
-                                  ? "bg-primary/10 border-primary text-foreground"
-                                  : "border-border text-muted-foreground hover:bg-accent/50"
-                              )}
-                            >
-                              {/* This does not do anything at the moment. The Workflow builder does not support input schemas.*/}
-                              Use custom schema
-                            </button>
-                          </div>
+                          <Tabs 
+                            value={inputSchemaMode} 
+                            onValueChange={(v) => {
+                              setInputSchemaMode(v as 'current' | 'custom');
+                              if (v === 'custom' && !inputSchema) {
+                                setInputSchema('{"type":"object","properties":{}}');
+                              }
+                            }}
+                          >
+                            <TabsList className="h-9 p-1 rounded-md w-full">
+                              <TabsTrigger value="current" className="flex-1 h-full px-3 text-xs rounded-sm data-[state=active]:rounded-sm">
+                                Use schema generated from tool input
+                              </TabsTrigger>
+                              <TabsTrigger value="custom" className="flex-1 h-full px-3 text-xs rounded-sm data-[state=active]:rounded-sm">
+                                {/* This does not do anything at the moment. The Workflow builder does not support input schemas.*/}
+                                Use custom schema
+                              </TabsTrigger>
+                            </TabsList>
+                          </Tabs>
 
                           {inputSchemaMode === 'custom' && (
                             <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground">
+                                Define a JSON Schema here to validate the tool's input.
+                              </p>
                               <JsonSchemaEditor
                                 value={inputSchema}
                                 onChange={setInputSchema}
@@ -1050,36 +1053,34 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                       {uploadedFiles.length > 0 && (
                         <div className="space-y-2 mb-3">
                           {uploadedFiles.map(file => {
-                            const getFileTypeInfo = (filename: string) => {
+                            const getFileIcon = (filename: string) => {
                               const ext = filename.toLowerCase().split('.').pop() || '';
                               switch (ext) {
-                                case 'json': return { color: 'text-blue-600', bgColor: 'bg-blue-50', icon: '{}' };
-                                case 'csv': return { color: 'text-green-600', bgColor: 'bg-green-50', icon: '▤' };
-                                case 'xml': return { color: 'text-orange-600', bgColor: 'bg-orange-50', icon: '<>' };
+                                case 'json': return FileJson;
+                                case 'csv': return FileSpreadsheet;
+                                case 'xml': return FileCode;
                                 case 'xlsx':
-                                case 'xls': return { color: 'text-emerald-600', bgColor: 'bg-emerald-50', icon: '⊞' };
-                                default: return { color: 'text-gray-600', bgColor: 'bg-gray-50', icon: '📄' };
+                                case 'xls': return FileSpreadsheet;
+                                default: return File;
                               }
                             };
-                            const fileInfo = getFileTypeInfo(file.name);
+                            const FileIcon = getFileIcon(file.name);
                             return (
                               <div
                                 key={file.key}
                                 className={cn(
-                                  "flex items-center justify-between px-3 py-2 rounded-md",
-                                  file.status === 'error' ? "bg-destructive/10" : fileInfo.bgColor
+                                  "flex items-center justify-between px-3 py-2 rounded-md border",
+                                  file.status === 'error' ? "bg-destructive/10 border-destructive/20" : "bg-muted/30 border-border"
                                 )}
                               >
                                 <div className="flex items-center gap-2">
-                                  <span className={cn("font-mono text-sm", fileInfo.color)}>
-                                    {fileInfo.icon}
-                                  </span>
+                                  <FileIcon className="h-4 w-4 text-gray-700 dark:text-gray-400" />
                                   <div>
                                     <div className="text-xs font-medium">{file.name}</div>
                                     <div className="text-[10px] text-muted-foreground">
                                       {file.status === 'processing' ? 'Parsing...' : 
                                        file.status === 'error' ? file.error :
-                                       `${formatBytes(file.size)} • ${file.key}`}
+                                       `${formatBytes(file.size)}`}
                                     </div>
                                   </div>
                                 </div>
@@ -1129,15 +1130,15 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                 {showResponseSchemaSection && (
                   <div className="border rounded-lg p-4 bg-card animate-fade-in mt-3" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
                     <h4 className="font-medium text-sm mb-3">Tool Result Schema</h4>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Define a JSON Schema to validate the tool's response
+                    </p>
                     <JsonSchemaEditor
                       value={responseSchema || null}
                       onChange={(value) => setResponseSchema(value || '')}
                       isOptional={true}
                       showModeToggle={true}
                     />
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Define a JSON Schema to validate the tool's response
-                    </p>
                   </div>
                 )}
 
