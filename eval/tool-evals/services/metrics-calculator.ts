@@ -1,4 +1,4 @@
-import { Metrics, WorkflowAttempt, WorkflowMetrics, WorkflowFailureReason, FailureCountsByReason } from "./types.js";
+import { Metrics, WorkflowAttempt, WorkflowMetrics, WorkflowFailureReason, FailureCountsByReason } from "../types.js";
 
 export class MetricsCalculator {
     public calculateMetrics(workflowAttempts: WorkflowAttempt[]): Metrics {

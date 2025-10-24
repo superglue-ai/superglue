@@ -2206,10 +2206,10 @@
       }
     }
   ],
-  "enabledWorkflows":"all",
+  "enabledWorkflows":["postgres-lego-get-colors"],
   "settings": {
     "runOneShotMode": true,
     "runSelfHealingMode": true,
-    "attemptsEachMode": 5
+    "attemptsEachMode": 1
   }
 }

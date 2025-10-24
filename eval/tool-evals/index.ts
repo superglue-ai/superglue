@@ -1,20 +1,20 @@
-import { loadConfig } from "./config-loader.js";
-import { logMessage } from "../../utils/logs.js";
-import { FileStore } from "../../datastore/filestore.js";
+import { loadConfig } from "./config/config-loader.js";
+import { logMessage } from "../../packages/core/utils/logs.js";
+import { FileStore } from "../../packages/core/datastore/filestore.js";
 import { join } from "path";
 import { dirname } from "path";
 import { fileURLToPath } from "node:url";
-import { IntegrationSetupService } from "./integration-setup.js";
-import { WorkflowRunnerService } from "./workflow-runner.js";
+import { IntegrationSetupService } from "./services/integration-setup.js";
+import { WorkflowRunnerService } from "./services/workflow-runner.js";
 import path from "node:path";
 import { config } from "dotenv";
-import { MetricsCalculator } from "./metrics-calculator.js";
-import { CsvReporter } from "./csv-reporter.js";
-import { MarkdownReporter } from "./markdown-reporter.js";
-import { MetricsComparer } from "./metrics-comparer.js";
-import { ConsoleReporter } from "./console-reporter.js";
-import { closeAllPools } from "../../execute/postgres/postgres.js";
-import { JsonReporter } from "./json-reporter.js";
+import { MetricsCalculator } from "./services/metrics-calculator.js";
+import { CsvReporter } from "./reporters/csv-reporter.js";
+import { MarkdownReporter } from "./reporters/markdown-reporter.js";
+import { MetricsComparer } from "./services/metrics-comparer.js";
+import { ConsoleReporter } from "./reporters/console-reporter.js";
+import { closeAllPools } from "../../packages/core/execute/postgres/postgres.js";
+import { JsonReporter } from "./reporters/json-reporter.js";
 
 const envPath = process.cwd().endsWith('packages/core')
   ? path.join(process.cwd(), '../../.env')
@@ -79,4 +79,7 @@ async function main(): Promise<void> {
   }
 }
 
-await main();
+main().catch(error => {
+  console.error('Fatal error:', error);
+  process.exit(1);
+});

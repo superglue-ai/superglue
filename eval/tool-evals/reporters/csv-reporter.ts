@@ -1,7 +1,7 @@
-import { Metrics, WorkflowMetrics } from "./types.js";
+import { Metrics, WorkflowMetrics } from "../types.js";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { Metadata } from "@superglue/shared";
-import { logMessage } from "../../utils/logs.js";
+import { logMessage } from "../../../packages/core/utils/logs.js";
 import { join, dirname } from "path";
 
 export class CsvReporter {
@@ -11,7 +11,7 @@ export class CsvReporter {
     private baseDir: string,
     private metadata: Metadata
   ) {
-    this.resultsDir = join(baseDir, "results");
+    this.resultsDir = join(baseDir, "data/results");
   }
 
   public report(timestamp: string, metrics: Metrics): string {

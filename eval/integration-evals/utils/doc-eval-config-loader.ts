@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { logMessage } from '../../../utils/logs.js';
+import { logMessage } from '../../../packages/core/utils/logs.js';
 import { DocumentationSite } from './doc-eval-fetcher.js';
 
 export interface DocumentationEvaluationConfig {

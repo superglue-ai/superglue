@@ -1,6 +1,6 @@
-import { DataStore } from '../../../datastore/types.js';
-import { DocumentationFetcher as DocumentationFetcherCore } from '../../../documentation/documentation-fetching.js';
-import { logMessage } from '../../../utils/logs.js';
+import { DataStore } from '../../../packages/core/datastore/types.js';
+import { DocumentationFetcher as DocumentationFetcherCore } from '../../../packages/core/documentation/documentation-fetching.js';
+import { logMessage } from '../../../packages/core/utils/logs.js';
 import * as fs from 'fs';
 import * as path from 'path';
 

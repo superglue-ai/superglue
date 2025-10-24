@@ -1,4 +1,4 @@
-import { Metrics, WorkflowMetrics, MetricsComparisonResult, MetricsComparison, WorkflowMetricsComparisonResult, WorkflowFailureReason } from "./types.js";
+import { Metrics, WorkflowMetrics, MetricsComparisonResult, MetricsComparison, WorkflowMetricsComparisonResult, WorkflowFailureReason } from "../types.js";
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
 
@@ -77,7 +77,7 @@ export class MetricsComparer {
     }
 
     private loadLastRunMetrics(): Metrics | undefined {
-        const resultsDir = join(this.baseDir, "results");
+        const resultsDir = join(this.baseDir, "data/results");
         if (!existsSync(resultsDir)) {
             return undefined;
         }
@@ -96,7 +96,7 @@ export class MetricsComparer {
     }
 
     private loadBenchmarkMetrics(): Metrics | undefined {
-        const benchmarkFile = join(this.baseDir, "benchmark", "agent-eval-benchmark.csv");
+        const benchmarkFile = join(this.baseDir, "data/benchmark", "agent-eval-benchmark.csv");
         if (!existsSync(benchmarkFile)) {
             return undefined;
         }

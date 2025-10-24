@@ -24,5 +24,5 @@ packages/core/eval/integration-testing/gha-integration-test-config.json
 packages/web/public/files
 
 # Agent Evaluation
-packages/core/eval/agent-eval/.data
-packages/core/eval/agent-eval/results/
+eval/tool-evals/.data
+eval/tool-evals/data/results/

@@ -4,8 +4,8 @@ import { DocumentationEvalFetcher } from './utils/doc-eval-fetcher.js';
 import { DocumentationEvaluator } from './utils/doc-eval-retrieval-evaulator.js';
 import { DocumentationEvaluationConfigLoader } from './utils/doc-eval-config-loader.js';
 import { BenchmarkComparer } from './utils/benchmark-comparer.js';
-import { createDataStore } from '../../datastore/datastore.js';
-import { logMessage } from '../../utils/logs.js';
+import { createDataStore } from '../../packages/core/datastore/datastore.js';
+import { logMessage } from '../../packages/core/utils/logs.js';
 
 // Load environment variables
 const envPath = process.cwd().endsWith('packages/core')

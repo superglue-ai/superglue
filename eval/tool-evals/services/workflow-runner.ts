@@ -1,7 +1,7 @@
 import { Integration } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
-import { DataStore } from "../../datastore/types.js";
-import { WorkflowAttempt, WorkflowConfig, TestSuiteSettings } from "./types.js";
+import { DataStore } from "../../../packages/core/datastore/types.js";
+import { WorkflowAttempt, WorkflowConfig, TestSuiteSettings } from "../types.js";
 import { SuperglueWorkflowAttemptService } from "./workflow-attempt.js";
 
 

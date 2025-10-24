@@ -1,4 +1,4 @@
-import type { Metrics, WorkflowMetrics, MetricsComparisonResult, WorkflowMetricsComparisonResult, WorkflowAttempt, FailureCountsByReason } from "./types.js";
+import type { Metrics, WorkflowMetrics, MetricsComparisonResult, WorkflowMetricsComparisonResult, WorkflowAttempt, FailureCountsByReason } from "../types.js";
 
 export class ConsoleReporter {
   static report(metrics: Metrics, metricsComparison?: MetricsComparisonResult, attempts?: WorkflowAttempt[]): void {

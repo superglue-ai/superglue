@@ -1,6 +1,6 @@
 import { readFile, access } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { AgentEvalConfig } from "./types.js";
+import type { AgentEvalConfig } from "../types.js";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
@@ -43,7 +43,7 @@ const AgentEvalConfigSchema = z.object({
 export async function loadConfig(): Promise<AgentEvalConfig> {
     const configPath = join(
         dirname(fileURLToPath(import.meta.url)),
-        "agent-eval-config.json"
+        "../data/agent-eval-config.json"
     );
 
     try {

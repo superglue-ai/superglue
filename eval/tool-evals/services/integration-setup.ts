@@ -1,8 +1,8 @@
-import { DataStore } from "../../datastore/types.js";
-import { logMessage } from "../../utils/logs.js";
-import type { AgentEvalConfig, IntegrationConfig } from "./types.js";
+import { DataStore } from "../../../packages/core/datastore/types.js";
+import { logMessage } from "../../../packages/core/utils/logs.js";
+import type { AgentEvalConfig, IntegrationConfig } from "../types.js";
 import { Integration } from "@superglue/client";
-import { DocumentationFetcher } from "../../documentation/index.js";
+import { DocumentationFetcher } from "../../../packages/core/documentation/index.js";
 import { Metadata } from "@playwright/test";
 
 export class IntegrationSetupService {

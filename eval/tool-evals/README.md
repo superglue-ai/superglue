@@ -1,12 +1,14 @@
-# Agent Evaluation
+# Tool Evaluation Framework
 
-Automated testing framework for Superglue's agent capabilities across multiple API integrations.
+Automated testing framework for Superglue's workflow builder and executor across multiple API integrations.
 
-## Getting Started
+## Quick Start
+
+**Entry point:** `index.ts` - Run the evaluation suite
 
 1. **Set up config**
 
-   Copy your config file to `packages/core/eval/agent-eval/agent-eval-config.json`
+   Edit your config file at `data/agent-eval-config.json`
 
 2. **Add credentials**
 
@@ -14,7 +16,7 @@ Automated testing framework for Superglue's agent capabilities across multiple A
 
 3. **Add benchmark (optional)**
 
-   Copy your benchmark file to `packages/core/eval/agent-eval/benchmark/agent-eval-benchmark.csv` (see [Benchmarking](#benchmarking) for details)
+   Copy your benchmark file to `data/benchmark/agent-eval-benchmark.csv` (see [Benchmarking](#benchmarking) for details)
 
 4. **Run evaluation**
 
@@ -25,13 +27,40 @@ Automated testing framework for Superglue's agent capabilities across multiple A
 5. **View results**
 
    - Console output shows immediate results
-   - `results/` folder contains timestamped CSV and Markdown reports
+   - `data/results/` folder contains timestamped CSV, JSON, and Markdown reports
+
+## Project Structure
+
+```
+tool-evals/
+├── index.ts              # Main entry point
+├── types.ts              # Shared type definitions
+├── config/               # Configuration loading
+│   └── config-loader.ts
+├── services/             # Core business logic
+│   ├── integration-setup.ts
+│   ├── workflow-runner.ts
+│   ├── workflow-attempt.ts
+│   ├── metrics-calculator.ts
+│   └── metrics-comparer.ts
+├── reporters/            # Output formatting (strategy pattern)
+│   ├── console-reporter.ts
+│   ├── csv-reporter.ts
+│   ├── json-reporter.ts
+│   └── markdown-reporter.ts
+├── utils/                # Utility functions
+│   └── utils.ts
+└── data/                 # Config files and outputs
+    ├── agent-eval-config.json
+    ├── benchmark/
+    └── results/
+```
 
 ## Configuration
 
 ### Config File Structure
 
-The `agent-eval-config.json` defines integrations and workflows:
+The `data/agent-eval-config.json` defines integrations and workflows:
 
 ```json
 {
@@ -122,10 +151,10 @@ Benchmarking tracks performance over time by comparing current runs against a ba
 ### Setting Up a Benchmark
 
 1. Run your first evaluation
-2. Review results in the `results/` folder
+2. Review results in the `data/results/` folder
 3. Copy a good run to use as your baseline:
    ```bash
-   cp results/agent-eval-YYYY-MM-DDTHH-mm-ss.csv packages/core/eval/agent-eval/benchmark/agent-eval-benchmark.csv
+   cp data/results/agent-eval-YYYY-MM-DDTHH-mm-ss.csv data/benchmark/agent-eval-benchmark.csv
    ```
 4. Future runs will automatically compare against this benchmark
 
@@ -137,7 +166,7 @@ When you improve your config or want to reset the baseline:
 2. Review the new results
 3. If satisfied, replace the benchmark:
    ```bash
-   cp results/agent-eval-YYYY-MM-DDTHH-mm-ss.csv packages/core/eval/agent-eval/benchmark/agent-eval-benchmark.csv
+   cp data/results/agent-eval-YYYY-MM-DDTHH-mm-ss.csv data/benchmark/agent-eval-benchmark.csv
    ```
 
 **Note:** The benchmark file is not in version control - each environment maintains its own baseline.

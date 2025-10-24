@@ -1,7 +1,7 @@
-import { WorkflowAttempt } from "./types.js";
+import { WorkflowAttempt } from "../types.js";
 import { writeFileSync } from "fs";
 import { join } from "path";
-import { logMessage } from "../../utils/logs.js";
+import { logMessage } from "../../../packages/core/utils/logs.js";
 import { Metadata } from "@superglue/shared";
 
 export class JsonReporter {
@@ -12,7 +12,7 @@ export class JsonReporter {
   }
 
   public reportAttempts(timestamp: string, attempts: WorkflowAttempt[]): void {
-    const filepath = join(this.baseDir, `results/agent-eval-${timestamp}.json` );
+    const filepath = join(this.baseDir, `data/results/agent-eval-${timestamp}.json` );
 
     const shortendAttempt = attempts.map(attempt => ({
       workflow: attempt.workflow.id,

@@ -1,8 +1,8 @@
 import { Integration, Workflow, WorkflowResult } from '@superglue/client';
 import { generateUniqueId } from '@superglue/shared/utils';
-import { DataStore } from '../../datastore/types.js';
-import { IntegrationManager } from '../../integrations/integration-manager.js';
-import { logEmitter, logMessage } from '../../utils/logs.js';
+import { DataStore } from '../../packages/core/datastore/types.js';
+import { IntegrationManager } from '../../packages/core/integrations/integration-manager.js';
+import { logEmitter, logMessage } from '../../packages/core/utils/logs.js';
 import { BaseWorkflowConfig } from './config-loader.js';
 import { validateWorkflowResult, type SoftValidationResult } from './soft-validator.js';
 
@@ -219,7 +219,7 @@ export class WorkflowRunner {
         try {
             logMessage('info', `📝 Building workflow ${workflowConfig.name}...`, this.metadata);
 
-            const { WorkflowBuilder } = await import('../../build/workflow-builder.js');
+            const { WorkflowBuilder } = await import('../../packages/core/build/workflow-builder.js');
             const builder = new WorkflowBuilder(
                 workflowConfig.instruction,
                 integrations,
@@ -262,7 +262,7 @@ export class WorkflowRunner {
             try {
                 logMessage('info', `🚀 Executing workflow ${workflowConfig.name}...`, this.metadata);
 
-                const { WorkflowExecutor } = await import('../../execute/workflow-executor.js');
+                const { WorkflowExecutor } = await import('../../packages/core/execute/workflow-executor.js');
                 const metadataWithWorkflowId = {
                     ...this.metadata,
                     workflowId: workflowConfig.id,

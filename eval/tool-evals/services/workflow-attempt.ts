@@ -1,13 +1,13 @@
 import { Integration, RequestOptions, SelfHealingMode, WorkflowResult } from "@superglue/client";
-import { WorkflowAttempt, WorkflowConfig, WorkflowFailureReason } from "./types.js";
+import { WorkflowAttempt, WorkflowConfig, WorkflowFailureReason } from "../types.js";
 import { Metadata } from "@superglue/shared";
 import { Workflow } from "@superglue/client";
 import { generateUniqueId } from "@superglue/shared/utils";
-import { IntegrationManager } from "../../integrations/integration-manager.js";
-import { DataStore } from "../../datastore/types.js";
-import { isDeepEqual } from "./utils.js";
-import { WorkflowBuilder } from "../../build/workflow-builder.js";
-import { WorkflowExecutor } from "../../execute/workflow-executor.js";
+import { IntegrationManager } from "../../../packages/core/integrations/integration-manager.js";
+import { DataStore } from "../../../packages/core/datastore/types.js";
+import { isDeepEqual } from "../utils/utils.js";
+import { WorkflowBuilder } from "../../../packages/core/build/workflow-builder.js";
+import { WorkflowExecutor } from "../../../packages/core/execute/workflow-executor.js";
 
 export class SuperglueWorkflowAttemptService {
     constructor(
