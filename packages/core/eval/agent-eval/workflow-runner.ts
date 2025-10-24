@@ -1,7 +1,7 @@
 import { Integration } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { DataStore } from "../../datastore/types.js";
-import { WorkflowAttempt, WorkflowConfig, TestSuiteSettings } from "./types.js";
+import { TestSuiteSettings, WorkflowAttempt, WorkflowConfig } from "./types.js";
 import { SuperglueWorkflowAttemptService } from "./workflow-attempt.js";
 
 
@@ -14,9 +14,9 @@ export class WorkflowRunnerService {
 
     public async runWorkflows(workflows: WorkflowConfig[], integrations: Integration[], settings: TestSuiteSettings): Promise<WorkflowAttempt[]> {
         const workflowAttemptService = new SuperglueWorkflowAttemptService(this.metadata, this.datastore);
+        const BATCH_SIZE = 5;
 
-        // Run all workflows in parallel, each with workflow-level batching
-        const workflowPromises = workflows.map(async (workflow) => {
+        const runWorkflow = async (workflow: WorkflowConfig): Promise<WorkflowAttempt[]> => {
             const workflowsIntegrations = integrations.filter(i => workflow.integrationIds.includes(i.id));
             const attempts: WorkflowAttempt[] = [];
             
@@ -45,7 +45,6 @@ export class WorkflowRunnerService {
                     attempts.push(...selfHealingAttempts);
                 }
             } else if (settings.runSelfHealingMode) {
-                // One-shot mode disabled, run self-healing mode only
                 const selfHealingPromises: Promise<WorkflowAttempt>[] = [];
                 for (let i = 0; i < settings.attemptsEachMode; i++) {
                     selfHealingPromises.push(
@@ -58,9 +57,16 @@ export class WorkflowRunnerService {
             }
             
             return attempts;
-        });
+        };
 
-        const allWorkflowAttempts = await Promise.all(workflowPromises);
-        return allWorkflowAttempts.flat();
+        const allWorkflowAttempts: WorkflowAttempt[] = [];
+        for (let i = 0; i < workflows.length; i += BATCH_SIZE) {
+            const batch = workflows.slice(i, i + BATCH_SIZE);
+            const batchPromises = batch.map(runWorkflow);
+            const batchResults = await Promise.all(batchPromises);
+            allWorkflowAttempts.push(...batchResults.flat());
+        }
+
+        return allWorkflowAttempts;
     }
 }

@@ -1,8 +1,8 @@
-import { WorkflowAttempt } from "./types.js";
+import { Metadata } from "@superglue/shared";
 import { writeFileSync } from "fs";
 import { join } from "path";
 import { logMessage } from "../../utils/logs.js";
-import { Metadata } from "@superglue/shared";
+import { WorkflowAttempt } from "./types.js";
 
 export class JsonReporter {
   constructor(
@@ -15,7 +15,7 @@ export class JsonReporter {
     const filepath = join(this.baseDir, `results/agent-eval-${timestamp}.json` );
 
     const shortendAttempt = attempts.map(attempt => ({
-      workflow: attempt.workflow.id,
+      workflow: attempt.workflow?.id ?? 'undefined',
       buildError: attempt.buildError ?? null,
       executionError: attempt.executionError ?? null,
       data: attempt.result?.data ?? null,

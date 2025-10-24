@@ -132,7 +132,8 @@ export class SuperglueWorkflowAttemptService {
             workflowConfig.payload || {},
             allCredentials,
             {
-                selfHealing: selfHealingEnabled ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED
+                selfHealing: selfHealingEnabled ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED,
+                testMode: selfHealingEnabled
             }
         );
 

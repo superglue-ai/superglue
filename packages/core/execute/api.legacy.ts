@@ -5,6 +5,7 @@ import ivm from "isolated-vm";
 import { server_defaults } from "../default.js";
 import { parseFile } from "../utils/file.js";
 import { composeUrl, maskCredentials, replaceVariables } from "../utils/tools.js";
+import { injectVMHelpersIndividually } from "../utils/vm-helpers.js";
 import { ExecutionResult } from "./execute.js";
 import { callFTP, FTPOperation } from "./ftp.js";
 import { ApiCallError, callAxios, handle2xxStatus, handle429Status, handleErrorStatus } from "./http.js";
@@ -320,6 +321,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
     try {
       const context = await isolate.createContext();
   
+      await injectVMHelpersIndividually(context);
       // Inject the response and pageInfo as JSON strings
       // legacy support for direct response data access
       await context.global.set('responseJSON', JSON.stringify({ data: response.data, headers: response.headers, ...response.data }));
@@ -343,7 +345,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
             return Boolean(result);
         `;
   
-      const shouldStop = await context.evalClosure(script, null, { timeout: 3000 });
+      const shouldStop = await context.evalClosure(script, [], { timeout: 3000 });
   
       return { shouldStop: Boolean(shouldStop) };
     } catch (error) {

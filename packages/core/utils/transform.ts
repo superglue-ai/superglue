@@ -1,9 +1,10 @@
 import { RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
 import type { DataStore, Metadata } from "@superglue/shared";
 import prettier from "prettier";
-import { getEvaluateTransformContext, getTransformContext } from "../context/context-builders.js";
+import { getEvaluateTransformContext, getObjectContext, getTransformContext } from "../context/context-builders.js";
 import { EVALUATE_TRANSFORM_SYSTEM_PROMPT, GENERATE_TRANSFORM_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
+import type { ToolDefinition } from "../generate/tools.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { logMessage } from "./logs.js";
 import { isSelfHealingEnabled, transformAndValidateSchema } from "./tools.js";
@@ -116,8 +117,8 @@ export async function generateTransformCode(
       required: ["mappingCode"],
       additionalProperties: false
     };
-
-    const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, mappingSchema, temperature);
+    const getValueTool = createGetValueTool(payload, payload);
+    const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, mappingSchema, temperature, [getValueTool]);
     messages = updatedMessages;
     try {
       // Autoformat the generated code
@@ -160,6 +161,8 @@ export async function evaluateTransform(
   try {
     logMessage('info', "Evaluating final transform", metadata);
 
+    const getValueTool = createGetValueTool(sourcePayload, transformedData);
+
     const systemPrompt = EVALUATE_TRANSFORM_SYSTEM_PROMPT;
     const userPrompt = getEvaluateTransformContext({ instruction, targetSchema, sourceData: sourcePayload, transformedData, transformCode: mappingCode }, { characterBudget: LanguageModel.contextLength / 10 });
 
@@ -177,7 +180,7 @@ export async function evaluateTransform(
       required: ["success", "reason"],
       additionalProperties: false
     };
-    const { response } = await LanguageModel.generateObject(messages, llmResponseSchema, 0);
+    const { response } = await LanguageModel.generateObject(messages, llmResponseSchema, 0, [getValueTool]);
     return response;
 
   } catch (error) {
@@ -185,4 +188,130 @@ export async function evaluateTransform(
     logMessage('error', `Error evaluating transform: ${errorMessage.slice(0, 250)}`, metadata);
     return { success: false, reason: `Error during evaluation: ${errorMessage}` };
   }
+}
+
+function createGetValueTool(sourceData: any, transformedData: any): ToolDefinition {
+  return {
+    name: "getValue",
+    description: "CALL MAXIMUM OF 5 TIMES: Check if a property path exists in the source or transformed data and get its value/type. Use this to verify the transform code accesses correct paths before failing evaluation. Supports array index notation (e.g., 'items[0]') and array wildcard selector ('[*]') to inspect array contents.",
+    maxCalls: 5,
+    arguments: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "The full property path to check including the root. Supports dot notation, array indices, and wildcards. Examples: 'sourceData.getAllLists.data.items', 'sourceData.users[0].name', 'transformedData.results[*]' (to see array structure)"
+        }
+      },
+      required: ["path"]
+    },
+    execute: async (args: { path: string }) => {
+      try {
+        // Determine root data source
+        console.log('getValueTool', args.path);
+        const rootMatch = args.path.match(/^(sourceData|transformedData)\./);
+        if (!rootMatch) {
+          console.log('getValueTool', 'Path must start with sourceData. or transformedData.', args.path);
+          return {
+            success: false,
+            error: `Path must start with 'sourceData.' or 'transformedData.', got: ${args.path}`
+          };
+        }
+        
+        const data = rootMatch[1] === 'sourceData' ? sourceData : transformedData;
+        const pathString = args.path.replace(/^(sourceData|transformedData)\./, '');
+        
+        // Parse path to handle dot notation and bracket notation
+        const pathParts = pathString
+          .replace(/\[(\d+)\]/g, '.$1')   // items[0] → items.0
+          .replace(/\[\*\]/g, '.[*]')     // items[*] → items.[*]
+          .split('.')
+          .filter(p => p);
+        
+        // Navigate to the target element
+        let current = data;
+        let errorInfo: { error: string; data?: any } | null = null;
+        
+        for (let i = 0; i < pathParts.length; i++) {
+          const part = pathParts[i];
+          const currentPath = pathParts.slice(0, i).join('.');
+          
+          // Handle array wildcard selector
+          if (part === '[*]') {
+            if (!Array.isArray(current)) {
+              errorInfo = {
+                error: `Cannot use [*] selector on non-array at path '${currentPath}'`,
+                data: { type: typeof current }
+              };
+            }
+            break; // Stop traversal at wildcard
+          }
+          
+          // Validate before accessing
+          if (current === null || current === undefined) {
+            errorInfo = {
+              error: `Path '${currentPath}.${part}' does not exist - parent is ${current === null ? 'null' : 'undefined'}`,
+              data: { availableKeys: [] }
+            };
+            break;
+          }
+          
+          if (typeof current !== 'object') {
+            errorInfo = {
+              error: `Cannot access property '${part}' of ${typeof current} at path '${currentPath}'`,
+              data: { type: typeof current }
+            };
+            break;
+          }
+          
+          if (!(part in current)) {
+            const availableKeys = Array.isArray(current) 
+              ? ['<array>', `length: ${current.length}`, ...(current.length > 0 ? [`first item type: ${typeof current[0]}`] : [])]
+              : Object.keys(current).slice(0, 10);
+            
+            errorInfo = {
+              error: `Property '${part}' does not exist at path '${currentPath}'`,
+              data: {
+                availableKeys,
+                suggestion: availableKeys.length > 0 ? `Available keys: ${availableKeys.join(', ')}` : 'Object has no keys'
+              }
+            };
+            break;
+          }
+          
+          current = current[part];
+        }
+        
+        // Return error if navigation failed
+        if (errorInfo) {
+          console.log('getValueTool', 'Error navigating path', errorInfo);
+          return { success: false, ...errorInfo };
+        }
+        
+        // Successfully navigated - return context for the element
+        const valueRepresentation = getObjectContext(current, {
+          include: { schema: true, preview: true, samples: Array.isArray(current) },
+          characterBudget: 2000
+        });
+        
+        console.log('getValueTool', 'Successfully navigated path', args.path);
+        return {
+          success: true,
+          data: {
+            exists: true,
+            type: Array.isArray(current) ? 'array' : typeof current,
+            representation: valueRepresentation,
+            ...(Array.isArray(current) && { arrayLength: current.length })
+          }
+        };
+        
+      } catch (error) {
+        console.log('getValueTool', 'Error checking path', error);
+        return {
+          success: false,
+          error: `Error checking path: ${error instanceof Error ? error.message : String(error)}`
+        };
+      }
+    }
+  };
 }

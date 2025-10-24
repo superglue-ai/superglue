@@ -14,7 +14,10 @@ import { DocumentationProcessingStrategy } from '../types.js';
 export class PostgreSqlStrategy implements DocumentationProcessingStrategy {
   async tryProcess(content: string, config: ApiConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null> {
     if (config.urlHost?.startsWith("postgres://") || config.urlHost?.startsWith("postgresql://")) {
-      const connectionString = composeUrl(config.urlHost, config.urlPath);
+      const connectionUrl = new URL(composeUrl(config.urlHost, config.urlPath));
+      connectionUrl.username = credentials?.username || credentials.user || '';
+      connectionUrl.password = credentials?.password || credentials.password || '';
+      const connectionString = connectionUrl.toString();
 
       const query = `SELECT 
     table_name,

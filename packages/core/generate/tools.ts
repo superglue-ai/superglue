@@ -16,6 +16,7 @@ export interface ToolDefinition {
         required?: string[];
     };
     execute?: ToolImplementation;
+    maxCalls?: number;
 }
 
 export interface ToolCall {

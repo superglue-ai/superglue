@@ -183,13 +183,23 @@ export class AiSdkModel implements LLM {
 
     try {
       let finalResult: any = null;
+      const toolCallCounts: Record<string, number> = {};
 
       while (finalResult === null) {
+        // Filter out tools that have exceeded their max calls
+        const availableTools = Object.fromEntries(
+          Object.entries(tools).filter(([toolName]) => {
+            const toolDef = customTools?.find(t => t.name === toolName);
+            if (!toolDef?.maxCalls) return true;
+            const callCount = toolCallCounts[toolName] || 0;
+            return callCount < toolDef.maxCalls;
+          })
+        );
 
         const result = await generateText({
           model: this.model,
           messages: conversationMessages,
-          tools,
+          tools: availableTools,
           toolChoice: toolChoice || 'required',
           temperature: temperatureToUse,
           maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
@@ -215,6 +225,13 @@ export class AiSdkModel implements LLM {
         }
 
         for (const toolCall of result.toolCalls) {
+          // Track tool call counts
+          toolCallCounts[toolCall.toolName] = (toolCallCounts[toolCall.toolName] || 0) + 1;
+          
+          const toolDef = customTools?.find(t => t.name === toolCall.toolName);
+          const maxCalls = toolDef?.maxCalls;
+          const callCount = toolCallCounts[toolCall.toolName];
+          
           // if we can find the tool id in the toolResults
           conversationMessages.push({role: 'assistant', content: [{
             type: 'tool-call',
@@ -224,11 +241,18 @@ export class AiSdkModel implements LLM {
           } as ToolCallPart]} as AssistantModelMessage);
           const toolResult = result.toolResults.find(tr => tr.toolCallId === toolCall.toolCallId);
           if (toolResult) {
+            let outputValue = typeof toolResult.output === 'string' ? toolResult.output : JSON.stringify(toolResult.output);
+            
+            // Add max calls warning if limit reached
+            if (maxCalls && callCount >= maxCalls) {
+              outputValue += `\n\n[WARNING: This was call ${callCount}/${maxCalls} for ${toolCall.toolName}. This tool is no longer available.]`;
+            }
+            
             conversationMessages.push({role: 'tool', content: [{
               type: 'tool-result',
               toolCallId: toolResult.toolCallId,
               toolName: toolResult.toolName,
-              output: {"type": "text", "value": toolResult.output?.toString() ?? ""}
+              output: {"type": "text", "value": typeof toolResult.output === 'string' ? toolResult.output : JSON.stringify(toolResult.output)}
             } as ToolResultPart]});
           } else {
             conversationMessages.push({role: 'tool', content: [{

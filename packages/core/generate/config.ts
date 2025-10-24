@@ -161,7 +161,7 @@ Examples:
     if (!generatedConfig?.code) {
         return {
             success: false,
-            error: 'Failed to generate code configuration',
+            error: 'Failed to generate code configuration: ' + JSON.stringify(generatedConfig),
             data: {
                 updatedMessages: updatedMessages
             }

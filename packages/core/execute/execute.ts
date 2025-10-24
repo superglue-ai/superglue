@@ -6,6 +6,7 @@ import { Metadata } from "../graphql/types.js";
 import { parseFile } from "../utils/file.js";
 import { logMessage } from "../utils/logs.js";
 import { smartMergeResponses } from "../utils/tools.js";
+import { injectVMHelpersIndividually } from "../utils/vm-helpers.js";
 import { ApiCallError } from "./http.js";
 import { executeRequest } from "./protocol-executor.js";
 
@@ -214,6 +215,7 @@ async function executeCodeInIsolate(
     try {
         const ivmContext = await isolate.createContext();
 
+        await injectVMHelpersIndividually(ivmContext);
         await ivmContext.global.set('contextJSON', JSON.stringify(context));
 
         const wrappedCode = wrapCodeFunction(code);
@@ -394,6 +396,7 @@ async function executePaginationHandler(
     try {
         const context = await isolate.createContext();
 
+        await injectVMHelpersIndividually(context);
         await context.global.set('responseJSON', JSON.stringify({ 
             data: response.data, 
             headers: response.headers,

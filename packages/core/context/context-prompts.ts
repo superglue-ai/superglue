@@ -1205,18 +1205,28 @@ ONLY fail the evaluation if you find:
 3. Output that violates the target schema structure
 4. Direct contradiction of explicit instructions (not assumptions based on samples)
 
-DO NOT fail for:
-- Field choices that differ from what you see in samples - the full data may contain values you don't see
-- Missing values in output samples - they may come from records not in your sample
-- Filter conditions that seem incorrect based on samples - trust the instruction over sample inference
-- Empty arrays or filtered results - the sample may not contain matching records
-- Field mappings you cannot verify from the limited sample
-- Using a field mentioned in the instruction even if it's not visible in your 5-record sample
+When you cannot verify the mapping logic from the sample data given, investigate further using the getValue tool:
 
-When the instruction specifies exact field names or conditions, trust the instruction even if you don't see those values in the sample. The instruction was written with knowledge of the full dataset.
+USING THE getValue TOOL (LIMITED TO 5 CALLS):
+Call getValue with the full path from the code (including sourceData/transformedData prefix).
+CRITICAL: DO NOT REPEAT path calls / get into endless loops of getValue calls.
+
+Supported path formats:
+- Dot notation: "sourceData.getAllLists.data.items"
+- Array indexing: "sourceData.users[0].name" (check specific array element)
+- Array wildcard: "sourceData.items[*]" (inspect array structure and see samples)
+- Mixed: "transformedData.results[0].data.values[*]"
+
+The tool returns:
+- success: true/false
+- If success=false: error message and data.availableKeys showing what actually exists
+- If success=true: data with { exists: true, type, representation } where representation is a formatted schema/preview of the value
+
+Use [*] selector to see array contents when you need to verify what's inside an array (e.g., "sourceData.items[*]" shows array structure with samples).
+
+CRITICAL: After using getValue to investigate (you have max 3 calls), you MUST make a decision and call submit with your evaluation result. Do not keep investigating indefinitely - either the code is correct or it's not.
 
 Focus on data accuracy and completeness of the mapping logic, and adherence to the instruction if provided.
-Be particularly lenient with arrays and filtered data since the samples may not contain all relevant records.
 Return { success: true, reason: "Mapping follows instruction and appears logically sound" } unless you find definitive errors in the code logic itself.`
 
 // Alias for backward compatibility
