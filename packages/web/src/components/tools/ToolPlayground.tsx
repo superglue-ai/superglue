@@ -5,7 +5,7 @@ import { executeFinalTransform, executeSingleStep, executeToolStepByStep, genera
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput } from "@/src/lib/utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
-import { Loader2, Play, X } from "lucide-react";
+import { Check, Loader2, Play, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -109,6 +109,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   }, [initialPayload]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [justPublished, setJustPublished] = useState(false);
   const [result, setResult] = useState<ToolResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
@@ -513,6 +514,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         }
         setToolId(savedTool.id);
       }
+
+      setJustPublished(true);
+      setTimeout(() => setJustPublished(false), 3000);
     } catch (error: any) {
       console.error("Error saving tool:", error);
       toast({
@@ -913,7 +917,12 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         disabled={saving || loading}
         className="h-9 px-5 shadow-md border border-primary/40"
       >
-        {saving ? "Publishing..." : "Publish"}
+        {saving ? "Publishing..." : justPublished ? (
+          <>
+            <Check className="mr-1 h-3.5 w-3.5" />
+            Published
+          </>
+        ) : "Publish"}
       </Button>
     </div>
   );
