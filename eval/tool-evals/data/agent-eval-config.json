@@ -590,7 +590,7 @@
   ],
   "tools": [
     {
-      "id": "clickup-task-list",
+      "id": "001-clickup-task-list",
       "name": "ClickUp Task List",
       "type": "retrieval",
       "instruction": "Get all tasks from the ClickUp task list. I want the final output to be a JSON object with the following structure: { \"tasks\": [ { \"name\": \"Task 1\", \"description\": \"Task 1 description\" } ]",
@@ -598,50 +598,21 @@
       "payload": {
         "listId": "901516361522"
       },
-      "expectedData": {
-        "tasks": [
-          {
-            "name": "First Task",
-            "description": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua."
-          }
-        ]
-      }
+      "validationFunction": "validators/001-clickup-task-list.ts",
+      "expectedResultDescription": "Should return tasks from list ID 901516361522. Expected to find at least one task named 'First Task' with a description starting with 'Lorem ipsum dolor sit amet'."
     },
     {
-      "id": "clickup-all-lists",
+      "id": "002-clickup-all-lists",
       "name": "ClickUp All Lists",
       "type": "retrieval",
       "instruction": "Get all lists of all workspaces in ClickUp. Including Lists located in Folders and in Spaces. Return an object of this shape: { lists: Array<{ id: string, name: string, content: string, due_date: string | null, start_date: string | null }> }. Dates should have the format YYYY-MM-DD.",
       "integrationIds": ["clickup"],
       "payload": {},
-      "expectedData": {
-        "lists": [
-          {
-            "id": "901516249723",
-            "name": "Projekt 1",
-            "content": "Project one's text",
-            "due_date": "2025-11-06",
-            "start_date": "2025-10-15"
-          },
-          {
-            "id": "901516249722",
-            "name": "Projekt 2",
-            "content": "",
-            "due_date": null,
-            "start_date": null
-          },
-          {
-            "id": "901516361522",
-            "name": "Test",
-            "content": "",
-            "due_date": null,
-            "start_date": null
-          }
-        ]
-      }
+      "validationFunction": "validators/002-clickup-all-lists.ts",
+      "expectedResultDescription": "Should return all lists from all workspaces (including Folders and Spaces). Expected to find 3 lists: 'Projekt 1' (with due_date 2025-11-06 and start_date 2025-10-15), 'Projekt 2' (no dates), and 'Test' (no dates). List IDs should be like '901516249723', '901516249722', '901516361522'."
     },
     {
-      "id": "clickup-all-comments-and-replies",
+      "id": "003-clickup-all-comments-and-replies",
       "name": "ClickUp All Comments and Replies",
       "type": "retrieval",
       "instruction": "Get all comments and and for each comment its sub-comments for the task with the given taskId. Be aware that you need to iterate over the comments and get the sub-comments for each comment using another API call. Return an object of this shape: { comments: Array<{ id: string, authorId: string, authorName: string, text: string, parentCommentId: string | null, createdAt: string }> }. Convert the create date to YYYY-MM-DD.",
@@ -649,126 +620,49 @@
       "payload": {
         "taskId": "86c5y6t56"
       },
-      "expectedData": {
-        "comments": [
-          {
-            "id": "90150163803004",
-            "authorId": "242688065",
-            "authorName": "Max Mustermann",
-            "text": "Second comment without replies\n",
-            "parentCommentId": null,
-            "createdAt": "2025-10-14"
-          },
-          {
-            "id": "90150163802974",
-            "authorId": "242688065",
-            "authorName": "Max Mustermann",
-            "text": "One comment\n",
-            "parentCommentId": null,
-            "createdAt": "2025-10-14"
-          },
-          {
-            "id": "90150163802992",
-            "authorId": "242688065",
-            "authorName": "Max Mustermann",
-            "text": "Sub comment\n",
-            "parentCommentId": "90150163802974",
-            "createdAt": "2025-10-14"
-          }
-        ]
-      }
+      "validationFunction": "validators/003-clickup-all-comments-and-replies.ts",
+      "expectedResultDescription": "Should return all comments and sub-comments for task 86c5y6t56. Expected to find 3 comments total from author 'Max Mustermann': 'Second comment without replies' (top-level), 'One comment' (top-level), and 'Sub comment' (reply to 'One comment'). Comments dated 2025-10-14."
     },
     {
-      "id": "clockify-time-entries",
+      "id": "004-clockify-time-entries",
       "name": "Clockify Time Entries",
       "type": "retrieval",
       "instruction": "Get all time entries for the authenticated user. I want the final output to be a JSON object with the following structure: { timeEntries: [{id: string,description: string, duration: number, // duration in MS }]}",
       "integrationIds": ["clockify"],
       "payload": {},
-      "expectedData": {
-        "timeEntries": [
-          {
-            "id": "68eaecf2a76c246ccca9f7ff",
-            "description": "Buchhaltung",
-            "duration": 3300000
-          },
-          {
-            "id": "68eaed76c0a1d045ac1d72b1",
-            "description": "Beratungsgespräch",
-            "duration": 3600000
-          },
-          {
-            "id": "68eaed55a76c246ccca9f9b7",
-            "description": "Beratungsgespräch",
-            "duration": 3600000
-          }
-        ]
-      }
+      "validationFunction": "validators/004-clockify-time-entries.ts",
+      "expectedResultDescription": "Should return time entries for the authenticated user. Expected to find 3 entries: one 'Buchhaltung' entry (55 minutes) and two 'Beratungsgespräch' entries (each 1 hour). Durations in milliseconds."
     },
     {
-      "id": "clockify-projects",
+      "id": "005-clockify-projects",
       "name": "Clockify Projects",
       "type": "retrieval",
       "instruction": "Get all projects for the authenticated user's active workspace. I want the final output to be a JSON object with the following structure: { projects: [{id: string, name: string, note: string, billable: boolean, hourlyRate?: number, hourlyRateCurrency?: string }]}. ",
       "integrationIds": ["clockify"],
       "payload": {},
-      "expectedData": {
-        "projects": [
-          {
-            "id": "68eaed6cf78d45743dec5b43",
-            "name": "Buchhaltung 2025",
-            "note": "Some notes",
-            "billable": false,
-            "hourlyRate": 0,
-            "hourlyRateCurrency": "USD"
-          },
-          {
-            "id": "68eaed36c0a1d045ac1d6fbc",
-            "name": "Marketing Project X",
-            "note": "",
-            "billable": true,
-            "hourlyRate": 8000,
-            "hourlyRateCurrency": "USD"
-          }
-        ]
-      }
+      "validationFunction": "validators/005-clockify-projects.ts",
+      "expectedResultDescription": "Should return projects from the user's active workspace. Expected to find 2 projects: 'Buchhaltung 2025' (non-billable, with notes) and 'Marketing Project X' (billable at $80/hour). Both in USD currency."
     },
     {
-      "id": "clockify-projects-all-workspaces",
+      "id": "006-clockify-projects-all-workspaces",
       "name": "Clockify Projects All Workspaces",
       "type": "retrieval",
       "instruction": "Get all projects the authenticated user has access to. I want the final output to be a JSON object with the following structure: { projects: [{id: string, name: string, note: string, billable: boolean, hourlyRate?: number, hourlyRateCurrency?: string }]}. ",
       "integrationIds": ["clockify"],
       "payload": {},
-      "expectedData": {
-        "projects": [
-          {
-            "id": "68eaed6cf78d45743dec5b43",
-            "name": "Buchhaltung 2025",
-            "note": "Some notes",
-            "billable": false,
-            "hourlyRate": 0,
-            "hourlyRateCurrency": "USD"
-          },
-          {
-            "id": "68eaed36c0a1d045ac1d6fbc",
-            "name": "Marketing Project X",
-            "note": "",
-            "billable": true,
-            "hourlyRate": 8000,
-            "hourlyRateCurrency": "USD"
-          }
-        ]
-      }
+      "validationFunction": "validators/006-clockify-projects-all-workspaces.ts",
+      "expectedResultDescription": "Should return projects from ALL workspaces the user has access to (not just active). Expected same 2 projects as active workspace: 'Buchhaltung 2025' and 'Marketing Project X'."
     },
     {
-      "id": "typeform-get-all-forms",
+      "id": "007-typeform-get-all-forms",
       "name": "Typeform Get All Forms",
       "type": "retrieval",
       "instruction": "Get all forms with responses (question and answer) for the authenticated user. I want the final output to be a JSON object with the following structure: { forms: [{id: string, name: string, responses: Array<{id: string, answers: Array<{question: string, answer: string}>, submittedAt: number // unix timestamp}>, createdAt: number // unix timestamp }], total: number}. Please make sure to include the questions and answers for each response.",
       "integrationIds": ["typeform"],
       "payload": {},
-      "expectedData": {
+      "validationFunction": "validators/007-typeform-get-all-forms.ts",
+      "expectedResultDescription": "Should return all forms with their responses. Expected 2 forms total: 'Coffee Shop Applications' (with 2 responses from Peter Mustermann as Cashier and Max Mustermann as Barista, including questions about name, email, position, experience, and motivation) and 'Just empty' (with no responses).",
+      "REMOVED_expectedData": {
         "forms": [
           {
             "id": "lyyDJUcC",
@@ -836,7 +730,7 @@
       }
     },
     {
-      "id": "typeform-get-form-by-id",
+      "id": "008-typeform-get-form-by-id",
       "name": "Typeform Get Form By Id",
       "type": "retrieval",
       "instruction": "Get the form with the given id. I want the final output to be a JSON object with the following structure: {id: string, name: string, responses: Array<{id: string, answers: Array<{question: string, answer: string}>, submittedAt: number // unix timestamp}>, createdAt: number // unix timestamp }. Please make sure to include the questions and answers for each response.",
@@ -844,7 +738,9 @@
       "payload": {
         "formId": "lyyDJUcC"
       },
-      "expectedData": {
+      "validationFunction": "validators/008-typeform-get-form-by-id.ts",
+      "expectedResultDescription": "Should return the form with ID lyyDJUcC. Expected to be 'Coffee Shop Applications' form with 1 response from Peter Mustermann applying for Cashier position. Response should include answers to questions about name, position, work experience, and motivation.",
+      "REMOVED_expectedData": {
         "id": "lyyDJUcC",
         "name": "Coffee Shop Applications",
         "responses": [
@@ -875,54 +771,27 @@
       }
     },
     {
-      "id": "typeform-get-all-workspaces",
+      "id": "009-typeform-get-all-workspaces",
       "name": "Typeform Get All Workspaces",
       "type": "retrieval",
       "instruction": "Get all workspaces for the authenticated user. I want the final output to be a JSON object with the following structure: { workspaces: [{id: string, name: string, numberOfForms: number}] }.",
       "integrationIds": ["typeform"],
       "payload": {},
-      "expectedData": {
-        "workspaces": [
-          {
-            "id": "QDctaF",
-            "name": "My workspace",
-            "numberOfForms": 2
-          }
-        ]
-      }
+      "validationFunction": "validators/009-typeform-get-all-workspaces.ts",
+      "expectedResultDescription": "Should return all workspaces for the authenticated user. Expected to find 1 workspace named 'My workspace' containing 2 forms."
     },
     {
-      "id": "confluence-get-all-spaces",
+      "id": "010-confluence-get-all-spaces",
       "name": "Confluence Get All Spaces",
       "type": "retrieval",
       "instruction": "Get all spaces for the authenticated user. I want the final output to be a JSON object with the following structure: { spaces: [{id: number, type: string, name: string, archived: boolean}] }. Please use /wiki/rest/api/... not  rest/api/v2/...",
       "integrationIds": ["confluence"],
       "payload": {},
-      "expectedData": {
-        "spaces": [
-          {
-            "id": 294916,
-            "type": "knowledge_base",
-            "name": "Docs",
-            "archived": false
-          },
-          {
-            "id": 196611,
-            "type": "personal",
-            "name": "Max Mustermann",
-            "archived": false
-          },
-          {
-            "id": 98312,
-            "type": "onboarding",
-            "name": "Projektmanagement",
-            "archived": true
-          }
-        ]
-      }
+      "validationFunction": "validators/010-confluence-get-all-spaces.ts",
+      "expectedResultDescription": "Should return all Confluence spaces for the authenticated user. Expected to find 3 spaces: 'Docs' (knowledge_base, active), 'Max Mustermann' (personal, active), and 'Projektmanagement' (onboarding, archived)."
     },
     {
-      "id": "confluence-get-page-content",
+      "id": "011-confluence-get-page-content",
       "name": "Confluence Get Page Content",
       "type": "retrieval",
       "instruction": "Get the content of the page with the given id. I want the final output to be a JSON object with the following structure: { content: string }. ",
@@ -930,12 +799,11 @@
       "payload": {
         "pageId": "163855"
       },
-      "expectedData": {
-        "content": "<p>Intern Onboarding …</p>"
-      }
+      "validationFunction": "validators/011-confluence-get-page-content.ts",
+      "expectedResultDescription": "Should return the content of Confluence page ID 163855. Expected content about 'Intern Onboarding' in HTML format."
     },
     {
-      "id": "confluence-get-all-pages-of-space",
+      "id": "012-confluence-get-all-pages-of-space",
       "name": "Confluence Get All Pages Of Space",
       "type": "retrieval",
       "instruction": "Get all pages for the given space id. I want the final output to be a JSON object with the following structure: { pages: [{id: string, title: string, content: string}] }. ",
@@ -943,137 +811,51 @@
       "payload": {
         "spaceId": "294916"
       },
-      "expectedData": {
-        "pages": [
-          {
-            "id": "163848",
-            "title": "Company Guidelines",
-            "content": "<p>Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut</p>"
-          },
-          {
-            "id": "295032",
-            "title": "Docs",
-            "content": "<p>Overview Page</p>"
-          },
-          {
-            "id": "163855",
-            "title": "Interns",
-            "content": "<p>Intern Onboarding …</p>"
-          },
-          {
-            "id": "295094",
-            "title": "IT Service Desk",
-            "content": "<p>Text about the IT Service Desk</p>"
-          }
-        ]
-      }
+      "validationFunction": "validators/012-confluence-get-all-pages-of-space.ts",
+      "expectedResultDescription": "Should return all pages from Confluence space ID 294916. Expected to find 4 pages: 'Company Guidelines', 'Docs', 'Interns', and 'IT Service Desk'. Each page should contain HTML content."
     },
     {
-      "id": "github-list-repos",
+      "id": "013-github-list-repos",
       "name": "GitHub List Repositories",
       "type": "retrieval",
       "instruction": "List all repositories for the authenticated user. I want the final output to be a JSON object with the following structure: { repositories: [{id: number, name: string, isPublic: boolean}] }. ",
       "integrationIds": ["github"],
       "payload": {},
-      "expectedData": {
-        "repositories": [
-          {
-            "id": 1074517465,
-            "name": "congenial-tribble",
-            "isPublic": false
-          },
-          {
-            "id": 1074517568,
-            "name": "expert-octo-doodle",
-            "isPublic": false
-          },
-          {
-            "id": 1074520812,
-            "name": "strapi-cloud-template-blog-4b5423dbba",
-            "isPublic": true
-          },
-          {
-            "id": 1074517305,
-            "name": "Test1",
-            "isPublic": false
-          },
-          {
-            "id": 1074517689,
-            "name": "vigilant-octo-lamp",
-            "isPublic": false
-          }
-        ]
-      }
+      "validationFunction": "validators/013-github-list-repos.ts",
+      "expectedResultDescription": "Should return all repositories for the authenticated user. Expected to find 5 repositories including: 'congenial-tribble' (private), 'expert-octo-doodle' (private), 'strapi-cloud-template-blog-4b5423dbba' (public), 'Test1' (private), and 'vigilant-octo-lamp' (private)."
     },
     {
-      "id": "github-get-user",
+      "id": "014-github-get-user",
       "name": "GitHub Get User",
       "type": "retrieval",
       "instruction": "Get the user information for the authenticated user. I want the final output to be a JSON object with the following structure: { user: {id: number, username: string, profilePictureUrl: string | null, url: string, createdAt: string } }. ",
       "integrationIds": ["github"],
       "payload": {},
-      "expectedData": {
-        "user": {
-          "id": 237506962,
-          "username": "Evals304",
-          "profilePictureUrl": "https://avatars.githubusercontent.com/u/237506962?v=4",
-          "url": "https://github.com/Evals304",
-          "createdAt": "2025-10-12T00:13:19Z"
-        }
-      }
+      "validationFunction": "validators/014-github-get-user.ts",
+      "expectedResultDescription": "Should return authenticated GitHub user information. Expected username 'Evals304' with profile picture URL from avatars.githubusercontent.com, account created on 2025-10-12."
     },
     {
-      "id": "github-get-user-pull-requests",
+      "id": "015-github-get-user-pull-requests",
       "name": "GitHub Get User's Pull Requests",
       "type": "retrieval",
-      "instruction": "Get all pull requests for the authenticated user. I want the final output to be a JSON object with the following structure: { pullRequests: [{id: number, title: string, url: string, updatedAt: string, createdAt: string }] }. ",
+      "instruction": "Get all pull requests for the authenticated user. I want the final output to be a JSON object with the following structure: { pullRequests: [{id: number, title, string, url: string, updatedAt: string, createdAt: string }] }. ",
       "integrationIds": ["github"],
       "payload": {},
-      "expectedData": {
-        "pullRequests": [
-          {
-            "id": 3527944071,
-            "title": "Test something",
-            "url": "https://github.com/Evals304/congenial-tribble/pull/1",
-            "updatedAt": "2025-10-18T01:46:27Z",
-            "createdAt": "2025-10-18T01:46:27Z"
-          },
-          {
-            "id": 3527943775,
-            "title": "Update README.md",
-            "url": "https://github.com/Evals304/vigilant-octo-lamp/pull/1",
-            "updatedAt": "2025-10-18T01:45:59Z",
-            "createdAt": "2025-10-18T01:45:59Z"
-          }
-        ]
-      }
+      "validationFunction": "validators/015-github-get-user-pull-requests.ts",
+      "expectedResultDescription": "Should return all pull requests for the authenticated user. Expected to find 2 PRs: 'Test something' (from congenial-tribble repo) and 'Update README.md' (from vigilant-octo-lamp repo), both created on 2025-10-18."
     },
     {
-      "id": "linear-get-all-issues",
+      "id": "016-linear-get-all-issues",
       "name": "Linear Get All Issues",
       "type": "retrieval",
       "instruction": "Get all issues. I want the final output to be a JSON object with the following structure: { issues: [{id: string, title: string }] }. ",
       "integrationIds": ["linear"],
       "payload": {},
-      "expectedData": {
-        "issues": [
-          {
-            "id": "91d119b6-8c91-436e-9986-0198cf30cd8e",
-            "title": "Third"
-          },
-          {
-            "id": "4ba8526b-40b1-42cb-9cd4-9b273ed82eb7",
-            "title": "Second"
-          },
-          {
-            "id": "ba4a3f19-45af-4597-b165-bb2cd37aa0ec",
-            "title": "First"
-          }
-        ]
-      }
+      "validationFunction": "validators/016-linear-get-all-issues.ts",
+      "expectedResultDescription": "Should return all Linear issues. Expected to find 3 issues with titles: 'Third', 'Second', and 'First'."
     },
     {
-      "id": "linear-get-issue-by-id",
+      "id": "017-linear-get-issue-by-id",
       "name": "Linear Get Issue By Id",
       "type": "retrieval",
       "instruction": "Get the issue with the given id. I want the final output to be a JSON object with the following structure: { issue: {id: string, title: string }] }. ",
@@ -1081,35 +863,21 @@
       "payload": {
         "issueId": "91d119b6-8c91-436e-9986-0198cf30cd8e"
       },
-      "expectedData": {
-        "issue": {
-          "id": "91d119b6-8c91-436e-9986-0198cf30cd8e",
-          "title": "Third"
-        }
-      }
+      "validationFunction": "validators/017-linear-get-issue-by-id.ts",
+      "expectedResultDescription": "Should return the Linear issue with ID 91d119b6-8c91-436e-9986-0198cf30cd8e. Expected title to be 'Third'."
     },
     {
-      "id": "linear-get-all-projects",
+      "id": "018-linear-get-all-projects",
       "name": "Linear Get All Projects",
       "type": "retrieval",
       "instruction": "Get all projects. I want the final output to be a JSON object with the following structure: { projects: [{id: string, name: string }] }. ",
       "integrationIds": ["linear"],
       "payload": {},
-      "expectedData": {
-        "projects": [
-          {
-            "id": "7c811f73-677a-4040-80be-0ff374f951b2",
-            "name": "Empty 2"
-          },
-          {
-            "id": "fb067dcf-0867-4fbb-b409-4565411015f2",
-            "name": "Empty1"
-          }
-        ]
-      }
+      "validationFunction": "validators/018-linear-get-all-projects.ts",
+      "expectedResultDescription": "Should return all Linear projects. Expected to find 2 projects named 'Empty 2' and 'Empty1'."
     },
     {
-      "id": "postgres-lego-inventory-analysis",
+      "id": "019-postgres-lego-inventory-analysis",
       "name": "Postgres LEGO Inventory Analysis",
       "type": "retrieval",
       "instruction": "Query the LEGO database to find all LEGO themes. Please use the pagination payload to get the next page of results. I want the final output to be a JSON object with the following structure: { themes: [{id: string, name: string}]}. ",
@@ -1118,59 +886,19 @@
         "page": 2,
         "pageSize": 10
       },
-      "expectedData": {
-        "themes": [
-          {
-            "id": "11",
-            "name": "Off-Road"
-          },
-          {
-            "id": "12",
-            "name": "Race"
-          },
-          {
-            "id": "13",
-            "name": "Riding Cycle"
-          },
-          {
-            "id": "14",
-            "name": "Robot"
-          },
-          {
-            "id": "15",
-            "name": "Traffic"
-          },
-          {
-            "id": "16",
-            "name": "RoboRiders"
-          },
-          {
-            "id": "17",
-            "name": "Speed Slammers"
-          },
-          {
-            "id": "18",
-            "name": "Star Wars"
-          },
-          {
-            "id": "19",
-            "name": "Supplemental"
-          },
-          {
-            "id": "20",
-            "name": "Throwbot Slizer"
-          }
-        ]
-      }
+      "validationFunction": "validators/019-postgres-lego-inventory-analysis.ts",
+      "expectedResultDescription": "Should return page 2 of LEGO themes (10 items per page). Expected themes from IDs 11-20: 'Off-Road', 'Race', 'Riding Cycle', 'Robot', 'Traffic', 'RoboRiders', 'Speed Slammers', 'Star Wars', 'Supplemental', and 'Throwbot Slizer'."
     },
     {
-      "id": "postgres-lego-get-colors",
+      "id": "020-postgres-lego-get-colors",
       "name": "Postgres LEGO Get Colors",
       "type": "retrieval",
       "instruction": "Get all colors from the LEGO database. I want the final output to be a JSON object with the following structure: { colors: string[] }. ",
       "integrationIds": ["postgres-lego"],
       "payload": {},
-      "expectedData": {
+      "validationFunction": "validators/020-postgres-lego-get-colors.ts",
+      "expectedResultDescription": "Should return all LEGO colors from the database. Expected over 100 colors including basic colors like 'Black', 'Blue', 'Green', 'Red', 'White', 'Yellow', and specialty colors like 'Trans-Dark Blue', 'Chrome Gold', 'Glow In Dark Opaque'. Last color should be '[No Color]'.",
+      "REMOVED_expectedData": {
         "colors": [
           "Unknown",
           "Black",
@@ -1311,13 +1039,15 @@
       }
     },
     {
-      "id": "postgres-lego-get-ranked-themes",
+      "id": "021-postgres-lego-get-ranked-themes",
       "name": "Postgres LEGO Get Ranked Themes",
       "type": "retrieval",
       "instruction": "Return the top 20 most used LEGO themes from the database, ranked by number of sets (setCount) in each theme, descending. Output: { themes: [{ name: string, setCount: number }] }.",
       "integrationIds": ["postgres-lego"],
       "payload": {},
-      "expectedData": {
+      "validationFunction": "validators/021-postgres-lego-get-ranked-themes.ts",
+      "expectedResultDescription": "Should return the top 20 most popular LEGO themes ranked by number of sets (descending). Expected top theme to be 'Gear' with 246 sets, followed by 'Supplemental' with 240 sets, 'Duplo' with 219 sets, and 'City' with 216 sets. Themes like 'Friends', 'Ninjago', and 'Star Wars' should also appear in the top 20.",
+      "REMOVED_expectedData": {
         "themes": [
           {
             "name": "Gear",
@@ -1403,14 +1133,16 @@
       }
     },
     {
-      "id": "timbuk2-product-analysis",
+      "id": "022-timbuk2-product-analysis",
       "name": "Timbuk2 Product Analysis",
       "description": "Tests pagination",
       "type": "retrieval",
       "instruction": "Get all products from Timbuk2. Please make sure you get all products by using page and limit. I want the final output to be a JSON object with the following structure: { products: string[] }. ",
       "integrationIds": ["timbuk2-shopify"],
       "payload": {},
-      "expectedData": {
+      "validationFunction": "validators/022-timbuk2-product-analysis.ts",
+      "expectedResultDescription": "Should return all 137 Timbuk2 products using pagination. Expected products include bags like 'Flight Crossbody Sling Bag', 'Custom Classic Messenger Bag', 'Wingman Travel Backpack Duffel', backpacks like 'Water Resistant Tuck Backpack', 'Alcatraz Backpack' variants, accessories like 'Transit Dopp Kit', repair items, and components. First product should be 'Non-Repairable Return' and last should be 'Stealth Folio Organizer'.",
+      "REMOVED_expectedData": {
         "products": [
           "Non-Repairable Return",
           "Non-Repairable Recycle",
@@ -1553,84 +1285,38 @@
       }
     },
     {
-      "id": "timbuk2-get-public-vendors",
+      "id": "023-timbuk2-get-public-vendors",
       "name": "Timbuk2 Get Public Vendors",
       "description": "Tests pagination and deduplication since vendors are only found as fields on products; extraction and uniqueness must be computed client-side. Without `Please make sure you get all products by using page and limit.` it would not work.",
       "type": "retrieval",
       "instruction": "Get all unique publicly available vendors from Timbuk2. Please make sure you get all products by using page and limit. I want the final output to be a JSON object with the following structure: { vendors: string[] }. ",
       "integrationIds": ["timbuk2-shopify"],
       "payload": {},
-      "expectedData": {
-        "vendors": [
-          "Timbuk2-Timbuk2",
-          "Timbuk2-Corporate",
-          "Timbuk2-Sale",
-          "Timbuk2-Corporate-Sale"
-        ]
-      }
+      "validationFunction": "validators/023-timbuk2-get-public-vendors.ts",
+      "expectedResultDescription": "Should return all unique vendor names extracted from Timbuk2 products (requires pagination and deduplication). Expected 4 vendors: 'Timbuk2-Timbuk2', 'Timbuk2-Corporate', 'Timbuk2-Sale', and 'Timbuk2-Corporate-Sale'."
     },
     {
-      "id": "timbuk2-get-newest-products",
+      "id": "024-timbuk2-get-newest-products",
       "name": "Timbuk2 Get 10 Newest Products",
       "description": "Tests pagination and deduplication since vendors are only found as fields on products; extraction and uniqueness must be computed client-side. Without `Please make sure you get all products by using page and limit.` it would not work.",
       "type": "retrieval",
       "instruction": "Get the 10 newest products from Timbuk2. Please make sure you get all products by using page and limit. I want the final output to be a JSON object with the following structure: { products: [{title: string, updated_at: string}] }. ",
       "integrationIds": ["timbuk2-shopify"],
       "payload": {},
-      "expectedData": {
-        "products": [
-          {
-            "title": "Non-Repairable Return",
-            "updated_at": "2025-10-19T14:22:18-07:00"
-          },
-          {
-            "title": "Non-Repairable Recycle",
-            "updated_at": "2025-10-19T14:22:18-07:00"
-          },
-          {
-            "title": "Non-Payment Return",
-            "updated_at": "2025-10-19T14:22:18-07:00"
-          },
-          {
-            "title": "Non-Payment Recycle",
-            "updated_at": "2025-10-19T14:22:18-07:00"
-          },
-          {
-            "title": "Flight Crossbody Sling Bag",
-            "updated_at": "2025-10-19T14:22:18-07:00"
-          },
-          {
-            "title": "Flight Crossbody Satchel",
-            "updated_at": "2025-10-19T14:22:18-07:00"
-          },
-          {
-            "title": "Flight Convertible Tote Backpack",
-            "updated_at": "2025-10-19T14:22:18-07:00"
-          },
-          {
-            "title": "Flight Backpack",
-            "updated_at": "2025-10-19T14:22:18-07:00"
-          },
-          {
-            "title": "Flight Classic Messenger Bag",
-            "updated_at": "2025-10-19T14:22:18-07:00"
-          },
-          {
-            "title": "Miles Chest Pack",
-            "updated_at": "2025-10-19T14:22:18-07:00"
-          }
-        ]
-      }
+      "validationFunction": "validators/024-timbuk2-get-newest-products.ts",
+      "expectedResultDescription": "Should return exactly 10 newest Timbuk2 products sorted by updated_at (descending). Expected products include: 'Non-Repairable Return', 'Non-Repairable Recycle', 'Non-Payment Return', 'Non-Payment Recycle', 'Flight Crossbody Sling Bag', 'Flight Crossbody Satchel', 'Flight Convertible Tote Backpack', 'Flight Backpack', 'Flight Classic Messenger Bag', and 'Miles Chest Pack'. All should have same update timestamp 2025-10-19T14:22:18-07:00."
     },
     {
-      "id": "stripe-get-customers",
+      "id": "025-stripe-get-customers",
       "name": "Stripe Get Customers",
       "description": "This tests pagination. It usually fails because of nested structure.",
       "type": "retrieval",
       "instruction": "Get all customers from Stripe. I want the final output to be a JSON object with the following structure: { customers: string[] // person names }. The data is at sourceData.getAllProducts.results[0].data, not sourceData.getAllProducts.data. Update the finalTransform to access sourceData.getAllProducts.results and flatten the .data arrays from each result.",
       "integrationIds": ["stripe"],
       "payload": {},
-      "expectedData": {
+      "validationFunction": "validators/025-stripe-get-customers.ts",
+      "expectedResultDescription": "Should return 202 customer names from Stripe using pagination (tests nested data structure handling). Expected names include individuals like 'Daniel Miller', 'Olivia Taylor', 'Charlotte Brown', 'Sophia Lee', 'Jane Smith', and businesses like 'Hans GmbH' and 'Peter GmbH'. Names appear multiple times (e.g., 'Daniel Miller', 'Olivia Taylor', 'Matthew Lee' appear repeatedly).",
+      "REMOVED_expectedData": {
         "customers": [
           "Daniel Miller",
           "Olivia Taylor",
@@ -1838,86 +1524,40 @@
       }
     },
     {
-      "id": "stripe-calculate-revenue",
+      "id": "026-stripe-calculate-revenue",
       "name": "Stripe Calculate Revenue",
       "description": "This usually fails because of nested structure.",
       "type": "retrieval",
       "instruction": "Calculate the total revenue from Stripe. I want the final output to be a JSON object with the following structure: { gross_revenue: number, fees: number, net_revenue: number }. The data is at sourceData.getAllProducts.results[0].data, not sourceData.getAllProducts.data. Update the finalTransform to access sourceData.getAllProducts.results and flatten the .data arrays from each result.",
       "integrationIds": ["stripe"],
       "payload": {},
-      "expectedData": {
-        "gross_revenue": 5,
-        "fees": 0.74,
-        "net_revenue": 4.26
-      }
+      "validationFunction": "validators/026-stripe-calculate-revenue.ts",
+      "expectedResultDescription": "Should calculate total revenue from Stripe transactions (tests nested data aggregation). Expected gross revenue of $5.00, fees of $0.74, and net revenue of $4.26."
     },
     {
-      "id": "stripe-get-all-products",
+      "id": "027-stripe-get-all-products",
       "name": "Stripe Get Products",
       "description": "This tests pagination. It usually fails because of nested structure.",
       "type": "retrieval",
       "instruction": "Get all products from Stripe. I want the final output to be a JSON object with the following structure: { products: string[] }. The data is at sourceData.getAllProducts.results[0].data, not sourceData.getAllProducts.data. Update the finalTransform to access sourceData.getAllProducts.results and flatten the .data arrays from each result.",
       "integrationIds": ["stripe"],
       "payload": {},
-      "expectedData": {
-        "products": [
-          {
-            "id": "prod_TGbk1E8pRkHR51",
-            "object": "product",
-            "active": true,
-            "created": 1760910770,
-            "updated": 1760910770,
-            "name": "Superglue Cap"
-          },
-          {
-            "id": "prod_TGbjqL1f2Rqqkv",
-            "object": "product",
-            "active": true,
-            "created": 1760910683,
-            "updated": 1760910683,
-            "name": "Superglue T-Shirt"
-          },
-          {
-            "id": "prod_TGbixpbyW32QWP",
-            "object": "product",
-            "active": true,
-            "created": 1760910671,
-            "updated": 1760910671,
-            "name": "Superglue Coffee Mug"
-          }
-        ]
-      }
+      "validationFunction": "validators/027-stripe-get-all-products.ts",
+      "expectedResultDescription": "Should return all 3 Stripe products (tests nested data structure). Expected products: 'Superglue Cap', 'Superglue T-Shirt', and 'Superglue Coffee Mug'. All products should be active with IDs starting with 'prod_TGb'."
     },
     {
-      "id": "attio-get-15-oldest-people",
+      "id": "028-attio-get-15-oldest-people",
       "name": "Attio Get 15 Oldest People",
       "description": "",
       "type": "retrieval",
       "instruction": "Get 15 people from Attio and sort them by created at, oldest first. I want the final output to be a JSON object with the following structure: { people: string[] }. ",
       "integrationIds": ["attio"],
       "payload": {},
-      "expectedData": {
-        "people": [
-          "Isabella Davis",
-          "Mia Miller",
-          "Ava Martinez",
-          "Evelyn Martinez",
-          "Henry Brown",
-          "Amelia Brown",
-          "James Taylor",
-          "Evelyn Jones",
-          "Alexander Moore",
-          "Benjamin Davis",
-          "Benjamin Wilson",
-          "Noah Williams",
-          "James Lopez",
-          "Sophia Miller",
-          "Olivia Martinez"
-        ]
-      }
+      "validationFunction": "validators/028-attio-get-15-oldest-people.ts",
+      "expectedResultDescription": "Should return exactly 15 people from Attio CRM sorted by creation date (oldest first). Expected names in order: 'Isabella Davis', 'Mia Miller', 'Ava Martinez', 'Evelyn Martinez', 'Henry Brown', 'Amelia Brown', 'James Taylor', 'Evelyn Jones', 'Alexander Moore', 'Benjamin Davis', 'Benjamin Wilson', 'Noah Williams', 'James Lopez', 'Sophia Miller', and 'Olivia Martinez'."
     },
     {
-      "id": "attio-get-person-by-id",
+      "id": "029-attio-get-person-by-id",
       "name": "Attio Get Person",
       "description": "",
       "type": "retrieval",
@@ -1926,142 +1566,81 @@
       "payload": {
         "id": "004e6660-3d14-42ef-9d2d-b1f0167209aa"
       },
-      "expectedData": {
-        "person": {
-          "name": "Olivia Jackson",
-          "email": "olivia.jackson@yahoo.com",
-          "job_title": "Business Analyst"
-        }
-      }
+      "validationFunction": "validators/029-attio-get-person-by-id.ts",
+      "expectedResultDescription": "Should return person with ID 004e6660-3d14-42ef-9d2d-b1f0167209aa from Attio. Expected to be 'Olivia Jackson' with email olivia.jackson@yahoo.com and job title 'Business Analyst'."
     },
     {
-      "id": "attio-people-no-email",
+      "id": "030-attio-people-no-email",
       "name": "Attio People No Email",
       "type": "retrieval",
       "instruction": "Retrieve all people records from Attio CRM that have an empty email address. Return their names and created_at. Output JSON: { \"people\": [ { \"name\": string, \"created_at\": string } ] }.",
       "integrationIds": ["attio"],
       "payload": {},
-      "expectedData": {
-        "people": [
-          {
-            "name": "Hans Peter",
-            "created_at": "2025-10-20T00:09:59.640000000Z"
-          },
-          {
-            "name": "Max Mustermann",
-            "created_at": "2025-10-20T00:10:13.447000000Z"
-          }
-        ]
-      }
+      "validationFunction": "validators/030-attio-people-no-email.ts",
+      "expectedResultDescription": "Should return all Attio people records with empty email addresses. Expected to find 2 people: 'Hans Peter' (created 2025-10-20 00:09:59) and 'Max Mustermann' (created 2025-10-20 00:10:13)."
     },
     {
-      "id": "openai-structured-output-name-age",
+      "id": "031-openai-structured-output-name-age",
       "name": "OpenAI Structured Output Name and Age",
       "type": "retrieval",
       "instruction": "Call the OpenAI API with an unstructured list of 5 people's names and ages: 'Sarah is 28 years old, Mike 35, Emma age 22, David is 41, and Chris who is 19'. Ask OpenAI to return this data in a structured format with the people sorted alphabetically by name. Use structured output or response_format to enforce the schema. The final transform should propagate the result from the OpenAI request. Output JSON: { \"people\": Array<{ \"name\": string, \"age\": number }> }. Make sure the workflow output by the final transform is exactly this JSON object.",
       "integrationIds": ["openai"],
       "payload": {},
-      "expectedData": {
-        "people": [
-          {
-            "name": "Chris",
-            "age": 19
-          },
-          {
-            "name": "David",
-            "age": 41
-          },
-          {
-            "name": "Emma",
-            "age": 22
-          },
-          {
-            "name": "Mike",
-            "age": 35
-          },
-          {
-            "name": "Sarah",
-            "age": 28
-          }
-        ]
-      }
+      "validationFunction": "validators/031-openai-structured-output-name-age.ts",
+      "expectedResultDescription": "Should extract 5 people from unstructured text and sort alphabetically. Expected in order: Chris (19), David (41), Emma (22), Mike (35), and Sarah (28)."
     },
     {
-      "id": "openai-pdf-analysis-with-input-retrieval",
+      "id": "032-openai-pdf-analysis-with-input-retrieval",
       "name": "OpenAI PDF Analysis with Input Retrieval",
       "type": "retrieval",
       "instruction": "Call the OpenAI API to analyze a PDF file. First, make a request to the responses API endpoint with a file attachment pointing to this PDF: https://arxiv.org/pdf/2501.14426 and add exactly this prompt: Please provide a one sentence summary of this paper. Then, make a second call to the OpenAI input_items endpoint using the response ID from the first request to retrieve what inputs were provided to that request. The final output should be a list of the content from the second request, showing the inputs that were provided to the first OpenAI request. Final Transform Output JSON: { \"content\": Array<{ \"type\": string, (\"text\": string) | (\"file_url\": string) }> }.",
       "integrationIds": ["openai"],
       "payload": {},
-      "expectedData": {
-        "content": [
-          {
-            "type": "input_text",
-            "text": "Please provide a 1-sentence summary of this paper."
-          },
-          {
-            "type": "input_file",
-            "file_url": "https://arxiv.org/pdf/2501.14426"
-          }
-        ]
-      }
+      "validationFunction": "validators/032-openai-pdf-analysis-with-input-retrieval.ts",
+      "expectedResultDescription": "Should retrieve OpenAI request inputs showing 2 items: one text input with prompt '1-sentence summary' and one file input pointing to arxiv.org/pdf/2501.14426."
     },
     {
-      "id": "postgres-lego-openai-table-extraction",
+      "id": "033-postgres-lego-openai-table-extraction",
       "name": "PostgreSQL+OpenAI Structured Output",
       "type": "retrieval",
       "instruction": "First, query the LEGO PostgreSQL database to get the table schema information. You can use a query like SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' to get all table names. Then, send this schema information to OpenAI and ask it to extract and return a structured output containing only a list of table names. Use OpenAI's structured output feature or response_format to force the output to match the exact schema with a table_names array. Output JSON: { \"table_names\": string[] }. Make sure the final workflow output by the final transform also has this schema: { \"table_names\": string[] }.",
       "integrationIds": ["postgres-lego", "openai"],
       "payload": {},
-      "expectedData": {
-        "table_names": [
-          "lego_colors",
-          "lego_inventories",
-          "lego_inventory_parts",
-          "lego_inventory_sets",
-          "lego_part_categories",
-          "lego_parts",
-          "lego_sets",
-          "lego_themes"
-        ]
-      }
+      "validationFunction": "validators/033-postgres-lego-openai-table-extraction.ts",
+      "expectedResultDescription": "Should query LEGO database tables and use OpenAI to extract table names. Expected 8 tables: lego_colors, lego_inventories, lego_inventory_parts, lego_inventory_sets, lego_part_categories, lego_parts, lego_sets, and lego_themes."
     },
     {
-      "id": "tele2-http-download-verification",
+      "id": "034-tele2-http-download-verification",
       "name": "Tele2 HTTP Download",
       "type": "retrieval",
       "instruction": "Download the 10MB.zip file from the Tele2 FTP speedtest service at http://speedtest.tele2.net/10MB.zip. After the download completes, verify that the file exists and was successfully downloaded. In the final transform, check if the file is present and return a status object indicating success if the file exists, otherwise return failure. Output JSON: { \"status\": \"success\" | \"failure\", \"file\": string }.",
       "integrationIds": ["tele2-ftp"],
       "payload": {},
-      "expectedData": {
-        "status": "success",
-        "file": "10GB.zip"
-      }
+      "validationFunction": "validators/034-tele2-http-download-verification.ts",
+      "expectedResultDescription": "Should download 10GB.zip file from Tele2 speedtest and verify successful download. Expected status 'success' with file name '10GB.zip'."
     },
     {
-      "id": "tele2-ftp-upload-berkshire-letter",
+      "id": "035-tele2-ftp-upload-berkshire-letter",
       "name": "Tele2 FTP Upload Berkshire Letter",
       "type": "retrieval",
       "instruction": "First, download the Berkshire Hathaway 2024 shareholder letter PDF from https://www.berkshirehathaway.com/letters/2024ltr.pdf. Then, upload this downloaded file to the Tele2 FTP speedtest server at ftp://speedtest.tele2.net/upload/. The upload directory automatically removes files after upload completes. In the final transform, return a status object indicating success if the upload worked, otherwise return failure. Output JSON: { \"status\": \"success\" | \"failure\" }.",
       "integrationIds": ["tele2-ftp", "berkshire-hathaway-letter"],
       "payload": {},
-      "expectedData": {
-        "status": "success"
-      }
+      "validationFunction": "validators/035-tele2-ftp-upload-berkshire-letter.ts",
+      "expectedResultDescription": "Should download Berkshire Hathaway 2024 shareholder letter PDF and upload to Tele2 FTP server. Expected status 'success' indicating file was downloaded and uploaded successfully."
     },
     {
-      "id": "sec-jina-markdown-conversion",
+      "id": "036-sec-jina-markdown-conversion",
       "name": "SEC Filing to Markdown via Jina Reader",
       "type": "retrieval",
       "instruction": "This workflow has 2 steps. Step 1: Read the SEC EDGAR filing HTML from https://www.sec.gov/ix?doc=/Archives/edgar/data/0000040987/000119312525195442/d28129d8k.htm. Step 2: Call Jina's Reader API (https://r.jina.ai/) to convert the page content to markdown. When calling Jina's API, prepend 'https://r.jina.ai/' to the SEC URL and add the header 'x-respond-with: markdown' to get the response as markdown format. Make sure to retrieve the markdown content from the response. In the final transform, check if the markdown content is present and properly formatted. Return status 'success' if markdown is retrieved successfully, otherwise return 'failure'. Output JSON: { \"status\": \"success\" | \"failure\" }.",
       "integrationIds": ["sec-gov", "jina-reader"],
       "payload": {},
-      "expectedData": {
-        "status": "success"
-      }
+      "validationFunction": "validators/036-sec-jina-markdown-conversion.ts",
+      "expectedResultDescription": "Should fetch SEC EDGAR filing HTML and convert to markdown using Jina Reader API. Expected status 'success' indicating the HTML was successfully converted to markdown format."
     },
     {
-      "id": "brewery-db-california-count",
+      "id": "037-brewery-db-california-count",
       "name": "Open Brewery DB - California Brewery Count",
       "description": "Fetch all breweries in California and return total count",
       "type": "retrieval",
@@ -2070,12 +1649,11 @@
         "open-brewery-db"
       ],
       "payload": {},
-      "expectedData": {
-        "total_brewery_count": 919
-      }
+      "validationFunction": "validators/037-brewery-db-california-count.ts",
+      "expectedResultDescription": "Should count all breweries in California state. Expected total of 919 breweries."
     },
     {
-      "id": "openalex-fetch-1000-works-2025",
+      "id": "038-openalex-fetch-1000-works-2025",
       "name": "OpenAlex - Fetch 1000 Works from 2025",
       "description": "Fetch exactly 1000 scholarly works published in 2025 using pagination",
       "type": "retrieval",
@@ -2084,13 +1662,11 @@
         "openalex"
       ],
       "payload": {},
-      "expectedData": {
-        "total_fetched": 1000,
-        "publication_year": 2025
-      }
+      "validationFunction": "validators/038-openalex-fetch-1000-works-2025.ts",
+      "expectedResultDescription": "Should fetch exactly 1000 scholarly works from 2025 using OpenAlex pagination. Expected count 1000 with publication_year 2025."
     },
     {
-      "id": "openalex-pagination-1000-works-2025",
+      "id": "039-openalex-pagination-1000-works-2025",
       "name": "OpenAlex - Pagination 1000 Works from 2025",
       "description": "Fetch exactly 1000 scholarly works published in 2025 using pagination with a reminder to use pagination",
       "type": "retrieval",
@@ -2099,13 +1675,11 @@
         "openalex"
       ],
       "payload": {},
-      "expectedData": {
-        "total_fetched": 1000,
-        "publication_year": 2025
-      }
+      "validationFunction": "validators/039-openalex-pagination-1000-works-2025.ts",
+      "expectedResultDescription": "Should fetch exactly 1000 scholarly works from 2025 with explicit pagination reminder. Expected count 1000 with publication_year 2025."
     },
     {
-      "id": "punkapi-fetch-all-beers",
+      "id": "040-punkapi-fetch-all-beers",
       "name": "PunkAPI - Fetch All Beers",
       "description": "Fetch all BrewDog beers from the catalogue",
       "type": "retrieval",
@@ -2114,14 +1688,11 @@
         "punkapi"
       ],
       "payload": {},
-      "expectedData": {
-        "total_count": 415,
-        "first_beer_name": "Punk IPA 2007 - 2010",
-        "last_beer_name": "Aplomb Bomb"
-      }
+      "validationFunction": "validators/040-punkapi-fetch-all-beers.ts",
+      "expectedResultDescription": "Should fetch all 415 BrewDog beers from PunkAPI catalogue. Expected first beer 'Punk IPA 2007 - 2010' and last beer 'Aplomb Bomb'."
     },
     {
-      "id": "punkapi-fetch-all-beers-with-pagination-reminder",
+      "id": "041-punkapi-fetch-all-beers-with-pagination-reminder",
       "name": "PunkAPI - Fetch All Beers With Pagination Reminder",
       "description": "Fetch all BrewDog beers from the catalogue with a reminder to use pagination",
       "type": "retrieval",
@@ -2130,14 +1701,11 @@
         "punkapi"
       ],
       "payload": {},
-      "expectedData": {
-        "total_count": 415,
-        "first_beer_name": "Punk IPA 2007 - 2010",
-        "last_beer_name": "Aplomb Bomb"
-      }
+      "validationFunction": "validators/041-punkapi-fetch-all-beers-with-pagination-reminder.ts",
+      "expectedResultDescription": "Should fetch all 415 BrewDog beers with explicit pagination reminder. Expected first beer 'Punk IPA 2007 - 2010' and last beer 'Aplomb Bomb'."
     },
     {
-      "id": "slack-post-eval-message",
+      "id": "042-slack-post-eval-message",
       "name": "Slack Post Eval Message",
       "description": "Post a message to the evals channel",
       "type": "action",
@@ -2146,13 +1714,11 @@
         "slack"
       ],
       "payload": {},
-      "expectedData": {
-        "ok": true,
-        "channel": ""
-      }
+      "validationFunction": "validators/042-slack-post-eval-message.ts",
+      "expectedResultDescription": "Should successfully post message 'Hi, this is the superglue bot running some evals' to the evals channel. Expected response ok: true with a channel ID."
     },
     {
-      "id": "slack-list-non-sg-channels",
+      "id": "043-slack-list-non-sg-channels",
       "name": "Slack List Non-SG Channels",
       "description": "List all channels whose name doesn't start with sg-",
       "type": "retrieval",
@@ -2161,10 +1727,11 @@
         "slack"
       ],
       "payload": {},
-      "expectedData": {}
+      "skipValidationFunction": true,
+      "expectedResultDescription": "Should return all Slack channels (public and private) whose names do NOT start with 'sg-'. Expected channels to exclude anything starting with 'sg-' prefix. Channel count should match the number of channels in the array."
     },
     {
-      "id": "slack-get-last-20-messages",
+      "id": "044-slack-get-last-20-messages",
       "name": "Slack Get Last 20 Messages",
       "description": "Retrieve exactly 20 messages from all-superglue channel",
       "type": "retrieval",
@@ -2173,12 +1740,11 @@
         "slack"
       ],
       "payload": {},
-      "expectedData": {
-        "message_count": 20
-      }
+      "validationFunction": "validators/044-slack-get-last-20-messages.ts",
+      "expectedResultDescription": "Should retrieve exactly 20 most recent messages from the 'all-superglue' Slack channel. Expected message_count to be exactly 20."
     },
     {
-      "id": "slack-get-all-messages",
+      "id": "045-slack-get-all-messages",
       "name": "Slack Get All Messages",
       "description": "Retrieve exactly 1005 messages from the evals channel",
       "type": "retrieval",
@@ -2187,12 +1753,11 @@
         "slack"
       ],
       "payload": {},
-      "expectedData": {
-        "message_count": 1005
-      }
+      "validationFunction": "validators/045-slack-get-all-messages.ts",
+      "expectedResultDescription": "Should retrieve exactly 1005 messages from the 'evals' Slack channel (tests pagination handling). Expected message_count to be exactly 1005."
     },
     {
-      "id": "slack-get-all-messages-with-pagination-reminder",
+      "id": "046-slack-get-all-messages-with-pagination-reminder",
       "name": "Slack Get All Messages",
       "description": "Retrieve exactly 1005 messages from the evals channel with a reminder to use pagination",
       "type": "retrieval",
@@ -2201,15 +1766,18 @@
         "slack"
       ],
       "payload": {},
-      "expectedData": {
-        "message_count": 1005
-      }
+      "validationFunction": "validators/046-slack-get-all-messages-with-pagination-reminder.ts",
+      "expectedResultDescription": "Should retrieve exactly 1005 messages from the 'evals' Slack channel with explicit pagination reminder. Expected message_count to be exactly 1005."
     }
   ],
-  "enabledTools":["postgres-lego-get-colors"],
+  "enabledTools":["004-clockify-time-entries", "005-clockify-projects", "006-clockify-projects-all-workspaces", "007-typeform-get-all-forms"],
   "settings": {
     "runOneShotMode": true,
     "runSelfHealingMode": true,
     "attemptsEachMode": 1
+  },
+  "validationLlmConfig": {
+    "provider": "openai",
+    "model": "gpt-4o"
   }
 }

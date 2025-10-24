@@ -1,19 +1,20 @@
 import { Integration } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { DataStore } from "../../../packages/core/datastore/types.js";
-import { ToolAttempt, ToolConfig, TestSuiteSettings } from "../types.js";
+import { ToolAttempt, ToolConfig, TestSuiteSettings, ValidationLLMConfig } from "../types.js";
 import { SuperglueToolAttemptService } from "./tool-attempt.js";
 
 
 export class ToolRunnerService {
     constructor(
         private datastore: DataStore,
-        private metadata: Metadata
+        private metadata: Metadata,
+        private validationLlmConfig?: ValidationLLMConfig
     ) {
     }
 
     public async runTools(tools: ToolConfig[], integrations: Integration[], settings: TestSuiteSettings): Promise<ToolAttempt[]> {
-        const toolAttemptService = new SuperglueToolAttemptService(this.metadata, this.datastore);
+        const toolAttemptService = new SuperglueToolAttemptService(this.metadata, this.datastore, this.validationLlmConfig);
 
         // Run all tools in parallel, each with tool-level batching
         const toolPromises = tools.map(async (tool) => {

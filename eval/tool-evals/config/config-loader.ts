@@ -22,8 +22,9 @@ const ToolConfigSchema = z.object({
     type: z.enum(['retrieval', 'action', 'upsert']),
     instruction: z.string(),
     integrationIds: z.array(z.string()).min(1),
-    expectedData: z.any().optional(),
-    allowAdditionalProperties: z.boolean().optional(),
+    validationFunction: z.string().optional(),
+    skipValidationFunction: z.boolean().optional(),
+    expectedResultDescription: z.string().optional(),
     payload: z.any().optional(),
 });
 
@@ -33,11 +34,17 @@ const TestSuiteSettingsSchema = z.object({
     attemptsEachMode: z.number().min(1),
 });
 
+const ValidationLLMConfigSchema = z.object({
+    provider: z.string(),
+    model: z.string(),
+});
+
 const AgentEvalConfigSchema = z.object({
     integrations: z.array(IntegrationConfigSchema).min(1),
     tools: z.array(ToolConfigSchema).min(1),
     enabledTools: z.union([z.literal('all'), z.array(z.string()).min(1)]),
     settings: TestSuiteSettingsSchema,
+    validationLlmConfig: ValidationLLMConfigSchema.optional(),
 });
 
 export async function loadConfig(): Promise<AgentEvalConfig> {
@@ -61,6 +68,10 @@ export async function loadConfig(): Promise<AgentEvalConfig> {
             runOneShotMode: true,
             runSelfHealingMode: true,
             ...rawConfig.settings,
+        },
+        validationLlmConfig: rawConfig.validationLlmConfig || {
+            provider: "openai",
+            model: "gpt-4o",
         },
     };
 

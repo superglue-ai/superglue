@@ -1,0 +1,168 @@
+import assert from 'assert';
+
+const EXPECTED_DATA = {
+  "products": [
+    "Non-Repairable Return",
+    "Non-Repairable Recycle",
+    "Non-Payment Return",
+    "Non-Payment Recycle",
+    "Flight Crossbody Sling Bag",
+    "Flight Crossbody Satchel",
+    "Flight Convertible Tote Backpack",
+    "Flight Backpack",
+    "Flight Classic Messenger Bag",
+    "Miles Chest Pack",
+    "Water Resistant Tuck Backpack",
+    "Water Resistant Prospect Backpack",
+    "Water Resistant Mini Prospect Backpack",
+    "Water Resistant Division Backpack",
+    "Castle Crossbody Sling",
+    "Stark Messenger Bag",
+    "Spirit Laptop Backpack",
+    "Spark Mini Pack",
+    "Flight Classic Messenger Bag",
+    "Replacement Product",
+    "Water-Resistant Alcatraz Backpack",
+    "Reflective Alcatraz Backpack",
+    "Eco Ripstop Alcatraz Backpack",
+    "Eco Cordura Alcatraz Backpack",
+    "Flight Crossbody Sling Bag",
+    "Flight Crossbody Satchel",
+    "Flight Convertible Tote Backpack",
+    "Flight Backpack",
+    "Custom Classic Messenger Bag",
+    "Classic Messenger Bag",
+    "Wingman Travel Backpack Duffel",
+    "Custom Strap Pad",
+    "Classic Messenger Bag",
+    "Custom Classic Messenger Bag",
+    "Warranty Recycle",
+    "Luggage Roller Skate Wheel Assembly",
+    "Luggage Roller Skate Wheel",
+    "Quick Attach Thin SR Buckle",
+    "Quick Attach Tensionlock",
+    "Quick Attach Nemo Buckle Male",
+    "Canvas Shop Tote Bag",
+    "Canvas Shop Tote Bag",
+    "Utility Organization Pouch",
+    "Utility Laptop Sleeve",
+    "Closer Laptop Briefcase",
+    "Stealth Folio Organizer",
+    "Scholar Convertible Tote Backpack",
+    "Parkside Laptop Backpack 2.0",
+    "Custom Alcatraz Laptop Backpack",
+    "Packable Travel Tote",
+    "Custom Prospect Laptop Backpack",
+    "Custom Mini Prospect Backpack",
+    "Custom Division Laptop Backpack",
+    "Custom Tuck Backpack",
+    "Catapult Sling",
+    "Custom Tuck Backpack",
+    "Authority Laptop Backpack Deluxe",
+    "Transit Dopp Kit",
+    "Commute Messenger Bag 2.0",
+    "Spirit Laptop Backpack",
+    "Tuck Laptop Backpack",
+    "Tuck Laptop Backpack",
+    "Tandem Pannier",
+    "Transit Dopp Kit",
+    "Slacker Chest Pack",
+    "Vapor Sling Crossbody Bag",
+    "Muttmover Luxe Backpack",
+    "Wingman Travel Backpack Duffel",
+    "Agent Crossbody Bag",
+    "Packable Travel Tote",
+    "Vapor Convertible Tote Backpack",
+    "Hero Laptop Backpack",
+    "Scholar Convertible Tote Backpack",
+    "Stealth Folio Organizer",
+    "Tuck Laptop Backpack",
+    "Scheme Convertible Briefcase Backpack",
+    "Scheme Convertible Briefcase Backpack",
+    "Lane Commuter Backpack",
+    "Slacker Chest Pack",
+    "Player Duffel Bag",
+    "Player Duffel Bag",
+    "Closer Laptop Briefcase",
+    "Commute Messenger Bag 2.0",
+    "Never Check Expandable Backpack",
+    "Magnetic Clip Set",
+    "Never Check Expandable Backpack",
+    "Division Laptop Backpack Deluxe",
+    "Rogue Laptop Backpack 2.0",
+    "Quik Attach Stealth Male Clip",
+    "Spire Laptop Backpack 2.0",
+    "Division Laptop Backpack Deluxe",
+    "Spark Micro Pack",
+    "Parkside Laptop Backpack 2.0",
+    "Foundry Pack",
+    "Rascal Belt Bag",
+    "Custom Division Laptop Backpack",
+    "Impulse Travel Backpack",
+    "Q Laptop Backpack 2.0",
+    "Q Laptop Backpack 2.0",
+    "Especial Stash Messenger Bag",
+    "Especial Scope Expandable Backpack",
+    "$35 Repair Fee",
+    "Repair Fee Waived",
+    "$25 Repair Fee",
+    "3 Way Accessory Case",
+    "Reflector Tail",
+    "Standard Pannier Bracket",
+    "Standard Cam Buckle Female",
+    "Authority Laptop Backpack Deluxe",
+    "Foundry Pack",
+    "Copilot Luggage Roller",
+    "Custom Alcatraz Laptop Backpack",
+    "Custom Prospect Laptop Backpack",
+    "Custom Mini Prospect Backpack",
+    "eGift Card",
+    "Parker Commuter Backpack",
+    "Clark Commuter Backpack",
+    "Robin Commuter Backpack",
+    "Pannier System Type T",
+    "Roller Extending Handle",
+    "Standard CAM Buckle Male",
+    "Single Gate Keeper",
+    "Day Pack Puller",
+    "Universal Shoulder Strap",
+    "Sternum Straps for Backpacks",
+    "Bag Silencer Strips",
+    "Cross Strap Without Clips",
+    "Cross Strap With Clips",
+    "Male Stealth",
+    "Male Clip",
+    "Female Clip",
+    "Quick Attach Stealth Female",
+    "Triangle Hook",
+    "Classic Cam Buckle Male",
+    "Super Strap Pad",
+    "Copilot Luggage Roller",
+    "Stealth Folio Organizer"
+  ]
+};
+
+function isDeepEqual(expected: any, received: any): boolean {
+  if (expected === received) return true;
+  if (expected == null || received == null) return false;
+  if (typeof expected !== "object" || typeof received !== "object") return false;
+
+  const keysExpected = Object.keys(expected);
+  const keysReceived = Object.keys(received);
+
+  if (keysExpected.length !== keysReceived.length) return false;
+
+  for (const key of keysExpected) {
+    if (!Object.prototype.hasOwnProperty.call(received, key) || !isDeepEqual(expected[key], received[key])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export default function validate(data: any, payload: any): void {
+  assert(isDeepEqual(EXPECTED_DATA, data), `Data does not match expected structure. Expected: ${JSON.stringify(EXPECTED_DATA)}, Received: ${JSON.stringify(data)}`);
+}
+
+

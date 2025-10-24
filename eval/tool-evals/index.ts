@@ -41,7 +41,7 @@ async function main(): Promise<void> {
     const enabledToolsCount = config.enabledTools === 'all' ? config.tools.length : config.enabledTools.length;
     logMessage("info", `Integrations setup: ${integrations.length}, Tools: ${config.tools.length}, Enabled tools: ${enabledToolsCount}`, metadata);
 
-    const agentEvalRunner = new ToolRunnerService(store, metadata);
+    const agentEvalRunner = new ToolRunnerService(store, metadata, config.validationLlmConfig);
     const toolAttempts = await agentEvalRunner.runTools(enabledTools, integrations, config.settings);
 
     const metricsCalculatorService = new MetricsCalculator();

@@ -18,8 +18,9 @@ export interface ToolConfig {
     type: 'retrieval' | 'action' | 'upsert';
     instruction: string;
     integrationIds: string[];
-    expectedData?: any;
-    allowAdditionalProperties?: boolean;
+    validationFunction?: string;
+    skipValidationFunction?: boolean;
+    expectedResultDescription?: string;
     payload?: any;
 }
 
@@ -29,20 +30,44 @@ export interface TestSuiteSettings {
     attemptsEachMode: number;
 }
 
+export interface ValidationLLMConfig {
+    provider: string;
+    model: string;
+}
+
 export interface AgentEvalConfig {
     integrations: IntegrationConfig[];
     tools: ToolConfig[];
     enabledTools: 'all' | string[];
     settings: TestSuiteSettings;
+    validationLlmConfig?: ValidationLLMConfig;
 }
 
 export enum ToolFailureReason {
     BUILD = 'build',
     EXECUTION = 'execution',
-    STRICT_VALIDATION = 'strict_validation',
 }
 
 export type FailureCountsByReason = Record<ToolFailureReason, number>;
+
+export enum AttemptStatus {
+    BUILD_FAILED = 'build_failed',
+    EXECUTION_FAILED = 'execution_failed',
+    VALIDATION_PASSED = 'validation_passed',
+    VALIDATION_FAILED_LLM_PASSED = 'validation_failed_llm_passed',
+    VALIDATION_FAILED_LLM_PARTIAL = 'validation_failed_llm_partial',
+    VALIDATION_FAILED_LLM_FAILED = 'validation_failed_llm_failed',
+    VALIDATION_SKIPPED_LLM_PASSED = 'validation_skipped_llm_passed',
+    VALIDATION_SKIPPED_LLM_PARTIAL = 'validation_skipped_llm_partial',
+    VALIDATION_SKIPPED_LLM_FAILED = 'validation_skipped_llm_failed'
+}
+
+export interface ValidationResult {
+    passed: boolean;
+    functionError?: string;
+    llmJudgment?: 'passes' | 'partial' | 'failed';
+    llmReason?: string;
+}
 
 export interface ToolAttempt {
     toolConfig: ToolConfig;
@@ -57,6 +82,8 @@ export interface ToolAttempt {
     executionError?: string;
 
     failureReason?: ToolFailureReason;
+    status: AttemptStatus;
+    validationResult?: ValidationResult;
 
     workflow?: Workflow;
     result?: WorkflowResult;

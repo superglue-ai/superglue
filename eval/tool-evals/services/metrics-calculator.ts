@@ -76,7 +76,6 @@ export class MetricsCalculator {
             const initCounts: FailureCountsByReason = {
                 [ToolFailureReason.BUILD]: 0,
                 [ToolFailureReason.EXECUTION]: 0,
-                [ToolFailureReason.STRICT_VALIDATION]: 0,
             };
             const oneShotFailuresByReason: FailureCountsByReason = { ...initCounts };
             const selfHealingFailuresByReason: FailureCountsByReason = { ...initCounts };

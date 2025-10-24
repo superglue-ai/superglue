@@ -1,19 +1,24 @@
 import { Integration, RequestOptions, SelfHealingMode, WorkflowResult } from "@superglue/client";
-import { ToolAttempt, ToolConfig, ToolFailureReason } from "../types.js";
+import { ToolAttempt, ToolConfig, ToolFailureReason, ValidationLLMConfig, AttemptStatus } from "../types.js";
 import { Metadata } from "@playwright/test";
 import { Workflow } from "@superglue/client";
 import { generateUniqueId } from "@superglue/shared/utils";
 import { IntegrationManager } from "../../../packages/core/integrations/integration-manager.js";
 import { DataStore } from "../../../packages/core/datastore/types.js";
-import { isDeepEqual } from "../utils/utils.js";
 import { WorkflowBuilder } from "../../../packages/core/build/workflow-builder.js";
 import { WorkflowExecutor } from "../../../packages/core/execute/workflow-executor.js";
+import { ToolValidationService } from "./tool-validation.js";
 
 export class SuperglueToolAttemptService {
+    private validationService: ToolValidationService;
+
     constructor(
         private metadata: Metadata,
-        private datastore: DataStore
-    ) {}
+        private datastore: DataStore,
+        validationLlmConfig?: ValidationLLMConfig
+    ) {
+        this.validationService = new ToolValidationService(validationLlmConfig);
+    }
 
     public async runToolAttempt(
         toolConfig: ToolConfig,
@@ -27,6 +32,7 @@ export class SuperglueToolAttemptService {
             buildSuccess: false,
             executionTime: null,
             executionSuccess: false,
+            status: AttemptStatus.BUILD_FAILED,
             createdAt: new Date(),
         };
 
@@ -42,6 +48,7 @@ export class SuperglueToolAttemptService {
             attempt.buildTime = Date.now() - buildStart;
             attempt.buildError = error instanceof Error ? error.message : String(error);
             attempt.failureReason = ToolFailureReason.BUILD;
+            attempt.status = AttemptStatus.BUILD_FAILED;
 
             return attempt;
         }
@@ -50,27 +57,27 @@ export class SuperglueToolAttemptService {
         try {
             const workflowResult = await this.executeWorkflow(toolConfig, workflow, integrations, selfHealingEnabled);
             attempt.executionTime = Date.now() - execStart;
+            attempt.result = workflowResult;
 
-            if (workflowResult.success && !this.validateResult(toolConfig, workflowResult)) {
-                const truncatedResult = JSON.stringify(workflowResult.data).substring(0, 100);
+            if (!workflowResult.success) {
                 attempt.executionSuccess = false;
-                attempt.executionError = `Data did not match manually defined expected data. Truncated data: ${truncatedResult}`;
-                attempt.failureReason = ToolFailureReason.STRICT_VALIDATION;
-                attempt.result = workflowResult;
-
+                attempt.executionError = this.determineErrorMessage(workflowResult);
+                attempt.failureReason = ToolFailureReason.EXECUTION;
+                attempt.status = AttemptStatus.EXECUTION_FAILED;
                 return attempt;
             }
 
-            attempt.result = workflowResult;
-            attempt.executionSuccess = workflowResult.success;
-            attempt.executionError = this.determineErrorMessage(workflowResult);
-            attempt.failureReason = workflowResult.success ? undefined : ToolFailureReason.EXECUTION;
+            const validationResult = await this.validationService.validate(toolConfig, workflowResult);
+            attempt.validationResult = validationResult;
+            attempt.executionSuccess = validationResult.passed;
+            attempt.status = this.validationService.determineStatus(attempt);
 
             return attempt;
         } catch (error) {
             attempt.executionTime = Date.now() - execStart;
             attempt.executionError = error instanceof Error ? error.message : String(error);
             attempt.failureReason = ToolFailureReason.EXECUTION;
+            attempt.status = AttemptStatus.EXECUTION_FAILED;
             
             return attempt;
         }
@@ -138,22 +145,6 @@ export class SuperglueToolAttemptService {
         );
 
         return workflowResult;
-    }
-
-    private validateResult(toolConfig: ToolConfig, workflowResult: WorkflowResult): boolean {
-        if (!toolConfig.expectedData || Object.keys(toolConfig.expectedData).length === 0) { // empty object evaluates to valid
-            return true;
-        }
-
-        if (typeof toolConfig.expectedData === 'string') {
-            return workflowResult.data === toolConfig.expectedData;
-        }
-
-        if (typeof toolConfig.expectedData === 'object') {
-            return isDeepEqual(toolConfig.expectedData, workflowResult.data, toolConfig.allowAdditionalProperties ?? false);
-        }
-
-        return false;
     }
 
     private determineErrorMessage(workflowResult: WorkflowResult): string | undefined {
