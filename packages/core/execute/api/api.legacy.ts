@@ -2,15 +2,15 @@ import { ApiConfig, FileType, PaginationType } from "@superglue/client";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { RequestOptions } from "http";
 import ivm from "isolated-vm";
+import { SELF_HEALING_SYSTEM_PROMPT } from "../../context/context-prompts.js";
 import { server_defaults } from "../../default.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { LanguageModel, LLMMessage } from "../../llm/language-model.js";
-import { SELF_HEALING_SYSTEM_PROMPT } from "../../context/context-prompts.js";
 import { parseFile } from "../../utils/file.js";
 import { composeUrl, generateId, maskCredentials, replaceVariables, sample } from "../../utils/tools.js";
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../../utils/workflow-tools.js";
-import { executeFTP } from "../ftp/ftp.js";
-import { callPostgres } from "../postgres/postgres.js";
+import { callFTP } from "../ftp/ftp.legacy.js";
+import { callPostgres } from "../postgres/postgres.legacy.js";
 import { AbortError, ApiCallError, callAxios, checkResponseForErrors, handle2xxStatus, handle429Status, handleErrorStatus } from "./api.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
@@ -115,11 +115,17 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
         urlPath: processedUrlPath,
         body: processedBody
       };
-      return { data: await callPostgres({ endpoint: postgresEndpoint, payload, credentials, options }), statusCode: 200, headers: {} };
+      return { data: await callPostgres(postgresEndpoint, payload, credentials, options), statusCode: 200, headers: {} };
     }
 
     if (processedUrlHost.startsWith("ftp://") || processedUrlHost.startsWith("ftps://") || processedUrlHost.startsWith("sftp://")) {
-      return { data: await executeFTP({ operation: endpoint.body, credentials, options }), statusCode: 200, headers: {} };
+      const ftpEndpoint = {
+        ...endpoint,
+        urlHost: processedUrlHost,
+        urlPath: processedUrlPath,
+        body: processedBody
+      };
+      return { data: await callFTP({ endpoint: ftpEndpoint, credentials, options }), statusCode: 200, headers: {} };
     }
 
     const processedUrl = composeUrl(processedUrlHost, processedUrlPath);
