@@ -44,7 +44,6 @@ export class WorkflowSchedulerWorker {
     private async pollAndExecute(): Promise<void> {
         const schedules = await this.datastore.listDueWorkflowSchedules();
         logMessage('debug', `WORKFLOW SCHEDULER: Found ${schedules.length} due schedules`);
-        logMessage('debug', `WORKFLOW SCHEDULER: Schedules: ${JSON.stringify(schedules.map(s => ({id: s.id, nextRunAt: s.nextRunAt, enabled: s.enabled})))}`, {});
 
         for (const schedule of schedules) {
             try {
