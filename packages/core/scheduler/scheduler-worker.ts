@@ -1,3 +1,4 @@
+import { SelfHealingMode } from "@superglue/client";
 import { calculateNextRun } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { DataStore } from "../datastore/types.js";
@@ -40,9 +41,10 @@ export class WorkflowSchedulerWorker {
         logMessage('info', 'WORKFLOW SCHEDULER: Scheduler service stopped');
     }
 
-    private async pollAndExecute(): Promise<void> {      
+    private async pollAndExecute(): Promise<void> {
         const schedules = await this.datastore.listDueWorkflowSchedules();
         logMessage('debug', `WORKFLOW SCHEDULER: Found ${schedules.length} due schedules`);
+        logMessage('debug', `WORKFLOW SCHEDULER: Schedules: ${JSON.stringify(schedules.map(s => ({id: s.id, nextRunAt: s.nextRunAt, enabled: s.enabled})))}`, {});
 
         for (const schedule of schedules) {
             try {
@@ -57,16 +59,21 @@ export class WorkflowSchedulerWorker {
                     orgId: schedule.orgId
                 };
 
+                const options = schedule.options ? {
+                    ...schedule.options,
+                    selfHealing: schedule.options.selfHealing ? SelfHealingMode[schedule.options.selfHealing as keyof typeof SelfHealingMode] : undefined
+                } : {};
+
                 await executeWorkflowResolver(
                     {},
-                    { 
+                    {
                         input: { id: schedule.workflowId },
                         payload: schedule.payload || {},
                         credentials: {},
-                        options: schedule.options || {}
+                        options
                     },
                     context,
-                    {} as GraphQLResolveInfo // not needed
+                    {} as GraphQLResolveInfo
                 );
             } catch (error) {
                 logMessage('error', `WORKFLOW SCHEDULER: Failed to run scheduled workflow ${schedule.workflowId}: ${error}`);

@@ -89,12 +89,14 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
   React.useEffect(() => {
     if (scheduleSelectedItem === 'custom') {
       if (customCronExpression === '') {
-        setIsCustomCronValid(false);
+        setIsCustomCronValid(true);
       } else {
         setIsCustomCronValid(validateCronExpression(customCronExpression));
       }
+    } else {
+      setIsCustomCronValid(true);
     }
-  }, [scheduleSelectedItem]);
+  }, [scheduleSelectedItem, customCronExpression]);
 
   const validateJson = (jsonString: string) => {
     try {

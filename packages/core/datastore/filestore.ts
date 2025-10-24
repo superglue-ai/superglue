@@ -737,7 +737,7 @@ export class FileStore implements DataStore {
     await this.ensureInitialized();
     const now = new Date();
     return Array.from(this.storage.workflowSchedules.entries())
-      .filter(([key]) => key.includes(':workflow-schedule:'))
+      .filter(([key]) => key.includes('workflow-schedule:'))
       .map(([key, value]) => ({ ...value, id: key.split(':').pop() }))
       .filter(schedule => schedule.enabled && schedule.nextRunAt <= now);
   }
