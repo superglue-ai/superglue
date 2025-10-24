@@ -1,6 +1,6 @@
 # Tool Evaluation Framework
 
-Automated testing framework for Superglue's workflow builder and executor across multiple API integrations.
+Automated testing framework for Superglue's tool builder and executor across multiple API integrations.
 
 ## Quick Start
 
@@ -39,8 +39,8 @@ tool-evals/
 │   └── config-loader.ts
 ├── services/             # Core business logic
 │   ├── integration-setup.ts
-│   ├── workflow-runner.ts
-│   ├── workflow-attempt.ts
+│   ├── tool-runner.ts
+│   ├── tool-attempt.ts
 │   ├── metrics-calculator.ts
 │   └── metrics-comparer.ts
 ├── reporters/            # Output formatting (strategy pattern)
@@ -60,7 +60,7 @@ tool-evals/
 
 ### Config File Structure
 
-The `data/agent-eval-config.json` defines integrations and workflows:
+The `data/agent-eval-config.json` defines integrations and tools:
 
 ```json
 {
@@ -77,10 +77,10 @@ The `data/agent-eval-config.json` defines integrations and workflows:
       "keywords": ["users", "data"]
     }
   ],
-  "workflows": [
+  "tools": [
     {
-      "id": "my-workflow",
-      "name": "My Workflow",
+      "id": "my-tool",
+      "name": "My Tool",
       "type": "retrieval",
       "instruction": "Get all users from MyAPI",
       "integrationIds": ["myapi"],
@@ -89,7 +89,7 @@ The `data/agent-eval-config.json` defines integrations and workflows:
       }
     }
   ],
-  "enabledWorkflows": "all",
+  "enabledTools": "all",
   "settings": {
     "runOneShotMode": true,
     "runSelfHealingMode": true,
@@ -105,13 +105,13 @@ The `data/agent-eval-config.json` defines integrations and workflows:
   - `credentials`: Keys that must exist as env vars
   - `urlHost`, `documentationUrl`: Used by agent for API understanding
 
-- `workflows`: Array of test workflows
+- `tools`: Array of test tools
   - `instruction`: Natural language description of what to do
   - `integrationIds`: Which integration(s) to use
   - `expectedData`: Optional validation data
   - `type`: `"retrieval"`, `"action"`, or `"upsert"`
 
-- `enabledWorkflows`: `"all"` or array of workflow IDs to run
+- `enabledTools`: `"all"` or array of tool IDs to run
 
 - `settings`:
   - `runOneShotMode`: Test without retries

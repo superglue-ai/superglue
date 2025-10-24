@@ -588,7 +588,7 @@
       ]
     }
   ],
-  "workflows": [
+  "tools": [
     {
       "id": "clickup-task-list",
       "name": "ClickUp Task List",
@@ -2206,7 +2206,7 @@
       }
     }
   ],
-  "enabledWorkflows":["postgres-lego-get-colors"],
+  "enabledTools":["postgres-lego-get-colors"],
   "settings": {
     "runOneShotMode": true,
     "runSelfHealingMode": true,

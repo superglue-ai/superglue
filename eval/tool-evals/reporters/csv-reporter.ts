@@ -1,4 +1,4 @@
-import { Metrics, WorkflowMetrics } from "../types.js";
+import { Metrics, ToolMetrics } from "../types.js";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { Metadata } from "@superglue/shared";
 import { logMessage } from "../../../packages/core/utils/logs.js";
@@ -31,8 +31,8 @@ export class CsvReporter {
 
   private generateCsv(metrics: Metrics): string {
     const headers = [
-      "workflow_id",
-      "workflow_name",
+      "tool_id",
+      "tool_name",
       "mode",
       "total_attempts",
       "total_successful_attempts",
@@ -51,38 +51,38 @@ export class CsvReporter {
 
     const rows: string[] = [headers.join(",")];
 
-    for (const workflow of metrics.workflowMetrics) {
-      if (workflow.hasOneShotAttempts) {
-        rows.push(this.workflowToRow(workflow, "one-shot"));
+    for (const tool of metrics.toolMetrics) {
+      if (tool.hasOneShotAttempts) {
+        rows.push(this.toolToRow(tool, "one-shot"));
       }
-      if (workflow.hasSelfHealingAttempts) {
-        rows.push(this.workflowToRow(workflow, "self-healing"));
+      if (tool.hasSelfHealingAttempts) {
+        rows.push(this.toolToRow(tool, "self-healing"));
       }
     }
 
     return rows.join("\n");
   }
 
-  private workflowToRow(workflow: WorkflowMetrics, mode: "one-shot" | "self-healing"): string {
+  private toolToRow(tool: ToolMetrics, mode: "one-shot" | "self-healing"): string {
     const isOneShot = mode === "one-shot";
-    const success = isOneShot ? workflow.hadOneShotSuccess : workflow.hadSelfHealingSuccess;
-    const avgBuildTime = workflow.averageBuildTimeMs;
-    const avgExecTime = isOneShot ? workflow.oneShotAverageExecutionTimeMs : workflow.selfHealingAverageExecutionTimeMs;
-    const failures = isOneShot ? workflow.oneShotFailuresByReason : workflow.selfHealingFailuresByReason;
+    const success = isOneShot ? tool.hadOneShotSuccess : tool.hadSelfHealingSuccess;
+    const avgBuildTime = tool.averageBuildTimeMs;
+    const avgExecTime = isOneShot ? tool.oneShotAverageExecutionTimeMs : tool.selfHealingAverageExecutionTimeMs;
+    const failures = isOneShot ? tool.oneShotFailuresByReason : tool.selfHealingFailuresByReason;
 
     const escapeCsv = (str: string) => `"${str.replace(/"/g, '""')}"`;
 
     return [
-      escapeCsv(workflow.workflowId),
-      escapeCsv(workflow.workflowName),
+      escapeCsv(tool.toolId),
+      escapeCsv(tool.toolName),
       mode,
-      workflow.totalAttempts,
-      workflow.totalSuccessfulAttempts,
-      workflow.totalFailedAttempts,
-      workflow.hasOneShotAttempts ? "true" : "false",
-      workflow.hasSelfHealingAttempts ? "true" : "false",
-      workflow.hadOneShotSuccess ? "true" : "false",
-      workflow.hadSelfHealingSuccess ? "true" : "false",
+      tool.totalAttempts,
+      tool.totalSuccessfulAttempts,
+      tool.totalFailedAttempts,
+      tool.hasOneShotAttempts ? "true" : "false",
+      tool.hasSelfHealingAttempts ? "true" : "false",
+      tool.hadOneShotSuccess ? "true" : "false",
+      tool.hadSelfHealingSuccess ? "true" : "false",
       success ? "true" : "false",
       avgBuildTime?.toFixed(2) ?? "",
       avgExecTime?.toFixed(2) ?? "",

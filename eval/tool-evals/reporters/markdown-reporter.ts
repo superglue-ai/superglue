@@ -1,4 +1,4 @@
-import type { Metrics, WorkflowMetrics, MetricsComparisonResult, WorkflowMetricsComparisonResult, WorkflowAttempt, FailureCountsByReason } from "../types.js";
+import type { Metrics, ToolMetrics, MetricsComparisonResult, ToolMetricsComparisonResult, ToolAttempt, FailureCountsByReason } from "../types.js";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { Metadata } from "@superglue/shared";
 import { logMessage } from "../../../packages/core/utils/logs.js";
@@ -14,7 +14,7 @@ export class MarkdownReporter {
     this.resultsDir = join(baseDir, "data/results");
   }
 
-  public report(timestamp: string, metrics: Metrics, metricsComparison?: MetricsComparisonResult, attempts?: WorkflowAttempt[]): string {
+  public report(timestamp: string, metrics: Metrics, metricsComparison?: MetricsComparisonResult, attempts?: ToolAttempt[]): string {
     if (!existsSync(this.resultsDir)) {
       mkdirSync(this.resultsDir, { recursive: true });
     }
@@ -29,12 +29,12 @@ export class MarkdownReporter {
     return filepath;
   }
 
-  private generateMarkdown(metrics: Metrics, metricsComparison?: MetricsComparisonResult, attempts?: WorkflowAttempt[]): string {
+  private generateMarkdown(metrics: Metrics, metricsComparison?: MetricsComparisonResult, attempts?: ToolAttempt[]): string {
     const sections: string[] = [];
     
     sections.push(this.generateHeader());
     sections.push(this.generateOverallMetrics(metrics, metricsComparison));
-    sections.push(this.generateWorkflowBreakdown(metrics, metricsComparison));
+    sections.push(this.generateToolBreakdown(metrics, metricsComparison));
     sections.push(this.generateDeterminismSection(attempts ?? []));
     sections.push(this.generatePerformanceMetrics(metrics, metricsComparison));
     
@@ -46,8 +46,8 @@ export class MarkdownReporter {
   }
 
   private generateOverallMetrics(metrics: Metrics, comparison?: MetricsComparisonResult): string {
-    const selfHealingRate = metrics.workflowSelfHealingSuccessRate !== null ? metrics.workflowSelfHealingSuccessRate * 100 : null;
-    const oneShotRate = metrics.workflowOneShotSuccessRate !== null ? metrics.workflowOneShotSuccessRate * 100 : null;
+    const selfHealingRate = metrics.toolSelfHealingSuccessRate !== null ? metrics.toolSelfHealingSuccessRate * 100 : null;
+    const oneShotRate = metrics.toolOneShotSuccessRate !== null ? metrics.toolOneShotSuccessRate * 100 : null;
     
     let output = '## 📈 Overall Metrics\n\n';
     output += '| Metric | Current | vs Last | vs Benchmark |\n';
@@ -55,8 +55,8 @@ export class MarkdownReporter {
 
     if (selfHealingRate !== null) {
       const current = `${selfHealingRate.toFixed(1)}%`;
-      const lastDiffVal = comparison?.lastRun.workflowSelfHealingSuccessRateDifference;
-      const benchDiffVal = comparison?.benchmark.workflowSelfHealingSuccessRateDifference;
+      const lastDiffVal = comparison?.lastRun.toolSelfHealingSuccessRateDifference;
+      const benchDiffVal = comparison?.benchmark.toolSelfHealingSuccessRateDifference;
       const lastDiff = this.formatCompactDiff(lastDiffVal !== null && lastDiffVal !== undefined ? lastDiffVal * 100 : null);
       const benchDiff = this.formatCompactDiff(benchDiffVal !== null && benchDiffVal !== undefined ? benchDiffVal * 100 : null);
       output += `| 🔄 Self-Healing | ${current} | ${lastDiff} | ${benchDiff} |\n`;
@@ -64,8 +64,8 @@ export class MarkdownReporter {
 
     if (oneShotRate !== null) {
       const current = `${oneShotRate.toFixed(1)}%`;
-      const lastDiffVal = comparison?.lastRun.workflowOneShotSuccessRateDifference;
-      const benchDiffVal = comparison?.benchmark.workflowOneShotSuccessRateDifference;
+      const lastDiffVal = comparison?.lastRun.toolOneShotSuccessRateDifference;
+      const benchDiffVal = comparison?.benchmark.toolOneShotSuccessRateDifference;
       const lastDiff = this.formatCompactDiff(lastDiffVal !== null && lastDiffVal !== undefined ? lastDiffVal * 100 : null);
       const benchDiff = this.formatCompactDiff(benchDiffVal !== null && benchDiffVal !== undefined ? benchDiffVal * 100 : null);
       output += `| 🎯 One-Shot | ${current} | ${lastDiff} | ${benchDiff} |\n`;
@@ -74,7 +74,7 @@ export class MarkdownReporter {
     return output;
   }
 
-  private generateDeterminismSection(attempts: WorkflowAttempt[]): string {
+  private generateDeterminismSection(attempts: ToolAttempt[]): string {
     let output = '## 🧪 Determinism\n\n';
     
     if (attempts.length === 0) {
@@ -82,15 +82,15 @@ export class MarkdownReporter {
       return output;
     }
 
-    const byWorkflow = new Map<string, WorkflowAttempt[]>();
+    const byTool = new Map<string, ToolAttempt[]>();
     for (const a of attempts) {
-      const id = a.workflowConfig.id;
-      if (!byWorkflow.has(id)) byWorkflow.set(id, []);
-      byWorkflow.get(id)!.push(a);
+      const id = a.toolConfig.id;
+      if (!byTool.has(id)) byTool.set(id, []);
+      byTool.get(id)!.push(a);
     }
 
-    const nonDeterministicWorkflows: string[] = [];
-    for (const [id, items] of byWorkflow.entries()) {
+    const nonDeterministicTools: string[] = [];
+    for (const [id, items] of byTool.entries()) {
       const sh = items.filter(x => x.selfHealingEnabled);
       const os = items.filter(x => !x.selfHealingEnabled);
       
@@ -101,18 +101,18 @@ export class MarkdownReporter {
       
       const isNonDeterministic = (shSucc > 0 && shFail > 0) || (osSucc > 0 && osFail > 0);
       if (isNonDeterministic) {
-        nonDeterministicWorkflows.push(id);
+        nonDeterministicTools.push(id);
       }
     }
 
-    const totalWorkflows = byWorkflow.size;
-    const deterministicCount = totalWorkflows - nonDeterministicWorkflows.length;
+    const totalTools = byTool.size;
+    const deterministicCount = totalTools - nonDeterministicTools.length;
     
-    output += `**${deterministicCount}/${totalWorkflows}** workflows deterministic`;
+    output += `**${deterministicCount}/${totalTools}** tools deterministic`;
     
-    if (nonDeterministicWorkflows.length > 0) {
-      output += ` (${nonDeterministicWorkflows.length} non-deterministic)\n\n`;
-      output += `**Non-deterministic workflows:** ${nonDeterministicWorkflows.join(', ')}\n`;
+    if (nonDeterministicTools.length > 0) {
+      output += ` (${nonDeterministicTools.length} non-deterministic)\n\n`;
+      output += `**Non-deterministic tools:** ${nonDeterministicTools.join(', ')}\n`;
     } else {
       output += '\n';
     }
@@ -139,49 +139,49 @@ export class MarkdownReporter {
     return output;
   }
 
-  private generateWorkflowBreakdown(metrics: Metrics, comparison?: MetricsComparisonResult): string {
-    let output = '## 📋 Workflow Breakdown\n\n';
-    output += '| Workflow | 1-Shot | Heal* | 1-Shot Failed At | Healing Failed At |\n';
+  private generateToolBreakdown(metrics: Metrics, comparison?: MetricsComparisonResult): string {
+    let output = '## 📋 Tool Breakdown\n\n';
+    output += '| Tool | 1-Shot | Heal* | 1-Shot Failed At | Healing Failed At |\n';
     output += '|----------|--------|-------|------------------|-------------------|\n';
     
     const comparisonById = comparison 
-      ? new Map(comparison.lastRun.workflowMetrics.map(c => [c.workflowId, c]))
+      ? new Map(comparison.lastRun.toolMetrics.map(c => [c.toolId, c]))
       : undefined;
     
-    const sortedWorkflows = [...metrics.workflowMetrics].sort((a, b) => 
-      a.workflowName.localeCompare(b.workflowName)
+    const sortedTools = [...metrics.toolMetrics].sort((a, b) => 
+      a.toolName.localeCompare(b.toolName)
     );
     
-    for (const workflow of sortedWorkflows) {
-      const workflowComparison = comparisonById?.get(workflow.workflowId);
-      output += this.generateWorkflowRow(workflow, workflowComparison);
+    for (const tool of sortedTools) {
+      const toolComparison = comparisonById?.get(tool.toolId);
+      output += this.generateToolRow(tool, toolComparison);
     }
     
-    output += `\n**Total:** ${sortedWorkflows.length} workflows\n`;
-    output += '*Self-healing only runs for workflows that failed one-shot*\n';
+    output += `\n**Total:** ${sortedTools.length} tools\n`;
+    output += '*Self-healing only runs for tools that failed one-shot*\n';
     
     return output;
   }
 
-  private generateWorkflowRow(workflow: WorkflowMetrics, comparison?: WorkflowMetricsComparisonResult): string {
-    const oneShot = workflow.hadOneShotSuccess ? '✅' : (workflow.hasOneShotAttempts ? '❌' : ' ');
-    const heal = workflow.hadSelfHealingSuccess ? '✅' : (workflow.hasSelfHealingAttempts ? '❌' : ' ');
+  private generateToolRow(tool: ToolMetrics, comparison?: ToolMetricsComparisonResult): string {
+    const oneShot = tool.hadOneShotSuccess ? '✅' : (tool.hasOneShotAttempts ? '❌' : ' ');
+    const heal = tool.hadSelfHealingSuccess ? '✅' : (tool.hasSelfHealingAttempts ? '❌' : ' ');
 
     const arrow = (d: -1 | 0 | 1) => d > 0 ? '↗' : d < 0 ? '↘' : '';
-    const oneShotDelta = comparison && comparison.oneShotSuccessChange !== 0 && workflow.hasOneShotAttempts ? `${arrow(comparison.oneShotSuccessChange)}` : '';
-    const healDelta = comparison && comparison.selfHealingSuccessChange !== 0 && workflow.hasSelfHealingAttempts ? `${arrow(comparison.selfHealingSuccessChange)}` : '';
+    const oneShotDelta = comparison && comparison.oneShotSuccessChange !== 0 && tool.hasOneShotAttempts ? `${arrow(comparison.oneShotSuccessChange)}` : '';
+    const healDelta = comparison && comparison.selfHealingSuccessChange !== 0 && tool.hasSelfHealingAttempts ? `${arrow(comparison.selfHealingSuccessChange)}` : '';
 
     const oneShotText = `${oneShot}${oneShotDelta}`;
     const healText = `${heal}${healDelta}`;
 
-    const oneShotFailures = !workflow.hadOneShotSuccess && workflow.hasOneShotAttempts
-      ? this.formatFailureReasons(workflow.oneShotFailuresByReason)
+    const oneShotFailures = !tool.hadOneShotSuccess && tool.hasOneShotAttempts
+      ? this.formatFailureReasons(tool.oneShotFailuresByReason)
       : '';
-    const healingFailures = !workflow.hadSelfHealingSuccess && workflow.hasSelfHealingAttempts
-      ? this.formatFailureReasons(workflow.selfHealingFailuresByReason)
+    const healingFailures = !tool.hadSelfHealingSuccess && tool.hasSelfHealingAttempts
+      ? this.formatFailureReasons(tool.selfHealingFailuresByReason)
       : '';
 
-    return `| ${workflow.workflowName} | ${oneShotText} | ${healText} | ${oneShotFailures} | ${healingFailures} |\n`;
+    return `| ${tool.toolName} | ${oneShotText} | ${healText} | ${oneShotFailures} | ${healingFailures} |\n`;
   }
 
   private formatFailureReasons(failureCounts: FailureCountsByReason): string {

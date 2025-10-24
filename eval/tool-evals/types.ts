@@ -12,7 +12,7 @@ export interface IntegrationConfig {
     keywords: string[];
 }
 
-export interface WorkflowConfig {
+export interface ToolConfig {
     id: string;
     name: string;
     type: 'retrieval' | 'action' | 'upsert';
@@ -31,21 +31,21 @@ export interface TestSuiteSettings {
 
 export interface AgentEvalConfig {
     integrations: IntegrationConfig[];
-    workflows: WorkflowConfig[];
-    enabledWorkflows: 'all' | string[];
+    tools: ToolConfig[];
+    enabledTools: 'all' | string[];
     settings: TestSuiteSettings;
 }
 
-export enum WorkflowFailureReason {
+export enum ToolFailureReason {
     BUILD = 'build',
     EXECUTION = 'execution',
     STRICT_VALIDATION = 'strict_validation',
 }
 
-export type FailureCountsByReason = Record<WorkflowFailureReason, number>;
+export type FailureCountsByReason = Record<ToolFailureReason, number>;
 
-export interface WorkflowAttempt {
-    workflowConfig: WorkflowConfig;
+export interface ToolAttempt {
+    toolConfig: ToolConfig;
     selfHealingEnabled: boolean;
 
     buildTime: number | null;
@@ -56,7 +56,7 @@ export interface WorkflowAttempt {
     executionSuccess: boolean;
     executionError?: string;
 
-    failureReason?: WorkflowFailureReason;
+    failureReason?: ToolFailureReason;
 
     workflow?: Workflow;
     result?: WorkflowResult;
@@ -65,19 +65,19 @@ export interface WorkflowAttempt {
 }
 
 export interface Metrics {
-    workflowCount: number;
-    workflowSelfHealingSuccessRate: number | null;
-    workflowOneShotSuccessRate: number | null;
+    toolCount: number;
+    toolSelfHealingSuccessRate: number | null;
+    toolOneShotSuccessRate: number | null;
     overallAverageBuildTimeMs: number;
     overallAverageExecutionTimeMs: number;
     oneShotAverageExecutionTimeMs: number | null;
     selfHealingAverageExecutionTimeMs: number | null;
-    workflowMetrics: WorkflowMetrics[];
+    toolMetrics: ToolMetrics[];
 }
 
-export interface WorkflowMetrics {
-    workflowId: string;
-    workflowName: string;
+export interface ToolMetrics {
+    toolId: string;
+    toolName: string;
     totalAttempts: number;
     totalSuccessfulAttempts: number;
     totalFailedAttempts: number;
@@ -98,18 +98,18 @@ export interface MetricsComparisonResult {
 }
 
 export interface MetricsComparison {
-    workflowSelfHealingSuccessRateDifference: number | null;
-    workflowOneShotSuccessRateDifference: number | null;
+    toolSelfHealingSuccessRateDifference: number | null;
+    toolOneShotSuccessRateDifference: number | null;
     overallAverageBuildTimeMsDifference: number | null;
     overallAverageExecutionTimeMsDifference: number | null;
     oneShotAverageExecutionTimeMsDifference: number | null;
     selfHealingAverageExecutionTimeMsDifference: number | null;
-    workflowMetrics: WorkflowMetricsComparisonResult[];
+    toolMetrics: ToolMetricsComparisonResult[];
 }
 
-export interface WorkflowMetricsComparisonResult {
-    workflowId: string;
-    workflowName: string;
+export interface ToolMetricsComparisonResult {
+    toolId: string;
+    toolName: string;
     oneShotSuccessChange: -1 | 0 | 1;
     selfHealingSuccessChange: -1 | 0 | 1;
 }

@@ -1,10 +1,10 @@
-import type { Metrics, WorkflowMetrics, MetricsComparisonResult, WorkflowMetricsComparisonResult, WorkflowAttempt, FailureCountsByReason } from "../types.js";
+import type { Metrics, ToolMetrics, MetricsComparisonResult, ToolMetricsComparisonResult, ToolAttempt, FailureCountsByReason } from "../types.js";
 
 export class ConsoleReporter {
-  static report(metrics: Metrics, metricsComparison?: MetricsComparisonResult, attempts?: WorkflowAttempt[]): void {
+  static report(metrics: Metrics, metricsComparison?: MetricsComparisonResult, attempts?: ToolAttempt[]): void {
     this.printHeader();
     this.printOverallMetrics(metrics, metricsComparison);
-    this.printWorkflowBreakdown(metrics, metricsComparison);
+    this.printToolBreakdown(metrics, metricsComparison);
     this.printDeterminismSection(attempts ?? []);
     this.printPerformanceMetrics(metrics, metricsComparison);
     this.printFooter();
@@ -21,8 +21,8 @@ export class ConsoleReporter {
   }
 
   private static printOverallMetrics(metrics: Metrics, comparison?: MetricsComparisonResult): void {
-    const selfHealingRate = metrics.workflowSelfHealingSuccessRate !== null ? metrics.workflowSelfHealingSuccessRate * 100 : null;
-    const oneShotRate = metrics.workflowOneShotSuccessRate !== null ? metrics.workflowOneShotSuccessRate * 100 : null;
+    const selfHealingRate = metrics.toolSelfHealingSuccessRate !== null ? metrics.toolSelfHealingSuccessRate * 100 : null;
+    const oneShotRate = metrics.toolOneShotSuccessRate !== null ? metrics.toolOneShotSuccessRate * 100 : null;
     
     console.log('\n📈 OVERALL METRICS');
     
@@ -38,8 +38,8 @@ export class ConsoleReporter {
 
     if (selfHealingRate !== null) {
       const current = (selfHealingRate.toFixed(1) + '%').padEnd(COL_WIDTH);
-      const lastDiffVal = comparison?.lastRun.workflowSelfHealingSuccessRateDifference;
-      const benchDiffVal = comparison?.benchmark.workflowSelfHealingSuccessRateDifference;
+      const lastDiffVal = comparison?.lastRun.toolSelfHealingSuccessRateDifference;
+      const benchDiffVal = comparison?.benchmark.toolSelfHealingSuccessRateDifference;
       const lastDiff = this.formatCompactDiff(lastDiffVal !== null && lastDiffVal !== undefined ? lastDiffVal * 100 : null).padEnd(COL_WIDTH);
       const benchDiff = this.formatCompactDiff(benchDiffVal !== null && benchDiffVal !== undefined ? benchDiffVal * 100 : null).padEnd(COL_WIDTH);
       console.log(`  ${'🔄 Self-Healing'.padEnd(METRIC_WIDTH)}│${current}│${lastDiff}│${benchDiff}`);
@@ -48,8 +48,8 @@ export class ConsoleReporter {
 
     if (oneShotRate !== null) {
       const current = (oneShotRate.toFixed(1) + '%').padEnd(COL_WIDTH);
-      const lastDiffVal = comparison?.lastRun.workflowOneShotSuccessRateDifference;
-      const benchDiffVal = comparison?.benchmark.workflowOneShotSuccessRateDifference;
+      const lastDiffVal = comparison?.lastRun.toolOneShotSuccessRateDifference;
+      const benchDiffVal = comparison?.benchmark.toolOneShotSuccessRateDifference;
       const lastDiff = this.formatCompactDiff(lastDiffVal !== null && lastDiffVal !== undefined ? lastDiffVal * 100 : null).padEnd(COL_WIDTH);
       const benchDiff = this.formatCompactDiff(benchDiffVal !== null && benchDiffVal !== undefined ? benchDiffVal * 100 : null).padEnd(COL_WIDTH);
       console.log(`  ${'🎯 One-Shot'.padEnd(METRIC_WIDTH)}│${current}│${lastDiff}│${benchDiff}`);
@@ -57,7 +57,7 @@ export class ConsoleReporter {
     }
   }
 
-  private static printDeterminismSection(attempts: WorkflowAttempt[]): void {
+  private static printDeterminismSection(attempts: ToolAttempt[]): void {
     console.log('\n🧪 DETERMINISM');
     console.log('─'.repeat(80));
     
@@ -66,15 +66,15 @@ export class ConsoleReporter {
       return;
     }
 
-    const byWorkflow = new Map<string, WorkflowAttempt[]>();
+    const byTool = new Map<string, ToolAttempt[]>();
     for (const a of attempts) {
-      const id = a.workflowConfig.id;
-      if (!byWorkflow.has(id)) byWorkflow.set(id, []);
-      byWorkflow.get(id)!.push(a);
+      const id = a.toolConfig.id;
+      if (!byTool.has(id)) byTool.set(id, []);
+      byTool.get(id)!.push(a);
     }
 
-    const nonDeterministicWorkflows: string[] = [];
-    for (const [id, items] of byWorkflow.entries()) {
+    const nonDeterministicTools: string[] = [];
+    for (const [id, items] of byTool.entries()) {
       const sh = items.filter(x => x.selfHealingEnabled);
       const os = items.filter(x => !x.selfHealingEnabled);
       
@@ -85,17 +85,17 @@ export class ConsoleReporter {
       
       const isNonDeterministic = (shSucc > 0 && shFail > 0) || (osSucc > 0 && osFail > 0);
       if (isNonDeterministic) {
-        nonDeterministicWorkflows.push(id);
+        nonDeterministicTools.push(id);
       }
     }
 
-    const totalWorkflows = byWorkflow.size;
-    const deterministicCount = totalWorkflows - nonDeterministicWorkflows.length;
+    const totalTools = byTool.size;
+    const deterministicCount = totalTools - nonDeterministicTools.length;
     
-    console.log(`  ${deterministicCount}/${totalWorkflows} workflows deterministic${nonDeterministicWorkflows.length > 0 ? ` (${nonDeterministicWorkflows.length} non-deterministic)` : ''}`);
+    console.log(`  ${deterministicCount}/${totalTools} tools deterministic${nonDeterministicTools.length > 0 ? ` (${nonDeterministicTools.length} non-deterministic)` : ''}`);
     
-    if (nonDeterministicWorkflows.length > 0) {
-      console.log(`    Non-deterministic: ${nonDeterministicWorkflows.join(', ')}`);
+    if (nonDeterministicTools.length > 0) {
+      console.log(`    Non-deterministic: ${nonDeterministicTools.join(', ')}`);
     }
   }
 
@@ -118,54 +118,54 @@ export class ConsoleReporter {
     }
   }
 
-  private static printWorkflowBreakdown(metrics: Metrics, comparison?: MetricsComparisonResult): void {
-    console.log('\n📋 WORKFLOW BREAKDOWN');
+  private static printToolBreakdown(metrics: Metrics, comparison?: MetricsComparisonResult): void {
+    console.log('\n📋 TOOL BREAKDOWN');
     const NAME_WIDTH = 45;
     const COL_WIDTH = 10;
     const FAIL_WIDTH = 35;
     const tableWidth = 2 + NAME_WIDTH + 1 + COL_WIDTH + 1 + COL_WIDTH + 1 + FAIL_WIDTH + 1 + FAIL_WIDTH;
     console.log('─'.repeat(tableWidth));
-    const header = `  ${'Workflow'.padEnd(NAME_WIDTH)}│${'1-Shot'.padEnd(COL_WIDTH)}│${'Heal*'.padEnd(COL_WIDTH)}│${'1-Shot Failed At'.padEnd(FAIL_WIDTH)}│${'Healing Failed At'.padEnd(FAIL_WIDTH)}`;
+    const header = `  ${'Tool'.padEnd(NAME_WIDTH)}│${'1-Shot'.padEnd(COL_WIDTH)}│${'Heal*'.padEnd(COL_WIDTH)}│${'1-Shot Failed At'.padEnd(FAIL_WIDTH)}│${'Healing Failed At'.padEnd(FAIL_WIDTH)}`;
     console.log(header);
     const separator = '  ' + '─'.repeat(NAME_WIDTH) + '┼' + '─'.repeat(COL_WIDTH) + '┼' + '─'.repeat(COL_WIDTH) + '┼' + '─'.repeat(FAIL_WIDTH) + '┼' + '─'.repeat(FAIL_WIDTH);
     console.log(separator);
     
     const comparisonById = comparison 
-      ? new Map(comparison.lastRun.workflowMetrics.map(c => [c.workflowId, c]))
+      ? new Map(comparison.lastRun.toolMetrics.map(c => [c.toolId, c]))
       : undefined;
     
-    const sortedWorkflows = [...metrics.workflowMetrics].sort((a, b) => 
-      a.workflowName.localeCompare(b.workflowName)
+    const sortedTools = [...metrics.toolMetrics].sort((a, b) => 
+      a.toolName.localeCompare(b.toolName)
     );
     
-    for (let i = 0; i < sortedWorkflows.length; i++) {
-      const workflow = sortedWorkflows[i];
-      const workflowComparison = comparisonById?.get(workflow.workflowId);
-      this.printWorkflowRow(workflow, workflowComparison);
+    for (let i = 0; i < sortedTools.length; i++) {
+      const tool = sortedTools[i];
+      const toolComparison = comparisonById?.get(tool.toolId);
+      this.printToolRow(tool, toolComparison);
       
-      if (i < sortedWorkflows.length - 1) {
+      if (i < sortedTools.length - 1) {
         console.log(separator);
       }
     }
     
     console.log(separator);
-    console.log(`  Total: ${sortedWorkflows.length} workflows`);
-    console.log('  * Self-healing only runs for workflows that failed one-shot');
+    console.log(`  Total: ${sortedTools.length} tools`);
+    console.log('  * Self-healing only runs for tools that failed one-shot');
   }
 
-  private static printWorkflowRow(workflow: WorkflowMetrics, comparison?: WorkflowMetricsComparisonResult): void {
+  private static printToolRow(tool: ToolMetrics, comparison?: ToolMetricsComparisonResult): void {
     const NAME_WIDTH = 45;
     const COL_WIDTH = 10;
     const FAIL_WIDTH = 35;
-    const label = `${workflow.workflowName}`;
+    const label = `${tool.toolName}`;
     const paddedName = label.padEnd(NAME_WIDTH);
 
-    const oneShot = workflow.hadOneShotSuccess ? '✅' : (workflow.hasOneShotAttempts ? '❌' : ' ');
-    const heal = workflow.hadSelfHealingSuccess ? '✅' : (workflow.hasSelfHealingAttempts ? '❌' : ' ');
+    const oneShot = tool.hadOneShotSuccess ? '✅' : (tool.hasOneShotAttempts ? '❌' : ' ');
+    const heal = tool.hadSelfHealingSuccess ? '✅' : (tool.hasSelfHealingAttempts ? '❌' : ' ');
 
     const arrow = (d: -1 | 0 | 1) => d > 0 ? '↗' : d < 0 ? '↘' : '';
-    const oneShotDelta = comparison && comparison.oneShotSuccessChange !== 0 && workflow.hasOneShotAttempts ? `(${arrow(comparison.oneShotSuccessChange)})` : '';
-    const healDelta = comparison && comparison.selfHealingSuccessChange !== 0 && workflow.hasSelfHealingAttempts ? `(${arrow(comparison.selfHealingSuccessChange)})` : '';
+    const oneShotDelta = comparison && comparison.oneShotSuccessChange !== 0 && tool.hasOneShotAttempts ? `(${arrow(comparison.oneShotSuccessChange)})` : '';
+    const healDelta = comparison && comparison.selfHealingSuccessChange !== 0 && tool.hasSelfHealingAttempts ? `(${arrow(comparison.selfHealingSuccessChange)})` : '';
 
     // Emojis display as 2 chars wide in terminal, so pad less
     const oneShotText = `${oneShot}${oneShotDelta}`;
@@ -175,11 +175,11 @@ export class ConsoleReporter {
     const oneShotCol = oneShotText + ' '.repeat(Math.max(0, COL_WIDTH - oneShotVisualWidth));
     const healCol = healText + ' '.repeat(Math.max(0, COL_WIDTH - healVisualWidth));
 
-    const oneShotFailures = !workflow.hadOneShotSuccess && workflow.hasOneShotAttempts
-      ? this.formatFailureReasons(workflow.oneShotFailuresByReason)
+    const oneShotFailures = !tool.hadOneShotSuccess && tool.hasOneShotAttempts
+      ? this.formatFailureReasons(tool.oneShotFailuresByReason)
       : '';
-    const healingFailures = !workflow.hadSelfHealingSuccess && workflow.hasSelfHealingAttempts
-      ? this.formatFailureReasons(workflow.selfHealingFailuresByReason)
+    const healingFailures = !tool.hadSelfHealingSuccess && tool.hasSelfHealingAttempts
+      ? this.formatFailureReasons(tool.selfHealingFailuresByReason)
       : '';
 
     const oneShotFailsCol = oneShotFailures.padEnd(FAIL_WIDTH);

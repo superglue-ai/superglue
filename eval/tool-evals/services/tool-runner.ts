@@ -1,30 +1,30 @@
 import { Integration } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { DataStore } from "../../../packages/core/datastore/types.js";
-import { WorkflowAttempt, WorkflowConfig, TestSuiteSettings } from "../types.js";
-import { SuperglueWorkflowAttemptService } from "./workflow-attempt.js";
+import { ToolAttempt, ToolConfig, TestSuiteSettings } from "../types.js";
+import { SuperglueToolAttemptService } from "./tool-attempt.js";
 
 
-export class WorkflowRunnerService {
+export class ToolRunnerService {
     constructor(
         private datastore: DataStore,
         private metadata: Metadata
     ) {
     }
 
-    public async runWorkflows(workflows: WorkflowConfig[], integrations: Integration[], settings: TestSuiteSettings): Promise<WorkflowAttempt[]> {
-        const workflowAttemptService = new SuperglueWorkflowAttemptService(this.metadata, this.datastore);
+    public async runTools(tools: ToolConfig[], integrations: Integration[], settings: TestSuiteSettings): Promise<ToolAttempt[]> {
+        const toolAttemptService = new SuperglueToolAttemptService(this.metadata, this.datastore);
 
-        // Run all workflows in parallel, each with workflow-level batching
-        const workflowPromises = workflows.map(async (workflow) => {
-            const workflowsIntegrations = integrations.filter(i => workflow.integrationIds.includes(i.id));
-            const attempts: WorkflowAttempt[] = [];
+        // Run all tools in parallel, each with tool-level batching
+        const toolPromises = tools.map(async (tool) => {
+            const toolIntegrations = integrations.filter(i => tool.integrationIds.includes(i.id));
+            const attempts: ToolAttempt[] = [];
             
             if (settings.runOneShotMode) {
-                const oneShotPromises: Promise<WorkflowAttempt>[] = [];
+                const oneShotPromises: Promise<ToolAttempt>[] = [];
                 for (let i = 0; i < settings.attemptsEachMode; i++) {
                     oneShotPromises.push(
-                        workflowAttemptService.runWorkflowAttempt(workflow, workflowsIntegrations, false)
+                        toolAttemptService.runToolAttempt(tool, toolIntegrations, false)
                     );
                 }
                 
@@ -34,10 +34,10 @@ export class WorkflowRunnerService {
                 const hadOneShotSuccess = oneShotAttempts.some(a => a.buildSuccess && a.executionSuccess);
                 
                 if (settings.runSelfHealingMode && !hadOneShotSuccess) {
-                    const selfHealingPromises: Promise<WorkflowAttempt>[] = [];
+                    const selfHealingPromises: Promise<ToolAttempt>[] = [];
                     for (let i = 0; i < settings.attemptsEachMode; i++) {
                         selfHealingPromises.push(
-                            workflowAttemptService.runWorkflowAttempt(workflow, workflowsIntegrations, true)
+                            toolAttemptService.runToolAttempt(tool, toolIntegrations, true)
                         );
                     }
                     
@@ -46,10 +46,10 @@ export class WorkflowRunnerService {
                 }
             } else if (settings.runSelfHealingMode) {
                 // One-shot mode disabled, run self-healing mode only
-                const selfHealingPromises: Promise<WorkflowAttempt>[] = [];
+                const selfHealingPromises: Promise<ToolAttempt>[] = [];
                 for (let i = 0; i < settings.attemptsEachMode; i++) {
                     selfHealingPromises.push(
-                        workflowAttemptService.runWorkflowAttempt(workflow, workflowsIntegrations, true)
+                        toolAttemptService.runToolAttempt(tool, toolIntegrations, true)
                     );
                 }
                 
@@ -60,7 +60,7 @@ export class WorkflowRunnerService {
             return attempts;
         });
 
-        const allWorkflowAttempts = await Promise.all(workflowPromises);
-        return allWorkflowAttempts.flat();
+        const allToolAttempts = await Promise.all(toolPromises);
+        return allToolAttempts.flat();
     }
 }

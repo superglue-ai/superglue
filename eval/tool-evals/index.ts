@@ -5,7 +5,7 @@ import { join } from "path";
 import { dirname } from "path";
 import { fileURLToPath } from "node:url";
 import { IntegrationSetupService } from "./services/integration-setup.js";
-import { WorkflowRunnerService } from "./services/workflow-runner.js";
+import { ToolRunnerService } from "./services/tool-runner.js";
 import path from "node:path";
 import { config } from "dotenv";
 import { MetricsCalculator } from "./services/metrics-calculator.js";
@@ -36,16 +36,16 @@ async function main(): Promise<void> {
     const integrationSetupService = new IntegrationSetupService(store, config, metadata);
     const integrations = await integrationSetupService.setupIntegrations();
   
-    const enabledWorkflows = config.enabledWorkflows === 'all' ? config.workflows : config.workflows.filter(workflow => config.enabledWorkflows.includes(workflow.id));
+    const enabledTools = config.enabledTools === 'all' ? config.tools : config.tools.filter(tool => config.enabledTools.includes(tool.id));
 
-    const enabledWorkflowsCount = config.enabledWorkflows === 'all' ? config.workflows.length : config.enabledWorkflows.length;
-    logMessage("info", `Integrations setup: ${integrations.length}, Workflows: ${config.workflows.length}, Enabled workflows: ${enabledWorkflowsCount}`, metadata);
+    const enabledToolsCount = config.enabledTools === 'all' ? config.tools.length : config.enabledTools.length;
+    logMessage("info", `Integrations setup: ${integrations.length}, Tools: ${config.tools.length}, Enabled tools: ${enabledToolsCount}`, metadata);
 
-    const agentEvalRunner = new WorkflowRunnerService(store, metadata);
-    const workflowAttempts = await agentEvalRunner.runWorkflows(enabledWorkflows, integrations, config.settings);
+    const agentEvalRunner = new ToolRunnerService(store, metadata);
+    const toolAttempts = await agentEvalRunner.runTools(enabledTools, integrations, config.settings);
 
     const metricsCalculatorService = new MetricsCalculator();
-    const metrics = metricsCalculatorService.calculateMetrics(workflowAttempts);
+    const metrics = metricsCalculatorService.calculateMetrics(toolAttempts);
 
     const baseDir = dirname(fileURLToPath(import.meta.url));
     
@@ -58,16 +58,16 @@ async function main(): Promise<void> {
     csvReporter.report(timestamp, metrics);
     
     const markdownReporter = new MarkdownReporter(baseDir, metadata);
-    markdownReporter.report(timestamp, metrics, metricsComparison, workflowAttempts);
+    markdownReporter.report(timestamp, metrics, metricsComparison, toolAttempts);
     
     const jsonReporter = new JsonReporter(baseDir, metadata);
-    jsonReporter.reportAttempts(timestamp, workflowAttempts);
+    jsonReporter.reportAttempts(timestamp, toolAttempts);
 
     const duration = new Date().getTime() - startedAt.getTime();
     logMessage("info", `Agent Evaluation Completed in ${(duration / 1000).toFixed(1)}s`, metadata);
 
     await new Promise(resolve => setTimeout(resolve, 1000));
-    ConsoleReporter.report(metrics, metricsComparison, workflowAttempts);
+    ConsoleReporter.report(metrics, metricsComparison, toolAttempts);
   } catch (error) {
     const message = error instanceof Error ? error.stack || error.message : String(error);
     console.error("Agent Eval failed:", message);

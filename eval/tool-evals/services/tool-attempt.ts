@@ -1,6 +1,6 @@
 import { Integration, RequestOptions, SelfHealingMode, WorkflowResult } from "@superglue/client";
-import { WorkflowAttempt, WorkflowConfig, WorkflowFailureReason } from "../types.js";
-import { Metadata } from "@superglue/shared";
+import { ToolAttempt, ToolConfig, ToolFailureReason } from "../types.js";
+import { Metadata } from "@playwright/test";
 import { Workflow } from "@superglue/client";
 import { generateUniqueId } from "@superglue/shared/utils";
 import { IntegrationManager } from "../../../packages/core/integrations/integration-manager.js";
@@ -9,19 +9,19 @@ import { isDeepEqual } from "../utils/utils.js";
 import { WorkflowBuilder } from "../../../packages/core/build/workflow-builder.js";
 import { WorkflowExecutor } from "../../../packages/core/execute/workflow-executor.js";
 
-export class SuperglueWorkflowAttemptService {
+export class SuperglueToolAttemptService {
     constructor(
         private metadata: Metadata,
         private datastore: DataStore
     ) {}
 
-    public async runWorkflowAttempt(
-        workflowConfig: WorkflowConfig,
+    public async runToolAttempt(
+        toolConfig: ToolConfig,
         integrations: Integration[],
         selfHealingEnabled: boolean = true
-    ): Promise<WorkflowAttempt> {
-        const attempt: WorkflowAttempt = {
-            workflowConfig,
+    ): Promise<ToolAttempt> {
+        const attempt: ToolAttempt = {
+            toolConfig,
             selfHealingEnabled: selfHealingEnabled,
             buildTime: null,
             buildSuccess: false,
@@ -33,7 +33,7 @@ export class SuperglueWorkflowAttemptService {
         const buildStart = Date.now();
         let workflow: Workflow | undefined;
         try {
-            workflow = await this.buildWorkflow(workflowConfig, integrations);
+            workflow = await this.buildWorkflow(toolConfig, integrations);
 
             attempt.buildSuccess = true;
             attempt.workflow = workflow;
@@ -41,21 +41,21 @@ export class SuperglueWorkflowAttemptService {
         } catch (error) {
             attempt.buildTime = Date.now() - buildStart;
             attempt.buildError = error instanceof Error ? error.message : String(error);
-            attempt.failureReason = WorkflowFailureReason.BUILD;
+            attempt.failureReason = ToolFailureReason.BUILD;
 
             return attempt;
         }
 
         const execStart = Date.now();
         try {
-            const workflowResult = await this.executeWorkflow(workflowConfig, workflow, integrations, selfHealingEnabled);
+            const workflowResult = await this.executeWorkflow(toolConfig, workflow, integrations, selfHealingEnabled);
             attempt.executionTime = Date.now() - execStart;
 
-            if (workflowResult.success && !this.validateResult(workflowConfig, workflowResult)) {
+            if (workflowResult.success && !this.validateResult(toolConfig, workflowResult)) {
                 const truncatedResult = JSON.stringify(workflowResult.data).substring(0, 100);
                 attempt.executionSuccess = false;
                 attempt.executionError = `Data did not match manually defined expected data. Truncated data: ${truncatedResult}`;
-                attempt.failureReason = WorkflowFailureReason.STRICT_VALIDATION;
+                attempt.failureReason = ToolFailureReason.STRICT_VALIDATION;
                 attempt.result = workflowResult;
 
                 return attempt;
@@ -64,26 +64,26 @@ export class SuperglueWorkflowAttemptService {
             attempt.result = workflowResult;
             attempt.executionSuccess = workflowResult.success;
             attempt.executionError = this.determineErrorMessage(workflowResult);
-            attempt.failureReason = workflowResult.success ? undefined : WorkflowFailureReason.EXECUTION;
+            attempt.failureReason = workflowResult.success ? undefined : ToolFailureReason.EXECUTION;
 
             return attempt;
         } catch (error) {
             attempt.executionTime = Date.now() - execStart;
             attempt.executionError = error instanceof Error ? error.message : String(error);
-            attempt.failureReason = WorkflowFailureReason.EXECUTION;
+            attempt.failureReason = ToolFailureReason.EXECUTION;
             
             return attempt;
         }
     }
 
     private async buildWorkflow(
-        workflowConfig: WorkflowConfig,
+        toolConfig: ToolConfig,
         integrations: Integration[]
     ): Promise<Workflow> {
         const builder = new WorkflowBuilder(
-            workflowConfig.instruction,
+            toolConfig.instruction,
             integrations,
-            workflowConfig.payload || {},
+            toolConfig.payload || {},
             {},
             this.metadata
         );
@@ -102,7 +102,7 @@ export class SuperglueWorkflowAttemptService {
     }
 
     private async executeWorkflow(
-        workflowConfig: WorkflowConfig,
+        toolConfig: ToolConfig,
         workflow: Workflow,
         integrations: Integration[],
         selfHealingEnabled: boolean
@@ -130,7 +130,7 @@ export class SuperglueWorkflowAttemptService {
         );
 
         const workflowResult = await executor.execute(
-            workflowConfig.payload || {},
+            toolConfig.payload || {},
             allCredentials,
             {
                 selfHealing: selfHealingEnabled ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED
@@ -140,17 +140,17 @@ export class SuperglueWorkflowAttemptService {
         return workflowResult;
     }
 
-    private validateResult(workflowConfig: WorkflowConfig, workflowResult: WorkflowResult): boolean {
-        if (!workflowConfig.expectedData || Object.keys(workflowConfig.expectedData).length === 0) { // empty object evaluates to valid
+    private validateResult(toolConfig: ToolConfig, workflowResult: WorkflowResult): boolean {
+        if (!toolConfig.expectedData || Object.keys(toolConfig.expectedData).length === 0) { // empty object evaluates to valid
             return true;
         }
 
-        if (typeof workflowConfig.expectedData === 'string') {
-            return workflowResult.data === workflowConfig.expectedData;
+        if (typeof toolConfig.expectedData === 'string') {
+            return workflowResult.data === toolConfig.expectedData;
         }
 
-        if (typeof workflowConfig.expectedData === 'object') {
-            return isDeepEqual(workflowConfig.expectedData, workflowResult.data, workflowConfig.allowAdditionalProperties ?? false);
+        if (typeof toolConfig.expectedData === 'object') {
+            return isDeepEqual(toolConfig.expectedData, workflowResult.data, toolConfig.allowAdditionalProperties ?? false);
         }
 
         return false;

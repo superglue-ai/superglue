@@ -16,7 +16,7 @@ const IntegrationConfigSchema = z.object({
     keywords: z.array(z.string()),
 });
 
-const WorkflowConfigSchema = z.object({
+const ToolConfigSchema = z.object({
     id: z.string(),
     name: z.string(),
     type: z.enum(['retrieval', 'action', 'upsert']),
@@ -35,8 +35,8 @@ const TestSuiteSettingsSchema = z.object({
 
 const AgentEvalConfigSchema = z.object({
     integrations: z.array(IntegrationConfigSchema).min(1),
-    workflows: z.array(WorkflowConfigSchema).min(1),
-    enabledWorkflows: z.union([z.literal('all'), z.array(z.string()).min(1)]),
+    tools: z.array(ToolConfigSchema).min(1),
+    enabledTools: z.union([z.literal('all'), z.array(z.string()).min(1)]),
     settings: TestSuiteSettingsSchema,
 });
 
@@ -80,8 +80,8 @@ export async function loadConfig(): Promise<AgentEvalConfig> {
 function validateIntegrationIds(config: z.infer<typeof AgentEvalConfigSchema>): void {
     const integrationIds = new Set(config.integrations.map(i => i.id));
     
-    for (const workflow of config.workflows) {
-        const invalidIds = workflow.integrationIds.filter(id => !integrationIds.has(id));
+    for (const tool of config.tools) {
+        const invalidIds = tool.integrationIds.filter(id => !integrationIds.has(id));
         if (invalidIds.length > 0) {
             throw new Error(`Invalid integration IDs: ${invalidIds.join(", ")}`);
         }
@@ -89,16 +89,16 @@ function validateIntegrationIds(config: z.infer<typeof AgentEvalConfigSchema>): 
 }
 
 function validateEnabledWorkflows(config: AgentEvalConfig): void {
-    if (config.enabledWorkflows === 'all') {
+    if (config.enabledTools === 'all') {
         return;
     }
     
-    const enabledWorkflows = new Set(config.enabledWorkflows);
-    const workflows = new Set(config.workflows.map(w => w.id));
+    const enabledTools = new Set(config.enabledTools);
+    const tools = new Set(config.tools.map(t => t.id));
 
-    for (const workflow of enabledWorkflows) {
-        if (!workflows.has(workflow)) {
-            throw new Error(`Invalid enabled workflow: ${workflow}`);
+    for (const tool of enabledTools) {
+        if (!tools.has(tool)) {
+            throw new Error(`Invalid enabled tool: ${tool}`);
         }
     }
 }
