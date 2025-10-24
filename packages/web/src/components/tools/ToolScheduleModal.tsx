@@ -359,7 +359,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                   <button
                     type="button"
                     onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="flex items-center gap-2 text-sm text-muted-foreground"
                   >
                     <ChevronRight className={cn("h-4 w-4 transition-transform", showAdvanced && "rotate-90")} />
                     <span>Advanced Options</span>
@@ -439,7 +439,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                 <Button variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button onClick={handleSubmit} disabled={!isJsonValid || isSubmitting || !isCustomCronValid}>
+                <Button onClick={handleSubmit} disabled={!isJsonValid || isSubmitting || !isCustomCronValid || (scheduleSelectedItem === 'custom' && customCronExpression.trim() === '')}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {schedule ? "Save Changes" : "Add Schedule"}
                 </Button>

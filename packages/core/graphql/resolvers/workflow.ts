@@ -139,7 +139,7 @@ export const executeWorkflowResolver = async (
 
     // Notify webhook if configured (fire-and-forget)
     if (args.options?.webhookUrl) {
-      notifyWebhook(args.options.webhookUrl, runId, true, result.data);
+      notifyWebhook(args.options.webhookUrl, runId, result.success, result.data, result.error);
     }
 
     return result;
