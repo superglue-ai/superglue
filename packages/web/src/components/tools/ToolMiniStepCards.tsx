@@ -8,7 +8,7 @@ import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE, type UploadedFileI
 import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon, getSimpleIcon, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { Integration } from '@superglue/client';
 import { inferJsonSchema } from '@superglue/shared';
-import { Check, Code2, Copy, Download, Eye, FileJson, Globe, Package, Play, RotateCw, Settings, Upload, X } from 'lucide-react';
+import { Check, Code2, Copy, Download, Eye, File, FileCode, FileJson, FileSpreadsheet, Globe, Package, Play, RotateCw, Settings, Upload, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-json';
@@ -262,23 +262,16 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
     );
 };
 
-// File type colors and icons
-const getFileTypeInfo = (filename: string): { color: string; bgColor: string; icon: string } => {
+// File type icon helper
+const getFileIcon = (filename: string) => {
     const ext = filename.toLowerCase().split('.').pop() || '';
     switch (ext) {
-        case 'json':
-            return { color: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-950/30', icon: '{}' };
-        case 'csv':
-            return { color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-50 dark:bg-green-950/30', icon: '▤' };
-        case 'xml':
-            return { color: 'text-orange-600 dark:text-orange-400', bgColor: 'bg-orange-50 dark:bg-orange-950/30', icon: '<>' };
+        case 'json': return FileJson;
+        case 'csv': return FileSpreadsheet;
+        case 'xml': return FileCode;
         case 'xlsx':
-        case 'xls':
-            return { color: 'text-emerald-600 dark:text-emerald-400', bgColor: 'bg-emerald-50 dark:bg-emerald-950/30', icon: '⊞' };
-        case 'txt':
-            return { color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-950/30', icon: '≡' };
-        default:
-            return { color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-950/30', icon: '📄' };
+        case 'xls': return FileSpreadsheet;
+        default: return File;
     }
 };
 
@@ -388,23 +381,21 @@ export const PayloadSpotlight = ({
                     {!readOnly && onFilesUpload && uploadedFiles.length > 0 && (
                         <div className="space-y-1.5">
                             {uploadedFiles.map(file => {
-                                const fileInfo = getFileTypeInfo(file.name);
+                                const FileIcon = getFileIcon(file.name);
                                 return (
                                     <div
                                         key={file.key}
                                         className={cn(
-                                            "flex items-center justify-between px-3 py-2 rounded-md transition-all",
+                                            "flex items-center justify-between px-3 py-2 rounded-md transition-all border",
                                             file.status === 'error'
-                                                ? "bg-destructive/10 border border-destructive/20"
+                                                ? "bg-destructive/10 border-destructive/20"
                                                 : file.status === 'processing'
-                                                    ? "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800"
-                                                    : `${fileInfo.bgColor} border border-border/50`
+                                                    ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
+                                                    : "bg-muted/30 border-border"
                                         )}
                                     >
                                         <div className="flex items-center gap-2 min-w-0">
-                                            <span className={cn("font-mono text-sm", fileInfo.color)}>
-                                                {fileInfo.icon}
-                                            </span>
+                                            <FileIcon className="h-4 w-4 text-gray-700 dark:text-gray-400" />
                                             <div className="flex flex-col min-w-0">
                                                 <span className="text-xs font-medium truncate" title={file.name}>
                                                     {file.name}
@@ -414,7 +405,7 @@ export const PayloadSpotlight = ({
                                                         ? 'Parsing...'
                                                         : file.status === 'error'
                                                             ? file.error || 'Failed to parse'
-                                                            : `${formatBytes(file.size)} • Key: ${file.key}`}
+                                                            : `${formatBytes(file.size)}`}
                                                 </span>
                                             </div>
                                         </div>
