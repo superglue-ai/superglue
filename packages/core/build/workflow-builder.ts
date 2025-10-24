@@ -1,13 +1,11 @@
 import { Integration, Workflow } from "@superglue/client";
-import { Metadata, toJsonSchema } from "@superglue/shared";
+import { Metadata, toJsonSchema, convertRequiredToArray } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { getWorkflowBuilderContext } from "../context/context-builders.js";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { executeTool } from "../execute/tools.js";
 import { LLMMessage } from "../llm/language-model.js";
 import { logMessage } from "../utils/logs.js";
-
-type ChatMessage = LLMMessage;
 
 export class WorkflowBuilder {
   private integrations: Record<string, Integration>;
@@ -36,20 +34,21 @@ export class WorkflowBuilder {
       const credentials = Object.values(integrations).reduce((acc, int) => {
         return { ...acc, ...Object.entries(int.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${int.id}_${name}`]: value }), {}) };
       }, {});
-      this.inputSchema = toJsonSchema(
+      const rawSchema = toJsonSchema(
         {
           payload: this.initialPayload,
           credentials: credentials
         },
-        { arrays: { mode: 'all' }, }
-      ) as unknown as JSONSchema;
+        { arrays: { mode: 'all' }, required: true }
+      );
+      this.inputSchema = convertRequiredToArray(rawSchema) as JSONSchema;
     } catch (error) {
       logMessage('error', `Error during payload parsing: ${error}`, this.metadata);
       throw new Error(`Error during payload parsing: ${error}`);
     }
   }
 
-  private prepareBuildingContext(): ChatMessage[] {
+  private prepareBuildingContext(): LLMMessage[] {
     const buildingPromptForAgent = getWorkflowBuilderContext({
       integrations: Object.values(this.integrations),
       payload: this.initialPayload,
@@ -162,7 +161,7 @@ export class WorkflowBuilder {
           messages.push({
             role: "user",
             content: `The previous workflow build attempt failed with the following error:\n\n${error.message}\n\nPlease fix these issues and generate a valid workflow.`
-          } as ChatMessage);
+          } as LLMMessage);
         }
 
         retryCount++;

@@ -1,10 +1,6 @@
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
-import { Input } from '@/src/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { Label } from '@/src/components/ui/label';
-import { Switch } from '@/src/components/ui/switch';
 import { Badge } from '@/src/components/ui/badge';
 import { canExecuteStep } from '@/src/lib/client-utils';
 import { downloadJson } from '@/src/lib/download-utils';
@@ -61,6 +57,8 @@ interface ToolStepGalleryProps {
     totalFileSize?: number;
     filePayloads?: Record<string, any>;
     stepSelfHealingEnabled?: boolean;
+    isPayloadValid?: boolean;
+    extractPayloadSchema?: (schema: string | null) => any | null;
 }
 
 const SpotlightStepCard = ({
@@ -82,7 +80,6 @@ const SpotlightStepCard = ({
     failedSteps = [],
     showOutputSignal,
     onConfigEditingChange,
-    selfHealingEnabled,
 }: {
     step: any;
     stepIndex: number;
@@ -103,7 +100,6 @@ const SpotlightStepCard = ({
     stepResultsMap?: Record<string, any>;
     showOutputSignal?: number;
     onConfigEditingChange?: (editing: boolean) => void;
-    selfHealingEnabled?: boolean;
 }) => {
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
@@ -446,7 +442,9 @@ export function ToolStepGallery({
     isProcessingFiles,
     totalFileSize,
     filePayloads,
-    stepSelfHealingEnabled
+    stepSelfHealingEnabled,
+    isPayloadValid = true,
+    extractPayloadSchema
 }: ToolStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
     const [windowWidth, setWindowWidth] = useState(1200);
@@ -721,7 +719,7 @@ export function ToolStepGallery({
     };
 
     useEffect(() => {
-        setActiveIndex(steps.length > 0 ? 1 : 0);
+        setActiveIndex(steps.length > 0 && isPayloadValid ? 1 : 0);
     }, []);
 
     // Keyboard navigation with arrow keys
@@ -841,7 +839,10 @@ export function ToolStepGallery({
                             size="icon"
                             onClick={() => handleNavigation('prev')}
                             disabled={activeIndex === 0}
-                            className="shrink-0 h-9 w-9"
+                            className={cn(
+                                "shrink-0 h-9 w-9",
+                                hiddenLeftCount > 0 && !isPayloadValid && "ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30 animate-pulse"
+                            )}
                             title="Previous"
                         >
                             <ChevronLeft className="h-4 w-4" />
@@ -849,7 +850,10 @@ export function ToolStepGallery({
                         {hiddenLeftCount > 0 && (
                             <Badge 
                                 variant="default" 
-                                className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center bg-primary text-primary-foreground"
+                                className={cn(
+                                    "absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center",
+                                    !isPayloadValid ? "bg-amber-500 text-white" : "bg-primary text-primary-foreground"
+                                )}
                             >
                                 {hiddenLeftCount}
                             </Badge>
@@ -947,7 +951,7 @@ export function ToolStepGallery({
                                                                 isTransform={item.type === 'transform'}
                                                                 isRunningAll={isExecuting && currentExecutingStepIndex === (globalIdx - 1)}
                                                                 isTesting={
-                                                                    item.type === 'step' ? isExecutingStep === (globalIdx - 1) :
+                                                                    item.type === 'step' ? (isExecutingStep === (globalIdx - 1) || isFixingWorkflow === (globalIdx - 1)) :
                                                                         item.type === 'transform' ? isExecutingTransform :
                                                                             false
                                                                 }
@@ -957,6 +961,8 @@ export function ToolStepGallery({
                                                                 isLastCard={globalIdx === totalCards - 1}
                                                                 integrations={integrations}
                                                                 hasTransformCompleted={hasTransformCompleted}
+                                                                isPayloadValid={isPayloadValid}
+                                                                payloadData={item.type === 'payload' ? workingPayload : undefined}
                                                             />
                                                         </div>
                                                         {showArrow && (
@@ -1047,6 +1053,7 @@ export function ToolStepGallery({
                                 onFileRemove={onFileRemove}
                                 isProcessingFiles={isProcessingFiles}
                                 totalFileSize={totalFileSize}
+                                extractPayloadSchema={extractPayloadSchema}
                             />
                         ) : currentItem.type === 'transform' ? (
                             <FinalTransformMiniStepCard
@@ -1072,7 +1079,7 @@ export function ToolStepGallery({
                                 onRemove={!readOnly && currentItem.type === 'step' ? handleRemoveStep : undefined}
                                 onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
                                 onFixStep={onFixStep ? () => onFixStep(activeIndex - 1) : undefined}
-                                canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
+                                canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap) && (activeIndex !== 1 || isPayloadValid)}
                                 isExecuting={isExecutingStep === activeIndex - 1}
                                 isFixingWorkflow={isFixingWorkflow === activeIndex - 1}
                                 isGlobalExecuting={!!(isExecuting || isExecutingTransform)}
@@ -1082,7 +1089,6 @@ export function ToolStepGallery({
                                 failedSteps={failedSteps}
                                 showOutputSignal={showStepOutputSignal}
                                 onConfigEditingChange={setIsConfiguratorEditing}
-                                selfHealingEnabled={stepSelfHealingEnabled}
                             />
                         )
                     )}

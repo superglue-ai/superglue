@@ -5,7 +5,7 @@ import { executeFinalTransform, executeSingleStep, executeToolStepByStep, genera
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput } from "@/src/lib/utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
-import { Loader2, Play, X } from "lucide-react";
+import { Check, Loader2, Play, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -13,6 +13,7 @@ import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { ToolStepGallery } from "./ToolStepGallery";
+import { Validator } from "jsonschema";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -108,6 +109,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   }, [initialPayload]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [justPublished, setJustPublished] = useState(false);
   const [result, setResult] = useState<ToolResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
@@ -137,6 +139,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [isStopping, setIsStopping] = useState(false);
   // Single source of truth for stopping across modes (embedded/standalone)
   const stopSignalRef = useRef<boolean>(false);
+  const [isPayloadValid, setIsPayloadValid] = useState<boolean>(true);
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (externalSelfHealingEnabled !== undefined) {
@@ -197,6 +201,60 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     endpoint: config.superglueEndpoint,
     apiKey: config.superglueApiKey,
   }), [config.superglueEndpoint, config.superglueApiKey]);
+
+  // Extract payload schema from full input schema
+  const extractPayloadSchema = (fullInputSchema: string | null): any | null => {
+    if (!fullInputSchema || fullInputSchema.trim() === '') {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(fullInputSchema);
+      if (parsed && typeof parsed === 'object' && parsed.properties && parsed.properties.payload) {
+        return parsed.properties.payload;
+      }
+      return parsed;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  // Validate payload against extracted schema
+  const validatePayload = (payloadText: string, schemaText: string | null): boolean => {
+    const payloadSchema = extractPayloadSchema(schemaText);
+    
+    // If schema is null/disabled, payload is always valid
+    if (!payloadSchema) {
+      return true;
+    }
+
+    try {
+      const payloadData = JSON.parse(payloadText || '{}');
+      const validator = new Validator();
+      const result = validator.validate(payloadData, payloadSchema);
+      return result.valid;
+    } catch (e) {
+      // Invalid JSON or validation error - consider invalid
+      return false;
+    }
+  };
+
+  // Debounced validation effect
+  useEffect(() => {
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current);
+    }
+
+    validationTimeoutRef.current = setTimeout(() => {
+      const isValid = validatePayload(payload, inputSchema);
+      setIsPayloadValid(isValid);
+    }, 300);
+
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+    };
+  }, [payload, inputSchema]);
 
   // Unified file upload handlers
   const handleFilesUpload = async (files: File[]) => {
@@ -456,6 +514,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         }
         setToolId(savedTool.id);
       }
+
+      setJustPublished(true);
+      setTimeout(() => setJustPublished(false), 3000);
     } catch (error: any) {
       console.error("Error saving tool:", error);
       toast({
@@ -843,7 +904,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         <Button
           variant="success"
           onClick={() => executeTool()}
-          disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
+          disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform || !isPayloadValid}
           className="h-9 px-4"
         >
           <Play className="h-4 w-4 fill-current" strokeWidth="3px" strokeLinejoin="round" strokeLinecap="round" />
@@ -856,7 +917,12 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         disabled={saving || loading}
         className="h-9 px-5 shadow-md border border-primary/40"
       >
-        {saving ? "Publishing..." : "Publish"}
+        {saving ? "Publishing..." : justPublished ? (
+          <>
+            <Check className="mr-1 h-3.5 w-3.5" />
+            Published
+          </>
+        ) : "Publish"}
       </Button>
     </div>
   );
@@ -932,6 +998,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   totalFileSize={totalFileSize}
                   filePayloads={filePayloads}
                   stepSelfHealingEnabled={selfHealingEnabled}
+                  isPayloadValid={isPayloadValid}
+                  extractPayloadSchema={extractPayloadSchema}
                 />
               )}
             </div>

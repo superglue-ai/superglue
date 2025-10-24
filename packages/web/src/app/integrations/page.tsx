@@ -75,12 +75,16 @@ export default function IntegrationsPage() {
     const { toast } = useToast();
     const searchParams = useSearchParams();
     const router = useRouter();
-    const { integrations, pendingDocIds, loading: initialLoading, refreshIntegrations, setPendingDocIds } = useIntegrations();
+    const { integrations, pendingDocIds, loading: initialLoading, isRefreshing, refreshIntegrations, setPendingDocIds } = useIntegrations();
 
     const client = useMemo(() => new SuperglueClient({
         endpoint: config.superglueEndpoint,
         apiKey: config.superglueApiKey,
     }), [config.superglueEndpoint, config.superglueApiKey]);
+
+    useEffect(() => {
+        refreshIntegrations();
+    }, [refreshIntegrations]);
 
     useEffect(() => {
         const success = searchParams.get('success');
@@ -150,8 +154,6 @@ export default function IntegrationsPage() {
 
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [integrationToDelete, setIntegrationToDelete] = useState<Integration | null>(null);
-
-    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const handleDelete = async (id: string) => {
         try {
@@ -373,9 +375,7 @@ export default function IntegrationsPage() {
 
 
     const handleRefresh = async () => {
-        setIsRefreshing(true);
         await refreshIntegrations();
-        setIsRefreshing(false);
     };
 
     const blockAllContent = initialLoading && !addFormOpen;

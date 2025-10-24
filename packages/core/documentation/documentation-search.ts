@@ -41,7 +41,7 @@ export class DocumentationSearch {
     openApiSchema: string = ''
   ): string {
     if ((!documentation || documentation.length === 0) && !openApiSchema) {
-      logMessage('warn', 'Cannot extract relevant sections: No documentation or openApiSchema provided', this.metadata);
+      // logMessage('warn', 'Cannot extract relevant sections: No documentation or openApiSchema provided', this.metadata);
       return '';
     }
 

@@ -9,7 +9,7 @@ import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimple
 import { Integration, IntegrationInput, SuperglueClient, Workflow as Tool, UpsertMode } from '@superglue/client';
 import { integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { ArrowRight, Check, Clock, Globe, Key, Loader2, Pencil, Plus, X } from 'lucide-react';
+import { ArrowRight, Check, Clock, File, FileCode, FileJson, FileSpreadsheet, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Upload, Wrench, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -18,15 +18,17 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
+import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
 import { DocStatus } from '../utils/DocStatusSpinner';
 import { HelpTooltip } from '../utils/HelpTooltip';
+import JsonSchemaEditor from '../utils/JsonSchemaEditor';
 import { StepIndicator, TOOL_CREATE_STEPS } from '../utils/StepIndicator';
 import { ToolCreateSuccess } from './ToolCreateSuccess';
 import { PayloadSpotlight } from './ToolMiniStepCards';
 import ToolPlayground, { ToolPlaygroundHandle } from './ToolPlayground';
 
-type ToolCreateStep = 'integrations' | 'prompt' | 'review' | 'success';
+type ToolCreateStep = 'integrations' | 'build' | 'run' | 'publish';
 
 interface ToolCreateStepperProps {
   onComplete?: () => void;
@@ -101,6 +103,16 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
+  // New state for redesigned prompt step
+  const [showPayloadSection, setShowPayloadSection] = useState(false);
+  const [showFileUploadSection, setShowFileUploadSection] = useState(false);
+  const [showResponseSchemaSection, setShowResponseSchemaSection] = useState(false);
+  const [responseSchema, setResponseSchema] = useState('');
+  const [inputSchema, setInputSchema] = useState<string | null>(null);
+  const [enforceInputSchema, setEnforceInputSchema] = useState(true);
+  const [inputSchemaMode, setInputSchemaMode] = useState<'current' | 'custom'>('current');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const client = useMemo(() => new ExtendedSuperglueClient({
     endpoint: superglueConfig.superglueEndpoint,
     apiKey: superglueConfig.superglueApiKey,
@@ -126,14 +138,26 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
 
 
   useEffect(() => {
-    if (step === 'prompt') {
+    if (step === 'build') {
       setCurrentTool(null);
+      // Lazy load suggestions when entering prompt step
+      if (selectedIntegrationIds.length > 0) {
+        handleGenerateInstructions();
+      }
     }
 
-    if (step !== 'prompt') {
+    if (step !== 'build') {
       setValidationErrors({});
     }
   }, [step]);
+
+  // Regenerate suggestions when selected integrations change
+  useEffect(() => {
+    if (step === 'build' && selectedIntegrationIds.length > 0) {
+      setSuggestions([]); // Clear old suggestions first
+      handleGenerateInstructions();
+    }
+  }, [selectedIntegrationIds, step]);
 
   const highlightJson = (code: string) => {
     return Prism.highlight(code, Prism.languages.json, 'json');
@@ -203,7 +227,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
       });
 
       setCurrentTool(saved);
-      setStep('success');
+      setStep('publish');
     } catch (e: any) {
       toast({
         title: 'Error publishing tool',
@@ -238,65 +262,9 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
   };
 
   const handleNext = async () => {
-    const steps: ToolCreateStep[] = ['integrations', 'prompt', 'review', 'success'];
-    const currentIndex = steps.indexOf(step);
-
     if (step === 'integrations') {
-
-      if (selectedIntegrationIds.length > 0) {
-        setIsGeneratingSuggestions(true);
-        try {
-          await handleGenerateInstructions();
-        } finally {
-          setIsGeneratingSuggestions(false);
-        }
-      }
-      setStep(steps[currentIndex + 1]);
-    } else if (step === 'prompt') {
-      const errors: Record<string, boolean> = {};
-      if (!instruction.trim()) errors.instruction = true;
-      try {
-        JSON.parse(payload || '{}');
-      } catch {
-        errors.payload = true;
-      }
-
-      setValidationErrors(errors);
-
-      if (Object.keys(errors).length > 0) {
-        toast({
-          title: 'Validation Error',
-          description: 'Please fix the errors below before continuing.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      setIsBuilding(true);
-      try {
-        const parsedPayload = JSON.parse(payload || '{}');
-        const effectivePayload = { ...parsedPayload, ...filePayloads };
-        const response = await client.buildWorkflow({
-          instruction: instruction,
-          payload: effectivePayload,
-          integrationIds: selectedIntegrationIds,
-          save: false
-        });
-        if (!response) {
-          throw new Error('Failed to build tool');
-        }
-        setCurrentTool(response);
-        setStep(steps[currentIndex + 1]);
-      } catch (error: any) {
-        console.error('Error building tool:', error);
-        toast({
-          title: 'Error Building Tool',
-          description: error.message,
-          variant: 'destructive',
-        });
-      } finally {
-        setIsBuilding(false);
-      }
-    } else if (step === 'success') {
+      setStep('build');
+    } else if (step === 'publish') {
       if (onComplete) {
         onComplete();
       } else {
@@ -306,7 +274,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
   };
 
   const handleBack = () => {
-    const steps: ToolCreateStep[] = ['integrations', 'prompt', 'review', 'success'];
+    const steps: ToolCreateStep[] = ['integrations', 'build', 'run', 'publish'];
     const currentIndex = steps.indexOf(step);
     if (step === 'integrations') {
       router.push('/configs');
@@ -357,7 +325,6 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
         });
         setSuggestions([]);
       }
-      
     } catch (error: any) {
       toast({
         title: 'Error Generating Suggestions',
@@ -459,12 +426,72 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
     setTotalFileSize(prev => Math.max(0, prev - fileToRemove.size));
   };
 
+  const handleSendPrompt = async () => {
+    const errors: Record<string, boolean> = {};
+    if (!instruction.trim()) errors.instruction = true;
+    try {
+      JSON.parse(payload || '{}');
+    } catch {
+      errors.payload = true;
+    }
+
+    setValidationErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please fix the errors below before continuing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsBuilding(true);
+    try {
+      const parsedPayload = JSON.parse(payload || '{}');
+      const effectivePayload = { ...parsedPayload, ...filePayloads };
+      const response = await client.buildWorkflow({
+        instruction: instruction,
+        payload: effectivePayload,
+        integrationIds: selectedIntegrationIds,
+        responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
+        save: false
+      });
+      if (!response) {
+        throw new Error('Failed to build tool');
+      }
+      setCurrentTool(response);
+      setStep('run');
+    } catch (error: any) {
+      console.error('Error building tool:', error);
+      toast({
+        title: 'Error Building Tool',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBuilding(false);
+    }
+  };
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInstruction(e.target.value);
+    if (e.target.value.trim()) {
+      setValidationErrors(prev => ({ ...prev, instruction: false }));
+    }
+    
+    // Auto-expand textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full p-6">
       <div className="flex-none mb-4">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
           <h1 className="text-2xl font-semibold">
-            {step === 'success' ? 'Tool Created!' : 'Create New Tool'}
+            {step === 'publish' ? 'Tool Created!' : 'Create New Tool'}
           </h1>
           <div className="flex items-center gap-2">
             <Button
@@ -483,7 +510,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="overflow-y-auto px-1 min-h-0">
+        <div className="overflow-y-auto px-1 min-h-0" style={{ scrollbarGutter: 'stable' }}>
           {step === 'integrations' && (
             <div className="space-y-4">
               <div className="mb-4 flex items-center justify-between gap-4">
@@ -775,87 +802,373 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
             </div>
           )}
 
-          {step === 'prompt' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="instruction">Tool Instruction*</Label>
-                <HelpTooltip text="Describe what you want this tool to achieve using the integrations you defined. Be specific!" />
-                <div className="relative">
+          {/* NEW REDESIGNED PROMPT STEP */}
+          {step === 'build' && (
+            <div className="flex items-start justify-center pt-8">
+              <div className="w-full max-w-3xl mx-auto space-y-4">
+                <div className="text-center mb-4">
+                  <h2 className="text-xl font-medium text-foreground">
+                    What should your tool do for you?
+                  </h2>
+                </div>
+
+                {/* Chat-like instruction input with send button and settings */}
+                <div className="relative border rounded-2xl bg-card p-4">
                   <Textarea
+                    ref={textareaRef}
                     id="instruction"
                     value={instruction}
-                    onChange={(e) => {
-                      setInstruction(e.target.value);
-                      if (e.target.value.trim()) {
-                        setValidationErrors(prev => ({ ...prev, instruction: false }));
-                      }
+                    onChange={handleTextareaChange}
+                    placeholder="Describe what you want this tool to achieve..."
+                    className={cn(
+                      "resize-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 scrollbar-thin scrollbar-thumb-rounded min-h-[80px]",
+                      validationErrors.instruction && inputErrorStyles
+                    )}
+                    rows={1}
+                    style={{ 
+                      maxHeight: '200px', 
+                      overflowY: instruction.split('\n').length > 8 ? 'auto' : 'hidden',
+                      scrollbarGutter: 'stable'
                     }}
-                    placeholder="e.g., 'Fetch customer details from CRM using the input email, then get their recent orders from productApi.'"
-                    className={cn("min-h-64", validationErrors.instruction && inputErrorStyles)}
                   />
-                  {suggestions.length > 0 && !instruction && (
-                    <div className="absolute bottom-0 p-3 pointer-events-none w-full">
-                      <div className="flex gap-2 overflow-x-auto whitespace-nowrap w-full pointer-events-auto">
-                        {suggestions.map((suggestion, index) => (
-                          <Button
-                            key={index}
-                            variant="outline"
-                            className="text-sm py-2 px-4 h-auto font-normal bg-background/80 hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 pointer-events-auto"
-                            onClick={() => setInstruction(suggestion)}
-                          >
-                            <ArrowRight className="h-3 w-3" />
-                            {suggestion}
-                          </Button>
-                        ))}
-                      </div>
+
+                  {/* Settings buttons on left, send button on right */}
+                  <div className="flex justify-between items-center gap-2 mt-3">
+                    <div className="flex gap-2">
+                      <button
+                      onClick={() => {
+                        if (showFileUploadSection) setShowFileUploadSection(false);
+                        if (showResponseSchemaSection) setShowResponseSchemaSection(false);
+                        setShowPayloadSection(!showPayloadSection);
+                        if (!showPayloadSection && payload.trim() === '') {
+                          setPayload('{}');
+                          setValidationErrors(prev => ({ ...prev, payload: false }));
+                        }
+                      }}
+                      className={cn(
+                        "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
+                        (() => {
+                          const trimmedPayload = payload.trim();
+                          const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
+                          
+                          if (isEmptyPayload) {
+                            return "border border-border text-muted-foreground hover:bg-accent/50";
+                          }
+                          
+                          // Check if JSON is valid
+                          try {
+                            JSON.parse(trimmedPayload);
+                            // Valid JSON - filled
+                            return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
+                          } catch {
+                            // Invalid JSON - same styling as filled
+                            return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
+                          }
+                        })()
+                      )}
+                    >
+                      <FileJson className="h-4 w-4" />
+                      {(() => {
+                        const trimmedPayload = payload.trim();
+                        const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
+                        
+                        if (isEmptyPayload) {
+                          return 'Attach JSON Tool Input';
+                        }
+                        
+                        try {
+                          JSON.parse(trimmedPayload);
+                          return 'JSON Tool Input Attached';
+                        } catch {
+                          return 'Invalid Input JSON';
+                        }
+                      })()}
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        if (showPayloadSection) setShowPayloadSection(false);
+                        if (!showPayloadSection && payload.trim() === '') {
+                          setPayload('{}');
+                          setValidationErrors(prev => ({ ...prev, payload: false }));
+                        }
+                        if (showResponseSchemaSection) setShowResponseSchemaSection(false);
+                        setShowFileUploadSection(!showFileUploadSection);
+                      }}
+                      className={cn(
+                        "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
+                        uploadedFiles.length > 0
+                          ? "bg-[#FFD700]/40 border border-[#FFA500] text-foreground"
+                          : "border border-border text-muted-foreground hover:bg-accent/50"
+                      )}
+                    >
+                      <Paperclip className="h-4 w-4" />
+                      {uploadedFiles.length > 0 ? `File Tool Input Attached (${uploadedFiles.length})` : 'Attach File Tool Input'}
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        if (showPayloadSection) setShowPayloadSection(false);
+                        if (!showPayloadSection && payload.trim() === '') {
+                          setPayload('{}');
+                          setValidationErrors(prev => ({ ...prev, payload: false }));
+                        }
+                        if (showFileUploadSection) setShowFileUploadSection(false);
+                        setShowResponseSchemaSection(!showResponseSchemaSection);
+                      }}
+                      className={cn(
+                        "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
+                        responseSchema 
+                          ? "bg-[#FFD700]/40 border border-[#FFA500] text-foreground" 
+                          : "border border-border text-muted-foreground hover:bg-accent/50"
+                      )}
+                    >
+                      <FileWarning className="h-4 w-4" />
+                      {responseSchema ? 'Tool Result Schema Defined' : 'Enforce Tool Result Schema'}
+                    </button>
                     </div>
-                  )}
+
+                    {/* Build button on the right */}
+                    <Button
+                      onClick={handleSendPrompt}
+                      disabled={isBuilding || !instruction.trim()}
+                      className="h-8 px-4 rounded-full flex-shrink-0 flex items-center gap-2"
+                      title="Build Tool"
+                    >
+                      {isBuilding ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Building...
+                        </>
+                      ) : (
+                        <>
+                          <Wrench className="h-4 w-4" />
+                          Build
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
                 {validationErrors.instruction && (
-                  <p className="text-sm text-destructive mt-1">Tool instruction is required</p>
+                  <p className="text-sm text-destructive text-center mt-2">Tool instruction is required</p>
                 )}
-              </div>
 
-              {isGeneratingSuggestions && (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              )}
+                {/* Expanded sections - show below buttons */}
+                {showPayloadSection && (
+                  <div className="space-y-3 border rounded-lg p-4 bg-card animate-fade-in mt-3" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-sm">JSON Tool Input</h4>
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="enforce-input-schema" className="text-xs cursor-pointer">
+                            Enforce Input Schema
+                          </Label>
+                          <Switch
+                            id="enforce-input-schema"
+                            checked={enforceInputSchema}
+                            onCheckedChange={setEnforceInputSchema}
+                            className="custom-switch"
+                          />
+                        </div>
+                      </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="payload">Initial Payload (Optional)</Label>
-                <HelpTooltip text="Provide the initial payload for the tool. Uploaded files (CSV, JSON, XML, Excel) will be automatically parsed and merged with the manual payload when the tool executes." />
-                <div className={cn(
-                  validationErrors.payload && "ring-2 ring-destructive ring-offset-2"
-                )}>
-                  <PayloadSpotlight
-                    payloadText={payload}
-                    inputSchema={null}
-                    onChange={(code) => {
-                      setPayload(code);
-                      try {
-                        JSON.parse(code || '{}');
-                        setValidationErrors(prev => ({ ...prev, payload: false }));
-                      } catch (e) {
-                        setValidationErrors(prev => ({ ...prev, payload: true }));
-                      }
-                    }}
-                    onInputSchemaChange={() => { }}
-                    readOnly={false}
-                    onFilesUpload={handleFilesUpload}
-                    uploadedFiles={uploadedFiles}
-                    onFileRemove={handleFileRemove}
-                    isProcessingFiles={isProcessingFiles}
-                    totalFileSize={totalFileSize}
-                  />
-                </div>
-                {validationErrors.payload && (
-                  <p className="text-xs text-destructive mt-1">Invalid JSON format</p>
+                      <Textarea
+                        value={payload}
+                        onChange={(e) => {
+                          setPayload(e.target.value);
+                          try {
+                            JSON.parse(e.target.value || '');
+                            setValidationErrors(prev => ({ ...prev, payload: false }));
+                          } catch {
+                            setValidationErrors(prev => ({ ...prev, payload: true }));
+                          }
+                        }}
+                        placeholder=""
+                        className={cn("font-mono text-xs min-h-[150px]", validationErrors.payload && inputErrorStyles)}
+                      />
+
+
+                      {/* Input Schema section - only show when enforcement is enabled */}
+                      {enforceInputSchema && (
+                        <div className="space-y-3 pt-3 border-t">
+                          <h4 className="font-medium text-sm">Enforced Tool Input Schema</h4>
+                          
+                          <Tabs 
+                            value={inputSchemaMode} 
+                            onValueChange={(v) => {
+                              setInputSchemaMode(v as 'current' | 'custom');
+                              if (v === 'custom' && !inputSchema) {
+                                setInputSchema('{"type":"object","properties":{}}');
+                              }
+                            }}
+                          >
+                            <TabsList className="h-9 p-1 rounded-md w-full">
+                              <TabsTrigger value="current" className="flex-1 h-full px-3 text-xs rounded-sm data-[state=active]:rounded-sm">
+                                Use schema generated from tool input
+                              </TabsTrigger>
+                              <TabsTrigger value="custom" className="flex-1 h-full px-3 text-xs rounded-sm data-[state=active]:rounded-sm">
+                                {/* This does not do anything at the moment. The Workflow builder does not support input schemas.*/}
+                                Use custom schema
+                              </TabsTrigger>
+                            </TabsList>
+                          </Tabs>
+
+                          {inputSchemaMode === 'custom' && (
+                            <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground">
+                                Define a JSON Schema here to validate the tool's input.
+                              </p>
+                              <JsonSchemaEditor
+                                value={inputSchema}
+                                onChange={setInputSchema}
+                                isOptional={false}
+                                showModeToggle={true}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {showFileUploadSection && (
+                  <div className="space-y-3 border rounded-lg p-4 bg-card animate-fade-in mt-3" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm">File Tool Input</h4>
+                      <input
+                        type="file"
+                        multiple
+                        accept=".json,.csv,.txt,.xml,.xlsx,.xls"
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files || []);
+                          if (files.length > 0) {
+                            await handleFilesUpload(files);
+                          }
+                          e.target.value = '';
+                        }}
+                        className="hidden"
+                        id="file-upload-new"
+                      />
+                      {uploadedFiles.length > 0 && (
+                        <div className="space-y-2 mb-3">
+                          {uploadedFiles.map(file => {
+                            const getFileIcon = (filename: string) => {
+                              const ext = filename.toLowerCase().split('.').pop() || '';
+                              switch (ext) {
+                                case 'json': return FileJson;
+                                case 'csv': return FileSpreadsheet;
+                                case 'xml': return FileCode;
+                                case 'xlsx':
+                                case 'xls': return FileSpreadsheet;
+                                default: return File;
+                              }
+                            };
+                            const FileIcon = getFileIcon(file.name);
+                            return (
+                              <div
+                                key={file.key}
+                                className={cn(
+                                  "flex items-center justify-between px-3 py-2 rounded-md border",
+                                  file.status === 'error' ? "bg-destructive/10 border-destructive/20" : "bg-muted/30 border-border"
+                                )}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <FileIcon className="h-4 w-4 text-gray-700 dark:text-gray-400" />
+                                  <div>
+                                    <div className="text-xs font-medium">{file.name}</div>
+                                    <div className="text-[10px] text-muted-foreground">
+                                      {file.status === 'processing' ? 'Parsing...' : 
+                                       file.status === 'error' ? file.error :
+                                       `${formatBytes(file.size)}`}
+                                    </div>
+                                  </div>
+                                </div>
+                                {file.status !== 'processing' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => handleFileRemove(file.key)}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div className="flex flex-col items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => document.getElementById('file-upload-new')?.click()}
+                          disabled={isProcessingFiles}
+                          className="w-48"
+                        >
+                          {isProcessingFiles ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <Paperclip className="h-4 w-4 mr-2" />
+                              Select Files
+                            </>
+                          )}
+                        </Button>
+                        <div className="text-xs text-muted-foreground text-center">
+                          {formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {showResponseSchemaSection && (
+                  <div className="border rounded-lg p-4 bg-card animate-fade-in mt-3" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
+                    <h4 className="font-medium text-sm mb-3">Tool Result Schema</h4>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Define a JSON Schema to validate the tool's response
+                    </p>
+                    <JsonSchemaEditor
+                      value={responseSchema || null}
+                      onChange={(value) => setResponseSchema(value || '')}
+                      isOptional={true}
+                      showModeToggle={true}
+                    />
+                  </div>
+                )}
+
+                {/* Suggested prompts with animation - only show when textarea is empty and no section is expanded */}
+                {suggestions.length > 0 && !instruction.trim() && !showPayloadSection && !showFileUploadSection && !showResponseSchemaSection && (
+                  <div className="space-y-2 mt-4">
+                    <p className="text-sm text-muted-foreground text-center">Suggestions</p>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {suggestions.map((suggestion, index) => (
+                        <Button
+                          key={index}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setInstruction(suggestion)}
+                          className="text-sm h-auto py-2 px-4 font-normal animate-fade-in"
+                          style={{
+                            animationDelay: `${index * 150}ms`,
+                            animationFillMode: 'backwards'
+                          }}
+                        >
+                          {suggestion}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
           )}
-          {step === 'review' && currentTool && (
+          {step === 'run' && currentTool && (
             <div className="w-full">
               <ToolPlayground
                 ref={playgroundRef}
@@ -865,7 +1178,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                 initialInstruction={instruction}
                 integrations={integrations}
                 onSave={handleSaveTool}
-                onInstructionEdit={() => setStep('prompt')}
+                onInstructionEdit={() => setStep('build')}
                 selfHealingEnabled={selfHealingEnabled}
                 onSelfHealingChange={setSelfHealingEnabled}
                 shouldStopExecution={shouldStopExecution}
@@ -910,7 +1223,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                         disabled={isSaving || isExecuting}
                         className="h-9 px-4"
                       >
-                        Test Tool
+                        Run All Steps
                       </Button>
                     )}
                     <Button
@@ -926,7 +1239,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
               />
             </div>
           )}
-          {step === 'success' && currentTool && (
+          {step === 'publish' && currentTool && (
             <div className="space-y-4">
               <p className="text-lg font-medium">
                 Tool{' '}
@@ -984,7 +1297,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
           Back
         </Button>
         <div className="flex gap-2">
-          {step !== 'review' && step !== 'success' && (
+          {step !== 'run' && step !== 'publish' && step !== 'build' && (
             <Button
               onClick={handleNext}
               disabled={

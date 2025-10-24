@@ -40,6 +40,7 @@ import ToolSchedulesList from '@/src/components/tools/ToolSchedulesList';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import EmptyStateActions from '@/src/components/utils/EmptyStateActions';
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
+import { loadFromCache, saveToCache } from '@/src/lib/cache-utils';
 import { ApiConfig, ExtractConfig, Integration, SuperglueClient, Workflow as Tool, TransformConfig } from '@superglue/client';
 import { Calendar, Check, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2, Zap } from "lucide-react";
 import { useRouter } from 'next/navigation';
@@ -47,11 +48,19 @@ import React from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 
+const CACHE_PREFIX = 'superglue-tools-cache';
+
+interface CachedTools {
+  configs: (ApiConfig | ExtractConfig | Tool | TransformConfig)[];
+  integrations: Integration[];
+  timestamp: number;
+}
+
 const ConfigTable = () => {
   const router = useRouter();
   const [allConfigs, setAllConfigs] = React.useState<(ApiConfig | ExtractConfig | Tool | TransformConfig)[]>([]);
   const [configs, setConfigs] = React.useState<(ApiConfig | ExtractConfig | Tool | TransformConfig)[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(0);
   const [pageSize] = React.useState(20);
@@ -93,7 +102,6 @@ const ConfigTable = () => {
   const refreshConfigs = React.useCallback(async () => {
     setShowConfigStepper(false);
     setIsRefreshing(true);
-    setLoading(true);
     try {
       const superglueClient = new SuperglueClient({
         endpoint: config.superglueEndpoint,
@@ -125,6 +133,12 @@ const ConfigTable = () => {
       setAllConfigs(combinedConfigs);
       setTotal(combinedConfigs.length);
       setPage(0);
+      
+      saveToCache(config.superglueApiKey, CACHE_PREFIX, {
+        configs: combinedConfigs,
+        integrations: integrationsData.items,
+        timestamp: Date.now()
+      });
     } catch (error) {
       console.error('Error fetching configs:', error);
     } finally {
@@ -134,8 +148,14 @@ const ConfigTable = () => {
   }, [config.superglueEndpoint, config.superglueApiKey]);
 
   React.useEffect(() => {
+    const cachedData = loadFromCache<CachedTools>(config.superglueApiKey, CACHE_PREFIX);
+    if (cachedData) {
+      setAllConfigs(cachedData.configs);
+      setIntegrations(cachedData.integrations);
+      setTotal(cachedData.configs.length);
+    }
     refreshConfigs();
-  }, [refreshConfigs]);
+  }, [refreshConfigs, config.superglueApiKey]);
 
   React.useEffect(() => {
     const filtered = allConfigs.filter(config => {
@@ -448,7 +468,7 @@ const ConfigTable = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {loading && allConfigs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-24 text-center">
                   <Loader2 className="h-6 w-6 animate-spin text-foreground inline-block" />

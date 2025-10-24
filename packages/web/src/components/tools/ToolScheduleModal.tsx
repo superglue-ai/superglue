@@ -302,7 +302,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
 
               {/* payload */}
               <div className="flex flex-col gap-2">
-                <Label htmlFor="payload">JSON Payload (Optional)</Label>
+                <Label htmlFor="payload">JSON Input (Optional)</Label>
                 <div className="border rounded-md p-3 bg-muted/50">
                   <Editor
                     value={schedulePayload}

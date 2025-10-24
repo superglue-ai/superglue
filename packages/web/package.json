@@ -39,6 +39,7 @@
         "graphql": "^16.10.0",
         "graphql-ws": "^6.0.4",
         "hasown": "^2.0.0",
+        "jsonschema": "^1.5.0",
         "jszip": "^3.10.1",
         "lucide-react": "^0.474.0",
         "mammoth": "^1.9.1",
