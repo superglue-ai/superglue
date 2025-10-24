@@ -52,7 +52,7 @@ async function main(): Promise<void> {
     const metricsComparer = new MetricsComparer(baseDir);
     const metricsComparison = metricsComparer.compare(metrics);
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('Z')[0];
+    const timestamp = new Date().toISOString().split('.')[0].replace(/[:.]/g, '-');
 
     const csvReporter = new CsvReporter(baseDir, metadata);
     csvReporter.report(timestamp, metrics);

@@ -75,6 +75,11 @@ export class SuperglueToolAttemptService {
             attempt.validationResult = validationResult;
             attempt.status = this.validationService.determineStatus(attempt);
 
+            // Set failure reason if validation didn't pass
+            if (!validationResult.passed) {
+                attempt.failureReason = ToolFailureReason.VALIDATION;
+            }
+
             return attempt;
         } catch (error) {
             attempt.executionTime = Date.now() - execStart;
@@ -143,7 +148,8 @@ export class SuperglueToolAttemptService {
             toolConfig.payload || {},
             allCredentials,
             {
-                selfHealing: selfHealingEnabled ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED
+                selfHealing: selfHealingEnabled ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED,
+                testMode: selfHealingEnabled ? true : false
             }
         );
 

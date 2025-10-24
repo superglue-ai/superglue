@@ -13,13 +13,13 @@ export class JsonReporter {
   }
 
   public reportAttempts(timestamp: string, attempts: ToolAttempt[]): void {
-    const filepath = join(this.baseDir, `data/results/agent-eval-${timestamp}.json` );
+    const filepath = join(this.baseDir, `data/results/${timestamp}-tool-eval.json` );
 
     const llmProvider = process.env.LLM_PROVIDER || 'not_set';
     const backendModel = this.getBackendModel(llmProvider);
     
     const detailedAttempts = attempts.map(attempt => ({
-      tool: attempt.workflow?.id ?? attempt.toolConfig.id,
+      tool: attempt.toolConfig.id,
       toolName: attempt.toolConfig.name,
       description: attempt.toolConfig.expectedResultDescription ?? null,
       instruction: attempt.toolConfig.instruction,

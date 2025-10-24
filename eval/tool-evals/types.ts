@@ -46,6 +46,7 @@ export interface AgentEvalConfig {
 export enum ToolFailureReason {
     BUILD = 'build',
     EXECUTION = 'execution',
+    VALIDATION = 'validation',
 }
 
 export type FailureCountsByReason = Record<ToolFailureReason, number>;

@@ -32,7 +32,11 @@ export class ToolRunnerService {
                 const oneShotAttempts = await Promise.all(oneShotPromises);
                 attempts.push(...oneShotAttempts);
                 
-                const hadOneShotSuccess = oneShotAttempts.some(a => a.buildSuccess && a.executionSuccess);
+                const hadOneShotSuccess = oneShotAttempts.some(a => 
+                    a.buildSuccess && 
+                    a.executionSuccess && 
+                    (!a.validationResult || a.validationResult.passed)
+                );
                 
                 if (settings.runSelfHealingMode && !hadOneShotSuccess) {
                     const selfHealingPromises: Promise<ToolAttempt>[] = [];

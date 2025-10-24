@@ -1,4 +1,4 @@
-import { Metrics, ToolAttempt, ToolMetrics, ToolFailureReason, FailureCountsByReason } from "../types.js";
+import { Metrics, ToolAttempt, ToolMetrics, ToolFailureReason, FailureCountsByReason, AttemptStatus } from "../types.js";
 
 export class MetricsCalculator {
     public calculateMetrics(toolAttempts: ToolAttempt[]): Metrics {
@@ -68,14 +68,15 @@ export class MetricsCalculator {
         return Object.values(toolAttemptsByToolId).map(toolAttempts => {
             const hasOneShotAttempts = toolAttempts.some(a => !a.selfHealingEnabled);
             const hasSelfHealingAttempts = toolAttempts.some(a => a.selfHealingEnabled);
-            const hadOneShotSuccess = toolAttempts.some(a => !a.selfHealingEnabled && a.executionSuccess);
-            const hadSelfHealingSuccess = toolAttempts.some(a => a.selfHealingEnabled && a.executionSuccess);
-            const totalSuccessfulAttempts = toolAttempts.filter(a => a.executionSuccess).length;
-            const totalFailedAttempts = toolAttempts.filter(a => !a.executionSuccess).length;
+            const hadOneShotSuccess = toolAttempts.some(a => !a.selfHealingEnabled && this.isAttemptSuccessful(a));
+            const hadSelfHealingSuccess = toolAttempts.some(a => a.selfHealingEnabled && this.isAttemptSuccessful(a));
+            const totalSuccessfulAttempts = toolAttempts.filter(a => this.isAttemptSuccessful(a)).length;
+            const totalFailedAttempts = toolAttempts.filter(a => !this.isAttemptSuccessful(a)).length;
 
             const initCounts: FailureCountsByReason = {
                 [ToolFailureReason.BUILD]: 0,
                 [ToolFailureReason.EXECUTION]: 0,
+                [ToolFailureReason.VALIDATION]: 0,
             };
             const oneShotFailuresByReason: FailureCountsByReason = { ...initCounts };
             const selfHealingFailuresByReason: FailureCountsByReason = { ...initCounts };
@@ -144,5 +145,15 @@ export class MetricsCalculator {
         });
 
         return grouped;
+    }
+
+    private isAttemptSuccessful(attempt: ToolAttempt): boolean {
+        // Success = validation passed OR validation failed/skipped but LLM passed
+        const successStatuses: AttemptStatus[] = [
+            AttemptStatus.VALIDATION_PASSED,
+            AttemptStatus.VALIDATION_FAILED_LLM_PASSED,
+            AttemptStatus.VALIDATION_SKIPPED_LLM_PASSED
+        ];
+        return successStatuses.includes(attempt.status);
     }
 }

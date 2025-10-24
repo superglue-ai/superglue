@@ -19,7 +19,7 @@ export class CsvReporter {
       mkdirSync(this.resultsDir, { recursive: true });
     }
 
-    const filename = `agent-eval-${timestamp}.csv`;
+    const filename = `${timestamp}-tool-eval.csv`;
     const filepath = join(this.resultsDir, filename);
 
     const csvContent = this.generateCsv(metrics);

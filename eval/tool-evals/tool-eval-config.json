@@ -1770,11 +1770,11 @@
       "expectedResultDescription": "Should retrieve exactly 1005 messages from the 'evals' Slack channel with explicit pagination reminder. Expected message_count to be exactly 1005."
     }
   ],
-  "enabledTools":["004-clockify-time-entries", "005-clockify-projects", "006-clockify-projects-all-workspaces", "007-typeform-get-all-forms"],
+  "enabledTools":"all",
   "settings": {
     "runOneShotMode": true,
     "runSelfHealingMode": true,
-    "attemptsEachMode": 1
+    "attemptsEachMode": 2
   },
   "validationLlmConfig": {
     "provider": "openai",

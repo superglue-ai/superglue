@@ -19,7 +19,7 @@ export class MarkdownReporter {
       mkdirSync(this.resultsDir, { recursive: true });
     }
 
-    const filename = `agent-eval-${timestamp}.md`;
+    const filename = `${timestamp}-tool-eval.md`;
     const filepath = join(this.resultsDir, filename);
 
     const markdownContent = this.generateMarkdown(metrics, metricsComparison, attempts);
