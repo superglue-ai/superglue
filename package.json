@@ -19,7 +19,7 @@
     "generate-ranking": "tsc && node --max-old-space-size=12288 --expose-gc dist/eval/api-ranking/generate-api-ranking.js"
   },
   "dependencies": {
-    "@playwright/test": "^1.50.1",
+    "@playwright/test": "^1.55.0",
     "@superglue/client": "^2.3.53",
     "dotenv": "^16.4.7",
     "dotenv-cli": "^8.0.0"
