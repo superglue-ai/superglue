@@ -1,53 +1,11 @@
 import { Integration, Workflow } from "@superglue/client";
-import { Metadata, toJsonSchema } from "@superglue/shared";
+import { Metadata, toJsonSchema, convertRequiredToArray } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { LLMMessage } from "../llm/language-model.js";
 import { executeTool } from "../execute/tools.js";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { logMessage } from "../utils/logs.js";
 import { getWorkflowBuilderContext } from "../context/context-builders.js";
-
-type ChatMessage = LLMMessage;
-
-function convertRequiredToArray(schema: any): any {
-  if (!schema || typeof schema !== 'object') {
-    return schema;
-  }
-
-  if (Array.isArray(schema)) {
-    return schema.map(item => convertRequiredToArray(item));
-  }
-
-  const result: any = { ...schema };
-  delete result.required;
-
-  if (result.properties && typeof result.properties === 'object') {
-    const requiredFields: string[] = [];
-    const newProperties: any = {};
-
-    for (const [key, value] of Object.entries(result.properties)) {
-      const fieldSchema: any = value;
-      if (fieldSchema && typeof fieldSchema === 'object' && fieldSchema.required === true) {
-        requiredFields.push(key);
-        const { required, ...rest } = fieldSchema;
-        newProperties[key] = convertRequiredToArray(rest);
-      } else {
-        newProperties[key] = convertRequiredToArray(fieldSchema);
-      }
-    }
-
-    result.properties = newProperties;
-    if (requiredFields.length > 0) {
-      result.required = requiredFields;
-    }
-  }
-
-  if (result.items) {
-    result.items = convertRequiredToArray(result.items);
-  }
-
-  return result;
-}
 
 export class WorkflowBuilder {
   private integrations: Record<string, Integration>;
@@ -90,7 +48,7 @@ export class WorkflowBuilder {
     }
   }
 
-  private prepareBuildingContext(): ChatMessage[] {
+  private prepareBuildingContext(): LLMMessage[] {
     const buildingPromptForAgent = getWorkflowBuilderContext({
       integrations: Object.values(this.integrations),
       payload: this.initialPayload,
@@ -203,7 +161,7 @@ export class WorkflowBuilder {
           messages.push({
             role: "user",
             content: `The previous workflow build attempt failed with the following error:\n\n${error.message}\n\nPlease fix these issues and generate a valid workflow.`
-          } as ChatMessage);
+          } as LLMMessage);
         }
 
         retryCount++;

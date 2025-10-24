@@ -1,6 +1,7 @@
 import { Integration, SuperglueClient } from '@superglue/client'
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react'
 import { useConfig } from './config-context'
+import { loadFromCache, saveToCache } from '@/src/lib/cache-utils'
 
 interface IntegrationsContextType {
     integrations: Integration[]
@@ -13,35 +14,13 @@ interface IntegrationsContextType {
 
 const IntegrationsContext = createContext<IntegrationsContextType | null>(null)
 
-const getCacheKey = (apiKey: string) => {
-    const hash = apiKey.split('').reduce((acc, char) => {
-        return ((acc << 5) - acc) + char.charCodeAt(0) | 0;
-    }, 0);
-    return `superglue-integrations-cache-${Math.abs(hash)}`;
-};
+const CACHE_PREFIX = 'superglue-integrations-cache'
 
-const loadCachedIntegrations = (apiKey: string) => {
-    try {
-        const cached = localStorage.getItem(getCacheKey(apiKey));
-        if (!cached) return null;
-        return JSON.parse(cached);
-    } catch (error) {
-        console.error('Error loading cached integrations:', error);
-        return null;
-    }
-};
-
-const saveCachedIntegrations = (apiKey: string, integrations: Integration[], pendingDocIds: Set<string>) => {
-    try {
-        localStorage.setItem(getCacheKey(apiKey), JSON.stringify({
-            integrations,
-            pendingDocIds: Array.from(pendingDocIds),
-            timestamp: Date.now()
-        }));
-    } catch (error) {
-        console.error('Error saving cached integrations:', error);
-    }
-};
+interface CachedIntegrations {
+    integrations: Integration[]
+    pendingDocIds: string[]
+    timestamp: number
+}
 
 export function IntegrationsProvider({ children }: { children: ReactNode }) {
     const config = useConfig()
@@ -67,7 +46,11 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
             const newPendingDocIds = new Set(pendingIds);
             setPendingDocIds(newPendingDocIds)
             
-            saveCachedIntegrations(config.superglueApiKey, items, newPendingDocIds);
+            saveToCache(config.superglueApiKey, CACHE_PREFIX, {
+                integrations: items,
+                pendingDocIds: Array.from(newPendingDocIds),
+                timestamp: Date.now()
+            });
         } catch (error) {
             console.error('Error loading integrations:', error)
         } finally {
@@ -77,7 +60,7 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
     }, [config.superglueEndpoint, config.superglueApiKey])
 
     useEffect(() => {
-        const cachedData = loadCachedIntegrations(config.superglueApiKey);
+        const cachedData = loadFromCache<CachedIntegrations>(config.superglueApiKey, CACHE_PREFIX);
         if (cachedData) {
             setIntegrations(cachedData.integrations);
             setPendingDocIds(new Set(cachedData.pendingDocIds || []));

@@ -461,3 +461,43 @@ export function toJsonSchema(value: any, options?: Options): JSONSchema3or4 {
     const tjs = new ToJsonSchema(options)
     return tjs.getSchema(value)
 }
+
+export function convertRequiredToArray(schema: any): any {
+    if (!schema || typeof schema !== 'object') {
+      return schema;
+    }
+  
+    if (Array.isArray(schema)) {
+      return schema.map(item => convertRequiredToArray(item));
+    }
+  
+    const result: any = { ...schema };
+    delete result.required;
+  
+    if (result.properties && typeof result.properties === 'object') {
+      const requiredFields: string[] = [];
+      const newProperties: any = {};
+  
+      for (const [key, value] of Object.entries(result.properties)) {
+        const fieldSchema: any = value;
+        if (fieldSchema && typeof fieldSchema === 'object' && fieldSchema.required === true) {
+          requiredFields.push(key);
+          const { required, ...rest } = fieldSchema;
+          newProperties[key] = convertRequiredToArray(rest);
+        } else {
+          newProperties[key] = convertRequiredToArray(fieldSchema);
+        }
+      }
+  
+      result.properties = newProperties;
+      if (requiredFields.length > 0) {
+        result.required = requiredFields;
+      }
+    }
+  
+    if (result.items) {
+      result.items = convertRequiredToArray(result.items);
+    }
+  
+    return result;
+  }

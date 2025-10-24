@@ -40,6 +40,7 @@ import ToolSchedulesList from '@/src/components/tools/ToolSchedulesList';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import EmptyStateActions from '@/src/components/utils/EmptyStateActions';
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
+import { loadFromCache, saveToCache } from '@/src/lib/cache-utils';
 import { ApiConfig, ExtractConfig, Integration, SuperglueClient, Workflow as Tool, TransformConfig } from '@superglue/client';
 import { Calendar, Check, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2, Zap } from "lucide-react";
 import { useRouter } from 'next/navigation';
@@ -47,35 +48,13 @@ import React from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 
-const getCacheKey = (apiKey: string) => {
-  const hash = apiKey.split('').reduce((acc, char) => {
-    return ((acc << 5) - acc) + char.charCodeAt(0) | 0;
-  }, 0);
-  return `superglue-tools-cache-${Math.abs(hash)}`;
-};
+const CACHE_PREFIX = 'superglue-tools-cache';
 
-const loadCachedData = (apiKey: string) => {
-  try {
-    const cached = localStorage.getItem(getCacheKey(apiKey));
-    if (!cached) return null;
-    return JSON.parse(cached);
-  } catch (error) {
-    console.error('Error loading cached data:', error);
-    return null;
-  }
-};
-
-const saveCacheData = (apiKey: string, configs: any[], integrations: any[]) => {
-  try {
-    localStorage.setItem(getCacheKey(apiKey), JSON.stringify({
-      configs,
-      integrations,
-      timestamp: Date.now()
-    }));
-  } catch (error) {
-    console.error('Error saving cache data:', error);
-  }
-};
+interface CachedTools {
+  configs: (ApiConfig | ExtractConfig | Tool | TransformConfig)[];
+  integrations: Integration[];
+  timestamp: number;
+}
 
 const ConfigTable = () => {
   const router = useRouter();
@@ -155,7 +134,11 @@ const ConfigTable = () => {
       setTotal(combinedConfigs.length);
       setPage(0);
       
-      saveCacheData(config.superglueApiKey, combinedConfigs, integrationsData.items);
+      saveToCache(config.superglueApiKey, CACHE_PREFIX, {
+        configs: combinedConfigs,
+        integrations: integrationsData.items,
+        timestamp: Date.now()
+      });
     } catch (error) {
       console.error('Error fetching configs:', error);
     } finally {
@@ -165,7 +148,7 @@ const ConfigTable = () => {
   }, [config.superglueEndpoint, config.superglueApiKey]);
 
   React.useEffect(() => {
-    const cachedData = loadCachedData(config.superglueApiKey);
+    const cachedData = loadFromCache<CachedTools>(config.superglueApiKey, CACHE_PREFIX);
     if (cachedData) {
       setAllConfigs(cachedData.configs);
       setIntegrations(cachedData.integrations);
