@@ -219,7 +219,9 @@ type ToolStep {
 type SuggestedTool {
   id: ID!                           # Tool identifier
   instruction: String               # What the tool does
+  inputSchema: JSONSchema           # Input schema for the tool
   steps: [ToolStep!]!               # Steps and integrations used
+  responseSchema: JSONSchema        # Output schema for the tool
   reason: String!                   # Why this tool matches the search
 }
 ```

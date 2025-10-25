@@ -12,10 +12,12 @@ type ChatMessage = LLMMessage;
 export interface SuggestedTool {
     id: string;
     instruction?: string;
+    inputSchema?: any;
     steps: Array<{
         integrationId?: string;
         instruction?: string;
     }>;
+    responseSchema?: any;
     reason: string;
 }
 
@@ -24,6 +26,20 @@ export class ToolSelector {
 
     constructor(metadata: Metadata) {
         this.metadata = metadata;
+    }
+
+    private toSuggestedTools(tools: Workflow[], reason: string): SuggestedTool[] {
+        return tools.map(tool => ({
+            id: tool.id,
+            instruction: tool.instruction,
+            inputSchema: tool.inputSchema,
+            responseSchema: tool.responseSchema,
+            steps: tool.steps.map(s => ({
+                integrationId: s.integrationId,
+                instruction: s.apiConfig?.instruction
+            })),
+            reason
+        }));
     }
 
     public async select(
@@ -37,15 +53,7 @@ export class ToolSelector {
 
         if (!query || query.trim() === "" || query.trim() === "*" || query.trim() === "all") {
             logMessage('info', 'No specific query provided, returning all available tools.', this.metadata);
-            return tools.map(tool => ({
-                id: tool.id,
-                instruction: tool.instruction,
-                steps: tool.steps.map(s => ({
-                    integrationId: s.integrationId,
-                    instruction: s.apiConfig?.instruction
-                })),
-                reason: "Available tool (no specific query provided)"
-            }));
+            return this.toSuggestedTools(tools, "Available tool (no specific query provided)");
         }
 
         const selectionSchema = zodToJsonSchema(z.object({
@@ -73,63 +81,34 @@ export class ToolSelector {
                 selectionSchema
             );
 
-            //if (rawSelection && rawSelection.suggestedTools && Array.isArray(rawSelection.suggestedTools)) {
-            if (!rawSelection || !rawSelection.suggestedTools || !Array.isArray(rawSelection.suggestedTools)) {
-                logMessage('warn', "Tool selection returned an unexpected format. Returning all available tools as fallback.", this.metadata);
-                return tools.map(tool => ({
-                    id: tool.id,
-                    instruction: tool.instruction,
-                    steps: tool.steps.map(s => ({
-                        integrationId: s.integrationId,
-                        instruction: s.apiConfig?.instruction
-                    })),
-                    reason: "Selection failed, but this tool is available for use"
-                }));
+            if (!rawSelection?.suggestedTools || !Array.isArray(rawSelection.suggestedTools)) {
+                logMessage('warn', "Tool selection returned unexpected format. Returning all tools.", this.metadata);
+                return this.toSuggestedTools(tools, "Available tool");
             }
-                const suggestions = rawSelection.suggestedTools
-                    .map(suggestion => {
-                        const tool = tools.find(t => t.id === suggestion.id);
-                        if (!tool) {
-                            return null;
-                        }
-                        return {
-                            id: tool.id,
-                            instruction: tool.instruction,
-                            steps: tool.steps.map(s => ({
-                                integrationId: s.integrationId,
-                                instruction: s.apiConfig?.instruction
-                            })),
-                            reason: suggestion.reason
-                        };
-                    })
-                    .filter((suggestion): suggestion is NonNullable<typeof suggestion> => suggestion !== null);
 
-                if (suggestions.length === 0) {
-                    logMessage('info', 'Tool selector returned no specific tools. Returning all available tools as a fallback.', this.metadata);
-                    return tools.map(tool => ({
+            const suggestions = rawSelection.suggestedTools
+                .map(suggestion => {
+                    const tool = tools.find(t => t.id === suggestion.id);
+                    if (!tool) return null;
+
+                    return {
                         id: tool.id,
                         instruction: tool.instruction,
+                        inputSchema: tool.inputSchema,
+                        responseSchema: tool.responseSchema,
                         steps: tool.steps.map(s => ({
                             integrationId: s.integrationId,
                             instruction: s.apiConfig?.instruction
                         })),
-                        reason: "No specific match found for your query, but this tool is available for use"
-                    }));
-                }
+                        reason: suggestion.reason
+                    };
+                })
+                .filter((suggestion): suggestion is NonNullable<typeof suggestion> => suggestion !== null);
 
-                return suggestions;
+            return suggestions.length > 0 ? suggestions : this.toSuggestedTools(tools, "Available tool");
         } catch (error) {
             logMessage('error', `Error during tool selection: ${error}`, this.metadata);
-            logMessage('info', 'Returning all available tools as fallback due to selection error.', this.metadata);
-            return tools.map(tool => ({
-                id: tool.id,
-                instruction: tool.instruction,
-                steps: tool.steps.map(s => ({
-                    integrationId: s.integrationId,
-                    instruction: s.apiConfig?.instruction
-                })),
-                reason: "Selection failed due to error, but this tool is available for use"
-            }));
+            return this.toSuggestedTools(tools, "Available tool");
         }
     }
 }

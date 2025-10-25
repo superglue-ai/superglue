@@ -106,7 +106,7 @@ The superglue MCP server provides two focused tools:
 
     **What it does:** Searches through your saved workflows and returns relevant tool IDs with their instructions and integrations.
 
-    **Returns:** Tool metadata including ID, instruction, steps, and integrations used.
+    **Returns:** Tool metadata including ID, instruction, input/output schemas, steps, and integrations used.
   </Accordion>
   <Accordion title="superglue_execute_tool" icon="play">
     **Purpose:** Execute a saved tool by ID

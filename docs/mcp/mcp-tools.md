@@ -21,10 +21,12 @@ Search for saved superglue tools using natural language.
   tools: Array<{
     id: string;              // Tool identifier for execution
     instruction?: string;    // What the tool does
+    inputSchema?: object;    // Input schema for the tool
     steps: Array<{
       integrationId?: string;      // Integration used in this step
       instruction?: string;        // Step-level instruction
     }>;
+    responseSchema?: object; // Output schema for the tool
     reason: string;          // Why this tool matches your search
   }>;
 }
@@ -49,12 +51,27 @@ Search for saved superglue tools using natural language.
     {
       "id": "send-slack-alert",
       "instruction": "Post alert message to Slack pr channel",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel": { "type": "string" },
+          "message": { "type": "string" }
+        },
+        "required": ["channel", "message"]
+      },
       "steps": [
         {
           "integrationId": "slack",
           "instruction": "Post a payload message to the Slack pr channel"
         }
       ],
+      "responseSchema": {
+        "type": "object",
+        "properties": {
+          "messageId": { "type": "string" },
+          "timestamp": { "type": "string" }
+        }
+      },
       "reason": "Matches Slack posting functionality"
     }
   ]

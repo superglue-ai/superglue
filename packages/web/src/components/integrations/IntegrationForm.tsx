@@ -237,6 +237,7 @@ export function IntegrationForm({
     // Function to handle file removal
     const handleFileRemove = () => {
         setDocumentation('');
+        setDocumentationUrl('');
         setHasUploadedFile(false);
     };
 
@@ -671,21 +672,21 @@ export function IntegrationForm({
                     </Popover>
                 </div>
                 {!isEditing && (
-                            <div>
-                                <Label htmlFor="integrationId">Integration ID*</Label>
-                                <HelpTooltip text="A unique identifier for this integration within the tool. You cannot change this after saving." />
-                                <Input
-                                    id="integrationId"
-                                    value={id || ''}
-                                    onChange={e => {
-                                        setId(e.target.value);
-                                        setIsIdManuallyEdited(true);
-                                    }}
-                                    placeholder="e.g., crm-api"
-                                    className={cn(validationErrors.id && inputErrorStyles)}
-                                />
-                                {validationErrors.id && <p className="text-sm text-destructive mt-1">Integration ID is required and must be unique.</p>}
-                            </div>
+                    <div>
+                        <Label htmlFor="integrationId">Integration ID*</Label>
+                        <HelpTooltip text="A unique identifier for this integration within the tool. You cannot change this after saving." />
+                        <Input
+                            id="integrationId"
+                            value={id || ''}
+                            onChange={e => {
+                                setId(e.target.value);
+                                setIsIdManuallyEdited(true);
+                            }}
+                            placeholder="e.g., crm-api"
+                            className={cn(validationErrors.id && inputErrorStyles)}
+                        />
+                        {validationErrors.id && <p className="text-sm text-destructive mt-1">Integration ID is required and must be unique.</p>}
+                    </div>
                 )}
                 <div>
                     <Label htmlFor="integrationFullUrl">API Endpoint*</Label>
