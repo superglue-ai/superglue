@@ -1,10 +1,11 @@
 import { Integration } from '@superglue/client';
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import fs from 'fs';
-import { FileStore } from '../../packages/core/datastore/filestore.js';
-import { DataStore } from '../../packages/core/datastore/types.js';
-import { server_defaults } from '../../packages/core/default.js';
-import { logMessage } from '../../packages/core/utils/logs.js';
+import { FileStore } from '@core/datastore/filestore.js';
+import { DataStore } from '@core/datastore/types.js';
+import { server_defaults } from '@core/default.js';
+import { logMessage } from '@core/utils/logs.js';
+import { DocumentationFetcher } from '@core/documentation/index.js';
 import { IntegrationConfig } from './config-loader.js';
 
 export interface SetupResult {
@@ -202,7 +203,6 @@ export class SetupManager {
             try {
                 logMessage('info', `📚 Starting documentation fetch for ${integration.id}`, this.metadata);
 
-                const { DocumentationFetcher } = await import('../../packages/core/documentation/index.js');
                 const docFetcher = new DocumentationFetcher(
                     {
                         urlHost: config.urlHost,
