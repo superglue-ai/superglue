@@ -767,7 +767,7 @@ function copyToClipboard(elementId) {
 // Load benchmark CSV (only works when served via HTTP, not file://)
 async function loadBenchmarkCsv() {
     try {
-        const response = await fetch('../data/benchmark/agent-eval-benchmark.csv');
+        const response = await fetch('../data/benchmark/tool-eval-benchmark.csv');
         if (!response.ok) {
             console.log('No benchmark file available - use file input to load manually');
             return;
@@ -843,7 +843,7 @@ function unquote(str) {
 async function tryLoadLatestResult() {
     try {
         // Try to load a default file - user can adjust this path
-        const response = await fetch('../data/results/agent-eval-latest.json');
+        const response = await fetch('../data/results/tool-eval-latest.json');
         if (response.ok) {
             const data = await response.json();
             currentData = data;

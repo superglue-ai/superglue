@@ -21,7 +21,7 @@ config({ path: envPath });
 
 async function main(): Promise<void> {
   const startedAt = new Date();
-  const metadata = { orgId: "agent-eval", userId: "system" };
+  const metadata = { orgId: "tool-eval", userId: "system" };
   logMessage("info", "Starting Agent Evaluation...", metadata);
 
   let store: FileStore | undefined;

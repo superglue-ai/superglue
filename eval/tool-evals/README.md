@@ -16,12 +16,12 @@ Automated testing framework for Superglue's tool builder and executor across mul
 
 3. **Add benchmark (optional)**
 
-   Copy your benchmark file to `data/benchmark/agent-eval-benchmark.csv` (see [Benchmarking](#benchmarking) for details)
+   Copy your benchmark file to `data/benchmark/tool-eval-benchmark.csv` (see [Benchmarking](#benchmarking) for details)
 
 4. **Run evaluation**
 
    ```bash
-   npm run test:agent-eval
+   npm run test:tool-eval
    ```
 
 5. **View results**
@@ -154,7 +154,7 @@ Benchmarking tracks performance over time by comparing current runs against a ba
 2. Review results in the `data/results/` folder
 3. Copy a good run to use as your baseline:
    ```bash
-   cp data/results/agent-eval-YYYY-MM-DDTHH-mm-ss.csv data/benchmark/agent-eval-benchmark.csv
+   cp data/results/tool-eval-YYYY-MM-DDTHH-mm-ss.csv data/benchmark/tool-eval-benchmark.csv
    ```
 4. Future runs will automatically compare against this benchmark
 
@@ -166,7 +166,7 @@ When you improve your config or want to reset the baseline:
 2. Review the new results
 3. If satisfied, replace the benchmark:
    ```bash
-   cp data/results/agent-eval-YYYY-MM-DDTHH-mm-ss.csv data/benchmark/agent-eval-benchmark.csv
+   cp data/results/tool-eval-YYYY-MM-DDTHH-mm-ss.csv data/benchmark/tool-eval-benchmark.csv
    ```
 
 **Note:** The benchmark file is not in version control - each environment maintains its own baseline.
