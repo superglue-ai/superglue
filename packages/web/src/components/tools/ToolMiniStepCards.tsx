@@ -778,9 +778,8 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
                         </div>
                         <div className="flex items-center gap-1 mt-1">
                             {!isPayloadValid ? (
-                                <span className="text-[9px] font-medium text-amber-600 dark:text-amber-400">Tool Input Needed</span>
+                                <span className="text-[9px] font-medium text-amber-600 dark:text-amber-400">Tool Input Required</span>
                             ) : (() => {
-                                // Check if payload is empty or just {}
                                 const isEmptyPayload = !payloadData ||
                                     (typeof payloadData === 'object' && Object.keys(payloadData).length === 0) ||
                                     (typeof payloadData === 'string' && (!payloadData.trim() || payloadData.trim() === '{}'));

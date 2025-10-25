@@ -302,7 +302,9 @@ type ToolStep {
 type SuggestedTool {
   id: ID!
   instruction: String
-  steps: [ToolStep!]!
+  inputSchema: JSON
+  steps: [ToolStep!]
+  responseSchema: JSON
   reason: String!
 }
 
