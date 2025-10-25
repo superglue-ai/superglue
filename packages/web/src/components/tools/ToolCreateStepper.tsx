@@ -4,12 +4,12 @@ import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
-import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, processFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/utils';
 import { Integration, IntegrationInput, SuperglueClient, Workflow as Tool, UpsertMode } from '@superglue/client';
 import { integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { ArrowRight, Check, Clock, File, FileCode, FileJson, FileSpreadsheet, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Upload, Wrench, X } from 'lucide-react';
+import { Check, Clock, File, FileCode, FileJson, FileSpreadsheet, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Wrench, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -25,7 +25,6 @@ import { HelpTooltip } from '../utils/HelpTooltip';
 import JsonSchemaEditor from '../utils/JsonSchemaEditor';
 import { StepIndicator, TOOL_CREATE_STEPS } from '../utils/StepIndicator';
 import { ToolCreateSuccess } from './ToolCreateSuccess';
-import { PayloadSpotlight } from './ToolMiniStepCards';
 import ToolPlayground, { ToolPlaygroundHandle } from './ToolPlayground';
 
 type ToolCreateStep = 'integrations' | 'build' | 'run' | 'publish';
@@ -53,7 +52,7 @@ class ExtendedSuperglueClient extends SuperglueClient {
       })
     });
     const result = await response.json();
-    
+
     instructions = result.data.generateInstructions;
     if (instructions.length === 1 && instructions[0].startsWith('Error:')) {
       throw new Error(instructions[0].replace('Error: ', ''));
@@ -368,15 +367,24 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
           };
           newFiles.push(fileInfo);
           setUploadedFiles(prev => [...prev, fileInfo]);
+          const isPdf = file.name.toLowerCase().endsWith('.pdf');
 
-          const extractResult = await client.extract({
-            file: file
-          });
+          let parsedData: any;
+          if (isPdf) {
+            const extractedText = await processFile(file, file.name);
+            parsedData = { text: extractedText };
+          } else {
+            // Use backend extract endpoint for other file types
+            const extractResult = await client.extract({
+              file: file
+            });
 
-          if (!extractResult.success) {
-            throw new Error(extractResult.error || 'Failed to extract data');
+            if (!extractResult.success) {
+              throw new Error(extractResult.error || 'Failed to extract data');
+            }
+            parsedData = extractResult.data;
           }
-          const parsedData = extractResult.data;
+
           setFilePayloads(prev => ({ ...prev, [key]: parsedData }));
           existingKeys.push(key);
 
@@ -478,7 +486,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
     if (e.target.value.trim()) {
       setValidationErrors(prev => ({ ...prev, instruction: false }));
     }
-    
+
     // Auto-expand textarea
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -825,8 +833,8 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                       validationErrors.instruction && inputErrorStyles
                     )}
                     rows={1}
-                    style={{ 
-                      maxHeight: '200px', 
+                    style={{
+                      maxHeight: '200px',
                       overflowY: instruction.split('\n').length > 8 ? 'auto' : 'hidden',
                       scrollbarGutter: 'stable'
                     }}
@@ -836,96 +844,96 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                   <div className="flex justify-between items-center gap-2 mt-3">
                     <div className="flex gap-2">
                       <button
-                      onClick={() => {
-                        if (showFileUploadSection) setShowFileUploadSection(false);
-                        if (showResponseSchemaSection) setShowResponseSchemaSection(false);
-                        setShowPayloadSection(!showPayloadSection);
-                        if (!showPayloadSection && payload.trim() === '') {
-                          setPayload('{}');
-                          setValidationErrors(prev => ({ ...prev, payload: false }));
-                        }
-                      }}
-                      className={cn(
-                        "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
-                        (() => {
+                        onClick={() => {
+                          if (showFileUploadSection) setShowFileUploadSection(false);
+                          if (showResponseSchemaSection) setShowResponseSchemaSection(false);
+                          setShowPayloadSection(!showPayloadSection);
+                          if (!showPayloadSection && payload.trim() === '') {
+                            setPayload('{}');
+                            setValidationErrors(prev => ({ ...prev, payload: false }));
+                          }
+                        }}
+                        className={cn(
+                          "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
+                          (() => {
+                            const trimmedPayload = payload.trim();
+                            const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
+
+                            if (isEmptyPayload) {
+                              return "border border-border text-muted-foreground hover:bg-accent/50";
+                            }
+
+                            // Check if JSON is valid
+                            try {
+                              JSON.parse(trimmedPayload);
+                              // Valid JSON - filled
+                              return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
+                            } catch {
+                              // Invalid JSON - same styling as filled
+                              return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
+                            }
+                          })()
+                        )}
+                      >
+                        <FileJson className="h-4 w-4" />
+                        {(() => {
                           const trimmedPayload = payload.trim();
                           const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
-                          
+
                           if (isEmptyPayload) {
-                            return "border border-border text-muted-foreground hover:bg-accent/50";
+                            return 'Attach JSON Tool Input';
                           }
-                          
-                          // Check if JSON is valid
+
                           try {
                             JSON.parse(trimmedPayload);
-                            // Valid JSON - filled
-                            return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
+                            return 'JSON Tool Input Attached';
                           } catch {
-                            // Invalid JSON - same styling as filled
-                            return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
+                            return 'Invalid Input JSON';
                           }
-                        })()
-                      )}
-                    >
-                      <FileJson className="h-4 w-4" />
-                      {(() => {
-                        const trimmedPayload = payload.trim();
-                        const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
-                        
-                        if (isEmptyPayload) {
-                          return 'Attach JSON Tool Input';
-                        }
-                        
-                        try {
-                          JSON.parse(trimmedPayload);
-                          return 'JSON Tool Input Attached';
-                        } catch {
-                          return 'Invalid Input JSON';
-                        }
-                      })()}
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        if (showPayloadSection) setShowPayloadSection(false);
-                        if (!showPayloadSection && payload.trim() === '') {
-                          setPayload('{}');
-                          setValidationErrors(prev => ({ ...prev, payload: false }));
-                        }
-                        if (showResponseSchemaSection) setShowResponseSchemaSection(false);
-                        setShowFileUploadSection(!showFileUploadSection);
-                      }}
-                      className={cn(
-                        "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
-                        uploadedFiles.length > 0
-                          ? "bg-[#FFD700]/40 border border-[#FFA500] text-foreground"
-                          : "border border-border text-muted-foreground hover:bg-accent/50"
-                      )}
-                    >
-                      <Paperclip className="h-4 w-4" />
-                      {uploadedFiles.length > 0 ? `File Tool Input Attached (${uploadedFiles.length})` : 'Attach File Tool Input'}
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        if (showPayloadSection) setShowPayloadSection(false);
-                        if (!showPayloadSection && payload.trim() === '') {
-                          setPayload('{}');
-                          setValidationErrors(prev => ({ ...prev, payload: false }));
-                        }
-                        if (showFileUploadSection) setShowFileUploadSection(false);
-                        setShowResponseSchemaSection(!showResponseSchemaSection);
-                      }}
-                      className={cn(
-                        "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
-                        responseSchema 
-                          ? "bg-[#FFD700]/40 border border-[#FFA500] text-foreground" 
-                          : "border border-border text-muted-foreground hover:bg-accent/50"
-                      )}
-                    >
-                      <FileWarning className="h-4 w-4" />
-                      {responseSchema ? 'Tool Result Schema Defined' : 'Enforce Tool Result Schema'}
-                    </button>
+                        })()}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (showPayloadSection) setShowPayloadSection(false);
+                          if (!showPayloadSection && payload.trim() === '') {
+                            setPayload('{}');
+                            setValidationErrors(prev => ({ ...prev, payload: false }));
+                          }
+                          if (showResponseSchemaSection) setShowResponseSchemaSection(false);
+                          setShowFileUploadSection(!showFileUploadSection);
+                        }}
+                        className={cn(
+                          "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
+                          uploadedFiles.length > 0
+                            ? "bg-[#FFD700]/40 border border-[#FFA500] text-foreground"
+                            : "border border-border text-muted-foreground hover:bg-accent/50"
+                        )}
+                      >
+                        <Paperclip className="h-4 w-4" />
+                        {uploadedFiles.length > 0 ? `File Tool Input Attached (${uploadedFiles.length})` : 'Attach File Tool Input'}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (showPayloadSection) setShowPayloadSection(false);
+                          if (!showPayloadSection && payload.trim() === '') {
+                            setPayload('{}');
+                            setValidationErrors(prev => ({ ...prev, payload: false }));
+                          }
+                          if (showFileUploadSection) setShowFileUploadSection(false);
+                          setShowResponseSchemaSection(!showResponseSchemaSection);
+                        }}
+                        className={cn(
+                          "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
+                          responseSchema
+                            ? "bg-[#FFD700]/40 border border-[#FFA500] text-foreground"
+                            : "border border-border text-muted-foreground hover:bg-accent/50"
+                        )}
+                      >
+                        <FileWarning className="h-4 w-4" />
+                        {responseSchema ? 'Tool Result Schema Defined' : 'Enforce Tool Result Schema'}
+                      </button>
                     </div>
 
                     {/* Build button on the right */}
@@ -992,9 +1000,9 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                       {enforceInputSchema && (
                         <div className="space-y-3 pt-3 border-t">
                           <h4 className="font-medium text-sm">Enforced Tool Input Schema</h4>
-                          
-                          <Tabs 
-                            value={inputSchemaMode} 
+
+                          <Tabs
+                            value={inputSchemaMode}
                             onValueChange={(v) => {
                               setInputSchemaMode(v as 'current' | 'custom');
                               if (v === 'custom' && !inputSchema) {
@@ -1039,7 +1047,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                       <input
                         type="file"
                         multiple
-                        accept=".json,.csv,.txt,.xml,.xlsx,.xls"
+                        accept=".json,.csv,.txt,.xml,.xlsx,.xls,.pdf"
                         onChange={async (e) => {
                           const files = Array.from(e.target.files || []);
                           if (files.length > 0) {
@@ -1078,9 +1086,9 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                                   <div>
                                     <div className="text-xs font-medium">{file.name}</div>
                                     <div className="text-[10px] text-muted-foreground">
-                                      {file.status === 'processing' ? 'Parsing...' : 
-                                       file.status === 'error' ? file.error :
-                                       `${formatBytes(file.size)}`}
+                                      {file.status === 'processing' ? 'Parsing...' :
+                                        file.status === 'error' ? file.error :
+                                          `${formatBytes(file.size)}`}
                                     </div>
                                   </div>
                                 </div>

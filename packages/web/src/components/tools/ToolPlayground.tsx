@@ -2,7 +2,7 @@
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
-import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, processFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput } from "@/src/lib/utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
 import { Validator } from "jsonschema";
@@ -221,7 +221,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   };
 
   // Validate payload against extracted schema
-  const validatePayload = (payloadText: string, schemaText: string | null): boolean => {
+  const validatePayload = (payloadText: string, schemaText: string | null, filePlds: Record<string, any>): boolean => {
     const payloadSchema = extractPayloadSchema(schemaText);
 
     // If schema is null/disabled, payload is always valid
@@ -231,11 +231,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
     try {
       const payloadData = JSON.parse(payloadText || '{}');
+      const mergedPayload = { ...payloadData, ...filePlds };
       const validator = new Validator();
-      const result = validator.validate(payloadData, payloadSchema);
+      const result = validator.validate(mergedPayload, payloadSchema);
       return result.valid;
     } catch (e) {
-      // Invalid JSON or validation error - consider invalid
       return false;
     }
   };
@@ -247,7 +247,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
 
     validationTimeoutRef.current = setTimeout(() => {
-      const isValid = validatePayload(payload, inputSchema);
+      const isValid = validatePayload(payload, inputSchema, filePayloads);
       setIsPayloadValid(isValid);
     }, 300);
 
@@ -256,7 +256,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         clearTimeout(validationTimeoutRef.current);
       }
     };
-  }, [payload, inputSchema]);
+  }, [payload, inputSchema, filePayloads]);
 
   // Unified file upload handlers
   const handleFilesUpload = async (files: File[]) => {
@@ -296,14 +296,24 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           newFiles.push(fileInfo);
           setLocalUploadedFiles(prev => [...prev, fileInfo]);
 
-          const extractResult = await client.extract({
-            file: file
-          });
+          const isPdf = file.name.toLowerCase().endsWith('.pdf');
 
-          if (!extractResult.success) {
-            throw new Error(extractResult.error || 'Failed to extract data');
+          let parsedData: any;
+          if (isPdf) {
+            const extractedText = await processFile(file, file.name);
+            parsedData = { text: extractedText };
+          } else {
+            // Use backend extract endpoint for other file types
+            const extractResult = await client.extract({
+              file: file
+            });
+
+            if (!extractResult.success) {
+              throw new Error(extractResult.error || 'Failed to extract data');
+            }
+            parsedData = extractResult.data;
           }
-          const parsedData = extractResult.data;
+
           setLocalFilePayloads(prev => ({ ...prev, [key]: parsedData }));
           existingKeys.push(key);
 

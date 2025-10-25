@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/ta
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { downloadJson } from '@/src/lib/download-utils';
-import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { ALLOWED_EXTENSIONS, formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon, getSimpleIcon, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/utils';
 import { Integration } from '@superglue/client';
 import { inferJsonSchema } from '@superglue/shared';
@@ -19,46 +19,46 @@ export function usePrismHighlight(code: string, language: 'javascript' | 'json',
     const [html, setHtml] = useState<string>('');
     const lastHtmlRef = useRef<string>('');
     const highlightFn = useMemo(() => {
-      return (c: string) => {
-        try {
-          const lang = language === 'javascript' ? Prism.languages.javascript : Prism.languages.json;
-          return Prism.highlight(c, lang, language);
-        } catch {
-          return c;
-        }
-      };
+        return (c: string) => {
+            try {
+                const lang = language === 'javascript' ? Prism.languages.javascript : Prism.languages.json;
+                return Prism.highlight(c, lang, language);
+            } catch {
+                return c;
+            }
+        };
     }, [language]);
-  
+
     useEffect(() => {
-      let cancelled = false;
-      let cancel: (() => void) | null = null;
-      const schedule = (fn: () => void) => {
-        const w: any = window as any;
-        if (typeof w.requestIdleCallback === 'function') {
-          const id = w.requestIdleCallback(fn, { timeout: delayMs });
-          return () => w.cancelIdleCallback?.(id);
-        }
-        const id = window.requestAnimationFrame(fn);
-        return () => window.cancelAnimationFrame(id);
-      };
-  
-      cancel = schedule(() => {
-        if (cancelled) return;
-        const next = highlightFn(code);
-        if (!cancelled) {
-          lastHtmlRef.current = next;
-          setHtml(next);
-        }
-      });
-  
-      return () => {
-        cancelled = true;
-        cancel?.();
-      };
+        let cancelled = false;
+        let cancel: (() => void) | null = null;
+        const schedule = (fn: () => void) => {
+            const w: any = window as any;
+            if (typeof w.requestIdleCallback === 'function') {
+                const id = w.requestIdleCallback(fn, { timeout: delayMs });
+                return () => w.cancelIdleCallback?.(id);
+            }
+            const id = window.requestAnimationFrame(fn);
+            return () => window.cancelAnimationFrame(id);
+        };
+
+        cancel = schedule(() => {
+            if (cancelled) return;
+            const next = highlightFn(code);
+            if (!cancelled) {
+                lastHtmlRef.current = next;
+                setHtml(next);
+            }
+        });
+
+        return () => {
+            cancelled = true;
+            cancel?.();
+        };
     }, [code, highlightFn, delayMs]);
-  
+
     return html || lastHtmlRef.current || code;
-  }
+}
 
 
 export const CopyButton = ({ text, getData }: { text?: string; getData?: () => any }) => {
@@ -83,7 +83,7 @@ export const InstructionDisplay = ({ instruction, onEdit, showEditButton = true 
     const [copied, setCopied] = useState(false);
     const [isTruncated, setIsTruncated] = useState(false);
     const textRef = useRef<HTMLParagraphElement>(null);
-    
+
     const handleCopy = () => {
         navigator.clipboard.writeText(instruction);
         setCopied(true);
@@ -98,7 +98,7 @@ export const InstructionDisplay = ({ instruction, onEdit, showEditButton = true 
             setIsTruncated(element.scrollHeight > element.clientHeight);
         }
     }, [normalizedText]);
-    
+
     return (
         <>
             <div className="max-w-[75%]">
@@ -116,7 +116,7 @@ export const InstructionDisplay = ({ instruction, onEdit, showEditButton = true 
 
                     </div>
                 </div>
-                <p 
+                <p
                     ref={textRef}
                     className="text-[13px] text-muted-foreground line-clamp-2"
                 >
@@ -364,7 +364,7 @@ export const PayloadSpotlight = ({
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".json,.csv,.txt,.xml,.xlsx,.xls"
+                accept={ALLOWED_EXTENSIONS.join(',')}
                 onChange={handleFileInputChange}
                 className="hidden"
             />
@@ -569,7 +569,7 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
     useEffect(() => { setLocalTransform(transform || ''); }, [transform]);
     useEffect(() => { if (!schemaInitialized) { setLocalSchema(responseSchema || ''); setSchemaInitialized(true); } }, [responseSchema, schemaInitialized]);
     useEffect(() => { const handleTabChange = () => { if (onTransformChange && localTransform !== transform) onTransformChange(localTransform); if (onResponseSchemaChange && localSchema !== responseSchema) onResponseSchemaChange(localSchema); }; handleTabChange(); }, [activeTab]);
-    
+
     // Switch to output tab when transform completes
     useEffect(() => {
         if (hasTransformCompleted) {
@@ -720,26 +720,26 @@ export const FinalTransformMiniStepCard = ({ transform, responseSchema, onTransf
 };
 
 const getStatusInfo = (isRunning: boolean, isFailed: boolean, isCompleted: boolean) => {
-    if (isRunning) return { 
-        text: "Running", 
+    if (isRunning) return {
+        text: "Running",
         color: "text-amber-600 dark:text-amber-400",
         dotColor: "bg-amber-600 dark:bg-amber-400",
         animate: true
     };
-    if (isFailed) return { 
-        text: "Failed", 
+    if (isFailed) return {
+        text: "Failed",
         color: "text-red-600 dark:text-red-400",
         dotColor: "bg-red-600 dark:bg-red-400",
         animate: false
     };
-    if (isCompleted) return { 
-        text: "Completed", 
+    if (isCompleted) return {
+        text: "Completed",
         color: "text-muted-foreground",
         dotColor: "bg-green-600 dark:bg-green-400",
         animate: false
     };
-    return { 
-        text: "Pending", 
+    return {
+        text: "Pending",
         color: "text-gray-500 dark:text-gray-400",
         dotColor: "bg-gray-500 dark:bg-gray-400",
         animate: false
@@ -777,20 +777,20 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
                             <span className="text-[9px] text-muted-foreground">Tool Input</span>
                         </div>
                         <div className="flex items-center gap-1 mt-1">
-                        {!isPayloadValid ? (
-                            <span className="text-[9px] font-medium text-amber-600 dark:text-amber-400">Tool Input Needed</span>
-                        ) : (() => {
-                            // Check if payload is empty or just {}
-                            const isEmptyPayload = !payloadData || 
-                                (typeof payloadData === 'object' && Object.keys(payloadData).length === 0) ||
-                                (typeof payloadData === 'string' && (!payloadData.trim() || payloadData.trim() === '{}'));
-                            
-                            if (isEmptyPayload) {
-                                return <span className="text-[9px] font-medium text-muted-foreground">No Input</span>;
-                            } else {
-                                return <span className="text-[9px] font-medium text-muted-foreground">JSON Provided</span>;
-                            }
-                        })()}
+                            {!isPayloadValid ? (
+                                <span className="text-[9px] font-medium text-amber-600 dark:text-amber-400">Tool Input Needed</span>
+                            ) : (() => {
+                                // Check if payload is empty or just {}
+                                const isEmptyPayload = !payloadData ||
+                                    (typeof payloadData === 'object' && Object.keys(payloadData).length === 0) ||
+                                    (typeof payloadData === 'string' && (!payloadData.trim() || payloadData.trim() === '{}'));
+
+                                if (isEmptyPayload) {
+                                    return <span className="text-[9px] font-medium text-muted-foreground">No Input</span>;
+                                } else {
+                                    return <span className="text-[9px] font-medium text-muted-foreground">JSON Provided</span>;
+                                }
+                            })()}
                         </div>
                     </div>
                 </Card>
@@ -837,16 +837,16 @@ export const MiniStepCard = ({ step, index, isActive, onClick, stepId, isPayload
     const isFailed = stepId ? failedSteps.includes(stepId) : false;
     const isRunning = isTesting || (isRunningAll && !!stepId);
     const statusInfo = getStatusInfo(isRunning, isFailed, isCompleted);
-    
+
     // Find matching integration for this step
     const linkedIntegration = integrations?.find(integration => {
         if (step.integrationId && integration.id === step.integrationId) return true;
         return step.apiConfig?.urlHost && integration.urlHost && step.apiConfig.urlHost.includes(integration.urlHost.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, ''));
     });
-    
+
     const iconName = linkedIntegration ? getIntegrationIcon(linkedIntegration) : null;
     const simpleIcon = iconName ? getSimpleIcon(iconName) : null;
-    
+
     return (
         <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick}>
             <Card className={cn(
