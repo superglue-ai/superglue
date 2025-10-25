@@ -1,4 +1,4 @@
-import { ApiConfig, ExtractConfig, TransformConfig } from "@superglue/client";
+import { ApiConfig } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
 import { Context } from '../types.js';
 
@@ -47,68 +47,5 @@ export const upsertApiResolver = async (
     version: resolveField(input.version, oldConfig?.version)
   };
   await context.datastore.upsertApiConfig({ id, config, orgId: context.orgId });
-  return config;
-};
-
-export const upsertTransformResolver = async (
-  _: any,
-  { id, input }: { id: string; input: TransformConfig; },
-  context: Context,
-  info: GraphQLResolveInfo
-) => {
-  if (!id) {
-    throw new Error("id is required");
-  }
-  const oldConfig = await context.datastore.getTransformConfig({ id, orgId: context.orgId });
-
-  // reset the response mapping if there are major updates
-  let newResponseMapping = input.responseMapping;
-  if (newResponseMapping === undefined && !input.responseSchema && !input.instruction) {
-    newResponseMapping = oldConfig?.responseMapping;
-  }
-
-  const config = {
-    id: id,
-    updatedAt: new Date(),
-    createdAt: resolveField(input.createdAt, oldConfig?.createdAt, new Date()),
-    instruction: resolveField(input.instruction, oldConfig?.instruction, ''),
-    responseSchema: resolveField(input.responseSchema, oldConfig?.responseSchema, {}),
-    responseMapping: newResponseMapping,
-    version: resolveField(input.version, oldConfig?.version)
-  };
-
-  await context.datastore.upsertTransformConfig({ id, config, orgId: context.orgId });
-  return config;
-};
-
-export const upsertExtractResolver = async (
-  _: any,
-  { id, input }: { id: string; input: ExtractConfig; },
-  context: Context,
-  info: GraphQLResolveInfo
-) => {
-  if (!id) {
-    throw new Error("id is required");
-  }
-  const oldConfig = await context.datastore.getExtractConfig({ id, orgId: context.orgId });
-  const config = {
-    id: id,
-    urlHost: resolveField(input.urlHost, oldConfig?.urlHost, ''),
-    urlPath: resolveField(input.urlPath, oldConfig?.urlPath, ''),
-    instruction: resolveField(input.instruction, oldConfig?.instruction, ''),
-    createdAt: resolveField(input.createdAt, oldConfig?.createdAt, new Date()),
-    updatedAt: new Date(),
-    method: resolveField(input.method, oldConfig?.method),
-    queryParams: resolveField(input.queryParams, oldConfig?.queryParams),
-    headers: resolveField(input.headers, oldConfig?.headers),
-    body: resolveField(input.body, oldConfig?.body),
-    documentationUrl: resolveField(input.documentationUrl, oldConfig?.documentationUrl),
-    decompressionMethod: resolveField(input.decompressionMethod, oldConfig?.decompressionMethod),
-    authentication: resolveField(input.authentication, oldConfig?.authentication),
-    fileType: resolveField(input.fileType, oldConfig?.fileType),
-    dataPath: resolveField(input.dataPath, oldConfig?.dataPath),
-    version: resolveField(input.version, oldConfig?.version)
-  };
-  await context.datastore.upsertExtractConfig({ id, config, orgId: context.orgId });
   return config;
 };
