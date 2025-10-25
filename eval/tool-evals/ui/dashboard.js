@@ -65,6 +65,7 @@ function hideWarning() {
 
 function renderDashboard(data) {
     checkForNewTools(data);
+    renderBenchmarkSummary(data);
     renderMetrics(data);
     renderTools(data);
     
@@ -89,6 +90,27 @@ function checkForNewTools(data) {
     } else {
         hideWarning();
     }
+}
+
+function renderBenchmarkSummary(data) {
+    const summaryEl = document.getElementById('benchmarkSummary');
+    
+    if (!benchmarkData) {
+        summaryEl.style.display = 'none';
+        return;
+    }
+    
+    const currentToolIds = [...new Set(data.results.map(r => r.tool))];
+    const benchmarkToolIds = new Set(benchmarkData.map(b => b.tool_id));
+    const commonToolIds = currentToolIds.filter(id => benchmarkToolIds.has(id));
+    
+    const totalBenchmarkTools = new Set(benchmarkData.map(b => b.tool_id)).size;
+    
+    summaryEl.innerHTML = `
+        <strong>Benchmark Comparison:</strong> Comparing your metrics agains the same <strong>${commonToolIds.length}</strong> tools 
+        (There are ${totalBenchmarkTools} possible total in benchmark)
+    `;
+    summaryEl.style.display = 'block';
 }
 
 // Calculate and render metrics
@@ -266,8 +288,7 @@ function getToolStatusChange(toolId, oneShotAttempts, selfHealingAttempts) {
     const benchmarkRows = benchmarkData.filter(b => b.tool_id === toolId);
     if (benchmarkRows.length === 0) return null;
     
-    let hasRegression = false;
-    let hasImprovement = false;
+    const changes = [];
     
     // Check one-shot mode
     if (oneShotAttempts.length > 0) {
@@ -277,9 +298,18 @@ function getToolStatusChange(toolId, oneShotAttempts, selfHealingAttempts) {
             const benchmarkSuccess = benchmarkOneShot.success === true;
             
             if (benchmarkSuccess && !currentSuccess) {
-                hasRegression = true;
+                const currentFailure = getFailureStage(getFurthestAttempt(oneShotAttempts));
+                changes.push({
+                    type: 'regression',
+                    mode: 'one-shot',
+                    detail: `was ✓, now ${currentFailure.label}`
+                });
             } else if (!benchmarkSuccess && currentSuccess) {
-                hasImprovement = true;
+                changes.push({
+                    type: 'improvement',
+                    mode: 'one-shot',
+                    detail: 'was ✗, now ✓'
+                });
             }
         }
     }
@@ -292,16 +322,30 @@ function getToolStatusChange(toolId, oneShotAttempts, selfHealingAttempts) {
             const benchmarkSuccess = benchmarkSelfHealing.success === true;
             
             if (benchmarkSuccess && !currentSuccess) {
-                hasRegression = true;
+                const currentFailure = getFailureStage(getFurthestAttempt(selfHealingAttempts));
+                changes.push({
+                    type: 'regression',
+                    mode: 'self-healing',
+                    detail: `was ✓, now ${currentFailure.label}`
+                });
             } else if (!benchmarkSuccess && currentSuccess) {
-                hasImprovement = true;
+                changes.push({
+                    type: 'improvement',
+                    mode: 'self-healing',
+                    detail: 'was ✗, now ✓'
+                });
             }
         }
     }
     
-    if (hasRegression) return 'regression';
-    if (hasImprovement) return 'improvement';
-    return null;
+    if (changes.length === 0) return null;
+    
+    // Return the most severe change with all details
+    const hasRegression = changes.some(c => c.type === 'regression');
+    return {
+        type: hasRegression ? 'regression' : 'improvement',
+        changes: changes
+    };
 }
 
 function createToolItem(toolId, attempts) {
@@ -314,13 +358,13 @@ function createToolItem(toolId, attempts) {
     const toolName = attempts[0].toolName;
     
     // Check for status changes vs benchmark
-    const statusChange = getToolStatusChange(toolId, oneShotAttempts, selfHealingAttempts);
+    const statusChangeInfo = getToolStatusChange(toolId, oneShotAttempts, selfHealingAttempts);
     
     // Create header
     const header = document.createElement('div');
     header.className = 'tool-header';
     
-    const statusChangeBadge = statusChange ? createStatusChangeBadge(statusChange) : '';
+    const statusChangeBadge = statusChangeInfo ? createStatusChangeBadge(statusChangeInfo) : '';
     
     header.innerHTML = `
         <div class="tool-info">
@@ -400,11 +444,19 @@ function createToolItem(toolId, attempts) {
     return container;
 }
 
-function createStatusChangeBadge(statusChange) {
-    if (statusChange === 'regression') {
-        return '<span class="status-change-badge status-change-regression">⚠ Regression vs Benchmark</span>';
-    } else if (statusChange === 'improvement') {
-        return '<span class="status-change-badge status-change-improvement">✓ Improvement vs Benchmark</span>';
+function createStatusChangeBadge(statusChangeInfo) {
+    const { type, changes } = statusChangeInfo;
+    
+    // Create detailed text showing all changes
+    const details = changes.map(change => {
+        const modeLabel = change.mode === 'one-shot' ? '1-Shot' : 'Healing';
+        return `${modeLabel}: ${change.detail}`;
+    }).join('; ');
+    
+    if (type === 'regression') {
+        return `<span class="status-change-badge status-change-regression" title="${escapeHtml(details)}">⚠ Regression (${details})</span>`;
+    } else if (type === 'improvement') {
+        return `<span class="status-change-badge status-change-improvement" title="${escapeHtml(details)}">✓ Improvement (${details})</span>`;
     }
     return '';
 }

@@ -107,6 +107,16 @@ h2 {
     font-size: 0.9em;
 }
 
+.benchmark-summary {
+    background-color: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
+    padding: 12px 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
 .metrics-section {
     background: white;
     padding: 30px;
