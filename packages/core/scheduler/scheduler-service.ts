@@ -1,6 +1,7 @@
 import { calculateNextRun, validateCronExpression } from "@superglue/shared";
 import crypto from "crypto";
 import { DataStore, WorkflowScheduleInternal } from "../datastore/types.js";
+import { server_defaults } from "../default.js";
 import { isValidTimezone } from "../utils/timezone.js";
 
 export class WorkflowScheduler {
@@ -10,16 +11,16 @@ export class WorkflowScheduler {
         this.datastore = datastore;
     }
 
-    public async upsertWorkflowSchedule(params: { 
-        id?: string, 
-        workflowId?: string, 
-        orgId: string, 
-        cronExpression?: string, 
+    public async upsertWorkflowSchedule(params: {
+        id?: string,
+        workflowId?: string,
+        orgId: string,
+        cronExpression?: string,
         timezone?: string,
-        enabled?: boolean, 
-        payload?: Record<string, any>, 
+        enabled?: boolean,
+        payload?: Record<string, any>,
         options?: Record<string, any>
-    }) : Promise<WorkflowScheduleInternal> {
+    }): Promise<WorkflowScheduleInternal> {
         if (!params.id && !params.workflowId) {
             throw new Error("Failed to upsert workflow schedule: Provide either ID (for updates) or Workflow ID (for new schedules)");
         }
@@ -28,11 +29,11 @@ export class WorkflowScheduler {
             throw new Error("Failed to upsert workflow schedule: Invalid cron expression");
         }
 
-        if(params.timezone !== undefined && !isValidTimezone(params.timezone)) {
+        if (params.timezone !== undefined && !isValidTimezone(params.timezone)) {
             throw new Error("Failed to upsert workflow schedule: Invalid timezone");
         }
 
-        let existingScheduleOrNull = null; 
+        let existingScheduleOrNull = null;
         if (params.id) {
             existingScheduleOrNull = await this.datastore.getWorkflowSchedule({ id: params.id, orgId: params.orgId });
 
@@ -41,12 +42,18 @@ export class WorkflowScheduler {
             }
         }
 
-        if(!params.cronExpression && !existingScheduleOrNull?.cronExpression) {
+        if (!params.cronExpression && !existingScheduleOrNull?.cronExpression) {
             throw new Error("Failed to upsert workflow schedule: Cron expression is required for new schedule");
         }
 
-        if(!params.timezone && !existingScheduleOrNull) {
+        if (!params.timezone && !existingScheduleOrNull) {
             throw new Error("Failed to upsert workflow schedule: Timezone is required for new schedule");
+        }
+
+        if (params.options?.retries !== undefined) {
+            if (typeof params.options.retries !== 'number' || params.options.retries < 0 || params.options.retries > server_defaults.MAX_CALL_RETRIES) {
+                throw new Error(`Failed to upsert workflow schedule: Retries must be between 0 and ${server_defaults.MAX_CALL_RETRIES}`);
+            }
         }
 
         const id = existingScheduleOrNull?.id ?? crypto.randomUUID();
@@ -58,7 +65,7 @@ export class WorkflowScheduler {
         let nextRunAt = existingScheduleOrNull?.nextRunAt;
         const cronExpressionChanged = params.cronExpression !== undefined && params.cronExpression !== existingScheduleOrNull?.cronExpression;
         const timezoneChanged = params.timezone !== undefined && params.timezone !== existingScheduleOrNull?.timezone;
-        if(cronExpressionChanged || timezoneChanged || params.enabled == true) {
+        if (cronExpressionChanged || timezoneChanged || params.enabled == true) {
             const currentDate = new Date(Date.now());
             nextRunAt = calculateNextRun(cronExpression, timezone, currentDate);
         }
@@ -82,11 +89,11 @@ export class WorkflowScheduler {
         return scheduleToSave;
     }
 
-    public async deleteWorkflowSchedule({id, orgId}: { id: string, orgId: string }) : Promise<boolean> {
+    public async deleteWorkflowSchedule({ id, orgId }: { id: string, orgId: string }): Promise<boolean> {
         return await this.datastore.deleteWorkflowSchedule({ id, orgId });
     }
 
-    public async listWorkflowSchedules({workflowId, orgId}: { workflowId: string, orgId: string }) : Promise<WorkflowScheduleInternal[]> {
+    public async listWorkflowSchedules({ workflowId, orgId }: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]> {
         return await this.datastore.listWorkflowSchedules({ workflowId, orgId });
     }
 }

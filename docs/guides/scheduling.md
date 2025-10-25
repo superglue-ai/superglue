@@ -222,7 +222,7 @@ await client.upsertWorkflowSchedule({
   - `TRANSFORM_ONLY`: Only fixes data transformation errors
   - `REQUEST_ONLY`: Only fixes API call errors
 
-- **Retries**: Number of retry attempts for failed API calls (default: 1)
+- **Retries**: Number of retry attempts for failed API calls (default: 1, max: 10)
 
 - **Timeout**: Maximum time to wait for API responses in milliseconds (default: 60000ms / 1 minute)
 

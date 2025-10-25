@@ -1,16 +1,15 @@
 import { type ApiConfig, type RequestOptions } from "@superglue/client";
+import { getEvaluateStepResponseContext } from "../context/context-builders.js";
+import { EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
 import { Metadata } from "../graphql/types.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
-import { isSelfHealingEnabled, maskCredentials, sample } from "../utils/tools.js";
+import { isSelfHealingEnabled, maskCredentials } from "../utils/tools.js";
 import { AbortError, ApiCallError } from "./api/api.js";
 import { callEndpointLegacyImplementation, generateApiConfig } from "./api/api.legacy.js";
-import { getEvaluateStepResponseContext } from "../context/context-builders.js";
-import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions } from "../context/context-types.js";
-import { EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT } from "../context/context-prompts.js";
 
 export async function evaluateStepResponse({
   data,
