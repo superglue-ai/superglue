@@ -13,14 +13,26 @@ export class IntegrationSetupService {
   ) {}
 
   async setupIntegrations(): Promise<Integration[]> {
-    const integrationConfigs = this.config.integrations;
+    const enabledTools = this.config.enabledTools === 'all' 
+      ? this.config.tools 
+      : this.config.tools.filter(tool => this.config.enabledTools.includes(tool.id));
+    
+    const usedIntegrationIds = new Set(
+      enabledTools.flatMap(tool => tool.integrationIds)
+    );
+    
+    const integrationConfigs = this.config.integrations.filter(integration => 
+      usedIntegrationIds.has(integration.id)
+    );
+
+    this.applyEnvironmentVariablesToConfigs(integrationConfigs);
 
     const integrations = await Promise.all(
       integrationConfigs.map((config) => this.setupSingleIntegration(config))
     );
 
     logMessage("info", `${integrations.length}/${integrationConfigs.length} integrations setup complete`, this.metadata);
-    return this.applyEnvirnonmentVariables(integrations);
+    return integrations;
   }
 
   private async setupSingleIntegration(integrationConfig: IntegrationConfig): Promise<Integration> {
@@ -39,13 +51,9 @@ export class IntegrationSetupService {
       };
     }
 
-    if (!integrationConfig.documentationUrl || integrationConfig.documentationUrl.trim() === "") {
-      logMessage("info", `${integrationConfig.name} has no documentation URL, skipping setup`, this.metadata);
-
-      return {
-        ...(existing ?? integrationConfig),
-        credentials: integrationConfig.credentials,
-      };
+    if (integrationConfig.id === "postgres-lego") {
+      // replace the username, password, host, port, and database in the urlHost with the values from the credentials
+      integrationConfig.urlHost = integrationConfig.urlHost.replace("<<username>>", integrationConfig.credentials.username).replace("<<password>>", integrationConfig.credentials.password).replace("<<host>>", integrationConfig.credentials.host).replace("<<port>>", integrationConfig.credentials.port).replace("<<database>>", integrationConfig.credentials.database);
     }
 
     const docFetcher = new DocumentationFetcher(
@@ -92,24 +100,22 @@ export class IntegrationSetupService {
     };
   }
 
-  private applyEnvirnonmentVariables(integrations: Integration[]): Integration[] {
-    for (const integration of integrations) {
-      if (!integration.credentials || !integration.id ) {
+  private applyEnvironmentVariablesToConfigs(integrationConfigs: IntegrationConfig[]): void {
+    for (const config of integrationConfigs) {
+      if (!config.credentials || !config.id) {
         continue;
       }
 
-      for (const [key, _] of Object.entries(integration.credentials)) {
-        const expectedEnvVarName = `${integration.id.toUpperCase().replace(/-/g, '_')}_${key.toUpperCase()}`;
+      for (const [key, _] of Object.entries(config.credentials)) {
+        const expectedEnvVarName = `${config.id.toUpperCase().replace(/-/g, '_')}_${key.toUpperCase()}`;
         const envValue = process.env[expectedEnvVarName];
 
         if (envValue) {
-          integration.credentials[key] = envValue;
+          config.credentials[key] = envValue;
         } else {
-          logMessage('warn', `Missing credential: ${integration.id}.${key} (${expectedEnvVarName})`); //todo: hard fail, but only for enabled ones
+          logMessage('warn', `Missing credential: ${config.id}.${key} (${expectedEnvVarName})`);
         }
       }
     }
-
-    return integrations;
   }
 }

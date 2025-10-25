@@ -67,5 +67,3 @@ function isDeepEqual(expected: any, received: any): boolean {
 export default function validate(data: any, payload: any): void {
   assert(isDeepEqual(EXPECTED_DATA, data), `Data does not match expected structure. Expected: ${JSON.stringify(EXPECTED_DATA)}, Received: ${JSON.stringify(data)}`);
 }
-
-

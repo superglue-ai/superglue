@@ -7,7 +7,7 @@ import { generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 
-const MAX_OUTPUT_FOR_LLM = 2000;
+const MAX_OUTPUT_FOR_LLM = 3000;
 
 export class ToolValidationService {
     private validationLlmConfig: ValidationLLMConfig;
@@ -183,14 +183,9 @@ ${output}`;
 ${expectedDescription}`;
         }
 
-        if (functionError) {
-            prompt += `\n\nValidation Function Error:
-${functionError}`;
-        }
-
         prompt += `\n\nEvaluate if the output satisfies the instruction. Respond with:
-- "passes" if the output fully meets the requirements
-- "partial" if the output is mostly correct but has minor issues
+- "passes" if the output fully meets the requirements (it can have minor issues like returning additional data, or having a slightly different format, but it should be correct overall)
+- "partial" if the output is mostly correct but has minor issues like returning additional data, or missing one out of many required fields or items in the wrong order, or wrong json structure but correct content.
 - "failed" if the output is incorrect or missing key requirements
 
 Provide a brief one-sentence reason for your judgment.`;

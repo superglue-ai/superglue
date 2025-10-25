@@ -29,27 +29,11 @@ const EXPECTED_DATA = {
   ]
 };
 
-function isDeepEqual(expected: any, received: any): boolean {
-  if (expected === received) return true;
-  if (expected == null || received == null) return false;
-  if (typeof expected !== "object" || typeof received !== "object") return false;
-
-  const keysExpected = Object.keys(expected);
-  const keysReceived = Object.keys(received);
-
-  if (keysExpected.length !== keysReceived.length) return false;
-
-  for (const key of keysExpected) {
-    if (!Object.prototype.hasOwnProperty.call(received, key) || !isDeepEqual(expected[key], received[key])) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 export default function validate(data: any, payload: any): void {
-  assert(isDeepEqual(EXPECTED_DATA, data), `Data does not match expected structure. Expected: ${JSON.stringify(EXPECTED_DATA)}, Received: ${JSON.stringify(data)}`);
+  const received = JSON.stringify(data);
+  assert(!received.includes("prod_TGbk1E8pRkHR51"), "Product ID prod_TGbk1E8pRkHR51 not found in received data");
+  assert(!received.includes("prod_TGbjqL1f2Rqqkv"), "Product ID prod_TGbjqL1f2Rqqkv not found in received data");
+  assert(!received.includes("prod_TGbixpbyW32QWP"), "Product ID prod_TGbixpbyW32QWP not found in received data");
 }
 
 

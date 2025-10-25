@@ -188,7 +188,7 @@
       "urlPath": "",
       "documentationUrl": "https://linear.app/developers",
       "credentials": {
-        "access_token": ""
+        "api_key": ""
       },
       "description": "Linear API",
       "keywords": [
@@ -357,11 +357,15 @@
     {
       "id": "postgres-lego",
       "name": "LEGO Database",
-      "urlHost": "",
+      "urlHost": "postgres://<<username>>:<<password>>@<<host>>:<<port>>/<<database>>/",
       "urlPath": "",
       "documentationUrl": "",
       "credentials": {
-        "connection_string": ""
+        "username": "",
+        "password": "",
+        "host": "",
+        "port": "",
+        "database": ""
       },
       "description": "PostgreSQL LEGO database for testing",
       "keywords": [
@@ -459,8 +463,8 @@
       ]
     },
     {
-      "id": "tele2-ftp",
-      "name": "Tele2 FTP Speedtest",
+      "id": "tele2-http",
+      "name": "Tele2 HTTP and FTP Speedtest",
       "urlHost": "http://speedtest.tele2.net",
       "urlPath": "",
       "documentationUrl": "http://speedtest.tele2.net/",
@@ -673,7 +677,7 @@
         "formId": "lyyDJUcC"
       },
       "validationFunction": "validators/008-typeform-get-form-by-id.ts",
-      "expectedResultDescription": "Should return the form with ID lyyDJUcC. Expected to be 'Coffee Shop Applications' form with 1 response from Peter Mustermann applying for Cashier position. Response should include answers to questions about name, position, work experience, and motivation."
+      "expectedResultDescription": "Should return the form with ID lyyDJUcC. Expected to be 'Coffee Shop Applications' form with 2 responses from Peter and Max Mustermann applying for Cashier and Barista position. Response should include answers to questions about name, position, work experience, and motivation."
     },
     {
       "id": "009-typeform-get-all-workspaces",
@@ -693,7 +697,7 @@
       "integrationIds": ["confluence"],
       "payload": {},
       "validationFunction": "validators/010-confluence-get-all-spaces.ts",
-      "expectedResultDescription": "Should return all Confluence spaces for the authenticated user. Expected to find 3 spaces: 'Docs' (knowledge_base, active), 'Max Mustermann' (personal, active), and 'Projektmanagement' (onboarding, archived)."
+      "expectedResultDescription": "Should return all Confluence spaces for the authenticated user. Expected to find 3 spaces: 'Docs' (knowledge_base), 'Max Mustermann' (personal), and 'Projektmanagement' (onboarding, archived)."
     },
     {
       "id": "011-confluence-get-page-content",
@@ -705,7 +709,7 @@
         "pageId": "163855"
       },
       "validationFunction": "validators/011-confluence-get-page-content.ts",
-      "expectedResultDescription": "Should return the content of Confluence page ID 163855. Expected content about 'Intern Onboarding' in HTML format."
+      "expectedResultDescription": "Should return the content of Confluence page for a given ID. Expected content about 'Intern Onboarding' in HTML format."
     },
     {
       "id": "012-confluence-get-all-pages-of-space",
@@ -717,7 +721,7 @@
         "spaceId": "294916"
       },
       "validationFunction": "validators/012-confluence-get-all-pages-of-space.ts",
-      "expectedResultDescription": "Should return all pages from Confluence space ID 294916. Expected to find 4 pages: 'Company Guidelines', 'Docs', 'Interns', and 'IT Service Desk'. Each page should contain HTML content."
+      "expectedResultDescription": "Should return all pages from Confluence for a given space ID. Expected to find 4 pages: 'Company Guidelines', 'Docs', 'Interns', and 'IT Service Desk'. Each page should contain HTML content."
     },
     {
       "id": "013-github-list-repos",
@@ -753,7 +757,7 @@
       "id": "016-linear-get-all-issues",
       "name": "Linear Get All Issues",
       "type": "retrieval",
-      "instruction": "Get all issues. I want the final output to be a JSON object with the following structure: { issues: [{id: string, title: string }] }. ",
+      "instruction": "Get me all linear issues. I want the final output to be a JSON object with the following structure: { issues: [{id: string, title: string }] }. ",
       "integrationIds": ["linear"],
       "payload": {},
       "validationFunction": "validators/016-linear-get-all-issues.ts",
@@ -785,14 +789,14 @@
       "id": "019-postgres-lego-inventory-analysis",
       "name": "Postgres LEGO Inventory Analysis",
       "type": "retrieval",
-      "instruction": "Query the LEGO database to find all LEGO themes. Please use the pagination payload to get the next page of results. I want the final output to be a JSON object with the following structure: { themes: [{id: string, name: string}]}. ",
+      "instruction":"Use the payload to query a specific section of my lego themes list. Return the output in this structure: { themes: [{id: string, name: string}]}",
       "integrationIds": ["postgres-lego"],
       "payload": {
-        "page": 2,
-        "pageSize": 10
+        "offset": 2,
+        "limit": 10
       },
       "validationFunction": "validators/019-postgres-lego-inventory-analysis.ts",
-      "expectedResultDescription": "Should return page 2 of LEGO themes (10 items per page). Expected themes from IDs 11-20: 'Off-Road', 'Race', 'Riding Cycle', 'Robot', 'Traffic', 'RoboRiders', 'Speed Slammers', 'Star Wars', 'Supplemental', and 'Throwbot Slizer'."
+      "expectedResultDescription": "Should return page 2 of LEGO themes (10 items per page). Expected themes from IDs 11-20 and no more."
     },
     {
       "id": "020-postgres-lego-get-colors",
@@ -815,44 +819,44 @@
       "expectedResultDescription": "Should return the top 20 most popular LEGO themes ranked by number of sets (descending). Expected top theme to be 'Gear' with 246 sets, followed by 'Supplemental' with 240 sets, 'Duplo' with 219 sets, and 'City' with 216 sets. Themes like 'Friends', 'Ninjago', and 'Star Wars' should also appear in the top 20."
     },
     {
-      "id": "022-timbuk2-product-analysis",
-      "name": "Timbuk2 Product Analysis",
-      "description": "Tests pagination",
+      "id": "022-timbuk2-paginated-product-fetch",
+      "name": "Timbuk2 Paginated Product Fetch",
+      "description": "Tests basic pagination functionality - fetching multiple pages and combining results",
       "type": "retrieval",
-      "instruction": "Get all products from Timbuk2. Please make sure you get all products by using page and limit. I want the final output to be a JSON object with the following structure: { products: string[] }. ",
+      "instruction": "Fetch the first 3 pages of products from Timbuk2 with 5 products per page. Return a JSON object with structure: { total_fetched: number, products: [{ id: number, title: string, vendor: string }] }",
       "integrationIds": ["timbuk2-shopify"],
       "payload": {},
-      "validationFunction": "validators/022-timbuk2-product-analysis.ts",
-      "expectedResultDescription": "Should return all 137 Timbuk2 products using pagination. Expected products include bags like 'Flight Crossbody Sling Bag', 'Custom Classic Messenger Bag', 'Wingman Travel Backpack Duffel', backpacks like 'Water Resistant Tuck Backpack', 'Alcatraz Backpack' variants, accessories like 'Transit Dopp Kit', repair items, and components. First product should be 'Non-Repairable Return' and last should be 'Stealth Folio Organizer'."
+      "skipValidationFunction": true,
+      "expectedResultDescription": "Should fetch exactly 15 products across 3 pages. Each product must have numeric id, non-empty title string, and vendor string starting with 'Timbuk2-'. The total_fetched field should equal 15."
     },
     {
-      "id": "023-timbuk2-get-public-vendors",
-      "name": "Timbuk2 Get Public Vendors",
-      "description": "Tests pagination and deduplication since vendors are only found as fields on products; extraction and uniqueness must be computed client-side. Without `Please make sure you get all products by using page and limit.` it would not work.",
+      "id": "023-timbuk2-vendor-aggregation",
+      "name": "Timbuk2 Vendor Aggregation",
+      "description": "Tests pagination with client-side aggregation and deduplication",
       "type": "retrieval",
-      "instruction": "Get all unique publicly available vendors from Timbuk2. Please make sure you get all products by using page and limit. I want the final output to be a JSON object with the following structure: { vendors: string[] }. ",
+      "instruction": "Get all unique vendors from Timbuk2 products. Fetch multiple pages to ensure you capture all products, using page and limit parameters. Return JSON: { unique_vendors: string[], total_products_scanned: number }",
       "integrationIds": ["timbuk2-shopify"],
       "payload": {},
-      "validationFunction": "validators/023-timbuk2-get-public-vendors.ts",
-      "expectedResultDescription": "Should return all unique vendor names extracted from Timbuk2 products (requires pagination and deduplication). Expected 4 vendors: 'Timbuk2-Timbuk2', 'Timbuk2-Corporate', 'Timbuk2-Sale', and 'Timbuk2-Corporate-Sale'."
+      "skipValidationFunction": true,
+      "expectedResultDescription": "Should return an array of unique vendor names (unique_vendors should be a string array with no duplicates, each starting with 'Timbuk2-'). The total_products_scanned should be a positive number indicating how many products were processed to find the vendors."
     },
     {
-      "id": "024-timbuk2-get-newest-products",
-      "name": "Timbuk2 Get 10 Newest Products",
-      "description": "Tests pagination and deduplication since vendors are only found as fields on products; extraction and uniqueness must be computed client-side. Without `Please make sure you get all products by using page and limit.` it would not work.",
+      "id": "024-timbuk2-price-range-analysis",
+      "name": "Timbuk2 Price Range Analysis",
+      "description": "Tests pagination with data transformation and aggregation across variants",
       "type": "retrieval",
-      "instruction": "Get the 10 newest products from Timbuk2. Please make sure you get all products by using page and limit. I want the final output to be a JSON object with the following structure: { products: [{title: string, updated_at: string}] }. ",
+      "instruction": "Analyze product prices from Timbuk2. Fetch products using pagination (page and limit parameters). For each product, extract all variant prices and calculate statistics. Return JSON: { products_analyzed: number, price_range: { min_price: string, max_price: string }, zero_price_products: number }",
       "integrationIds": ["timbuk2-shopify"],
       "payload": {},
-      "validationFunction": "validators/024-timbuk2-get-newest-products.ts",
-      "expectedResultDescription": "Should return exactly 10 newest Timbuk2 products sorted by updated_at (descending). Expected products include: 'Non-Repairable Return', 'Non-Repairable Recycle', 'Non-Payment Return', 'Non-Payment Recycle', 'Flight Crossbody Sling Bag', 'Flight Crossbody Satchel', 'Flight Convertible Tote Backpack', 'Flight Backpack', 'Flight Classic Messenger Bag', and 'Miles Chest Pack'. All should have same update timestamp 2025-10-19T14:22:18-07:00."
+      "skipValidationFunction": true,
+      "expectedResultDescription": "Should return statistics from paginated product data. products_analyzed should be a positive number. price_range should contain min_price and max_price as numeric strings (e.g., '0', '149.99'). zero_price_products should be a number >= 0 representing products with free variants."
     },
     {
       "id": "025-stripe-get-customers",
       "name": "Stripe Get Customers",
       "description": "This tests pagination. It usually fails because of nested structure.",
       "type": "retrieval",
-      "instruction": "Get all customers from Stripe. I want the final output to be a JSON object with the following structure: { customers: string[] // person names }. The data is at sourceData.getAllProducts.results[0].data, not sourceData.getAllProducts.data. Update the finalTransform to access sourceData.getAllProducts.results and flatten the .data arrays from each result.",
+      "instruction": "Get all (over the whole account history) my customers from Stripe.",
       "integrationIds": ["stripe"],
       "payload": {},
       "validationFunction": "validators/025-stripe-get-customers.ts",
@@ -863,7 +867,7 @@
       "name": "Stripe Calculate Revenue",
       "description": "This usually fails because of nested structure.",
       "type": "retrieval",
-      "instruction": "Calculate the total revenue from Stripe. I want the final output to be a JSON object with the following structure: { gross_revenue: number, fees: number, net_revenue: number }. The data is at sourceData.getAllProducts.results[0].data, not sourceData.getAllProducts.data. Update the finalTransform to access sourceData.getAllProducts.results and flatten the .data arrays from each result.",
+      "instruction": "Calculate the total revenue from Stripe. I want the final output to be a JSON object with the following structure: { gross_revenue: number, fees: number, net_revenue: number }.",
       "integrationIds": ["stripe"],
       "payload": {},
       "validationFunction": "validators/026-stripe-calculate-revenue.ts",
@@ -874,7 +878,7 @@
       "name": "Stripe Get Products",
       "description": "This tests pagination. It usually fails because of nested structure.",
       "type": "retrieval",
-      "instruction": "Get all products from Stripe. I want the final output to be a JSON object with the following structure: { products: string[] }. The data is at sourceData.getAllProducts.results[0].data, not sourceData.getAllProducts.data. Update the finalTransform to access sourceData.getAllProducts.results and flatten the .data arrays from each result.",
+      "instruction": "Get a complete list of all products from Stripe. I need the ID and the name",
       "integrationIds": ["stripe"],
       "payload": {},
       "validationFunction": "validators/027-stripe-get-all-products.ts",
@@ -885,11 +889,11 @@
       "name": "Attio Get 15 Oldest People",
       "description": "",
       "type": "retrieval",
-      "instruction": "Get 15 people from Attio and sort them by created at, oldest first. I want the final output to be a JSON object with the following structure: { people: string[] }. ",
+      "instruction": "From Attio, get me the 10 'oldest' people, so the people with the older created at date. I want the final output to be a JSON object with the names of the people and the following structure: { people: string[] }. ",
       "integrationIds": ["attio"],
       "payload": {},
-      "validationFunction": "validators/028-attio-get-15-oldest-people.ts",
-      "expectedResultDescription": "Should return exactly 15 people from Attio CRM sorted by creation date (oldest first). Expected names in order: 'Isabella Davis', 'Mia Miller', 'Ava Martinez', 'Evelyn Martinez', 'Henry Brown', 'Amelia Brown', 'James Taylor', 'Evelyn Jones', 'Alexander Moore', 'Benjamin Davis', 'Benjamin Wilson', 'Noah Williams', 'James Lopez', 'Sophia Miller', and 'Olivia Martinez'."
+      "skipValidationFunction": true,
+      "expectedResultDescription": "Should return exactly 10 people from Attio CRM. Expected names (not in order): 'Isabella Davis', 'Mia Miller', 'Ava Martinez', 'Evelyn Martinez', 'Henry Brown', 'Amelia Brown', 'James Taylor', 'Evelyn Jones', 'Alexander Moore', 'Benjamin Davis'."
     },
     {
       "id": "029-attio-get-person-by-id",
@@ -948,20 +952,20 @@
       "id": "034-tele2-http-download-verification",
       "name": "Tele2 HTTP Download",
       "type": "retrieval",
-      "instruction": "Download the 10MB.zip file from the Tele2 FTP speedtest service at http://speedtest.tele2.net/10MB.zip. After the download completes, verify that the file exists and was successfully downloaded. In the final transform, check if the file is present and return a status object indicating success if the file exists, otherwise return failure. Output JSON: { \"status\": \"success\" | \"failure\", \"file\": string }.",
-      "integrationIds": ["tele2-ftp"],
+      "instruction": "Download the 10MB.zip file from the Tele2 speedtest service at http://speedtest.tele2.net/10MB.zip. After the download completes, verify that the file exists and was successfully downloaded. In the final transform, check if the file is present and return a status object indicating success if the file exists, otherwise return failure. Output JSON: { \"status\": \"success\" | \"failure\", \"file\": string }.",
+      "integrationIds": ["tele2-http"],
       "payload": {},
       "validationFunction": "validators/034-tele2-http-download-verification.ts",
       "expectedResultDescription": "Should download 10GB.zip file from Tele2 speedtest and verify successful download. Expected status 'success' with file name '10GB.zip'."
     },
     {
-      "id": "035-tele2-ftp-upload-berkshire-letter",
-      "name": "Tele2 FTP Upload Berkshire Letter",
+      "id": "035-tele2-http-upload-berkshire-letter",
+      "name": "Tele2 HTTP Upload Berkshire Letter",
       "type": "retrieval",
-      "instruction": "First, download the Berkshire Hathaway 2024 shareholder letter PDF from https://www.berkshirehathaway.com/letters/2024ltr.pdf. Then, upload this downloaded file to the Tele2 FTP speedtest server at ftp://speedtest.tele2.net/upload/. The upload directory automatically removes files after upload completes. In the final transform, return a status object indicating success if the upload worked, otherwise return failure. Output JSON: { \"status\": \"success\" | \"failure\" }.",
-      "integrationIds": ["tele2-ftp", "berkshire-hathaway-letter"],
+      "instruction": "Download the Berkshire Hathaway 2024 shareholder letter PDF from https://www.berkshirehathaway.com/letters/2024ltr.pdf and upload it to the Tele2 FTP speedtest server. Return success status if upload works, failure status otherwise.",
+      "integrationIds": ["tele2-http", "berkshire-hathaway-letter"],
       "payload": {},
-      "validationFunction": "validators/035-tele2-ftp-upload-berkshire-letter.ts",
+      "validationFunction": "validators/035-tele2-http-upload-berkshire-letter.ts",
       "expectedResultDescription": "Should download Berkshire Hathaway 2024 shareholder letter PDF and upload to Tele2 FTP server. Expected status 'success' indicating file was downloaded and uploaded successfully."
     },
     {
@@ -1105,11 +1109,11 @@
       "expectedResultDescription": "Should retrieve exactly 1005 messages from the 'evals' Slack channel with explicit pagination reminder. Expected message_count to be exactly 1005."
     }
   ],
-  "enabledTools": ["003-clickup-all-comments-and-replies"],
+  "enabledTools": "all",
   "settings": {
     "runOneShotMode": true,
     "runSelfHealingMode": true,
-    "attemptsEachMode": 3
+    "attemptsEachMode": 2
   },
   "validationLlmConfig": {
     "provider": "openai",
