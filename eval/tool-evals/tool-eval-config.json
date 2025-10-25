@@ -599,7 +599,7 @@
         "listId": "901516361522"
       },
       "validationFunction": "validators/001-clickup-task-list.ts",
-      "expectedResultDescription": "Should return tasks from list ID 901516361522. Expected to find at least one task named 'First Task' with a description starting with 'Lorem ipsum dolor sit amet'."
+      "expectedResultDescription": "Should return tasks from a give list ID. Expected to find at least one task named 'First Task' with a description starting with 'Lorem ipsum dolor sit amet'."
     },
     {
       "id": "002-clickup-all-lists",
@@ -1105,11 +1105,11 @@
       "expectedResultDescription": "Should retrieve exactly 1005 messages from the 'evals' Slack channel with explicit pagination reminder. Expected message_count to be exactly 1005."
     }
   ],
-  "enabledTools": ["042-slack-post-eval-message", "043-slack-list-non-sg-channels", "044-slack-get-last-20-messages", "045-slack-get-all-messages"],
+  "enabledTools": ["003-clickup-all-comments-and-replies"],
   "settings": {
     "runOneShotMode": true,
     "runSelfHealingMode": true,
-    "attemptsEachMode": 2
+    "attemptsEachMode": 3
   },
   "validationLlmConfig": {
     "provider": "openai",
