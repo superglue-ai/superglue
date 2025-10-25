@@ -395,6 +395,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                             id="retries"
                             type="number"
                             min="0"
+                            max="10"
                             placeholder="Default: 1"
                             value={retries}
                             onChange={(e) => setRetries(e.target.value)}
@@ -419,7 +420,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2">
                           <Label htmlFor="webhookUrl">Webhook URL</Label>
-                          <HelpTooltip text="Send execution results to this webhook URL. The webhook will receive a POST request with {runId, success, data?, error?} after each scheduled execution." />
+                          <HelpTooltip text="Send execution results to this webhook URL." />
                         </div>
                         <Input
                           id="webhookUrl"

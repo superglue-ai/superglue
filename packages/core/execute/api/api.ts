@@ -37,7 +37,7 @@ const httpsAgent = configureHttpsAgent();
 export async function callAxios(config: AxiosRequestConfig, options: RequestOptions): Promise<CallAxiosResult> {
   let retryCount = 0;
   const defaultRetries = process.env.AXIOS_KEEP_ALIVE === 'false' ? 3 : 1;
-  const maxRetries = options?.retries ?? defaultRetries;
+  const maxRetries = Math.min(options?.retries ?? defaultRetries, server_defaults.MAX_CALL_RETRIES);
   const delay = options?.retryDelay || server_defaults.AXIOS.DEFAULT_RETRY_DELAY_MS;
   const maxRateLimitWaitMs = server_defaults.AXIOS.MAX_RATE_LIMIT_WAIT_MS;
   let rateLimitRetryCount = 0;
