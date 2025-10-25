@@ -50,9 +50,10 @@ export class WorkflowScheduler {
             throw new Error("Failed to upsert workflow schedule: Timezone is required for new schedule");
         }
 
-        // Cap retries at MAX_CALL_RETRIES for safety
-        if (params.options?.retries !== undefined && params.options.retries > server_defaults.MAX_CALL_RETRIES) {
-            params.options.retries = server_defaults.MAX_CALL_RETRIES;
+        if (params.options?.retries !== undefined) {
+            if (typeof params.options.retries !== 'number' || params.options.retries < 0 || params.options.retries > server_defaults.MAX_CALL_RETRIES) {
+                throw new Error(`Failed to upsert workflow schedule: Retries must be between 0 and ${server_defaults.MAX_CALL_RETRIES}`);
+            }
         }
 
         const id = existingScheduleOrNull?.id ?? crypto.randomUUID();

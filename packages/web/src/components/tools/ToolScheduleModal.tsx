@@ -51,6 +51,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selfHealing, setSelfHealing] = useState<string>('DISABLED');
   const [retries, setRetries] = useState<string>('');
+  const [isRetriesValid, setIsRetriesValid] = useState(true);
   const [timeout, setTimeout] = useState<string>('');
   const [webhookUrl, setWebhookUrl] = useState<string>('');
 
@@ -190,6 +191,16 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
   const handlePayloadChange = (code: string) => {
     setPayload(code);
     validateJson(code);
+  };
+
+  const handleRetriesChange = (value: string) => {
+    setRetries(value);
+    if (value === '') {
+      setIsRetriesValid(true);
+    } else {
+      const numValue = parseInt(value);
+      setIsRetriesValid(!isNaN(numValue) && numValue >= 0 && numValue <= 10);
+    }
   };
 
   const highlightJson = (code: string) => {
@@ -356,14 +367,22 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
 
                 {/* advanced options */}
                 <div className="flex flex-col gap-4 border-t pt-4">
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    aria-expanded={showAdvanced}
+                    tabIndex={0}
                     onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="flex items-center gap-2 text-sm text-muted-foreground"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setShowAdvanced(!showAdvanced);
+                      }
+                    }}
+                    className="flex items-center gap-2 text-sm text-muted-foreground select-none cursor-pointer outline-none focus:outline-none"
                   >
                     <ChevronRight className={cn("h-4 w-4 transition-transform", showAdvanced && "rotate-90")} />
                     <span>Advanced Options</span>
-                  </button>
+                  </div>
 
                   {showAdvanced && (
                     <div className="flex flex-col gap-4">
@@ -389,7 +408,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                         <div className="flex flex-col gap-2">
                           <div className="flex items-center gap-2">
                             <Label htmlFor="retries">Retries</Label>
-                            <HelpTooltip text="Number of retry attempts for failed API calls. Higher values increase reliability but may slow execution." />
+                            <HelpTooltip text="Number of retry attempts for failed API calls (max 10). Higher values increase reliability but may slow execution." />
                           </div>
                           <Input
                             id="retries"
@@ -398,8 +417,13 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                             max="10"
                             placeholder="Default: 1"
                             value={retries}
-                            onChange={(e) => setRetries(e.target.value)}
+                            onChange={(e) => handleRetriesChange(e.target.value)}
                           />
+                          {!isRetriesValid && (
+                            <p className="text-sm text-destructive mt-1">
+                              Maximum 10 retries allowed
+                            </p>
+                          )}
                         </div>
                         <div className="flex flex-col gap-2">
                           <div className="flex items-center gap-2">
@@ -440,7 +464,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                 <Button variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button onClick={handleSubmit} disabled={!isJsonValid || isSubmitting || !isCustomCronValid || (scheduleSelectedItem === 'custom' && customCronExpression.trim() === '')}>
+                <Button onClick={handleSubmit} disabled={!isJsonValid || isSubmitting || !isCustomCronValid || !isRetriesValid || (scheduleSelectedItem === 'custom' && customCronExpression.trim() === '')}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {schedule ? "Save Changes" : "Add Schedule"}
                 </Button>
