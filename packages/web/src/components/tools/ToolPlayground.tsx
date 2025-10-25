@@ -221,7 +221,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   };
 
   // Validate payload against extracted schema
-  const validatePayload = (payloadText: string, schemaText: string | null, filePlds: Record<string, any>): boolean => {
+  const validatePayload = (payloadText: string, schemaText: string | null, filePayloads: Record<string, any>): boolean => {
     const payloadSchema = extractPayloadSchema(schemaText);
 
     // If schema is null/disabled, payload is always valid
@@ -231,7 +231,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
     try {
       const payloadData = JSON.parse(payloadText || '{}');
-      const mergedPayload = { ...payloadData, ...filePlds };
+      const mergedPayload = { ...payloadData, ...filePayloads };
       const validator = new Validator();
       const result = validator.validate(mergedPayload, payloadSchema);
       return result.valid;
