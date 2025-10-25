@@ -13,21 +13,3 @@ export const deleteApiResolver = async (
   }
   return context.datastore.deleteApiConfig({ id, orgId: context.orgId });
 };
-
-export const deleteTransformResolver = async (
-  _: any,
-  { id }: { id: string; },
-  context: Context,
-  info: GraphQLResolveInfo
-) => {
-  return context.datastore.deleteTransformConfig({ id, orgId: context.orgId });
-};
-
-export const deleteExtractResolver = async (
-  _: any,
-  { id }: { id: string; },
-  context: Context,
-  info: GraphQLResolveInfo
-) => {
-  return context.datastore.deleteExtractConfig({ id, orgId: context.orgId });
-};

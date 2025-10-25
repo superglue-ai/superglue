@@ -11,8 +11,9 @@ interface BaseConfig {
   updatedAt: DateTime
 }
 
-union ConfigType = ApiConfig | ExtractConfig | TransformConfig | Workflow
+union ConfigType = ApiConfig | Workflow
 
+# deprecated - only left in for backwards compatibility with one customer
 type ApiConfig implements BaseConfig {
   # BaseConfig
   id: ID!
@@ -36,6 +37,7 @@ type ApiConfig implements BaseConfig {
   dataPath: String
 }
 
+# used by the tool creation for file content extraction
 type ExtractConfig implements BaseConfig {
   # BaseConfig
   id: ID!
@@ -56,19 +58,6 @@ type ExtractConfig implements BaseConfig {
   authentication: AuthType
   fileType: FileType
   dataPath: String
-}
-
-type TransformConfig implements BaseConfig {
-  # BaseConfig
-  id: ID!
-  version: String
-  createdAt: DateTime
-  updatedAt: DateTime
-
-  # Specific implementation
-  instruction: String
-  responseSchema: JSONSchema
-  responseMapping: JSONata
 }
 
 type RunResult {
@@ -100,16 +89,6 @@ type ApiList {
   total: Int!
 }
 
-type TransformList {
-  items: [TransformConfig!]!
-  total: Int!
-}
-
-type ExtractList {
-  items: [ExtractConfig!]!
-  total: Int!
-}
-
 type WorkflowList {
   items: [Workflow!]!
   total: Int!
@@ -127,6 +106,7 @@ enum AuthType {
   OAUTH2
 }
 
+# also go away
 enum DecompressionMethod {
   GZIP
   DEFLATE
@@ -222,14 +202,6 @@ input ExtractInput {
   version: String
 }
 
-input TransformInput {
-  id: ID!
-  instruction: String
-  responseSchema: JSONSchema
-  responseMapping: JSONata
-  version: String
-}
-
 input RequestOptions {
   selfHealing: SelfHealingMode
   cacheMode: CacheMode
@@ -255,11 +227,6 @@ input ApiInputRequest @oneOf {
 input ExtractInputRequest @oneOf {
   endpoint: ExtractInput
   file: Upload
-  id: ID
-}
-
-input TransformInputRequest @oneOf {
-  endpoint: TransformInput
   id: ID
 }
 
@@ -311,8 +278,6 @@ type SuggestedTool {
 type Query {
   listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
   listApis(limit: Int = 10, offset: Int = 0): ApiList!
-  listTransforms(limit: Int = 10, offset: Int = 0): TransformList!
-  listExtracts(limit: Int = 10, offset: Int = 0): ExtractList!
   listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
   listIntegrations(limit: Int = 10, offset: Int = 0): IntegrationList!
   findRelevantIntegrations(searchTerms: String): [SuggestedIntegration!]
@@ -320,8 +285,6 @@ type Query {
 
   getRun(id: ID!): RunResult
   getApi(id: ID!): ApiConfig
-  getTransform(id: ID!): TransformConfig
-  getExtract(id: ID!): ExtractConfig
   getWorkflow(id: ID!): Workflow
   getIntegration(id: ID!): Integration
 
@@ -447,12 +410,6 @@ type Mutation {
     options: RequestOptions
   ): RunResult!
 
-  transform(
-    input: TransformInputRequest!
-    data: JSON!
-    options: RequestOptions
-  ): RunResult!
-
   executeWorkflow(
     input: WorkflowInputRequest!
     payload: JSON
@@ -477,12 +434,6 @@ type Mutation {
   deleteApi(id: ID!): Boolean!
 
   updateApiConfigId(oldId: ID!, newId: ID!): ApiConfig!
-
-  upsertExtraction(id: ID!, input: JSON!): ExtractConfig!
-  deleteExtraction(id: ID!): Boolean!
-
-  upsertTransformation(id: ID!, input: JSON!): TransformConfig!
-  deleteTransformation(id: ID!): Boolean!
 
   upsertIntegration(
     input: IntegrationInput!
