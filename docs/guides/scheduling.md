@@ -197,7 +197,7 @@ await client.upsertWorkflowSchedule({
 
 ### Using Options
 
-Control workflow execution behavior:
+Control workflow execution behavior with advanced options. These can be configured both via SDK and in the web UI under "Advanced Options":
 
 ```typescript
 await client.upsertWorkflowSchedule({
@@ -213,6 +213,26 @@ await client.upsertWorkflowSchedule({
   }
 });
 ```
+
+#### Available Options
+
+- **Self-Healing**: Automatically retry and fix API configuration errors
+  - `DISABLED`: No automatic fixes
+  - `ENABLED`: Fixes both API requests and data transforms
+  - `TRANSFORM_ONLY`: Only fixes data transformation errors
+  - `REQUEST_ONLY`: Only fixes API call errors
+
+- **Retries**: Number of retry attempts for failed API calls (default: 1)
+
+- **Timeout**: Maximum time to wait for API responses in milliseconds (default: 60000ms / 1 minute)
+
+- **Webhook URL**: Send execution results to a webhook endpoint after each scheduled run
+  - Receives POST request with `{runId, success, data?, error?}`
+  - Useful for monitoring, alerting, or chaining workflows
+
+<Tip>
+  In the web UI, these options are available by clicking "Advanced Options" when creating or editing a schedule.
+</Tip>
 
 ## Common Scheduling Patterns
 

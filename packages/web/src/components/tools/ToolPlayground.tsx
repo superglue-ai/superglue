@@ -5,6 +5,7 @@ import { executeFinalTransform, executeSingleStep, executeToolStepByStep, genera
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput } from "@/src/lib/utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
+import { Validator } from "jsonschema";
 import { Check, Loader2, Play, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
@@ -13,7 +14,6 @@ import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { ToolStepGallery } from "./ToolStepGallery";
-import { Validator } from "jsonschema";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -38,6 +38,7 @@ export interface ToolPlaygroundProps {
   isProcessingFiles?: boolean;
   totalFileSize?: number;
   filePayloads?: Record<string, any>;
+  publishButtonText?: string;
 }
 
 export interface ToolPlaygroundHandle {
@@ -68,7 +69,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   onFileRemove: parentOnFileRemove,
   isProcessingFiles: parentIsProcessingFiles,
   totalFileSize: parentTotalFileSize,
-  filePayloads: parentFilePayloads
+  filePayloads: parentFilePayloads,
+  publishButtonText = "Publish"
 }, ref) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -221,7 +223,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   // Validate payload against extracted schema
   const validatePayload = (payloadText: string, schemaText: string | null): boolean => {
     const payloadSchema = extractPayloadSchema(schemaText);
-    
+
     // If schema is null/disabled, payload is always valid
     if (!payloadSchema) {
       return true;
@@ -616,7 +618,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
       const finalData = state.stepResults['__final_transform__']?.data;
       setFinalPreviewResult(finalData);
-      
+
       const wr: ToolResult = {
         id: generateUUID(),
         success: state.failedSteps.length === 0,
@@ -635,7 +637,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         config: {
           id: toolId,
           steps: state.currentTool.steps,
-          finalTransform:   state.currentTool.finalTransform || finalTransform,
+          finalTransform: state.currentTool.finalTransform || finalTransform,
         } as any
       };
       setResult(wr);
@@ -922,7 +924,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
             <Check className="mr-1 h-3.5 w-3.5" />
             Published
           </>
-        ) : "Publish"}
+        ) : publishButtonText}
       </Button>
     </div>
   );
