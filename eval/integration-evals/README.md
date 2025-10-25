@@ -11,7 +11,8 @@ Evaluates the quality of documentation crawling and retrieval across multiple AP
 ## How to Run
 
 ```bash
-cd packages/core && npm run build && node dist/eval/documentation-crawl-and-fetch/run-documentation-evaluations.js 
+# TypeScript direct run
+npm run test:integration-evals
 ```
 
 ## Configuration

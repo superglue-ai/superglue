@@ -13,6 +13,7 @@
     "test:unit": "turbo run test",
     "test:coverage": "turbo run test:coverage",
     "test:evals": "npx tsx eval/tool-evals/index.ts",
+    "test:integration-evals": "npx tsx eval/integration-evals/index.ts",
     "test:all": "npm run test:unit && npm run test:integration",
     "lint": "turbo run lint",
     "clean": "turbo run clean",

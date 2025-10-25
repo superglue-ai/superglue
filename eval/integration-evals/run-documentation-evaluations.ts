@@ -29,10 +29,10 @@ async function main() {
     
     const datastore = createDataStore({ type: 'postgres' });
     
-    const isCompiledDist = import.meta.url.includes('/dist/');
-    const scriptDir = path.dirname(new URL(import.meta.url).pathname);
-    const benchmarkDir = isCompiledDist 
-      ? path.join(scriptDir, '../../../eval/documentation-crawl-and-fetch/benchmark')
+    const scriptDir = __dirname;
+    const isCompiledDist = scriptDir.includes(`${path.sep}dist${path.sep}`);
+    const benchmarkDir = isCompiledDist
+      ? path.join(scriptDir, '../../../eval/integration-evals/benchmark')
       : path.join(scriptDir, 'benchmark');
     const comparer = new BenchmarkComparer(benchmarkDir);
     
@@ -60,8 +60,10 @@ async function main() {
   process.exit(0);
 }
 
-// Run if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run if this file is executed directly (CommonJS)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const maybeRequire: any = (global as unknown as { require?: unknown }).require || (typeof require !== 'undefined' ? require : undefined);
+if (maybeRequire && maybeRequire.main === module) {
   main().catch((error) => {
     logMessage('error', `Unhandled error in main: ${error}`, { orgId: 'documentation-eval', userId: 'system' });
     process.exit(1);
