@@ -1,172 +1,140 @@
 # Tool Evaluation Framework
 
-Automated testing framework for Superglue's tool builder and executor across multiple API integrations.
+Tests Superglue's tool builder and executor against real API integrations. Validates that the AI agent can correctly build and execute tools for various APIs.
 
-## Quick Start
+## What It Tests
 
-**Entry point:** `index.ts` - Run the evaluation suite
+The framework validates:
+- **Tool Building**: Can the agent create working API tools from natural language instructions?
+- **Execution**: Do the built tools successfully call APIs and return data?
+- **Self-Healing**: Can tools recover from errors through retries?
+- **Determinism**: Do repeated builds produce consistent results?
 
-1. **Set up config**
+Two test modes:
+- **One-Shot**: Build and execute without retries (tests first-attempt success)
+- **Self-Healing**: Build with error recovery enabled (tests resilience)
 
-   Edit your config file at `tool-eval-config.json`
+## Running Tests
 
-2. **Add credentials**
-
-   Add your API credentials to root `.env` or as environment variables (see [Credentials Setup](#credentials-setup) for naming rules)
-
-3. **Add benchmark (optional)**
-
-   Copy your benchmark file to `data/benchmark/tool-eval-benchmark.csv` (see [Benchmarking](#benchmarking) for details)
-
-4. **Run evaluation**
-
-   ```bash
-   npm run test:tool-eval
-   ```
-
-5. **View results**
-
-   - Console output shows immediate results
-   - `data/results/` folder contains timestamped CSV, JSON, and Markdown reports
-
-## Project Structure
-
-```
-tool-evals/
-├── index.ts              # Main entry point
-├── types.ts              # Shared type definitions
-├── tool-eval-config.json # Configuration file
-├── config/               # Configuration loading
-│   └── config-loader.ts
-├── services/             # Core business logic
-│   ├── integration-setup.ts
-│   ├── tool-runner.ts
-│   ├── tool-attempt.ts
-│   ├── metrics-calculator.ts
-│   └── metrics-comparer.ts
-├── reporters/            # Output formatting (strategy pattern)
-│   ├── console-reporter.ts
-│   ├── csv-reporter.ts
-│   ├── json-reporter.ts
-│   └── markdown-reporter.ts
-├── utils/                # Utility functions
-│   └── utils.ts
-└── data/                 # Outputs
-    ├── benchmark/
-    └── results/
+From project root:
+```bash
+npm run test:tool-eval
 ```
 
-## Configuration
+## Required Setup
 
-### Config File Structure
+### 1. Environment Variables
 
-The `tool-eval-config.json` defines integrations and tools:
+Add API credentials to root `.env` file using the pattern: `{INTEGRATION_ID}_{CREDENTIAL_KEY}`
+
+Example for integration `id: "stripe"` with credential `api_key`:
+```bash
+STRIPE_API_KEY=sk_test_abc123...
+```
+
+**Current test integrations:**
+```bash
+# Project Management
+CLICKUP_API_TOKEN=<your_token>
+LINEAR_API_KEY=<your_key>
+JIRA_EMAIL=<your_email>
+JIRA_API_TOKEN=<your_token>
+TRELLO_API_KEY=<your_key>
+ASANA_API_KEY=<your_key>
+
+# CRM & Communication
+ATTIO_API_TOKEN=<your_token>
+HUBSPOT_APP_TOKEN=<your_token>
+SLACK_BOT_TOKEN=<your_token>
+
+# Data & Storage
+AIRTABLE_API_KEY=<your_key>
+POSTGRES_LEGO_USERNAME=<username>
+POSTGRES_LEGO_PASSWORD=<password>
+POSTGRES_LEGO_HOST=<host>
+POSTGRES_LEGO_PORT=5432
+POSTGRES_LEGO_DATABASE=<database>
+
+# Payments & Forms
+STRIPE_API_KEY=<your_key>
+TYPEFORM_PERSONAL_ACCESS_TOKEN=<your_token>
+
+# Time & Documentation
+CLOCKIFY_API_KEY=<your_key>
+CONFLUENCE_EMAIL=<your_email>
+CONFLUENCE_API_TOKEN=<your_token>
+GITHUB_API_TOKEN=<your_token>
+```
+
+### 2. Configuration File
+
+Edit `eval/tool-evals/tool-eval-config.json` to define integrations and test tools.
+
+## Viewing Results
+
+Results are written to `eval/tool-evals/data/results/` with timestamp:
+
+- **CSV**: `tool-eval-YYYY-MM-DDTHH-mm-ss.csv` - Tabular results for analysis
+- **JSON**: `tool-eval-YYYY-MM-DDTHH-mm-ss.json` - Full structured data
+- **Markdown**: `tool-eval-YYYY-MM-DDTHH-mm-ss.md` - Human-readable report
+- **Console**: Live output during test run
+
+### Key Metrics
+- **Success Rate**: % of tools that executed successfully
+- **Build Success**: % of tools that built without errors
+- **Execution Success**: % of built tools that ran successfully
+- **Validation Pass**: % that passed data validation (if configured)
+- **Average Attempts**: Mean attempts needed to succeed
+
+## Adding New Tests
+
+### Basic Test
+Add to `tool-eval-config.json`:
 
 ```json
 {
-  "integrations": [
-    {
-      "id": "myapi",
-      "name": "My API",
-      "urlHost": "https://api.myapi.com",
-      "urlPath": "/v1",
-      "documentationUrl": "https://docs.myapi.com",
-      "credentials": {
-        "api_key": ""
-      },
-      "keywords": ["users", "data"]
+  "integrations": [{
+    "id": "myapi",
+    "name": "My API",
+    "urlHost": "https://api.myapi.com",
+    "documentationUrl": "https://docs.myapi.com/api",
+    "credentials": {
+      "api_key": ""
     }
-  ],
-  "tools": [
-    {
-      "id": "my-tool",
-      "name": "My Tool",
-      "type": "retrieval",
-      "instruction": "Get all users from MyAPI",
-      "integrationIds": ["myapi"],
-      "expectedData": {
-        "users": []
-      }
-    }
-  ],
-  "enabledTools": "all",
-  "settings": {
-    "runOneShotMode": true,
-    "runSelfHealingMode": true,
-    "attemptsEachMode": 2
-  }
+  }],
+  "tools": [{
+    "id": "myapi-get-users",
+    "name": "Get Users",
+    "type": "retrieval",
+    "instruction": "Fetch all users from My API",
+    "integrationIds": ["myapi"]
+  }]
 }
 ```
 
-**Key fields:**
+Then add env var: `MYAPI_API_KEY=<your_key>`
 
-- `integrations`: Array of API integrations to test
-  - `id`: Used for credential lookup as env vars
-  - `credentials`: Keys that must exist as env vars
-  - `urlHost`, `documentationUrl`: Used by agent for API understanding
+### Test with Validation
 
-- `tools`: Array of test tools
-  - `instruction`: Natural language description of what to do
-  - `integrationIds`: Which integration(s) to use
-  - `expectedData`: Optional validation data
-  - `type`: `"retrieval"`, `"action"`, or `"upsert"`
+Add `expectedData` and optional `skipValidation`:
 
-- `enabledTools`: `"all"` or array of tool IDs to run
-
-- `settings`:
-  - `runOneShotMode`: Test without retries
-  - `runSelfHealingMode`: Test with error recovery
-  - `attemptsEachMode`: Attempts per mode (for determinism testing)
-
-### Credentials Setup
-
-API credentials must be available as environment variables using this naming pattern:
-
-```
-{INTEGRATION_ID}_{CREDENTIAL_KEY}
+```json
+{
+  "id": "myapi-get-users",
+  "instruction": "Fetch all users",
+  "integrationIds": ["myapi"],
+  "expectedData": {
+    "users": [],
+    "total": 0
+  },
+  "skipValidation": ["users[0].id", "total"]
+}
 ```
 
-**Example:** For an integration with `id: "stripe"` and credential key `"secret_key"`:
+**skipValidation** excludes fields from validation:
+- Useful for dynamic data (IDs, timestamps, counts)
+- Uses JSONPath syntax
+- Array syntax: `users[0].id` skips ID in first user
+- Wildcard: `users[*].id` skips all user IDs
 
-```bash
-STRIPE_SECRET_KEY=sk_test_your_key_here
-```
-
-You can set these in the root `.env` file or directly as environment variables in your shell.
-
-**Rules:**
-- Use uppercase for the entire variable name
-- All credentials defined in your config's `credentials` object must be available as env vars
-- The integration `id` from config becomes the prefix
-- Multiple credentials per integration are supported:
-  ```bash
-  MYAPI_API_KEY=key123
-  MYAPI_SECRET=secret456
-  ```
-
-## Benchmarking
-
-Benchmarking tracks performance over time by comparing current runs against a baseline.
-
-### Setting Up a Benchmark
-
-1. Run your first evaluation
-2. Review results in the `data/results/` folder
-3. Copy a good run to use as your baseline:
-   ```bash
-   cp data/results/tool-eval-YYYY-MM-DDTHH-mm-ss.csv data/benchmark/tool-eval-benchmark.csv
-   ```
-4. Future runs will automatically compare against this benchmark
-
-### Updating Your Benchmark
-
-When you improve your config or want to reset the baseline:
-
-1. Run evaluation with the updated setup
-2. Review the new results
-3. If satisfied, replace the benchmark:
-   ```bash
-   cp data/results/tool-eval-YYYY-MM-DDTHH-mm-ss.csv data/benchmark/tool-eval-benchmark.csv
-   ```
-
-**Note:** The benchmark file is not in version control - each environment maintains its own baseline.
+Without `skipValidation`, exact values would be compared.
