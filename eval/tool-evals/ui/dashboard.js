@@ -449,7 +449,7 @@ function createStatusChangeBadge(statusChangeInfo) {
     
     // Create detailed text showing all changes
     const details = changes.map(change => {
-        const modeLabel = change.mode === 'one-shot' ? '1-Shot' : 'Healing';
+        const modeLabel = change.mode === 'one-shot' ? 'One-Shot' : 'Self-Healing';
         return `${modeLabel}: ${change.detail}`;
     }).join('; ');
     
