@@ -315,18 +315,19 @@ function createToolItem(toolId, attempts) {
     
     // Check for status changes vs benchmark
     const statusChange = getToolStatusChange(toolId, oneShotAttempts, selfHealingAttempts);
-    if (statusChange === 'regression') {
-        container.classList.add('status-regression');
-    } else if (statusChange === 'improvement') {
-        container.classList.add('status-improvement');
-    }
     
     // Create header
     const header = document.createElement('div');
     header.className = 'tool-header';
+    
+    const statusChangeBadge = statusChange ? createStatusChangeBadge(statusChange) : '';
+    
     header.innerHTML = `
         <div class="tool-info">
-            <div class="tool-name">${toolName}</div>
+            <div class="tool-name-row">
+                <div class="tool-name">${toolName}</div>
+                ${statusChangeBadge}
+            </div>
             <div class="tool-id">${toolId}</div>
         </div>
         <div class="status-indicators">
@@ -397,6 +398,15 @@ function createToolItem(toolId, attempts) {
     container.appendChild(content);
     
     return container;
+}
+
+function createStatusChangeBadge(statusChange) {
+    if (statusChange === 'regression') {
+        return '<span class="status-change-badge status-change-regression">⚠ Regression vs Benchmark</span>';
+    } else if (statusChange === 'improvement') {
+        return '<span class="status-change-badge status-change-improvement">✓ Improvement vs Benchmark</span>';
+    }
+    return '';
 }
 
 function createModeStatusHTML(modeName, attempts) {
@@ -731,15 +741,15 @@ function parseBenchmarkCsv(csvText) {
         if (!line) continue;
         
         const values = parseCsvLine(line);
-        if (values.length < 12) continue;
+        if (values.length < 6) continue;
         
         const row = {
             tool_id: unquote(values[0]),
             tool_name: unquote(values[1]),
             mode: values[2],
-            success: values[10] === 'true',
-            avg_build_time_ms: parseFloat(values[11]) || null,
-            avg_exec_time_ms: parseFloat(values[12]) || null
+            success: values[3] === 'true',
+            avg_build_time_ms: parseFloat(values[4]) || null,
+            avg_exec_time_ms: parseFloat(values[5]) || null
         };
         
         rows.push(row);

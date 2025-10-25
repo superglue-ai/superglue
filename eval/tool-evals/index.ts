@@ -10,8 +10,6 @@ import path from "node:path";
 import { config } from "dotenv";
 import { MetricsCalculator } from "./services/metrics-calculator.js";
 import { CsvReporter } from "./reporters/csv-reporter.js";
-import { MarkdownReporter } from "./reporters/markdown-reporter.js";
-import { MetricsComparer } from "./services/metrics-comparer.js";
 import { ConsoleReporter } from "./reporters/console-reporter.js";
 import { closeAllPools } from "../../packages/core/execute/postgres/postgres.js";
 import { JsonReporter } from "./reporters/json-reporter.js";
@@ -48,17 +46,10 @@ async function main(): Promise<void> {
     const metrics = metricsCalculatorService.calculateMetrics(toolAttempts);
 
     const baseDir = dirname(fileURLToPath(import.meta.url));
-    
-    const metricsComparer = new MetricsComparer(baseDir);
-    const metricsComparison = metricsComparer.compare(metrics);
-
     const timestamp = new Date().toISOString().split('.')[0].replace(/[:.]/g, '-');
 
     const csvReporter = new CsvReporter(baseDir, metadata);
     csvReporter.report(timestamp, metrics);
-    
-    const markdownReporter = new MarkdownReporter(baseDir, metadata);
-    markdownReporter.report(timestamp, metrics, metricsComparison, toolAttempts);
     
     const jsonReporter = new JsonReporter(baseDir, metadata, config.settings.attemptsEachMode);
     jsonReporter.reportAttempts(timestamp, toolAttempts);
@@ -67,7 +58,7 @@ async function main(): Promise<void> {
     logMessage("info", `Agent Evaluation Completed in ${(duration / 1000).toFixed(1)}s`, metadata);
 
     await new Promise(resolve => setTimeout(resolve, 1000));
-    ConsoleReporter.report(metrics, metricsComparison, toolAttempts);
+    ConsoleReporter.report(metrics, timestamp, baseDir);
   } catch (error) {
     const message = error instanceof Error ? error.stack || error.message : String(error);
     console.error("Agent Eval failed:", message);

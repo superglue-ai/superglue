@@ -34,19 +34,9 @@ export class CsvReporter {
       "tool_id",
       "tool_name",
       "mode",
-      "total_attempts",
-      "total_successful_attempts",
-      "total_failed_attempts",
-      "has_one_shot_attempts",
-      "has_self_healing_attempts",
-      "had_one_shot_success",
-      "had_self_healing_success",
       "success",
       "avg_build_time_ms",
-      "avg_exec_time_ms",
-      "failures_build",
-      "failures_execution",
-      "failures_strict_validation"
+      "avg_exec_time_ms"
     ];
 
     const rows: string[] = [headers.join(",")];
@@ -68,7 +58,6 @@ export class CsvReporter {
     const success = isOneShot ? tool.hadOneShotSuccess : tool.hadSelfHealingSuccess;
     const avgBuildTime = tool.averageBuildTimeMs;
     const avgExecTime = isOneShot ? tool.oneShotAverageExecutionTimeMs : tool.selfHealingAverageExecutionTimeMs;
-    const failures = isOneShot ? tool.oneShotFailuresByReason : tool.selfHealingFailuresByReason;
 
     const escapeCsv = (str: string) => `"${str.replace(/"/g, '""')}"`;
 
@@ -76,19 +65,9 @@ export class CsvReporter {
       escapeCsv(tool.toolId),
       escapeCsv(tool.toolName),
       mode,
-      tool.totalAttempts,
-      tool.totalSuccessfulAttempts,
-      tool.totalFailedAttempts,
-      tool.hasOneShotAttempts ? "true" : "false",
-      tool.hasSelfHealingAttempts ? "true" : "false",
-      tool.hadOneShotSuccess ? "true" : "false",
-      tool.hadSelfHealingSuccess ? "true" : "false",
       success ? "true" : "false",
       avgBuildTime?.toFixed(2) ?? "",
-      avgExecTime?.toFixed(2) ?? "",
-      failures.build,
-      failures.execution,
-      failures.strict_validation
+      avgExecTime?.toFixed(2) ?? ""
     ].join(",");
   }
 }

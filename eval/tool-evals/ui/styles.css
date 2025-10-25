@@ -204,16 +204,6 @@ h2 {
     overflow: hidden;
 }
 
-.tool-item.status-regression {
-    border: 3px solid #dc3545;
-    box-shadow: 0 0 8px rgba(220, 53, 69, 0.3);
-}
-
-.tool-item.status-improvement {
-    border: 3px solid #28a745;
-    box-shadow: 0 0 8px rgba(40, 167, 69, 0.3);
-}
-
 .tool-header {
     padding: 16px 20px;
     cursor: pointer;
@@ -237,11 +227,35 @@ h2 {
     flex: 1;
 }
 
+.tool-name-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
 .tool-name {
     font-weight: 600;
     font-size: 15px;
-    margin-bottom: 4px;
     color: #212529;
+}
+
+.status-change-badge {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.status-change-regression {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.status-change-improvement {
+    background-color: #d4edda;
+    color: #155724;
 }
 
 .tool-id {
