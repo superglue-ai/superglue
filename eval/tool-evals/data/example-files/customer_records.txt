@@ -1,0 +1,21 @@
+C00000001 Alice Johnson                  35 New York             5250.75
+C00000002 Bob Smith                     42 Los Angeles         12350.00
+C00000003 Charlie Davis                 28 Chicago             3890.50
+C00000004 Diana Lee                     31 Houston             7620.25
+C00000005 Edward Wilson                 45 Phoenix             9840.00
+C00000006 Fiona Martinez                38 Philadelphia        4560.80
+C00000007 George Anderson               52 San Antonio         15230.50
+C00000008 Hannah Thomas                 29 San Diego           2340.90
+C00000009 Ian Jackson                   47 Dallas              11450.00
+C00000010 Julia White                   33 San Jose            6780.30
+C00000011 Kevin Harris                  41 Austin              8920.75
+C00000012 Laura Martin                  36 Jacksonville        5430.60
+C00000013 Michael Thompson              50 Fort Worth          13560.00
+C00000014 Nancy Garcia                  27 Columbus            3210.40
+C00000015 Oscar Rodriguez               44 Charlotte           10890.50
+C00000016 Paula Lewis                   39 San Francisco       7340.25
+C00000017 Quinn Walker                  32 Indianapolis        4670.80
+C00000018 Rachel Hall                   48 Seattle             12780.00
+C00000019 Steven Allen                  30 Denver              5890.35
+C00000020 Tina Young                    43 Washington          9560.90
+

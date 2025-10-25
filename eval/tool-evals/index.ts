@@ -1,0 +1,76 @@
+import { loadConfig } from "./config/config-loader.js";
+import { logMessage } from "../../packages/core/utils/logs.js";
+import { FileStore } from "../../packages/core/datastore/filestore.js";
+import { join } from "path";
+import { dirname } from "path";
+import { fileURLToPath } from "node:url";
+import { IntegrationSetupService } from "./services/integration-setup.js";
+import { ToolRunnerService } from "./services/tool-runner.js";
+import path from "node:path";
+import { config } from "dotenv";
+import { MetricsCalculator } from "./services/metrics-calculator.js";
+import { CsvReporter } from "./reporters/csv-reporter.js";
+import { ConsoleReporter } from "./reporters/console-reporter.js";
+import { closeAllPools } from "../../packages/core/execute/postgres/postgres.js";
+import { JsonReporter } from "./reporters/json-reporter.js";
+
+const envPath = process.cwd().endsWith('packages/core')
+  ? path.join(process.cwd(), '../../.env')
+  : path.join(process.cwd(), '.env');
+config({ path: envPath });
+
+async function main(): Promise<void> {
+  const startedAt = new Date();
+  const metadata = { orgId: "tool-eval", userId: "system" };
+  logMessage("info", "Starting Agent Evaluation...", metadata);
+
+  let store: FileStore | undefined;
+
+  try {
+    const config = await loadConfig();
+    const storePath = join(dirname(fileURLToPath(import.meta.url)), "./.data");
+    store = new FileStore(storePath);
+
+    const integrationSetupService = new IntegrationSetupService(store, config, metadata);
+    const integrations = await integrationSetupService.setupIntegrations();
+  
+    const enabledTools = config.enabledTools === 'all' ? config.tools : config.tools.filter(tool => config.enabledTools.includes(tool.id));
+
+    const enabledToolsCount = config.enabledTools === 'all' ? config.tools.length : config.enabledTools.length;
+    logMessage("info", `Integrations setup: ${integrations.length}, Tools: ${config.tools.length}, Enabled tools: ${enabledToolsCount}`, metadata);
+
+    const agentEvalRunner = new ToolRunnerService(store, metadata, config.validationLlmConfig);
+    const toolAttempts = await agentEvalRunner.runTools(enabledTools, integrations, config.settings);
+
+    const metricsCalculatorService = new MetricsCalculator();
+    const metrics = metricsCalculatorService.calculateMetrics(toolAttempts);
+
+    const baseDir = dirname(fileURLToPath(import.meta.url));
+    const timestamp = new Date().toISOString().split('.')[0].replace(/[:.]/g, '-');
+
+    const csvReporter = new CsvReporter(baseDir, metadata);
+    csvReporter.report(timestamp, metrics);
+    
+    const jsonReporter = new JsonReporter(baseDir, metadata, config.settings.attemptsEachMode);
+    jsonReporter.reportAttempts(timestamp, toolAttempts);
+
+    const duration = new Date().getTime() - startedAt.getTime();
+    logMessage("info", `Agent Evaluation Completed in ${(duration / 1000).toFixed(1)}s`, metadata);
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    ConsoleReporter.report(metrics, timestamp, baseDir);
+  } catch (error) {
+    const message = error instanceof Error ? error.stack || error.message : String(error);
+    console.error("Agent Eval failed:", message);
+    logMessage("error", `Agent Eval failed: ${message}`, metadata);
+    process.exitCode = 1;
+  } finally {
+    await closeAllPools();
+    await store?.disconnect();
+  }
+}
+
+main().catch(error => {
+  console.error('Fatal error:', error);
+  process.exit(1);
+});
