@@ -21,7 +21,7 @@ const ToolConfigSchema = z.object({
     name: z.string(),
     type: z.enum(['retrieval', 'action', 'upsert']),
     instruction: z.string(),
-    integrationIds: z.array(z.string()).min(1),
+    integrationIds: z.array(z.string()).min(0),
     validationFunction: z.string().optional(),
     skipValidationFunction: z.boolean().optional(),
     expectedResultDescription: z.string().optional(),
@@ -85,7 +85,35 @@ export async function loadConfig(): Promise<AgentEvalConfig> {
     validateIntegrationIds(config);
     validateEnabledWorkflows(config);
 
+    await processFilePayloads(config);
+
     return config;
+}
+
+async function processFilePayloads(config: AgentEvalConfig): Promise<void> {
+    const exampleFilesDir = join(
+        dirname(fileURLToPath(import.meta.url)),
+        "../data/example-files"
+    );
+
+    for (const tool of config.tools) {
+        if (!tool.payload || typeof tool.payload !== 'object') {
+            continue;
+        }
+
+        for (const [key, value] of Object.entries(tool.payload)) {
+            if (key.endsWith('_file') && typeof value === 'string') {
+                const filePath = join(exampleFilesDir, value);
+                try {
+                    await access(filePath);
+                    const fileContent = await readFile(filePath, 'utf-8');
+                    tool.payload[key] = fileContent;
+                } catch (error) {
+                    throw new Error(`Failed to read file ${filePath} for tool ${tool.id}: ${error instanceof Error ? error.message : String(error)}`);
+                }
+            }
+        }
+    }
 }
 
 function validateIntegrationIds(config: z.infer<typeof AgentEvalConfigSchema>): void {

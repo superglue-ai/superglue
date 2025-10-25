@@ -1107,6 +1107,100 @@
       "payload": {},
       "validationFunction": "validators/046-slack-get-all-messages-with-pagination-reminder.ts",
       "expectedResultDescription": "Should retrieve exactly 1005 messages from the 'evals' Slack channel with explicit pagination reminder. Expected message_count to be exactly 1005."
+    },
+    {
+      "id": "047-csv-aggregate-filter",
+      "name": "CSV Aggregate and Filter",
+      "description": "Aggregate sales data by category and filter categories with revenue > $5000",
+      "type": "retrieval",
+      "instruction": "Parse the CSV data provided in csv_file. Aggregate total revenue by category (sum of quantity * price for each row). Filter to only include categories where total revenue exceeds $5000. Sort results by revenue descending. Return JSON: { categories: Array<{ category: string, total_revenue: number, item_count: number }> }",
+      "integrationIds": [],
+      "payload": {
+        "csv_file": "sales_data.csv"
+      },
+      "validationFunction": "validators/047-csv-aggregate-filter.ts",
+      "expectedResultDescription": "Should parse CSV, aggregate by category, and filter categories with revenue > $5000. Expected to find Electronics with highest revenue (~$23.5k) and Furniture (~$20k), with accurate item counts for each category."
+    },
+    {
+      "id": "048-csv-top-performers",
+      "name": "CSV Top Sales Performers",
+      "description": "Find top 3 salespeople by revenue with region and sales count",
+      "type": "retrieval",
+      "instruction": "Parse the CSV data provided in csv_file. Calculate total revenue for each salesperson (sum of quantity * price). Find the top 3 salespeople by total revenue. For each, include their name, total revenue, region (use the most common region for that salesperson), and number of sales transactions. Return JSON: { top_performers: Array<{ name: string, total_revenue: number, region: string, sales_count: number }> }",
+      "integrationIds": [],
+      "payload": {
+        "csv_file": "sales_data.csv"
+      },
+      "validationFunction": "validators/048-csv-top-performers.ts",
+      "expectedResultDescription": "Should identify top 3 salespeople by revenue. Expected Bob Smith, Alice Johnson, and Diana Lee or Charlie Davis in top positions with accurate revenue calculations and sales counts."
+    },
+    {
+      "id": "049-json-flatten-users",
+      "name": "JSON Flatten User Profiles",
+      "description": "Flatten nested user profile objects using dot notation",
+      "type": "retrieval",
+      "instruction": "Parse the JSON data provided in json_file. Flatten each user object to a single-level object using dot notation for nested fields (e.g., 'address.city', 'preferences.theme'). Do not flatten the orders array - keep it as is. Return JSON: { users: Array<{ id: string, name: string, email: string, 'address.street': string, 'address.city': string, 'address.state': string, 'address.zipcode': string, 'address.country': string, orders: Array<any>, 'preferences.newsletter': boolean, 'preferences.notifications.email': boolean, 'preferences.notifications.sms': boolean, 'preferences.theme': string }> }",
+      "integrationIds": [],
+      "payload": {
+        "json_file": "user_profiles.json"
+      },
+      "validationFunction": "validators/049-json-flatten-users.ts",
+      "expectedResultDescription": "Should flatten nested user objects using dot notation. Expected all 10 users with fields like 'address.city' and 'preferences.theme' at the top level, while preserving orders array structure."
+    },
+    {
+      "id": "050-json-extract-orders",
+      "name": "JSON Extract and Aggregate Orders",
+      "description": "Extract all orders across users and calculate totals per user",
+      "type": "retrieval",
+      "instruction": "Parse the JSON data provided in json_file. Extract all orders from all users. For each user who has orders, calculate their total order value (sum of all order totals). Return JSON: { order_summary: Array<{ user_id: string, user_name: string, order_count: number, total_value: number }> }. Sort by total_value descending.",
+      "integrationIds": [],
+      "payload": {
+        "json_file": "user_profiles.json"
+      },
+      "validationFunction": "validators/050-json-extract-orders.ts",
+      "expectedResultDescription": "Should extract all orders and calculate totals per user. Expected 9 users with orders (U004 has no orders). Total of 14 orders across all users. Michael Chen (U003) should have highest total at $949.95 with 3 orders."
+    },
+    {
+      "id": "051-fixedwidth-parse-structure",
+      "name": "Fixed-Width Parse to Structured JSON",
+      "description": "Parse fixed-width customer records into structured JSON",
+      "type": "retrieval",
+      "instruction": "Parse the fixed-width text data provided in fixedwidth_file. The format is: customer_id (positions 0-9, 10 chars), name (positions 10-39, 30 chars), age (positions 40-42, 3 chars), city (positions 43-62, 20 chars), balance (positions 63-72, 10 chars). Trim whitespace from all fields. Convert age to integer and balance to float. Return JSON: { customers: Array<{ customer_id: string, name: string, age: number, city: string, balance: number }> }",
+      "integrationIds": [],
+      "payload": {
+        "fixedwidth_file": "customer_records.txt"
+      },
+      "validationFunction": "validators/051-fixedwidth-parse-structure.ts",
+      "expectedResultDescription": "Should parse fixed-width format correctly. Expected 20 customers with properly extracted fields, trimmed strings, age as integers, and balance as floats. First customer should be Alice Johnson from New York with balance 5250.75."
+    },
+    {
+      "id": "052-multifile-csv-json-join",
+      "name": "Multi-File CSV-JSON Join",
+      "description": "Join sales CSV data with user JSON data on salesperson name",
+      "type": "retrieval",
+      "instruction": "Parse both csv_file and json_file. From the CSV, aggregate sales by salesperson (total revenue). From the JSON, extract user names and their email addresses. Join the data where the salesperson name matches a user name (use contains matching - check if any user name is contained in or contains the salesperson name). Return JSON: { matched_sales: Array<{ salesperson: string, total_revenue: number, email: string | null }> }. If no email match found, set email to null.",
+      "integrationIds": [],
+      "payload": {
+        "csv_file": "sales_data.csv",
+        "json_file": "user_profiles.json"
+      },
+      "validationFunction": "validators/052-multifile-csv-json-join.ts",
+      "expectedResultDescription": "Should join CSV sales data with JSON user data. Expected 4 salespeople (Alice Johnson, Bob Smith, Charlie Davis, Diana Lee) with their revenue totals. May or may not match emails depending on name matching logic."
+    },
+    {
+      "id": "053-multifile-all-summary",
+      "name": "Multi-File Summary Statistics",
+      "description": "Generate summary statistics from all three file types",
+      "type": "retrieval",
+      "instruction": "Parse all three files: csv_file, json_file, and fixedwidth_file. Generate summary statistics for each. Return JSON: { csv_summary: { total_rows: number, total_revenue: number, unique_products: number, date_range: { earliest: string, latest: string } }, json_summary: { total_users: number, users_with_orders: number, total_orders: number, total_order_value: number }, fixedwidth_summary: { total_customers: number, total_balance: number, avg_age: number, unique_cities: number } }",
+      "integrationIds": [],
+      "payload": {
+        "csv_file": "sales_data.csv",
+        "json_file": "user_profiles.json",
+        "fixedwidth_file": "customer_records.txt"
+      },
+      "validationFunction": "validators/053-multifile-all-summary.ts",
+      "expectedResultDescription": "Should generate accurate summary statistics from all three files. CSV: 50 rows, ~$44k revenue, 35 unique products. JSON: 10 users, 9 with orders, 14 total orders, ~$5619.59 total value. Fixed-width: 20 customers, ~$161.5k total balance, avg age ~38.5, 20 unique cities."
     }
   ],
   "enabledTools": "all",
