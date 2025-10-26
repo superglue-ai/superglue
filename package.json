@@ -12,15 +12,16 @@
     "test": "turbo run test",
     "test:unit": "turbo run test",
     "test:coverage": "turbo run test:coverage",
-    "test:integration": "cd packages/core && npm run build && npm run test:integration",
+    "test:evals": "tsx eval/tool-evals/index.ts",
+    "test:integration-evals": "npx tsx eval/integration-evals/index.ts --max-old-space-size=12288",
     "test:all": "npm run test:unit && npm run test:integration",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
     "generate-ranking": "tsc && node --max-old-space-size=12288 --expose-gc dist/eval/api-ranking/generate-api-ranking.js"
   },
   "dependencies": {
-    "@playwright/test": "^1.50.1",
-    "@superglue/client": "github:superglue-ai/superglue-js#code-for-calls",
+    "@playwright/test": "^1.55.0",
+    "@superglue/client": "^2.3.53",
     "dotenv": "^16.4.7",
     "dotenv-cli": "^8.0.0"
   },
@@ -29,6 +30,7 @@
     "@types/node": "^20.17.19",
     "mcp-remote": "^0.1.5",
     "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
     "turbo": "^2.5.6",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"

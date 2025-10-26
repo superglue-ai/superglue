@@ -152,7 +152,7 @@ const loopStrategy: ExecutionStrategy = {
             }
           }
 
-          const rawData = { currentItem: currentItem, data: apiResponse.data, ...(typeof apiResponse.data === 'object' ? apiResponse.data : {}) };
+          const rawData = { currentItem: currentItem, data: apiResponse.data };
           const transformedData = await applyJsonata(rawData, step.responseMapping); //LEGACY: New workflow strategy will not use response mappings, default to $
 
           stepResults.push({

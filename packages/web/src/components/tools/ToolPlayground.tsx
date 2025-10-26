@@ -523,7 +523,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           .map(([stepId, result]: [string, StepExecutionResult]) => ({
             stepId,
             success: result.success || !result.error,
-            data: result.data || result,
+            data: result,
             error: result.error
           })),
         config: {
@@ -725,7 +725,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       const stepData: Record<string, any> = {};
       Object.entries(stepResultsMap).forEach(([stepId, result]) => {
         if (stepId !== '__final_transform__') {
-          stepData[stepId] = result?.data !== undefined ? result.data : result;
+          stepData[stepId] = result;
         }
       });
       const parsedResponseSchema = schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null;

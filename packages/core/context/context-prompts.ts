@@ -648,8 +648,9 @@ Pagination is OPTIONAL. Only configure it if you have verified the exact paginat
 BEFORE configuring pagination:
 1. Check the documentation for pagination details
 2. Verify the exact parameter names the API expects
-3. Confirm the pagination type (offset, page, or cursor-based)
-4. If unsure about ANY aspect, DO NOT configure pagination
+3. Verify the exact response structure from documentation or example responses
+4. Confirm the pagination type (offset, page, or cursor-based)
+5. If unsure about ANY aspect, DO NOT configure pagination
 
 When you DO configure pagination:
 1. Set the pagination object with type and handler
@@ -658,14 +659,23 @@ When you DO configure pagination:
    - context.paginationState.offset (for OFFSET_BASED)
    - context.paginationState.cursor (for CURSOR_BASED)
 
+The handler function receives:
+- response: object with { data, headers } where data contains the COMPLETE API response body
+  * Access API response via response.data (e.g., if API returns { items: [...] }, access as response.data.items)
+  * If API returns nested like { data: { items: [...] } }, access as response.data.data.items
+  * Use the actual structure shown in the example response data or documentation, don't assume/guess paths
+- pageInfo: { page, offset, cursor, totalFetched }
+  - totalFetched: total items accumulated from all previous pages
+
 The handler function must return:
 - hasMore: boolean - Whether to continue pagination
 - resultSize: number - Number of items in THIS page (handler extracts this from response)
 - cursor?: any - Next cursor (for cursor-based pagination only)
 
-Handler receives pageInfo with:
-- totalFetched: total items accumulated from all previous pages
-- page, offset, cursor: current pagination state
+CRITICAL: Match the response structure to what you see in the actual API documentation/response.
+If docs show { items: [...] }, use response.data.items
+If docs show { data: { items: [...] } }, use response.data.data.items
+If docs show { results: { edges: { nodes: [...] } } }, use response.data.results.edges.nodes
 
 Example with OFFSET_BASED pagination (minimal - uses auto-generated handler):
 pagination: {
@@ -681,7 +691,7 @@ configCode: (context) => ({
   }
 })
 
-Example with CURSOR_BASED pagination (custom handler for nested data):
+Example with CURSOR_BASED - API returns { items: [...], next_cursor: "abc" }:
 pagination: {
   type: "CURSOR_BASED",
   handler: "(response, pageInfo) => ({ hasMore: !!response.data.next_cursor, resultSize: (response.data.items || []).length, cursor: response.data.next_cursor })"
@@ -696,10 +706,10 @@ configCode: (context) => ({
   }
 })
 
-Example with PAGE_BASED pagination and max limit:
+Example with nested response - API returns { data: { results: [...], hasMore: true } }:
 pagination: {
   type: "PAGE_BASED",
-  handler: "(response, pageInfo) => ({ hasMore: response.data.results.length > 0 && pageInfo.totalFetched < 5000, resultSize: response.data.results.length })"
+  handler: "(response, pageInfo) => ({ hasMore: response.data.data.hasMore && pageInfo.totalFetched < 5000, resultSize: (response.data.data.results || []).length })"
 }
 configCode: (context) => ({
   url: 'https://api.example.com/data',
@@ -707,6 +717,20 @@ configCode: (context) => ({
   params: {
     page: context.paginationState.page,
     per_page: 100
+  }
+})
+
+Example with GraphQL - API returns { data: { issues: { nodes: [...], pageInfo: { hasNextPage, endCursor } } } }:
+pagination: {
+  type: "CURSOR_BASED",
+  handler: "(response, pageInfo) => ({ hasMore: !!response.data.data.issues.pageInfo.hasNextPage, resultSize: (response.data.data.issues.nodes || []).length, cursor: response.data.data.issues.pageInfo.endCursor })"
+}
+configCode: (context) => ({
+  url: 'https://api.example.com/graphql',
+  method: 'POST',
+  headers: { 'Authorization': \`Bearer \${context.credentials.api_token}\` },
+  data: {
+    query: \`query { issues(after: "\${context.paginationState.cursor || ''}") { nodes { id title } pageInfo { hasNextPage endCursor } } }\`
   }
 })
 
@@ -1228,6 +1252,63 @@ CRITICAL: After using getValue to investigate (you have max 3 calls), you MUST m
 
 Focus on data accuracy and completeness of the mapping logic, and adherence to the instruction if provided.
 Return { success: true, reason: "Mapping follows instruction and appears logically sound" } unless you find definitive errors in the code logic itself.`
+
+export const VALIDATE_GENERATED_CONFIG_PROMPT = `You previously generated a config that was executed. Now validate the result.
+
+YOU WILL SEE EITHER:
+- An actual API response (if execution succeeded)
+- An execution error (if execution failed)
+
+VALIDATION CHECKLIST:
+
+If execution succeeded (you see <actual_api_response>):
+1. Response plausibility:
+   - Does response contain data requested in instruction?
+   - Is response structure reasonable?
+   - Are required fields present?
+
+2. Pagination verification (if pagination configured):
+   - CRITICAL: Remember that in the handler, response.data contains the COMPLETE API response body
+   - Use getValue to check if handler accesses correct response paths
+   - Example: If API returns { items: [...] }, handler should use response.data.items, so check getValue({ path: "response.data.items" })
+   - Example: If API returns { data: { items: [...] } }, handler should use response.data.data.items, so check getValue({ path: "response.data.data.items" })
+   - Verify hasMore logic works with actual response
+   - Verify resultSize calculation uses correct array path
+   - Check stop conditions work correctly
+   - Common error: Handler assumes wrong nesting level (e.g., uses response.data.data.items when API returns response.data.items)
+
+3. Data extraction:
+   - Use getValue to verify response structure matches your assumptions
+   - Check if paths you access would fail
+
+If execution failed (you see <execution_error>):
+1. Analyze the error:
+   - "Cannot read properties of undefined" in pagination handler? Wrong response path - check actual structure with getValue
+   - Authentication errors? Fix auth headers/credentials usage
+   - 400/404 errors? Fix URL, method, or request body
+   - Missing fields? Fix data construction
+   - Type errors? Fix data types in request
+
+2. Correct the config:
+   - Fix URL construction, auth headers, request body
+   - Fix pagination handler to match actual response structure (use getValue to find correct paths)
+   - Submit correctedConfig
+
+USING getValue TOOL (MAX 5 CALLS):
+- getValue({ path: "response.data" }) - see top-level structure of API response body
+- getValue({ path: "response.data.items" }) - check if path exists in response body
+- getValue({ path: "response.data.items[*]" }) - see array structure with samples
+- getValue({ path: "response.data.data" }) - check for nested data wrapper
+- If path doesn't exist, tool shows availableKeys to find correct path
+
+SUBMIT YOUR VALIDATION:
+If everything is correct:
+{ validated: true, reason: "Response verified and contains requested data" }
+
+If you found and fixed issues:
+{ validated: false, reason: "Specific issue and correction" }
+
+Use getValue to verify paths, then make a decision. Don't loop endlessly.`;
 
 // Alias for backward compatibility
 export const SELF_HEALING_CODE_CONFIG_AGENT_PROMPT = SELF_HEALING_SYSTEM_PROMPT;

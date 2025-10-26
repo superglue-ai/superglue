@@ -348,7 +348,7 @@ describe('API Utilities', () => {
       mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
 
       const result = await callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} });
-      expect(result.statusCode).toBe(200);
+      expect(result.status).toBe(200);
       expect(result.data).toEqual(mockResponse.data);
     });
 
@@ -417,7 +417,7 @@ describe('API Utilities', () => {
       mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
 
       const result = await callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} });
-      expect(result.statusCode).toBe(200);
+      expect(result.status).toBe(200);
       expect(result.data).toEqual(mockResponse.data);
     });
   });

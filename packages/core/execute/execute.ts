@@ -1,6 +1,7 @@
 import { CodeConfig, FileType, Integration, RequestOptions } from "@superglue/client";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import ivm from "isolated-vm";
+import { getObjectContext } from "../context/context-builders.js";
 import { server_defaults } from "../default.js";
 import { Metadata } from "../graphql/types.js";
 import { parseFile } from "../utils/file.js";
@@ -76,7 +77,7 @@ export async function executeCodeConfig({
     integration?: Integration;
     options: RequestOptions;
     metadata?: Metadata;
-}): Promise<ExecutionResult> {
+}): Promise<AxiosResponse> {
     let mergedResult: any = null;
     const hasPagination = !!codeConfig.pagination;
     const maxRequests = server_defaults.MAX_PAGINATION_REQUESTS;
@@ -126,40 +127,48 @@ export async function executeCodeConfig({
         // when the two response are the same we should return
         if (!hasPagination || JSON.stringify(mergedResult) == JSON.stringify(responseData)) {
             return {
-                data: responseData,
-                statusCode: lastResponse.status,
-                request: axiosConfig
-            };
+                status: lastResponse.status,
+                config: lastResponse.config as any,
+                headers: lastResponse.headers,
+                statusText: lastResponse.statusText,
+                data: mergedResult,
+            }
         }
 
         // Merge response data
         mergedResult = smartMergeResponses(mergedResult, responseData);
 
         // Handler determines result size and pagination state
-        const handlerResult = await handlePaginationWithHandler(
-            responseData,
-            lastResponse,
-            paginationState,
-            codeConfig
-        );
-
-        // Increment page/offset using result size from handler
-        updatePaginationState(
-            paginationState, 
-            codeConfig.pagination!.type, 
-            String(handlerResult.resultSize || 50), 
-            paginationState.cursor
-        );
-
-        paginationState.loopCounter++;
+        try {
+            const handlerResult = await handlePaginationWithHandler(
+                lastResponse,
+                paginationState,
+                codeConfig
+            );
+    
+            // Increment page/offset using result size from handler
+            updatePaginationState(
+                paginationState, 
+                codeConfig.pagination!.type, 
+                String(handlerResult.resultSize || 50), 
+                paginationState.cursor
+            );
+    
+            paginationState.loopCounter++;    
+        } catch (error) {
+            mergedResult = { error: error instanceof Error ? error.message : String(error), data: getObjectContext(mergedResult, { include: { schema: true, preview: true }, characterBudget: 10000 }) };
+            break;
+        }
     }
 
-    return formatFinalResult(
-        mergedResult,
-        codeConfig.pagination!.type,
-        paginationState.cursor,
-        lastResponse!
-    );
+    return {
+        status: lastResponse.status,
+        config: lastResponse.config as any,
+        headers: lastResponse.headers,
+        statusText: lastResponse.statusText,
+        data: mergedResult,
+    };
+
 }
 
 function createMaskedContext(context: CodeExecutionContext): Record<string, any> {
@@ -314,7 +323,6 @@ function generateDefaultHandler(paginationType: string): string {
 }
 
 async function handlePaginationWithHandler(
-    responseData: any,
     response: AxiosResponse,
     paginationState: PaginationState,
     codeConfig: CodeConfig
@@ -362,36 +370,12 @@ async function handlePaginationWithHandler(
     return { resultSize: handlerResult.resultSize };
 }
 
-function formatFinalResult(
-    mergedResult: any,
-    paginationType: string,
-    cursor: any,
-    lastResponse: AxiosResponse
-): ExecutionResult {
-    if (paginationType === "CURSOR_BASED") {
-        return {
-            data: {
-                next_cursor: cursor,
-                ...(Array.isArray(mergedResult) ? { results: mergedResult } : mergedResult)
-            },
-            statusCode: lastResponse.status,
-            request: lastResponse.config as AxiosRequestConfig
-        };
-    }
-
-    return {
-        data: mergedResult,
-        statusCode: lastResponse.status,
-        request: lastResponse.config as AxiosRequestConfig
-    };
-}
-
 async function executePaginationHandler(
     handlerCode: string,
-    response: AxiosResponse,
+    response: Partial<AxiosResponse>,
     pageInfo: { page: number; offset: number; cursor: any; totalFetched: number }
 ): Promise<{ hasMore: boolean; resultSize: number; cursor?: any; error?: string }> {
-    const isolate = new ivm.Isolate({ memoryLimit: 128 });
+    const isolate = new ivm.Isolate({ memoryLimit: 512 });
 
     try {
         const context = await isolate.createContext();
@@ -400,7 +384,9 @@ async function executePaginationHandler(
         await context.global.set('responseJSON', JSON.stringify({ 
             data: response.data, 
             headers: response.headers,
-            ...response.data  // Legacy support: allow direct access to response fields
+            status: response.status,
+            statusText: response.statusText,
+            config: response.config as any,
         }));
         await context.global.set('pageInfoJSON', JSON.stringify(pageInfo));
 

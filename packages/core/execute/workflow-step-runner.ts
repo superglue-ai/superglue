@@ -1,17 +1,16 @@
 import { CodeConfig, type ApiConfig, type RequestOptions } from "@superglue/client";
 import { Message } from "@superglue/shared";
-import { AxiosRequestConfig } from "axios";
+import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { server_defaults } from "../default.js";
-import { generateConfigImplementation } from "../generate/config.js";
-import { evaluateStepResponse } from "../generate/step-evaluation.js";
+import { generateConfigImplementation, validateConfigWithAgent } from "../generate/config.js";
 import { Metadata } from "../graphql/types.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
-import { isSelfHealingEnabled, maskCredentials } from "../utils/tools.js";
+import { isSelfHealingEnabled } from "../utils/tools.js";
 import { callEndpointLegacyImplementation } from "./api.legacy.js";
-import { executeCodeConfig, ExecutionResult } from "./execute.js";
-import { AbortError, ApiCallError } from "./http.js";
+import { executeCodeConfig } from "./execute.js";
+import { ApiCallError } from "./http.js";
 
 export async function executeStep({
   endpoint,
@@ -36,7 +35,7 @@ export async function executeStep({
   statusCode: number;
   request: AxiosRequestConfig;
 }> {
-  let response: ExecutionResult = null;
+  let response: Partial<AxiosResponse> = null;
   let retryCount = 0;
   let lastError: string | null = null;
   let messages: Message[] = [];
@@ -50,40 +49,43 @@ export async function executeStep({
 
   // If self healing is enabled, use the retries from the options or the default max of 10 if not specified, otherwise use 0 (no self-healing case)
   const effectiveMaxRetries = isSelfHealing ? (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES) : 0;
+  const integration = await integrationManager?.getIntegration();
+  const integrationId = integration?.id;
+  const scopedCredentials = integrationId 
+    ? Object.entries(credentials)
+        .filter(([key]) => key.startsWith(`${integrationId}_`) || !key.includes('_'))
+        .reduce((acc, [key, val]) => ({ ...acc, [key.replace(`${integrationId}_`, '')]: val }), {})
+    : credentials;
 
   do {
-    try {
-      const integration = await integrationManager?.getIntegration();
-      const integrationId = integration?.id;
-      const scopedCredentials = integrationId 
-      ? Object.entries(credentials)
-          .filter(([key]) => key.startsWith(`${integrationId}_`) || !key.includes('_'))
-          .reduce((acc, [key, val]) => ({ ...acc, [key.replace(`${integrationId}_`, '')]: val }), {})
-      : credentials;
 
-      if (retryCount > 0 && isSelfHealing) {
-        logMessage('info', `Generating code config (retry ${retryCount})`, metadata);
-        const currentConfig = codeConfig || endpoint;
-        const result = await generateConfigImplementation({}, {
-          runId: metadata.runId,
-          orgId: metadata.orgId,
-          currentConfig,
-          inputData,
-          credentials: scopedCredentials,
-          retryCount,
-          messages,
-          integrationManager
-        });
-        messages = result.data?.updatedMessages || [];
-        if (!result.success || !result.data) {
-          throw new Error(result.error || "Failed to generate code config");
-        }
-        
-        codeConfig = result.data?.config as CodeConfig;
+    // Generate config only on first iteration
+    if (retryCount === 0 && !codeConfig && !endpoint) {
+      throw new Error("Either codeConfig or apiConfig must be provided");
+    }
+    if (retryCount > 0 && isSelfHealing) {
+      logMessage('info', `Generating code config (${retryCount})`, metadata);
+      const currentConfig = codeConfig || endpoint;
+      const result = await generateConfigImplementation({}, {
+        runId: metadata.runId,
+        orgId: metadata.orgId,
+        currentConfig,
+        inputData,
+        credentials: scopedCredentials,
+        retryCount,
+        messages,
+        integrationManager
+      });
+      if (!result.success) {
+        throw new Error(`Failed to generate code config: ${result.error}`);
       }
-
+      codeConfig.code = result.data?.config?.code;
+      codeConfig.pagination = result.data?.config?.pagination;
+    }
+  // Execute config (wrapped in try-catch)
+    let executionError: string | null = null;
+    try {
       if (codeConfig) {
-        // Scope credentials to only the relevant integration for security
         response = await executeCodeConfig({
           codeConfig,
           inputData,
@@ -93,7 +95,6 @@ export async function executeStep({
           metadata
         });
       } else if (endpoint) {
-        // Legacy execution (only on first attempt without self-healing)
         response = await callEndpointLegacyImplementation({ 
           endpoint: endpoint as ApiConfig, 
           payload: inputData, 
@@ -101,53 +102,49 @@ export async function executeStep({
           options 
         });
       }
-      else {
-        throw new Error("No config type provided");
-      }
 
-      if (!response.data) {
-        throw new Error("No data returned from API. This could be due to a configuration error.");
+      if (!response?.data) {
+        executionError = "No data returned from API";
       }
-
-      // Check if response is valid
-      if (retryCount > 0 && isSelfHealing || options.testMode) {
-        const stepConfigString = `<step_config>${JSON.stringify(codeConfig || endpoint)}</step_config>\n<generated_config>${JSON.stringify(response.request)}</generated_config>`;
-        const instruction = codeConfig?.stepInstruction || endpoint?.instruction;
-        const result = await evaluateStepResponse({
-          data: response.data,
-          stepConfigString,
-          docSearchResultsForStepInstruction: await integrationManager?.searchDocumentation(instruction)
-        });
-        success = result.success;
-        if (!result.success) throw new Error(result?.shortReason.slice(0, 2000) + " " + JSON.stringify(response.data).slice(0, 1000) + " for request: " + JSON.stringify(response.request).slice(0, 1000));
+    } catch (execError: any) {
+      executionError = execError?.message || JSON.stringify(execError || {});
+      if (!response?.status) {
+        response = { ...response, status: execError instanceof ApiCallError ? execError.statusCode : 500 };
       }
-      else {
-        success = true;
-      }
-      break;
     }
-    catch (error: any) {
-      const rawErrorString = error?.message || JSON.stringify(error || {});
-      lastError = maskCredentials(rawErrorString, credentials).slice(0, 2000);
-      if (retryCount > 0) {
-        messages.push({ 
-          id: `retry-${retryCount}`,
-          role: "user", 
-          content: `There was an error with the configuration, please fix: ${rawErrorString}`,
-          timestamp: new Date()
-        });
-        logMessage('warn', `API call failed. ${lastError}`, metadata);
-      }
 
-      if (!response?.statusCode) {
-        response = { ...response, statusCode: error instanceof ApiCallError ? error.statusCode : 500 };
-      }
-      if (error instanceof AbortError) {
+    // ALWAYS validate (whether execution succeeded or failed)
+    const shouldValidate = isSelfHealing || options.testMode || retryCount > 0;
+    
+    if (shouldValidate && codeConfig) {
+      const validationResult = await validateConfigWithAgent({
+        currentConfig: codeConfig,
+        inputData,
+        credentials: scopedCredentials,
+        response,
+        executionError,
+        integrationManager,
+        messages,
+        runId: metadata.runId,
+        orgId: metadata.orgId
+      });
+      
+      if (validationResult.validated) {
+        success = true;
         break;
       }
+    } else {
+      // No validation - check execution result
+      if (executionError) {
+        lastError = executionError;
+        logMessage('warn', `Execution failed: ${lastError}`, metadata);
+      }
+      success = true;
+      break;
     }
+
     retryCount++;
-  } while (retryCount <= effectiveMaxRetries);
+  } while (retryCount <= effectiveMaxRetries && isSelfHealing);
   
   if (!success) {
     const config = codeConfig || endpoint;
@@ -155,14 +152,14 @@ export async function executeStep({
       config,
       retryCount: retryCount,
     });
-    throw new ApiCallError(`API call failed. Last error: ${lastError}`, response?.statusCode);
+    throw new ApiCallError(`API call failed. Last error: ${lastError}`, response?.status);
   }
 
   return { 
     data: response?.data, 
     endpoint, 
     codeConfig,
-    statusCode: response?.statusCode, 
+    statusCode: response?.status, 
     request: response?.request 
   };
 }

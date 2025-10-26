@@ -6,7 +6,6 @@ import { server_defaults } from "../default.js";
 import { parseFile } from "../utils/file.js";
 import { composeUrl, maskCredentials, replaceVariables } from "../utils/tools.js";
 import { injectVMHelpersIndividually } from "../utils/vm-helpers.js";
-import { ExecutionResult } from "./execute.js";
 import { callFTP, FTPOperation } from "./ftp.js";
 import { ApiCallError, callAxios, handle2xxStatus, handle429Status, handleErrorStatus } from "./http.js";
 import { callPostgres } from "./postgres.js";
@@ -26,7 +25,7 @@ export function convertBasicAuthToBase64(headerValue: string) {
     return headerValue;
   }
   
-export async function callEndpointLegacyImplementation({ endpoint, payload, credentials, options }: { endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<ExecutionResult> {
+export async function callEndpointLegacyImplementation({ endpoint, payload, credentials, options }: { endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<Partial<AxiosResponse>> {
     const allVariables = { ...payload, ...credentials };
   
     let allResults = [];
@@ -112,13 +111,13 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
         const query = body.query;
         const params = body.params || body.values;
         const request  = { method: "POST", url: connectionString, headers: processedHeaders, data: processedBody, params: processedQueryParams };
-        return { data: await callPostgres({ connectionString, query, params, options }), statusCode: 200, request: request };
+        return { data: await callPostgres({ connectionString, query, params, options }), status: 200, config: request as any };
       }
   
       if (processedUrlHost.startsWith("ftp://") || processedUrlHost.startsWith("ftps://") || processedUrlHost.startsWith("sftp://")) {
         const url = composeUrl(processedUrlHost, processedUrlPath);
         const operation: FTPOperation = { path: url, ...JSON.parse(endpoint.body) };
-        return { data: await callFTP({ operation, credentials, options }), statusCode: 200, request: { method: "POST", url: url, headers: processedHeaders, data: operation, params: processedQueryParams } };
+        return { data: await callFTP({ operation, credentials, options }), status: 200, config: { method: "POST", url: url, headers: processedHeaders, data: operation, params: processedQueryParams } as any };
       }
   
       const processedUrl = composeUrl(processedUrlHost, processedUrlPath);
@@ -293,19 +292,23 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
   
     if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
       return {
+        status: lastResponse.status,
+        config: lastResponse.config as any,
+        headers: lastResponse.headers,
+        statusText: lastResponse.statusText,
         data: {
           next_cursor: cursor,
           ...(Array.isArray(allResults) ? { results: allResults } : allResults)
         },
-        statusCode: lastResponse.status,
-        request: lastResponse.config
       };
     }
   
     return {
+      status: lastResponse.status,
+      config: lastResponse.config as any,
+      headers: lastResponse.headers,
+      statusText: lastResponse.statusText,
       data: allResults?.length === 1 ? allResults[0] : allResults,
-      statusCode: lastResponse.status,
-      request: lastResponse.config
     };
   }
   

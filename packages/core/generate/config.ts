@@ -1,13 +1,15 @@
 import type { ApiConfig, CodeConfig } from "@superglue/client";
 import { Message } from "@superglue/shared";
+import { AxiosResponse } from "axios";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { getObjectContext } from "../context/context-builders.js";
-import { SELF_HEALING_CODE_CONFIG_AGENT_PROMPT } from "../context/context-prompts.js";
+import { SELF_HEALING_CODE_CONFIG_AGENT_PROMPT, VALIDATE_GENERATED_CONFIG_PROMPT } from "../context/context-prompts.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel } from "../llm/language-model.js";
 import { parseJSON } from "../utils/json-parser.js";
 import { composeUrl } from "../utils/tools.js";
+import { createGetValueTool } from "../utils/transform.js";
 import { BaseToolContext, ToolDefinition, ToolImplementation } from "./tools.js";
 
 export interface ConfigGenerationContext extends BaseToolContext {
@@ -112,7 +114,10 @@ Must return: { url: string, method: string, headers?: object, data?: any, params
             handler: z.string().describe(`Pagination control handler. Format: (response, pageInfo) => ({ hasMore: boolean, resultSize: number, cursor?: any })
             
 The handler receives:
-- response: { data: any, headers: any } - Full API response with direct field access
+- response: object with { data, headers } where data contains the COMPLETE API response body
+  * Access API response via response.data (e.g., if API returns { items: [...] }, access as response.data.items)
+  * If API returns nested like { data: { items: [...] } }, access as response.data.data.items
+  * Use the actual structure shown in the example response data, don't assume/guess paths
 - pageInfo: { page, offset, cursor, totalFetched }
   - totalFetched: total items accumulated so far (from previous pages)
 
@@ -123,30 +128,43 @@ Must return:
 
 Responses are automatically merged: arrays concatenated, objects joined, conflicts resolved by taking most recent.
 
-Examples:
-1. Extract array from nested path:
+CRITICAL: Match the response structure to what you see in the actual API documentation/response. 
+If you see { items: [...] } in docs, use response.data.items
+If you see { data: { items: [...] } } in docs, use response.data.data.items
+If you see { results: { edges: { nodes: [...] } } } in docs, use response.data.results.edges.nodes
+
+Examples based on different API response structures:
+
+1. API returns { items: [...], has_more: true }:
    (response, pageInfo) => ({ 
      hasMore: response.data.has_more,
      resultSize: (response.data.items || []).length 
    })
 
-2. Stop at max items:
+2. API returns { data: { items: [...], hasMore: true } }:
    (response, pageInfo) => ({ 
-     hasMore: response.data.items.length > 0 && pageInfo.totalFetched < 10000,
-     resultSize: response.data.items.length
+     hasMore: response.data.data.hasMore,
+     resultSize: (response.data.data.items || []).length
    })
 
-3. Cursor-based with array extraction:
+3. API returns { results: [...], next_cursor: "abc" }:
    (response, pageInfo) => ({ 
      hasMore: !!response.data.next_cursor,
      resultSize: (response.data.results || []).length,
      cursor: response.data.next_cursor
    })
 
-4. Direct array response:
+4. API returns array directly [...]:
    (response, pageInfo) => ({ 
      hasMore: response.data.length >= 100 && pageInfo.totalFetched < 5000,
      resultSize: response.data.length
+   })
+
+5. GraphQL style { data: { issues: { nodes: [...], pageInfo: { hasNextPage, endCursor } } } }:
+   (response, pageInfo) => ({ 
+     hasMore: !!response.data.data.issues.pageInfo.hasNextPage,
+     resultSize: (response.data.data.issues.nodes || []).length,
+     cursor: response.data.data.issues.pageInfo.endCursor
    })`)
         }).optional().describe("Optional pagination configuration with unified handler for all pagination logic.")
     }));
@@ -232,4 +250,68 @@ export function sanitizeInstructionSuggestions(raw: unknown): string[] {
 
   return filtered;
 }
+
+export const validateConfigWithAgent = async (context: {
+  currentConfig: CodeConfig | ApiConfig,
+  inputData: any,
+  credentials: any,
+  response: Partial<AxiosResponse>,
+  executionError?: string | null,
+  integrationManager: IntegrationManager,
+  messages: Message[],
+  runId: string,
+  orgId: string
+}): Promise<{ validated: boolean; reason?: string; correctedConfig?: { code: string; pagination?: any } }> => {
+  const { response, executionError, inputData, currentConfig, messages, credentials, integrationManager } = context;
+  
+  const getValueTool = createGetValueTool({response});
+  
+  const instruction = (currentConfig as any).stepInstruction || (currentConfig as any).instruction || 'Execute API call';
+  const codeConfig = currentConfig as CodeConfig;
+  
+  const integration = await integrationManager?.getIntegration();
+  const baseUrl = integration ? composeUrl(integration.urlHost, integration.urlPath) : '';
+  
+  const validationPrompt = `Your config was executed. Validate the result:
+
+<your_generated_config>
+Code: ${codeConfig.code || 'N/A'}
+${codeConfig.pagination ? `Pagination: ${JSON.stringify(codeConfig.pagination, null, 2)}` : 'No pagination configured'}
+</your_generated_config>
+
+${executionError ? `<execution_error>
+${executionError}
+</execution_error>` : `<actual_api_response>
+${getObjectContext(response?.data, { include: { schema: true, preview: true, samples: true }, characterBudget: 10000 })}
+</actual_api_response>`}
+
+<request_sent>
+${JSON.stringify(response?.request, null, 2)}
+</request_sent>
+
+<instruction>
+${instruction}
+</instruction>
+
+<integration_context>
+Base URL: ${baseUrl}
+Available credentials: ${Object.keys(credentials || {}).map(v => `context.credentials.${v}`).join(", ")}
+</integration_context>
+
+${VALIDATE_GENERATED_CONFIG_PROMPT}`;
+
+  const validationSchema = {
+    type: "object",
+    properties: {
+      validated: { type: "boolean", description: "True if config is correct, false if corrections needed" },
+      reason: { type: "string", description: "Explanation of validation result or what was corrected" },
+    },
+    required: ["validated"]
+  };
+  
+  const validationMessages = [...messages, { role: "user", content: validationPrompt }];
+  const { response: validationResponse } = await LanguageModel.generateObject(validationMessages, validationSchema, 0, [getValueTool]);
+  
+  return validationResponse;
+};
 

@@ -14,7 +14,7 @@ export class WorkflowRunnerService {
 
     public async runWorkflows(workflows: WorkflowConfig[], integrations: Integration[], settings: TestSuiteSettings): Promise<WorkflowAttempt[]> {
         const workflowAttemptService = new SuperglueWorkflowAttemptService(this.metadata, this.datastore);
-        const BATCH_SIZE = 5;
+        const BATCH_SIZE = 10;
 
         const runWorkflow = async (workflow: WorkflowConfig): Promise<WorkflowAttempt[]> => {
             const workflowsIntegrations = integrations.filter(i => workflow.integrationIds.includes(i.id));

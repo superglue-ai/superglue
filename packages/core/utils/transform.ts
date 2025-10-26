@@ -117,7 +117,7 @@ export async function generateTransformCode(
       required: ["mappingCode"],
       additionalProperties: false
     };
-    const getValueTool = createGetValueTool(payload, payload);
+    const getValueTool = createGetValueTool(payload);
     const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, mappingSchema, temperature, [getValueTool]);
     messages = updatedMessages;
     try {
@@ -161,8 +161,7 @@ export async function evaluateTransform(
   try {
     logMessage('info', "Evaluating final transform", metadata);
 
-    const getValueTool = createGetValueTool(sourcePayload, transformedData);
-
+    const getValueTool = createGetValueTool({sourceData: sourcePayload, transformedData});
     const systemPrompt = EVALUATE_TRANSFORM_SYSTEM_PROMPT;
     const userPrompt = getEvaluateTransformContext({ instruction, targetSchema, sourceData: sourcePayload, transformedData, transformCode: mappingCode }, { characterBudget: LanguageModel.contextLength / 10 });
 
@@ -190,39 +189,25 @@ export async function evaluateTransform(
   }
 }
 
-function createGetValueTool(sourceData: any, transformedData: any): ToolDefinition {
+export function createGetValueTool(data: any): ToolDefinition {
   return {
     name: "getValue",
-    description: "CALL MAXIMUM OF 5 TIMES: Check if a property path exists in the source or transformed data and get its value/type. Use this to verify the transform code accesses correct paths before failing evaluation. Supports array index notation (e.g., 'items[0]') and array wildcard selector ('[*]') to inspect array contents.",
+    description: "CALL MAXIMUM OF 5 TIMES: Check if a property path exists in the source or transformed data and get its value/type.Supports array index notation (e.g., 'items[0]') and array wildcard selector ('[*]') to inspect array contents.",
     maxCalls: 5,
     arguments: {
       type: "object",
       properties: {
         path: {
           type: "string",
-          description: "The full property path to check including the root. Supports dot notation, array indices, and wildcards. Examples: 'sourceData.getAllLists.data.items', 'sourceData.users[0].name', 'transformedData.results[*]' (to see array structure)"
+          description: "The full property path to check including the root. Supports dot notation, array indices, and wildcards. Available top level keys: " + Object.keys(data).join(', ')
         }
       },
       required: ["path"]
     },
     execute: async (args: { path: string }) => {
       try {
-        // Determine root data source
-        console.log('getValueTool', args.path);
-        const rootMatch = args.path.match(/^(sourceData|transformedData)\./);
-        if (!rootMatch) {
-          console.log('getValueTool', 'Path must start with sourceData. or transformedData.', args.path);
-          return {
-            success: false,
-            error: `Path must start with 'sourceData.' or 'transformedData.', got: ${args.path}`
-          };
-        }
-        
-        const data = rootMatch[1] === 'sourceData' ? sourceData : transformedData;
-        const pathString = args.path.replace(/^(sourceData|transformedData)\./, '');
-        
         // Parse path to handle dot notation and bracket notation
-        const pathParts = pathString
+        const pathParts = args.path
           .replace(/\[(\d+)\]/g, '.$1')   // items[0] → items.0
           .replace(/\[\*\]/g, '.[*]')     // items[*] → items.[*]
           .split('.')
@@ -267,7 +252,7 @@ function createGetValueTool(sourceData: any, transformedData: any): ToolDefiniti
           if (!(part in current)) {
             const availableKeys = Array.isArray(current) 
               ? ['<array>', `length: ${current.length}`, ...(current.length > 0 ? [`first item type: ${typeof current[0]}`] : [])]
-              : Object.keys(current).slice(0, 10);
+              : Object.keys(current).slice(0, 10).map(key => currentPath ? `'${currentPath}.${key}'` : `'${key}'`);
             
             errorInfo = {
               error: `Property '${part}' does not exist at path '${currentPath}'`,
