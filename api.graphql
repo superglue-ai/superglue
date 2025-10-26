@@ -106,7 +106,6 @@ enum AuthType {
   OAUTH2
 }
 
-# also go away
 enum DecompressionMethod {
   GZIP
   DEFLATE

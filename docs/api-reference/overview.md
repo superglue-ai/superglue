@@ -3,20 +3,10 @@ title: 'Overview'
 description: 'Overview of the superglue GraphQL API'
 ---
 
-The Core API provides GraphQL endpoints for managing API configurations, data extraction, transformations, and workflows. Main concepts:
+The Core API provides GraphQL endpoints for managing workflows and integrations. Main concepts:
 
-* **Workflows**: Chain multiple steps into a single execution (recommended)
+* **Workflows**: Chain multiple steps into a single execution
 * **Integrations**: Manage integrations (e.g. Stripe, Hubspot) and their credentials
-
-## Deprecated Operations
-
-**⚠️ The following operations are deprecated:**
-* **API Calls**: Individual `call` operations - use `executeWorkflow` instead
-* **Extractions**: Individual `extract` operations - use `executeWorkflow` instead  
-* **Transformations**: Individual `transform` operations - use `executeWorkflow` instead
-* **Legacy Config Management**: `upsertApi`, `upsertExtract`, `upsertTransform` - use workflow-based operations instead
-
-These deprecated operations are still available but moved to the bottom of the documentation. Use workflows for better performance, reliability, and capabilities.
 
 ## Endpoint
 
@@ -40,50 +30,10 @@ interface BaseConfig {
   updatedAt: DateTime
 }
 
-union ConfigType = ApiConfig | ExtractConfig | TransformConfig | Workflow
+union ConfigType = Workflow
 ```
 
 ## Input Types
-
-### ApiInput
-- id: ID!
-- urlHost: String!
-- urlPath: String
-- instruction: String!
-- queryParams: JSON
-- method: HttpMethod
-- headers: JSON
-- body: String
-- documentationUrl: String
-- responseSchema: JSONSchema
-- responseMapping: JSONata
-- authentication: AuthType
-- pagination: PaginationInput
-- dataPath: String
-- version: String
-
-### ExtractInput
-- id: ID!
-- urlHost: String!
-- urlPath: String
-- queryParams: JSON
-- instruction: String!
-- method: HttpMethod
-- headers: JSON
-- body: String
-- documentationUrl: String
-- decompressionMethod: DecompressionMethod
-- fileType: FileType
-- authentication: AuthType
-- dataPath: String
-- version: String
-
-### TransformInput
-- id: ID!
-- instruction: String!
-- responseSchema: JSONSchema!
-- responseMapping: JSONata
-- version: String
 
 ### WorkflowInput
 - id: String!
@@ -117,7 +67,7 @@ Control how operations are executed with fine-grained options.
   "timeout": 300000,             // Default: 300000ms (5 minutes)
   "retries": 10,                 // Default: 10 attempts
   "retryDelay": 0,           // Default: 0ms (no delay)
-  "webhookUrl": null,           // Deprecated, Default: null (no webhooks) - this only works for calls, not for workflows.
+  "webhookUrl": null,           // Default: null (no webhooks)
   "testMode": false             // Default: false - if this is true, superglue will validate the request after each execution. This is useful for building, testing and debugging.
 }
 ```
@@ -219,7 +169,7 @@ If `webhookUrl` is set in options:
 
 ## Workflows
 
-Workflows let you chain multiple steps (API, extract, transform) into a single execution. Each step can run in DIRECT mode or LOOP mode for batch processing.
+Workflows let you chain multiple steps into a single execution. Each step can run in DIRECT mode or LOOP mode for batch processing.
 
 ## Integrations
 
