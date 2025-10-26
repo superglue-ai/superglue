@@ -23,8 +23,6 @@ export const extractResolver = async (
   const callId = crypto.randomUUID();
   const startedAt = new Date();
   let preparedExtract: ExtractConfig;
-  const readCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
-  const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : false;
   try {
     // Resolve endpoint configuration from cache or prepare new one
     let response: any;
@@ -51,28 +49,15 @@ export const extractResolver = async (
           fileType: FileType.AUTO
         };
         response = await processFile(buffer, preparedExtract);
-      }
-      else {
-        preparedExtract = readCache ?
-          await context.datastore.getExtractConfig({ id: input.id, orgId: context.orgId })
-          : null;
-        if (!preparedExtract) {
-          if (!input.endpoint.instruction) {
-            throw new Error("Id could not be found and no endpoint provided.");
-          }
-          const documentation = new DocumentationFetcher(input.endpoint, credentials, metadata);
-          const rawDoc = await documentation.fetchAndProcess();
-          const documentationSearch = new DocumentationSearch({ orgId: context.orgId });
-          const documentationString = documentationSearch.extractRelevantSections(rawDoc, input.endpoint.instruction || "");
-          preparedExtract = await generateExtractConfig(input.endpoint, documentationString, payload, credentials, lastError);
-        }
-
-        try {
-          const buffer = await callExtract(preparedExtract, payload, credentials, options);
-          response = await processFile(buffer, preparedExtract);
-        } catch (error) {
-          logMessage('warn', "Extraction failed. Retrying...", metadata);
-          lastError = error?.message || JSON.stringify(error || {});
+      } else {
+        logMessage('error', "Extract call failed. No file provided", metadata);
+        return {
+          id: callId,
+          success: false,
+          error: "No file provided",
+          config: preparedExtract,
+          startedAt,
+          completedAt: new Date(),
         }
       }
       retryCount++;
@@ -87,17 +72,7 @@ export const extractResolver = async (
       throw new Error(`Extract call failed after ${retryCount} retries. Last error: ${lastError}`);
     }
 
-    // Save configuration if requested
-    if (writeCache) {
-      context.datastore.upsertExtractConfig({ id: input.id || preparedExtract.id, config: preparedExtract, orgId: context.orgId });
-    }
     const completedAt = new Date();
-
-    // Notify webhook if configured
-    // call async
-    if (options?.webhookUrl) {
-      notifyWebhook(options.webhookUrl, callId, true, response);
-    }
 
     return {
       id: callId,

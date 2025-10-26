@@ -10,12 +10,12 @@ interface BaseConfig {
   updatedAt: DateTime
 }
 
-union ConfigType = ApiConfig | ExtractConfig | TransformConfig | Workflow
+union ConfigType = Workflow
 ```
 
 ### ApiConfig
 
-Configuration for API endpoints. Inherits from [BaseConfig](overview.md#base-types).
+Configuration for API calls within workflow steps. This type is used internally by `ExecutionStep` to define how each step calls an API.
 
 ```graphql
 type ApiConfig implements BaseConfig {
@@ -30,58 +30,17 @@ type ApiConfig implements BaseConfig {
   headers: JSON                     # Request headers (default: {})
   queryParams: JSON                 # URL query parameters (default: {})
   body: String                      # Request body for POST/PUT/PATCH requests
-  instruction: String               # Natural language description of what this API does
+  instruction: String               # Natural language description
   authentication: AuthType          # Authentication method (default: NONE)
   responseSchema: JSONSchema        # Expected response format (auto-generated if not provided)
-  responseMapping: JSONata         # JSONata transformation expression (optional)
-  pagination: Pagination           # Pagination configuration (default: DISABLED)
-  dataPath: String                 # JSONPath to extract data from response (e.g., "$.data")
-  documentationUrl: String         # URL to API documentation for auto-configuration
+  responseMapping: JSONata          # JSONata transformation (optional)
+  pagination: Pagination            # Pagination configuration (default: DISABLED)
+  dataPath: String                  # JSONPath to extract data from response (e.g., "$.data")
+  documentationUrl: String          # API documentation URL
 }
 ```
 
-### ExtractConfig
-
-Configuration for data extraction from files or APIs. Inherits from [BaseConfig](overview.md#base-types).
-
-```graphql
-type ExtractConfig implements BaseConfig {
-  id: ID!
-  version: String
-  createdAt: DateTime
-  updatedAt: DateTime
-  
-  urlHost: String                   # Source URL or file location (e.g., "https://api.example.com" or "s3://bucket")
-  urlPath: String                   # Path component of the URL or file path
-  method: HttpMethod                # HTTP method for API sources (default: GET)
-  headers: JSON                     # Request headers for API sources (default: {})
-  queryParams: JSON                 # URL query parameters for API sources (default: {})
-  body: String                      # Request body for API sources
-  instruction: String               # Natural language description of what to extract
-  authentication: AuthType          # Authentication method for API sources (default: NONE)
-  fileType: FileType                # Format of the source file (default: AUTO)
-  decompressionMethod: DecompressionMethod  # Decompression algorithm (default: AUTO)
-  dataPath: String                  # JSONPath to extract specific data (e.g., "$.records")
-  documentationUrl: String         # URL to API/file format documentation
-}
-```
-
-### TransformConfig
-
-Configuration for data transformation. Inherits from [BaseConfig](overview.md#base-types).
-
-```graphql
-type TransformConfig implements BaseConfig {
-  id: ID!
-  version: String
-  createdAt: DateTime
-  updatedAt: DateTime
-  
-  instruction: String               # Natural language description of desired transformation
-  responseSchema: JSONSchema        # Target data format
-  responseMapping: JSONata         # Transformation expression
-}
-```
+> **Note:** `ApiConfig` is used within workflow steps. For creating integrations and workflows, use `Integration` and `Workflow` types.
 
 ### Workflow
 
@@ -163,7 +122,7 @@ Individual step within a workflow.
 ```graphql
 type ExecutionStep {
   id: String!
-  apiConfig: ApiConfig!
+  apiConfig: ApiConfig!             # API configuration for this step
   integrationId: ID                 # Integration to use for this step
   executionMode: String             # DIRECT | LOOP
   loopSelector: JSONata             # JSONata expression for loop iteration
@@ -323,30 +282,6 @@ type Pagination {
 ```graphql
 type RunList {
   items: [RunResult!]!
-  total: Int!
-}
-```
-
-### ApiList
-```graphql
-type ApiList {
-  items: [ApiConfig!]!
-  total: Int!
-}
-```
-
-### TransformList
-```graphql
-type TransformList {
-  items: [TransformConfig!]!
-  total: Int!
-}
-```
-
-### ExtractList
-```graphql
-type ExtractList {
-  items: [ExtractConfig!]!
   total: Int!
 }
 ```

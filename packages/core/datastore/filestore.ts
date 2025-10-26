@@ -1,4 +1,4 @@
-import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
+import type { ApiConfig, Integration, RunResult, Workflow } from "@superglue/client";
 import fs from 'node:fs';
 import path from 'node:path';
 import { credentialEncryption } from "../utils/encryption.js";
@@ -9,8 +9,6 @@ export class FileStore implements DataStore {
 
   private storage: {
     apis: Map<string, ApiConfig>;
-    extracts: Map<string, ExtractConfig>;
-    transforms: Map<string, TransformConfig>;
     workflows: Map<string, Workflow>;
     workflowSchedules: Map<string, WorkflowScheduleInternal>;
     integrations: Map<string, Integration>;
@@ -28,8 +26,6 @@ export class FileStore implements DataStore {
   constructor(storageDir = '/data') {
     this.storage = {
       apis: new Map(),
-      extracts: new Map(),
-      transforms: new Map(),
       workflows: new Map(),
       workflowSchedules: new Map(),
       integrations: new Map(),
@@ -84,8 +80,6 @@ export class FileStore implements DataStore {
         this.storage = {
           ...this.storage,
           apis: new Map(Object.entries(parsed.apis || {})),
-          extracts: new Map(Object.entries(parsed.extracts || {})),
-          transforms: new Map(Object.entries(parsed.transforms || {})),
           workflows: new Map(Object.entries(parsed.workflows || {})),
           workflowSchedules: new Map(Object.entries(parsed.workflowSchedules || {})),
           integrations: new Map(Object.entries(parsed.integrations || {})),
@@ -132,8 +126,6 @@ export class FileStore implements DataStore {
       this.isPersisting = true;
       const serialized = {
         apis: Object.fromEntries(this.storage.apis),
-        extracts: Object.fromEntries(this.storage.extracts),
-        transforms: Object.fromEntries(this.storage.transforms),
         workflows: Object.fromEntries(this.storage.workflows),
         workflowSchedules: Object.fromEntries(this.storage.workflowSchedules),
         integrations: Object.fromEntries(this.storage.integrations),
@@ -352,84 +344,6 @@ export class FileStore implements DataStore {
     return deleted;
   }
 
-  // Extract Config Methods
-  async getExtractConfig(params: { id: string; orgId?: string }): Promise<ExtractConfig | null> {
-    await this.ensureInitialized();
-    const { id, orgId } = params;
-    if (!id) return null;
-    const key = this.getKey('extract', id, orgId);
-    const config = this.storage.extracts.get(key);
-    return config ? { ...config, id } : null;
-  }
-
-  async listExtractConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: ExtractConfig[], total: number }> {
-    await this.ensureInitialized();
-    const { limit = 10, offset = 0, orgId } = params || {};
-    const items = this.getOrgItems(this.storage.extracts, 'extract', orgId)
-      .slice(offset, offset + limit);
-    const total = this.getOrgItems(this.storage.extracts, 'extract', orgId).length;
-    return { items, total };
-  }
-
-  async upsertExtractConfig(params: { id: string; config: ExtractConfig; orgId?: string }): Promise<ExtractConfig> {
-    await this.ensureInitialized();
-    const { id, config, orgId } = params;
-    if (!id || !config) return null;
-    const key = this.getKey('extract', id, orgId);
-    this.storage.extracts.set(key, config);
-    await this.persist();
-    return { ...config, id };
-  }
-
-  async deleteExtractConfig(params: { id: string; orgId?: string }): Promise<boolean> {
-    await this.ensureInitialized();
-    const { id, orgId } = params;
-    if (!id) return false;
-    const key = this.getKey('extract', id, orgId);
-    const deleted = this.storage.extracts.delete(key);
-    await this.persist();
-    return deleted;
-  }
-
-  // Transform Config Methods  
-  async getTransformConfig(params: { id: string; orgId?: string }): Promise<TransformConfig | null> {
-    await this.ensureInitialized();
-    const { id, orgId } = params;
-    if (!id) return null;
-    const key = this.getKey('transform', id, orgId);
-    const config = this.storage.transforms.get(key);
-    return config ? { ...config, id } : null;
-  }
-
-  async listTransformConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: TransformConfig[], total: number }> {
-    await this.ensureInitialized();
-    const { limit = 10, offset = 0, orgId } = params || {};
-    const items = this.getOrgItems(this.storage.transforms, 'transform', orgId)
-      .slice(offset, offset + limit);
-    const total = this.getOrgItems(this.storage.transforms, 'transform', orgId).length;
-    return { items, total };
-  }
-
-  async upsertTransformConfig(params: { id: string; config: TransformConfig; orgId?: string }): Promise<TransformConfig> {
-    await this.ensureInitialized();
-    const { id, config, orgId } = params;
-    if (!id || !config) return null;
-    const key = this.getKey('transform', id, orgId);
-    this.storage.transforms.set(key, config);
-    await this.persist();
-    return { ...config, id };
-  }
-
-  async deleteTransformConfig(params: { id: string; orgId?: string }): Promise<boolean> {
-    await this.ensureInitialized();
-    const { id, orgId } = params;
-    if (!id) return false;
-    const key = this.getKey('transform', id, orgId);
-    const deleted = this.storage.transforms.delete(key);
-    await this.persist();
-    return deleted;
-  }
-
   // Run Result Methods
   async getRun(params: { id: string; orgId?: string }): Promise<RunResult | null> {
     await this.ensureInitialized();
@@ -521,8 +435,6 @@ export class FileStore implements DataStore {
   async clearAll(): Promise<void> {
     await this.ensureInitialized();
     this.storage.apis.clear();
-    this.storage.extracts.clear();
-    this.storage.transforms.clear();
     this.storage.workflows.clear();
     this.storage.workflowSchedules.clear();
     this.storage.integrations.clear();

@@ -13,12 +13,6 @@ import {
   AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog";
 import { Button } from "@/src/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/src/components/ui/dropdown-menu";
 import { Input } from "@/src/components/ui/input";
 import {
   Select,
@@ -40,9 +34,8 @@ import ToolSchedulesList from '@/src/components/tools/ToolSchedulesList';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import EmptyStateActions from '@/src/components/utils/EmptyStateActions';
 import { loadFromCache, saveToCache } from '@/src/lib/cache-utils';
-import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
-import { ApiConfig, ExtractConfig, Integration, SuperglueClient, Workflow as Tool, TransformConfig } from '@superglue/client';
-import { Calendar, Check, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2, Zap } from "lucide-react";
+import { ApiConfig, Integration, SuperglueClient, Workflow as Tool } from '@superglue/client';
+import { Calendar, Check, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React from 'react';
 import type { SimpleIcon } from 'simple-icons';
@@ -51,53 +44,30 @@ import * as simpleIcons from 'simple-icons';
 const CACHE_PREFIX = 'superglue-tools-cache';
 
 interface CachedTools {
-  configs: (ApiConfig | ExtractConfig | Tool | TransformConfig)[];
+  configs: (ApiConfig | Tool)[];
   integrations: Integration[];
   timestamp: number;
 }
 
 const ConfigTable = () => {
   const router = useRouter();
-  const [allConfigs, setAllConfigs] = React.useState<(ApiConfig | ExtractConfig | Tool | TransformConfig)[]>([]);
-  const [configs, setConfigs] = React.useState<(ApiConfig | ExtractConfig | Tool | TransformConfig)[]>([]);
+  const [allConfigs, setAllConfigs] = React.useState<(ApiConfig | Tool)[]>([]);
+  const [configs, setConfigs] = React.useState<(ApiConfig | Tool)[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(0);
   const [pageSize] = React.useState(20);
   const config = useConfig();
-  const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | ExtractConfig | Tool | TransformConfig | null>(null);
+  const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | Tool | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [showConfigStepper, setShowConfigStepper] = React.useState(false);
   const [configStepperProps, setConfigStepperProps] = React.useState<{ prefillData?: any }>({});
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
-  const [showHiddenOptions, setShowHiddenOptions] = React.useState(false);
   const [expandedToolId, setExpandedToolId] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [integrations, setIntegrations] = React.useState<Integration[]>([]);
   const [selectedIntegration, setSelectedIntegration] = React.useState<string>("all");
 
-  // Add effect to track Command/Shift key presses
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.metaKey || e.shiftKey) {
-        setShowHiddenOptions(true);
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (!e.metaKey && !e.shiftKey) {
-        setShowHiddenOptions(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, []);
 
   const refreshConfigs = React.useCallback(async () => {
     setShowConfigStepper(false);
@@ -108,11 +78,9 @@ const ConfigTable = () => {
         apiKey: config.superglueApiKey
       });
 
-      // Fetch APIs, Extracts, Transforms, Tools, and Integrations concurrently
-      const [apiConfigs, extractConfigs, transformConfigs, toolConfigs, integrationsData] = await Promise.all([
+      // Fetch APIs, Tools, and Integrations concurrently
+      const [apiConfigs, toolConfigs, integrationsData] = await Promise.all([
         superglueClient.listApis(1000, 0),
-        superglueClient.listExtracts(1000, 0),
-        superglueClient.listTransforms(1000, 0),
         superglueClient.listWorkflows(1000, 0),
         superglueClient.listIntegrations(1000, 0),
       ]);
@@ -121,8 +89,6 @@ const ConfigTable = () => {
 
       const combinedConfigs = [
         ...apiConfigs.items.map(item => ({ ...item, type: 'api' as const })),
-        ...extractConfigs.items.map(item => ({ ...item, type: 'extract' as const })),
-        ...transformConfigs.items.map(item => ({ ...item, type: 'transform' as const })),
         ...toolConfigs.items.map((item: any) => ({ ...item, type: 'tool' as const }))
       ].sort((a, b) => {
         const dateA = new Date(a.updatedAt || a.createdAt).getTime();
@@ -212,13 +178,6 @@ const ConfigTable = () => {
   const handleTool = () => {
     router.push('/tools');
   };
-  const handleToolManual = () => {
-    router.push('/tools/manual');
-  };
-
-  const handleTransform = () => {
-    router.push('/transforms');
-  };
 
 
   const handleEdit = (e: React.MouseEvent, id: string) => {
@@ -231,15 +190,6 @@ const ConfigTable = () => {
     router.push(`/configs/${id}/run`);
   };
 
-  const handlePlayExtract = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    router.push(`/extracts/${id}/run`);
-  };
-
-  const handlePlayTransform = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    router.push(`/transforms/${id}`);
-  };
 
   const handleViewLogs = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -266,12 +216,6 @@ const ConfigTable = () => {
       switch ((configToDelete as any)?.type) {
         case 'api':
           deletePromise = superglueClient.deleteApi(configToDelete.id);
-          break;
-        case 'extract':
-          deletePromise = superglueClient.deleteExtraction(configToDelete.id);
-          break;
-        case 'transform':
-          deletePromise = superglueClient.deleteTransformation(configToDelete.id);
           break;
         case 'tool':
           deletePromise = superglueClient.deleteWorkflow(configToDelete.id);
@@ -373,8 +317,6 @@ const ConfigTable = () => {
 
         <EmptyStateActions
           handleTool={handleTool}
-          handleToolManual={handleToolManual}
-          handleTransform={handleTransform}
         />
       </div>
     );
@@ -385,30 +327,10 @@ const ConfigTable = () => {
       <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2">
         <h1 className="text-2xl font-bold">Tools</h1>
         <div className="flex gap-4">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Create
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align='end'>
-              <DropdownMenuItem onClick={handleTransform} className='p-4'>
-                <Zap className="mr-2 h-4 w-4" />
-                Transform
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleTool} className='p-4'>
-                <Hammer className="mr-2 h-4 w-4" />
-                Tool
-              </DropdownMenuItem>
-              {showHiddenOptions && (
-                <DropdownMenuItem onClick={handleToolManual} className='p-4'>
-                  <Hammer className="mr-2 h-4 w-4" />
-                  Tool (Manual)
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button onClick={handleTool}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create
+          </Button>
         </div>
       </div>
 
@@ -482,18 +404,14 @@ const ConfigTable = () => {
               </TableRow>
             ) : (
               configs.map((config) => {
-                const configType = (config as any).type;
-                const isApi = configType === 'api';
-                const isExtract = configType === 'extract';
-                const isTransform = configType === 'transform';
-                const isTool = configType === 'tool';
+              const configType = (config as any).type;
+              const isApi = configType === 'api';
+              const isTool = configType === 'tool';
 
-                const handleRunClick = (e: React.MouseEvent) => {
-                  if (isApi) handlePlay(e, config.id);
-                  else if (isExtract) handlePlayExtract(e, config.id);
-                  else if (isTransform) handlePlayTransform(e, config.id);
-                  else if (isTool) handlePlayTool(e, config.id);
-                };
+              const handleRunClick = (e: React.MouseEvent) => {
+                if (isApi) handlePlay(e, config.id);
+                else if (isTool) handlePlayTool(e, config.id);
+              };
 
                 return (
                   <React.Fragment key={`${configType}-${config.id}`}>
@@ -676,28 +594,28 @@ const ConfigTable = () => {
                               </Tooltip>
                             )}
 
-                            {/* Delete Action (Available for all types) */}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setConfigToDelete(config);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Delete {isApi ? 'Configuration' : isExtract ? 'Configuration' : isTransform ? 'Transform' : 'Tool'}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                          {/* Delete Action (Available for all types) */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConfigToDelete(config);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Delete {isApi ? 'Configuration' : 'Tool'}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </TableCell>
+                  </TableRow>
 
                     {/* Expanded Details Row */}
                     {expandedToolId === config.id && (

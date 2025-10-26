@@ -11,7 +11,7 @@ This guide demonstrates how to build and execute a superglue Workflow to:
 2. For each company, fetch its associated contacts.
 3. Combine this data into a nested structure where each company object contains an array of its contacts.
 
-> **Note:** All config objects for individual workflow steps support the full [ApiConfig](/api-reference/types) schema. superglue infers most fields, but you can provide explicit configurations if needed. Workflows themselves are defined and then executed.
+> **Note:** Workflow steps support flexible API configurations. superglue infers most fields, but you can provide explicit configurations if needed. Workflows themselves are defined and then executed.
 
 ## Prerequisites
 
@@ -124,7 +124,7 @@ When `buildWorkflow` is called:
 - It determines the necessary API endpoints (e.g., `/crm/v3/objects/companies`, `/crm/v3/objects/contacts`, and how to query associations).
 - It generates transformations to fit the data into `hubspotDataSchema`.
 
-The `workflow` object returned contains the definition of these steps, including the generated `ApiConfig` objects for each API call.
+The `workflow` object returned contains the definition of these steps, including the generated configurations for each API call.
 
 ## Executing the Workflow
 

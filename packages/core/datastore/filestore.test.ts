@@ -1,4 +1,4 @@
-import { ApiConfig, ExtractConfig, HttpMethod, RunResult, TransformConfig, Workflow } from '@superglue/client';
+import { ApiConfig, HttpMethod, RunResult, Workflow } from '@superglue/client';
 import fs from 'fs';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -76,69 +76,6 @@ describe('FileStore', () => {
       await store.upsertApiConfig({ id: testConfig.id, config: testConfig, orgId: testOrgId });
       await store.deleteApiConfig({ id: testConfig.id, orgId: testOrgId });
       const retrieved = await store.getApiConfig({ id: testConfig.id, orgId: testOrgId });
-      expect(retrieved).toBeNull();
-    });
-  });
-
-  describe('Extract Config', () => {
-    const testExtractConfig: ExtractConfig = {
-      id: 'test-extract-id',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      instruction: 'Test extraction',
-      urlHost: 'https://test.com',
-    };
-
-    it('should store and retrieve extract configs', async () => {
-      await store.upsertExtractConfig({ id: testExtractConfig.id, config: testExtractConfig, orgId: testOrgId });
-      const retrieved = await store.getExtractConfig({ id: testExtractConfig.id, orgId: testOrgId });
-      expect(retrieved).toEqual(testExtractConfig);
-    });
-
-    it('should list extract configs', async () => {
-      await store.upsertExtractConfig({ id: testExtractConfig.id, config: testExtractConfig, orgId: testOrgId });
-      const { items, total } = await store.listExtractConfigs({ limit: 10, offset: 0, orgId: testOrgId });
-      expect(items).toHaveLength(1);
-      expect(total).toBe(1);
-      expect(items[0]).toEqual(testExtractConfig);
-    });
-
-    it('should delete extract configs', async () => {
-      await store.upsertExtractConfig({ id: testExtractConfig.id, config: testExtractConfig, orgId: testOrgId });
-      await store.deleteExtractConfig({ id: testExtractConfig.id, orgId: testOrgId });
-      const retrieved = await store.getExtractConfig({ id: testExtractConfig.id, orgId: testOrgId });
-      expect(retrieved).toBeNull();
-    });
-  });
-
-  describe('Transform Config', () => {
-    const testTransformConfig: TransformConfig = {
-      id: 'test-transform-id',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      instruction: 'Test transformation',
-      responseSchema: {},
-      responseMapping: ''
-    };
-
-    it('should store and retrieve transform configs', async () => {
-      await store.upsertTransformConfig({ id: testTransformConfig.id, config: testTransformConfig, orgId: testOrgId });
-      const retrieved = await store.getTransformConfig({ id: testTransformConfig.id, orgId: testOrgId });
-      expect(retrieved).toEqual(testTransformConfig);
-    });
-
-    it('should list transform configs', async () => {
-      await store.upsertTransformConfig({ id: testTransformConfig.id, config: testTransformConfig, orgId: testOrgId });
-      const { items, total } = await store.listTransformConfigs({ limit: 10, offset: 0, orgId: testOrgId });
-      expect(items).toHaveLength(1);
-      expect(total).toBe(1);
-      expect(items[0]).toEqual(testTransformConfig);
-    });
-
-    it('should delete transform configs', async () => {
-      await store.upsertTransformConfig({ id: testTransformConfig.id, config: testTransformConfig, orgId: testOrgId });
-      await store.deleteTransformConfig({ id: testTransformConfig.id, orgId: testOrgId });
-      const retrieved = await store.getTransformConfig({ id: testTransformConfig.id, orgId: testOrgId });
       expect(retrieved).toBeNull();
     });
   });
