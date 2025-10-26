@@ -28,6 +28,7 @@ export interface TestSuiteSettings {
     runOneShotMode: boolean;
     runSelfHealingMode: boolean;
     attemptsEachMode: number;
+    maxConcurrentWorkers?: number;
 }
 
 export interface ValidationLLMConfig {

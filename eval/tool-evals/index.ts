@@ -52,7 +52,7 @@ async function main(): Promise<void> {
     csvReporter.report(timestamp, metrics);
     
     const jsonReporter = new JsonReporter(baseDir, metadata, config.settings.attemptsEachMode);
-    jsonReporter.reportAttempts(timestamp, toolAttempts);
+    jsonReporter.reportAttempts(timestamp, toolAttempts, config);
 
     const duration = new Date().getTime() - startedAt.getTime();
     logMessage("info", `Agent Evaluation Completed in ${(duration / 1000).toFixed(1)}s`, metadata);
