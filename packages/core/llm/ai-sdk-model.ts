@@ -1,5 +1,4 @@
 import { anthropic } from "@ai-sdk/anthropic";
-import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
 import { getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
 import { AssistantModelMessage, TextPart, ToolCallPart, ToolResultPart, generateText, jsonSchema, tool } from "ai";
@@ -60,9 +59,6 @@ export class AiSdkModel implements LLM {
         tools["web_search"] = anthropic.tools.webSearch_20250305({
           maxUses: 5,
         });
-        break;
-      case 'gemini':
-        tools["web_search"] = google.tools.googleSearch({});
         break;
       default:
         break;
