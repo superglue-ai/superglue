@@ -96,13 +96,13 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   }, [isCodeMode, forceCodeMode]);
 
   React.useEffect(() => {
-    if (isOptional) {
+    if (isOptional && !localIsEnabled) {
       const shouldBeEnabled = value !== null && value !== '' && value !== undefined && value !== '{}' && value !== '{"type":"object","properties":{}}';
-      if (shouldBeEnabled !== localIsEnabled) {
-        setLocalIsEnabled(shouldBeEnabled);
+      if (shouldBeEnabled) {
+        setLocalIsEnabled(true);
       }
     }
-  }, [value, isOptional]);
+  }, [value, isOptional, localIsEnabled]);
 
   const [visualSchema, setVisualSchema] = React.useState<any>({});
   const [editingField, setEditingField] = React.useState<string | null>(null);
