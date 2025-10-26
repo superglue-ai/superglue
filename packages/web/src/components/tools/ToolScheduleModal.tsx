@@ -1,7 +1,7 @@
 import { useConfig } from '@/src/app/config-context';
 import { Switch } from "@/src/components/ui/switch";
 import { useToast } from '@/src/hooks/use-toast';
-import { cn, getGroupedTimezones } from '@/src/lib/utils';
+import { cn, getGroupedTimezones } from '@/src/lib/general-utils';
 import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/client';
 import { validateCronExpression } from '@superglue/shared';
 import { Check, CheckCircle, ChevronRight, ChevronsUpDown, Loader2, XCircle } from 'lucide-react';

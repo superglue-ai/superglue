@@ -264,7 +264,15 @@ export const findRelevantToolsResolver = async (
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
     const allTools = await context.datastore.listWorkflows({ limit: 1000, offset: 0, orgId: context.orgId });
-    const tools = allTools.items || [];
+    const tools = (allTools.items || []).map(tool => {
+      if (tool.inputSchema && typeof tool.inputSchema === 'string') {
+        tool.inputSchema = parseJSON(tool.inputSchema);
+      }
+      if (tool.responseSchema && typeof tool.responseSchema === 'string') {
+        tool.responseSchema = parseJSON(tool.responseSchema);
+      }
+      return tool;
+    });
 
     const selector = new ToolSelector(metadata);
     return await selector.select(searchTerms, tools);

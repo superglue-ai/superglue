@@ -98,15 +98,17 @@ The superglue MCP server provides two focused tools:
 
 <AccordionGroup>
   <Accordion title="superglue_find_relevant_tools" icon="search">
-    **Purpose:** Search for your pre-built superglue tools
+    **Purpose:** Search for your pre-built superglue tools using natural language
 
     **Usage:**
 
     > "Find my Slack notification tools"
 
-    **What it does:** Searches through your saved workflows and returns relevant tool IDs with their instructions and integrations.
+    **What it does:** Uses AI to intelligently match your query to relevant tools. Returns tool metadata with explanations of why each tool is relevant.
 
-    **Returns:** Tool metadata including ID, instruction, input/output schemas, steps, and integrations used.
+    **Returns:** Tool metadata including ID, instruction, input/output schemas, steps, integrations, and a reason explaining the match.
+
+    **Fallback:** If no specific matches are found or an error occurs, returns all available tools. Empty query or `*` also returns all tools.
   </Accordion>
   <Accordion title="superglue_execute_tool" icon="play">
     **Purpose:** Execute a saved tool by ID

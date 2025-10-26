@@ -10,7 +10,7 @@ import {
 } from '@/src/components/ui/dialog';
 import { Input } from '@/src/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { cn } from '@/src/lib/utils';
+import { cn } from '@/src/lib/general-utils';
 import { ExecutionStep, SuperglueClient, Workflow as Tool } from '@superglue/client';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -41,7 +41,7 @@ export function AddStepDialog({
     const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const config = useConfig();
-    
+
     const client = new SuperglueClient({
         endpoint: config.superglueEndpoint,
         apiKey: config.superglueApiKey,
@@ -96,17 +96,17 @@ export function AddStepDialog({
 
     const handleConfirmScratch = () => {
         const trimmedId = stepId.trim();
-        
+
         if (!trimmedId) {
             setError('Step ID cannot be empty');
             return;
         }
-        
+
         if (existingStepIds.includes(trimmedId)) {
             setError(`Step with ID "${trimmedId}" already exists`);
             return;
         }
-        
+
         onConfirm(trimmedId, instruction.trim());
         setError('');
     };
@@ -139,13 +139,13 @@ export function AddStepDialog({
                         Create a new step from scratch or import steps from an existing tool
                     </DialogDescription>
                 </DialogHeader>
-                
+
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'scratch' | 'tool')} className="overflow-hidden w-full">
                     <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="scratch">Add new step</TabsTrigger>
                         <TabsTrigger value="tool">Import tool</TabsTrigger>
                     </TabsList>
-                    
+
                     <TabsContent value="scratch" className="space-y-4 py-4 overflow-hidden">
                         <div className="space-y-2">
                             <label htmlFor="step-id" className="text-sm font-medium">
@@ -186,7 +186,7 @@ export function AddStepDialog({
                             />
                         </div>
                     </TabsContent>
-                    
+
                     <TabsContent value="tool" className="space-y-4 py-4">
                         {loadingTools ? (
                             <div className="flex items-center justify-center py-8">
@@ -244,7 +244,7 @@ export function AddStepDialog({
                         )}
                     </TabsContent>
                 </Tabs>
-                
+
                 <DialogFooter>
                     <Button
                         variant="outline"
@@ -252,7 +252,7 @@ export function AddStepDialog({
                     >
                         Cancel
                     </Button>
-                    <Button 
+                    <Button
                         onClick={activeTab === 'scratch' ? handleConfirmScratch : handleConfirmTool}
                         disabled={loadingTools}
                     >

@@ -1,4 +1,4 @@
-import { cn } from '@/src/lib/utils';
+import { cn } from '@/src/lib/general-utils';
 import { Check } from 'lucide-react';
 
 export type StepperStep = 'basic' | 'try_and_output' | 'publish'

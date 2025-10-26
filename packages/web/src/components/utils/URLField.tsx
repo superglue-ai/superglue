@@ -3,7 +3,7 @@
 import { Badge } from '@/src/components/ui/badge';
 import { Input } from '@/src/components/ui/input';
 import { splitUrl } from '@/src/lib/client-utils';
-import { cn, getSimpleIcon } from '@/src/lib/utils';
+import { cn, getSimpleIcon } from '@/src/lib/general-utils';
 import { integrations } from '@superglue/shared';
 import { Link } from 'lucide-react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';

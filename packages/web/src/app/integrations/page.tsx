@@ -17,8 +17,8 @@ import { Input } from '@/src/components/ui/input';
 import { DocStatus } from '@/src/components/utils/DocStatusSpinner';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
+import { composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
 import { createOAuthErrorHandler, triggerOAuthFlow } from '@/src/lib/oauth-utils';
-import { composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import type { Integration } from '@superglue/client';
 import { SuperglueClient, UpsertMode } from '@superglue/client';
 import { integrationOptions } from '@superglue/shared';
@@ -138,7 +138,7 @@ export default function IntegrationsPage() {
 
     const [page, setPage] = useState(0);
     const PAGE_SIZE = 10;
-    
+
     const filteredIntegrations = integrations?.filter(integration => {
         if (!searchQuery) return true;
         const query = searchQuery.toLowerCase();
@@ -148,7 +148,7 @@ export default function IntegrationsPage() {
             integration.urlPath?.toLowerCase().includes(query)
         );
     }).sort((a, b) => a.id.localeCompare(b.id)) || [];
-    
+
     const paginatedIntegrations = filteredIntegrations.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
     const totalPages = Math.ceil(filteredIntegrations.length / PAGE_SIZE);
 

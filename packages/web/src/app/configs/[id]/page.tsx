@@ -1,19 +1,18 @@
 'use client'
 
-import React from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { ExternalLink } from 'lucide-react';
-import { Button } from "@/src/components/ui/button";
+import { useConfig } from '@/src/app/config-context';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/src/components/ui/accordion";
-import { composeUrl } from '@/src/lib/utils';
-import { ApiConfig } from '@superglue/client';
-import { useConfig } from '@/src/app/config-context';
-import { SuperglueClient } from '@superglue/client';
+import { Button } from "@/src/components/ui/button";
+import { composeUrl } from '@/src/lib/general-utils';
+import { ApiConfig, SuperglueClient } from '@superglue/client';
+import { ExternalLink } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import React from 'react';
 
 const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void }) => {
   const router = useRouter();
@@ -32,7 +31,7 @@ const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void })
           const superglueClient = new SuperglueClient({
             endpoint: superglueConfig.superglueEndpoint,
             apiKey: superglueConfig.superglueApiKey
-          })      
+          })
           const foundConfig = await superglueClient.getApi(id);
           if (!foundConfig) {
             throw new Error('Configuration not found');
@@ -43,7 +42,7 @@ const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void })
             createdAt: foundConfig.createdAt || new Date().toISOString(),
             updatedAt: foundConfig.updatedAt || new Date().toISOString(),
           };
-          
+
           setConfig(transformedConfig as ApiConfig);
         } catch (error) {
           console.error('Error fetching config:', error);

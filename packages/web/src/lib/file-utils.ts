@@ -4,32 +4,82 @@ import * as pdfjsLib from 'pdfjs-dist';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
-export const MAX_TOTAL_FILE_SIZE = 1000 * 1024 * 1024; // 1000MB total
+// Context-specific file size limits
+export const MAX_FILE_SIZE_CHAT = 50 * 1024 * 1024;           // 50 MB per message for chat (performance)
+export const MAX_FILE_SIZE_DOCUMENTATION = 50 * 1024 * 1024;  // 50 MB for documentation (processing limits)
+export const MAX_FILE_SIZE_TOOLS = 1000 * 1024 * 1024;        // 1000 MB for tool creation/playground
+export const MAX_FILE_PAYLOAD_PER_MESSAGE = 50 * 1024 * 1024; // 50 MB total extracted content per message
+
 export const ALLOWED_EXTENSIONS = ['.json', '.csv', '.txt', '.xml', '.xlsx', '.xls', '.pdf'];
+
+export interface UploadedFileInfo {
+    name: string;
+    size?: number;  // Optional for cases where size is unknown (e.g., from file:// URLs)
+    key: string;
+    status?: 'processing' | 'ready' | 'error';  // Optional, defaults to 'ready'
+    error?: string;
+}
 
 export function isAllowedFileType(filename: string): boolean {
     const ext = filename.toLowerCase().split('.').pop();
     return ALLOWED_EXTENSIONS.includes(`.${ext}`);
 }
 
-export function sanitizeFileName(name: string): string {
-    // Remove extension
-    let base = name.replace(/\.[^/.]+$/, '');
+export function needsFrontendProcessing(filename: string): boolean {
+    const lower = filename.toLowerCase();
+    return lower.endsWith('.pdf') || lower.endsWith('.zip');
+}
 
-    // Replace special characters with underscores
-    base = base.replace(/[^a-zA-Z0-9_]/g, '_');
+export async function processAndExtractFile(file: File, client: any): Promise<any> {
+    if (needsFrontendProcessing(file.name)) {
+        return await processFile(file, file.name);
+    } else {
+        const extractResult = await client.extract({ file });
+        if (!extractResult.success) {
+            throw new Error(extractResult.error || 'Failed to extract data');
+        }
+        return extractResult.data;
+    }
+}
 
-    // Ensure doesn't start with number
+export function sanitizeFileName(name: string, options?: {
+  removeExtension?: boolean;
+  lowercase?: boolean;
+}): string {
+  const { removeExtension = true, lowercase = true } = options || {};
+  
+  let base = removeExtension ? name.replace(/\.[^/.]+$/, '') : name;
+  
+  base = base
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  
+  if (lowercase) {
+    base = base.toLowerCase();
+  }
+  
+  base = base
+    .replace(/[^a-zA-Z0-9_.-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  
     if (/^\d/.test(base)) {
         base = '_' + base;
     }
 
-    // Ensure not empty
     if (!base) {
         base = 'file';
     }
 
     return base;
+}
+
+export function setFileUploadDocumentationURL(fileNames: string[]): string {
+  // Format: file://filename1,filename2,filename3 (single file:// prefix)
+  const sanitizedNames = fileNames.map(fileName => 
+    sanitizeFileName(fileName, { removeExtension: false, lowercase: true })
+  );
+  return `file://${sanitizedNames.join(',')}`;
 }
 
 export function generateUniqueKey(baseKey: string, existingKeys: string[]): string {
@@ -55,14 +105,6 @@ export function formatBytes(bytes: number): string {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-export interface UploadedFileInfo {
-    name: string;
-    size: number;
-    key: string;
-    status: 'processing' | 'ready' | 'error';
-    error?: string;
-}
-
 /**
  * Process a file and extract text content.
  * Handles PDF (with markdown formatting), DOCX, ZIP archives, and plain text files.
@@ -84,11 +126,9 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
             const page = await pdf.getPage(pageNum);
             const textContent = await page.getTextContent();
 
-            // Get viewport to understand page dimensions
             const viewport = page.getViewport({ scale: 1.0 });
             const pageHeight = viewport.height;
 
-            // Extract text items with position and style info
             const textItems = textContent.items as any[];
             const enrichedItems = textItems.map(item => ({
                 text: item.str,
@@ -100,7 +140,6 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
                 fontName: item.fontName || ''
             }));
 
-            // Group items by lines
             const lines: {
                 y: number;
                 items: typeof enrichedItems;
@@ -113,7 +152,6 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
             enrichedItems.forEach(item => {
                 if (!item.text.trim()) return;
 
-                // Find line at this Y position (with tolerance)
                 let line = lines.find(l => Math.abs(l.y - item.y) < 3);
 
                 if (!line) {
@@ -133,7 +171,6 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
                 line.maxX = Math.max(line.maxX, item.x + item.width);
             });
 
-            // Calculate average font size and detect bold for each line
             lines.forEach(line => {
                 const totalSize = line.items.reduce((sum, item) => sum + item.fontSize, 0);
                 line.avgFontSize = totalSize / line.items.length;
@@ -143,30 +180,23 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
                 );
             });
 
-            // Sort lines by Y position (top to bottom)
             lines.sort((a, b) => b.y - a.y);
 
-            // Detect tables by finding aligned columns
             const detectTable = (startIdx: number): { rows: string[][], endIdx: number } | null => {
                 const potentialRows: typeof lines[0][] = [];
                 const columnPositions: number[] = [];
 
-                // Look for multiple lines with similar X positions
                 for (let i = startIdx; i < lines.length; i++) {
                     const line = lines[i];
-                    if (line.items.length < 2) continue; // Need at least 2 items for a table row
+        if (line.items.length < 2) continue;
 
-                    // Sort items by X position
                     const sortedItems = [...line.items].sort((a, b) => a.x - b.x);
-
-                    // Extract column positions
                     const lineColumns = sortedItems.map(item => item.x);
 
                     if (columnPositions.length === 0) {
                         columnPositions.push(...lineColumns);
                         potentialRows.push(line);
                     } else {
-                        // Check if this line aligns with existing columns
                         let matches = 0;
                         for (const pos of lineColumns) {
                             if (columnPositions.some(col => Math.abs(col - pos) < 10)) {
@@ -177,23 +207,20 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
                         if (matches >= lineColumns.length * 0.5) {
                             potentialRows.push(line);
                         } else {
-                            break; // End of table
+            break;
                         }
                     }
 
-                    // Stop if gap is too large
-                    if (i > startIdx && Math.abs(line.y - lines[i - 1].y) > 50) {
+        if (i > startIdx && Math.abs(line.y - lines[i-1].y) > 50) {
                         break;
                     }
                 }
 
                 if (potentialRows.length >= 2) {
-                    // Convert to table rows
                     const rows = potentialRows.map(line => {
                         const sortedItems = [...line.items].sort((a, b) => a.x - b.x);
                         const cells: string[] = [];
 
-                        // Group items into cells based on large gaps
                         let currentCell = '';
                         let lastX = 0;
 
@@ -223,13 +250,11 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
                 return null;
             };
 
-            // Find average font size across the page
             const allFontSizes = lines.map(l => l.avgFontSize).filter(s => s > 0);
             const avgPageFontSize = allFontSizes.length > 0
                 ? allFontSizes.reduce((a, b) => a + b, 0) / allFontSizes.length
                 : 12;
 
-            // Convert to markdown
             let pageContent = ``;
             let prevY = null;
             let i = 0;
@@ -243,17 +268,13 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
                     continue;
                 }
 
-                // Check for table
                 const tableResult = detectTable(i);
                 if (tableResult) {
-                    // Format as markdown table
                     const { rows } = tableResult;
                     if (rows.length > 0) {
-                        // First row as header
                         pageContent += '| ' + rows[0].join(' | ') + ' |\n';
                         pageContent += '|' + rows[0].map(() => ' --- ').join('|') + '|\n';
 
-                        // Rest as data rows
                         for (let j = 1; j < rows.length; j++) {
                             pageContent += '| ' + rows[j].join(' | ') + ' |\n';
                         }
@@ -265,16 +286,13 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
                     continue;
                 }
 
-                // Add paragraph breaks for larger gaps
                 if (prevY !== null && prevY - line.y > 25) {
                     pageContent += '\n';
                 }
 
-                // Improved heading detection
                 let isHeading = false;
                 let headingLevel = 3;
 
-                // Check font size relative to average
                 const sizeRatio = line.avgFontSize / avgPageFontSize;
                 if (sizeRatio > 1.5) {
                     isHeading = true;
@@ -287,26 +305,21 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
                     headingLevel = 3;
                 }
 
-                // Additional heading patterns
                 if (!isHeading && text.length < 80) {
-                    // Numbered sections (1., 1.1, etc.)
                     if (/^\d+(\.\d+)*\.?\s+[A-Z]/.test(text)) {
                         isHeading = true;
-                        headingLevel = text.split('.').length + 1; // More dots = deeper level
+          headingLevel = text.split('.').length + 1;
                     }
-                    // All caps (but not single words)
                     else if (text === text.toUpperCase() && text.split(' ').length > 1) {
                         isHeading = true;
                         headingLevel = 3;
                     }
-                    // Lines ending with colon (often section headers)
                     else if (text.endsWith(':') && text.length < 50) {
                         isHeading = true;
                         headingLevel = 4;
                     }
                 }
 
-                // Apply heading or normal text
                 if (isHeading) {
                     const prefix = '#'.repeat(Math.min(headingLevel + 2, 6)); // Offset by 2 since page is H2
                     pageContent += `${prefix} ${text}\n\n`;
@@ -324,14 +337,12 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
         return markdownContent.trim();
     } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
         lowerFileName.endsWith('.docx')) {
-        // For DOCX files, use mammoth
         const arrayBuffer = await file.arrayBuffer();
         const result = await mammoth.extractRawText({ arrayBuffer });
         return result.value;
     } else if (fileType === 'application/zip' ||
         fileType === 'application/x-zip-compressed' ||
         lowerFileName.endsWith('.zip')) {
-        // For ZIP files, extract text from files inside
         const arrayBuffer = await file.arrayBuffer();
         const zip = new (JSZip as any)();
         const loadedZip = await zip.loadAsync(arrayBuffer);
@@ -340,17 +351,12 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
 
         const files = Object.entries(loadedZip.files) as [string, any][];
         for (const [zipFileName, zipEntry] of files) {
-            // Skip directories
             if (zipEntry.dir) continue;
-
-            // Skip macOS metadata files
             if (zipFileName.startsWith('__MACOSX/') || zipFileName.startsWith('._')) continue;
 
             try {
-                // Get the file as a blob
                 const blob = await zipEntry.async('blob');
 
-                // Determine MIME type from filename since blob won't have it
                 let mimeType = 'text/plain';
                 const lowerZipFileName = zipFileName.toLowerCase();
                 if (lowerZipFileName.endsWith('.pdf')) {
@@ -361,9 +367,7 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
                     mimeType = 'application/msword';
                 }
 
-                // Create a new blob with the correct MIME type
                 const typedBlob = new Blob([blob], { type: mimeType });
-
                 const content = await processFile(typedBlob, zipFileName);
 
                 if (content && content.trim()) {
@@ -376,7 +380,42 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
 
         return combinedText || `ZIP file contains ${Object.keys(loadedZip.files).length} files but no extractable text files were found.`;
     } else {
-        // For text files (.txt, .md, etc)
         return await file.text();
     }
+}
+
+export function getFileType(filename: string): 'json' | 'csv' | 'xml' | 'excel' | 'pdf' | 'text' | 'code' | 'archive' | 'other' {
+  const ext = filename.toLowerCase().split('.').pop() || '';
+  switch (ext) {
+    case 'json': return 'json';
+    case 'csv': return 'csv';
+    case 'xml': return 'xml';
+    case 'xlsx':
+    case 'xls': return 'excel';
+    case 'pdf': return 'pdf';
+    case 'txt': return 'text';
+    case 'md':
+    case 'markdown': return 'code';
+    case 'zip': return 'archive';
+    default: return 'other';
+  }
+}
+
+export function truncateFileContent(content: string, maxChars: number): { truncated: string; wasTruncated: boolean } {
+  if (content.length <= maxChars) {
+    return { truncated: content, wasTruncated: false };
+  }
+
+  const headChars = Math.floor(maxChars * 0.7);
+  const tailChars = Math.floor(maxChars * 0.3);
+  
+  const head = content.slice(0, headChars);
+  const tail = content.slice(-tailChars);
+  
+  const originalChars = content.length;
+  const omittedChars = originalChars - (headChars + tailChars);
+  
+  const truncated = `${head}\n\n... [truncated ${omittedChars.toLocaleString()} characters (~${Math.ceil(omittedChars / 5)} tokens) for context window management] ...\n\n${tail}`;
+  
+  return { truncated, wasTruncated: true };
 }

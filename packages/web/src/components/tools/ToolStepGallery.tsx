@@ -1,11 +1,11 @@
+import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { Badge } from '@/src/components/ui/badge';
 import { canExecuteStep } from '@/src/lib/client-utils';
 import { downloadJson } from '@/src/lib/download-utils';
 import { type UploadedFileInfo } from '@/src/lib/file-utils';
-import { buildEvolvingPayload, cn, isEmptyData, MAX_DISPLAY_LINES, MAX_DISPLAY_SIZE, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { buildEvolvingPayload, cn, isEmptyData, MAX_DISPLAY_LINES, MAX_DISPLAY_SIZE, truncateForDisplay, truncateLines } from '@/src/lib/general-utils';
 import { Integration } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
 import { ChevronLeft, ChevronRight, Database, Download, FileJson, Package, Play, Plus, Settings, Trash2, Wand2 } from 'lucide-react';
@@ -601,7 +601,7 @@ export function ToolStepGallery({
         : stepResults;
 
     const hasTransformCompleted = completedSteps.includes('__final_transform__') && (transformResult || finalResult);
-    
+
     const toolItems = [
         {
             type: 'payload',
@@ -726,17 +726,17 @@ export function ToolStepGallery({
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // Only handle if not typing in an input/textarea/contenteditable
-            if (e.target instanceof HTMLInputElement || 
+            if (e.target instanceof HTMLInputElement ||
                 e.target instanceof HTMLTextAreaElement ||
                 (e.target as HTMLElement).isContentEditable) {
                 return;
             }
-            
+
             // Don't navigate when editing step config
             if (isConfiguratorEditing) {
                 return;
             }
-            
+
             if (e.key === 'ArrowLeft' && activeIndex > 0) {
                 e.preventDefault();
                 handleNavigation('prev');
@@ -745,7 +745,7 @@ export function ToolStepGallery({
                 handleNavigation('next');
             }
         };
-        
+
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [activeIndex, toolItems.length, isConfiguratorEditing]);
@@ -798,7 +798,7 @@ export function ToolStepGallery({
                                             autoFocus
                                         />
                                     ) : (
-                                        <h1 
+                                        <h1
                                             className="text-2xl font-bold cursor-pointer hover:text-primary/80 transition-colors"
                                             onClick={() => {
                                                 if (!readOnly && onToolIdChange) {
@@ -832,267 +832,267 @@ export function ToolStepGallery({
             {/* Scrollable content section */}
             <div className="flex-1 overflow-y-auto pr-4" style={{ scrollbarGutter: 'stable' }}>
                 <div className="space-y-6">
-                <div className="flex items-center gap-0">
-                    <div className="relative">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => handleNavigation('prev')}
-                            disabled={activeIndex === 0}
-                            className={cn(
-                                "shrink-0 h-9 w-9",
-                                hiddenLeftCount > 0 && !isPayloadValid && "ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30 animate-pulse"
-                            )}
-                            title="Previous"
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        {hiddenLeftCount > 0 && (
-                            <Badge 
-                                variant="default" 
-                                className={cn(
-                                    "absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center",
-                                    !isPayloadValid ? "bg-amber-500 text-white" : "bg-primary text-primary-foreground"
-                                )}
-                            >
-                                {hiddenLeftCount}
-                            </Badge>
-                        )}
-                    </div>
-
-                    <div className="flex-1 overflow-hidden px-0">
+                    <div className="flex items-center gap-0">
                         <div className="relative">
-                            <div
-                                ref={listRef}
-                                className="flex justify-center items-center overflow-visible py-3"
-                                style={{ minHeight: '150px' }}
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => handleNavigation('prev')}
+                                disabled={activeIndex === 0}
+                                className={cn(
+                                    "shrink-0 h-9 w-9",
+                                    hiddenLeftCount > 0 && !isPayloadValid && "ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30 animate-pulse"
+                                )}
+                                title="Previous"
                             >
-                                {!isHydrated ? (
-                                    // Show a simple loading state during hydration
-                                    <div className="flex items-center justify-center">
-                                        <div className="w-48 h-24 bg-muted/20 rounded-md animate-pulse" />
-                                    </div>
-                                ) : (() => {
-                                    const totalCards = toolItems.length;
-                                    let startIdx = 0;
-                                    let endIdx = totalCards;
-                                    const CARD_WIDTH = 180; // px (matches card classes)
-                                    const ARROW_WIDTH = 24; // px (ChevronRight ~20px, add buffer)
-                                    const GUTTER = 16; // px (doubled spacing)
-                                    const SAFE_MARGIN = 12; // px extra space to avoid clipping
-                                    const available = Math.max(0, (containerWidth || windowWidth) - SAFE_MARGIN);
-                                    let cardsToShow = 1;
-                                    const maxCandidates = Math.min(toolItems.length, 12);
-                                    for (let c = 1; c <= maxCandidates; c++) {
-                                        const needed = (c * CARD_WIDTH) + ((c - 1) * (ARROW_WIDTH + GUTTER));
-                                        if (needed <= available) {
-                                            cardsToShow = c;
-                                        } else {
-                                            break;
+                                <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            {hiddenLeftCount > 0 && (
+                                <Badge
+                                    variant="default"
+                                    className={cn(
+                                        "absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center",
+                                        !isPayloadValid ? "bg-amber-500 text-white" : "bg-primary text-primary-foreground"
+                                    )}
+                                >
+                                    {hiddenLeftCount}
+                                </Badge>
+                            )}
+                        </div>
+
+                        <div className="flex-1 overflow-hidden px-0">
+                            <div className="relative">
+                                <div
+                                    ref={listRef}
+                                    className="flex justify-center items-center overflow-visible py-3"
+                                    style={{ minHeight: '150px' }}
+                                >
+                                    {!isHydrated ? (
+                                        // Show a simple loading state during hydration
+                                        <div className="flex items-center justify-center">
+                                            <div className="w-48 h-24 bg-muted/20 rounded-md animate-pulse" />
+                                        </div>
+                                    ) : (() => {
+                                        const totalCards = toolItems.length;
+                                        let startIdx = 0;
+                                        let endIdx = totalCards;
+                                        const CARD_WIDTH = 180; // px (matches card classes)
+                                        const ARROW_WIDTH = 24; // px (ChevronRight ~20px, add buffer)
+                                        const GUTTER = 16; // px (doubled spacing)
+                                        const SAFE_MARGIN = 12; // px extra space to avoid clipping
+                                        const available = Math.max(0, (containerWidth || windowWidth) - SAFE_MARGIN);
+                                        let cardsToShow = 1;
+                                        const maxCandidates = Math.min(toolItems.length, 12);
+                                        for (let c = 1; c <= maxCandidates; c++) {
+                                            const needed = (c * CARD_WIDTH) + ((c - 1) * (ARROW_WIDTH + GUTTER));
+                                            if (needed <= available) {
+                                                cardsToShow = c;
+                                            } else {
+                                                break;
+                                            }
                                         }
-                                    }
 
-                                    cardsToShow = Math.max(1, cardsToShow);
+                                        cardsToShow = Math.max(1, cardsToShow);
 
-                                    if (totalCards <= cardsToShow) {
-                                        // Show all cards if we have fewer than cardsToShow
-                                        startIdx = 0;
-                                        endIdx = totalCards;
-                                    } else {
-                                        const halfWindow = Math.floor(cardsToShow / 2);
-                                        startIdx = Math.max(0, Math.min(activeIndex - halfWindow, totalCards - cardsToShow));
-                                        endIdx = startIdx + cardsToShow;
-                                    }
+                                        if (totalCards <= cardsToShow) {
+                                            // Show all cards if we have fewer than cardsToShow
+                                            startIdx = 0;
+                                            endIdx = totalCards;
+                                        } else {
+                                            const halfWindow = Math.floor(cardsToShow / 2);
+                                            startIdx = Math.max(0, Math.min(activeIndex - halfWindow, totalCards - cardsToShow));
+                                            endIdx = startIdx + cardsToShow;
+                                        }
 
-                                    const visibleItems = toolItems.slice(startIdx, endIdx);
-                                    const visibleIndices = visibleItems.map((_, i) => startIdx + i);
-                                    const hasHiddenLeft = startIdx > 0;
-                                    const hasHiddenRight = endIdx < totalCards;
-                                    const hiddenLeft = startIdx;
-                                    const hiddenRight = totalCards - endIdx;
-                                    
-                                    // Update state for badges (use ref to avoid re-render loop)
-                                    if (hiddenLeft !== hiddenLeftCount) setHiddenLeftCount(hiddenLeft);
-                                    if (hiddenRight !== hiddenRightCount) setHiddenRightCount(hiddenRight);
-                                    const sepWidth = ARROW_WIDTH + GUTTER;
-                                    const edgeWidth = sepWidth;
-                                    const count = Math.max(1, visibleItems.length);
-                                    const innerAvailable = Math.max(0, (containerWidth || windowWidth) - SAFE_MARGIN - (2 * edgeWidth) - ((count - 1) * sepWidth));
-                                    const baseCardWidth = Math.floor(innerAvailable / count);
-                                    const widthRemainder = innerAvailable - (baseCardWidth * count);
+                                        const visibleItems = toolItems.slice(startIdx, endIdx);
+                                        const visibleIndices = visibleItems.map((_, i) => startIdx + i);
+                                        const hasHiddenLeft = startIdx > 0;
+                                        const hasHiddenRight = endIdx < totalCards;
+                                        const hiddenLeft = startIdx;
+                                        const hiddenRight = totalCards - endIdx;
 
-                                    return (
-                                        <>
-                                            {hasHiddenLeft && null}
+                                        // Update state for badges (use ref to avoid re-render loop)
+                                        if (hiddenLeft !== hiddenLeftCount) setHiddenLeftCount(hiddenLeft);
+                                        if (hiddenRight !== hiddenRightCount) setHiddenRightCount(hiddenRight);
+                                        const sepWidth = ARROW_WIDTH + GUTTER;
+                                        const edgeWidth = sepWidth;
+                                        const count = Math.max(1, visibleItems.length);
+                                        const innerAvailable = Math.max(0, (containerWidth || windowWidth) - SAFE_MARGIN - (2 * edgeWidth) - ((count - 1) * sepWidth));
+                                        const baseCardWidth = Math.floor(innerAvailable / count);
+                                        const widthRemainder = innerAvailable - (baseCardWidth * count);
 
-                                            {visibleItems.length > 0 && (
-                                                <div style={{ flex: `0 0 ${sepWidth}px`, width: `${sepWidth}px` }} />
-                                            )}
-                                            {visibleItems.map((item, idx) => {
-                                                const globalIdx = visibleIndices[idx];
-                                                const showArrow = idx < visibleItems.length - 1;
-                                                return (
-                                                    <React.Fragment key={globalIdx}>
-                                                        <div
-                                                            className="flex items-center justify-center"
-                                                            style={{
-                                                                flex: `0 0 ${baseCardWidth + (idx < widthRemainder ? 1 : 0)}px`,
-                                                                width: `${baseCardWidth + (idx < widthRemainder ? 1 : 0)}px`,
-                                                                maxWidth: `${baseCardWidth + (idx < widthRemainder ? 1 : 0)}px`
-                                                            }}
-                                                        >
-                                                            <MiniStepCard
-                                                                step={item.data}
-                                                                index={globalIdx}
-                                                                isActive={globalIdx === activeIndex}
-                                                                onClick={() => handleCardClick(globalIdx)}
-                                                                stepId={item.type === 'step' ? item.data.id : undefined}
-                                                                isPayload={item.type === 'payload'}
-                                                                isTransform={item.type === 'transform'}
-                                                                isRunningAll={isExecuting && currentExecutingStepIndex === (globalIdx - 1)}
-                                                                isTesting={
-                                                                    item.type === 'step' ? (isExecutingStep === (globalIdx - 1) || isFixingWorkflow === (globalIdx - 1)) :
-                                                                        item.type === 'transform' ? isExecutingTransform :
-                                                                            false
-                                                                }
-                                                                completedSteps={completedSteps}
-                                                                failedSteps={failedSteps}
-                                                                isFirstCard={globalIdx === 0}
-                                                                isLastCard={globalIdx === totalCards - 1}
-                                                                integrations={integrations}
-                                                                hasTransformCompleted={hasTransformCompleted}
-                                                                isPayloadValid={isPayloadValid}
-                                                                payloadData={item.type === 'payload' ? workingPayload : undefined}
-                                                            />
-                                                        </div>
-                                                        {showArrow && (
-                                                            <div style={{ flex: `0 0 ${sepWidth}px`, width: `${sepWidth}px` }} className="flex items-center justify-center">
-                                                                {!readOnly && onStepsChange && (
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleInsertStep(globalIdx);
-                                                                        }}
-                                                                        className="group relative flex items-center justify-center h-8 w-8 rounded-full hover:bg-primary/10 transition-colors"
-                                                                        title="Add step here"
-                                                                    >
-                                                                        <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:opacity-0 transition-opacity" />
-                                                                        <Plus className="h-4 w-4 text-primary absolute opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                                    </button>
-                                                                )}
-                                                                {(readOnly || !onStepsChange) && (
-                                                                    <ChevronRight className="h-5 w-5 text-muted-foreground/50" />
-                                                                )}
+                                        return (
+                                            <>
+                                                {hasHiddenLeft && null}
+
+                                                {visibleItems.length > 0 && (
+                                                    <div style={{ flex: `0 0 ${sepWidth}px`, width: `${sepWidth}px` }} />
+                                                )}
+                                                {visibleItems.map((item, idx) => {
+                                                    const globalIdx = visibleIndices[idx];
+                                                    const showArrow = idx < visibleItems.length - 1;
+                                                    return (
+                                                        <React.Fragment key={globalIdx}>
+                                                            <div
+                                                                className="flex items-center justify-center"
+                                                                style={{
+                                                                    flex: `0 0 ${baseCardWidth + (idx < widthRemainder ? 1 : 0)}px`,
+                                                                    width: `${baseCardWidth + (idx < widthRemainder ? 1 : 0)}px`,
+                                                                    maxWidth: `${baseCardWidth + (idx < widthRemainder ? 1 : 0)}px`
+                                                                }}
+                                                            >
+                                                                <MiniStepCard
+                                                                    step={item.data}
+                                                                    index={globalIdx}
+                                                                    isActive={globalIdx === activeIndex}
+                                                                    onClick={() => handleCardClick(globalIdx)}
+                                                                    stepId={item.type === 'step' ? item.data.id : undefined}
+                                                                    isPayload={item.type === 'payload'}
+                                                                    isTransform={item.type === 'transform'}
+                                                                    isRunningAll={isExecuting && currentExecutingStepIndex === (globalIdx - 1)}
+                                                                    isTesting={
+                                                                        item.type === 'step' ? (isExecutingStep === (globalIdx - 1) || isFixingWorkflow === (globalIdx - 1)) :
+                                                                            item.type === 'transform' ? isExecutingTransform :
+                                                                                false
+                                                                    }
+                                                                    completedSteps={completedSteps}
+                                                                    failedSteps={failedSteps}
+                                                                    isFirstCard={globalIdx === 0}
+                                                                    isLastCard={globalIdx === totalCards - 1}
+                                                                    integrations={integrations}
+                                                                    hasTransformCompleted={hasTransformCompleted}
+                                                                    isPayloadValid={isPayloadValid}
+                                                                    payloadData={item.type === 'payload' ? workingPayload : undefined}
+                                                                />
                                                             </div>
-                                                        )}
-                                                    </React.Fragment>
-                                                );
-                                            })}
-                                            {visibleItems.length > 0 && (
-                                                <div style={{ flex: `0 0 ${sepWidth}px`, width: `${sepWidth}px` }} />
-                                            )}
+                                                            {showArrow && (
+                                                                <div style={{ flex: `0 0 ${sepWidth}px`, width: `${sepWidth}px` }} className="flex items-center justify-center">
+                                                                    {!readOnly && onStepsChange && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleInsertStep(globalIdx);
+                                                                            }}
+                                                                            className="group relative flex items-center justify-center h-8 w-8 rounded-full hover:bg-primary/10 transition-colors"
+                                                                            title="Add step here"
+                                                                        >
+                                                                            <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:opacity-0 transition-opacity" />
+                                                                            <Plus className="h-4 w-4 text-primary absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                        </button>
+                                                                    )}
+                                                                    {(readOnly || !onStepsChange) && (
+                                                                        <ChevronRight className="h-5 w-5 text-muted-foreground/50" />
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </React.Fragment>
+                                                    );
+                                                })}
+                                                {visibleItems.length > 0 && (
+                                                    <div style={{ flex: `0 0 ${sepWidth}px`, width: `${sepWidth}px` }} />
+                                                )}
 
-                                            {hasHiddenRight && null}
-                                        </>
-                                    );
-                                })()}
+                                                {hasHiddenRight && null}
+                                            </>
+                                        );
+                                    })()}
+                                </div>
                             </div>
+                        </div>
+
+                        <div className="relative">
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => handleNavigation('next')}
+                                disabled={activeIndex === toolItems.length - 1}
+                                className="shrink-0 h-9 w-9"
+                                title="Next"
+                            >
+                                <ChevronRight className="h-4 w-4" />
+                            </Button>
+                            {hiddenRightCount > 0 && (
+                                <Badge
+                                    variant="default"
+                                    className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center bg-primary text-primary-foreground"
+                                >
+                                    {hiddenRightCount}
+                                </Badge>
+                            )}
                         </div>
                     </div>
 
-                    <div className="relative">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => handleNavigation('next')}
-                            disabled={activeIndex === toolItems.length - 1}
-                            className="shrink-0 h-9 w-9"
-                            title="Next"
-                        >
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
-                        {hiddenRightCount > 0 && (
-                            <Badge 
-                                variant="default" 
-                                className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center bg-primary text-primary-foreground"
-                            >
-                                {hiddenRightCount}
-                            </Badge>
+                    <div className="flex justify-center items-center gap-2">
+                        <div className="flex gap-1">
+                            {indicatorIndices.map((globalIdx) => (
+                                <button
+                                    key={`dot-${globalIdx}`}
+                                    onClick={() => { if (isConfiguratorEditing) return; navigateToIndex(globalIdx); }}
+                                    className={cn(
+                                        "w-1.5 h-1.5 rounded-full transition-colors",
+                                        globalIdx === activeIndex ? "bg-primary" : "bg-muted"
+                                    )}
+                                    aria-label={`Go to item ${globalIdx + 1}`}
+                                    title={`Go to item ${globalIdx + 1}`}
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="min-h-[220px] max-w-6xl mx-auto">
+                        {currentItem && (
+                            currentItem.type === 'payload' ? (
+                                <PayloadMiniStepCard
+                                    payloadText={currentItem.data.payloadText}
+                                    inputSchema={currentItem.data.inputSchema}
+                                    onChange={handlePayloadJsonChange}
+                                    onInputSchemaChange={onInputSchemaChange}
+                                    readOnly={readOnly}
+                                    onFilesUpload={onFilesUpload}
+                                    uploadedFiles={uploadedFiles}
+                                    onFileRemove={onFileRemove}
+                                    isProcessingFiles={isProcessingFiles}
+                                    totalFileSize={totalFileSize}
+                                    extractPayloadSchema={extractPayloadSchema}
+                                />
+                            ) : currentItem.type === 'transform' ? (
+                                <FinalTransformMiniStepCard
+                                    transform={currentItem.data.transform}
+                                    responseSchema={currentItem.data.responseSchema}
+                                    onTransformChange={onFinalTransformChange}
+                                    onResponseSchemaChange={onResponseSchemaChange}
+                                    readOnly={readOnly}
+                                    onExecuteTransform={onExecuteTransform}
+                                    isExecutingTransform={isExecutingTransform}
+                                    canExecute={steps.every((s: any) => completedSteps.includes(s.id))}
+                                    transformResult={transformResult || finalResult}
+                                    stepInputs={currentItem.evolvingPayload}
+                                    hasTransformCompleted={hasTransformCompleted}
+                                />
+                            ) : (
+                                <SpotlightStepCard
+                                    step={currentItem.data}
+                                    stepIndex={activeIndex - 1} // Adjust for payload card
+                                    evolvingPayload={currentItem.evolvingPayload || {}}
+                                    stepResult={currentItem.stepResult}
+                                    onEdit={!readOnly ? onStepEdit : undefined}
+                                    onRemove={!readOnly && currentItem.type === 'step' ? handleRemoveStep : undefined}
+                                    onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
+                                    onFixStep={onFixStep ? () => onFixStep(activeIndex - 1) : undefined}
+                                    canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap) && (activeIndex !== 1 || isPayloadValid)}
+                                    isExecuting={isExecutingStep === activeIndex - 1}
+                                    isFixingWorkflow={isFixingWorkflow === activeIndex - 1}
+                                    isGlobalExecuting={!!(isExecuting || isExecutingTransform)}
+                                    currentExecutingStepIndex={currentExecutingStepIndex}
+                                    integrations={integrations}
+                                    readOnly={readOnly}
+                                    failedSteps={failedSteps}
+                                    showOutputSignal={showStepOutputSignal}
+                                    onConfigEditingChange={setIsConfiguratorEditing}
+                                />
+                            )
                         )}
                     </div>
-                </div>
-
-                <div className="flex justify-center items-center gap-2">
-                    <div className="flex gap-1">
-                        {indicatorIndices.map((globalIdx) => (
-                            <button
-                                key={`dot-${globalIdx}`}
-                                onClick={() => { if (isConfiguratorEditing) return; navigateToIndex(globalIdx); }}
-                                className={cn(
-                                    "w-1.5 h-1.5 rounded-full transition-colors",
-                                    globalIdx === activeIndex ? "bg-primary" : "bg-muted"
-                                )}
-                                aria-label={`Go to item ${globalIdx + 1}`}
-                                title={`Go to item ${globalIdx + 1}`}
-                            />
-                        ))}
-                    </div>
-                </div>
-
-                <div className="min-h-[220px] max-w-6xl mx-auto">
-                    {currentItem && (
-                        currentItem.type === 'payload' ? (
-                            <PayloadMiniStepCard
-                                payloadText={currentItem.data.payloadText}
-                                inputSchema={currentItem.data.inputSchema}
-                                onChange={handlePayloadJsonChange}
-                                onInputSchemaChange={onInputSchemaChange}
-                                readOnly={readOnly}
-                                onFilesUpload={onFilesUpload}
-                                uploadedFiles={uploadedFiles}
-                                onFileRemove={onFileRemove}
-                                isProcessingFiles={isProcessingFiles}
-                                totalFileSize={totalFileSize}
-                                extractPayloadSchema={extractPayloadSchema}
-                            />
-                        ) : currentItem.type === 'transform' ? (
-                            <FinalTransformMiniStepCard
-                                transform={currentItem.data.transform}
-                                responseSchema={currentItem.data.responseSchema}
-                                onTransformChange={onFinalTransformChange}
-                                onResponseSchemaChange={onResponseSchemaChange}
-                                readOnly={readOnly}
-                                onExecuteTransform={onExecuteTransform}
-                                isExecutingTransform={isExecutingTransform}
-                                canExecute={steps.every((s: any) => completedSteps.includes(s.id))}
-                                transformResult={transformResult || finalResult}
-                                stepInputs={currentItem.evolvingPayload}
-                                hasTransformCompleted={hasTransformCompleted}
-                            />
-                        ) : (
-                            <SpotlightStepCard
-                                step={currentItem.data}
-                                stepIndex={activeIndex - 1} // Adjust for payload card
-                                evolvingPayload={currentItem.evolvingPayload || {}}
-                                stepResult={currentItem.stepResult}
-                                onEdit={!readOnly ? onStepEdit : undefined}
-                                onRemove={!readOnly && currentItem.type === 'step' ? handleRemoveStep : undefined}
-                                onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
-                                onFixStep={onFixStep ? () => onFixStep(activeIndex - 1) : undefined}
-                                canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap) && (activeIndex !== 1 || isPayloadValid)}
-                                isExecuting={isExecutingStep === activeIndex - 1}
-                                isFixingWorkflow={isFixingWorkflow === activeIndex - 1}
-                                isGlobalExecuting={!!(isExecuting || isExecutingTransform)}
-                                currentExecutingStepIndex={currentExecutingStepIndex}
-                                integrations={integrations}
-                                readOnly={readOnly}
-                                failedSteps={failedSteps}
-                                showOutputSignal={showStepOutputSignal}
-                                onConfigEditingChange={setIsConfiguratorEditing}
-                            />
-                        )
-                    )}
-                </div>
                 </div>
             </div>
 
