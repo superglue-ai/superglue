@@ -6,7 +6,7 @@ import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { downloadJson } from '@/src/lib/download-utils';
 import { ALLOWED_EXTENSIONS, formatBytes, isAllowedFileType, MAX_FILE_SIZE_TOOLS, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon, getSimpleIcon, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/general-utils'
+import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon, getSimpleIcon, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
 import { inferJsonSchema } from '@superglue/shared';
 import { Check, Code2, Copy, Download, Eye, FileJson, Globe, Package, Play, RotateCw, Settings, Upload, X } from 'lucide-react';
