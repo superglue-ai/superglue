@@ -781,7 +781,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           steps
         } as any,
         idx,
-        JSON.parse(payload || '{}'),
+        { ...JSON.parse(payload || '{}'), ...filePayloads },
         stepResultsMap,  // Pass accumulated results
         selfHealing,
       );
