@@ -332,12 +332,6 @@ export const PayloadSpotlight = ({
             return;
         }
 
-        const newSize = files.reduce((sum, f) => sum + f.size, 0);
-        if (totalFileSize + newSize > MAX_FILE_SIZE_TOOLS) {
-            setError(`Total file size cannot exceed ${formatBytes(MAX_FILE_SIZE_TOOLS)}`);
-            return;
-        }
-
         if (onFilesUpload) {
             await onFilesUpload(files);
         }
