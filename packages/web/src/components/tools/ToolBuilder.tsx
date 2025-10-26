@@ -337,6 +337,13 @@ export function ToolBuilder({
     } catch {
       errors.payload = true;
     }
+    if (responseSchema && responseSchema.trim()) {
+      try {
+        JSON.parse(responseSchema);
+      } catch {
+        errors.responseSchema = true;
+      }
+    }
 
     setValidationErrors(errors);
 
@@ -782,13 +789,33 @@ export function ToolBuilder({
                 }}
                 className={cn(
                   "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
-                  responseSchema
-                    ? "bg-[#FFD700]/40 border border-[#FFA500] text-foreground"
-                    : "border border-border text-muted-foreground hover:bg-accent/50"
+                  (() => {
+                    const trimmedSchema = responseSchema?.trim();
+                    if (!trimmedSchema) {
+                      return "border border-border text-muted-foreground hover:bg-accent/50";
+                    }
+                    try {
+                      JSON.parse(trimmedSchema);
+                      return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
+                    } catch {
+                      return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
+                    }
+                  })()
                 )}
               >
                 <FileWarning className="h-4 w-4" />
-                {responseSchema ? 'Tool Result Schema Defined' : 'Enforce Tool Result Schema'}
+                {(() => {
+                  const trimmedSchema = responseSchema?.trim();
+                  if (!trimmedSchema) {
+                    return 'Enforce Tool Result Schema';
+                  }
+                  try {
+                    JSON.parse(trimmedSchema);
+                    return 'Tool Result Schema Defined';
+                  } catch {
+                    return 'Invalid Result Schema';
+                  }
+                })()}
               </button>
             </div>
 
@@ -959,7 +986,19 @@ export function ToolBuilder({
             </p>
             <JsonSchemaEditor
               value={responseSchema || null}
-              onChange={(value) => setResponseSchema(value || '')}
+              onChange={(value) => {
+                setResponseSchema(value || '');
+                if (value && value.trim()) {
+                  try {
+                    JSON.parse(value);
+                    setValidationErrors(prev => ({ ...prev, responseSchema: false }));
+                  } catch {
+                    setValidationErrors(prev => ({ ...prev, responseSchema: true }));
+                  }
+                } else {
+                  setValidationErrors(prev => ({ ...prev, responseSchema: false }));
+                }
+              }}
               isOptional={true}
               showModeToggle={true}
             />
