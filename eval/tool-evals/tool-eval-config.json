@@ -1207,7 +1207,8 @@
   "settings": {
     "runOneShotMode": true,
     "runSelfHealingMode": true,
-    "attemptsEachMode": 5
+    "attemptsEachMode": 5,
+    "maxConcurrentWorkers": 10
   },
   "validationLlmConfig": {
     "provider": "openai",

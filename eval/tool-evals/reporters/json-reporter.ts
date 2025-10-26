@@ -3,6 +3,7 @@ import { writeFileSync } from "fs";
 import { join } from "path";
 import { logMessage } from "../../../packages/core/utils/logs.js";
 import { Metadata } from "@superglue/shared";
+import { AgentEvalConfig } from "../types.js";
 
 export class JsonReporter {
   constructor(
@@ -12,7 +13,7 @@ export class JsonReporter {
   ) {
   }
 
-  public reportAttempts(timestamp: string, attempts: ToolAttempt[]): void {
+  public reportAttempts(timestamp: string, attempts: ToolAttempt[], config: AgentEvalConfig): void {
     const filepath = join(this.baseDir, `data/results/${timestamp}-tool-eval.json` );
 
     const llmProvider = process.env.LLM_PROVIDER || 'not_set';
@@ -50,8 +51,8 @@ export class JsonReporter {
         attemptsPerMode: this.attemptsPerMode,
         llmProvider: llmProvider,
         backendModel: backendModel,
-        validationLlmProvider: process.env.LLM_PROVIDER || 'not_set',
-        validationLlmModel: backendModel,
+        validationLlmProvider: config.validationLlmConfig?.provider || 'not_set',
+        validationLlmModel: config.validationLlmConfig?.model || 'not_set',
       },
       results: detailedAttempts,
     };
