@@ -11,7 +11,7 @@ interface BaseConfig {
   updatedAt: DateTime
 }
 
-union ConfigType = ApiConfig | Workflow
+union ConfigType = ApiConfig | Workflow | ExtractConfig
 
 # deprecated - only left in for backwards compatibility with one customer
 type ApiConfig implements BaseConfig {
