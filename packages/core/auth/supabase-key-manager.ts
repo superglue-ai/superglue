@@ -14,15 +14,15 @@ export class SupabaseKeyManager implements AuthManager {
     );
   }
 
-  public async authenticate(apiKey: string): Promise<AuthResult> {
+  public async authenticate(token: string): Promise<AuthResult> {
     await this.initialRefreshPromise;
     
     let keys = await this.getApiKeys();
-    let key = keys.find(k => k.key === apiKey);
+    let key = keys.find(k => k.key === token);
     if (!key) {
       await this.refreshApiKeys();
       keys = await this.getApiKeys();
-      key = keys.find(k => k.key === apiKey);
+      key = keys.find(k => k.key === token);
     }
 
     return { 
