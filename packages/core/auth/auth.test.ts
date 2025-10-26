@@ -67,7 +67,7 @@ describe('Auth Module', () => {
       expect(mockAuthManager.authenticate).toHaveBeenCalledWith('test123');
       expect(result).toEqual({
         success: true,
-        message: '',
+        message: 'Authentication successful',
         orgId: 'org123'
       });
     })

@@ -4,20 +4,19 @@ import { AuthManager, AuthResult } from "./types.js";
 export class SupabaseKeyManager implements AuthManager {
   private cachedApiKeys: { key: string; orgId: string }[] = [];
   private readonly API_KEY_CACHE_TTL = 60000; // 1 minute cache
+  private initialRefreshPromise: Promise<void>;
 
   constructor() {
-    this.refreshApiKeys();
+    this.initialRefreshPromise = this.refreshApiKeys();
     setInterval(
       () => this.refreshApiKeys(),
       this.API_KEY_CACHE_TTL
     );
   }
 
-  public async getApiKeys(): Promise<{ orgId: string; key: string }[]> {
-    return this.cachedApiKeys;
-  }
-
   public async authenticate(apiKey: string): Promise<AuthResult> {
+    await this.initialRefreshPromise;
+    
     let keys = await this.getApiKeys();
     let key = keys.find(k => k.key === apiKey);
     if (!key) {
@@ -30,6 +29,10 @@ export class SupabaseKeyManager implements AuthManager {
       success: !!key,
       orgId: key?.orgId
     };
+  }
+
+  private async getApiKeys(): Promise<{ orgId: string; key: string }[]> {
+    return this.cachedApiKeys;
   }
 
   private async fetchApiKeys(): Promise<{ orgId: string; key: string }[]> {
@@ -81,7 +84,7 @@ export class SupabaseKeyManager implements AuthManager {
       this.cachedApiKeys = await this.fetchApiKeys();
     } catch (error) {
       console.error('Failed to refresh API keys:', error);
+      this.cachedApiKeys = [];
     }
   }
-
 }

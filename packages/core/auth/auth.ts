@@ -28,7 +28,7 @@ export async function validateToken(token: string | undefined): Promise<AuthResu
   const authResult = await getAuthManager().authenticate(token);
   return {
     ...authResult,
-    message: authResult.success ? undefined : 'Invalid token'
+    message: authResult.success ? 'Authentication successful' : 'Authentication failed'
   }
 }
 
