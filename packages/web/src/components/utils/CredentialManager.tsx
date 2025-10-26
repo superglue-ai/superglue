@@ -4,7 +4,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { parseCredentialsHelper } from '@/src/lib/client-utils';
 import { cn } from '@/src/lib/general-utils';
-import { Plus, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 type Credential = {
@@ -37,6 +37,7 @@ function getDuplicateIndexesExceptFirst(creds: Credential[]): Set<number> {
 
 export function CredentialsManager({ value, onChange, className }: CredentialsManagerProps) {
   const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [showValues, setShowValues] = useState<Record<number, boolean>>({});
 
   // Only set default row on first mount
   useEffect(() => {
@@ -92,6 +93,10 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
     updateCredentials(newCredentials);
   };
 
+  const toggleShowValue = (index: number) => {
+    setShowValues(prev => ({ ...prev, [index]: !prev[index] }));
+  };
+
   return (
     <div className={cn(className)}>
       <div className="w-full">
@@ -117,13 +122,28 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
                         duplicateIndexes.has(index) && 'border-2 border-red-500 bg-red-100/30'
                       )}
                     />
-                    <Input
-                      type="password"
-                      value={cred.value}
-                      onChange={(e) => updateCredential(index, 'value', e.target.value)}
-                      placeholder="Enter your API key"
-                      className="flex-[2] h-7 text-xs min-w-0"
-                    />
+                    <div className="relative flex-[2]">
+                      <Input
+                        type={showValues[index] ? "text" : "password"}
+                        value={cred.value}
+                        onChange={(e) => updateCredential(index, 'value', e.target.value)}
+                        placeholder="Enter your API key"
+                        className="h-7 text-xs min-w-0 pr-8"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-7 w-7 hover:bg-transparent"
+                        onClick={() => toggleShowValue(index)}
+                      >
+                        {showValues[index] ? (
+                          <EyeOff className="h-3 w-3 text-muted-foreground" />
+                        ) : (
+                          <Eye className="h-3 w-3 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
                     <Button
                       variant="ghost"
                       size="icon"
