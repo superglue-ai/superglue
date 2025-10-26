@@ -3,7 +3,7 @@
 import { useConfig } from '@/src/app/config-context';
 import { useToast } from '@/src/hooks/use-toast';
 import { parseCredentialsHelper, splitUrl } from '@/src/lib/client-utils';
-import { cn, composeUrl, inputErrorStyles } from '@/src/lib/utils';
+import { cn, composeUrl, inputErrorStyles } from '@/src/lib/general-utils';
 import { ApolloClient, gql, InMemoryCache, useSubscription } from '@apollo/client';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { Label } from '@radix-ui/react-label';

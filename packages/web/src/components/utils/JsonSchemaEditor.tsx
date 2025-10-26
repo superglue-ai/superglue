@@ -15,7 +15,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
-import { cn, MAX_DISPLAY_LINES, MAX_DISPLAY_SIZE } from "@/src/lib/utils";
+import { cn, MAX_DISPLAY_LINES, MAX_DISPLAY_SIZE } from "@/src/lib/general-utils";
 import { Check, Copy, Plus, Trash2 } from "lucide-react";
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -70,7 +70,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
 }) => {
   const [isCodeMode, setIsCodeMode] = React.useState(forceCodeMode || false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
-  const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(() => {    
+  const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(() => {
     if (!isOptional) {
       return true;
     }

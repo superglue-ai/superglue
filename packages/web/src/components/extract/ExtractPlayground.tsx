@@ -5,7 +5,7 @@ import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { useToast } from "@/src/hooks/use-toast";
-import { cn } from "@/src/lib/utils";
+import { cn } from "@/src/lib/general-utils";
 import { CacheMode, ExtractConfig, SuperglueClient } from "@superglue/client";
 import { AlertCircle, Clock, Copy, Play, Upload } from "lucide-react";
 import { useParams } from "next/navigation";

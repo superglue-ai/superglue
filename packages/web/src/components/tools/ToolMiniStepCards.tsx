@@ -1,14 +1,15 @@
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
+import { FileChip } from '@/src/components/ui/FileChip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { downloadJson } from '@/src/lib/download-utils';
-import { ALLOWED_EXTENSIONS, formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon, getSimpleIcon, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { ALLOWED_EXTENSIONS, formatBytes, isAllowedFileType, MAX_FILE_SIZE_TOOLS, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon, getSimpleIcon, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/general-utils'
 import { Integration } from '@superglue/client';
 import { inferJsonSchema } from '@superglue/shared';
-import { Check, Code2, Copy, Download, Eye, File, FileCode, FileJson, FileSpreadsheet, Globe, Package, Play, RotateCw, Settings, Upload, X } from 'lucide-react';
+import { Check, Code2, Copy, Download, Eye, FileJson, Globe, Package, Play, RotateCw, Settings, Upload, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-json';
@@ -262,18 +263,6 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
     );
 };
 
-// File type icon helper
-const getFileIcon = (filename: string) => {
-    const ext = filename.toLowerCase().split('.').pop() || '';
-    switch (ext) {
-        case 'json': return FileJson;
-        case 'csv': return FileSpreadsheet;
-        case 'xml': return FileCode;
-        case 'xlsx':
-        case 'xls': return FileSpreadsheet;
-        default: return File;
-    }
-};
 
 export const PayloadSpotlight = ({
     payloadText,
@@ -344,8 +333,8 @@ export const PayloadSpotlight = ({
         }
 
         const newSize = files.reduce((sum, f) => sum + f.size, 0);
-        if (totalFileSize + newSize > MAX_TOTAL_FILE_SIZE) {
-            setError(`Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE)}`);
+        if (totalFileSize + newSize > MAX_FILE_SIZE_TOOLS) {
+            setError(`Total file size cannot exceed ${formatBytes(MAX_FILE_SIZE_TOOLS)}`);
             return;
         }
 
@@ -380,56 +369,17 @@ export const PayloadSpotlight = ({
                 <TabsContent value="payload" className="mt-3 space-y-3">
                     {!readOnly && onFilesUpload && uploadedFiles.length > 0 && (
                         <div className="space-y-1.5">
-                            {uploadedFiles.map(file => {
-                                const FileIcon = getFileIcon(file.name);
-                                return (
-                                    <div
-                                        key={file.key}
-                                        className={cn(
-                                            "flex items-center justify-between px-3 py-2 rounded-md transition-all border",
-                                            file.status === 'error'
-                                                ? "bg-destructive/10 border-destructive/20"
-                                                : file.status === 'processing'
-                                                    ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
-                                                    : "bg-muted/30 border-border"
-                                        )}
-                                    >
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <FileIcon className="h-4 w-4 text-gray-700 dark:text-gray-400" />
-                                            <div className="flex flex-col min-w-0">
-                                                <span className="text-xs font-medium truncate" title={file.name}>
-                                                    {file.name}
-                                                </span>
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    {file.status === 'processing'
-                                                        ? 'Parsing...'
-                                                        : file.status === 'error'
-                                                            ? file.error || 'Failed to parse'
-                                                            : `${formatBytes(file.size)}`}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            {file.status === 'processing' && (
-                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-amber-600 dark:border-amber-400 border-t-transparent" />
-                                            )}
-                                            {file.status === 'ready' && (
-                                                <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
-                                            )}
-                                            {onFileRemove && file.status !== 'processing' && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-5 w-5 hover:bg-background/80"
-                                                    onClick={() => onFileRemove(file.key)}
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                            {uploadedFiles.map(file => (
+                                <FileChip
+                                    key={file.key}
+                                    file={file}
+                                    onRemove={onFileRemove}
+                                    size="default"
+                                    rounded="md"
+                                    showOriginalName={true}
+                                    showKey={true}
+                                />
+                            ))}
                         </div>
                     )}
                     <JsonSchemaEditor
@@ -447,7 +397,7 @@ export const PayloadSpotlight = ({
                                     variant="outline"
                                     size="sm"
                                     onClick={() => fileInputRef.current?.click()}
-                                    disabled={isProcessingFiles || totalFileSize >= MAX_TOTAL_FILE_SIZE}
+                                    disabled={isProcessingFiles || totalFileSize >= MAX_FILE_SIZE_TOOLS}
                                     className="h-9 px-4"
                                 >
                                     {isProcessingFiles ? (
@@ -463,7 +413,7 @@ export const PayloadSpotlight = ({
                                     )}
                                 </Button>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <span>{formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE)}</span>
+                                    <span>{formatBytes(totalFileSize)} / {formatBytes(MAX_FILE_SIZE_TOOLS)}</span>
                                     <HelpTooltip text="Upload CSV, JSON, XML, or Excel files. Files will be automatically parsed to JSON and merged with the manual payload when the tool executes." />
                                 </div>
                             </div>

@@ -2,11 +2,13 @@
 
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
+import { FileChip } from '@/src/components/ui/FileChip';
 import { FileQuestion, FileText, Link, Upload } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { processFile, sanitizeFileName } from '../../lib/file-utils';
-import { cn } from '../../lib/utils';
-import { Input } from '../ui/input';
+import { processFile, sanitizeFileName, formatBytes, MAX_FILE_SIZE_DOCUMENTATION, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { cn } from '@/src/lib/general-utils';
+import { Input } from '@/src/components/ui/input';
+import { useToast } from '@/src/hooks/use-toast';
 
 interface DocumentationFieldProps {
   url: string
@@ -32,16 +34,27 @@ export function DocumentationField({
   hasUploadedFile = false
 }: DocumentationFieldProps) {
   const [localUrl, setLocalUrl] = useState(url)
-  const [docFile, setDocFile] = useState<File | null>(null)
+  const [docFile, setDocFile] = useState<UploadedFileInfo | null>(null)
   const [urlError, setUrlError] = useState(false)
+  const { toast } = useToast()
 
-  // Extract filename from file:// URL for display
-  const getFileNameFromUrl = (fileUrl: string): string | null => {
-    if (fileUrl.startsWith('file://')) {
-      return fileUrl.replace('file://', '')
-    }
-    return null
+  // Parse multiple files from file:// URL format
+  const parseFileUrls = (fileUrl: string): UploadedFileInfo[] => {
+    if (!fileUrl.startsWith('file://')) return []
+    
+    const filesString = fileUrl.replace('file://', '')
+    const filenames = filesString.split(',').map(f => f.trim()).filter(Boolean)
+    
+    // Limit to 5 files for display
+    return filenames.slice(0, 5).map(filename => ({
+      name: filename,
+      size: null,
+      key: filename,
+      status: 'ready' as const
+    }))
   }
+
+  const displayFiles = hasUploadedFile ? (docFile ? [docFile] : parseFileUrls(url)) : []
 
   useEffect(() => {
     setLocalUrl(url)
@@ -64,16 +77,40 @@ export function DocumentationField({
     const file = e.target.files?.[0]
     if (!file) return
 
+    // Check file size limit
+    if (file.size > MAX_FILE_SIZE_DOCUMENTATION) {
+      toast({
+        title: 'File too large',
+        description: `Documentation files cannot exceed ${formatBytes(MAX_FILE_SIZE_DOCUMENTATION)}. Current file: ${formatBytes(file.size)}`,
+        variant: 'destructive'
+      })
+      // Reset file input
+      e.target.value = ''
+      return
+    }
+
+    const fileInfo: UploadedFileInfo = {
+      name: file.name,
+      size: file.size,
+      key: sanitizeFileName(file.name, { removeExtension: false, lowercase: true }),
+      status: 'processing'
+    }
+    setDocFile(fileInfo)
+
     try {
       const text = await processFile(file, file.name)
-      setDocFile(file)
+      setDocFile({ ...fileInfo, status: 'ready' })
       if (onContentChange) onContentChange(text)
-      // Set file:// pattern for URL using sanitized filename (no extension)
-      const sanitized = sanitizeFileName(file.name)
-      onUrlChange(`file://${sanitized}`)
+      onUrlChange(`file://${fileInfo.key}`)
       if (typeof onFileUpload === 'function') onFileUpload(text);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error reading file:', error)
+      setDocFile({ ...fileInfo, status: 'error', error: error.message })
+      toast({
+        title: 'Failed to process file',
+        description: error.message,
+        variant: 'destructive'
+      })
     }
   }
 
@@ -102,24 +139,24 @@ export function DocumentationField({
 
   return (
     <div className={className}>
-      {hasUploadedFile ? (
-        // Show file info when file is uploaded
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50">
-              <Upload className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium">{docFile?.name || getFileNameFromUrl(url) || 'Uploaded file'}</span>
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="shrink-0"
-            onClick={handleRemoveFile}
-          >
-            Remove
-          </Button>
+      {hasUploadedFile && displayFiles.length > 0 ? (
+        <div className="space-y-2">
+          {displayFiles.map((file, idx) => (
+            <FileChip
+              key={file.key}
+              file={file}
+              onRemove={idx === 0 ? handleRemoveFile : undefined}
+              size="large"
+              rounded="sm"
+              showOriginalName={true}
+              showSize={file.size > 0}
+            />
+          ))}
+          {url.startsWith('file://') && url.replace('file://', '').split(',').length > 5 && (
+            <p className="text-xs text-muted-foreground pl-2">
+              + {url.replace('file://', '').split(',').length - 5} more file(s)
+            </p>
+          )}
         </div>
       ) : (
         // Show URL field when no file is uploaded

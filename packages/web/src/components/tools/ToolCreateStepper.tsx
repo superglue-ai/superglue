@@ -4,8 +4,8 @@ import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
-import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, processFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/utils';
+import { formatBytes, generateUniqueKey, MAX_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/general-utils'
 import { Integration, IntegrationInput, SuperglueClient, Workflow as Tool, UpsertMode } from '@superglue/client';
 import { integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
@@ -15,6 +15,7 @@ import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui/button';
+import { FileChip } from '@/src/components/ui/FileChip';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
@@ -341,10 +342,10 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
     try {
       // Check total size limit
       const newSize = files.reduce((sum, f) => sum + f.size, 0);
-      if (totalFileSize + newSize > MAX_TOTAL_FILE_SIZE) {
+      if (totalFileSize + newSize > MAX_FILE_SIZE_TOOLS) {
         toast({
           title: 'Size limit exceeded',
-          description: `Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE)}`,
+          description: `Total file size cannot exceed ${formatBytes(MAX_FILE_SIZE_TOOLS)}`,
           variant: 'destructive'
         });
         return;
@@ -367,23 +368,8 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
           };
           newFiles.push(fileInfo);
           setUploadedFiles(prev => [...prev, fileInfo]);
-          const isPdf = file.name.toLowerCase().endsWith('.pdf');
 
-          let parsedData: any;
-          if (isPdf) {
-            const extractedText = await processFile(file, file.name);
-            parsedData = { text: extractedText };
-          } else {
-            // Use backend extract endpoint for other file types
-            const extractResult = await client.extract({
-              file: file
-            });
-
-            if (!extractResult.success) {
-              throw new Error(extractResult.error || 'Failed to extract data');
-            }
-            parsedData = extractResult.data;
-          }
+          const parsedData = await processAndExtractFile(file, client);
 
           setFilePayloads(prev => ({ ...prev, [key]: parsedData }));
           existingKeys.push(key);
@@ -431,7 +417,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
 
     // Update files list and total size
     setUploadedFiles(prev => prev.filter(f => f.key !== key));
-    setTotalFileSize(prev => Math.max(0, prev - fileToRemove.size));
+    setTotalFileSize(prev => Math.max(0, prev - (fileToRemove.size || 0)));
   };
 
   const handleSendPrompt = async () => {
@@ -1060,51 +1046,16 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                       />
                       {uploadedFiles.length > 0 && (
                         <div className="space-y-2 mb-3">
-                          {uploadedFiles.map(file => {
-                            const getFileIcon = (filename: string) => {
-                              const ext = filename.toLowerCase().split('.').pop() || '';
-                              switch (ext) {
-                                case 'json': return FileJson;
-                                case 'csv': return FileSpreadsheet;
-                                case 'xml': return FileCode;
-                                case 'xlsx':
-                                case 'xls': return FileSpreadsheet;
-                                default: return File;
-                              }
-                            };
-                            const FileIcon = getFileIcon(file.name);
-                            return (
-                              <div
-                                key={file.key}
-                                className={cn(
-                                  "flex items-center justify-between px-3 py-2 rounded-md border",
-                                  file.status === 'error' ? "bg-destructive/10 border-destructive/20" : "bg-muted/30 border-border"
-                                )}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <FileIcon className="h-4 w-4 text-gray-700 dark:text-gray-400" />
-                                  <div>
-                                    <div className="text-xs font-medium">{file.name}</div>
-                                    <div className="text-[10px] text-muted-foreground">
-                                      {file.status === 'processing' ? 'Parsing...' :
-                                        file.status === 'error' ? file.error :
-                                          `${formatBytes(file.size)}`}
-                                    </div>
-                                  </div>
-                                </div>
-                                {file.status !== 'processing' && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() => handleFileRemove(file.key)}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                )}
-                              </div>
-                            );
-                          })}
+                          {uploadedFiles.map(file => (
+                            <FileChip
+                              key={file.key}
+                              file={file}
+                              onRemove={handleFileRemove}
+                              size="default"
+                              rounded="md"
+                              showOriginalName={true}
+                            />
+                          ))}
                         </div>
                       )}
                       <div className="flex flex-col items-center gap-2">
@@ -1128,7 +1079,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                           )}
                         </Button>
                         <div className="text-xs text-muted-foreground text-center">
-                          {formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE)}
+                          {formatBytes(totalFileSize)} / {formatBytes(MAX_FILE_SIZE_TOOLS)}
                         </div>
                       </div>
                     </div>

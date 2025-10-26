@@ -132,13 +132,8 @@ function buildAvailableVariableContext(payload: any, integrations: Integration[]
 }
 
 function buildToolContext(tool: Workflow, opts: BuildToolContextOptions): string {
-    const budget = Math.max(0, opts.characterBudget | 0);
-
-    const toolOpeningTag = `<${tool.id}>`;
-    const toolInstructionContext = `<tool_instruction>${tool.instruction}</tool_instruction>`;
-    const integrationsUsedByToolStepsContext = `<integrations_used_in_tool_steps>${tool.steps.map(step => step.integrationId).join(', ')}</integrations_used_in_tool_steps>`;;
-    const toolClosingTag = `</${tool.id}>`;
-    return toolOpeningTag + '\n' + [toolInstructionContext, integrationsUsedByToolStepsContext].filter(Boolean).join('\n').slice(0, budget - toolOpeningTag.length - toolClosingTag.length) + '\n' + toolClosingTag;
+    const integrationIds = Array.from(new Set(tool.steps.map(step => step.integrationId).filter(Boolean)));
+    return `- ${tool.id}: ${tool.instruction || 'No description'} (integrations: ${integrationIds.join(', ') || 'none'})`;
 }
 
 export function getWorkflowBuilderContext(input: WorkflowBuilderContextInput, options: WorkflowBuilderContextOptions): string {
@@ -234,14 +229,11 @@ export function getFindRelevantIntegrationsContext(input: FindRelevantIntegratio
 }
 
 export function getFindRelevantToolsContext(input: FindRelevantToolsContextInput, options: FindRelevantToolsContextOptions): string {
-    const budget = Math.max(0, options.characterBudget | 0);
-    if (budget === 0) return '';
-
     const promptStart = `Based on the search terms, select the most relevant tools from the following list.`
     const searchTermsContext = `<search_terms>${input.searchTerms}</search_terms>`;
-    const availableToolsContext = `<available_tools>${input.availableTools.map(tool => buildToolContext(tool, { characterBudget: 1500 })).join('\n')}</available_tools>`;
-    const promptEnd = `Return a JSON object conforming to the schema, containing a list of suggested tool IDs no longer than 10 in order of relevance and a brief reason for each selection. If no tools are relevant, return an empty list.`
-    const prompt = promptStart + '\n' + ([searchTermsContext, availableToolsContext].filter(Boolean).join('\n')).slice(0, budget - promptStart.length - promptEnd.length) + '\n' + promptEnd;
+    const availableToolsContext = `<available_tools>\n${input.availableTools.map(tool => buildToolContext(tool, { characterBudget: 0 })).join('\n')}\n</available_tools>`;
+    const promptEnd = `Return a JSON object conforming to the schema, containing a list of suggested tool IDs (use exact IDs from the list above) no longer than 10 in order of relevance and a brief reason for each selection. If no tools are relevant, return an empty list.`
+    const prompt = promptStart + '\n' + searchTermsContext + '\n' + availableToolsContext + '\n' + promptEnd;
     return prompt;
 }
 

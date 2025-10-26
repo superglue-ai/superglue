@@ -68,7 +68,7 @@ export class ToolSelector {
             availableTools: tools
         };
 
-        const userPrompt = getFindRelevantToolsContext(contextInput, { characterBudget: 50000 });
+        const userPrompt = getFindRelevantToolsContext(contextInput, { characterBudget: 100000 });
 
         const messages: ChatMessage[] = [
             { role: "system", content: FIND_RELEVANT_TOOLS_SYSTEM_PROMPT },
@@ -87,9 +87,12 @@ export class ToolSelector {
             }
 
             const suggestions = rawSelection.suggestedTools
-                .map(suggestion => {
+                .map((suggestion) => {
                     const tool = tools.find(t => t.id === suggestion.id);
-                    if (!tool) return null;
+                    if (!tool) {
+                        logMessage('warn', `LLM suggested tool ID '${suggestion.id}' which was not found in available tools. Available IDs: ${tools.map(t => t.id).join(', ')}`, this.metadata);
+                        return null;
+                    }
 
                     return {
                         id: tool.id,

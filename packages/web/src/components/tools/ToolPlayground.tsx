@@ -2,8 +2,8 @@
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
-import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE, processFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { computeStepOutput } from "@/src/lib/utils";
+import { formatBytes, generateUniqueKey, MAX_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { computeStepOutput } from "@/src/lib/general-utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
 import { Validator } from "jsonschema";
 import { Check, Loader2, Play, X } from "lucide-react";
@@ -270,10 +270,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
     try {
       const newSize = files.reduce((sum, f) => sum + f.size, 0);
-      if (localTotalFileSize + newSize > MAX_TOTAL_FILE_SIZE) {
+      if (localTotalFileSize + newSize > MAX_FILE_SIZE_TOOLS) {
         toast({
           title: 'Size limit exceeded',
-          description: `Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE)}`,
+          description: `Total file size cannot exceed ${formatBytes(MAX_FILE_SIZE_TOOLS)}`,
           variant: 'destructive'
         });
         return;
@@ -296,23 +296,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           newFiles.push(fileInfo);
           setLocalUploadedFiles(prev => [...prev, fileInfo]);
 
-          const isPdf = file.name.toLowerCase().endsWith('.pdf');
-
-          let parsedData: any;
-          if (isPdf) {
-            const extractedText = await processFile(file, file.name);
-            parsedData = { text: extractedText };
-          } else {
-            // Use backend extract endpoint for other file types
-            const extractResult = await client.extract({
-              file: file
-            });
-
-            if (!extractResult.success) {
-              throw new Error(extractResult.error || 'Failed to extract data');
-            }
-            parsedData = extractResult.data;
-          }
+          const parsedData = await processAndExtractFile(file, client);
 
           setLocalFilePayloads(prev => ({ ...prev, [key]: parsedData }));
           existingKeys.push(key);
@@ -361,7 +345,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       return newPayloads;
     });
     setLocalUploadedFiles(prev => prev.filter(f => f.key !== key));
-    setLocalTotalFileSize(prev => Math.max(0, prev - fileToRemove.size));
+    setLocalTotalFileSize(prev => Math.max(0, prev - (fileToRemove.size || 0)));
   };
 
 

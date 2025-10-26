@@ -39,8 +39,8 @@ import {
 import ToolSchedulesList from '@/src/components/tools/ToolSchedulesList';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import EmptyStateActions from '@/src/components/utils/EmptyStateActions';
-import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/utils';
 import { loadFromCache, saveToCache } from '@/src/lib/cache-utils';
+import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
 import { ApiConfig, ExtractConfig, Integration, SuperglueClient, Workflow as Tool, TransformConfig } from '@superglue/client';
 import { Calendar, Check, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2, Zap } from "lucide-react";
 import { useRouter } from 'next/navigation';
@@ -133,7 +133,7 @@ const ConfigTable = () => {
       setAllConfigs(combinedConfigs);
       setTotal(combinedConfigs.length);
       setPage(0);
-      
+
       saveToCache(config.superglueApiKey, CACHE_PREFIX, {
         configs: combinedConfigs,
         integrations: integrationsData.items,
@@ -159,29 +159,29 @@ const ConfigTable = () => {
 
   React.useEffect(() => {
     const filtered = allConfigs.filter(config => {
-      if(!config) return false;
-      
+      if (!config) return false;
+
       // Search filter
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
         const configString = JSON.stringify(config).toLowerCase();
         if (!configString.includes(searchLower)) return false;
       }
-      
+
       // Integration filter
       if (selectedIntegration !== "all") {
         const configType = (config as any).type;
         const isTool = configType === 'tool';
-        
+
         if (!isTool) return false;
-        
+
         const tool = config as Tool;
         const allIntegrationIds = new Set<string>();
-        
+
         if (tool.integrationIds) {
           tool.integrationIds.forEach(id => allIntegrationIds.add(id));
         }
-        
+
         if (tool.steps) {
           tool.steps.forEach((step: any) => {
             if (step.integrationId) {
@@ -189,15 +189,15 @@ const ConfigTable = () => {
             }
           });
         }
-        
+
         if (!allIntegrationIds.has(selectedIntegration)) return false;
       }
-      
+
       return true;
     });
-    
+
     setTotal(filtered.length);
-    
+
     const start = page * pageSize;
     const end = start + pageSize;
     setConfigs(filtered.slice(start, end));
@@ -346,7 +346,7 @@ const ConfigTable = () => {
       </div>
     )
   }
-  
+
   if (allConfigs.length === 0 && !loading) {
     return (
       <div className="p-8 max-w-none w-full min-h-full">
@@ -482,234 +482,234 @@ const ConfigTable = () => {
               </TableRow>
             ) : (
               configs.map((config) => {
-              const configType = (config as any).type;
-              const isApi = configType === 'api';
-              const isExtract = configType === 'extract';
-              const isTransform = configType === 'transform';
-              const isTool = configType === 'tool';
+                const configType = (config as any).type;
+                const isApi = configType === 'api';
+                const isExtract = configType === 'extract';
+                const isTransform = configType === 'transform';
+                const isTool = configType === 'tool';
 
-              const handleRunClick = (e: React.MouseEvent) => {
-                if (isApi) handlePlay(e, config.id);
-                else if (isExtract) handlePlayExtract(e, config.id);
-                else if (isTransform) handlePlayTransform(e, config.id);
-                else if (isTool) handlePlayTool(e, config.id);
-              };
+                const handleRunClick = (e: React.MouseEvent) => {
+                  if (isApi) handlePlay(e, config.id);
+                  else if (isExtract) handlePlayExtract(e, config.id);
+                  else if (isTransform) handlePlayTransform(e, config.id);
+                  else if (isTool) handlePlayTool(e, config.id);
+                };
 
-              return (
-                <React.Fragment key={`${configType}-${config.id}`}>
-                  <TableRow
-                    key={`${configType}-${config.id}`}
-                    className="hover:bg-secondary"
-                  // Consider adding onClick={() => handleRowClick(config)} if needed
-                  >
-                    <TableCell className="w-[60px]">
-                      {isTool && (() => {
-                        const tool = config as Tool;
-                        const allIntegrationIds = new Set<string>();
-                        
-                        if (tool.integrationIds) {
-                          tool.integrationIds.forEach(id => allIntegrationIds.add(id));
-                        }
-                        
-                        if (tool.steps) {
-                          tool.steps.forEach((step: any) => {
-                            if (step.integrationId) {
-                              allIntegrationIds.add(step.integrationId);
-                            }
-                          });
-                        }
-                        
-                        const integrationIdsArray = Array.from(allIntegrationIds);
-                        
-                        return integrationIdsArray.length > 0 ? (
-                          <div className="flex items-center justify-center gap-1 flex-shrink-0">
-                            {integrationIdsArray.map((integrationId: string) => {
-                              const integration = integrations.find(i => i.id === integrationId);
-                              if (!integration) return null;
-                              const icon = getIntegrationIcon(integration);
-                              return icon ? (
-                                <TooltipProvider key={integrationId}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <svg
-                                        width="14"
-                                        height="14"
-                                        viewBox="0 0 24 24"
-                                        fill={`#${icon.hex}`}
-                                        className="flex-shrink-0"
-                                      >
-                                        <path d={icon.path} />
-                                      </svg>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>{integration.id}</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              ) : (
-                                <TooltipProvider key={integrationId}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>{integration.id}</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              );
-                            })}
-                          </div>
-                        ) : null;
-                      })()}
-                    </TableCell>
-                    <TableCell className="font-medium max-w-[200px] truncate relative group">
-                      <div className="flex items-center space-x-1">
-                        <span className="truncate">{config.id}</span>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={(e) => handleCopyId(e, config.id)}
-                              >
-                                {copiedId === config.id ? (
-                                  <Check className="h-3.5 w-3.5 text-green-500" />
+                return (
+                  <React.Fragment key={`${configType}-${config.id}`}>
+                    <TableRow
+                      key={`${configType}-${config.id}`}
+                      className="hover:bg-secondary"
+                    // Consider adding onClick={() => handleRowClick(config)} if needed
+                    >
+                      <TableCell className="w-[60px]">
+                        {isTool && (() => {
+                          const tool = config as Tool;
+                          const allIntegrationIds = new Set<string>();
+
+                          if (tool.integrationIds) {
+                            tool.integrationIds.forEach(id => allIntegrationIds.add(id));
+                          }
+
+                          if (tool.steps) {
+                            tool.steps.forEach((step: any) => {
+                              if (step.integrationId) {
+                                allIntegrationIds.add(step.integrationId);
+                              }
+                            });
+                          }
+
+                          const integrationIdsArray = Array.from(allIntegrationIds);
+
+                          return integrationIdsArray.length > 0 ? (
+                            <div className="flex items-center justify-center gap-1 flex-shrink-0">
+                              {integrationIdsArray.map((integrationId: string) => {
+                                const integration = integrations.find(i => i.id === integrationId);
+                                if (!integration) return null;
+                                const icon = getIntegrationIcon(integration);
+                                return icon ? (
+                                  <TooltipProvider key={integrationId}>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <svg
+                                          width="14"
+                                          height="14"
+                                          viewBox="0 0 24 24"
+                                          fill={`#${icon.hex}`}
+                                          className="flex-shrink-0"
+                                        >
+                                          <path d={icon.path} />
+                                        </svg>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>{integration.id}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 ) : (
-                                  <Copy className="h-3.5 w-3.5" />
-                                )}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              <p>{copiedId === config.id ? "Copied!" : "Copy ID"}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </TableCell>
-                    <TableCell className="max-w-[300px] truncate relative group">
-                      <div className="flex items-center space-x-1">
-                        <span className="truncate">{config.instruction}</span>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={(e) => handleCopyDetails(e, config.instruction || '')}
-                              >
-                                {copiedDetails === config.instruction ? (
-                                  <Check className="h-3.5 w-3.5 text-green-500" />
-                                ) : (
-                                  <Copy className="h-3.5 w-3.5" />
-                                )}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              <p>{copiedDetails === config.instruction ? "Copied!" : "Copy details"}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </TableCell>
-                    <TableCell className="w-[150px]">
-                      {config.updatedAt ? new Date(config.updatedAt).toLocaleDateString() : (config.createdAt ? new Date(config.createdAt).toLocaleDateString() : '')}
-                    </TableCell>
-                    <TableCell className="w-[100px]">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={handleRunClick}
-                          className="gap-2"
-                        >
-                          {isTool ? <Hammer className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                          Run
-                        </Button>
-                        {isTool && (
+                                  <TooltipProvider key={integrationId}>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>{integration.id}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                );
+                              })}
+                            </div>
+                          ) : null;
+                        })()}
+                      </TableCell>
+                      <TableCell className="font-medium max-w-[200px] truncate relative group">
+                        <div className="flex items-center space-x-1">
+                          <span className="truncate">{config.id}</span>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => handleCopyId(e, config.id)}
+                                >
+                                  {copiedId === config.id ? (
+                                    <Check className="h-3.5 w-3.5 text-green-500" />
+                                  ) : (
+                                    <Copy className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                <p>{copiedId === config.id ? "Copied!" : "Copy ID"}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-[300px] truncate relative group">
+                        <div className="flex items-center space-x-1">
+                          <span className="truncate">{config.instruction}</span>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => handleCopyDetails(e, config.instruction || '')}
+                                >
+                                  {copiedDetails === config.instruction ? (
+                                    <Check className="h-3.5 w-3.5 text-green-500" />
+                                  ) : (
+                                    <Copy className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                <p>{copiedDetails === config.instruction ? "Copied!" : "Copy details"}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </TableCell>
+                      <TableCell className="w-[150px]">
+                        {config.updatedAt ? new Date(config.updatedAt).toLocaleDateString() : (config.createdAt ? new Date(config.createdAt).toLocaleDateString() : '')}
+                      </TableCell>
+                      <TableCell className="w-[100px]">
+                        <div className="flex justify-end gap-2">
                           <Button
-                            variant="outline"
+                            variant="default"
                             size="sm"
-                            onClick={(e) => handleScheduleClick(e, config.id)}
+                            onClick={handleRunClick}
                             className="gap-2"
                           >
-                            <Calendar className="h-4 w-4" />
-                            Schedules
+                            {isTool ? <Hammer className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                            Run
                           </Button>
-                        )}
-                        <TooltipProvider>
-                          {/* Common Actions */}
-                          {isApi && (
+                          {isTool && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => handleScheduleClick(e, config.id)}
+                              className="gap-2"
+                            >
+                              <Calendar className="h-4 w-4" />
+                              Schedules
+                            </Button>
+                          )}
+                          <TooltipProvider>
+                            {/* Common Actions */}
+                            {isApi && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => handleViewLogs(e, config.id)}
+                                  >
+                                    <History className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>View Run History</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+
+                            {isApi && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => handleEdit(e, config.id)}
+                                  >
+                                    <Settings className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Edit Configuration</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+
+                            {/* Delete Action (Available for all types) */}
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={(e) => handleViewLogs(e, config.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfigToDelete(config);
+                                  }}
                                 >
-                                  <History className="h-4 w-4" />
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>View Run History</p>
+                                <p>Delete {isApi ? 'Configuration' : isExtract ? 'Configuration' : isTransform ? 'Transform' : 'Tool'}</p>
                               </TooltipContent>
                             </Tooltip>
-                          )}
-
-                          {isApi && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => handleEdit(e, config.id)}
-                                >
-                                  <Settings className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Edit Configuration</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-
-                          {/* Delete Action (Available for all types) */}
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setConfigToDelete(config);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Delete {isApi ? 'Configuration' : isExtract ? 'Configuration' : isTransform ? 'Transform' : 'Tool'}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-
-                  {/* Expanded Details Row */}
-                  {expandedToolId === config.id && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="p-0">
-                        <ToolSchedulesList toolId={config.id} />
+                          </TooltipProvider>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  )}
-                </React.Fragment>
-              );
-            })
+
+                    {/* Expanded Details Row */}
+                    {expandedToolId === config.id && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="p-0">
+                          <ToolSchedulesList toolId={config.id} />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                );
+              })
             )}
           </TableBody>
         </Table>

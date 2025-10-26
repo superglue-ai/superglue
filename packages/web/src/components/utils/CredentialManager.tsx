@@ -3,7 +3,7 @@
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { parseCredentialsHelper } from '@/src/lib/client-utils';
-import { cn } from '@/src/lib/utils';
+import { cn } from '@/src/lib/general-utils';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -50,8 +50,8 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
     } catch (e) {
       setCredentials([{ key: '', value: '' }])
     }
-    
-  }, []) 
+
+  }, [])
 
   // Compute duplicate indexes for UI and output
   const duplicateIndexes = useMemo(() => getDuplicateIndexesExceptFirst(credentials), [credentials]);
@@ -141,9 +141,9 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
             )}
           </div>
           {credentials.length > 0 && (
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={addCredential}
               className="text-xs h-6"
             >

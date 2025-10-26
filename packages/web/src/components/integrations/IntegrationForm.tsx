@@ -14,7 +14,7 @@ import { DocumentationField } from '@/src/components/utils/DocumentationField';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { URLField } from '@/src/components/utils/URLField';
 import { useToast } from '@/src/hooks/use-toast';
-import { cn, composeUrl, inputErrorStyles } from '@/src/lib/utils';
+import { cn, composeUrl, inputErrorStyles } from '@/src/lib/general-utils';
 import type { Integration } from '@superglue/client';
 
 import { createOAuthErrorHandler, getOAuthCallbackUrl, triggerOAuthFlow } from '@/src/lib/oauth-utils';

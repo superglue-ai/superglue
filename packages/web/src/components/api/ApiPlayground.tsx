@@ -6,7 +6,7 @@ import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { useToast } from "@/src/hooks/use-toast";
 import { generateUUID } from "@/src/lib/client-utils";
-import { composeUrl } from "@/src/lib/utils";
+import { composeUrl } from "@/src/lib/general-utils";
 import { ApiConfig, CacheMode, SuperglueClient } from "@superglue/client";
 import { AlertCircle, Clock, Copy, Play, Plus, X } from "lucide-react";
 import { useParams } from "next/navigation";

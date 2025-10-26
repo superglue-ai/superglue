@@ -3,7 +3,7 @@
 import { useConfig } from '@/src/app/config-context';
 import { useToast } from '@/src/hooks/use-toast';
 import { findArraysOfObjects, parseCredentialsHelper } from '@/src/lib/client-utils';
-import { cn, inputErrorStyles } from '@/src/lib/utils';
+import { cn, inputErrorStyles } from '@/src/lib/general-utils';
 import { ApiConfig, AuthType, CacheMode, ExtractConfig, SuperglueClient, TransformConfig } from '@superglue/client';
 import { Copy, Download, Loader2, Terminal, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';

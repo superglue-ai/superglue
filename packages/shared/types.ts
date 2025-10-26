@@ -20,8 +20,15 @@ export interface Message {
   role: 'user' | 'assistant';
   timestamp: Date;
   tools?: ToolCall[];
-  parts?: MessagePart[]; // New field to track sequence
+  parts?: MessagePart[];
   isStreaming?: boolean;
+  attachedFiles?: Array<{
+    name: string;
+    size?: number;
+    key: string;
+    status?: 'processing' | 'ready' | 'error';
+    error?: string;
+  }>;
 }
 
 export interface ToolCall {

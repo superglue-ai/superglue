@@ -5,7 +5,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { useToast } from '@/src/hooks/use-toast';
 import { downloadJson } from '@/src/lib/download-utils';
-import { ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, isEmptyData, MAX_DISPLAY_LINES, truncateForDisplay, truncateLines } from '@/src/lib/utils';
+import { ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, isEmptyData, MAX_DISPLAY_LINES, truncateForDisplay, truncateLines } from '@/src/lib/general-utils';
 import { Integration, SuperglueClient } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
 import { ArrowDown, Check, Copy, Download, Edit, Globe, RotateCw } from 'lucide-react';
@@ -338,17 +338,17 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             )}
                                         </div>
                                         {isEditingInstruction ? (
-                                            <Textarea 
-                                                value={step.apiConfig.instruction || ''} 
-                                                onChange={(e) => handleImmediateEdit((s) => ({ 
-                                                    ...s, 
-                                                    apiConfig: { 
-                                                        ...s.apiConfig, 
-                                                        instruction: e.target.value 
-                                                    } 
-                                                }))} 
+                                            <Textarea
+                                                value={step.apiConfig.instruction || ''}
+                                                onChange={(e) => handleImmediateEdit((s) => ({
+                                                    ...s,
+                                                    apiConfig: {
+                                                        ...s.apiConfig,
+                                                        instruction: e.target.value
+                                                    }
+                                                }))}
                                                 onBlur={() => setIsEditingInstruction(false)}
-                                                className="text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" 
+                                                className="text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0"
                                                 placeholder="Describe what this step should do..."
                                                 disabled={disabled}
                                                 autoFocus
