@@ -24,7 +24,6 @@ import { Textarea } from '../ui/textarea';
 import { DocStatus } from '../utils/DocStatusSpinner';
 import { HelpTooltip } from '../utils/HelpTooltip';
 import JsonSchemaEditor from '../utils/JsonSchemaEditor';
-import { StepIndicator, TOOL_CREATE_STEPS } from '../utils/StepIndicator';
 import { ToolCreateSuccess } from './ToolCreateSuccess';
 import ToolPlayground, { ToolPlaygroundHandle } from './ToolPlayground';
 
@@ -273,18 +272,6 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
     }
   };
 
-  const handleBack = () => {
-    const steps: ToolCreateStep[] = ['integrations', 'build', 'run', 'publish'];
-    const currentIndex = steps.indexOf(step);
-    if (step === 'integrations') {
-      router.push('/configs');
-      return;
-    }
-
-    if (currentIndex > 0) {
-      setStep(steps[currentIndex - 1]);
-    }
-  };
 
   const handleClose = () => {
     if (onComplete) {
@@ -483,7 +470,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
   return (
     <div className="flex-1 flex flex-col h-full p-6">
       <div className="flex-none mb-4">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold">
             {step === 'publish' ? 'Tool Created!' : 'Create New Tool'}
           </h1>
@@ -500,22 +487,36 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
             </Button>
           </div>
         </div>
-        <StepIndicator currentStep={step} steps={TOOL_CREATE_STEPS} />
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col">
         <div className="overflow-y-auto px-1 min-h-0" style={{ scrollbarGutter: 'stable' }}>
           {step === 'integrations' && (
-            <div className="space-y-4">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <h3 className="font-medium">
-                  Select one or more integrations to use in your tool. You can add new integrations as needed.
-                </h3>
-                <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setShowIntegrationForm(true)}>
-                  <Plus className="mr-2 h-4 w-4" /> Add Integration
-                </Button>
-              </div>
-              <div className="overflow-y-auto">
+            <div className="flex items-start justify-center pt-8">
+              <div className="w-full max-w-3xl mx-auto space-y-4">
+                <div className="text-center mb-6">
+                  <h2 className="text-xl font-medium text-foreground mb-2">
+                    Select integrations for your tool
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Choose one or more integrations, or create transform-only tools without any
+                  </p>
+                </div>
+                
+                <div className="border rounded-2xl bg-card p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Input
+                      placeholder="Search integrations..."
+                      value={integrationSearch}
+                      onChange={e => setIntegrationSearch(e.target.value)}
+                      className="h-10 flex-1"
+                    />
+                    <Button variant="outline" size="sm" className="h-10 shrink-0" onClick={() => setShowIntegrationForm(true)}>
+                      <Plus className="mr-2 h-4 w-4" /> Add Integration
+                    </Button>
+                  </div>
+
+                  <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 450px)', minHeight: '200px' }}>
                 {loading ? (
                   <div className="h-full bg-background" />
                 ) : integrations.length === 0 ? (
@@ -525,105 +526,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                     </p>
                   </div>
                 ) : (
-                  <div className="gap-2 flex flex-col">
-                    <div className="flex items-center justify-between py-2 pr-4 text-sm font-medium text-foreground border-b gap-4">
-                      <Input
-                        placeholder="Search integrations..."
-                        value={integrationSearch}
-                        onChange={e => setIntegrationSearch(e.target.value)}
-                        className="h-8 text-sm flex-1"
-                      />
-                      <div className="flex items-center gap-2">
-                        {(() => {
-                          const filteredIntegrations = integrations.filter(sys =>
-                            integrationSearch === '' ||
-                            sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-                            sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-                            sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
-                          );
-                          const filteredIds = filteredIntegrations.map(i => i.id);
-                          const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
-                          const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
-
-                          return (
-                            <span className="text-xs text-muted-foreground">
-                              {allSelected || selectedCount > 0 ? 'Unselect all' : 'Select all'}
-                            </span>
-                          );
-                        })()}
-                        <button
-                          className={cn(
-                            "h-5 w-5 rounded border-2 transition-all duration-200 flex items-center justify-center",
-                            (() => {
-                              const filteredIntegrations = integrations.filter(sys =>
-                                integrationSearch === '' ||
-                                sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-                                sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-                                sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
-                              );
-                              const filteredIds = filteredIntegrations.map(i => i.id);
-                              const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
-                              const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
-                              const someSelected = selectedCount > 0 && selectedCount < filteredIds.length;
-
-                              if (allSelected || someSelected) {
-                                return "bg-primary border-primary";
-                              }
-                              return "bg-background border-input hover:border-primary/50";
-                            })()
-                          )}
-                          onClick={() => {
-                            const filteredIntegrations = integrations.filter(sys =>
-                              integrationSearch === '' ||
-                              sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-                              sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-                              sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
-                            );
-                            const filteredIds = filteredIntegrations.map(i => i.id);
-                            const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
-                            const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
-
-                            if (allSelected || selectedCount > 0) {
-                              setSelectedIntegrationIds(ids => ids.filter(id => !filteredIds.includes(id)));
-                            } else {
-                              setSelectedIntegrationIds(ids => [...new Set([...ids, ...filteredIds])]);
-                            }
-                          }}
-                        >
-                          {(() => {
-                            const filteredIntegrations = integrations.filter(sys =>
-                              integrationSearch === '' ||
-                              sys.id.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-                              sys.urlHost.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-                              sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
-                            );
-                            const filteredIds = filteredIntegrations.map(i => i.id);
-                            const selectedCount = filteredIds.filter(id => selectedIntegrationIds.includes(id)).length;
-                            const allSelected = filteredIds.length > 0 && selectedCount === filteredIds.length;
-                            const someSelected = selectedCount > 0 && selectedCount < filteredIds.length;
-
-                            if (allSelected) {
-                              return <Check className="h-3 w-3 text-primary-foreground" />;
-                            } else if (someSelected) {
-                              return <div className="h-0.5 w-2.5 bg-primary-foreground" />;
-                            }
-                            return null;
-                          })()}
-                        </button>
-                      </div>
-                    </div>
-                    {selectedIntegrationIds.length === 0 && integrations.length > 0 && (
-                      <div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/50 py-2 px-4 rounded-md">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <path d="M12 16v-4" />
-                            <path d="M12 8h.01" />
-                          </svg>
-                          No integrations selected - you can create transform-only tools or add integrations for API calls
-                        </div>
-                      </div>
-                    )}
+                  <div className="space-y-2">
                     {(() => {
                       const filteredIntegrations = integrations.filter(sys =>
                         integrationSearch === '' ||
@@ -636,14 +539,21 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                         <>
                           {filteredIntegrations.map(sys => {
                             const selected = selectedIntegrationIds.includes(sys.id);
+                            const badge = getAuthBadge(sys);
+                            const colorClasses = {
+                              blue: 'text-blue-800 dark:text-blue-300 bg-blue-500/10',
+                              amber: 'text-amber-800 dark:text-amber-300 bg-amber-500/10',
+                              green: 'text-green-800 dark:text-green-300 bg-green-500/10'
+                            };
+                            
                             return (
                               <div
                                 key={sys.id}
                                 className={cn(
-                                  "flex items-center justify-between rounded-md px-4 py-3 transition-all duration-200 cursor-pointer",
+                                  "flex items-center justify-between rounded-lg px-4 py-3 transition-all duration-200 cursor-pointer",
                                   selected
                                     ? "bg-primary/10 dark:bg-primary/40 border border-primary/50 dark:border-primary/60 hover:bg-primary/15 dark:hover:bg-primary/25"
-                                    : "bg-background border border-transparent hover:bg-accent/50 hover:border-border"
+                                    : "bg-muted/30 border border-border hover:bg-muted/50 hover:border-border/80"
                                 )}
                                 onClick={() => {
                                   if (selected) {
@@ -672,36 +582,17 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                                     );
                                   })()}
                                   <div className="flex flex-col min-w-0">
-                                    <span className="font-medium truncate max-w-[200px]">{sys.id}</span>
-                                    <span className="text-xs text-muted-foreground truncate max-w-[240px]">
+                                    <span className="font-medium text-sm truncate">{sys.id}</span>
+                                    <span className="text-xs text-muted-foreground truncate">
                                       {composeUrl(sys.urlHost, sys.urlPath)}
                                     </span>
                                   </div>
-                                  <div className="flex flex-col items-center gap-2">
-                                    <div className="flex items-center gap-2">
-                                      <DocStatus
-                                        pending={pendingDocIds.has(sys.id)}
-                                        hasDocumentation={hasDocumentation(sys)}
-                                      />
-                                      {(() => {
-                                        const badge = getAuthBadge(sys);
-                                        const colorClasses = {
-                                          blue: 'text-blue-800 dark:text-blue-300 bg-blue-500/10',
-                                          amber: 'text-amber-800 dark:text-amber-300 bg-amber-500/10',
-                                          green: 'text-green-800 dark:text-green-300 bg-green-500/10'
-                                        };
-
-                                        return (
-                                          <span className={`text-xs ${colorClasses[badge.color]} px-2 py-0.5 rounded flex items-center gap-1`}>
-                                            {badge.icon === 'clock' ? <Clock className="h-3 w-3" /> : <Key className="h-3 w-3" />}
-                                            {badge.label}
-                                          </span>
-                                        );
-                                      })()}
-                                    </div>
-                                  </div>
                                 </div>
                                 <div className="flex gap-2 items-center">
+                                  <span className={`text-xs ${colorClasses[badge.color]} px-2 py-0.5 rounded flex items-center gap-1`}>
+                                    {badge.icon === 'clock' ? <Clock className="h-3 w-3" /> : <Key className="h-3 w-3" />}
+                                    {badge.label}
+                                  </span>
                                   <Button
                                     variant="ghost"
                                     size="icon"
@@ -778,32 +669,102 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                     })()}
                   </div>
                 )}
-              </div>
-              {showIntegrationForm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-                  <div className="bg-background rounded-xl max-w-2xl w-full p-0">
-                    <IntegrationForm
-                      modal={true}
-                      integration={integrationFormEdit || undefined}
-                      onSave={handleIntegrationFormSave}
-                      onCancel={handleIntegrationFormCancel}
-                      integrationOptions={integrationOptions}
-                      getSimpleIcon={getSimpleIcon}
-                    />
                   </div>
                 </div>
-              )}
+              
+                {/* Next button positioned bottom-right within container */}
+                <div className="flex justify-end mt-4">
+                  <Button
+                    onClick={handleNext}
+                    className="h-10 px-6 rounded-full"
+                  >
+                    Next
+                  </Button>
+                </div>
+              
+                {showIntegrationForm && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+                    <div className="bg-background rounded-xl max-w-2xl w-full p-0">
+                      <IntegrationForm
+                        modal={true}
+                        integration={integrationFormEdit || undefined}
+                        onSave={handleIntegrationFormSave}
+                        onCancel={handleIntegrationFormCancel}
+                        integrationOptions={integrationOptions}
+                        getSimpleIcon={getSimpleIcon}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           {/* NEW REDESIGNED PROMPT STEP */}
           {step === 'build' && (
-            <div className="flex items-start justify-center pt-8">
-              <div className="w-full max-w-3xl mx-auto space-y-4">
+            <div className="flex flex-col items-center pt-8">
+              <div className="w-full max-w-3xl space-y-4">
                 <div className="text-center mb-4">
                   <h2 className="text-xl font-medium text-foreground">
                     What should your tool do for you?
                   </h2>
+                </div>
+                
+                {/* Selected integration chips - below heading */}
+                <div className="flex flex-wrap gap-2 justify-center mb-4">
+                  {selectedIntegrationIds.map(id => {
+                    const integration = integrations.find(i => i.id === id);
+                    if (!integration) return null;
+                    
+                    const iconName = getIntegrationIconName(integration);
+                    const icon = iconName ? getSimpleIcon(iconName) : null;
+                    
+                    return (
+                      <button
+                        key={id}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setSelectedIntegrationIds(ids => ids.filter(i => i !== id));
+                          setSuggestions([]);
+                          if (selectedIntegrationIds.length > 1) {
+                            handleGenerateInstructions();
+                          }
+                        }}
+                        className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-border hover:bg-red-500/10 hover:border-red-500/50 transition-all"
+                        title="Click to remove"
+                      >
+                        {icon ? (
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill={`#${icon.hex}`}
+                            className="flex-shrink-0"
+                          >
+                            <path d={icon.path} />
+                          </svg>
+                        ) : (
+                          <Globe className="h-4 w-4 flex-shrink-0 text-foreground" />
+                        )}
+                        <span className="text-sm font-medium max-w-[120px] truncate">
+                          {integration.id}
+                        </span>
+                        <X className="h-3 w-3 text-muted-foreground group-hover:text-red-500 transition-colors" />
+                      </button>
+                    );
+                  })}
+                  
+                  {/* Add Integration button */}
+                  <button
+                    onClick={() => setStep('integrations')}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-dashed border-border hover:bg-muted/80 hover:border-border/80 transition-all"
+                    title="Add integrations"
+                  >
+                    <Plus className="h-4 w-4 flex-shrink-0 text-foreground" />
+                    <span className="text-sm font-medium">
+                      Add Integration
+                    </span>
+                  </button>
                 </div>
 
                 {/* Chat-like instruction input with send button and settings */}
@@ -1100,31 +1061,31 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                     />
                   </div>
                 )}
-
-                {/* Suggested prompts with animation - only show when textarea is empty and no section is expanded */}
-                {suggestions.length > 0 && !instruction.trim() && !showPayloadSection && !showFileUploadSection && !showResponseSchemaSection && (
-                  <div className="space-y-2 mt-4">
-                    <p className="text-sm text-muted-foreground text-center">Suggestions</p>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      {suggestions.map((suggestion, index) => (
-                        <Button
-                          key={index}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setInstruction(suggestion)}
-                          className="text-sm h-auto py-2 px-4 font-normal animate-fade-in"
-                          style={{
-                            animationDelay: `${index * 150}ms`,
-                            animationFillMode: 'backwards'
-                          }}
-                        >
-                          {suggestion}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
+              
+              {/* Suggested prompts with animation - only show when textarea is empty and no section is expanded - wider than chat box */}
+              {suggestions.length > 0 && !instruction.trim() && !showPayloadSection && !showFileUploadSection && !showResponseSchemaSection && (
+                <div className="w-full max-w-4xl space-y-2 mt-4">
+                  <p className="text-sm text-muted-foreground text-center">Suggestions</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {suggestions.map((suggestion, index) => (
+                      <Button
+                        key={index}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setInstruction(suggestion)}
+                        className="text-sm h-auto py-2 px-4 font-normal animate-fade-in whitespace-normal text-left max-w-full"
+                        style={{
+                          animationDelay: `${index * 150}ms`,
+                          animationFillMode: 'backwards'
+                        }}
+                      >
+                        {suggestion}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {step === 'run' && currentTool && (
@@ -1240,36 +1201,6 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                 </Button>
               </div>
             </div>
-          )}
-        </div>
-      </div>
-
-      <div className="flex-none mt-4 pt-4 border-t flex justify-between items-center">
-        <Button
-          variant="outline"
-          onClick={handleBack}
-          disabled={
-            (step === 'integrations' && showIntegrationForm) ||
-            isBuilding || isSaving
-          }
-        >
-          Back
-        </Button>
-        <div className="flex gap-2">
-          {step !== 'run' && step !== 'publish' && step !== 'build' && (
-            <Button
-              onClick={handleNext}
-              disabled={
-                isBuilding ||
-                isSaving ||
-                isGeneratingSuggestions
-              }
-            >
-              {isBuilding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building...</> :
-                isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> :
-                  isGeneratingSuggestions ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</> :
-                    'Next'}
-            </Button>
           )}
         </div>
       </div>
