@@ -9,10 +9,15 @@ The superglue MCP server exposes a minimal set of tools focused on discovering a
 
 ### superglue_find_relevant_tools
 
-Search for saved superglue tools using natural language.
+Search for saved superglue tools using natural language. Uses AI to intelligently match your query to relevant tools.
 
 **Input Schema:**
-- `searchTerms`: (Optional) Natural language search query. If not provided or set to `*`, returns all available tools.
+- `searchTerms`: (Optional) Natural language search query. If not provided, empty, or set to `*` or `all`, returns all available tools.
+
+**Behavior:**
+- AI matches your query to relevant tools and explains why each tool is relevant via the `reason` field
+- If no specific matches are found or an error occurs, returns all available tools as a fallback
+- Each tool includes its input/output schemas to help understand what data it expects and returns
 
 **Returns:**
 ```typescript
