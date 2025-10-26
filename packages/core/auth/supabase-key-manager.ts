@@ -3,13 +3,11 @@ import { AuthManager, AuthResult } from "./types.js";
 
 export class SupabaseKeyManager implements AuthManager {
   private cachedApiKeys: { key: string; orgId: string }[] = [];
-  private lastFetchTime = 0;
   private readonly API_KEY_CACHE_TTL = 60000; // 1 minute cache
-  private refreshInterval: NodeJS.Timeout;
 
   constructor() {
     this.refreshApiKeys();
-    this.refreshInterval = setInterval(
+    setInterval(
       () => this.refreshApiKeys(),
       this.API_KEY_CACHE_TTL
     );
@@ -27,12 +25,10 @@ export class SupabaseKeyManager implements AuthManager {
       keys = await this.getApiKeys();
       key = keys.find(k => k.key === apiKey);
     }
+
     return { 
-      orgId: key?.orgId || '', 
       success: !!key,
-      userId: undefined,
-      orgName: undefined,
-      orgRole: undefined
+      orgId: key?.orgId
     };
   }
 
@@ -83,7 +79,6 @@ export class SupabaseKeyManager implements AuthManager {
   private async refreshApiKeys(): Promise<void> {
     try {
       this.cachedApiKeys = await this.fetchApiKeys();
-      this.lastFetchTime = Date.now();
     } catch (error) {
       console.error('Failed to refresh API keys:', error);
     }
