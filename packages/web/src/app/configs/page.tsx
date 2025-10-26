@@ -34,6 +34,7 @@ import ToolSchedulesList from '@/src/components/tools/ToolSchedulesList';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import EmptyStateActions from '@/src/components/utils/EmptyStateActions';
 import { loadFromCache, saveToCache } from '@/src/lib/cache-utils';
+import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
 import { ApiConfig, Integration, SuperglueClient, Workflow as Tool } from '@superglue/client';
 import { Calendar, Check, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
@@ -404,14 +405,14 @@ const ConfigTable = () => {
               </TableRow>
             ) : (
               configs.map((config) => {
-              const configType = (config as any).type;
-              const isApi = configType === 'api';
-              const isTool = configType === 'tool';
+                const configType = (config as any).type;
+                const isApi = configType === 'api';
+                const isTool = configType === 'tool';
 
-              const handleRunClick = (e: React.MouseEvent) => {
-                if (isApi) handlePlay(e, config.id);
-                else if (isTool) handlePlayTool(e, config.id);
-              };
+                const handleRunClick = (e: React.MouseEvent) => {
+                  if (isApi) handlePlay(e, config.id);
+                  else if (isTool) handlePlayTool(e, config.id);
+                };
 
                 return (
                   <React.Fragment key={`${configType}-${config.id}`}>
@@ -594,28 +595,28 @@ const ConfigTable = () => {
                               </Tooltip>
                             )}
 
-                          {/* Delete Action (Available for all types) */}
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setConfigToDelete(config);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Delete {isApi ? 'Configuration' : 'Tool'}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                            {/* Delete Action (Available for all types) */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfigToDelete(config);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Delete {isApi ? 'Configuration' : 'Tool'}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </TableCell>
+                    </TableRow>
 
                     {/* Expanded Details Row */}
                     {expandedToolId === config.id && (
