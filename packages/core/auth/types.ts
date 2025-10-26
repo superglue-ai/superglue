@@ -1,6 +1,6 @@
 export interface AuthResult {
     success: boolean;
-    orgId?: string;
+    orgId: string
     userId?: string;
     orgName?: string;
     orgRole?: string;

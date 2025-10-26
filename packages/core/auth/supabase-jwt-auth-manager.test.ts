@@ -69,13 +69,13 @@ describe('SupabaseJWTAuthManager', () => {
     
     const result = await authManager.authenticate('any-token');
 
-    expect(result).toEqual({ success: false });
+    expect(result).toEqual({ success: false, orgId: '' });
   });
 
   it('should fail authentication when token is invalid', async () => {
     const result = await authManager.authenticate('invalid-token');
 
-    expect(result).toEqual({ success: false });
+    expect(result).toEqual({ success: false, orgId: '' });
   });
 
   it('should fail authentication when userId is missing', async () => {
@@ -87,7 +87,7 @@ describe('SupabaseJWTAuthManager', () => {
 
     const result = await authManager.authenticate(token);
 
-    expect(result).toEqual({ success: false });
+    expect(result).toEqual({ success: false, orgId: '' });
   });
 
   it('should fail authentication when orgId is missing', async () => {
@@ -98,7 +98,7 @@ describe('SupabaseJWTAuthManager', () => {
 
     const result = await authManager.authenticate(token);
 
-    expect(result).toEqual({ success: false });
+    expect(result).toEqual({ success: false, orgId: '' });
   });
 
   it('should fail authentication when app_metadata is missing', async () => {
@@ -108,7 +108,7 @@ describe('SupabaseJWTAuthManager', () => {
 
     const result = await authManager.authenticate(token);
 
-    expect(result).toEqual({ success: false });
+    expect(result).toEqual({ success: false, orgId: '' });
   });
 
   it('should fail authentication when token has wrong issuer', async () => {
@@ -127,7 +127,7 @@ describe('SupabaseJWTAuthManager', () => {
 
     const result = await authManager.authenticate(token);
 
-    expect(result).toEqual({ success: false });
+    expect(result).toEqual({ success: false, orgId: '' });
   });
 
   it('should fail authentication when token is expired', async () => {
@@ -146,7 +146,7 @@ describe('SupabaseJWTAuthManager', () => {
 
     const result = await authManager.authenticate(token);
 
-    expect(result).toEqual({ success: false });
+    expect(result).toEqual({ success: false, orgId: '' });
   });
 });
 

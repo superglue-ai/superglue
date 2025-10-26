@@ -1,10 +1,11 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 
 export interface AuthenticatedFastifyRequest extends FastifyRequest {
-  orgId: string;
   authInfo: {
-    token: string;
-    clientId: string;
+    orgId: string;
+    userId?: string;
+    orgName?: string;
+    orgRole?: string;
   };
   datastore: any;
 }

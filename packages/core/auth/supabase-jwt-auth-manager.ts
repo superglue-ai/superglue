@@ -9,7 +9,8 @@ export class SupabaseJWTAuthManager implements AuthManager {
       
       if (!jwtSecret) {
         return {
-          success: false
+          success: false,
+          orgId: ''
         };
       }
 
@@ -28,13 +29,15 @@ export class SupabaseJWTAuthManager implements AuthManager {
 
       if (!userId) {
         return {
-          success: false
+          success: false,
+          orgId: ''
         };
       }
 
       if (!orgId) {
         return {
-          success: false
+          success: false,
+          orgId: ''
         };
       }
 
@@ -50,7 +53,8 @@ export class SupabaseJWTAuthManager implements AuthManager {
     } catch (error: any) {
       logMessage('debug', `JWT verification failed: ${error.message}`);
       return {
-        success: false
+        success: false,
+        orgId: ''
       };
     }
   }

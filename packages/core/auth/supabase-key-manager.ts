@@ -27,7 +27,7 @@ export class SupabaseKeyManager implements AuthManager {
 
     return { 
       success: !!key,
-      orgId: key?.orgId
+      orgId: key?.orgId || ''
     };
   }
 

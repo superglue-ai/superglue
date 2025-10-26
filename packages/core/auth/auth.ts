@@ -20,7 +20,7 @@ export async function validateToken(token: string | undefined): Promise<AuthResu
     return {
       success: false,
       message: 'No token provided',
-      orgId: undefined,
+      orgId: '',
     }
   }
 
@@ -28,6 +28,7 @@ export async function validateToken(token: string | undefined): Promise<AuthResu
   const authResult = await getAuthManager().authenticate(token);
   return {
     ...authResult,
+    orgId: authResult.orgId || '',
     message: authResult.success ? 'Authentication successful' : 'Authentication failed'
   }
 }

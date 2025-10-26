@@ -32,7 +32,7 @@ describe('SupabaseKeyManager', () => {
     keyManager = new SupabaseKeyManager();
     const result = await keyManager.authenticate('nonexistent');
     
-    expect(result).toEqual({ success: false, orgId: undefined });
+    expect(result).toEqual({ success: false, orgId: '' });
   });
 
   it('should authenticate active keys and reject inactive keys', async () => {
@@ -54,7 +54,7 @@ describe('SupabaseKeyManager', () => {
     const testAuth3 = await keyManager.authenticate(mockData[2].key);
     
     expect(testAuth1).toEqual({ success: true, orgId: '1' });
-    expect(testAuth2).toEqual({ success: false, orgId: undefined });
+    expect(testAuth2).toEqual({ success: false, orgId: '' });
     expect(testAuth3).toEqual({ success: true, orgId: '3' });
   });
 
@@ -65,7 +65,7 @@ describe('SupabaseKeyManager', () => {
     const keyManagerTest = new SupabaseKeyManager();
     const result = await keyManagerTest.authenticate('key1');
     
-    expect(result).toEqual({ success: false, orgId: undefined });
+    expect(result).toEqual({ success: false, orgId: '' });
     expect(consoleSpy).toHaveBeenCalledWith('Missing required Supabase environment variables');
 
     consoleSpy.mockRestore();
@@ -80,7 +80,7 @@ describe('SupabaseKeyManager', () => {
     keyManager = new SupabaseKeyManager();
     const result = await keyManager.authenticate('any-key');
     
-    expect(result).toEqual({ success: false, orgId: undefined });
+    expect(result).toEqual({ success: false, orgId: '' });
   });
 
   it('should cache results and not fetch again within TTL', async () => {

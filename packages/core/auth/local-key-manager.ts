@@ -12,6 +12,7 @@ export class LocalKeyManager implements AuthManager {
     if (!this.authToken) {
       return { 
         success: false,
+        orgId: ''
       };
     }
     return {

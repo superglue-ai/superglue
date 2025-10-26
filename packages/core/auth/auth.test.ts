@@ -55,7 +55,7 @@ describe('Auth Module', () => {
       expect(result).toEqual({
         success: false,
         message: 'No token provided',
-        orgId: undefined
+        orgId: ''
       })
     })
 

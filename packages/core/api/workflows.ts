@@ -10,7 +10,7 @@ interface WorkflowRequest extends AuthenticatedFastifyRequest {
 
 const getWorkflows = async (request: WorkflowRequest, reply: FastifyReply) => {
   try {
-    const { datastore, orgId } = request;
+    const { datastore, authInfo: { orgId } } = request;
     const workflows = await datastore.listWorkflows({ orgId });
     
     logMessage('info', `Listed ${workflows.length} workflows`, { orgId });
@@ -21,7 +21,7 @@ const getWorkflows = async (request: WorkflowRequest, reply: FastifyReply) => {
       count: workflows.length
     };
   } catch (error) {
-    logMessage('error', `Failed to list workflows: ${error}`, { orgId: request.orgId });
+    logMessage('error', `Failed to list workflows: ${error}`, { orgId: request.authInfo.orgId });
     reply.code(500);
     return { success: false, error: 'Failed to list workflows' };
   }
@@ -29,7 +29,7 @@ const getWorkflows = async (request: WorkflowRequest, reply: FastifyReply) => {
 
 const getWorkflow = async (request: WorkflowRequest, reply: FastifyReply) => {
   try {
-    const { datastore, orgId, params } = request;
+    const { datastore, authInfo: { orgId }, params } = request;
     const workflow = await datastore.getWorkflow({ id: params.id, orgId });
     
     if (!workflow) {
@@ -44,7 +44,7 @@ const getWorkflow = async (request: WorkflowRequest, reply: FastifyReply) => {
       data: workflow
     };
   } catch (error) {
-    logMessage('error', `Failed to get workflow ${request.params.id}: ${error}`, { orgId: request.orgId });
+    logMessage('error', `Failed to get workflow ${request.params.id}: ${error}`, { orgId: request.authInfo.orgId });
     reply.code(500);
     return { success: false, error: 'Failed to get workflow' };
   }
