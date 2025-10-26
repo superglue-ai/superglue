@@ -1,4 +1,4 @@
-import { RequestOptions, TransformConfig, TransformInputRequest } from "@superglue/client";
+import { RequestOptions, BaseConfig, JSONSchema, JSONata } from "@superglue/client";
 import type { DataStore, Metadata } from "@superglue/shared";
 import prettier from "prettier";
 import { getEvaluateTransformContext, getTransformContext } from "../context/context-builders.js";
@@ -7,6 +7,17 @@ import { server_defaults } from "../default.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { logMessage } from "./logs.js";
 import { isSelfHealingEnabled, transformAndValidateSchema } from "./tools.js";
+
+export interface TransformConfig extends BaseConfig {
+  instruction: string;
+  responseSchema: JSONSchema;
+  responseMapping?: JSONata;
+}
+
+export type TransformInputRequest = {
+  id?: string;
+  endpoint?: TransformConfig;
+};
 
 export async function executeTransform(args: {
   datastore: DataStore,

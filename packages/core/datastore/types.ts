@@ -1,4 +1,4 @@
-import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow, WorkflowSchedule } from "@superglue/client";
+import type { ApiConfig, Integration, RunResult, Workflow, WorkflowSchedule } from "@superglue/client";
 
 export interface DataStore {
   // API Config Methods
@@ -6,18 +6,6 @@ export interface DataStore {
   listApiConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: ApiConfig[], total: number }>;
   upsertApiConfig(params: { id: string; config: ApiConfig; orgId?: string }): Promise<ApiConfig>;
   deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean>;
-
-  // Extract Config Methods
-  getExtractConfig(params: { id: string; orgId?: string }): Promise<ExtractConfig | null>;
-  listExtractConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: ExtractConfig[], total: number }>;
-  upsertExtractConfig(params: { id: string; config: ExtractConfig; orgId?: string }): Promise<ExtractConfig>;
-  deleteExtractConfig(params: { id: string; orgId?: string }): Promise<boolean>;
-
-  // Transform Config Methods
-  getTransformConfig(params: { id: string; orgId?: string }): Promise<TransformConfig | null>;
-  listTransformConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: TransformConfig[], total: number }>;
-  upsertTransformConfig(params: { id: string; config: TransformConfig; orgId?: string }): Promise<TransformConfig>;
-  deleteTransformConfig(params: { id: string; orgId?: string }): Promise<boolean>;
 
   // Run Result Methods
   getRun(params: { id: string; orgId?: string }): Promise<RunResult | null>;
