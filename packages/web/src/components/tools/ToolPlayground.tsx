@@ -14,6 +14,7 @@ import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { ToolStepGallery } from "./ToolStepGallery";
+import { ToolCreateSuccess } from "./ToolCreateSuccess";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -39,6 +40,8 @@ export interface ToolPlaygroundProps {
   totalFileSize?: number;
   filePayloads?: Record<string, any>;
   publishButtonText?: string;
+  showSuccessPage?: boolean;
+  onSuccessPageAction?: (action: 'view-tool' | 'view-all') => void;
 }
 
 export interface ToolPlaygroundHandle {
@@ -70,7 +73,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   isProcessingFiles: parentIsProcessingFiles,
   totalFileSize: parentTotalFileSize,
   filePayloads: parentFilePayloads,
-  publishButtonText = "Publish"
+  publishButtonText = "Publish",
+  showSuccessPage = false,
+  onSuccessPageAction
 }, ref) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -922,6 +927,53 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       </Button>
     </div>
   );
+
+  if (showSuccessPage) {
+    const currentTool = {
+      id: toolId,
+      steps: steps.map((step: ExecutionStep) => ({
+        ...step,
+        apiConfig: {
+          id: step.apiConfig.id || step.id,
+          ...step.apiConfig,
+          pagination: step.apiConfig.pagination || null
+        }
+      })),
+      responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
+      inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
+      finalTransform,
+      instruction: instructions
+    };
+
+    const credentials = integrations.reduce((acc, sys: any) => {
+      return {
+        ...acc,
+        ...Object.entries(sys.credentials || {}).reduce(
+          (obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }),
+          {}
+        ),
+      };
+    }, {});
+
+    let parsedPayload = {};
+    try {
+      parsedPayload = JSON.parse(payload || '{}');
+    } catch {
+      parsedPayload = {};
+    }
+
+    return (
+      <div className="flex-1 flex flex-col h-full p-6">
+        <ToolCreateSuccess
+          currentTool={currentTool}
+          credentials={credentials}
+          payload={parsedPayload}
+          onViewTool={onSuccessPageAction ? () => onSuccessPageAction('view-tool') : () => router.push(`/tools/${currentTool.id}`)}
+          onViewAllTools={onSuccessPageAction ? () => onSuccessPageAction('view-all') : () => router.push('/')}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={embedded ? "w-full h-full" : "pt-2 px-6 pb-6 max-w-none w-full h-screen flex flex-col"}>
