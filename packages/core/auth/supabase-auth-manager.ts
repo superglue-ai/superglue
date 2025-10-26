@@ -15,13 +15,21 @@ export class SupabaseAuthManager implements AuthManager {
   }
 
   public async authenticate(token: string): Promise<AuthResult> {
-    const jwtResult = await this.jwtAuthManager.authenticate(token);
-    if (jwtResult.success) {
-      return jwtResult;
+    if (this.isJWT(token)) {
+      const jwtResult = await this.jwtAuthManager.authenticate(token);
+      if (jwtResult.success) {
+        return jwtResult;
+      }
+
+      logMessage('debug', 'JWT authentication failed, falling back to API key lookup');
     }
 
-    logMessage('debug', 'JWT authentication failed, falling back to API key lookup');
     return this.keyAuthManager.authenticate(token);
+  }
+
+  private isJWT(token: string): boolean {
+    const parts = token.split('.');
+    return parts.length === 3 && parts.every(part => part.length > 0);
   }
 }
 
