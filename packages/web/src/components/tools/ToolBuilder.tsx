@@ -12,6 +12,7 @@ import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { Check, Clock, FileJson, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Wrench, X } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '../ui/button';
 import { FileChip } from '@/src/components/ui/FileChip';
 import { Input } from '../ui/input';
@@ -605,8 +606,8 @@ export function ToolBuilder({
             </Button>
           </div>
         
-          {showIntegrationForm && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          {showIntegrationForm && typeof document !== 'undefined' && createPortal(
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
               <div className="bg-background rounded-xl max-w-2xl w-full p-0">
                 <IntegrationForm
                   modal={true}
@@ -617,7 +618,8 @@ export function ToolBuilder({
                   getSimpleIcon={getSimpleIcon}
                 />
               </div>
-            </div>
+            </div>,
+            document.body
           )}
         </div>
       </div>
