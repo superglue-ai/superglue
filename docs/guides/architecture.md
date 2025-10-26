@@ -105,7 +105,7 @@ This is the core of superglue, responsible for executing integration workflows.
 superglue relies on persistent storage for its operational data:
 
 - **Workflow Definitions**: Stores the structure of user-defined workflows, including the sequence of steps and their configurations.
-- **API/Step Configurations**: Contains the specific configurations for each step within a workflow (e.g., `ApiConfig`, `ExtractConfig`, `TransformConfig` for individual API calls or file processing operations).
+- **API/Step Configurations**: Contains the specific configurations for each step within a workflow for individual API calls.
 - **Transformation Cache (Mappings)**: Caches the generated JSONata transformation rules for quick and deterministic reuse.
 - **Run Logs**: Stores execution logs for workflows and individual steps for monitoring and debugging.
   Two main storage modes are supported:
@@ -122,7 +122,7 @@ superglue relies on persistent storage for its operational data:
 1. A workflow is triggered (e.g., by an API call from 'Your Application' to superglue).
 2. The **Workflow Engine** in superglue loads the workflow definition.
 3. **For each step in the workflow** (e.g., calling API A, then API B using data from A):
-   a.  The Orchestrator initiates the step, using the specific configuration for that step (e.g., an `ApiConfig` for calling API A).
+   a.  The Orchestrator initiates the step, using the specific configuration for that step for calling the API.
    b.  The **Extract Pipeline** retrieves raw data from the external system (e.g., API A).
    c.  The **LLM Transform Engine** processes the raw data, applying cached or newly generated transformation rules to map it to the desired schema for that step.
    d.  The **Schema Validator** validates the transformed data. If it fails, it may trigger a feedback loop to the Transform Engine to attempt self-healing of the transformation rules.

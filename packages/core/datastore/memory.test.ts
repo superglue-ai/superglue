@@ -1,4 +1,4 @@
-import { ApiConfig, ExtractConfig, HttpMethod, Integration, RunResult, TransformConfig, Workflow } from '@superglue/client';
+import { ApiConfig, HttpMethod, Integration, RunResult, Workflow } from '@superglue/client';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MemoryStore } from './memory.js';
 import { WorkflowScheduleInternal } from './types.js';
@@ -42,69 +42,6 @@ describe('MemoryStore', () => {
       await store.upsertApiConfig({ id: testConfig.id, config: testConfig, orgId: testOrgId });
       await store.deleteApiConfig({ id: testConfig.id, orgId: testOrgId });
       const retrieved = await store.getApiConfig({ id: testConfig.id, orgId: testOrgId });
-      expect(retrieved).toBeNull();
-    });
-  });
-
-  describe('Extract Config', () => {
-    const testExtractConfig: ExtractConfig = {
-      id: 'test-extract-id',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      instruction: 'Test extraction',
-      urlHost: 'https://test.com',
-    };
-
-    it('should store and retrieve extract configs', async () => {
-      await store.upsertExtractConfig({ id: testExtractConfig.id, config: testExtractConfig, orgId: testOrgId });
-      const retrieved = await store.getExtractConfig({ id: testExtractConfig.id, orgId: testOrgId });
-      expect(retrieved).toEqual(testExtractConfig);
-    });
-
-    it('should list extract configs', async () => {
-      await store.upsertExtractConfig({ id: testExtractConfig.id, config: testExtractConfig, orgId: testOrgId });
-      const { items, total } = await store.listExtractConfigs({ limit: 10, offset: 0, orgId: testOrgId });
-      expect(items).toHaveLength(1);
-      expect(total).toBe(1);
-      expect(items[0]).toEqual(testExtractConfig);
-    });
-
-    it('should delete extract configs', async () => {
-      await store.upsertExtractConfig({ id: testExtractConfig.id, config: testExtractConfig, orgId: testOrgId });
-      await store.deleteExtractConfig({ id: testExtractConfig.id, orgId: testOrgId });
-      const retrieved = await store.getExtractConfig({ id: testExtractConfig.id, orgId: testOrgId });
-      expect(retrieved).toBeNull();
-    });
-  });
-
-  describe('Transform Config', () => {
-    const testTransformConfig: TransformConfig = {
-      id: 'test-transform-id',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      instruction: 'Test transformation',
-      responseSchema: {},
-      responseMapping: ''
-    };
-
-    it('should store and retrieve transform configs', async () => {
-      await store.upsertTransformConfig({ id: testTransformConfig.id, config: testTransformConfig, orgId: testOrgId });
-      const retrieved = await store.getTransformConfig({ id: testTransformConfig.id, orgId: testOrgId });
-      expect(retrieved).toEqual(testTransformConfig);
-    });
-
-    it('should list transform configs', async () => {
-      await store.upsertTransformConfig({ id: testTransformConfig.id, config: testTransformConfig, orgId: testOrgId });
-      const { items, total } = await store.listTransformConfigs({ limit: 10, offset: 0, orgId: testOrgId });
-      expect(items).toHaveLength(1);
-      expect(total).toBe(1);
-      expect(items[0]).toEqual(testTransformConfig);
-    });
-
-    it('should delete transform configs', async () => {
-      await store.upsertTransformConfig({ id: testTransformConfig.id, config: testTransformConfig, orgId: testOrgId });
-      await store.deleteTransformConfig({ id: testTransformConfig.id, orgId: testOrgId });
-      const retrieved = await store.getTransformConfig({ id: testTransformConfig.id, orgId: testOrgId });
       expect(retrieved).toBeNull();
     });
   });
@@ -531,23 +468,6 @@ describe('MemoryStore', () => {
         instruction: 'Test API',
       };
       
-      const testExtractConfig: ExtractConfig = {
-        id: 'test-extract',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        instruction: 'Test extraction',
-        urlHost: 'https://test.com',
-      };
-
-      const testTransformConfig: TransformConfig = {
-        id: 'test-transform',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        instruction: 'Test transformation',
-        responseSchema: {},
-        responseMapping: ''
-      };
-      
       const testRunResult: RunResult = {
         id: 'test-run',
         startedAt: new Date(),
@@ -591,8 +511,6 @@ describe('MemoryStore', () => {
       };
 
       await store.upsertApiConfig({ id: 'test-api', config: testApiConfig, orgId: testOrgId });
-      await store.upsertExtractConfig({ id: 'test-extract', config: testExtractConfig, orgId: testOrgId });
-      await store.upsertTransformConfig({ id: 'test-transform', config: testTransformConfig, orgId: testOrgId });
       await store.createRun({ result: testRunResult, orgId: testOrgId });
       await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration, orgId: testOrgId });
       await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
@@ -601,16 +519,12 @@ describe('MemoryStore', () => {
       await store.clearAll();
       
       const { total: apiTotal } = await store.listApiConfigs({ limit: 10, offset: 0, orgId: testOrgId });
-      const { total: extractTotal } = await store.listExtractConfigs({ limit: 10, offset: 0, orgId: testOrgId });
-      const { total: transformTotal } = await store.listTransformConfigs({ limit: 10, offset: 0, orgId: testOrgId });
       const { total: runTotal } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
       const { total: integrationTotal } = await store.listIntegrations({ limit: 10, offset: 0, includeDocs: true, orgId: testOrgId });
       const { total: workflowTotal } = await store.listWorkflows({ limit: 10, offset: 0, orgId: testOrgId });
       const workflowSchedules = await store.listWorkflowSchedules({ workflowId: testWorkflow.id, orgId: testOrgId });
 
       expect(apiTotal).toBe(0);
-      expect(extractTotal).toBe(0);
-      expect(transformTotal).toBe(0);
       expect(runTotal).toBe(0);
       expect(integrationTotal).toBe(0);
       expect(workflowTotal).toBe(0);

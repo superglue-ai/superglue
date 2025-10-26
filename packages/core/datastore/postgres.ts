@@ -1,11 +1,11 @@
-import type { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
+import type { ApiConfig, Integration, RunResult, Workflow } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
 import type { DataStore, WorkflowScheduleInternal } from "./types.js";
 
-type ConfigType = 'api' | 'extract' | 'transform' | 'workflow';
-type ConfigData = ApiConfig | ExtractConfig | TransformConfig | Workflow;
+type ConfigType = 'api' | 'workflow';
+type ConfigData = ApiConfig | Workflow;
 
 export class PostgresService implements DataStore {
     private pool: Pool;
@@ -99,7 +99,7 @@ export class PostgresService implements DataStore {
         CREATE TABLE IF NOT EXISTS configurations (
           id VARCHAR(255) NOT NULL,
           org_id VARCHAR(255),
-          type VARCHAR(20) NOT NULL CHECK (type IN ('api', 'extract', 'transform', 'workflow')),
+          type VARCHAR(20) NOT NULL CHECK (type IN ('api', 'workflow')),
           version VARCHAR(50),
           data JSONB NOT NULL,
           integration_ids VARCHAR(255)[] DEFAULT '{}',
@@ -342,48 +342,6 @@ export class PostgresService implements DataStore {
     async deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean> {
         const { id, orgId } = params;
         return this.deleteConfig(id, 'api', orgId);
-    }
-
-    // Extract Config Methods
-    async getExtractConfig(params: { id: string; orgId?: string }): Promise<ExtractConfig | null> {
-        const { id, orgId } = params;
-        return this.getConfig<ExtractConfig>(id, 'extract', orgId);
-    }
-
-    async listExtractConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: ExtractConfig[], total: number }> {
-        const { limit = 10, offset = 0, orgId } = params || {};
-        return this.listConfigs<ExtractConfig>('extract', limit, offset, orgId);
-    }
-
-    async upsertExtractConfig(params: { id: string; config: ExtractConfig; orgId?: string }): Promise<ExtractConfig> {
-        const { id, config, orgId } = params;
-        return this.upsertConfig(id, config, 'extract', orgId);
-    }
-
-    async deleteExtractConfig(params: { id: string; orgId?: string }): Promise<boolean> {
-        const { id, orgId } = params;
-        return this.deleteConfig(id, 'extract', orgId);
-    }
-
-    // Transform Config Methods
-    async getTransformConfig(params: { id: string; orgId?: string }): Promise<TransformConfig | null> {
-        const { id, orgId } = params;
-        return this.getConfig<TransformConfig>(id, 'transform', orgId);
-    }
-
-    async listTransformConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: TransformConfig[], total: number }> {
-        const { limit = 10, offset = 0, orgId } = params || {};
-        return this.listConfigs<TransformConfig>('transform', limit, offset, orgId);
-    }
-
-    async upsertTransformConfig(params: { id: string; config: TransformConfig; orgId?: string }): Promise<TransformConfig> {
-        const { id, config, orgId } = params;
-        return this.upsertConfig(id, config, 'transform', orgId);
-    }
-
-    async deleteTransformConfig(params: { id: string; orgId?: string }): Promise<boolean> {
-        const { id, orgId } = params;
-        return this.deleteConfig(id, 'transform', orgId);
     }
 
     // Run Result Methods

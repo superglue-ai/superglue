@@ -18,7 +18,7 @@
     "@ai-sdk/google": "^2.0.20",
     "@ai-sdk/openai": "^2.0.46",
     "@anthropic-ai/sdk": "^0.64.0",
-    "@superglue/client": "^2.3.52",
+    "@superglue/client": "^2.3.55",
     "ai": "^5.0.76",
     "cron-parser": "^5.3.1",
     "cron-validate": "^1.5.2",

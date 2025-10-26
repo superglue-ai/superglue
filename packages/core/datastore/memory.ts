@@ -1,12 +1,10 @@
-import { ApiConfig, ExtractConfig, Integration, RunResult, TransformConfig, Workflow } from "@superglue/client";
+import { ApiConfig, Integration, RunResult, Workflow } from "@superglue/client";
 import { createHash } from 'node:crypto';
 import type { DataStore, WorkflowScheduleInternal } from "./types.js";
 
 export class MemoryStore implements DataStore {
   private storage: {
     apis: Map<string, ApiConfig>;
-    extracts: Map<string, ExtractConfig>;
-    transforms: Map<string, TransformConfig>;
     runs: Map<string, RunResult>;
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
     workflows: Map<string, Workflow>;
@@ -22,8 +20,6 @@ export class MemoryStore implements DataStore {
   constructor() {
     this.storage = {
       apis: new Map(),
-      extracts: new Map(),
-      transforms: new Map(),
       runs: new Map(),
       runsIndex: new Map(),
       workflows: new Map(),
@@ -75,68 +71,6 @@ export class MemoryStore implements DataStore {
     if (!id) return false;
     const key = this.getKey('api', id, orgId);
     return this.storage.apis.delete(key);
-  }
-
-  // Extract Config Methods
-  async getExtractConfig(params: { id: string; orgId?: string }): Promise<ExtractConfig | null> {
-    const { id, orgId } = params;
-    if (!id) return null;
-    const key = this.getKey('extract', id, orgId);
-    const config = this.storage.extracts.get(key);
-    return config ? { ...config, id } : null;
-  }
-
-  async listExtractConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: ExtractConfig[], total: number }> {
-    const { limit = 10, offset = 0, orgId } = params || {};
-    const items = this.getOrgItems(this.storage.extracts, 'extract', orgId).slice(offset, offset + limit);
-    const total = this.getOrgItems(this.storage.extracts, 'extract', orgId).length;
-    return { items, total };
-  }
-
-  async upsertExtractConfig(params: { id: string; config: ExtractConfig; orgId?: string }): Promise<ExtractConfig> {
-    const { id, config, orgId } = params;
-    if (!id || !config) return null;
-    const key = this.getKey('extract', id, orgId);
-    this.storage.extracts.set(key, config);
-    return { ...config, id };
-  }
-
-  async deleteExtractConfig(params: { id: string; orgId?: string }): Promise<boolean> {
-    const { id, orgId } = params;
-    if (!id) return false;
-    const key = this.getKey('extract', id, orgId);
-    return this.storage.extracts.delete(key);
-  }
-
-  // Transform Config Methods
-  async getTransformConfig(params: { id: string; orgId?: string }): Promise<TransformConfig | null> {
-    const { id, orgId } = params;
-    if (!id) return null;
-    const key = this.getKey('transform', id, orgId);
-    const config = this.storage.transforms.get(key);
-    return config ? { ...config, id } : null;
-  }
-
-  async listTransformConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: TransformConfig[], total: number }> {
-    const { limit = 10, offset = 0, orgId } = params || {};
-    const items = this.getOrgItems(this.storage.transforms, 'transform', orgId).slice(offset, offset + limit);
-    const total = this.getOrgItems(this.storage.transforms, 'transform', orgId).length;
-    return { items, total };
-  }
-
-  async upsertTransformConfig(params: { id: string; config: TransformConfig; orgId?: string }): Promise<TransformConfig> {
-    const { id, config, orgId } = params;
-    if (!id || !config) return null;
-    const key = this.getKey('transform', id, orgId);
-    this.storage.transforms.set(key, config);
-    return { ...config, id };
-  }
-
-  async deleteTransformConfig(params: { id: string; orgId?: string }): Promise<boolean> {
-    const { id, orgId } = params;
-    if (!id) return false;
-    const key = this.getKey('transform', id, orgId);
-    return this.storage.transforms.delete(key);
   }
 
   // Run Result Methods
@@ -248,8 +182,6 @@ export class MemoryStore implements DataStore {
 
   async clearAll(): Promise<void> {
     this.storage.apis.clear();
-    this.storage.extracts.clear();
-    this.storage.transforms.clear();
     this.storage.runs.clear();
     this.storage.runsIndex.clear();
     this.storage.workflows.clear();
