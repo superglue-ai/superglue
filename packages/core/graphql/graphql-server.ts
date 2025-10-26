@@ -38,7 +38,10 @@ export async function startGraphqlServer(datastore: DataStore) {
   const getHttpContext = async ({ req }) => {
     return {
       datastore: datastore,
-      orgId: req.orgId || ''
+      orgId: req.orgId || '',
+      userId: req.authInfo?.userId,
+      orgName: req.authInfo?.orgName,
+      orgRole: req.authInfo?.orgRole
     };
   };
 
@@ -65,7 +68,13 @@ export async function startGraphqlServer(datastore: DataStore) {
       }
 
       logMessage('debug', `Websocket Subscription connected`);
-      return { datastore, orgId: authResult.orgId };
+      return { 
+        datastore, 
+        orgId: authResult.orgId,
+        userId: authResult.userId,
+        orgName: authResult.orgName,
+        orgRole: authResult.orgRole
+      };
     },
     onDisconnect(ctx, code, reason) {
       logMessage('debug', `Websocket Subscription disconnected. code=${code} reason=${reason}`);

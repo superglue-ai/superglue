@@ -62,6 +62,7 @@
     "http": "^0.0.1-security",
     "ioredis": "^5.5.0",
     "isolated-vm": "^6.0.0",
+    "jose": "^6.1.0",
     "js-yaml": "^4.1.0",
     "json-schema-to-zod": "^2.6.1",
     "jsonata": "^2.0.6",

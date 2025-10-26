@@ -1,37 +1,36 @@
 import { logMessage } from "../utils/logs.js";
-import { LocalKeyManager } from "./localKeyManager.js";
-import { SupabaseKeyManager } from "./supabaseKeyManager.js";
+import { AuthManager, AuthResult } from "./types.js";
+import { LocalKeyManager } from "./local-key-manager.js";
+import { SupabaseAuthManager } from "./supabase-auth-manager.js";
 
-// ============================================================================
-// SHARED AUTHENTICATION LOGIC (used by both Express and Fastify)
-// ============================================================================
-
-// Instead, create a getter to ensure manager is initialized after mocks
-let _authManager: LocalKeyManager | SupabaseKeyManager | null = null;
-function getAuthManager() {
+let _authManager: AuthManager | null = null;
+function getAuthManager(): AuthManager {
   if (!_authManager) {
-    _authManager = process.env.NEXT_PUBLIC_SUPABASE_URL ? new SupabaseKeyManager() : new LocalKeyManager();
+    _authManager = process.env.NEXT_PUBLIC_SUPABASE_URL ? new SupabaseAuthManager() : new LocalKeyManager();
   }
   return _authManager;
 }
 
-export const _resetAuthManager = (manager: LocalKeyManager | SupabaseKeyManager | null = null) => {
+export const _resetAuthManager = (manager: AuthManager | null = null) => {
   _authManager = manager;
 };
 
-export async function validateToken(token: string | undefined) {
+export async function validateToken(token: string | undefined): Promise<AuthResult> {
   if (!token) {
     return {
       success: false,
       message: 'No token provided',
-      orgId: undefined
+      orgId: undefined,
+      userId: undefined,
+      orgName: undefined,
+      orgRole: undefined
     }
   }
 
+  // Authenticate using the appropriate manager (handles both JWT and API keys)
   const authResult = await getAuthManager().authenticate(token);
   return {
-    success: authResult.success,
-    orgId: authResult.orgId,
+    ...authResult,
     message: authResult.success ? '' : 'Invalid token'
   }
 }
@@ -57,7 +56,13 @@ export const authMiddleware = async (req: any, res: any, next: any) => {
   // Add orgId to request object
   req.orgId = authResult.orgId;
   req.headers["orgId"] = authResult.orgId;
-  req.authInfo = { token: token, clientId: authResult.orgId };
+  req.authInfo = { 
+    token: token, 
+    clientId: authResult.orgId,
+    userId: authResult.userId,
+    orgName: authResult.orgName,
+    orgRole: authResult.orgRole
+  };
   return next();
 };
 
@@ -111,4 +116,4 @@ export const extractTokenFromFastifyRequest = (request: any): string | undefined
   }
 
   return undefined;
-}; 
+};

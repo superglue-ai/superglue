@@ -64,7 +64,10 @@ export async function startApiServer(datastore: DataStore) {
     (request as any).orgId = authResult.orgId;
     (request as any).authInfo = { 
       token: token, 
-      clientId: authResult.orgId 
+      clientId: authResult.orgId,
+      userId: authResult.userId,
+      orgName: authResult.orgName,
+      orgRole: authResult.orgRole
     };
 
     // Add datastore to request context

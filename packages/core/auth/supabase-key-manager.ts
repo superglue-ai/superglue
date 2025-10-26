@@ -1,7 +1,7 @@
 import { logMessage } from "../utils/logs.js";
-import { ApiKeyManager } from "./apiKeyManager.js";
+import { AuthManager, AuthResult } from "./types.js";
 
-export class SupabaseKeyManager implements ApiKeyManager {
+export class SupabaseKeyManager implements AuthManager {
   private cachedApiKeys: { key: string; orgId: string }[] = [];
   private lastFetchTime = 0;
   private readonly API_KEY_CACHE_TTL = 60000; // 1 minute cache
@@ -19,7 +19,7 @@ export class SupabaseKeyManager implements ApiKeyManager {
     return this.cachedApiKeys;
   }
 
-  public async authenticate(apiKey: string): Promise<{ orgId: string; success: boolean }> {
+  public async authenticate(apiKey: string): Promise<AuthResult> {
     let keys = await this.getApiKeys();
     let key = keys.find(k => k.key === apiKey);
     if (!key) {
@@ -27,7 +27,13 @@ export class SupabaseKeyManager implements ApiKeyManager {
       keys = await this.getApiKeys();
       key = keys.find(k => k.key === apiKey);
     }
-    return { orgId: key?.orgId || '', success: !!key };
+    return { 
+      orgId: key?.orgId || '', 
+      success: !!key,
+      userId: undefined,
+      orgName: undefined,
+      orgRole: undefined
+    };
   }
 
   private async fetchApiKeys(): Promise<{ orgId: string; key: string }[]> {
@@ -83,7 +89,4 @@ export class SupabaseKeyManager implements ApiKeyManager {
     }
   }
 
-  public cleanup(): void {
-    clearInterval(this.refreshInterval);
-  }
 }
