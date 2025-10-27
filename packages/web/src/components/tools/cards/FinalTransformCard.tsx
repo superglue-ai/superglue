@@ -246,64 +246,71 @@ export const FinalTransformMiniStepCard = React.memo(
               )}
             </TabsList>
             <TabsContent value="inputs" className="mt-2">
-              <>
-                <JsonCodeEditor
-                  value={inputData.displayString}
-                  readOnly={true}
-                  minHeight="150px"
-                  maxHeight="250px"
-                  resizable={true}
-                  overlay={
-                    <div className="flex items-center gap-2">
-                      {(inputProcessor.isComputingPreview || inputProcessor.isComputingSchema) && (
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      )}
-                      <Tabs
-                        value={inputViewMode}
-                        onValueChange={(v) =>
-                          handleInputViewModeChange(v as "preview" | "schema")
-                        }
-                        className="w-auto"
-                      >
-                        <TabsList className="h-6 rounded-md">
-                          <TabsTrigger
-                            value="preview"
-                            className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md"
-                          >
-                            Preview
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="schema"
-                            className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md"
-                          >
-                            Schema
-                          </TabsTrigger>
-                        </TabsList>
-                      </Tabs>
-                      <span className="text-[10px] text-muted-foreground">
-                        {inputData.bytes.toLocaleString()} bytes
-                      </span>
-                      <CopyButton text={inputData.displayString} />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() =>
-                          downloadJson(stepInputs, "transform_step_inputs.json")
-                        }
-                        title="Download transform inputs as JSON"
-                      >
-                        <Download className="h-3 w-3" />
-                      </Button>
+              {!canExecute ? (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
+                  <div className="text-xs mb-1">No input yet</div>
+                  <p className="text-[10px]">Run all previous steps to see inputs</p>
+                </div>
+              ) : (
+                <>
+                  <JsonCodeEditor
+                    value={inputData.displayString}
+                    readOnly={true}
+                    minHeight="150px"
+                    maxHeight="250px"
+                    resizable={true}
+                    overlay={
+                      <div className="flex items-center gap-2">
+                        {(inputProcessor.isComputingPreview || inputProcessor.isComputingSchema) && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                        <Tabs
+                          value={inputViewMode}
+                          onValueChange={(v) =>
+                            handleInputViewModeChange(v as "preview" | "schema")
+                          }
+                          className="w-auto"
+                        >
+                          <TabsList className="h-6 rounded-md">
+                            <TabsTrigger
+                              value="preview"
+                              className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md"
+                            >
+                              Preview
+                            </TabsTrigger>
+                            <TabsTrigger
+                              value="schema"
+                              className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md"
+                            >
+                              Schema
+                            </TabsTrigger>
+                          </TabsList>
+                        </Tabs>
+                        <span className="text-[10px] text-muted-foreground">
+                          {inputData.bytes.toLocaleString()} bytes
+                        </span>
+                        <CopyButton text={inputData.displayString} />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() =>
+                            downloadJson(stepInputs, "transform_step_inputs.json")
+                          }
+                          title="Download transform inputs as JSON"
+                        >
+                          <Download className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    }
+                  />
+                  {inputData.truncated && inputViewMode === "preview" && (
+                    <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
+                      Preview truncated for display performance
                     </div>
-                  }
-                />
-                {inputData.truncated && inputViewMode === "preview" && (
-                  <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
-                    Preview truncated for display performance
-                  </div>
-                )}
-              </>
+                  )}
+                </>
+              )}
             </TabsContent>
             <TabsContent value="transform" className="mt-2">
               <JavaScriptCodeEditor

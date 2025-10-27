@@ -47,6 +47,14 @@ export const PayloadSpotlight = ({
     useEffect(() => {
         const trimmed = (payloadText || '').trim();
         const isEmptyPayload = trimmed === '' || trimmed === '{}';
+        const hasUploadedFiles = uploadedFiles && uploadedFiles.length > 0;
+
+        // Don't regenerate default if files are uploaded (even if payload is empty)
+        if (hasUploadedFiles) {
+            isInitialMountRef.current = false;
+            setLocalPayload(payloadText || '');
+            return;
+        }
 
         // Only generate default on first mount if payload is empty and we have a schema
         if (isInitialMountRef.current && isEmptyPayload && inputSchema && extractPayloadSchema && !hasGeneratedDefaultRef.current) {
@@ -72,7 +80,7 @@ export const PayloadSpotlight = ({
 
         isInitialMountRef.current = false;
         setLocalPayload(payloadText || '');
-    }, [payloadText, inputSchema, extractPayloadSchema, onChange]);
+    }, [payloadText, inputSchema, extractPayloadSchema, onChange, uploadedFiles]);
 
     useEffect(() => { setLocalInputSchema(inputSchema || null); }, [inputSchema]);
 

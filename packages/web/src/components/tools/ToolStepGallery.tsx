@@ -43,6 +43,7 @@ export interface ToolStepGalleryProps {
     transformResult?: any;
     readOnly?: boolean;
     payloadText?: string;
+    computedPayload?: any;
     inputSchema?: string | null;
     onInputSchemaChange?: (schema: string | null) => void;
     headerActions?: React.ReactNode;
@@ -91,6 +92,7 @@ export function ToolStepGallery({
     transformResult,
     readOnly = false,
     payloadText,
+    computedPayload,
     inputSchema,
     onInputSchemaChange,
     headerActions,
@@ -201,39 +203,8 @@ export function ToolStepGallery({
 
 
     const [rawPayloadText, setRawPayloadText] = useState<string>(payloadText || '');
-    // Initialize workingPayload with filePayloads if available
-    const [workingPayload, setWorkingPayload] = useState<any>(() => {
-        const trimmed = (payloadText || '').trim();
-        if (trimmed === '') {
-            return filePayloads || {};
-        }
-        try {
-            const parsed = JSON.parse(payloadText);
-            return filePayloads ? { ...parsed, ...filePayloads } : parsed;
-        } catch {
-            return filePayloads || {};
-        }
-    });
 
-    useEffect(() => {
-        const trimmed = (rawPayloadText || '').trim();
-        if (trimmed === '') {
-            // Even with empty manual payload, include file payloads
-            setWorkingPayload(filePayloads || {});
-            return;
-        }
-        try {
-            const parsed = JSON.parse(rawPayloadText);
-            // Merge manual payload with file payloads
-            const merged = filePayloads ? { ...parsed, ...filePayloads } : parsed;
-            setWorkingPayload(merged);
-        } catch {
-            // On parse error, still include file payloads
-            setWorkingPayload(filePayloads || {});
-        }
-    }, [rawPayloadText, filePayloads]);
-
-    // Keep local payload text in sync with external prop so uploads reflect immediately
+    // Keep local payload text in sync with external prop
     useEffect(() => {
         if (typeof payloadText === 'string') {
             setRawPayloadText(payloadText);
@@ -243,16 +214,10 @@ export function ToolStepGallery({
     const handlePayloadJsonChange = (jsonString: string) => {
         setRawPayloadText(jsonString);
         onPayloadChange?.(jsonString);
-        try {
-            const parsed = JSON.parse(jsonString);
-            // Always merge with file payloads when manually editing
-            const merged = filePayloads ? { ...parsed, ...filePayloads } : parsed;
-            setWorkingPayload(merged);
-        } catch {
-            // On parse error, still include file payloads
-            setWorkingPayload(filePayloads || {});
-        }
     };
+    
+    // Use computed payload from parent (already merged manual + files)
+    const workingPayload = computedPayload || {};
 
     const stepResultsMap = Array.isArray(stepResults)
         ? stepResults.reduce((acc: Record<string, any>, result: any) => {

@@ -185,8 +185,9 @@ export const SpotlightStepCard = React.memo(({
                         {activePanel === 'input' && (
                             <div>
                                 {(() => {
-                                    const noInputYet = stepIndex > 0 && isEmptyData(evolvingPayload || {});
-                                    if (noInputYet) {
+                                    // Show "run previous step" if we can't execute this step yet
+                                    const cannotExecuteYet = stepIndex > 0 && !canExecute;
+                                    if (cannotExecuteYet) {
                                         return (
                                             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
                                                 <div className="text-xs mb-1">No input yet</div>
