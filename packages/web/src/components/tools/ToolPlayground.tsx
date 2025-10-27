@@ -40,6 +40,7 @@ export interface ToolPlaygroundProps {
   isProcessingFiles?: boolean;
   totalFileSize?: number;
   filePayloads?: Record<string, any>;
+  onFilesChange?: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
   publishButtonText?: string;
   showSuccessPage?: boolean;
   onSuccessPageAction?: (action: 'view-tool' | 'view-all') => void;
@@ -74,6 +75,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   isProcessingFiles: parentIsProcessingFiles,
   totalFileSize: parentTotalFileSize,
   filePayloads: parentFilePayloads,
+  onFilesChange: parentOnFilesChange,
   publishButtonText = "Publish",
   showSuccessPage = false,
   onSuccessPageAction
@@ -229,11 +231,14 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     setInstructions(context.instruction);
     setPayload(context.payload);
     
-    // Update file state if using local state
-    if (!parentUploadedFiles) {
-      setLocalUploadedFiles(context.uploadedFiles);
-      setLocalFilePayloads(context.filePayloads);
-      setLocalTotalFileSize(context.uploadedFiles.reduce((sum, f) => sum + f.size, 0));
+    // Update local file state
+    setLocalUploadedFiles(context.uploadedFiles);
+    setLocalFilePayloads(context.filePayloads);
+    setLocalTotalFileSize(context.uploadedFiles.reduce((sum, f) => sum + f.size, 0));
+    
+    // Notify parent of file changes if callback provided
+    if (parentOnFilesChange) {
+      parentOnFilesChange(context.uploadedFiles, context.filePayloads);
     }
     
     // Clear execution state since tool changed

@@ -32,6 +32,8 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
 
   const [currentTool, setCurrentTool] = useState<Tool | null>(null);
   const [buildContext, setBuildContext] = useState<BuildContext | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
+  const [filePayloads, setFilePayloads] = useState<Record<string, any>>({});
 
   const client = useMemo(() => new SuperglueClient({
     endpoint: superglueConfig.superglueEndpoint,
@@ -41,7 +43,14 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
   const handleToolBuilt = (tool: Tool, context: BuildContext) => {
     setCurrentTool(tool);
     setBuildContext(context);
+    setUploadedFiles(context.uploadedFiles);
+    setFilePayloads(context.filePayloads);
     setStep('run');
+  };
+
+  const handleFilesChange = (files: any[], payloads: Record<string, any>) => {
+    setUploadedFiles(files);
+    setFilePayloads(payloads);
   };
 
   const handleSaveTool = async (tool: Tool) => {
@@ -155,8 +164,9 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                 onSelfHealingChange={setSelfHealingEnabled}
                 shouldStopExecution={shouldStopExecution}
                 onStopExecution={handleStopExecution}
-                uploadedFiles={buildContext.uploadedFiles}
-                filePayloads={buildContext.filePayloads}
+                uploadedFiles={uploadedFiles}
+                filePayloads={filePayloads}
+                onFilesChange={handleFilesChange}
               />
             </div>
           )}
