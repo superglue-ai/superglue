@@ -414,6 +414,9 @@ export function ToolBuilder({
       return;
     }
 
+    setShowPayloadSection(false);
+    setShowFileUploadSection(false);
+    setShowResponseSchemaSection(false);
     setIsBuilding(true);
     try {
       const parsedPayload = JSON.parse(payload || '{}');
@@ -694,7 +697,7 @@ export function ToolBuilder({
           </h2>
         </div>
         
-        <div className="flex flex-wrap gap-2 justify-center mb-4">
+          <div className="flex flex-wrap gap-2 justify-center mb-4">
           {selectedIntegrationIds.map(id => {
             const integration = integrations.find(i => i.id === id);
             if (!integration) return null;
@@ -707,14 +710,21 @@ export function ToolBuilder({
                 key={id}
                 onClick={(e) => {
                   e.preventDefault();
+                  if (isBuilding) return;
                   setSelectedIntegrationIds(ids => ids.filter(i => i !== id));
                   setSuggestions([]);
                   if (selectedIntegrationIds.length > 1) {
                     handleGenerateInstructions();
                   }
                 }}
-                className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-border hover:bg-red-500/10 hover:border-red-500/50 transition-all"
-                title="Click to remove"
+                disabled={isBuilding}
+                className={cn(
+                  "group flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-border transition-all",
+                  isBuilding 
+                    ? "opacity-50 cursor-not-allowed" 
+                    : "hover:bg-red-500/10 hover:border-red-500/50"
+                )}
+                title={isBuilding ? "Cannot modify while building" : "Click to remove"}
               >
                 {icon ? (
                   <svg
@@ -738,9 +748,15 @@ export function ToolBuilder({
           })}
           
           <button
-            onClick={() => setView('integrations')}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-dashed border-border hover:bg-muted/80 hover:border-border/80 transition-all"
-            title="Add integrations"
+            onClick={() => !isBuilding && setView('integrations')}
+            disabled={isBuilding}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-dashed border-border transition-all",
+              isBuilding
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:bg-muted/80 hover:border-border/80"
+            )}
+            title={isBuilding ? "Cannot modify while building" : "Add integrations"}
           >
             <Plus className="h-4 w-4 flex-shrink-0 text-foreground" />
             <span className="text-sm font-medium">
@@ -756,9 +772,11 @@ export function ToolBuilder({
             value={instruction}
             onChange={handleTextareaChange}
             placeholder="Describe what you want this tool to achieve..."
+            disabled={isBuilding}
             className={cn(
               "resize-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 scrollbar-thin scrollbar-thumb-rounded min-h-[80px]",
-              validationErrors.instruction && inputErrorStyles
+              validationErrors.instruction && inputErrorStyles,
+              isBuilding && "opacity-50 cursor-not-allowed"
             )}
             rows={1}
             style={{
@@ -772,6 +790,7 @@ export function ToolBuilder({
             <div className="flex gap-2">
               <button
                 onClick={() => {
+                  if (isBuilding) return;
                   if (showFileUploadSection) setShowFileUploadSection(false);
                   if (showResponseSchemaSection) setShowResponseSchemaSection(false);
                   setShowPayloadSection(!showPayloadSection);
@@ -780,8 +799,10 @@ export function ToolBuilder({
                     setValidationErrors(prev => ({ ...prev, payload: false }));
                   }
                 }}
+                disabled={isBuilding}
                 className={cn(
                   "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 border",
+                  isBuilding && "opacity-50 cursor-not-allowed",
                   (() => {
                     const trimmedPayload = payload.trim();
                     const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
@@ -830,6 +851,7 @@ export function ToolBuilder({
 
               <button
                 onClick={() => {
+                  if (isBuilding) return;
                   if (showPayloadSection) setShowPayloadSection(false);
                   if (!showPayloadSection && payload.trim() === '') {
                     setPayload('{}');
@@ -838,8 +860,10 @@ export function ToolBuilder({
                   if (showResponseSchemaSection) setShowResponseSchemaSection(false);
                   setShowFileUploadSection(!showFileUploadSection);
                 }}
+                disabled={isBuilding}
                 className={cn(
                   "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 border",
+                  isBuilding && "opacity-50 cursor-not-allowed",
                   uploadedFiles.length > 0
                     ? showFileUploadSection
                       ? "bg-[#FFD700]/40 border-[#FF8C00] text-foreground"
@@ -855,6 +879,7 @@ export function ToolBuilder({
 
               <button
                 onClick={() => {
+                  if (isBuilding) return;
                   if (showPayloadSection) setShowPayloadSection(false);
                   if (!showPayloadSection && payload.trim() === '') {
                     setPayload('{}');
@@ -863,8 +888,10 @@ export function ToolBuilder({
                   if (showFileUploadSection) setShowFileUploadSection(false);
                   setShowResponseSchemaSection(!showResponseSchemaSection);
                 }}
+                disabled={isBuilding}
                 className={cn(
                   "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 border",
+                  isBuilding && "opacity-50 cursor-not-allowed",
                   (() => {
                     const trimmedSchema = responseSchema?.trim();
                     
