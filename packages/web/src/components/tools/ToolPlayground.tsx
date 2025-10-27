@@ -137,6 +137,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setManualPayloadText(initialPayload);
     }
   }, [initialPayload]);
+  
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justPublished, setJustPublished] = useState(false);
@@ -172,8 +173,29 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [isPayloadValid, setIsPayloadValid] = useState<boolean>(true);
   const [hasUserEditedPayload, setHasUserEditedPayload] = useState<boolean>(false);
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasGeneratedDefaultPayloadRef = useRef<boolean>(false);
   const [showToolBuilder, setShowToolBuilder] = useState(false);
   const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
+
+  // Generate default payload once when schema is available if payload is empty
+  useEffect(() => {
+    const trimmed = manualPayloadText.trim();
+    const isEmptyPayload = trimmed === '' || trimmed === '{}';
+    
+    if (!hasUserEditedPayload && isEmptyPayload && inputSchema && !hasGeneratedDefaultPayloadRef.current) {
+      try {
+        const payloadSchema = extractPayloadSchema(inputSchema);
+        if (payloadSchema) {
+          const defaultJson = generateDefaultFromSchema(payloadSchema);
+          const defaultString = JSON.stringify(defaultJson, null, 2);
+          setManualPayloadText(defaultString);
+          hasGeneratedDefaultPayloadRef.current = true;
+        }
+      } catch (e) {
+        console.error('Failed to generate default from schema:', e);
+      }
+    }
+  }, [inputSchema, manualPayloadText, hasUserEditedPayload]);
 
   useEffect(() => {
     if (externalSelfHealingEnabled !== undefined) {
@@ -1203,7 +1225,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   filePayloads={filePayloads}
                   stepSelfHealingEnabled={selfHealingEnabled}
                   isPayloadValid={isPayloadValid}
-                  extractPayloadSchema={extractPayloadSchema}
                   onPayloadUserEdit={() => setHasUserEditedPayload(true)}
                 />
               )}

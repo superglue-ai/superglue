@@ -1,7 +1,6 @@
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { FileChip } from '@/src/components/ui/FileChip';
-import { generateDefaultFromSchema } from '@superglue/shared';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
@@ -20,7 +19,6 @@ export const PayloadSpotlight = ({
     onFileRemove,
     isProcessingFiles = false,
     totalFileSize = 0,
-    extractPayloadSchema,
     onUserEdit
 }: {
     payloadText: string;
@@ -33,7 +31,6 @@ export const PayloadSpotlight = ({
     onFileRemove?: (fileName: string) => void;
     isProcessingFiles?: boolean;
     totalFileSize?: number;
-    extractPayloadSchema?: (schema: string | null) => any | null;
     onUserEdit?: () => void;
 }) => {
     const [activeTab, setActiveTab] = useState('payload');
@@ -41,94 +38,58 @@ export const PayloadSpotlight = ({
     const [localInputSchema, setLocalInputSchema] = useState(inputSchema || null);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const hasGeneratedDefaultRef = useRef<boolean>(false);
-    const isInitialMountRef = useRef<boolean>(true);
-    const isUserEditingRef = useRef<boolean>(false);
+
+    // Simple sync with parent payload (parent is source of truth)
+    useEffect(() => {
+        setLocalPayload(payloadText || '');
+    }, [payloadText]);
 
     useEffect(() => {
-        // Don't sync from parent if user is actively editing
-        if (isUserEditingRef.current) {
-            return;
-        }
-
-        const trimmed = (payloadText || '').trim();
-        const isEmptyPayload = trimmed === '' || trimmed === '{}';
-        const hasUploadedFiles = uploadedFiles && uploadedFiles.length > 0;
-
-        // Don't regenerate default if files are uploaded (even if payload is empty)
-        if (hasUploadedFiles) {
-            isInitialMountRef.current = false;
-            setLocalPayload(payloadText || '');
-            return;
-        }
-
-        // Only generate default on first mount if payload is empty and we have a schema
-        if (isInitialMountRef.current && isEmptyPayload && inputSchema && extractPayloadSchema && !hasGeneratedDefaultRef.current) {
-            try {
-                const payloadSchema = extractPayloadSchema(inputSchema);
-
-                if (payloadSchema) {
-                    const defaultJson = generateDefaultFromSchema(payloadSchema);
-                    const defaultString = JSON.stringify(defaultJson, null, 2);
-                    setLocalPayload(defaultString);
-                    hasGeneratedDefaultRef.current = true;
-
-                    if (onChange) {
-                        onChange(defaultString);
-                    }
-                    isInitialMountRef.current = false;
-                    return;
-                }
-            } catch (e) {
-                console.error('Failed to generate default from schema:', e);
-            }
-        }
-
-        isInitialMountRef.current = false;
-        setLocalPayload(payloadText || '');
-    }, [payloadText, inputSchema, extractPayloadSchema, onChange, uploadedFiles]);
-
-    useEffect(() => { setLocalInputSchema(inputSchema || null); }, [inputSchema]);
+        setLocalInputSchema(inputSchema || null);
+    }, [inputSchema]);
 
     const handlePayloadChange = (value: string) => {
-        // Mark that user is actively editing to prevent sync from parent
-        isUserEditingRef.current = true;
-        
         setLocalPayload(value);
-        // Mark that user has edited the payload
+        
         if (onUserEdit) {
             onUserEdit();
         }
+        
         const trimmed = (value || '').trim();
         if (trimmed === '') {
             setError(null);
             if (onChange) onChange(value);
-            // Clear editing flag after parent has processed the change
-            setTimeout(() => {
-                isUserEditingRef.current = false;
-            }, 100);
             return;
         }
+        
         try {
             JSON.parse(value);
             setError(null);
             if (onChange) onChange(value);
-            // Clear editing flag after parent has processed the change
-            setTimeout(() => {
-                isUserEditingRef.current = false;
-            }, 100);
         } catch {
-            setError('Invalid JSON');
-            // Still clear the flag even on error
-            setTimeout(() => {
-                isUserEditingRef.current = false;
-            }, 100);
+            setError('Invalid JSON - will not be saved. Navigating away will revert to last valid JSON.');
         }
     };
 
     const handleSchemaChange = (value: string | null) => {
         setLocalInputSchema(value);
         if (onInputSchemaChange) onInputSchemaChange(value);
+    };
+
+    // Extract payload schema from full input schema for display in schema tab
+    const extractPayloadSchemaForDisplay = (fullInputSchema: string | null): any | null => {
+        if (!fullInputSchema || fullInputSchema.trim() === '') {
+            return null;
+        }
+        try {
+            const parsed = JSON.parse(fullInputSchema);
+            if (parsed?.properties?.payload) {
+                return parsed.properties.payload;
+            }
+            return parsed;
+        } catch {
+            return null;
+        }
     };
 
     const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -185,6 +146,9 @@ export const PayloadSpotlight = ({
                             ))}
                         </div>
                     )}
+                    <span className="text-xs text-muted-foreground">
+                        Enter your inputs here manually, or upload files to autofill missing JSON fields.
+                    </span>
                     <JsonSchemaEditor
                         value={localPayload}
                         onChange={(val) => handlePayloadChange(val || '')}
@@ -192,6 +156,7 @@ export const PayloadSpotlight = ({
                         readOnly={!!readOnly}
                         forceCodeMode={true}
                         showModeToggle={false}
+                        errorPrefix="Invalid JSON - no input changes saved. Navigating away will revert to last valid JSON."
                     />
                     {!readOnly && onFilesUpload && (
                         <div className="pt-3 border-t border-border/50 space-y-3">
@@ -225,7 +190,7 @@ export const PayloadSpotlight = ({
                 </TabsContent>
                 <TabsContent value="schema" className="mt-3">
                     <JsonSchemaEditor
-                        value={extractPayloadSchema && localInputSchema ? JSON.stringify(extractPayloadSchema(localInputSchema), null, 2) : localInputSchema}
+                        value={localInputSchema ? JSON.stringify(extractPayloadSchemaForDisplay(localInputSchema), null, 2) : localInputSchema}
                         onChange={(value) => {
                             if (value && value.trim() !== '') {
                                 try {
@@ -267,7 +232,6 @@ export const PayloadMiniStepCard = React.memo(({
     onFileRemove,
     isProcessingFiles,
     totalFileSize,
-    extractPayloadSchema,
     onUserEdit
 }: {
     payloadText: string;
@@ -280,7 +244,6 @@ export const PayloadMiniStepCard = React.memo(({
     onFileRemove?: (key: string) => void;
     isProcessingFiles?: boolean;
     totalFileSize?: number;
-    extractPayloadSchema?: (schema: string | null) => any | null;
     onUserEdit?: () => void;
 }) => {
     return (
@@ -304,7 +267,6 @@ export const PayloadMiniStepCard = React.memo(({
                     onFileRemove={onFileRemove}
                     isProcessingFiles={isProcessingFiles}
                     totalFileSize={totalFileSize}
-                    extractPayloadSchema={extractPayloadSchema}
                     onUserEdit={onUserEdit}
                 />
             </div>

@@ -58,7 +58,6 @@ export interface ToolStepGalleryProps {
     filePayloads?: Record<string, any>;
     stepSelfHealingEnabled?: boolean;
     isPayloadValid?: boolean;
-    extractPayloadSchema?: (schema: string | null) => any | null;
     onPayloadUserEdit?: () => void;
 }
 
@@ -107,7 +106,6 @@ export function ToolStepGallery({
     filePayloads,
     stepSelfHealingEnabled,
     isPayloadValid = true,
-    extractPayloadSchema,
     onPayloadUserEdit
 }: ToolStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
@@ -690,7 +688,6 @@ export function ToolStepGallery({
                                     onFileRemove={onFileRemove}
                                     isProcessingFiles={isProcessingFiles}
                                     totalFileSize={totalFileSize}
-                                    extractPayloadSchema={extractPayloadSchema}
                                     onUserEdit={onPayloadUserEdit}
                                 />
                             ) : currentItem.type === 'transform' ? (
