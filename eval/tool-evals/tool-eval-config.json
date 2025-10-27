@@ -792,7 +792,7 @@
       "instruction":"Use the payload to query a specific section of my lego themes list. Return the output in this structure: { themes: [{id: string, name: string}]}",
       "integrationIds": ["postgres-lego"],
       "payload": {
-        "offset": 2,
+        "page": 2,
         "limit": 10
       },
       "validationFunction": "validators/019-postgres-lego-inventory-analysis.ts",
@@ -1207,7 +1207,8 @@
   "settings": {
     "runOneShotMode": true,
     "runSelfHealingMode": true,
-    "attemptsEachMode": 5
+    "attemptsEachMode": 5,
+    "maxConcurrentWorkers": 10
   },
   "validationLlmConfig": {
     "provider": "openai",

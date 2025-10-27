@@ -32,6 +32,7 @@ const TestSuiteSettingsSchema = z.object({
     runOneShotMode: z.boolean(),
     runSelfHealingMode: z.boolean(),
     attemptsEachMode: z.number().min(1),
+    maxConcurrentWorkers: z.number().min(1).optional(),
 });
 
 const ValidationLLMConfigSchema = z.object({
