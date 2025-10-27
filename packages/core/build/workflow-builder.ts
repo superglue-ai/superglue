@@ -39,7 +39,7 @@ export class WorkflowBuilder {
           payload: this.initialPayload,
           credentials: credentials
         },
-        { arrays: { mode: 'all' }, required: true }
+        { arrays: { mode: 'all' }, required: true, requiredDepth: 2 }
       );
       this.inputSchema = convertRequiredToArray(rawSchema) as JSONSchema;
     } catch (error) {

@@ -31,6 +31,7 @@ interface JsonSchemaEditorProps {
   onBlur?: () => void;
   forceCodeMode?: boolean;
   showModeToggle?: boolean;
+  errorPrefix?: string;
 }
 
 const SCHEMA_TYPES = ['object', 'string', 'number', 'boolean', 'integer', 'any', 'string[]', 'number[]', 'boolean[]', 'integer[]', 'object[]', 'any[]'];
@@ -67,6 +68,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   onBlur,
   forceCodeMode = false,
   showModeToggle = true,
+  errorPrefix,
 }) => {
   const [isCodeMode, setIsCodeMode] = React.useState(forceCodeMode || false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
@@ -96,13 +98,13 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   }, [isCodeMode, forceCodeMode]);
 
   React.useEffect(() => {
-    if (isOptional) {
+    if (isOptional && !localIsEnabled) {
       const shouldBeEnabled = value !== null && value !== '' && value !== undefined && value !== '{}' && value !== '{"type":"object","properties":{}}';
-      if (shouldBeEnabled !== localIsEnabled) {
-        setLocalIsEnabled(shouldBeEnabled);
+      if (shouldBeEnabled) {
+        setLocalIsEnabled(true);
       }
     }
-  }, [value, isOptional]);
+  }, [value, isOptional, localIsEnabled]);
 
   const [visualSchema, setVisualSchema] = React.useState<any>({});
   const [editingField, setEditingField] = React.useState<string | null>(null);
@@ -622,8 +624,14 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       )}
 
       {isCodeMode && jsonError && (
+          
         <div className="p-2 bg-destructive/10 border border-destructive/20 text-destructive text-xs rounded-md">
-          {jsonError}
+        {errorPrefix && (
+            <div >
+              {errorPrefix}
+            </div>
+          )}
+          Error: {jsonError}
         </div>
       )}
       {isCodeMode && readOnly && value && (value.length > MAX_DISPLAY_SIZE || (value.split('\n').length > MAX_DISPLAY_LINES)) && (

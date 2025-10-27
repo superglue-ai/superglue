@@ -10,12 +10,16 @@ interface ToolCreateSuccessProps {
   currentTool: Tool
   payload: Record<string, any>
   credentials?: Record<string, string>
+  onViewTool?: () => void
+  onViewAllTools?: () => void
 }
 
 export function ToolCreateSuccess({
   currentTool,
   payload,
-  credentials
+  credentials,
+  onViewTool,
+  onViewAllTools
 }: ToolCreateSuccessProps) {
   const superglueConfig = useConfig();
   const [sdkCopied, setSdkCopied] = useState(false)
@@ -49,7 +53,18 @@ export function ToolCreateSuccess({
   })}'`
 
   return (
-    <div className="space-y-4 mt-6">
+    <div className="space-y-4">
+      <p className="text-lg font-medium">
+        Tool{' '}
+        <span className="font-mono text-base bg-muted px-2 py-0.5 rounded">
+          {currentTool.id}
+        </span>{' '}
+        created successfully!
+      </p>
+      <p>
+        You can now use this tool ID in the "Tools" page or call it via the API/SDK.
+      </p>
+
       <div className="rounded-md bg-muted p-4">
         <div className="flex items-start space-x-2">
           <div className="space-y-1 w-full">
@@ -103,6 +118,21 @@ export function ToolCreateSuccess({
           </div>
         </div>
       </div>
+
+      {(onViewTool || onViewAllTools) && (
+        <div className="flex gap-2 mt-6">
+          {onViewTool && (
+            <Button variant="outline" onClick={onViewTool}>
+              Go to Tool
+            </Button>
+          )}
+          {onViewAllTools && (
+            <Button variant="outline" onClick={onViewAllTools}>
+              View All Tools
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   )
 } 

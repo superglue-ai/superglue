@@ -46,8 +46,11 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
             const newPendingDocIds = new Set(pendingIds);
             setPendingDocIds(newPendingDocIds)
             
+            // Strip heavy fields from cache (documentation and openApiSchema can be massive)
+            const integrationsForCache = items.map(({ documentation, openApiSchema, ...rest }) => rest);
+            
             saveToCache(config.superglueApiKey, CACHE_PREFIX, {
-                integrations: items,
+                integrations: integrationsForCache,
                 pendingDocIds: Array.from(newPendingDocIds),
                 timestamp: Date.now()
             });

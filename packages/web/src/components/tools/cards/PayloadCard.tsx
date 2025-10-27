@@ -19,7 +19,8 @@ export const PayloadSpotlight = ({
     onFileRemove,
     isProcessingFiles = false,
     totalFileSize = 0,
-    extractPayloadSchema
+    onUserEdit,
+    isPayloadValid
 }: {
     payloadText: string;
     inputSchema?: string | null;
@@ -31,7 +32,8 @@ export const PayloadSpotlight = ({
     onFileRemove?: (fileName: string) => void;
     isProcessingFiles?: boolean;
     totalFileSize?: number;
-    extractPayloadSchema?: (schema: string | null) => any | null;
+    onUserEdit?: () => void;
+    isPayloadValid?: boolean;
 }) => {
     const [activeTab, setActiveTab] = useState('payload');
     const [localPayload, setLocalPayload] = useState<string>(payloadText || '');
@@ -39,31 +41,57 @@ export const PayloadSpotlight = ({
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Simple sync with parent payload (parent is source of truth)
     useEffect(() => {
         setLocalPayload(payloadText || '');
     }, [payloadText]);
-    useEffect(() => { setLocalInputSchema(inputSchema || null); }, [inputSchema]);
+
+    useEffect(() => {
+        setLocalInputSchema(inputSchema || null);
+    }, [inputSchema]);
 
     const handlePayloadChange = (value: string) => {
         setLocalPayload(value);
+        
+        if (onUserEdit) {
+            onUserEdit();
+        }
+        
         const trimmed = (value || '').trim();
         if (trimmed === '') {
             setError(null);
             if (onChange) onChange(value);
             return;
         }
+        
         try {
             JSON.parse(value);
             setError(null);
             if (onChange) onChange(value);
         } catch {
-            setError('Invalid JSON');
+            setError('Invalid JSON - will not be saved. Navigating away will revert to last valid JSON.');
         }
     };
 
     const handleSchemaChange = (value: string | null) => {
         setLocalInputSchema(value);
         if (onInputSchemaChange) onInputSchemaChange(value);
+    };
+
+    // Extract payload schema from full input schema for display in schema tab
+    const extractPayloadSchemaForDisplay = (fullInputSchema: string | null): any | null => {
+        if (!fullInputSchema || fullInputSchema.trim() === '') {
+            return null;
+        }
+        try {
+            const parsed = JSON.parse(fullInputSchema);
+            if (parsed?.properties?.payload) {
+                return parsed.properties.payload;
+            }
+            return parsed;
+        } catch {
+            return null;
+        }
     };
 
     const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,11 +128,18 @@ export const PayloadSpotlight = ({
                     <TabsTrigger value="payload" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
                         <FileJson className="h-4 w-4" /> Payload JSON
                     </TabsTrigger>
-                    <TabsTrigger value="schema" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
-                        <Code2 className="h-4 w-4" /> Input Schema
-                    </TabsTrigger>
+                    {isPayloadValid && (
+                        <TabsTrigger value="schema" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                            <Code2 className="h-4 w-4" /> Input Schema
+                        </TabsTrigger>
+                    )}
+                    {!isPayloadValid && (
+                        <TabsTrigger value="schema" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                            <Code2 color="#FFA500" className="h-4 w-4" /> Input Schema
+                        </TabsTrigger>
+                    )}
                 </TabsList>
-                <TabsContent value="payload" className="mt-3 space-y-3">
+                <TabsContent value="payload" className="mt-1 space-y-3">
                     {!readOnly && onFilesUpload && uploadedFiles.length > 0 && (
                         <div className="space-y-1.5">
                             {uploadedFiles.map(file => (
@@ -120,6 +155,9 @@ export const PayloadSpotlight = ({
                             ))}
                         </div>
                     )}
+                    <span className="text-xs text-muted-foreground">
+                        Enter your inputs here manually, or upload files to autofill missing JSON fields.
+                    </span>
                     <JsonSchemaEditor
                         value={localPayload}
                         onChange={(val) => handlePayloadChange(val || '')}
@@ -127,6 +165,7 @@ export const PayloadSpotlight = ({
                         readOnly={!!readOnly}
                         forceCodeMode={true}
                         showModeToggle={false}
+                        errorPrefix="Invalid JSON - no input changes saved. Navigating away will revert to last valid JSON."
                     />
                     {!readOnly && onFilesUpload && (
                         <div className="pt-3 border-t border-border/50 space-y-3">
@@ -160,7 +199,7 @@ export const PayloadSpotlight = ({
                 </TabsContent>
                 <TabsContent value="schema" className="mt-3">
                     <JsonSchemaEditor
-                        value={extractPayloadSchema && localInputSchema ? JSON.stringify(extractPayloadSchema(localInputSchema), null, 2) : localInputSchema}
+                        value={localInputSchema ? JSON.stringify(extractPayloadSchemaForDisplay(localInputSchema), null, 2) : localInputSchema}
                         onChange={(value) => {
                             if (value && value.trim() !== '') {
                                 try {
@@ -202,7 +241,8 @@ export const PayloadMiniStepCard = React.memo(({
     onFileRemove,
     isProcessingFiles,
     totalFileSize,
-    extractPayloadSchema
+    onUserEdit,
+    isPayloadValid
 }: {
     payloadText: string;
     inputSchema?: string | null;
@@ -214,7 +254,8 @@ export const PayloadMiniStepCard = React.memo(({
     onFileRemove?: (key: string) => void;
     isProcessingFiles?: boolean;
     totalFileSize?: number;
-    extractPayloadSchema?: (schema: string | null) => any | null;
+    onUserEdit?: () => void;
+    isPayloadValid?: boolean;
 }) => {
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
@@ -237,7 +278,8 @@ export const PayloadMiniStepCard = React.memo(({
                     onFileRemove={onFileRemove}
                     isProcessingFiles={isProcessingFiles}
                     totalFileSize={totalFileSize}
-                    extractPayloadSchema={extractPayloadSchema}
+                    onUserEdit={onUserEdit}
+                    isPayloadValid={isPayloadValid}
                 />
             </div>
         </Card>

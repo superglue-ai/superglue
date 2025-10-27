@@ -195,6 +195,31 @@ export function getSimpleIcon(name: string): SimpleIcon | null {
   }
 }
 
+// Computes the execution-ready payload by merging manual JSON with file payloads
+export const computeToolPayload = (manualPayloadText: string, filePayloads: Record<string, any>): any => {
+  try {
+    const manualPayload = JSON.parse(manualPayloadText || '{}');
+    return { ...manualPayload, ...filePayloads };
+  } catch {
+    return { ...filePayloads };
+  }
+};
+
+// Removes file keys from the manual payload text
+export const removeFileKeysFromPayload = (payloadText: string, fileKeys: string[]): string => {
+  if (fileKeys.length === 0) return payloadText;
+  
+  try {
+    const parsed = JSON.parse(payloadText || '{}');
+    fileKeys.forEach(key => {
+      delete parsed[key];
+    });
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return payloadText;
+  }
+};
+
 export const buildEvolvingPayload = (initialPayload: any, steps: any[], stepResults: Record<string, any>, upToIndex: number) => {
   let evolvingPayload = { ...initialPayload };
 

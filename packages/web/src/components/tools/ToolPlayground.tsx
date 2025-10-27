@@ -3,10 +3,12 @@ import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { computeStepOutput } from "@/src/lib/general-utils";
+import { computeStepOutput, computeToolPayload, removeFileKeysFromPayload } from "@/src/lib/general-utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
+import { generateDefaultFromSchema } from "@superglue/shared";
+import isEqual from "lodash.isequal";
 import { Validator } from "jsonschema";
-import { Check, Loader2, Play, X } from "lucide-react";
+import { Check, Hammer, Loader2, Play, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -14,6 +16,18 @@ import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { ToolStepGallery } from "./ToolStepGallery";
+import { ToolCreateSuccess } from "./ToolCreateSuccess";
+import { ToolBuilder, type BuildContext } from "./ToolBuilder";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -38,7 +52,11 @@ export interface ToolPlaygroundProps {
   isProcessingFiles?: boolean;
   totalFileSize?: number;
   filePayloads?: Record<string, any>;
+  onFilesChange?: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
   publishButtonText?: string;
+  showSuccessPage?: boolean;
+  onSuccessPageAction?: (action: 'view-tool' | 'view-all') => void;
+  hideRebuildButton?: boolean;
 }
 
 export interface ToolPlaygroundHandle {
@@ -70,7 +88,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   isProcessingFiles: parentIsProcessingFiles,
   totalFileSize: parentTotalFileSize,
   filePayloads: parentFilePayloads,
-  publishButtonText = "Publish"
+  onFilesChange: parentOnFilesChange,
+  publishButtonText = "Publish",
+  showSuccessPage = false,
+  onSuccessPageAction,
+  hideRebuildButton = false
 }, ref) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -90,8 +112,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       ? JSON.stringify(initialTool.inputSchema, null, 2)
       : null
   );
-  const [payload, setPayload] = useState<string>(initialPayload || '{}');
-
+  
+  // Payload state: separate manual input from computed execution payload
+  const [manualPayloadText, setManualPayloadText] = useState<string>(initialPayload || '{}');
+  
   // File upload state - use parent's if provided (embedded), otherwise use local
   const [localUploadedFiles, setLocalUploadedFiles] = useState<UploadedFileInfo[]>([]);
   const [localTotalFileSize, setLocalTotalFileSize] = useState(0);
@@ -103,12 +127,19 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const totalFileSize = parentTotalFileSize ?? localTotalFileSize;
   const isProcessingFiles = parentIsProcessingFiles ?? localIsProcessingFiles;
   const filePayloads = parentFilePayloads || localFilePayloads;
+  
+  // Computed payload: merge manual + file payloads (execution-ready)
+  const computedPayload = useMemo(() => 
+    computeToolPayload(manualPayloadText, filePayloads),
+    [manualPayloadText, filePayloads]
+  );
 
   useEffect(() => {
     if (initialPayload !== undefined) {
-      setPayload(initialPayload);
+      setManualPayloadText(initialPayload);
     }
   }, [initialPayload]);
+  
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justPublished, setJustPublished] = useState(false);
@@ -142,7 +173,31 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   // Single source of truth for stopping across modes (embedded/standalone)
   const stopSignalRef = useRef<boolean>(false);
   const [isPayloadValid, setIsPayloadValid] = useState<boolean>(true);
+  const [hasUserEditedPayload, setHasUserEditedPayload] = useState<boolean>(false);
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasGeneratedDefaultPayloadRef = useRef<boolean>(false);
+  const [showToolBuilder, setShowToolBuilder] = useState(false);
+  const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
+
+  // Generate default payload once when schema is available if payload is empty
+  useEffect(() => {
+    const trimmed = manualPayloadText.trim();
+    const isEmptyPayload = trimmed === '' || trimmed === '{}';
+    
+    if (!hasUserEditedPayload && isEmptyPayload && inputSchema && !hasGeneratedDefaultPayloadRef.current) {
+      try {
+        const payloadSchema = extractPayloadSchema(inputSchema);
+        if (payloadSchema) {
+          const defaultJson = generateDefaultFromSchema(payloadSchema);
+          const defaultString = JSON.stringify(defaultJson, null, 2);
+          setManualPayloadText(defaultString);
+          hasGeneratedDefaultPayloadRef.current = true;
+        }
+      } catch (e) {
+        console.error('Failed to generate default from schema:', e);
+      }
+    }
+  }, [inputSchema, manualPayloadText, hasUserEditedPayload]);
 
   useEffect(() => {
     if (externalSelfHealingEnabled !== undefined) {
@@ -204,6 +259,44 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     apiKey: config.superglueApiKey,
   }), [config.superglueEndpoint, config.superglueApiKey]);
 
+  const extractIntegrationIds = (steps: ExecutionStep[]): string[] => {
+    return Array.from(new Set(
+      steps.map(s => s.integrationId).filter(Boolean) as string[]
+    ));
+  };
+
+  const handleToolRebuilt = (tool: Tool, context: BuildContext) => {
+    setToolId(tool.id);
+    setSteps(tool.steps?.map(step => ({
+      ...step,
+      apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id }
+    })) || []);
+    setFinalTransform(tool.finalTransform || finalTransform);
+    setResponseSchema(tool.responseSchema ? JSON.stringify(tool.responseSchema, null, 2) : '');
+    setInputSchema(tool.inputSchema ? JSON.stringify(tool.inputSchema, null, 2) : null);
+    setInstructions(context.instruction);
+    setManualPayloadText(context.payload);
+    
+    // Update local file state
+    setLocalUploadedFiles(context.uploadedFiles);
+    setLocalFilePayloads(context.filePayloads);
+    setLocalTotalFileSize(context.uploadedFiles.reduce((sum, f) => sum + f.size, 0));
+    
+    // Notify parent of file changes if callback provided
+    if (parentOnFilesChange) {
+      parentOnFilesChange(context.uploadedFiles, context.filePayloads);
+    }
+    
+    // Clear execution state since tool changed
+    setResult(null);
+    setCompletedSteps([]);
+    setFailedSteps([]);
+    setStepResultsMap({});
+    setFinalPreviewResult(null);
+    
+    setShowToolBuilder(false);
+  };
+
   // Extract payload schema from full input schema
   const extractPayloadSchema = (fullInputSchema: string | null): any | null => {
     if (!fullInputSchema || fullInputSchema.trim() === '') {
@@ -220,34 +313,53 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
   };
 
-  // Validate payload against extracted schema
-  const validatePayload = (payloadText: string, schemaText: string | null, filePayloads: Record<string, any>): boolean => {
+  // Simplified validation: validates the computed payload against input schema
+  const validateComputedPayload = (payload: any, schemaText: string | null, userHasEdited: boolean): boolean => {
     const payloadSchema = extractPayloadSchema(schemaText);
 
-    // If schema is null/disabled, payload is always valid
-    if (!payloadSchema) {
+    // Empty/disabled schema → always valid (no payload required)
+    if (!payloadSchema || Object.keys(payloadSchema).length === 0) {
       return true;
     }
 
     try {
-      const payloadData = JSON.parse(payloadText || '{}');
-      const mergedPayload = { ...payloadData, ...filePayloads };
       const validator = new Validator();
-      const result = validator.validate(mergedPayload, payloadSchema);
-      return result.valid;
+      const result = validator.validate(payload, payloadSchema);
+      
+      if (!result.valid) {
+        return false;
+      }
+      
+      // If user hasn't edited yet, check if payload matches default (require edit)
+      if (!userHasEdited) {
+        try {
+          const generatedDefault = generateDefaultFromSchema(payloadSchema);
+          // If default is {} (empty object), no user edit required
+          if (Object.keys(generatedDefault).length === 0 && typeof generatedDefault === 'object') {
+            return true;
+          }
+          if (isEqual(payload, generatedDefault)) {
+            return false;
+          }
+        } catch (e) {
+          // Can't generate default, we rely on schema validation
+        }
+      }
+      
+      return true;
     } catch (e) {
       return false;
     }
   };
 
-  // Debounced validation effect
+  // Debounced validation effect using computed payload
   useEffect(() => {
     if (validationTimeoutRef.current) {
       clearTimeout(validationTimeoutRef.current);
     }
 
     validationTimeoutRef.current = setTimeout(() => {
-      const isValid = validatePayload(payload, inputSchema, filePayloads);
+      const isValid = validateComputedPayload(computedPayload, inputSchema, hasUserEditedPayload);
       setIsPayloadValid(isValid);
     }, 300);
 
@@ -256,7 +368,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         clearTimeout(validationTimeoutRef.current);
       }
     };
-  }, [payload, inputSchema, filePayloads]);
+  }, [computedPayload, inputSchema, hasUserEditedPayload]);
 
   // Unified file upload handlers
   const handleFilesUpload = async (files: File[]) => {
@@ -265,12 +377,18 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       return parentOnFilesUpload(files);
     }
 
-    // Local handling for non-embedded mode
-    setLocalIsProcessingFiles(true);
+    const currentFiles = parentUploadedFiles || localUploadedFiles;
+    const currentSize = parentTotalFileSize ?? localTotalFileSize;
+    const currentPayloads = parentFilePayloads || localFilePayloads;
+    
+    const setProcessing = parentIsProcessingFiles !== undefined ? () => {} : setLocalIsProcessingFiles;
+    
+    setProcessing(true);
+    setHasUserEditedPayload(true);
 
     try {
       const newSize = files.reduce((sum, f) => sum + f.size, 0);
-      if (localTotalFileSize + newSize > MAX_TOTAL_FILE_SIZE_TOOLS) {
+      if (currentSize + newSize > MAX_TOTAL_FILE_SIZE_TOOLS) {
         toast({
           title: 'Size limit exceeded',
           description: `Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE_TOOLS)}`,
@@ -279,9 +397,12 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         return;
       }
 
-      const existingKeys = localUploadedFiles.map(f => f.key);
+      const existingKeys = currentFiles.map(f => f.key);
       const newFiles: UploadedFileInfo[] = [];
+      const newPayloads: Record<string, any> = { ...currentPayloads };
+      const keysToRemove: string[] = [];
 
+      // Process all files without intermediate state updates
       for (const file of files) {
         try {
           const baseKey = sanitizeFileName(file.name, { removeExtension: true, lowercase: false });
@@ -294,25 +415,19 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
             status: 'processing'
           };
           newFiles.push(fileInfo);
-          setLocalUploadedFiles(prev => [...prev, fileInfo]);
+          existingKeys.push(key);
 
           const parsedData = await processAndExtractFile(file, client);
 
-          setLocalFilePayloads(prev => ({ ...prev, [key]: parsedData }));
-          existingKeys.push(key);
-
-          setLocalUploadedFiles(prev => prev.map(f =>
-            f.key === key ? { ...f, status: 'ready' } : f
-          ));
+          newPayloads[key] = parsedData;
+          fileInfo.status = 'ready';
+          keysToRemove.push(key);
 
         } catch (error: any) {
           const fileInfo = newFiles.find(f => f.name === file.name);
           if (fileInfo) {
-            setLocalUploadedFiles(prev => prev.map(f =>
-              f.key === fileInfo.key
-                ? { ...f, status: 'error', error: error.message }
-                : f
-            ));
+            fileInfo.status = 'error';
+            fileInfo.error = error.message;
           }
 
           toast({
@@ -322,10 +437,26 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           });
         }
       }
-      setLocalTotalFileSize(prev => prev + newSize);
+
+      // Single state update after all files processed
+      const finalFiles = [...currentFiles, ...newFiles];
+      const newTotalSize = finalFiles.reduce((sum, f) => sum + f.size, 0);
+      
+      if (parentOnFilesChange) {
+        parentOnFilesChange(finalFiles, newPayloads);
+      } else {
+        setLocalUploadedFiles(finalFiles);
+        setLocalFilePayloads(newPayloads);
+        setLocalTotalFileSize(newTotalSize);
+      }
+      
+      // Remove file keys from manual payload text (once, after all processing)
+      if (keysToRemove.length > 0) {
+        setManualPayloadText(prev => removeFileKeysFromPayload(prev, keysToRemove));
+      }
 
     } finally {
-      setLocalIsProcessingFiles(false);
+      setProcessing(false);
     }
   };
 
@@ -335,17 +466,26 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       return parentOnFileRemove(key);
     }
 
-    // Local handling
-    const fileToRemove = localUploadedFiles.find(f => f.key === key);
+    // Determine which state to use
+    const currentFiles = parentUploadedFiles || localUploadedFiles;
+    const currentPayloads = parentFilePayloads || localFilePayloads;
+    
+    const fileToRemove = currentFiles.find(f => f.key === key);
     if (!fileToRemove) return;
 
-    setLocalFilePayloads(prev => {
-      const newPayloads = { ...prev };
-      delete newPayloads[key];
-      return newPayloads;
-    });
-    setLocalUploadedFiles(prev => prev.filter(f => f.key !== key));
-    setLocalTotalFileSize(prev => Math.max(0, prev - (fileToRemove.size || 0)));
+    const newFiles = currentFiles.filter(f => f.key !== key);
+    const newPayloads = { ...currentPayloads };
+    delete newPayloads[key];
+
+    if (parentOnFilesChange) {
+      parentOnFilesChange(newFiles, newPayloads);
+    } else {
+      setLocalUploadedFiles(newFiles);
+      setLocalFilePayloads(newPayloads);
+      setLocalTotalFileSize(prev => Math.max(0, prev - (fileToRemove.size || 0)));
+    }
+    
+    // Don't modify manual payload text - leave user's JSON as-is
   };
 
 
@@ -390,7 +530,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setResponseSchema(tool.responseSchema ? JSON.stringify(tool.responseSchema, null, 2) : '');
 
       setInputSchema(tool.inputSchema ? JSON.stringify(tool.inputSchema, null, 2) : null);
-      // Don't modify payload when loading a tool - keep existing or use empty object
+      // Don't modify payload when loading a tool - keep existing manual payload
     } catch (error: any) {
       console.error("Error loading tool:", error);
       toast({
@@ -452,7 +592,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 }`);
       setResponseSchema('');
       setInputSchema(null);
-      setPayload('{}');
+      setManualPayloadText('{}');
       setResult(null);
       setFinalPreviewResult(null);
     }
@@ -525,6 +665,14 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
   };
 
+  const handleRunAllSteps = () => {
+    if (!isPayloadValid) {
+      setShowInvalidPayloadDialog(true);
+    } else {
+      executeTool();
+    }
+  };
+
   const executeTool = async (opts?: { selfHealing?: boolean }) => {
     setLoading(true);
     // Fully clear any stale stop signals from a previous run (both modes)
@@ -558,15 +706,13 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       // Store original steps to compare against self-healed result
       const originalStepsJson = JSON.stringify(executionSteps);
 
-      // Merge manual payload with file payloads for execution
-      const manualPayload = JSON.parse(payload || '{}');
-      const payloadObj = { ...manualPayload, ...filePayloads };
+      // Use computed payload for execution (already merged manual + files)
       setCurrentExecutingStepIndex(0);
 
       const state = await executeToolStepByStep(
         client,
         tool,
-        payloadObj,
+        computedPayload,
         (i: number, res: StepExecutionResult) => {
           if (i < tool.steps.length - 1) {
             setCurrentExecutingStepIndex(i + 1);
@@ -776,8 +922,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           steps
         } as any,
         idx,
-        { ...JSON.parse(payload || '{}'), ...filePayloads },
-        stepResultsMap,  // Pass accumulated results
+        computedPayload,
+        stepResultsMap,
         selfHealing,
       );
       const sid = steps[idx].id;
@@ -834,8 +980,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         }
       });
       const parsedResponseSchema = schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null;
-      const manualPayload = JSON.parse(payload || '{}');
-      const fullPayload = { ...manualPayload, ...filePayloads };
 
       const result = await executeFinalTransform(
         client,
@@ -843,7 +987,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         transformStr || finalTransform,
         parsedResponseSchema,
         inputSchema ? JSON.parse(inputSchema) : null,
-        fullPayload,
+        computedPayload,
         stepData,
         false
       );
@@ -899,12 +1043,22 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       ) : (
         <Button
           variant="success"
-          onClick={() => executeTool()}
-          disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform || !isPayloadValid}
+          onClick={handleRunAllSteps}
+          disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
           className="h-9 px-4"
         >
           <Play className="h-4 w-4 fill-current" strokeWidth="3px" strokeLinejoin="round" strokeLinecap="round" />
           Run All Steps
+          </Button>
+      )}
+      {!readOnly && !hideRebuildButton && (
+        <Button
+          variant="outline"
+          onClick={() => setShowToolBuilder(true)}
+          className="h-9 px-5"
+        >
+          <Hammer fill="currentColor" className="h-4 w-4" />
+          Rebuild
         </Button>
       )}
       <Button
@@ -922,6 +1076,83 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       </Button>
     </div>
   );
+
+  if (showToolBuilder) {
+    // Extract just the payload schema (what user sees in input card), not the full input schema
+    const payloadSchema = extractPayloadSchema(inputSchema);
+    const payloadSchemaString = payloadSchema ? JSON.stringify(payloadSchema, null, 2) : null;
+
+    return (
+      <div className={embedded ? "w-full h-full" : "pt-2 px-6 pb-6 max-w-none w-full h-screen flex flex-col"}>
+        {!embedded && !hideHeader && (
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Edit & Rebuild Tool</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowToolBuilder(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        <div className="flex-1 overflow-hidden">
+        <ToolBuilder
+          initialView="instructions"
+          initialIntegrationIds={extractIntegrationIds(steps)}
+          initialInstruction={instructions}
+          initialPayload={manualPayloadText}
+          initialResponseSchema={responseSchema}
+          initialInputSchema={payloadSchemaString}
+          initialFiles={uploadedFiles}
+          onToolBuilt={handleToolRebuilt}
+          onCancel={() => setShowToolBuilder(false)}
+          mode="rebuild"
+        />
+        </div>
+      </div>
+    );
+  }
+
+  if (showSuccessPage) {
+    const currentTool = {
+      id: toolId,
+      steps: steps.map((step: ExecutionStep) => ({
+        ...step,
+        apiConfig: {
+          id: step.apiConfig.id || step.id,
+          ...step.apiConfig,
+          pagination: step.apiConfig.pagination || null
+        }
+      })),
+      responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
+      inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
+      finalTransform,
+      instruction: instructions
+    };
+
+    const credentials = integrations.reduce((acc, sys: any) => {
+      return {
+        ...acc,
+        ...Object.entries(sys.credentials || {}).reduce(
+          (obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }),
+          {}
+        ),
+      };
+    }, {});
+
+    return (
+      <div className="flex-1 flex flex-col h-full p-6">
+        <ToolCreateSuccess
+          currentTool={currentTool}
+          credentials={credentials}
+          payload={computedPayload}
+          onViewTool={onSuccessPageAction ? () => onSuccessPageAction('view-tool') : () => router.push(`/tools/${currentTool.id}`)}
+          onViewAllTools={onSuccessPageAction ? () => onSuccessPageAction('view-all') : () => router.push('/')}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={embedded ? "w-full h-full" : "pt-2 px-6 pb-6 max-w-none w-full h-screen flex flex-col"}>
@@ -968,7 +1199,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   onExecuteTransform={handleExecuteTransform}
                   onFinalTransformChange={setFinalTransform}
                   onResponseSchemaChange={setResponseSchema}
-                  onPayloadChange={setPayload}
+                  onPayloadChange={setManualPayloadText}
                   onToolIdChange={setToolId}
                   onInstructionEdit={embedded ? onInstructionEdit : undefined}
                   integrations={integrations}
@@ -982,8 +1213,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   readOnly={readOnly}
                   inputSchema={inputSchema}
                   onInputSchemaChange={(v) => setInputSchema(v)}
-                  payloadText={payload}
-                  headerActions={headerActions || (!embedded ? defaultHeaderActions : undefined)}
+                  payloadText={manualPayloadText}
+                  computedPayload={computedPayload}
+                  headerActions={headerActions !== undefined ? headerActions : (!readOnly ? defaultHeaderActions : undefined)}
                   navigateToFinalSignal={navigateToFinalSignal}
                   showStepOutputSignal={showStepOutputSignal}
                   focusStepId={focusStepId}
@@ -995,13 +1227,35 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   filePayloads={filePayloads}
                   stepSelfHealingEnabled={selfHealingEnabled}
                   isPayloadValid={isPayloadValid}
-                  extractPayloadSchema={extractPayloadSchema}
+                  onPayloadUserEdit={() => setHasUserEditedPayload(true)}
+                  embedded={embedded}
                 />
               )}
             </div>
           </div>
         </div>
       </div>
+
+      <AlertDialog open={showInvalidPayloadDialog} onOpenChange={setShowInvalidPayloadDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tool Input Does Not Match Input Schema</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your tool input does not match the input schema. This may cause execution to fail.
+              You can edit the input and schema in the Start (Tool Input) Card.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setShowInvalidPayloadDialog(false);
+              executeTool();
+            }}>
+              Run Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 });

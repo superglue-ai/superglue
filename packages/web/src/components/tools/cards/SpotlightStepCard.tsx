@@ -10,6 +10,16 @@ import { CopyButton } from '../shared/CopyButton';
 import { JsonCodeEditor } from '../editors/JsonCodeEditor';
 import { ToolStepConfigurator } from '../ToolStepConfigurator';
 import { useDataProcessor } from '../hooks/use-data-processor';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/src/components/ui/alert-dialog';
 
 export const SpotlightStepCard = React.memo(({
     step,
@@ -30,6 +40,8 @@ export const SpotlightStepCard = React.memo(({
     failedSteps = [],
     showOutputSignal,
     onConfigEditingChange,
+    isFirstStep = false,
+    isPayloadValid = true,
 }: {
     step: any;
     stepIndex: number;
@@ -50,10 +62,13 @@ export const SpotlightStepCard = React.memo(({
     stepResultsMap?: Record<string, any>;
     showOutputSignal?: number;
     onConfigEditingChange?: (editing: boolean) => void;
+    isFirstStep?: boolean;
+    isPayloadValid?: boolean;
 }) => {
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
     const [outputViewMode, setOutputViewMode] = useState<'preview' | 'schema'>('preview');
+    const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
 
     const inputProcessor = useDataProcessor(
         evolvingPayload,
@@ -98,6 +113,14 @@ export const SpotlightStepCard = React.memo(({
         }
     }, [stepResult, outputViewMode, activePanel, outputProcessor]);
 
+    const handleRunStepClick = () => {
+        if (isFirstStep && !isPayloadValid) {
+            setShowInvalidPayloadDialog(true);
+        } else if (onExecuteStep) {
+            onExecuteStep();
+        }
+    };
+
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50 overflow-hidden">
             <div className="p-3">
@@ -117,7 +140,7 @@ export const SpotlightStepCard = React.memo(({
                                 <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Run this single step"}>
                                     <Button
                                         variant="ghost"
-                                        onClick={onExecuteStep}
+                                        onClick={handleRunStepClick}
                                         disabled={!canExecute || isExecuting || isFixingWorkflow}
                                         className="h-8 px-3 gap-2"
                                     >
@@ -185,8 +208,9 @@ export const SpotlightStepCard = React.memo(({
                         {activePanel === 'input' && (
                             <div>
                                 {(() => {
-                                    const noInputYet = stepIndex > 0 && isEmptyData(evolvingPayload || {});
-                                    if (noInputYet) {
+                                    // Show "run previous step" if we can't execute this step yet
+                                    const cannotExecuteYet = stepIndex > 0 && !canExecute;
+                                    if (cannotExecuteYet) {
                                         return (
                                             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
                                                 <div className="text-xs mb-1">No input yet</div>
@@ -378,6 +402,29 @@ export const SpotlightStepCard = React.memo(({
                     </div>
                 </div>
             </div>
+
+            <AlertDialog open={showInvalidPayloadDialog} onOpenChange={setShowInvalidPayloadDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Tool Input Does Not Match Input Schema</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Your tool input does not match the input schema. This may cause execution to fail.
+                            You can edit the input and schema in the Start (Tool Input) Card.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => {
+                            setShowInvalidPayloadDialog(false);
+                            if (onExecuteStep) {
+                                onExecuteStep();
+                            }
+                        }}>
+                            Run Anyway
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Card>
     );
 });

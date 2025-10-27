@@ -19,7 +19,7 @@ import type { Integration } from '@superglue/client';
 
 import { createOAuthErrorHandler, getOAuthCallbackUrl, triggerOAuthFlow } from '@/src/lib/oauth-utils';
 import { integrations } from '@superglue/shared';
-import { Check, ChevronRight, ChevronsUpDown, Copy, Globe } from 'lucide-react';
+import { Check, ChevronRight, ChevronsUpDown, Copy, Eye, EyeOff, Globe } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 export interface IntegrationFormProps {
@@ -155,6 +155,7 @@ export function IntegrationForm({
     const [showOAuth, setShowOAuth] = useState(false);
     const [useSuperglueOAuth, setUseSuperglueOAuth] = useState<boolean>(false);
     const [connectLoading, setConnectLoading] = useState(false);
+    const [showClientSecret, setShowClientSecret] = useState(false);
     const [hasUploadedFile, setHasUploadedFile] = useState(
         // Check if existing integration has file upload
         integration?.documentationUrl?.startsWith('file://') || false
@@ -845,15 +846,30 @@ export function IntegrationForm({
                                                         Client Secret*
                                                         <HelpTooltip text="Secret from your OAuth provider app settings." />
                                                     </Label>
-                                                    <Input
-                                                        id="client_secret"
-                                                        type="password"
-                                                        value={oauthFields.client_secret}
-                                                        onChange={e => setOauthFields(prev => ({ ...prev, client_secret: e.target.value }))}
-                                                        placeholder="Your OAuth app client secret"
-                                                        className={cn("h-9", validationErrors.client_secret && inputErrorStyles)}
-                                                        autoComplete="new-password"
-                                                    />
+                                                    <div className="relative">
+                                                        <Input
+                                                            id="client_secret"
+                                                            type={showClientSecret ? "text" : "password"}
+                                                            value={oauthFields.client_secret}
+                                                            onChange={e => setOauthFields(prev => ({ ...prev, client_secret: e.target.value }))}
+                                                            placeholder="Your OAuth app client secret"
+                                                            className={cn("h-9 pr-9", validationErrors.client_secret && inputErrorStyles)}
+                                                            autoComplete="new-password"
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="absolute right-0 top-0 h-9 w-9 hover:bg-transparent"
+                                                            onClick={() => setShowClientSecret(!showClientSecret)}
+                                                        >
+                                                            {showClientSecret ? (
+                                                                <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                                            ) : (
+                                                                <Eye className="h-4 w-4 text-muted-foreground" />
+                                                            )}
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             </div>
 

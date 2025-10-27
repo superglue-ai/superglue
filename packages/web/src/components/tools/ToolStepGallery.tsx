@@ -43,6 +43,7 @@ export interface ToolStepGalleryProps {
     transformResult?: any;
     readOnly?: boolean;
     payloadText?: string;
+    computedPayload?: any;
     inputSchema?: string | null;
     onInputSchemaChange?: (schema: string | null) => void;
     headerActions?: React.ReactNode;
@@ -57,7 +58,8 @@ export interface ToolStepGalleryProps {
     filePayloads?: Record<string, any>;
     stepSelfHealingEnabled?: boolean;
     isPayloadValid?: boolean;
-    extractPayloadSchema?: (schema: string | null) => any | null;
+    onPayloadUserEdit?: () => void;
+    embedded?: boolean;
 }
 
 export function ToolStepGallery({
@@ -90,6 +92,7 @@ export function ToolStepGallery({
     transformResult,
     readOnly = false,
     payloadText,
+    computedPayload,
     inputSchema,
     onInputSchemaChange,
     headerActions,
@@ -104,7 +107,8 @@ export function ToolStepGallery({
     filePayloads,
     stepSelfHealingEnabled,
     isPayloadValid = true,
-    extractPayloadSchema
+    onPayloadUserEdit,
+    embedded = false
 }: ToolStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
     const [windowWidth, setWindowWidth] = useState(1200);
@@ -119,6 +123,8 @@ export function ToolStepGallery({
     const isConfiguratorEditingRef = useRef<boolean>(false);
     const [hiddenLeftCount, setHiddenLeftCount] = useState(0);
     const [hiddenRightCount, setHiddenRightCount] = useState(0);
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    
     useEffect(() => {
         isConfiguratorEditingRef.current = isConfiguratorEditing;
     }, [isConfiguratorEditing]);
@@ -141,6 +147,27 @@ export function ToolStepGallery({
             const card = container?.children?.[nextIndex] as HTMLElement | undefined;
             if (container && card) {
                 card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
+            
+            // Scroll to top based on mode
+            if (embedded) {
+                // In embedded mode, find the nearest scrollable parent
+                let scrollParent = scrollContainerRef.current?.parentElement;
+                while (scrollParent && scrollParent !== document.body) {
+                    const { overflowY } = window.getComputedStyle(scrollParent);
+                    if (overflowY === 'auto' || overflowY === 'scroll') {
+                        scrollParent.scrollTo({ top: 0, behavior: 'smooth' });
+                        break;
+                    }
+                    scrollParent = scrollParent.parentElement;
+                }
+                // Fallback: scroll window
+                if (!scrollParent || scrollParent === document.body) {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            } else if (scrollContainerRef.current) {
+                // Non-embedded mode: use local scroll container
+                scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
             }
         }, NAV_DELAY_MS);
     };
@@ -199,39 +226,8 @@ export function ToolStepGallery({
 
 
     const [rawPayloadText, setRawPayloadText] = useState<string>(payloadText || '');
-    // Initialize workingPayload with filePayloads if available
-    const [workingPayload, setWorkingPayload] = useState<any>(() => {
-        const trimmed = (payloadText || '').trim();
-        if (trimmed === '') {
-            return filePayloads || {};
-        }
-        try {
-            const parsed = JSON.parse(payloadText);
-            return filePayloads ? { ...parsed, ...filePayloads } : parsed;
-        } catch {
-            return filePayloads || {};
-        }
-    });
 
-    useEffect(() => {
-        const trimmed = (rawPayloadText || '').trim();
-        if (trimmed === '') {
-            // Even with empty manual payload, include file payloads
-            setWorkingPayload(filePayloads || {});
-            return;
-        }
-        try {
-            const parsed = JSON.parse(rawPayloadText);
-            // Merge manual payload with file payloads
-            const merged = filePayloads ? { ...parsed, ...filePayloads } : parsed;
-            setWorkingPayload(merged);
-        } catch {
-            // On parse error, still include file payloads
-            setWorkingPayload(filePayloads || {});
-        }
-    }, [rawPayloadText, filePayloads]);
-
-    // Keep local payload text in sync with external prop so uploads reflect immediately
+    // Keep local payload text in sync with external prop
     useEffect(() => {
         if (typeof payloadText === 'string') {
             setRawPayloadText(payloadText);
@@ -241,25 +237,22 @@ export function ToolStepGallery({
     const handlePayloadJsonChange = (jsonString: string) => {
         setRawPayloadText(jsonString);
         onPayloadChange?.(jsonString);
-        try {
-            const parsed = JSON.parse(jsonString);
-            // Always merge with file payloads when manually editing
-            const merged = filePayloads ? { ...parsed, ...filePayloads } : parsed;
-            setWorkingPayload(merged);
-        } catch {
-            // On parse error, still include file payloads
-            setWorkingPayload(filePayloads || {});
-        }
     };
+    
+    // Use computed payload from parent (already merged manual + files)
+    const workingPayload = computedPayload || {};
 
-    const stepResultsMap = Array.isArray(stepResults)
-        ? stepResults.reduce((acc: Record<string, any>, result: any) => {
-            if (result.stepId) {
-                acc[result.stepId] = result.data || result.transformedData || result;
-            }
-            return acc;
-        }, {})
-        : stepResults;
+    const stepResultsMap = useMemo(() => 
+        Array.isArray(stepResults)
+            ? stepResults.reduce((acc: Record<string, any>, result: any) => {
+                if (result.stepId) {
+                    acc[result.stepId] = result.data || result.transformedData || result;
+                }
+                return acc;
+            }, {})
+            : stepResults,
+        [stepResults]
+    );
 
     const hasTransformCompleted = completedSteps.includes('__final_transform__') && (transformResult || finalResult);
 
@@ -497,7 +490,7 @@ export function ToolStepGallery({
             </div>
 
             {/* Scrollable content section */}
-            <div className="flex-1 overflow-y-auto pr-4" style={{ scrollbarGutter: 'stable' }}>
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-4" style={{ scrollbarGutter: 'stable' }}>
                 <div className="space-y-6">
                     <div className="flex items-center gap-0">
                         <div className="relative">
@@ -720,7 +713,8 @@ export function ToolStepGallery({
                                     onFileRemove={onFileRemove}
                                     isProcessingFiles={isProcessingFiles}
                                     totalFileSize={totalFileSize}
-                                    extractPayloadSchema={extractPayloadSchema}
+                                    onUserEdit={onPayloadUserEdit}
+                                    isPayloadValid={isPayloadValid}
                                 />
                             ) : currentItem.type === 'transform' ? (
                                 <FinalTransformMiniStepCard
@@ -746,7 +740,7 @@ export function ToolStepGallery({
                                     onRemove={!readOnly && currentItem.type === 'step' ? handleRemoveStep : undefined}
                                     onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
                                     onFixStep={onFixStep ? () => onFixStep(activeIndex - 1) : undefined}
-                                    canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap) && (activeIndex !== 1 || isPayloadValid)}
+                                    canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
                                     isExecuting={isExecutingStep === activeIndex - 1}
                                     isFixingWorkflow={isFixingWorkflow === activeIndex - 1}
                                     isGlobalExecuting={!!(isExecuting || isExecutingTransform)}
@@ -756,6 +750,8 @@ export function ToolStepGallery({
                                     failedSteps={failedSteps}
                                     showOutputSignal={showStepOutputSignal}
                                     onConfigEditingChange={setIsConfiguratorEditing}
+                                    isFirstStep={activeIndex === 1}
+                                    isPayloadValid={isPayloadValid}
                                 />
                             )
                         )}

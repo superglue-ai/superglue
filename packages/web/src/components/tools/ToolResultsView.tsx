@@ -6,7 +6,7 @@ import { Check, Copy, Loader2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { AutoSizer, List } from 'react-virtualized';
 import { ToolCreateSuccess } from './ToolCreateSuccess';
-import { truncateForDisplay } from './ToolMiniStepCards';
+import { truncateForDisplay } from '@/src/lib/general-utils';
 
 const MAX_LINES = 10000;
 const getResponseLines = (response: any): { lines: string[], truncated: boolean } => {
