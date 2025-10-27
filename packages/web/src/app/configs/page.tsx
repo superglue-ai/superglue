@@ -287,34 +287,8 @@ const ConfigTable = () => {
   }
 
   if (allConfigs.length === 0 && !loading) {
-    return (
-      <div className="p-8 max-w-none w-full min-h-full">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Tools</h1>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={refreshConfigs}
-                  className="transition-transform"
-                >
-                  <RotateCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Refresh Tools</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-
-        <EmptyStateActions
-          handleTool={handleTool}
-        />
-      </div>
-    );
+    router.push('/tools');
+    return null;
   }
 
   return (
