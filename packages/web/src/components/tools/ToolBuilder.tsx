@@ -479,7 +479,7 @@ export function ToolBuilder({
               Select integrations for your tool
             </h2>
             <p className="text-sm text-muted-foreground">
-              Choose one or more integrations, or create transform-only tools without any
+              Choose one or more integrations, or choose none to create transform-only tools
             </p>
           </div>
           
@@ -659,7 +659,9 @@ export function ToolBuilder({
             >
               {selectedIntegrationIds.length === 0
                 ? "Select None"
-                : `Select ${selectedIntegrationIds.length} Integrations`}
+                : selectedIntegrationIds.length === 1
+                  ? "Select 1 Integration"
+                  : `Select ${selectedIntegrationIds.length} Integrations`}
             </Button>
           </div>
         
