@@ -297,15 +297,15 @@ export const PayloadSpotlight = ({
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const hasGeneratedDefaultRef = useRef<boolean>(false);
+    const isInitialMountRef = useRef<boolean>(true);
 
-    // Generate default JSON from schema when payload is empty
+    // Generate default JSON from schema only on initial mount when payload is empty
     useEffect(() => {
         const trimmed = (payloadText || '').trim();
         const isEmptyPayload = trimmed === '' || trimmed === '{}';
         
-        // Only generate default if payload is empty/empty object and we have a schema
-        // AND we haven't already generated a default for this schema
-        if (isEmptyPayload && inputSchema && extractPayloadSchema && !hasGeneratedDefaultRef.current) {
+        // Only generate default on first mount if payload is empty and we have a schema
+        if (isInitialMountRef.current && isEmptyPayload && inputSchema && extractPayloadSchema && !hasGeneratedDefaultRef.current) {
             try {
                 const payloadSchema = extractPayloadSchema(inputSchema);
                 
@@ -318,6 +318,7 @@ export const PayloadSpotlight = ({
                     if (onChange) {
                         onChange(defaultString);
                     }
+                    isInitialMountRef.current = false;
                     return;
                 }
             } catch (e) {
@@ -325,11 +326,7 @@ export const PayloadSpotlight = ({
             }
         }
         
-        // If payload is not empty, reset the flag so we can generate again if user clears it
-        if (!isEmptyPayload) {
-            hasGeneratedDefaultRef.current = false;
-        }
-        
+        isInitialMountRef.current = false;
         setLocalPayload(payloadText || '');
     }, [payloadText, inputSchema, extractPayloadSchema, onChange]);
     

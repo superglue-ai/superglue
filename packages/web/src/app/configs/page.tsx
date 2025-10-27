@@ -54,7 +54,7 @@ const ConfigTable = () => {
   const router = useRouter();
   const [allConfigs, setAllConfigs] = React.useState<(ApiConfig | Tool)[]>([]);
   const [configs, setConfigs] = React.useState<(ApiConfig | Tool)[]>([]);
-  const [loading, setLoading] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(0);
   const [pageSize] = React.useState(20);
@@ -114,6 +114,7 @@ const ConfigTable = () => {
     if (cachedData) {
       setAllConfigs(cachedData.configs);
       setTotal(cachedData.configs.length);
+      setLoading(false);
     }
     refreshConfigs();
   }, [refreshConfigs, config.superglueApiKey]);
@@ -286,8 +287,10 @@ const ConfigTable = () => {
     )
   }
 
-  if (allConfigs.length === 0 && !loading) {
-    router.push('/tools');
+  if (allConfigs.length === 0 && !loading && !isRefreshing) {
+    if (typeof window !== 'undefined') {
+      router.push('/tools');
+    }
     return null;
   }
 
