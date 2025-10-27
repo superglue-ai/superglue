@@ -17,7 +17,9 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { HelpTooltip } from '../utils/HelpTooltip';
-import { CopyButton, JavaScriptCodeEditor, JsonCodeEditor } from './ToolMiniStepCards';
+import { JavaScriptCodeEditor } from "./editors/JavaScriptCodeEditor";
+import { JsonCodeEditor } from "./editors/JsonCodeEditor";
+import { CopyButton } from "./shared/CopyButton";
 
 interface ToolStepConfiguratorProps {
     step: any;
