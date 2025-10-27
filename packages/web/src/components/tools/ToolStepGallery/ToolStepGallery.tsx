@@ -6,12 +6,12 @@ import { buildEvolvingPayload, cn } from '@/src/lib/general-utils';
 import { Integration } from "@superglue/client";
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AddStepDialog } from './AddStepDialog';
-import { FinalTransformMiniStepCard } from './cards/FinalTransformCard';
-import { MiniStepCard } from './cards/MiniStepCard';
-import { PayloadMiniStepCard } from './cards/PayloadCard';
-import { SpotlightStepCard } from './cards/SpotlightStepCard';
-import { InstructionDisplay } from './shared/InstructionDisplay';
+import { AddStepDialog } from '../AddStepDialog';
+import { FinalTransformMiniStepCard } from '../cards/FinalTransformCard';
+import { MiniStepCard } from '../cards/MiniStepCard';
+import { PayloadMiniStepCard } from '../cards/PayloadCard';
+import { SpotlightStepCard } from '../cards/SpotlightStepCard';
+import { InstructionDisplay } from '../shared/InstructionDisplay';
 
 export interface ToolStepGalleryProps {
     steps: any[];
