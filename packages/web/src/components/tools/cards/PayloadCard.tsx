@@ -139,7 +139,7 @@ export const PayloadSpotlight = ({
                         </TabsTrigger>
                     )}
                 </TabsList>
-                <TabsContent value="payload" className="mt-3 space-y-3">
+                <TabsContent value="payload" className="mt-1 space-y-3">
                     {!readOnly && onFilesUpload && uploadedFiles.length > 0 && (
                         <div className="space-y-1.5">
                             {uploadedFiles.map(file => (
