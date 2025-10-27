@@ -56,6 +56,7 @@ export interface ToolPlaygroundProps {
   publishButtonText?: string;
   showSuccessPage?: boolean;
   onSuccessPageAction?: (action: 'view-tool' | 'view-all') => void;
+  hideRebuildButton?: boolean;
 }
 
 export interface ToolPlaygroundHandle {
@@ -90,7 +91,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   onFilesChange: parentOnFilesChange,
   publishButtonText = "Publish",
   showSuccessPage = false,
-  onSuccessPageAction
+  onSuccessPageAction,
+  hideRebuildButton = false
 }, ref) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -1047,9 +1049,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         >
           <Play className="h-4 w-4 fill-current" strokeWidth="3px" strokeLinejoin="round" strokeLinecap="round" />
           Run All Steps
-        </Button>
+          </Button>
       )}
-      {!readOnly && (
+      {!readOnly && !hideRebuildButton && (
         <Button
           variant="outline"
           onClick={() => setShowToolBuilder(true)}
