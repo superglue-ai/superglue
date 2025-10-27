@@ -101,6 +101,19 @@ export const FinalTransformMiniStepCard = React.memo(
       activeTab === "output"
     );
 
+    // Re-trigger schema computation when data changes and we're viewing schema
+    useEffect(() => {
+      if (activeTab === "output" && outputViewMode === "schema" && transformResult) {
+        outputProcessor.computeSchema();
+      }
+    }, [transformResult, outputViewMode, activeTab, outputProcessor]);
+
+    useEffect(() => {
+      if (activeTab === "inputs" && inputViewMode === "schema" && stepInputs) {
+        inputProcessor.computeSchema();
+      }
+    }, [stepInputs, inputViewMode, activeTab, inputProcessor]);
+
     const inputData = {
       displayString: inputViewMode === "schema" 
         ? inputProcessor.schema?.displayString || ""

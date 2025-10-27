@@ -2,14 +2,14 @@ import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { downloadJson } from '@/src/lib/download-utils';
-import { isEmptyData, MAX_DISPLAY_LINES, truncateForDisplay, truncateLines } from '@/src/lib/general-utils';
+import { isEmptyData } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
-import { inferJsonSchema } from '@superglue/shared';
-import { Database, Download, FileJson, Package, Play, Settings, Trash2, Wand2 } from 'lucide-react';
+import { Database, Download, FileJson, Loader2, Package, Play, Settings, Trash2, Wand2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { CopyButton } from '../shared/CopyButton';
 import { JsonCodeEditor } from '../editors/JsonCodeEditor';
 import { ToolStepConfigurator } from '../ToolStepConfigurator';
+import { useDataProcessor } from '../hooks/use-data-processor';
 
 export const SpotlightStepCard = React.memo(({
     step,
@@ -55,11 +55,48 @@ export const SpotlightStepCard = React.memo(({
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
     const [outputViewMode, setOutputViewMode] = useState<'preview' | 'schema'>('preview');
 
+    const inputProcessor = useDataProcessor(
+        evolvingPayload,
+        activePanel === 'input'
+    );
+
+    const outputProcessor = useDataProcessor(
+        stepResult,
+        activePanel === 'output'
+    );
+
+    const handleInputViewModeChange = (mode: 'preview' | 'schema') => {
+        setInputViewMode(mode);
+        if (mode === 'schema') {
+            inputProcessor.computeSchema();
+        }
+    };
+
+    const handleOutputViewModeChange = (mode: 'preview' | 'schema') => {
+        setOutputViewMode(mode);
+        if (mode === 'schema') {
+            outputProcessor.computeSchema();
+        }
+    };
+
     useEffect(() => {
         if (showOutputSignal) {
             setActivePanel('output');
         }
     }, [showOutputSignal]);
+
+    // Re-trigger schema computation when data changes and we're viewing schema
+    useEffect(() => {
+        if (activePanel === 'input' && inputViewMode === 'schema' && evolvingPayload) {
+            inputProcessor.computeSchema();
+        }
+    }, [evolvingPayload, inputViewMode, activePanel, inputProcessor]);
+
+    useEffect(() => {
+        if (activePanel === 'output' && outputViewMode === 'schema' && stepResult) {
+            outputProcessor.computeSchema();
+        }
+    }, [stepResult, outputViewMode, activePanel, outputProcessor]);
 
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50 overflow-hidden">
@@ -157,33 +194,36 @@ export const SpotlightStepCard = React.memo(({
                                             </div>
                                         );
                                     }
-                                    let inputString = '';
-                                    let isTruncated = false;
-                                    if (inputViewMode === 'schema') {
-                                        const schemaObj = inferJsonSchema(evolvingPayload || {});
-                                        inputString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
-                                    } else {
-                                        const displayData = truncateForDisplay(evolvingPayload);
-                                        inputString = displayData.value;
-                                        isTruncated = displayData.truncated;
-                                    }
+
+                                    const inputData = {
+                                        displayString: inputViewMode === 'schema'
+                                            ? inputProcessor.schema?.displayString || ''
+                                            : inputProcessor.preview?.displayString || '',
+                                        truncated: inputViewMode === 'schema'
+                                            ? inputProcessor.schema?.truncated || false
+                                            : inputProcessor.preview?.truncated || false,
+                                    };
+
                                     return (
                                         <>
                                             <JsonCodeEditor
-                                                value={inputString}
+                                                value={inputData.displayString}
                                                 readOnly={true}
                                                 minHeight="300px"
                                                 maxHeight="600px"
                                                 resizable={true}
                                                 overlay={
                                                     <div className="flex items-center gap-1">
-                                                        <Tabs value={inputViewMode} onValueChange={(v) => setInputViewMode(v as 'preview' | 'schema')} className="w-auto">
+                                                        {(inputProcessor.isComputingPreview || inputProcessor.isComputingSchema) && (
+                                                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                                        )}
+                                                        <Tabs value={inputViewMode} onValueChange={(v) => handleInputViewModeChange(v as 'preview' | 'schema')} className="w-auto">
                                                             <TabsList className="h-6 p-0.5 rounded-md">
                                                                 <TabsTrigger value="preview" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Preview</TabsTrigger>
                                                                 <TabsTrigger value="schema" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Schema</TabsTrigger>
                                                             </TabsList>
                                                         </Tabs>
-                                                        <CopyButton text={inputString} />
+                                                        <CopyButton text={inputData.displayString} />
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
@@ -196,7 +236,7 @@ export const SpotlightStepCard = React.memo(({
                                                     </div>
                                                 }
                                             />
-                                            {isTruncated && inputViewMode === 'preview' && (
+                                            {inputData.truncated && inputViewMode === 'preview' && (
                                                 <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
                                                     Preview truncated for display performance
                                                 </div>
@@ -234,6 +274,7 @@ export const SpotlightStepCard = React.memo(({
 
                                     let outputString = '';
                                     let isTruncated = false;
+                                    
                                     if (!isPending) {
                                         if (errorResult) {
                                             if (stepResult) {
@@ -242,19 +283,19 @@ export const SpotlightStepCard = React.memo(({
                                                         stepResult.substring(0, 50000) + '\n... [Error message truncated]' :
                                                         stepResult;
                                                 } else {
-                                                    const displayData = truncateForDisplay(stepResult);
-                                                    outputString = displayData.value;
+                                                    outputString = outputProcessor.preview?.displayString || '';
+                                                    isTruncated = outputProcessor.preview?.truncated || false;
                                                 }
                                             } else {
                                                 outputString = '{\n  "error": "Step execution failed"\n}';
                                             }
-                                        } else if (outputViewMode === 'schema') {
-                                            const schemaObj = inferJsonSchema(stepResult || {});
-                                            outputString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
                                         } else {
-                                            const displayData = truncateForDisplay(stepResult);
-                                            outputString = displayData.value;
-                                            isTruncated = displayData.truncated;
+                                            outputString = outputViewMode === 'schema'
+                                                ? outputProcessor.schema?.displayString || ''
+                                                : outputProcessor.preview?.displayString || '';
+                                            isTruncated = outputViewMode === 'schema'
+                                                ? outputProcessor.schema?.truncated || false
+                                                : outputProcessor.preview?.truncated || false;
                                         }
                                     }
                                     const showEmptyWarning = !stepFailed && !isPending && !errorResult && outputViewMode === 'preview' && isEmptyData(outputString || '');
@@ -290,8 +331,11 @@ export const SpotlightStepCard = React.memo(({
                                                         resizable={true}
                                                         overlay={
                                                             <div className="flex items-center gap-1">
+                                                                {!errorResult && (outputProcessor.isComputingPreview || outputProcessor.isComputingSchema) && (
+                                                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                                                )}
                                                                 {!errorResult && (
-                                                                    <Tabs value={outputViewMode} onValueChange={(v) => setOutputViewMode(v as 'preview' | 'schema')} className="w-auto">
+                                                                    <Tabs value={outputViewMode} onValueChange={(v) => handleOutputViewModeChange(v as 'preview' | 'schema')} className="w-auto">
                                                                         <TabsList className="h-6 p-0.5 rounded-md">
                                                                             <TabsTrigger value="preview" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Preview</TabsTrigger>
                                                                             <TabsTrigger value="schema" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Schema</TabsTrigger>
