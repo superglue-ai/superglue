@@ -3,9 +3,9 @@ import { inferJsonSchema } from '@superglue/shared';
 import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
+import { z } from "zod";
 import { parseJSON } from "./json-parser.js";
 import { injectVMHelpersIndividually } from "./vm-helpers.js";
-import { z } from "zod";
 
 export interface TransformResult {
   success: boolean;
@@ -251,38 +251,41 @@ export function composeUrl(host: string, path: string) {
   return `${cleanHost}/${cleanPath}`;
 }
 
-export async function replaceVariables(template: string, payload: Record<string, any>): Promise<string> {
-  if (!template) return "";
+export async function replaceVariables(rawStringWithReferences: string, allVariables: Record<string, any>): Promise<string> {
+  if (!rawStringWithReferences) return "";
 
-  const pattern = /<<([\s\S]*?)>>/g;
+  const varEscapePattern = /<<([\s\S]*?)>>/g;
 
-  let result = template;
-  const matches = [...template.matchAll(pattern)];
+  let processedString = rawStringWithReferences;
+  const varReferences = [...rawStringWithReferences.matchAll(varEscapePattern)];
 
-  for (const match of matches) {
-    const path = match[1].trim();
-    let value: any;
-    if (payload[path]) {
-      value = payload[path];
+  for (const varReferenceMatches of varReferences) {
+    const varReference = varReferenceMatches[1].trim();
+    let resolvedValue: any;
+    if (allVariables[varReference]) { // check if the expression is a direct variable reference
+      resolvedValue = allVariables[varReference];
     }
     else {
-      // Use transformAndValidateSchema to handle both JS and JSONata
-      const result = await transformAndValidateSchema(payload, path, null);
-      if (result.success) {
-        value = result.data;
+      // try evaluating the expression as a JavaScript expression
+      const evalResult = await transformAndValidateSchema(allVariables, varReference, null);
+      if (evalResult.success) {
+        resolvedValue = evalResult.data;
+        if (resolvedValue === undefined) {
+          throw new Error(`Variable reference not found: ${varReference} - Variable does not exist or expression returned undefined`);
+        }
       } else {
-        throw new Error(`Failed to run JS expression: ${path} - ${result.error}`);
+        throw new Error(`Failed to run JS expression: ${varReference} - ${evalResult.error}`);
       }
     }
 
-    if (Array.isArray(value) || typeof value === 'object') {
-      value = JSON.stringify(value);
+    if (Array.isArray(resolvedValue) || typeof resolvedValue === 'object') {
+      resolvedValue = JSON.stringify(resolvedValue);
     }
 
-    result = result.replace(match[0], String(value));
+    processedString = processedString.replace(varReferenceMatches[0], String(resolvedValue));
   }
 
-  return oldReplaceVariables(result, payload);
+  return oldReplaceVariables(processedString, allVariables);
 }
 
 function oldReplaceVariables(template: string, variables: Record<string, any>): string {

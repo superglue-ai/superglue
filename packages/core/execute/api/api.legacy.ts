@@ -3,13 +3,14 @@ import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { RequestOptions } from "http";
 import ivm from "isolated-vm";
 import { getGenerateApiConfigContext } from "../../context/context-builders.js";
+import { getPaginationErrorContext, getVarResolverErrorContext } from "../../context/context-error-messages.js";
 import { SELF_HEALING_SYSTEM_PROMPT } from "../../context/context-prompts.js";
 import { server_defaults } from "../../default.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { LanguageModel, LLMMessage } from "../../llm/language-model.js";
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../../llm/llm-tools.js";
 import { parseFile } from "../../utils/file.js";
-import { composeUrl, generateId, maskCredentials, replaceVariables, convertBasicAuthToBase64 } from "../../utils/helpers.js";
+import { composeUrl, convertBasicAuthToBase64, generateId, maskCredentials, replaceVariables } from "../../utils/helpers.js";
 import { callFTP } from "../ftp/ftp.legacy.js";
 import { callPostgres } from "../postgres/postgres.legacy.js";
 import { AbortError, ApiCallError, callAxios, checkResponseForErrors, handle2xxStatus, handle429Status, handleErrorStatus } from "./api.js";
@@ -42,27 +43,12 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
 
     const requestVars = { ...paginationVars, ...allVariables };
 
-    if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
-      const request = JSON.stringify(endpoint);
-      if (!request.includes('page')) {
-        throw new Error(`Pagination type is ${PaginationType.PAGE_BASED} but no page parameter is provided in the request. Please provide a page parameter in the request.`);
-      }
-    } else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
-      const request = JSON.stringify(endpoint);
-      if (!request.includes('offset')) {
-        throw new Error(`Pagination type is ${PaginationType.OFFSET_BASED} but no offset parameter is provided in the request. Please provide an offset parameter in the request.`);
-      }
-    } else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
-      const request = JSON.stringify(endpoint);
-      if (!request.includes('cursor')) {
-        throw new Error(`Pagination type is ${PaginationType.CURSOR_BASED} but no cursor parameter is provided in the request. Please provide a cursor parameter in the request.`);
-      }
-    }
+    validatePaginationConfig(endpoint);
 
     const headersWithReplacedVars = Object.fromEntries(
       (await Promise.all(
         Object.entries(endpoint.headers || {})
-          .map(async ([key, value]) => [key, await replaceVariables(String(value), requestVars)])
+          .map(async ([key, value]) => [key, await resolveVarReferences({ apiConfig: endpoint, configField: "header", rawStringWithReferences: String(value), allVariables: requestVars })])
       )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
@@ -83,16 +69,16 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
     const processedQueryParams = Object.fromEntries(
       (await Promise.all(
         Object.entries(endpoint.queryParams || {})
-          .map(async ([key, value]) => [key, await replaceVariables(String(value), requestVars)])
+          .map(async ([key, value]) => [key, await resolveVarReferences({ apiConfig: endpoint, configField: "queryParam", rawStringWithReferences: String(value), allVariables: requestVars })])
       )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
     const processedBody = endpoint.body ?
-      await replaceVariables(endpoint.body, requestVars) :
+      await resolveVarReferences({ apiConfig: endpoint, configField: "body", rawStringWithReferences: endpoint.body, allVariables: requestVars }) :
       "";
 
-    const processedUrlHost = await replaceVariables(endpoint.urlHost, requestVars);
-    const processedUrlPath = await replaceVariables(endpoint.urlPath, requestVars);
+    const processedUrlHost = await resolveVarReferences({ apiConfig: endpoint, configField: "urlHost", rawStringWithReferences: endpoint.urlHost, allVariables: requestVars });
+    const processedUrlPath = await resolveVarReferences({ apiConfig: endpoint, configField: "urlPath", rawStringWithReferences: endpoint.urlPath, allVariables: requestVars });
 
     if (processedUrlHost.startsWith("postgres://") || processedUrlHost.startsWith("postgresql://")) {
       const postgresEndpoint = {
@@ -437,4 +423,88 @@ export async function generateApiConfig({
     } as ApiConfig,
     messages: updatedMessages
   };
+}
+
+export function validatePaginationConfig(apiConfig: ApiConfig): void {
+  if (!apiConfig.pagination?.type) return;
+
+  const request = JSON.stringify(apiConfig);
+  const paginationType = apiConfig.pagination.type;
+  const missingVariables: string[] = [];
+
+  if (paginationType === PaginationType.PAGE_BASED) {
+    if (!request.includes('page')) {
+      missingVariables.push('page');
+    }
+  } else if (paginationType === PaginationType.OFFSET_BASED) {
+    if (!request.includes('offset')) {
+      missingVariables.push('offset');
+    }
+  } else if (paginationType === PaginationType.CURSOR_BASED) {
+    if (!request.includes('cursor')) {
+      missingVariables.push('cursor');
+    }
+  }
+
+  if (missingVariables.length > 0) {
+    throw new Error(getPaginationErrorContext(
+      { paginationType, apiConfig, missingVariables },
+      { characterBudget: 5000 }
+    ));
+  }
+}
+
+type resolveVarReferencesInput = {
+  apiConfig: ApiConfig;
+  configField: string;
+  rawStringWithReferences: string;
+  allVariables: Record<string, any>;
+};
+
+export async function resolveVarReferences(input: resolveVarReferencesInput): Promise<string> {
+  try {
+    return await replaceVariables(input.rawStringWithReferences, input.allVariables);
+  } catch (error) {
+    const originalErrorMessage = error instanceof Error ? error.message : String(error);
+
+    // check if the error is a variable reference not found error (which is thrown if a var resolves to undefined)
+    const variableReferenceMatch = originalErrorMessage.match(/Variable reference not found: (.+?) - (.+)$/);
+    if (variableReferenceMatch) {
+      const varReference = variableReferenceMatch[1];
+
+      if (varReference.trim().toLowerCase() === 'cursor') {
+        return "";
+      }
+
+      throw new Error(getVarResolverErrorContext(
+        {
+          apiConfig: input.apiConfig,
+          configField: input.configField,
+          errorType: "undefined_variable",
+          varReference: varReference,
+          originalErrorMessage,
+          allVariables: input.allVariables
+        },
+        { characterBudget: 5000 }
+      ));
+    }
+    // check if the error is a code execution error (which is thrown if a js expression fails to execute)
+    const codeExecutionMatch = originalErrorMessage.match(/Failed to run JS expression: (.+?) - (.+)$/);
+    if (codeExecutionMatch) {
+      const varReference = codeExecutionMatch[1];
+
+      throw new Error(getVarResolverErrorContext(
+        {
+          apiConfig: input.apiConfig,
+          configField: input.configField,
+          errorType: "code_execution_error",
+          varReference: varReference,
+          originalErrorMessage,
+          allVariables: input.allVariables
+        },
+        { characterBudget: 5000 }
+      ));
+    }
+    throw new Error(`Unknown error while replacing variables: ${originalErrorMessage}`);
+  }
 }

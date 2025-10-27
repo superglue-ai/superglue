@@ -1,7 +1,4 @@
-import { Integration, JSONSchema, Workflow } from "@superglue/client";
-import { ExtractConfig } from "@superglue/client";
-import { ExecutionStep } from "@superglue/client";
-import { ApiConfig } from "@superglue/client";
+import { ApiConfig, ExecutionStep, ExtractConfig, Integration, JSONSchema, Workflow } from "@superglue/client";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 
 export type ObjectContextOptions = {
@@ -124,5 +121,28 @@ export type GenerateApiConfigContextInput = {
 };
 
 export type GenerateApiConfigContextOptions = {
+    characterBudget: number;
+};
+
+export type PaginationErrorContextInput = {
+    paginationType: string;
+    apiConfig: ApiConfig;
+    missingVariables: string[];
+};
+
+export type PaginationErrorContextOptions = {
+    characterBudget: number;
+};
+
+export type VarResolverErrorContextInput = {
+    apiConfig: ApiConfig;
+    configField: string;
+    errorType: "undefined_variable" | "code_execution_error";
+    varReference: string;
+    originalErrorMessage?: string;
+    allVariables: Record<string, any>;
+};
+
+export type VarResolverErrorContextOptions = {
     characterBudget: number;
 };
