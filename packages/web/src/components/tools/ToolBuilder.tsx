@@ -496,16 +496,16 @@ export function ToolBuilder({
               </Button>
             </div>
 
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 450px)', minHeight: '200px' }}>
-              {loading ? (
-                <div className="h-full bg-background" />
-              ) : integrations.length === 0 ? (
-                <div className="h-[320px] flex items-center justify-center bg-background">
-                  <p className="text-sm text-muted-foreground italic">
-                    No integrations added yet. Define the APIs or data sources your tool will use.
-                  </p>
-                </div>
-              ) : (
+            {loading ? (
+              <div className="h-[200px] bg-background" />
+            ) : integrations.length === 0 ? (
+              <div className="py-16 flex items-center justify-center">
+                <p className="text-sm text-muted-foreground italic">
+                  No integrations added yet. Define the APIs or data sources your tool will use.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 450px)', minHeight: '200px' }}>
                 <div className="space-y-2">
                   {(() => {
                     const filteredIntegrations = integrations.filter(sys =>
@@ -648,21 +648,21 @@ export function ToolBuilder({
                     );
                   })()}
                 </div>
-              )}
+              </div>
+            )}
+
+            <div className="flex justify-end mt-3">
+              <Button
+                onClick={handleNextFromIntegrations}
+                className="h-8 px-4 rounded-full flex-shrink-0"
+              >
+                {selectedIntegrationIds.length === 0
+                  ? "Select None"
+                  : selectedIntegrationIds.length === 1
+                    ? "Select 1 Integration"
+                    : `Select ${selectedIntegrationIds.length} Integrations`}
+              </Button>
             </div>
-          </div>
-        
-          <div className="flex justify-end mt-4">
-            <Button
-              onClick={handleNextFromIntegrations}
-              className="h-10 px-6 rounded-full"
-            >
-              {selectedIntegrationIds.length === 0
-                ? "Select None"
-                : selectedIntegrationIds.length === 1
-                  ? "Select 1 Integration"
-                  : `Select ${selectedIntegrationIds.length} Integrations`}
-            </Button>
           </div>
         
           {showIntegrationForm && typeof document !== 'undefined' && createPortal(
