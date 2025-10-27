@@ -1,6 +1,7 @@
 "use client"
 
 import { useConfig } from '@/src/app/config-context';
+import { useIntegrations } from '@/src/app/integrations-context';
 import { ConfigCreateStepper } from '@/src/components/api/ConfigCreateStepper';
 import {
   AlertDialog,
@@ -46,7 +47,6 @@ const CACHE_PREFIX = 'superglue-tools-cache';
 
 interface CachedTools {
   configs: (ApiConfig | Tool)[];
-  integrations: Integration[];
   timestamp: number;
 }
 
@@ -59,6 +59,7 @@ const ConfigTable = () => {
   const [page, setPage] = React.useState(0);
   const [pageSize] = React.useState(20);
   const config = useConfig();
+  const { integrations } = useIntegrations();
   const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | Tool | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [showConfigStepper, setShowConfigStepper] = React.useState(false);
@@ -66,7 +67,6 @@ const ConfigTable = () => {
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const [expandedToolId, setExpandedToolId] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [integrations, setIntegrations] = React.useState<Integration[]>([]);
   const [selectedIntegration, setSelectedIntegration] = React.useState<string>("all");
 
 
@@ -79,14 +79,10 @@ const ConfigTable = () => {
         apiKey: config.superglueApiKey
       });
 
-      // Fetch APIs, Tools, and Integrations concurrently
-      const [apiConfigs, toolConfigs, integrationsData] = await Promise.all([
+      const [apiConfigs, toolConfigs] = await Promise.all([
         superglueClient.listApis(1000, 0),
         superglueClient.listWorkflows(1000, 0),
-        superglueClient.listIntegrations(1000, 0),
       ]);
-
-      setIntegrations(integrationsData.items);
 
       const combinedConfigs = [
         ...apiConfigs.items.map(item => ({ ...item, type: 'api' as const })),
@@ -103,7 +99,6 @@ const ConfigTable = () => {
 
       saveToCache(config.superglueApiKey, CACHE_PREFIX, {
         configs: combinedConfigs,
-        integrations: integrationsData.items,
         timestamp: Date.now()
       });
     } catch (error) {
@@ -118,7 +113,6 @@ const ConfigTable = () => {
     const cachedData = loadFromCache<CachedTools>(config.superglueApiKey, CACHE_PREFIX);
     if (cachedData) {
       setAllConfigs(cachedData.configs);
-      setIntegrations(cachedData.integrations);
       setTotal(cachedData.configs.length);
     }
     refreshConfigs();

@@ -147,12 +147,6 @@ export function ToolBuilder({
   }, [preselectedIntegrationId, integrations, selectedIntegrationIds.length]);
 
   useEffect(() => {
-    if (view === 'instructions' && selectedIntegrationIds.length > 0 && suggestions.length === 0) {
-      handleGenerateInstructions();
-    }
-  }, [view, selectedIntegrationIds]);
-
-  useEffect(() => {
     if (view === 'instructions' && selectedIntegrationIds.length > 0) {
       setSuggestions([]);
       handleGenerateInstructions();
