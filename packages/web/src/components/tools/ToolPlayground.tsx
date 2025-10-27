@@ -312,12 +312,18 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       return parentOnFilesUpload(files);
     }
 
-    // Local handling for non-embedded mode
-    setLocalIsProcessingFiles(true);
+    // Local handling - determine which state to use
+    const currentFiles = parentUploadedFiles || localUploadedFiles;
+    const currentSize = parentTotalFileSize ?? localTotalFileSize;
+    const currentPayloads = parentFilePayloads || localFilePayloads;
+    
+    const setProcessing = parentIsProcessingFiles !== undefined ? () => {} : setLocalIsProcessingFiles;
+    
+    setProcessing(true);
 
     try {
       const newSize = files.reduce((sum, f) => sum + f.size, 0);
-      if (localTotalFileSize + newSize > MAX_FILE_SIZE_TOOLS) {
+      if (currentSize + newSize > MAX_FILE_SIZE_TOOLS) {
         toast({
           title: 'Size limit exceeded',
           description: `Total file size cannot exceed ${formatBytes(MAX_FILE_SIZE_TOOLS)}`,
@@ -326,8 +332,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         return;
       }
 
-      const existingKeys = localUploadedFiles.map(f => f.key);
+      const existingKeys = currentFiles.map(f => f.key);
       const newFiles: UploadedFileInfo[] = [];
+      const newPayloads: Record<string, any> = { ...currentPayloads };
 
       for (const file of files) {
         try {
@@ -341,25 +348,46 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
             status: 'processing'
           };
           newFiles.push(fileInfo);
-          setLocalUploadedFiles(prev => [...prev, fileInfo]);
+          
+          // Update state optimistically
+          const updatedFiles = [...currentFiles, fileInfo];
+          if (parentOnFilesChange) {
+            parentOnFilesChange(updatedFiles, newPayloads);
+          } else {
+            setLocalUploadedFiles(updatedFiles);
+          }
 
           const parsedData = await processAndExtractFile(file, client);
 
-          setLocalFilePayloads(prev => ({ ...prev, [key]: parsedData }));
+          newPayloads[key] = parsedData;
           existingKeys.push(key);
 
-          setLocalUploadedFiles(prev => prev.map(f =>
-            f.key === key ? { ...f, status: 'ready' } : f
-          ));
+          // Update with successful status
+          const finalFiles = updatedFiles.map(f =>
+            f.key === key ? { ...f, status: 'ready' as const } : f
+          );
+          
+          if (parentOnFilesChange) {
+            parentOnFilesChange(finalFiles, newPayloads);
+          } else {
+            setLocalUploadedFiles(finalFiles);
+            setLocalFilePayloads(newPayloads);
+          }
 
         } catch (error: any) {
           const fileInfo = newFiles.find(f => f.name === file.name);
           if (fileInfo) {
-            setLocalUploadedFiles(prev => prev.map(f =>
+            const errorFiles = [...currentFiles, ...newFiles].map(f =>
               f.key === fileInfo.key
-                ? { ...f, status: 'error', error: error.message }
+                ? { ...f, status: 'error' as const, error: error.message }
                 : f
-            ));
+            );
+            
+            if (parentOnFilesChange) {
+              parentOnFilesChange(errorFiles, newPayloads);
+            } else {
+              setLocalUploadedFiles(errorFiles);
+            }
           }
 
           toast({
@@ -369,10 +397,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           });
         }
       }
-      setLocalTotalFileSize(prev => prev + newSize);
 
     } finally {
-      setLocalIsProcessingFiles(false);
+      setProcessing(false);
     }
   };
 
@@ -382,17 +409,24 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       return parentOnFileRemove(key);
     }
 
-    // Local handling
-    const fileToRemove = localUploadedFiles.find(f => f.key === key);
+    // Determine which state to use
+    const currentFiles = parentUploadedFiles || localUploadedFiles;
+    const currentPayloads = parentFilePayloads || localFilePayloads;
+    
+    const fileToRemove = currentFiles.find(f => f.key === key);
     if (!fileToRemove) return;
 
-    setLocalFilePayloads(prev => {
-      const newPayloads = { ...prev };
-      delete newPayloads[key];
-      return newPayloads;
-    });
-    setLocalUploadedFiles(prev => prev.filter(f => f.key !== key));
-    setLocalTotalFileSize(prev => Math.max(0, prev - (fileToRemove.size || 0)));
+    const newFiles = currentFiles.filter(f => f.key !== key);
+    const newPayloads = { ...currentPayloads };
+    delete newPayloads[key];
+
+    if (parentOnFilesChange) {
+      parentOnFilesChange(newFiles, newPayloads);
+    } else {
+      setLocalUploadedFiles(newFiles);
+      setLocalFilePayloads(newPayloads);
+      setLocalTotalFileSize(prev => Math.max(0, prev - (fileToRemove.size || 0)));
+    }
   };
 
 
