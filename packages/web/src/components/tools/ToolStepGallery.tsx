@@ -714,7 +714,7 @@ export function ToolStepGallery({
                                     onRemove={!readOnly && currentItem.type === 'step' ? handleRemoveStep : undefined}
                                     onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
                                     onFixStep={onFixStep ? () => onFixStep(activeIndex - 1) : undefined}
-                                    canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap) && (activeIndex !== 1 || isPayloadValid)}
+                                    canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
                                     isExecuting={isExecutingStep === activeIndex - 1}
                                     isFixingWorkflow={isFixingWorkflow === activeIndex - 1}
                                     isGlobalExecuting={!!(isExecuting || isExecutingTransform)}
@@ -724,6 +724,8 @@ export function ToolStepGallery({
                                     failedSteps={failedSteps}
                                     showOutputSignal={showStepOutputSignal}
                                     onConfigEditingChange={setIsConfiguratorEditing}
+                                    isFirstStep={activeIndex === 1}
+                                    isPayloadValid={isPayloadValid}
                                 />
                             )
                         )}
