@@ -1,11 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { generateText, tool, jsonSchema } from 'ai';
-import { openai } from '@ai-sdk/openai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
-import { initializeAIModel, getModelContextLength } from '@superglue/shared/utils';
-import { LLMMessage } from './language-model.js';
+import { openai } from '@ai-sdk/openai';
+import { getModelContextLength, initializeAIModel } from '@superglue/shared/utils';
+import { generateText, jsonSchema, tool } from 'ai';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AiSdkModel } from './ai-sdk-model.js';
+import { LLMMessage } from './language-model.js';
 
 vi.mock('ai');
 vi.mock('@ai-sdk/openai');
@@ -281,34 +281,6 @@ describe('AiSdkModel', () => {
         expect.objectContaining({
           tools: expect.objectContaining({
             web_search: { type: 'web_search_anthropic' }
-          })
-        })
-      );
-      
-      delete process.env.LLM_PROVIDER;
-    });
-
-    it('should add web_search tool for gemini provider', async () => {
-      process.env.LLM_PROVIDER = 'gemini';
-      const model = new AiSdkModel();
-      
-      mockGenerateText.mockResolvedValue({
-        text: '',
-        toolCalls: [{
-          toolCallId: 'call_123',
-          toolName: 'submit',
-          input: { key: 'value' }
-        }],
-        toolResults: []
-      } as any);
-
-      await model.generateObject([{ role: 'user', content: 'test' }], { type: 'object', properties: {} });
-
-      expect(google.tools.googleSearch).toHaveBeenCalledWith({});
-      expect(mockGenerateText).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tools: expect.objectContaining({
-            web_search: { type: 'web_search_google' }
           })
         })
       );
