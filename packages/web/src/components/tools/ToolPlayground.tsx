@@ -1119,7 +1119,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   inputSchema={inputSchema}
                   onInputSchemaChange={(v) => setInputSchema(v)}
                   payloadText={payload}
-                  headerActions={headerActions || (!embedded ? defaultHeaderActions : undefined)}
+                  headerActions={headerActions !== undefined ? headerActions : (!readOnly ? defaultHeaderActions : undefined)}
                   navigateToFinalSignal={navigateToFinalSignal}
                   showStepOutputSignal={showStepOutputSignal}
                   focusStepId={focusStepId}

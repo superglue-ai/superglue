@@ -5,9 +5,6 @@ import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useRef, useState } from 'react';
 import { Button } from '../ui/button';
-import { Label } from '../ui/label';
-import { Switch } from '../ui/switch';
-import { HelpTooltip } from '../utils/HelpTooltip';
 import { ToolBuilder, type BuildContext } from './ToolBuilder';
 import ToolPlayground, { ToolPlaygroundHandle } from './ToolPlayground';
 import { useConfig } from '@/src/app/config-context';
@@ -160,53 +157,6 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                 onStopExecution={handleStopExecution}
                 uploadedFiles={buildContext.uploadedFiles}
                 filePayloads={buildContext.filePayloads}
-                headerActions={(
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 mr-2">
-                      <Label htmlFor="wcs-selfHealing" className="text-xs flex items-center gap-1">
-                        <span>auto-repair</span>
-                      </Label>
-                      <div className="flex items-center">
-                        <Switch
-                          id="wcs-selfHealing"
-                          className="custom-switch"
-                          checked={selfHealingEnabled}
-                          onCheckedChange={setSelfHealingEnabled}
-                        />
-                        <div className="ml-1 flex items-center">
-                          <HelpTooltip text="Enable auto-repair during execution. Slower, but can auto-fix failures in tool steps and transformation code." />
-                        </div>
-                      </div>
-                    </div>
-                    {isExecuting ? (
-                      <Button
-                        variant="destructive"
-                        onClick={handleStopExecution}
-                        disabled={isSaving || isStopping}
-                        className="h-9 px-4"
-                      >
-                        {isStopping ? "Stopping..." : "Stop Execution"}
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="success"
-                        onClick={handleExecuteTool}
-                        disabled={isSaving || isExecuting}
-                        className="h-9 px-4"
-                      >
-                        Run All Steps
-                      </Button>
-                    )}
-                    <Button
-                      variant="default"
-                      onClick={() => playgroundRef.current?.saveTool()}
-                      disabled={isSaving}
-                      className="h-9 px-5 shadow-md border border-primary/40"
-                    >
-                      {isSaving ? "Publishing..." : "Publish"}
-                    </Button>
-                  </div>
-                )}
               />
             </div>
           )}
