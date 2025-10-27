@@ -9,6 +9,7 @@ import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimple
 import { Integration, IntegrationInput, SuperglueClient, Workflow as Tool, UpsertMode } from '@superglue/client';
 import { integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
+import { Validator } from 'jsonschema';
 import { Check, Clock, FileJson, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Wrench, X } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -45,6 +46,7 @@ interface ToolBuilderProps {
   initialFiles?: UploadedFileInfo[];
   onToolBuilt: (tool: Tool, context: BuildContext) => void;
   onCancel?: () => void;
+  mode?: 'build' | 'rebuild';
 }
 
 class ExtendedSuperglueClient extends SuperglueClient {
@@ -84,7 +86,8 @@ export function ToolBuilder({
   initialInputSchema = null,
   initialFiles = [],
   onToolBuilt,
-  onCancel
+  onCancel,
+  mode = 'build'
 }: ToolBuilderProps) {
   const [view, setView] = useState<ToolBuilderView>(initialView);
   const [isBuilding, setIsBuilding] = useState(false);
@@ -100,7 +103,9 @@ export function ToolBuilder({
   const [responseSchema, setResponseSchema] = useState(initialResponseSchema);
   const [inputSchema, setInputSchema] = useState<string | null>(initialInputSchema);
   const [enforceInputSchema, setEnforceInputSchema] = useState(true);
-  const [inputSchemaMode, setInputSchemaMode] = useState<'current' | 'custom'>('current');
+  const [inputSchemaMode, setInputSchemaMode] = useState<'current' | 'custom'>(
+    initialInputSchema ? 'custom' : 'current'
+  );
 
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -118,11 +123,19 @@ export function ToolBuilder({
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
-  const [showPayloadSection, setShowPayloadSection] = useState(false);
-  const [showFileUploadSection, setShowFileUploadSection] = useState(false);
-  const [showResponseSchemaSection, setShowResponseSchemaSection] = useState(false);
+  const [showPayloadSection, setShowPayloadSection] = useState(
+    initialPayload && initialPayload !== '{}' ? true : false
+  );
+  const [showFileUploadSection, setShowFileUploadSection] = useState(
+    initialFiles.length > 0 ? true : false
+  );
+  const [showResponseSchemaSection, setShowResponseSchemaSection] = useState(
+    initialResponseSchema ? true : false
+  );
+  const [isPayloadValid, setIsPayloadValid] = useState(true);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const client = useMemo(() => new ExtendedSuperglueClient({
     endpoint: superglueConfig.superglueEndpoint,
@@ -158,6 +171,45 @@ export function ToolBuilder({
       setValidationErrors({});
     }
   }, [view]);
+
+  // Auto-resize textarea when instruction changes (including initial mount)
+  useEffect(() => {
+    if (textareaRef.current && instruction) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [instruction]);
+
+  // Validate payload against custom input schema
+  useEffect(() => {
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current);
+    }
+
+    validationTimeoutRef.current = setTimeout(() => {
+      // Only validate if custom schema mode is active and schema is set
+      if (enforceInputSchema && inputSchemaMode === 'custom' && inputSchema) {
+        try {
+          const payloadData = JSON.parse(payload || '{}');
+          const mergedPayload = { ...payloadData, ...filePayloads };
+          const schemaObj = JSON.parse(inputSchema);
+          const validator = new Validator();
+          const result = validator.validate(mergedPayload, schemaObj);
+          setIsPayloadValid(result.valid);
+        } catch (e) {
+          setIsPayloadValid(false);
+        }
+      } else {
+        setIsPayloadValid(true);
+      }
+    }, 300);
+
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+    };
+  }, [payload, inputSchema, filePayloads, enforceInputSchema, inputSchemaMode]);
 
   const toIntegrationInput = (i: Integration): IntegrationInput => ({
     id: i.id,
@@ -621,7 +673,7 @@ export function ToolBuilder({
   }
 
   return (
-    <div className="flex flex-col items-center pt-8">
+    <div className="flex flex-col items-center pt-8 h-full overflow-y-auto pb-8" style={{ scrollbarGutter: 'stable' }}>
       <div className="w-full max-w-3xl space-y-4">
         <div className="text-center mb-4">
           <h2 className="text-xl font-medium text-foreground">
@@ -716,20 +768,26 @@ export function ToolBuilder({
                   }
                 }}
                 className={cn(
-                  "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
+                  "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 border",
                   (() => {
                     const trimmedPayload = payload.trim();
                     const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
 
                     if (isEmptyPayload) {
-                      return "border border-border text-muted-foreground hover:bg-accent/50";
+                      return showPayloadSection
+                        ? "border-foreground/70 text-foreground hover:bg-accent/50"
+                        : "border-border text-muted-foreground hover:bg-accent/50";
                     }
 
                     try {
                       JSON.parse(trimmedPayload);
-                      return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
+                      return showPayloadSection
+                        ? "bg-[#FFD700]/40 border-[#FF8C00] text-foreground"
+                        : "bg-[#FFD700]/40 border-[#FFA500] text-foreground";
                     } catch {
-                      return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
+                      return showPayloadSection
+                        ? "bg-[#FFD700]/40 border-[#FF8C00] text-foreground"
+                        : "bg-[#FFD700]/40 border-[#FFA500] text-foreground";
                     }
                   })()
                 )}
@@ -738,6 +796,11 @@ export function ToolBuilder({
                 {(() => {
                   const trimmedPayload = payload.trim();
                   const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
+
+                  // Check schema validation if custom schema is active
+                  if (!isPayloadValid && enforceInputSchema && inputSchemaMode === 'custom' && inputSchema) {
+                    return 'Input Does Not Match Schema';
+                  }
 
                   if (isEmptyPayload) {
                     return 'Attach JSON Tool Input';
@@ -763,10 +826,14 @@ export function ToolBuilder({
                   setShowFileUploadSection(!showFileUploadSection);
                 }}
                 className={cn(
-                  "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
+                  "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 border",
                   uploadedFiles.length > 0
-                    ? "bg-[#FFD700]/40 border border-[#FFA500] text-foreground"
-                    : "border border-border text-muted-foreground hover:bg-accent/50"
+                    ? showFileUploadSection
+                      ? "bg-[#FFD700]/40 border-[#FF8C00] text-foreground"
+                      : "bg-[#FFD700]/40 border-[#FFA500] text-foreground"
+                    : showFileUploadSection
+                      ? "border-foreground/70 text-foreground hover:bg-accent/50"
+                      : "border-border text-muted-foreground hover:bg-accent/50"
                 )}
               >
                 <Paperclip className="h-4 w-4" />
@@ -784,17 +851,25 @@ export function ToolBuilder({
                   setShowResponseSchemaSection(!showResponseSchemaSection);
                 }}
                 className={cn(
-                  "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5",
+                  "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 border",
                   (() => {
                     const trimmedSchema = responseSchema?.trim();
+                    
                     if (!trimmedSchema) {
-                      return "border border-border text-muted-foreground hover:bg-accent/50";
+                      return showResponseSchemaSection
+                        ? "border-foreground/70 text-foreground hover:bg-accent/50"
+                        : "border-border text-muted-foreground hover:bg-accent/50";
                     }
+                    
                     try {
                       JSON.parse(trimmedSchema);
-                      return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
+                      return showResponseSchemaSection
+                        ? "bg-[#FFD700]/40 border-[#FF8C00] text-foreground"
+                        : "bg-[#FFD700]/40 border-[#FFA500] text-foreground";
                     } catch {
-                      return "bg-[#FFD700]/40 border border-[#FFA500] text-foreground";
+                      return showResponseSchemaSection
+                        ? "bg-[#FFD700]/40 border-[#FF8C00] text-foreground"
+                        : "bg-[#FFD700]/40 border-[#FFA500] text-foreground";
                     }
                   })()
                 )}
@@ -817,19 +892,23 @@ export function ToolBuilder({
 
             <Button
               onClick={handleBuildTool}
-              disabled={isBuilding || !instruction.trim()}
+              disabled={isBuilding || !instruction.trim() || !isPayloadValid}
               className="h-8 px-4 rounded-full flex-shrink-0 flex items-center gap-2"
-              title="Build Tool"
+              title={
+                !isPayloadValid 
+                  ? 'Payload does not match custom input schema'
+                  : mode === 'rebuild' ? 'Rebuild Tool' : 'Build Tool'
+              }
             >
               {isBuilding ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Building...
+                  {mode === 'rebuild' ? 'Rebuilding...' : 'Building...'}
                 </>
               ) : (
                 <>
                   <Wrench className="h-4 w-4" />
-                  Build
+                  {mode === 'rebuild' ? 'Rebuild' : 'Build'}
                 </>
               )}
             </Button>
@@ -869,8 +948,18 @@ export function ToolBuilder({
                   }
                 }}
                 placeholder=""
-                className={cn("font-mono text-xs min-h-[150px]", validationErrors.payload && inputErrorStyles)}
+                className={cn(
+                  "font-mono text-xs min-h-[150px]",
+                  validationErrors.payload && inputErrorStyles,
+                  !isPayloadValid && enforceInputSchema && inputSchemaMode === 'custom' && inputSchema && inputErrorStyles
+                )}
               />
+              
+              {!isPayloadValid && enforceInputSchema && inputSchemaMode === 'custom' && inputSchema && (
+                <p className="text-xs text-destructive mt-1">
+                  Payload does not match the custom input schema
+                </p>
+              )}
 
               {enforceInputSchema && (
                 <div className="space-y-3 pt-3 border-t">

@@ -6,7 +6,7 @@ import { formatBytes, generateUniqueKey, MAX_FILE_SIZE_TOOLS, processAndExtractF
 import { computeStepOutput } from "@/src/lib/general-utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
 import { Validator } from "jsonschema";
-import { Check, Loader2, Play, X } from "lucide-react";
+import { Check, Hammer, Loader2, Play, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -15,6 +15,7 @@ import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { ToolStepGallery } from "./ToolStepGallery";
 import { ToolCreateSuccess } from "./ToolCreateSuccess";
+import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -148,6 +149,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const stopSignalRef = useRef<boolean>(false);
   const [isPayloadValid, setIsPayloadValid] = useState<boolean>(true);
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showToolBuilder, setShowToolBuilder] = useState(false);
 
   useEffect(() => {
     if (externalSelfHealingEnabled !== undefined) {
@@ -208,6 +210,41 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     endpoint: config.superglueEndpoint,
     apiKey: config.superglueApiKey,
   }), [config.superglueEndpoint, config.superglueApiKey]);
+
+  const extractIntegrationIds = (steps: ExecutionStep[]): string[] => {
+    return Array.from(new Set(
+      steps.map(s => s.integrationId).filter(Boolean) as string[]
+    ));
+  };
+
+  const handleToolRebuilt = (tool: Tool, context: BuildContext) => {
+    setToolId(tool.id);
+    setSteps(tool.steps?.map(step => ({
+      ...step,
+      apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id }
+    })) || []);
+    setFinalTransform(tool.finalTransform || finalTransform);
+    setResponseSchema(tool.responseSchema ? JSON.stringify(tool.responseSchema, null, 2) : '');
+    setInputSchema(tool.inputSchema ? JSON.stringify(tool.inputSchema, null, 2) : null);
+    setInstructions(context.instruction);
+    setPayload(context.payload);
+    
+    // Update file state if using local state
+    if (!parentUploadedFiles) {
+      setLocalUploadedFiles(context.uploadedFiles);
+      setLocalFilePayloads(context.filePayloads);
+      setLocalTotalFileSize(context.uploadedFiles.reduce((sum, f) => sum + f.size, 0));
+    }
+    
+    // Clear execution state since tool changed
+    setResult(null);
+    setCompletedSteps([]);
+    setFailedSteps([]);
+    setStepResultsMap({});
+    setFinalPreviewResult(null);
+    
+    setShowToolBuilder(false);
+  };
 
   // Extract payload schema from full input schema
   const extractPayloadSchema = (fullInputSchema: string | null): any | null => {
@@ -912,6 +949,16 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           Run All Steps
         </Button>
       )}
+      {!readOnly && (
+        <Button
+          variant="outline"
+          onClick={() => setShowToolBuilder(true)}
+          className="h-9 px-5"
+        >
+          <Hammer fill="currentColor" className="h-4 w-4" />
+          Rebuild
+        </Button>
+      )}
       <Button
         variant="default"
         onClick={saveTool}
@@ -927,6 +974,43 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       </Button>
     </div>
   );
+
+  if (showToolBuilder) {
+    // Extract just the payload schema (what user sees in input card), not the full input schema
+    const payloadSchema = extractPayloadSchema(inputSchema);
+    const payloadSchemaString = payloadSchema ? JSON.stringify(payloadSchema, null, 2) : null;
+
+    return (
+      <div className={embedded ? "w-full h-full" : "pt-2 px-6 pb-6 max-w-none w-full h-screen flex flex-col"}>
+        {!embedded && !hideHeader && (
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Edit & Rebuild Tool</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowToolBuilder(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        <div className="flex-1 overflow-hidden">
+          <ToolBuilder
+            initialView="instructions"
+            initialIntegrationIds={extractIntegrationIds(steps)}
+            initialInstruction={instructions}
+            initialPayload={payload}
+            initialResponseSchema={responseSchema}
+            initialInputSchema={payloadSchemaString}
+            initialFiles={uploadedFiles}
+            onToolBuilt={handleToolRebuilt}
+            onCancel={() => setShowToolBuilder(false)}
+            mode="rebuild"
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (showSuccessPage) {
     const currentTool = {
