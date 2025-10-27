@@ -1,12 +1,11 @@
 import type { ApiConfig, ExecutionStep, RequestOptions, WorkflowStepResult } from "@superglue/client";
 import { Integration, Metadata } from "@superglue/shared";
 import { getLoopSelectorContext } from "../context/context-builders.js";
-import { LoopSelectorContextInput, LoopSelectorContextOptions } from "../context/context-types.js";
 import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel } from "../llm/language-model.js";
+import { applyJsonata, flattenObject, isSelfHealingEnabled, transformAndValidateSchema } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
-import { applyJsonata, flattenObject, isSelfHealingEnabled, transformAndValidateSchema } from "../utils/tools.js";
 import { generateTransformCode } from "../utils/transform.js";
 import { executeStep } from "./workflow-step.js";
 
@@ -45,7 +44,7 @@ const directStrategy: ExecutionStrategy = {
     try {
       const apiResponse = await executeStep({
         endpoint: step.apiConfig,
-        payload,
+        stepInput: payload,
         credentials,
         options,
         metadata,
@@ -97,7 +96,7 @@ const loopStrategy: ExecutionStrategy = {
         }
         logMessage("error", `Loop selector for '${step.id}' did not return an array. Regenerating loop selector.`, metadata);
 
-        const loopPrompt = getLoopSelectorContext( { step: step, payload: payload, instruction: step.apiConfig.instruction }, { characterBudget: LanguageModel.contextLength / 10 });
+        const loopPrompt = getLoopSelectorContext({ step: step, payload: payload, instruction: step.apiConfig.instruction }, { characterBudget: LanguageModel.contextLength / 10 });
         const arraySchema = { type: "array", description: "Array of items to iterate over" };
         const transformResult = await generateTransformCode(arraySchema, payload, loopPrompt, metadata);
 
@@ -128,7 +127,7 @@ const loopStrategy: ExecutionStrategy = {
         try {
           const apiResponse = await executeStep({
             endpoint: successfulConfig || step.apiConfig,
-            payload: loopPayload,
+            stepInput: loopPayload,
             credentials,
             options: {
               ...options,

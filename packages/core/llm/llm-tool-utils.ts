@@ -6,7 +6,7 @@ import {
     searchDocumentationToolDefinition,
     searchDocumentationToolImplementation,
     submitToolDefinition
-} from "../utils/workflow-tools.js";
+} from "./llm-tools.js";
 
 export interface ToolDefinition {
     name: string;

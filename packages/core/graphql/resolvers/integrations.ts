@@ -5,9 +5,9 @@ import { GraphQLResolveInfo } from "graphql";
 import { PostgresService } from '../../datastore/postgres.js';
 import { server_defaults } from '../../default.js';
 import { DocumentationFetcher } from '../../documentation/documentation-fetching.js';
-import { IntegrationSelector } from '../../integrations/integration-selector.js';
+import { IntegrationFinder } from '../../find/integration-finder.js';
+import { composeUrl } from '../../utils/helpers.js';
 import { logMessage } from '../../utils/logs.js';
-import { composeUrl } from '../../utils/tools.js';
 
 export const listIntegrationsResolver = async (
   _: any,
@@ -153,8 +153,8 @@ export const findRelevantIntegrationsResolver = async (
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
     const allIntegrations = await context.datastore.listIntegrations({ limit: 1000, offset: 0, includeDocs: false, orgId: context.orgId });
 
-    const selector = new IntegrationSelector(metadata);
-    return await selector.select(searchTerms, allIntegrations.items || []);
+    const selector = new IntegrationFinder(metadata);
+    return await selector.findRelevantIntegrations(searchTerms, allIntegrations.items || []);
   } catch (error) {
     logMessage('error', `Error finding relevant integrations: ${String(error)}`, { orgId: context.orgId });
     return [];

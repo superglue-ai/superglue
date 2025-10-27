@@ -2,8 +2,8 @@ import { ExecutionStep, RequestOptions, Workflow, WorkflowResult, WorkflowStepRe
 import { Metadata } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { IntegrationManager } from "../integrations/integration-manager.js";
+import { isSelfHealingEnabled, transformAndValidateSchema } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
-import { isSelfHealingEnabled, transformAndValidateSchema } from "../utils/tools.js";
 import { evaluateTransform, generateTransformCode } from "../utils/transform.js";
 import { selectStrategy } from "./workflow-strategies.js";
 

@@ -1,7 +1,7 @@
 import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
 import { executeStep } from "../../execute/workflow-step.js";
-import { maskCredentials } from "../../utils/tools.js";
+import { maskCredentials } from "../../utils/helpers.js";
 import { executeTransform, TransformConfig } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { Context, Metadata } from '../types.js';
@@ -50,7 +50,7 @@ export const callResolver = async (
     }
     const callResult = await executeStep({
       endpoint,
-      payload,
+      stepInput: payload,
       credentials,
       integrationManager: null,
       options,

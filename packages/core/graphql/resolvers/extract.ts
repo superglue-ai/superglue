@@ -1,11 +1,9 @@
-import { CacheMode, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/client";
+import { DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
-import { DocumentationFetcher } from "../../documentation/documentation-fetching.js";
-import { DocumentationSearch } from "../../documentation/documentation-search.js";
-import { callExtract, generateExtractConfig, processFile } from "../../execute/extract.js";
+import { processFile } from "../../execute/extract.js";
+import { maskCredentials } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { maskCredentials } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { Context, Metadata } from '../types.js';
 

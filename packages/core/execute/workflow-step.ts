@@ -5,9 +5,9 @@ import { server_defaults } from "../default.js";
 import { Metadata } from "../graphql/types.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
+import { isSelfHealingEnabled, maskCredentials } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
-import { isSelfHealingEnabled, maskCredentials } from "../utils/tools.js";
 import { AbortError, ApiCallError } from "./api/api.js";
 import { callEndpointLegacyImplementation, generateApiConfig } from "./api/api.legacy.js";
 
@@ -43,14 +43,14 @@ export async function evaluateStepResponse({
 
 export async function executeStep({
   endpoint,
-  payload,
+  stepInput,
   credentials,
   integrationManager,
   options,
   metadata,
 }: {
   endpoint: ApiConfig,
-  payload: any,
+  stepInput: any,
   credentials: Record<string, string>,
   integrationManager: IntegrationManager,
   options: RequestOptions,
@@ -76,8 +76,8 @@ export async function executeStep({
       if (retryCount > 0 && isSelfHealing) {
         logMessage('info', `Failed to execute API Call. Self healing the step configuration for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, metadata);
         const computedApiCallConfig = await generateApiConfig({
-          apiConfig: endpoint,
-          payload,
+          failedConfig: endpoint,
+          stepInput: stepInput,
           credentials,
           retryCount,
           messages,
@@ -90,7 +90,7 @@ export async function executeStep({
         messages = computedApiCallConfig.messages;
       }
 
-      response = await callEndpointLegacyImplementation({ endpoint, payload, credentials, options });
+      response = await callEndpointLegacyImplementation({ endpoint, payload: stepInput, credentials, options });
 
       if (!response.data) {
         throw new Error("No data returned from API. This could be due to a configuration error.");

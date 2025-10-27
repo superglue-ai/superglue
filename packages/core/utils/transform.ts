@@ -1,12 +1,12 @@
-import { RequestOptions, BaseConfig, JSONSchema, JSONata } from "@superglue/client";
+import { BaseConfig, JSONata, JSONSchema, RequestOptions } from "@superglue/client";
 import type { DataStore, Metadata } from "@superglue/shared";
 import prettier from "prettier";
 import { getEvaluateTransformContext, getTransformContext } from "../context/context-builders.js";
 import { EVALUATE_TRANSFORM_SYSTEM_PROMPT, GENERATE_TRANSFORM_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
+import { isSelfHealingEnabled, transformAndValidateSchema } from "./helpers.js";
 import { logMessage } from "./logs.js";
-import { isSelfHealingEnabled, transformAndValidateSchema } from "./tools.js";
 
 export interface TransformConfig extends BaseConfig {
   instruction: string;

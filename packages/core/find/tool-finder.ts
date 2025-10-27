@@ -21,7 +21,7 @@ export interface SuggestedTool {
     reason: string;
 }
 
-export class ToolSelector {
+export class ToolFinder {
     private metadata: Metadata;
 
     constructor(metadata: Metadata) {
@@ -42,7 +42,7 @@ export class ToolSelector {
         }));
     }
 
-    public async select(
+    public async findRelevantTools(
         query: string | undefined,
         tools: Workflow[]
     ): Promise<SuggestedTool[]> {

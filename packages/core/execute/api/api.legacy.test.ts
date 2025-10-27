@@ -1,6 +1,6 @@
 import { ApiConfig, HttpMethod, PaginationType, SelfHealingMode } from '@superglue/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
-import { isSelfHealingEnabled } from '../../utils/tools.js';
+import { isSelfHealingEnabled } from '../../utils/helpers.js';
 import * as api from './api.js';
 import { callEndpointLegacyImplementation as callEndpoint, convertBasicAuthToBase64 } from './api.legacy.js';
 
@@ -272,7 +272,7 @@ describe('API Utilities', () => {
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce({ response: htmlResponse, retriesAttempted: 0, lastFailureStatus: undefined } );
+      mockedTools.callAxios.mockResolvedValueOnce({ response: htmlResponse, retriesAttempted: 0, lastFailureStatus: undefined });
 
       await expect(callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/Received HTML response/);
@@ -446,7 +446,7 @@ describe('API Utilities', () => {
       expect(true).toBe(true); // Placeholder test for self-healing integration
     });
   });
-}); 
+});
 
 describe('Basic Auth Utilities', () => {
   beforeEach(() => {

@@ -7,8 +7,8 @@ import { getExtractContext } from "../context/context-builders.js";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { decompressData, parseFile } from "../utils/file.js";
+import { composeUrl, replaceVariables } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
-import { composeUrl, replaceVariables } from "../utils/tools.js";
 import { callAxios } from "./api/api.js";
 
 
@@ -74,15 +74,9 @@ export async function generateExtractConfig(extractConfig: Partial<ExtractConfig
   const schema = zodToJsonSchema(z.object({
     urlHost: z.string(),
     urlPath: z.string().optional(),
-    queryParams: z.array(z.object({
-      key: z.string(),
-      value: z.string()
-    })).optional(),
+    queryParams: z.record(z.string()).optional(),
     method: z.enum(Object.values(HttpMethod) as [string, ...string[]]),
-    headers: z.array(z.object({
-      key: z.string(),
-      value: z.string()
-    })).optional(),
+    headers: z.record(z.string()).optional(),
     body: z.string().optional(),
     authentication: z.enum(Object.values(AuthType) as [string, ...string[]]),
     dataPath: z.string().optional().describe('The path to the data array in the response JSON. e.g. "products"'),
@@ -107,8 +101,8 @@ export async function generateExtractConfig(extractConfig: Partial<ExtractConfig
     urlHost: generatedConfig.urlHost,
     urlPath: generatedConfig.urlPath,
     method: generatedConfig.method,
-    queryParams: generatedConfig.queryParams ? Object.fromEntries(generatedConfig.queryParams.map(p => [p.key, p.value])) : undefined,
-    headers: generatedConfig.headers ? Object.fromEntries(generatedConfig.headers.map(p => [p.key, p.value])) : undefined,
+    queryParams: generatedConfig.queryParams,
+    headers: generatedConfig.headers,
     body: generatedConfig.body,
     authentication: generatedConfig.authentication,
     pagination: generatedConfig.pagination,

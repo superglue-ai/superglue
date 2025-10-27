@@ -1,9 +1,9 @@
 import { Integration, Workflow } from '@superglue/client';
 import { server_defaults } from '../default.js';
 import { DocumentationSearch } from '../documentation/documentation-search.js';
-import { composeUrl } from '../utils/tools.js';
+import { composeUrl } from '../utils/helpers.js';
 import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
-import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, FindRelevantIntegrationsContextInput, FindRelevantIntegrationsContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions, FindRelevantToolsContextInput, FindRelevantToolsContextOptions, BuildToolContextOptions } from './context-types.js';
+import { BuildToolContextOptions, EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, FindRelevantIntegrationsContextInput, FindRelevantIntegrationsContextOptions, FindRelevantToolsContextInput, FindRelevantToolsContextOptions, GenerateApiConfigContextInput, GenerateApiConfigContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions } from './context-types.js';
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
@@ -242,6 +242,20 @@ export function getFindRelevantToolsContext(input: FindRelevantToolsContextInput
     const availableToolsContext = `<available_tools>${input.availableTools.map(tool => buildToolContext(tool, { characterBudget: 1500 })).join('\n')}</available_tools>`;
     const promptEnd = `Return a JSON object conforming to the schema, containing a list of suggested tool IDs no longer than 10 in order of relevance and a brief reason for each selection. If no tools are relevant, return an empty list.`
     const prompt = promptStart + '\n' + ([searchTermsContext, availableToolsContext].filter(Boolean).join('\n')).slice(0, budget - promptStart.length - promptEnd.length) + '\n' + promptEnd;
+    return prompt;
+}
+
+export async function getGenerateApiConfigContext(input: GenerateApiConfigContextInput, options: GenerateApiConfigContextOptions): Promise<string> {
+    const budget = Math.max(0, options.characterBudget | 0);
+    if (budget === 0) return '';
+
+    const promptStart = `The current step config failed to execute. Generate a corrected API configuration that executes the step instruction:`;
+    const instructionContext = `<step_instruction>${input.instruction}</step_instruction>`;
+    const failedStepConfigContext = `<failed_step_config>${JSON.stringify(input.previousStepConfig)}</failed_step_config>`;
+    const stepInputContext = `<step_input>${getObjectContext(input.stepInput, { include: { schema: true, preview: false, samples: true }, characterBudget: budget * 0.5 })}</step_input>`;
+    const integration_specific_instructions = `<integration_specific_instructions>  ${(await input.integrationManager?.getIntegration())?.specificInstructions}</integration_specific_instructions>`;
+    const available_credentials = `<available_credentials>  ${Object.keys(input.credentials || {}).map(v => `<<${v}>>`).join(", ")}</available_credentials>`;
+    const prompt = promptStart + '\n' + ([instructionContext, failedStepConfigContext, stepInputContext, integration_specific_instructions, available_credentials].filter(Boolean).join('\n')).slice(0, budget - promptStart.length);
     return prompt;
 }
 

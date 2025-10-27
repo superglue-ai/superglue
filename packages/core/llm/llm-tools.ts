@@ -2,9 +2,9 @@ import { HttpMethod } from "@superglue/client";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
-import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../execute/tools.js";
-import { LanguageModel, LLMMessage } from "../llm/language-model.js";
-import { logMessage } from "./logs.js";
+import { logMessage } from "../utils/logs.js";
+import { LanguageModel, LLMMessage } from "./language-model.js";
+import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "./llm-tool-utils.js";
 
 export const searchDocumentationToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
     const { query } = args;
@@ -84,14 +84,8 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                     urlHost: z.string().describe("The base URL host (e.g., https://api.example.com). Must not be empty."),
                     urlPath: z.string().describe("The API endpoint path (e.g., /v1/users)."),
                     method: z.enum(Object.values(HttpMethod) as [string, ...string[]]).describe("HTTP method: GET, POST, PUT, DELETE, or PATCH"),
-                    queryParams: z.array(z.object({
-                        key: z.string(),
-                        value: z.string()
-                    })).optional().describe("Query parameters as key-value pairs. If pagination is configured, ensure you have included the right pagination parameters here or in the body."),
-                    headers: z.array(z.object({
-                        key: z.string(),
-                        value: z.string()
-                    })).optional().describe("HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions"),
+                    queryParams: z.record(z.string()).optional().describe("Query parameters as key-value object. If pagination is configured, ensure you have included the right pagination parameters here or in the body."),
+                    headers: z.record(z.string()).optional().describe("HTTP headers as key-value object. Use <<variable>> syntax for dynamic values or JavaScript expressions"),
                     body: z.string().optional().describe("Request body. Use <<variable>> syntax for dynamic values. If pagination is configured, ensure you have included the right pagination parameters here or in the queryParams."),
                     pagination: z.object({
                         type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"]),
@@ -128,12 +122,6 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
                     ...step,
                     apiConfig: {
                         ...step.apiConfig,
-                        queryParams: step.apiConfig.queryParams ?
-                            Object.fromEntries(step.apiConfig.queryParams.map((p: any) => [p.key, p.value])) :
-                            undefined,
-                        headers: step.apiConfig.headers ?
-                            Object.fromEntries(step.apiConfig.headers.map((p: any) => [p.key, p.value])) :
-                            undefined,
                         id: step.id,
                         createdAt: new Date(),
                         updatedAt: new Date()
@@ -209,28 +197,14 @@ export const submitToolDefinition: ToolDefinition = {
                         description: "HTTP method"
                     },
                     queryParams: {
-                        type: "array",
-                        description: "Query parameters as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions.",
-                        items: {
-                            type: "object",
-                            properties: {
-                                key: { type: "string" },
-                                value: { type: "string" }
-                            },
-                            required: ["key", "value"]
-                        }
+                        type: "object",
+                        description: "Query parameters as key-value object. Use <<variable>> syntax for dynamic values or JavaScript expressions.",
+                        additionalProperties: { type: "string" }
                     },
                     headers: {
-                        type: "array",
-                        description: "HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions",
-                        items: {
-                            type: "object",
-                            properties: {
-                                key: { type: "string" },
-                                value: { type: "string" }
-                            },
-                            required: ["key", "value"]
-                        }
+                        type: "object",
+                        description: "HTTP headers as key-value object. Use <<variable>> syntax for dynamic values or JavaScript expressions",
+                        additionalProperties: { type: "string" }
                     },
                     body: {
                         type: "string",

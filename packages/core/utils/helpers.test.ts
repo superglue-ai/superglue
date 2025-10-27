@@ -1,6 +1,6 @@
 import { SelfHealingMode } from '@superglue/client';
 import { describe, expect, it, vi } from 'vitest';
-import { applyAuthFormat, applyJsonata, applyJsonataWithValidation, composeUrl, isSelfHealingEnabled, maskCredentials, replaceVariables, safeHttpMethod, sample } from './tools.js';
+import { applyAuthFormat, applyJsonata, applyJsonataWithValidation, composeUrl, isSelfHealingEnabled, maskCredentials, replaceVariables, safeHttpMethod, sample } from './helpers.js';
 
 vi.mock('axios');
 

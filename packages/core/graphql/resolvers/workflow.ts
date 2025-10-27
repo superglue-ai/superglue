@@ -3,12 +3,12 @@ import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegr
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { WorkflowBuilder } from "../../build/workflow-builder.js";
-import { ToolSelector } from "../../execute/tool-selector.js";
 import { WorkflowExecutor } from "../../execute/workflow-executor.js";
+import { ToolFinder } from "../../find/tool-finder.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
+import { replaceVariables } from "../../utils/helpers.js";
 import { parseJSON } from "../../utils/json-parser.js";
 import { logMessage } from "../../utils/logs.js";
-import { replaceVariables } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { Context, Metadata } from '../types.js';
 
@@ -274,8 +274,8 @@ export const findRelevantToolsResolver = async (
       return tool;
     });
 
-    const selector = new ToolSelector(metadata);
-    return await selector.select(searchTerms, tools);
+    const selector = new ToolFinder(metadata);
+    return await selector.findRelevantTools(searchTerms, tools);
   } catch (error) {
     logMessage('error', `Error finding relevant tools: ${String(error)}`, { orgId: context.orgId });
     return [];

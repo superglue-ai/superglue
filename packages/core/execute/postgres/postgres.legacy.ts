@@ -1,8 +1,8 @@
 import { ApiConfig, RequestOptions } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
 import { server_defaults } from "../../default.js";
+import { composeUrl, replaceVariables } from "../../utils/helpers.js";
 import { parseJSON } from "../../utils/json-parser.js";
-import { composeUrl, replaceVariables } from "../../utils/tools.js";
 
 
 // Pool cache management
@@ -28,7 +28,7 @@ function startCleanupInterval() {
         }
       }
     }, server_defaults.POSTGRES.POOL_CLEANUP_INTERVAL);
-    
+
     // Prevent the interval from keeping the process alive
     if (cleanupInterval.unref) {
       cleanupInterval.unref();
@@ -39,32 +39,32 @@ function startCleanupInterval() {
 function getOrCreatePool(connectionString: string, poolConfig: PoolConfig): Pool {
   const cacheKey = connectionString;
   const existingEntry = poolCache.get(cacheKey);
-  
+
   if (existingEntry) {
     existingEntry.lastUsed = Date.now();
     return existingEntry.pool;
   }
-  
+
   const pool = new Pool({
     ...poolConfig,
     max: 10,
     idleTimeoutMillis: server_defaults.POSTGRES.DEFAULT_TIMEOUT,
     connectionTimeoutMillis: 5000,
   });
-  
+
   pool.on('error', (err) => {
     console.error('Unexpected pool error:', err);
     poolCache.delete(cacheKey);
   });
-  
+
   poolCache.set(cacheKey, {
     pool,
     lastUsed: Date.now(),
     connectionString
   });
-  
+
   startCleanupInterval();
-  
+
   return pool;
 }
 
@@ -73,11 +73,11 @@ export async function closeAllPools(): Promise<void> {
     clearInterval(cleanupInterval);
     cleanupInterval = null;
   }
-  
-  const closePromises = Array.from(poolCache.values()).map(entry => 
+
+  const closePromises = Array.from(poolCache.values()).map(entry =>
     entry.pool.end().catch(console.error)
   );
-  
+
   await Promise.all(closePromises);
   poolCache.clear();
 }
@@ -102,7 +102,7 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
   const requestVars = { ...payload, ...credentials };
   let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
   connectionString = sanitizeDatabaseName(connectionString);
-  
+
   let bodyParsed: any;
   try {
     bodyParsed = parseJSON(await replaceVariables(endpoint.body, requestVars));
@@ -115,7 +115,7 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
   const poolConfig: PoolConfig = {
     connectionString,
     statement_timeout: options?.timeout || server_defaults.POSTGRES.DEFAULT_TIMEOUT,
-    ssl: connectionString.includes('sslmode=') || connectionString.includes('localhost') || connectionString.includes('127.0.0.1') === false 
+    ssl: connectionString.includes('sslmode=') || connectionString.includes('localhost') || connectionString.includes('127.0.0.1') === false
       ? { rejectUnauthorized: false }
       : false
   };
@@ -126,18 +126,18 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
 
   do {
     try {
-      
-      const result = queryParams 
+
+      const result = queryParams
         ? await pool.query(queryText, queryParams)
         : await pool.query(queryText);
-        return result.rows;
+      return result.rows;
     } catch (error) {
-      
+
       attempts++;
 
       if (attempts > maxRetries) {
         if (error instanceof Error) {
-          const errorContext = queryParams 
+          const errorContext = queryParams
             ? ` for query: ${queryText} with params: ${JSON.stringify(queryParams)}`
             : ` for query: ${queryText}`;
           throw new Error(`PostgreSQL error: ${error.message}${errorContext}`);

@@ -9,8 +9,8 @@ import { Metadata } from "@superglue/shared";
 import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
 import { server_defaults } from '../../default.js';
+import { composeUrl } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
-import { composeUrl } from "../../utils/tools.js";
 import { DocumentationFetchingStrategy } from '../types.js';
 
 export class GraphQLStrategy implements DocumentationFetchingStrategy {

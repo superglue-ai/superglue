@@ -4,9 +4,9 @@ import { openai } from "@ai-sdk/openai";
 import { getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
 import { AssistantModelMessage, TextPart, ToolCallPart, ToolResultPart, generateText, jsonSchema, tool } from "ai";
 import { server_defaults } from "../default.js";
-import { ToolDefinition } from "../execute/tools.js";
 import { logMessage } from "../utils/logs.js";
 import { LLM, LLMMessage, LLMObjectResponse, LLMResponse } from "./language-model.js";
+import { ToolDefinition } from "./llm-tool-utils.js";
 
 export class AiSdkModel implements LLM {
   public contextLength: number;

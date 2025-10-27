@@ -1,6 +1,5 @@
 import { HttpMethod, RequestOptions, SelfHealingMode } from "@superglue/client";
 import { inferJsonSchema } from '@superglue/shared';
-import { GraphQLResolveInfo } from "graphql";
 import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
@@ -15,6 +14,21 @@ export interface TransformResult {
 }
 
 export const HttpMethodEnum = z.enum(["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]);
+
+export function convertBasicAuthToBase64(headerValue: string) {
+  if (!headerValue) return headerValue;
+  // Get the part of the 'Basic '
+  const credentials = headerValue.substring('Basic '.length).trim();
+  // checking if it is already Base64 decoded
+  const seemsEncoded = /^[A-Za-z0-9+/=]+$/.test(credentials);
+
+  if (!seemsEncoded) {
+    // if not encoded, convert to username:password to Base64
+    const base64Credentials = Buffer.from(credentials).toString('base64');
+    return `Basic ${base64Credentials}`;
+  }
+  return headerValue;
+}
 
 export async function applyJsonata(data: any, expr: string): Promise<any> {
   if (!expr) {

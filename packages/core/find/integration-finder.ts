@@ -14,14 +14,14 @@ export interface SuggestedIntegration {
     reason: string;
 }
 
-export class IntegrationSelector {
+export class IntegrationFinder {
     private metadata: Metadata;
 
     constructor(metadata: Metadata) {
         this.metadata = metadata;
     }
 
-    public async select(
+    public async findRelevantIntegrations(
         instruction: string | undefined,
         integrations: Integration[]
     ): Promise<SuggestedIntegration[]> {
