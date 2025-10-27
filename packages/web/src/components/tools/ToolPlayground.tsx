@@ -2,7 +2,7 @@
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
-import { formatBytes, generateUniqueKey, MAX_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput } from "@/src/lib/general-utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
 import { generateDefaultFromSchema } from "@superglue/shared";
@@ -356,10 +356,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
     try {
       const newSize = files.reduce((sum, f) => sum + f.size, 0);
-      if (currentSize + newSize > MAX_FILE_SIZE_TOOLS) {
+      if (localTotalFileSize + newSize > MAX_TOTAL_FILE_SIZE_TOOLS) {
         toast({
           title: 'Size limit exceeded',
-          description: `Total file size cannot exceed ${formatBytes(MAX_FILE_SIZE_TOOLS)}`,
+          description: `Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE_TOOLS)}`,
           variant: 'destructive'
         });
         return;
@@ -371,7 +371,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
       for (const file of files) {
         try {
-          const baseKey = sanitizeFileName(file.name);
+          const baseKey = sanitizeFileName(file.name, { removeExtension: true, lowercase: false });
           const key = generateUniqueKey(baseKey, [...existingKeys, ...newFiles.map(f => f.key)]);
 
           const fileInfo: UploadedFileInfo = {

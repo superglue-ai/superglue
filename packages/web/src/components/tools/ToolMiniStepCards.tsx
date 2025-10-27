@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/ta
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { downloadJson } from '@/src/lib/download-utils';
-import { ALLOWED_EXTENSIONS, formatBytes, isAllowedFileType, MAX_FILE_SIZE_TOOLS, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { ALLOWED_EXTENSIONS, formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE_TOOLS, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon, getSimpleIcon, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
 import { generateDefaultFromSchema, inferJsonSchema } from '@superglue/shared';
@@ -387,7 +387,7 @@ export const PayloadSpotlight = ({
                 multiple
                 accept={ALLOWED_EXTENSIONS.join(',')}
                 onChange={handleFileInputChange}
-                className="hidden"
+                className="hidden"  
             />
             <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="h-9 p-1 rounded-md mb-3">
@@ -429,7 +429,7 @@ export const PayloadSpotlight = ({
                                     variant="outline"
                                     size="sm"
                                     onClick={() => fileInputRef.current?.click()}
-                                    disabled={isProcessingFiles || totalFileSize >= MAX_FILE_SIZE_TOOLS}
+                                    disabled={isProcessingFiles || totalFileSize >= MAX_TOTAL_FILE_SIZE_TOOLS}
                                     className="h-9 px-4"
                                 >
                                     {isProcessingFiles ? (
@@ -445,7 +445,7 @@ export const PayloadSpotlight = ({
                                     )}
                                 </Button>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <span>{formatBytes(totalFileSize)} / {formatBytes(MAX_FILE_SIZE_TOOLS)}</span>
+                                    <span>{formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE_TOOLS)}</span>
                                     <HelpTooltip text="Upload CSV, JSON, XML, or Excel files. Files will be automatically parsed to JSON and merged with the manual payload when the tool executes." />
                                 </div>
                             </div>

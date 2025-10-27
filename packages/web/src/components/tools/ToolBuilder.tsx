@@ -4,7 +4,7 @@ import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
-import { formatBytes, generateUniqueKey, MAX_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/general-utils';
 import { Integration, IntegrationInput, SuperglueClient, Workflow as Tool, UpsertMode } from '@superglue/client';
 import { integrationOptions } from "@superglue/shared";
@@ -314,10 +314,10 @@ export function ToolBuilder({
 
     try {
       const newSize = files.reduce((sum, f) => sum + f.size, 0);
-      if (totalFileSize + newSize > MAX_FILE_SIZE_TOOLS) {
+      if (totalFileSize + newSize > MAX_TOTAL_FILE_SIZE_TOOLS) {
         toast({
           title: 'Size limit exceeded',
-          description: `Total file size cannot exceed ${formatBytes(MAX_FILE_SIZE_TOOLS)}`,
+          description: `Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE_TOOLS)}`,
           variant: 'destructive'
         });
         return;
@@ -328,7 +328,7 @@ export function ToolBuilder({
 
       for (const file of files) {
         try {
-          const baseKey = sanitizeFileName(file.name);
+          const baseKey = sanitizeFileName(file.name, { removeExtension: true, lowercase: false });
           const key = generateUniqueKey(baseKey, [...existingKeys, ...newFiles.map(f => f.key)]);
 
           const fileInfo: UploadedFileInfo = {
@@ -1096,7 +1096,7 @@ export function ToolBuilder({
                   )}
                 </Button>
                 <div className="text-xs text-muted-foreground text-center">
-                  {formatBytes(totalFileSize)} / {formatBytes(MAX_FILE_SIZE_TOOLS)}
+                  {formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE_TOOLS)}
                 </div>
               </div>
             </div>
