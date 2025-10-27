@@ -43,8 +43,14 @@ export const PayloadSpotlight = ({
     const fileInputRef = useRef<HTMLInputElement>(null);
     const hasGeneratedDefaultRef = useRef<boolean>(false);
     const isInitialMountRef = useRef<boolean>(true);
+    const isUserEditingRef = useRef<boolean>(false);
 
     useEffect(() => {
+        // Don't sync from parent if user is actively editing
+        if (isUserEditingRef.current) {
+            return;
+        }
+
         const trimmed = (payloadText || '').trim();
         const isEmptyPayload = trimmed === '' || trimmed === '{}';
         const hasUploadedFiles = uploadedFiles && uploadedFiles.length > 0;
@@ -85,6 +91,9 @@ export const PayloadSpotlight = ({
     useEffect(() => { setLocalInputSchema(inputSchema || null); }, [inputSchema]);
 
     const handlePayloadChange = (value: string) => {
+        // Mark that user is actively editing to prevent sync from parent
+        isUserEditingRef.current = true;
+        
         setLocalPayload(value);
         // Mark that user has edited the payload
         if (onUserEdit) {
@@ -94,14 +103,26 @@ export const PayloadSpotlight = ({
         if (trimmed === '') {
             setError(null);
             if (onChange) onChange(value);
+            // Clear editing flag after parent has processed the change
+            setTimeout(() => {
+                isUserEditingRef.current = false;
+            }, 100);
             return;
         }
         try {
             JSON.parse(value);
             setError(null);
             if (onChange) onChange(value);
+            // Clear editing flag after parent has processed the change
+            setTimeout(() => {
+                isUserEditingRef.current = false;
+            }, 100);
         } catch {
             setError('Invalid JSON');
+            // Still clear the flag even on error
+            setTimeout(() => {
+                isUserEditingRef.current = false;
+            }, 100);
         }
     };
 
