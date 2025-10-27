@@ -7,7 +7,7 @@ import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/general-utils';
 import { Integration, IntegrationInput, SuperglueClient, Workflow as Tool, UpsertMode } from '@superglue/client';
-import { integrationOptions } from "@superglue/shared";
+import { integrationOptions, generateDefaultFromSchema } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { Validator } from 'jsonschema';
 import { Check, Clock, FileJson, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Wrench, X } from 'lucide-react';
@@ -48,6 +48,37 @@ interface ToolBuilderProps {
   onCancel?: () => void;
   mode?: 'build' | 'rebuild';
 }
+
+// Check if a response schema is meaningful (not just empty or basic structure)
+const isMeaningfulResponseSchema = (schemaText: string | null): boolean => {
+  if (!schemaText || !schemaText.trim()) {
+    return false;
+  }
+  if (schemaText.trim() === '{}') {
+    return false;
+  }
+
+  try {
+    const schema = JSON.parse(schemaText);
+    
+    // Try to generate a default - if it fails or is empty, schema is not meaningful
+    try {
+      const defaultValue = generateDefaultFromSchema(schema);
+      // Check if the generated default is an empty object
+      if (typeof defaultValue === 'object' && defaultValue !== null) {
+        return Object.keys(defaultValue).length > 0;
+      }
+      // If it's not an object or is null, consider it meaningful
+      return true;
+    } catch {
+      // If we can't generate a default, it's not a meaningful schema
+      return false;
+    }
+  } catch {
+    // Invalid JSON
+    return false;
+  }
+};
 
 class ExtendedSuperglueClient extends SuperglueClient {
   async generateInstructions(integrations: IntegrationInput[]): Promise<string[]> {
@@ -103,9 +134,8 @@ export function ToolBuilder({
   const [responseSchema, setResponseSchema] = useState(initialResponseSchema);
   const [inputSchema, setInputSchema] = useState<string | null>(initialInputSchema);
   const [enforceInputSchema, setEnforceInputSchema] = useState(true);
-  const [inputSchemaMode, setInputSchemaMode] = useState<'current' | 'custom'>(
-    initialInputSchema ? 'custom' : 'current'
-  );
+  // Always default to 'current' (generated from tool input)
+  const [inputSchemaMode, setInputSchemaMode] = useState<'current' | 'custom'>('current');
 
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -123,26 +153,10 @@ export function ToolBuilder({
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
-  const [showPayloadSection, setShowPayloadSection] = useState(
-    initialPayload && initialPayload !== '{}' ? true : false
-  );
-  const [showFileUploadSection, setShowFileUploadSection] = useState(
-    initialFiles.length > 0 ? true : false
-  );
-  const [showResponseSchemaSection, setShowResponseSchemaSection] = useState(() => {
-    if (!initialResponseSchema || !initialResponseSchema.trim()) {
-      return false;
-    }
-    try {
-      const parsed = JSON.parse(initialResponseSchema);
-      const isEmpty = !parsed || 
-        (typeof parsed === 'object' && Object.keys(parsed).length === 0) ||
-        (parsed.type === 'object' && (!parsed.properties || Object.keys(parsed.properties).length === 0));
-      return !isEmpty;
-    } catch {
-      return false;
-    }
-  });
+  // Always start with all sections closed
+  const [showPayloadSection, setShowPayloadSection] = useState(false);
+  const [showFileUploadSection, setShowFileUploadSection] = useState(false);
+  const [showResponseSchemaSection, setShowResponseSchemaSection] = useState(false);
   const [isPayloadValid, setIsPayloadValid] = useState(true);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -893,40 +907,24 @@ export function ToolBuilder({
                   "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 border",
                   isBuilding && "opacity-50 cursor-not-allowed",
                   (() => {
-                    const trimmedSchema = responseSchema?.trim();
+                    const hasMeaningfulSchema = isMeaningfulResponseSchema(responseSchema);
                     
-                    if (!trimmedSchema) {
+                    if (!hasMeaningfulSchema) {
                       return showResponseSchemaSection
                         ? "border-foreground/70 text-foreground hover:bg-accent/50"
                         : "border-border text-muted-foreground hover:bg-accent/50";
                     }
                     
-                    try {
-                      JSON.parse(trimmedSchema);
-                      return showResponseSchemaSection
-                        ? "bg-[#FFD700]/40 border-[#FF8C00] text-foreground"
-                        : "bg-[#FFD700]/40 border-[#FFA500] text-foreground";
-                    } catch {
-                      return showResponseSchemaSection
-                        ? "bg-[#FFD700]/40 border-[#FF8C00] text-foreground"
-                        : "bg-[#FFD700]/40 border-[#FFA500] text-foreground";
-                    }
+                    return showResponseSchemaSection
+                      ? "bg-[#FFD700]/40 border-[#FF8C00] text-foreground"
+                      : "bg-[#FFD700]/40 border-[#FFA500] text-foreground";
                   })()
                 )}
               >
                 <FileWarning className="h-4 w-4" />
-                {(() => {
-                  const trimmedSchema = responseSchema?.trim();
-                  if (!trimmedSchema) {
-                    return 'Enforce Tool Result Schema';
-                  }
-                  try {
-                    JSON.parse(trimmedSchema);
-                    return 'Tool Result Schema Defined';
-                  } catch {
-                    return 'Invalid Result Schema';
-                  }
-                })()}
+                {isMeaningfulResponseSchema(responseSchema) 
+                  ? 'Tool Result Schema Defined' 
+                  : 'Enforce Tool Result Schema'}
               </button>
             </div>
 
