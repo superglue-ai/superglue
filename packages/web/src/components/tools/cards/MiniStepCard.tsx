@@ -72,7 +72,7 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
                                 if (isEmptyPayload) {
                                     return <span className="text-[9px] font-medium text-muted-foreground">No Input</span>;
                                 } else {
-                                    return <span className="text-[9px] font-medium text-muted-foreground">JSON Provided</span>;
+                                    return <span className="text-[9px] font-medium text-muted-foreground">Input Provided</span>;
                                 }
                             })()}
                         </div>

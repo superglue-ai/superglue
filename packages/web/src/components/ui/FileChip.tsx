@@ -53,7 +53,7 @@ export function FileChip({
     const fileStatus = file.status || 'ready';
 
     const sizeText = showSize && fileSize > 0 ? formatBytes(fileSize) : '';
-    const keyText = showKey && showOriginalName ? ` • ${file.key}` : '';
+    const keyText = showKey && showOriginalName ? ` • JSON Input Key: ${file.key}` : '';
 
     const subtitleText = fileStatus === 'processing'
         ? 'Parsing...'
