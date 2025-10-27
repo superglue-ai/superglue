@@ -59,6 +59,7 @@ interface ToolStepGalleryProps {
     stepSelfHealingEnabled?: boolean;
     isPayloadValid?: boolean;
     extractPayloadSchema?: (schema: string | null) => any | null;
+    onPayloadUserEdit?: () => void;
 }
 
 const SpotlightStepCard = ({
@@ -444,7 +445,8 @@ export function ToolStepGallery({
     filePayloads,
     stepSelfHealingEnabled,
     isPayloadValid = true,
-    extractPayloadSchema
+    extractPayloadSchema,
+    onPayloadUserEdit
 }: ToolStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
     const [windowWidth, setWindowWidth] = useState(1200);
@@ -1054,6 +1056,7 @@ export function ToolStepGallery({
                                     isProcessingFiles={isProcessingFiles}
                                     totalFileSize={totalFileSize}
                                     extractPayloadSchema={extractPayloadSchema}
+                                    onUserEdit={onPayloadUserEdit}
                                 />
                             ) : currentItem.type === 'transform' ? (
                                 <FinalTransformMiniStepCard

@@ -98,6 +98,7 @@ export interface JSONSchema3or4 {
 
 interface Options {
     required?: boolean | undefined;
+    requiredDepth?: number | undefined;
     postProcessFnc?(
         type: JSONSchema4TypeName,
         schema: JSONSchema3or4,
@@ -134,6 +135,7 @@ interface Options {
 
 const defaultOptions: Options = {
     required: false,
+    requiredDepth: Number.POSITIVE_INFINITY,
     postProcessFnc: null,
 
     strings: {
@@ -295,8 +297,10 @@ function getCommonArrayItemsType(arr: any[]): JSONSchema4TypeName | null {
 
 class ToJsonSchema {
     private options: Options
+    private depth: number
     constructor(options: Options) {
         this.options = merge({}, defaultOptions, options)
+        this.depth = 0
 
         this.getObjectSchemaDefault = this.getObjectSchemaDefault.bind(this)
         this.getStringSchemaDefault = this.getStringSchemaDefault.bind(this)
@@ -306,7 +310,12 @@ class ToJsonSchema {
     }
 
     getCommonArrayItemSchema(arr: Array<any>): object | null {
-        const schemas = arr.map(item => this.getSchema(item))
+        const schemas = arr.map(item => {
+            this.depth++
+            const schema = this.getSchema(item)
+            this.depth--
+            return schema
+        })
         return schemas.reduce((acc, current) => helpers.mergeSchemaObjs(acc, current), schemas.pop())
     }
 
@@ -315,7 +324,9 @@ class ToJsonSchema {
         const objKeys = Object.keys(obj)
         if (objKeys.length > 0) {
             schema.properties = objKeys.reduce((acc, propertyName) => {
+                this.depth++
                 acc[propertyName] = this.getSchema(obj[propertyName]) // eslint-disable-line no-param-reassign
+                this.depth--
                 return acc
             }, {})
         }
@@ -349,7 +360,9 @@ class ToJsonSchema {
     getArraySchemaNoMerging(arr: Array<any>): JSONSchema3or4 {
         const schema: JSONSchema3or4 = { type: 'array' }
         if (arr.length > 0) {
+            this.depth++
             schema.items = this.getSchema(arr[0])
+            this.depth--
         }
         return schema
     }
@@ -357,7 +370,12 @@ class ToJsonSchema {
     getArraySchemaTuple(arr: Array<any>): JSONSchema3or4 {
         const schema: JSONSchema3or4 = { type: 'array' }
         if (arr.length > 0) {
-            schema.items = arr.map(item => this.getSchema(item))
+            schema.items = arr.map(item => {
+                this.depth++
+                const itemSchema = this.getSchema(item)
+                this.depth--
+                return itemSchema
+            })
         }
         return schema
     }
@@ -367,7 +385,10 @@ class ToJsonSchema {
 
         if (arr.length > 1) {
             for (let i = 1; i < arr.length; i++) {
-                if (!isEqual(schema.items, this.getSchema(arr[i]))) {
+                this.depth++
+                const itemSchema = this.getSchema(arr[i])
+                this.depth--
+                if (!isEqual(schema.items, itemSchema)) {
                     throw new Error('Invalid schema, incompatible array items')
                 }
             }
@@ -399,7 +420,9 @@ class ToJsonSchema {
     }
 
     commmonPostProcessDefault(type: JSONSchema4TypeName, schema: JSONSchema3or4, value: any): JSONSchema3or4 { // eslint-disable-line no-unused-vars
-        if (this.options.required) {
+        const shouldBeRequired = this.options.required && this.depth <= this.options.requiredDepth
+        
+        if (shouldBeRequired) {
             return merge({}, schema, { required: true })
         }
         return schema
@@ -501,3 +524,83 @@ export function convertRequiredToArray(schema: any): any {
   
     return result;
   }
+
+export function generateDefaultFromSchema(schema: any): any {
+  if (!schema || typeof schema !== 'object') {
+    return null;
+  }
+
+  // Handle const values
+  if (schema.const !== undefined) {
+    return schema.const;
+  }
+
+  // Handle enum values - return first enum value
+  if (schema.enum && Array.isArray(schema.enum) && schema.enum.length > 0) {
+    return schema.enum[0];
+  }
+
+  // Handle default values if specified
+  if (schema.default !== undefined) {
+    return schema.default;
+  }
+
+  // Handle oneOf/anyOf - use first option
+  if (schema.oneOf && Array.isArray(schema.oneOf) && schema.oneOf.length > 0) {
+    return generateDefaultFromSchema(schema.oneOf[0]);
+  }
+  if (schema.anyOf && Array.isArray(schema.anyOf) && schema.anyOf.length > 0) {
+    return generateDefaultFromSchema(schema.anyOf[0]);
+  }
+
+  // Handle type-based defaults
+  const schemaType = Array.isArray(schema.type) ? schema.type[0] : schema.type;
+
+  switch (schemaType) {
+    case 'string':
+      return '';
+    
+    case 'number':
+    case 'integer':
+      return 0;
+    
+    case 'boolean':
+      return false;
+    
+    case 'null':
+      return null;
+    
+    case 'array':
+      if (schema.items) {
+        // Return empty array by default
+        return [];
+      }
+      return [];
+    
+    case 'object':
+      const obj: any = {};
+      
+      if (schema.properties && typeof schema.properties === 'object') {
+        const requiredFields = schema.required || [];
+        
+        // Generate all properties (not just required ones) to give full structure
+        for (const [key, propSchema] of Object.entries(schema.properties)) {
+          obj[key] = generateDefaultFromSchema(propSchema);
+        }
+      }
+      
+      return obj;
+    
+    default:
+      // If no type specified but has properties, treat as object
+      if (schema.properties && typeof schema.properties === 'object') {
+        const obj: any = {};
+        for (const [key, propSchema] of Object.entries(schema.properties)) {
+          obj[key] = generateDefaultFromSchema(propSchema);
+        }
+        return obj;
+      }
+      
+      return null;
+  }
+}

@@ -8,7 +8,7 @@ import { downloadJson } from '@/src/lib/download-utils';
 import { ALLOWED_EXTENSIONS, formatBytes, isAllowedFileType, MAX_FILE_SIZE_TOOLS, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon, getSimpleIcon, isEmptyData, isValidSourceDataArrowFunction, truncateForDisplay, truncateLines } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
-import { inferJsonSchema } from '@superglue/shared';
+import { generateDefaultFromSchema, inferJsonSchema } from '@superglue/shared';
 import { Check, Code2, Copy, Download, Eye, FileJson, Globe, Package, Play, RotateCw, Settings, Upload, X } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
@@ -275,7 +275,8 @@ export const PayloadSpotlight = ({
     onFileRemove,
     isProcessingFiles = false,
     totalFileSize = 0,
-    extractPayloadSchema
+    extractPayloadSchema,
+    onUserEdit
 }: {
     payloadText: string;
     inputSchema?: string | null;
@@ -288,20 +289,60 @@ export const PayloadSpotlight = ({
     isProcessingFiles?: boolean;
     totalFileSize?: number;
     extractPayloadSchema?: (schema: string | null) => any | null;
+    onUserEdit?: () => void;
 }) => {
     const [activeTab, setActiveTab] = useState('payload');
     const [localPayload, setLocalPayload] = useState<string>(payloadText || '');
     const [localInputSchema, setLocalInputSchema] = useState(inputSchema || null);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const hasGeneratedDefaultRef = useRef<boolean>(false);
 
+    // Generate default JSON from schema when payload is empty
     useEffect(() => {
+        const trimmed = (payloadText || '').trim();
+        const isEmptyPayload = trimmed === '' || trimmed === '{}';
+        
+        // Only generate default if payload is empty/empty object and we have a schema
+        // AND we haven't already generated a default for this schema
+        if (isEmptyPayload && inputSchema && extractPayloadSchema && !hasGeneratedDefaultRef.current) {
+            try {
+                const payloadSchema = extractPayloadSchema(inputSchema);
+                
+                if (payloadSchema) {
+                    const defaultJson = generateDefaultFromSchema(payloadSchema);
+                    const defaultString = JSON.stringify(defaultJson, null, 2);
+                    setLocalPayload(defaultString);
+                    hasGeneratedDefaultRef.current = true;
+                    
+                    if (onChange) {
+                        onChange(defaultString);
+                    }
+                    return;
+                }
+            } catch (e) {
+                console.error('Failed to generate default from schema:', e);
+            }
+        }
+        
+        // If payload is not empty, reset the flag so we can generate again if user clears it
+        if (!isEmptyPayload) {
+            hasGeneratedDefaultRef.current = false;
+        }
+        
         setLocalPayload(payloadText || '');
-    }, [payloadText]);
+    }, [payloadText, inputSchema, extractPayloadSchema, onChange]);
+    
     useEffect(() => { setLocalInputSchema(inputSchema || null); }, [inputSchema]);
 
     const handlePayloadChange = (value: string) => {
         setLocalPayload(value);
+        
+        // Mark that user has edited the payload
+        if (onUserEdit) {
+            onUserEdit();
+        }
+        
         const trimmed = (value || '').trim();
         if (trimmed === '') {
             setError(null);
@@ -460,7 +501,8 @@ export const PayloadMiniStepCard = ({
     onFileRemove,
     isProcessingFiles,
     totalFileSize,
-    extractPayloadSchema
+    extractPayloadSchema,
+    onUserEdit
 }: {
     payloadText: string;
     inputSchema?: string | null;
@@ -473,6 +515,7 @@ export const PayloadMiniStepCard = ({
     isProcessingFiles?: boolean;
     totalFileSize?: number;
     extractPayloadSchema?: (schema: string | null) => any | null;
+    onUserEdit?: () => void;
 }) => {
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
@@ -496,6 +539,7 @@ export const PayloadMiniStepCard = ({
                     isProcessingFiles={isProcessingFiles}
                     totalFileSize={totalFileSize}
                     extractPayloadSchema={extractPayloadSchema}
+                    onUserEdit={onUserEdit}
                 />
             </div>
         </Card>

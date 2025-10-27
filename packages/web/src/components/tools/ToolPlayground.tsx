@@ -5,6 +5,8 @@ import { executeFinalTransform, executeSingleStep, executeToolStepByStep, genera
 import { formatBytes, generateUniqueKey, MAX_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput } from "@/src/lib/general-utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
+import { generateDefaultFromSchema } from "@superglue/shared";
+import isEqual from "lodash.isequal";
 import { Validator } from "jsonschema";
 import { Check, Hammer, Loader2, Play, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
@@ -16,6 +18,16 @@ import { Switch } from "../ui/switch";
 import { ToolStepGallery } from "./ToolStepGallery";
 import { ToolCreateSuccess } from "./ToolCreateSuccess";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -152,6 +164,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [isPayloadValid, setIsPayloadValid] = useState<boolean>(true);
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showToolBuilder, setShowToolBuilder] = useState(false);
+  const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
+  const [hasUserEditedPayload, setHasUserEditedPayload] = useState<boolean>(false);
 
   useEffect(() => {
     if (externalSelfHealingEnabled !== undefined) {
@@ -268,7 +282,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   };
 
   // Validate payload against extracted schema
-  const validatePayload = (payloadText: string, schemaText: string | null, filePayloads: Record<string, any>): boolean => {
+  const validatePayload = (payloadText: string, schemaText: string | null, filePayloads: Record<string, any>, userHasEdited: boolean): boolean => {
     const payloadSchema = extractPayloadSchema(schemaText);
 
     // If schema is null/disabled, payload is always valid
@@ -281,7 +295,26 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       const mergedPayload = { ...payloadData, ...filePayloads };
       const validator = new Validator();
       const result = validator.validate(mergedPayload, payloadSchema);
-      return result.valid;
+      
+      // If validation fails, return false
+      if (!result.valid) {
+        return false;
+      }
+      
+      // Only check for default match if user hasn't edited the payload yet
+      // Once they've made any edit, we trust they know what they're doing
+      if (!userHasEdited) {
+        try {
+          const generatedDefault = generateDefaultFromSchema(payloadSchema);
+          if (isEqual(payloadData, generatedDefault)) {
+            return false;
+          }
+        } catch (e) {
+          // If we can't generate default, just rely on schema validation
+        }
+      }
+      
+      return true;
     } catch (e) {
       return false;
     }
@@ -294,7 +327,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
 
     validationTimeoutRef.current = setTimeout(() => {
-      const isValid = validatePayload(payload, inputSchema, filePayloads);
+      const isValid = validatePayload(payload, inputSchema, filePayloads, hasUserEditedPayload);
       setIsPayloadValid(isValid);
     }, 300);
 
@@ -303,7 +336,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         clearTimeout(validationTimeoutRef.current);
       }
     };
-  }, [payload, inputSchema, filePayloads]);
+  }, [payload, inputSchema, filePayloads, hasUserEditedPayload]);
 
   // Unified file upload handlers
   const handleFilesUpload = async (files: File[]) => {
@@ -603,6 +636,14 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRunAllSteps = () => {
+    if (!isPayloadValid) {
+      setShowInvalidPayloadDialog(true);
+    } else {
+      executeTool();
     }
   };
 
@@ -980,8 +1021,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       ) : (
         <Button
           variant="success"
-          onClick={() => executeTool()}
-          disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform || !isPayloadValid}
+          onClick={handleRunAllSteps}
+          disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
           className="h-9 px-4"
         >
           <Play className="h-4 w-4 fill-current" strokeWidth="3px" strokeLinejoin="round" strokeLinecap="round" />
@@ -1171,12 +1212,34 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   stepSelfHealingEnabled={selfHealingEnabled}
                   isPayloadValid={isPayloadValid}
                   extractPayloadSchema={extractPayloadSchema}
+                  onPayloadUserEdit={() => setHasUserEditedPayload(true)}
                 />
               )}
             </div>
           </div>
         </div>
       </div>
+
+      <AlertDialog open={showInvalidPayloadDialog} onOpenChange={setShowInvalidPayloadDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tool Input Does Not Match Input Schema</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your tool input does not match the input schema. This may cause execution to fail.
+              You can edit the input and schema in the Start (Tool Input) Card.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setShowInvalidPayloadDialog(false);
+              executeTool();
+            }}>
+              Run Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 });
