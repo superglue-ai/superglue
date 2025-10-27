@@ -714,6 +714,7 @@ export function ToolStepGallery({
                                     isProcessingFiles={isProcessingFiles}
                                     totalFileSize={totalFileSize}
                                     onUserEdit={onPayloadUserEdit}
+                                    isPayloadValid={isPayloadValid}
                                 />
                             ) : currentItem.type === 'transform' ? (
                                 <FinalTransformMiniStepCard

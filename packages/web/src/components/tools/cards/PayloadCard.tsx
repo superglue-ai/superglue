@@ -19,7 +19,8 @@ export const PayloadSpotlight = ({
     onFileRemove,
     isProcessingFiles = false,
     totalFileSize = 0,
-    onUserEdit
+    onUserEdit,
+    isPayloadValid
 }: {
     payloadText: string;
     inputSchema?: string | null;
@@ -32,6 +33,7 @@ export const PayloadSpotlight = ({
     isProcessingFiles?: boolean;
     totalFileSize?: number;
     onUserEdit?: () => void;
+    isPayloadValid?: boolean;
 }) => {
     const [activeTab, setActiveTab] = useState('payload');
     const [localPayload, setLocalPayload] = useState<string>(payloadText || '');
@@ -126,9 +128,16 @@ export const PayloadSpotlight = ({
                     <TabsTrigger value="payload" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
                         <FileJson className="h-4 w-4" /> Payload JSON
                     </TabsTrigger>
-                    <TabsTrigger value="schema" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
-                        <Code2 className="h-4 w-4" /> Input Schema
-                    </TabsTrigger>
+                    {isPayloadValid && (
+                        <TabsTrigger value="schema" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                            <Code2 className="h-4 w-4" /> Input Schema
+                        </TabsTrigger>
+                    )}
+                    {!isPayloadValid && (
+                        <TabsTrigger value="schema" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
+                            <Code2 color="#FFA500" className="h-4 w-4" /> Input Schema
+                        </TabsTrigger>
+                    )}
                 </TabsList>
                 <TabsContent value="payload" className="mt-3 space-y-3">
                     {!readOnly && onFilesUpload && uploadedFiles.length > 0 && (
@@ -232,7 +241,8 @@ export const PayloadMiniStepCard = React.memo(({
     onFileRemove,
     isProcessingFiles,
     totalFileSize,
-    onUserEdit
+    onUserEdit,
+    isPayloadValid
 }: {
     payloadText: string;
     inputSchema?: string | null;
@@ -245,6 +255,7 @@ export const PayloadMiniStepCard = React.memo(({
     isProcessingFiles?: boolean;
     totalFileSize?: number;
     onUserEdit?: () => void;
+    isPayloadValid?: boolean;
 }) => {
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
@@ -268,6 +279,7 @@ export const PayloadMiniStepCard = React.memo(({
                     isProcessingFiles={isProcessingFiles}
                     totalFileSize={totalFileSize}
                     onUserEdit={onUserEdit}
+                    isPayloadValid={isPayloadValid}
                 />
             </div>
         </Card>
