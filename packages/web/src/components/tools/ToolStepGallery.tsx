@@ -219,14 +219,17 @@ export function ToolStepGallery({
     // Use computed payload from parent (already merged manual + files)
     const workingPayload = computedPayload || {};
 
-    const stepResultsMap = Array.isArray(stepResults)
-        ? stepResults.reduce((acc: Record<string, any>, result: any) => {
-            if (result.stepId) {
-                acc[result.stepId] = result.data || result.transformedData || result;
-            }
-            return acc;
-        }, {})
-        : stepResults;
+    const stepResultsMap = useMemo(() => 
+        Array.isArray(stepResults)
+            ? stepResults.reduce((acc: Record<string, any>, result: any) => {
+                if (result.stepId) {
+                    acc[result.stepId] = result.data || result.transformedData || result;
+                }
+                return acc;
+            }, {})
+            : stepResults,
+        [stepResults]
+    );
 
     const hasTransformCompleted = completedSteps.includes('__final_transform__') && (transformResult || finalResult);
 

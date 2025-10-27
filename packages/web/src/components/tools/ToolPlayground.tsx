@@ -353,7 +353,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       return parentOnFilesUpload(files);
     }
 
-    // Local handling - determine which state to use
     const currentFiles = parentUploadedFiles || localUploadedFiles;
     const currentSize = parentTotalFileSize ?? localTotalFileSize;
     const currentPayloads = parentFilePayloads || localFilePayloads;
@@ -361,12 +360,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     const setProcessing = parentIsProcessingFiles !== undefined ? () => {} : setLocalIsProcessingFiles;
     
     setProcessing(true);
-    // Mark as edited when files are uploaded
     setHasUserEditedPayload(true);
 
     try {
       const newSize = files.reduce((sum, f) => sum + f.size, 0);
-      if (localTotalFileSize + newSize > MAX_TOTAL_FILE_SIZE_TOOLS) {
+      if (currentSize + newSize > MAX_TOTAL_FILE_SIZE_TOOLS) {
         toast({
           title: 'Size limit exceeded',
           description: `Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE_TOOLS)}`,
@@ -378,7 +376,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       const existingKeys = currentFiles.map(f => f.key);
       const newFiles: UploadedFileInfo[] = [];
       const newPayloads: Record<string, any> = { ...currentPayloads };
+      const keysToRemove: string[] = [];
 
+      // Process all files without intermediate state updates
       for (const file of files) {
         try {
           const baseKey = sanitizeFileName(file.name, { removeExtension: true, lowercase: false });
@@ -391,49 +391,19 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
             status: 'processing'
           };
           newFiles.push(fileInfo);
-          
-          // Update state optimistically
-          const updatedFiles = [...currentFiles, fileInfo];
-          if (parentOnFilesChange) {
-            parentOnFilesChange(updatedFiles, newPayloads);
-          } else {
-            setLocalUploadedFiles(updatedFiles);
-          }
+          existingKeys.push(key);
 
           const parsedData = await processAndExtractFile(file, client);
 
           newPayloads[key] = parsedData;
-          existingKeys.push(key);
-
-          // Update with successful status
-          const finalFiles = updatedFiles.map(f =>
-            f.key === key ? { ...f, status: 'ready' as const } : f
-          );
-          
-          if (parentOnFilesChange) {
-            parentOnFilesChange(finalFiles, newPayloads);
-          } else {
-            setLocalUploadedFiles(finalFiles);
-            setLocalFilePayloads(newPayloads);
-          }
-          
-          // Remove file key from manual payload text
-          setManualPayloadText(prev => removeFileKeysFromPayload(prev, [key]));
+          fileInfo.status = 'ready';
+          keysToRemove.push(key);
 
         } catch (error: any) {
           const fileInfo = newFiles.find(f => f.name === file.name);
           if (fileInfo) {
-            const errorFiles = [...currentFiles, ...newFiles].map(f =>
-              f.key === fileInfo.key
-                ? { ...f, status: 'error' as const, error: error.message }
-                : f
-            );
-            
-            if (parentOnFilesChange) {
-              parentOnFilesChange(errorFiles, newPayloads);
-            } else {
-              setLocalUploadedFiles(errorFiles);
-            }
+            fileInfo.status = 'error';
+            fileInfo.error = error.message;
           }
 
           toast({
@@ -442,6 +412,23 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
             variant: 'destructive'
           });
         }
+      }
+
+      // Single state update after all files processed
+      const finalFiles = [...currentFiles, ...newFiles];
+      const newTotalSize = finalFiles.reduce((sum, f) => sum + f.size, 0);
+      
+      if (parentOnFilesChange) {
+        parentOnFilesChange(finalFiles, newPayloads);
+      } else {
+        setLocalUploadedFiles(finalFiles);
+        setLocalFilePayloads(newPayloads);
+        setLocalTotalFileSize(newTotalSize);
+      }
+      
+      // Remove file keys from manual payload text (once, after all processing)
+      if (keysToRemove.length > 0) {
+        setManualPayloadText(prev => removeFileKeysFromPayload(prev, keysToRemove));
       }
 
     } finally {
