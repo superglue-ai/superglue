@@ -28,18 +28,25 @@ export class ToolSelector {
         this.metadata = metadata;
     }
 
-    private toSuggestedTools(tools: Workflow[], reason: string): SuggestedTool[] {
-        return tools.map(tool => ({
-            id: tool.id,
-            instruction: tool.instruction,
-            inputSchema: tool.inputSchema,
-            responseSchema: tool.responseSchema,
-            steps: tool.steps.map(s => ({
-                integrationId: s.integrationId,
-                instruction: s.apiConfig?.instruction
-            })),
-            reason
-        }));
+    private enrichTools(suggestions: Array<{ id: string, reason: string }>, allTools: Workflow[]): SuggestedTool[] {
+        return suggestions
+            .map(({ id, reason }) => {
+                const tool = allTools.find(t => t.id === id);
+                if (!tool) return null;
+                
+                return {
+                    id: tool.id,
+                    instruction: tool.instruction,
+                    inputSchema: tool.inputSchema,
+                    responseSchema: tool.responseSchema,
+                    steps: tool.steps.map(s => ({
+                        integrationId: s.integrationId,
+                        instruction: s.apiConfig?.instruction
+                    })),
+                    reason
+                };
+            })
+            .filter(t => t !== null);
     }
 
     public async select(
@@ -53,7 +60,7 @@ export class ToolSelector {
 
         if (!query || query.trim() === "" || query.trim() === "*" || query.trim() === "all") {
             logMessage('info', 'No specific query provided, returning all available tools.', this.metadata);
-            return this.toSuggestedTools(tools, "Available tool (no specific query provided)");
+            return this.enrichTools(tools.map(t => ({ id: t.id, reason: "Available tool" })), tools);
         }
 
         const selectionSchema = zodToJsonSchema(z.object({
@@ -82,36 +89,14 @@ export class ToolSelector {
             );
 
             if (!rawSelection?.suggestedTools || !Array.isArray(rawSelection.suggestedTools)) {
-                logMessage('warn', "Tool selection returned unexpected format. Returning all tools.", this.metadata);
-                return this.toSuggestedTools(tools, "Available tool");
+                logMessage('warn', "Tool selection returned unexpected format.", this.metadata);
+                return [];
             }
 
-            const suggestions = rawSelection.suggestedTools
-                .map((suggestion) => {
-                    const tool = tools.find(t => t.id === suggestion.id);
-                    if (!tool) {
-                        logMessage('warn', `LLM suggested tool ID '${suggestion.id}' which was not found in available tools. Available IDs: ${tools.map(t => t.id).join(', ')}`, this.metadata);
-                        return null;
-                    }
-
-                    return {
-                        id: tool.id,
-                        instruction: tool.instruction,
-                        inputSchema: tool.inputSchema,
-                        responseSchema: tool.responseSchema,
-                        steps: tool.steps.map(s => ({
-                            integrationId: s.integrationId,
-                            instruction: s.apiConfig?.instruction
-                        })),
-                        reason: suggestion.reason
-                    };
-                })
-                .filter((suggestion): suggestion is NonNullable<typeof suggestion> => suggestion !== null);
-
-            return suggestions.length > 0 ? suggestions : this.toSuggestedTools(tools, "Available tool");
+            return this.enrichTools(rawSelection.suggestedTools, tools);
         } catch (error) {
             logMessage('error', `Error during tool selection: ${error}`, this.metadata);
-            return this.toSuggestedTools(tools, "Available tool");
+            return [];
         }
     }
 }

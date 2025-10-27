@@ -5,7 +5,7 @@ import { Button } from '@/src/components/ui/button';
 import { FileChip } from '@/src/components/ui/FileChip';
 import { FileQuestion, FileText, Link, Upload } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { processFile, sanitizeFileName, formatBytes, MAX_FILE_SIZE_DOCUMENTATION, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { processFile, sanitizeFileName, formatBytes, MAX_TOTAL_FILE_SIZE_DOCUMENTATION, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn } from '@/src/lib/general-utils';
 import { Input } from '@/src/components/ui/input';
 import { useToast } from '@/src/hooks/use-toast';
@@ -78,10 +78,10 @@ export function DocumentationField({
     if (!file) return
 
     // Check file size limit
-    if (file.size > MAX_FILE_SIZE_DOCUMENTATION) {
+    if (file.size > MAX_TOTAL_FILE_SIZE_DOCUMENTATION) {
       toast({
         title: 'File too large',
-        description: `Documentation files cannot exceed ${formatBytes(MAX_FILE_SIZE_DOCUMENTATION)}. Current file: ${formatBytes(file.size)}`,
+        description: `Documentation files cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE_DOCUMENTATION)}. Current file: ${formatBytes(file.size)}`,
         variant: 'destructive'
       })
       // Reset file input
@@ -92,7 +92,7 @@ export function DocumentationField({
     const fileInfo: UploadedFileInfo = {
       name: file.name,
       size: file.size,
-      key: sanitizeFileName(file.name, { removeExtension: false, lowercase: true }),
+      key: sanitizeFileName(file.name, { removeExtension: false, lowercase: false }),
       status: 'processing'
     }
     setDocFile(fileInfo)

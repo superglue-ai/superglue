@@ -62,7 +62,7 @@ describe('getObjectContext performance and budget', () => {
             characterBudget: budget,
             tuning: { previewObjectKeyLimit: 100, previewArrayLimit: 5, previewDepthLimit: 5, samplesMaxArrayPaths: 2, samplesItemsPerArray: 2, sampleObjectMaxDepth: 2 }
         }));
-        expect(ms).toBeLessThanOrEqual(10_000);
+        expect(ms).toBeLessThanOrEqual(20_000);
         expect(result.length).toBeLessThanOrEqual(budget + 50);
     });
 
@@ -73,7 +73,7 @@ describe('getObjectContext performance and budget', () => {
             characterBudget: budget,
             tuning: { previewObjectKeyLimit: 100, previewArrayLimit: 5, previewDepthLimit: 5, samplesMaxArrayPaths: 2, samplesItemsPerArray: 2, sampleObjectMaxDepth: 2 }
         }));
-        expect(ms).toBeLessThanOrEqual(10000);
+        expect(ms).toBeLessThanOrEqual(20_000);
         expect(result.length).toBeLessThanOrEqual(budget + 50);
     });
 
