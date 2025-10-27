@@ -5,10 +5,9 @@ import * as pdfjsLib from 'pdfjs-dist';
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 // Context-specific file size limits
-export const MAX_FILE_SIZE_CHAT = 50 * 1024 * 1024;           // 50 MB per message for chat (performance)
-export const MAX_FILE_SIZE_DOCUMENTATION = 50 * 1024 * 1024;  // 50 MB for documentation (processing limits)
-export const MAX_FILE_SIZE_TOOLS = 1000 * 1024 * 1024;        // 1000 MB for tool creation/playground
-export const MAX_FILE_PAYLOAD_PER_MESSAGE = 50 * 1024 * 1024; // 50 MB total extracted content per message
+export const MAX_TOTAL_FILE_SIZE_CHAT = 50 * 1024 * 1024;           // 50 MB per message for chat (performance)
+export const MAX_TOTAL_FILE_SIZE_TOOLS = 1000 * 1024 * 1024;        // 1000 MB for tool creation/playground
+export const MAX_TOTAL_FILE_SIZE_DOCUMENTATION = 50 * 1024 * 1024;  // 50 MB for documentation (processing limits)
 
 export const ALLOWED_EXTENSIONS = ['.json', '.csv', '.txt', '.xml', '.xlsx', '.xls', '.pdf'];
 
@@ -77,7 +76,7 @@ export function sanitizeFileName(name: string, options?: {
 export function setFileUploadDocumentationURL(fileNames: string[]): string {
   // Format: file://filename1,filename2,filename3 (single file:// prefix)
   const sanitizedNames = fileNames.map(fileName => 
-    sanitizeFileName(fileName, { removeExtension: false, lowercase: true })
+    sanitizeFileName(fileName, { removeExtension: false, lowercase: false })
   );
   return `file://${sanitizedNames.join(',')}`;
 }
