@@ -4,12 +4,12 @@ import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
-import { formatBytes, generateUniqueKey, MAX_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/general-utils'
 import { Integration, IntegrationInput, SuperglueClient, Workflow as Tool, UpsertMode } from '@superglue/client';
 import { integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
-import { Check, Clock, File, FileCode, FileJson, FileSpreadsheet, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Wrench, X } from 'lucide-react';
+import { Check, Clock, FileJson, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Wrench, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
@@ -342,10 +342,10 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
     try {
       // Check total size limit
       const newSize = files.reduce((sum, f) => sum + f.size, 0);
-      if (totalFileSize + newSize > MAX_FILE_SIZE_TOOLS) {
+      if (totalFileSize + newSize > MAX_TOTAL_FILE_SIZE_TOOLS) {
         toast({
           title: 'Size limit exceeded',
-          description: `Total file size cannot exceed ${formatBytes(MAX_FILE_SIZE_TOOLS)}`,
+          description: `Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE_TOOLS)}`,
           variant: 'destructive'
         });
         return;
@@ -357,7 +357,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
       for (const file of files) {
         try {
           // Generate unique key
-          const baseKey = sanitizeFileName(file.name);
+          const baseKey = sanitizeFileName(file.name, { removeExtension: true, lowercase: false });
           const key = generateUniqueKey(baseKey, [...existingKeys, ...newFiles.map(f => f.key)]);
 
           const fileInfo: UploadedFileInfo = {
@@ -1079,7 +1079,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
                           )}
                         </Button>
                         <div className="text-xs text-muted-foreground text-center">
-                          {formatBytes(totalFileSize)} / {formatBytes(MAX_FILE_SIZE_TOOLS)}
+                          {formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE_TOOLS)}
                         </div>
                       </div>
                     </div>
