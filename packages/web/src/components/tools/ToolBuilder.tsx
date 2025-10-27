@@ -129,9 +129,20 @@ export function ToolBuilder({
   const [showFileUploadSection, setShowFileUploadSection] = useState(
     initialFiles.length > 0 ? true : false
   );
-  const [showResponseSchemaSection, setShowResponseSchemaSection] = useState(
-    initialResponseSchema ? true : false
-  );
+  const [showResponseSchemaSection, setShowResponseSchemaSection] = useState(() => {
+    if (!initialResponseSchema || !initialResponseSchema.trim()) {
+      return false;
+    }
+    try {
+      const parsed = JSON.parse(initialResponseSchema);
+      const isEmpty = !parsed || 
+        (typeof parsed === 'object' && Object.keys(parsed).length === 0) ||
+        (parsed.type === 'object' && (!parsed.properties || Object.keys(parsed.properties).length === 0));
+      return !isEmpty;
+    } catch {
+      return false;
+    }
+  });
   const [isPayloadValid, setIsPayloadValid] = useState(true);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
