@@ -1226,6 +1226,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   stepSelfHealingEnabled={selfHealingEnabled}
                   isPayloadValid={isPayloadValid}
                   onPayloadUserEdit={() => setHasUserEditedPayload(true)}
+                  embedded={embedded}
                 />
               )}
             </div>

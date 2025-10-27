@@ -59,6 +59,7 @@ export interface ToolStepGalleryProps {
     stepSelfHealingEnabled?: boolean;
     isPayloadValid?: boolean;
     onPayloadUserEdit?: () => void;
+    embedded?: boolean;
 }
 
 export function ToolStepGallery({
@@ -106,7 +107,8 @@ export function ToolStepGallery({
     filePayloads,
     stepSelfHealingEnabled,
     isPayloadValid = true,
-    onPayloadUserEdit
+    onPayloadUserEdit,
+    embedded = false
 }: ToolStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
     const [windowWidth, setWindowWidth] = useState(1200);
@@ -121,6 +123,8 @@ export function ToolStepGallery({
     const isConfiguratorEditingRef = useRef<boolean>(false);
     const [hiddenLeftCount, setHiddenLeftCount] = useState(0);
     const [hiddenRightCount, setHiddenRightCount] = useState(0);
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    
     useEffect(() => {
         isConfiguratorEditingRef.current = isConfiguratorEditing;
     }, [isConfiguratorEditing]);
@@ -143,6 +147,27 @@ export function ToolStepGallery({
             const card = container?.children?.[nextIndex] as HTMLElement | undefined;
             if (container && card) {
                 card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
+            
+            // Scroll to top based on mode
+            if (embedded) {
+                // In embedded mode, find the nearest scrollable parent
+                let scrollParent = scrollContainerRef.current?.parentElement;
+                while (scrollParent && scrollParent !== document.body) {
+                    const { overflowY } = window.getComputedStyle(scrollParent);
+                    if (overflowY === 'auto' || overflowY === 'scroll') {
+                        scrollParent.scrollTo({ top: 0, behavior: 'smooth' });
+                        break;
+                    }
+                    scrollParent = scrollParent.parentElement;
+                }
+                // Fallback: scroll window
+                if (!scrollParent || scrollParent === document.body) {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            } else if (scrollContainerRef.current) {
+                // Non-embedded mode: use local scroll container
+                scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
             }
         }, NAV_DELAY_MS);
     };
@@ -465,7 +490,7 @@ export function ToolStepGallery({
             </div>
 
             {/* Scrollable content section */}
-            <div className="flex-1 overflow-y-auto pr-4" style={{ scrollbarGutter: 'stable' }}>
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-4" style={{ scrollbarGutter: 'stable' }}>
                 <div className="space-y-6">
                     <div className="flex items-center gap-0">
                         <div className="relative">
