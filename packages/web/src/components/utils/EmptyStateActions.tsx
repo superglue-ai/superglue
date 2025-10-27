@@ -14,7 +14,7 @@ const EmptyStateActions: React.FC<EmptyStateActionsProps> = ({
       <div className="grid grid-cols-1 gap-8 w-full max-w-2xl">
         <Button
           onClick={handleTool}
-          className="h-auto md:h-80 shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl bg-card border border-primary/20 hover:border-primary/30 flex flex-col justify-center p-6 w-full group"
+          className="h-auto md:h-80 shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl bg-card border border-primary/20 hover:border-primary/30 flex flex-col justify-center p-6 w-full group hidden md:flex"
           variant="outline"
           size="lg"
         >
@@ -28,6 +28,10 @@ const EmptyStateActions: React.FC<EmptyStateActionsProps> = ({
             </div>
           </div>
         </Button>
+        <div className="text-center text-muted-foreground text-sm md:hidden">
+          No tools have been saved yet
+        </div>
+        <></>
       </div>
     </div>
   );

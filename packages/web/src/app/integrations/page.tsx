@@ -433,7 +433,7 @@ export default function IntegrationsPage() {
                                     }}
                                     className="flex-1 h-8"
                                 />
-                                <Button variant="outline" size="sm" onClick={handleAdd}>
+                                <Button variant="outline" size="sm" onClick={handleAdd} className="hidden sm:inline-flex">
                                     <Plus className="mr-2 h-4 w-4" /> Add Integration
                                 </Button>
                             </div>
@@ -442,7 +442,7 @@ export default function IntegrationsPage() {
                                 return (
                                     <div key={integration.id} className="relative">
                                         <div className="flex items-center gap-3 border rounded-lg p-4 bg-card">
-                                            <div className="flex items-center gap-3 flex-1 min-w-0 mr-4">
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
                                                 {getIntegrationIcon(integration) ? (
                                                     <svg
                                                         width="20"
@@ -463,7 +463,7 @@ export default function IntegrationsPage() {
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div className="ml-auto flex items-center gap-3">
+                                            <div className="hidden sm:flex flex-row items-center gap-3 ml-auto">
                                                 <div className="flex items-center gap-2">
                                                     <DocStatus
                                                         pending={pendingDocIds.has(integration.id)}
@@ -477,7 +477,7 @@ export default function IntegrationsPage() {
                                                         };
 
                                                         return (
-                                                            <span className={`text-xs ${colorClasses[badge.color]} px-2 py-0.5 rounded flex items-center gap-1`}>
+                                                            <span className={`text-xs ${colorClasses[badge.color]} px-2 py-0.5 rounded flex items-center gap-1 whitespace-nowrap`}>
                                                                 {badge.icon === 'clock' ? <Clock className="h-3 w-3" /> : <Key className="h-3 w-3" />}
                                                                 {badge.label}
                                                             </span>
