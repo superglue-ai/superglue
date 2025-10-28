@@ -50,3 +50,8 @@ export interface ToolCall {
   }>;
   buildResult?: any; // Optional property for build_and_run workflow build results
 }
+
+export enum UserRole {
+  ADMIN = 'admin',
+  MEMBER = 'member'
+}
