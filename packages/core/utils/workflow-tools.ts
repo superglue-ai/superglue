@@ -8,7 +8,9 @@ import { logMessage } from "./logs.js";
 
 export const searchDocumentationToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
     const { query } = args;
-    const { integration } = context;
+    
+    // Support both old direct access and new lazy loading pattern
+    const integration = context.integration || (context.getIntegration ? await context.getIntegration() : null);
 
     if (!integration) {
         return {
@@ -18,7 +20,7 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
     }
 
     try {
-        if (!integration.documentation || integration.documentation.length <= 50) {
+        if ((!integration.documentation || integration.documentation.length <= 50) && !integration.openApiSchema) {
             return {
                 success: true,
                 data: {
