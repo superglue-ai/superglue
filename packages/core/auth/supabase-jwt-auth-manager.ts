@@ -41,7 +41,6 @@ export class SupabaseJWTAuthManager implements AuthManager {
         };
       }
 
-      logMessage('debug', `JWT authentication successful for user ${userId}`);
       return {
         success: true,
         userId,
