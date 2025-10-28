@@ -306,7 +306,12 @@ export class WorkflowExecutor implements Workflow {
   
       for (let i = 0; i < loopItems.length; i++) {
         const currentItem = loopItems[i] || "";
-        logMessage("debug", `Executing loop iteration ${i + 1}/${loopItems.length}`, this.metadata);
+        if(loopItems.length > 1) {
+          logMessage("debug", `Executing loop iteration ${i + 1}/${loopItems.length} with item: ${JSON.stringify(currentItem).slice(0, 50)}...`, this.metadata);
+        }
+        else {
+          logMessage("debug", `Executing step ${step.id} with item: ${JSON.stringify(currentItem).slice(0, 50)}...`, this.metadata);
+        }
   
         const loopPayload: Record<string, any> = {
           currentItem: currentItem,

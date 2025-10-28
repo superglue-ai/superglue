@@ -1,12 +1,11 @@
-import { Integration, RequestOptions, SelfHealingMode, WorkflowResult } from "@superglue/client";
-import { ToolAttempt, ToolConfig, ToolFailureReason, ValidationLLMConfig, AttemptStatus } from "../types.js";
 import { Metadata } from "@playwright/test";
-import { Workflow } from "@superglue/client";
+import { Integration, SelfHealingMode, Workflow, WorkflowResult } from "@superglue/client";
 import { generateUniqueId } from "@superglue/shared/utils";
-import { IntegrationManager } from "../../../packages/core/integrations/integration-manager.js";
-import { DataStore } from "../../../packages/core/datastore/types.js";
 import { WorkflowBuilder } from "../../../packages/core/build/workflow-builder.js";
+import { DataStore } from "../../../packages/core/datastore/types.js";
 import { WorkflowExecutor } from "../../../packages/core/execute/workflow-executor.js";
+import { IntegrationManager } from "../../../packages/core/integrations/integration-manager.js";
+import { AttemptStatus, ToolAttempt, ToolConfig, ToolFailureReason, ValidationLLMConfig } from "../types.js";
 import { ToolValidationService } from "./tool-validation.js";
 
 export class SuperglueToolAttemptService {
@@ -64,6 +63,7 @@ export class SuperglueToolAttemptService {
                 attempt.executionError = this.determineErrorMessage(workflowResult);
                 attempt.failureReason = ToolFailureReason.EXECUTION;
                 attempt.status = AttemptStatus.EXECUTION_FAILED;
+                console.log(`Execution failed: ${attempt.executionError}`);
                 return attempt;
             }
 
@@ -123,13 +123,7 @@ export class SuperglueToolAttemptService {
         selfHealingEnabled: boolean
     ): Promise<WorkflowResult> {
         const executor = new WorkflowExecutor(
-            workflow,
-            this.metadata,
-            IntegrationManager.fromIntegrations(
-                integrations,
-                this.datastore,
-                this.metadata.orgId
-            )
+            { workflow, metadata: this.metadata, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId) }
         );
 
         const allCredentials = integrations.reduce(
@@ -145,12 +139,7 @@ export class SuperglueToolAttemptService {
         );
 
         const workflowResult = await executor.execute(
-            toolConfig.payload || {},
-            allCredentials,
-            {
-                selfHealing: selfHealingEnabled ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED,
-                testMode: selfHealingEnabled ? true : false
-            }
+            { payload: toolConfig.payload || {}, credentials: allCredentials, options: { selfHealing: selfHealingEnabled ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED, testMode: selfHealingEnabled ? true : false } }
         );
 
         return workflowResult;
