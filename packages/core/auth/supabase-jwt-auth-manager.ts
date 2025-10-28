@@ -1,6 +1,7 @@
 import { jwtVerify } from "jose";
 import { logMessage } from "../utils/logs.js";
 import { AuthManager, AuthResult } from "./types.js";
+import { mapUserRole } from "@superglue/shared";
 
 export class SupabaseJWTAuthManager implements AuthManager {
   public async authenticate(token: string): Promise<AuthResult> {
@@ -25,7 +26,7 @@ export class SupabaseJWTAuthManager implements AuthManager {
       const appMetadata = payload.app_metadata as any;
       const orgId = appMetadata?.active_org_id;
       const orgName = appMetadata?.active_org_name;
-      const orgRole = appMetadata?.active_org_role;
+      const orgRole = appMetadata?.active_org_role ? mapUserRole(appMetadata?.active_org_role) : undefined;
 
       if (!userId) {
         return {

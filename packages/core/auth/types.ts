@@ -1,9 +1,11 @@
+import { UserRole } from "@superglue/shared";
+
 export interface AuthResult {
     success: boolean;
     orgId: string
     userId?: string;
     orgName?: string;
-    orgRole?: string;
+    orgRole?: UserRole;
     message?: string;
 }
 
