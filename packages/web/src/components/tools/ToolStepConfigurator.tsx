@@ -1,15 +1,12 @@
 import { useConfig } from '@/src/app/config-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
-import { Switch } from "@/src/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { useToast } from '@/src/hooks/use-toast';
-import { downloadJson } from '@/src/lib/download-utils';
-import { ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, isEmptyData, MAX_DISPLAY_LINES, truncateForDisplay, truncateLines } from '@/src/lib/general-utils';
+import { splitUrl } from '@/src/lib/client-utils';
+import { composeUrl, ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, truncateForDisplay } from '@/src/lib/general-utils';
 import { Integration, SuperglueClient } from "@superglue/client";
-import { inferJsonSchema } from '@superglue/shared';
-import { ArrowDown, Check, Copy, Download, Edit, Globe, RotateCw } from 'lucide-react';
+import { ArrowDown, Check, Copy, Download, Edit, Globe } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { downloadJson } from '../../lib/download-utils';
 import { Badge } from "../ui/badge";
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -17,9 +14,9 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { HelpTooltip } from '../utils/HelpTooltip';
-import { JavaScriptCodeEditor } from "./editors/JavaScriptCodeEditor";
-import { JsonCodeEditor } from "./editors/JsonCodeEditor";
-import { CopyButton } from "./shared/CopyButton";
+import { JavaScriptCodeEditor } from './editors/JavaScriptCodeEditor';
+import { JsonCodeEditor } from './editors/JsonCodeEditor';
+import { CopyButton } from './shared/CopyButton';
 
 interface ToolStepConfiguratorProps {
     step: any;
@@ -35,14 +32,12 @@ interface ToolStepConfiguratorProps {
 
 export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput }: ToolStepConfiguratorProps) {
     const [didFormatLoopSelector, setDidFormatLoopSelector] = useState(false);
-    const [showJson, setShowJson] = useState(false);
     const [localIntegrations, setLocalIntegrations] = useState<Integration[]>([]);
     const [loadingIntegrations, setLoadingIntegrations] = useState(false);
     const [headersText, setHeadersText] = useState('');
     const [queryParamsText, setQueryParamsText] = useState('');
     const [headersError, setHeadersError] = useState(false);
     const [queryParamsError, setQueryParamsError] = useState(false);
-    const [copied, setCopied] = useState(false);
     const [isEditingInstruction, setIsEditingInstruction] = useState(false);
     const [instructionCopied, setInstructionCopied] = useState(false);
 
@@ -83,12 +78,14 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
 
     useEffect(() => {
         try {
-            setRawJsonText(JSON.stringify(step, null, 2));
-        } catch { }
-        try {
             const headers = step.apiConfig?.headers;
-            const headersJson = headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}';
-            setHeadersText(headersJson);
+            if (typeof headers === 'string') {
+                setHeadersText(headers);
+            } else if (headers !== undefined && headers !== null) {
+                setHeadersText(JSON.stringify(headers, null, 2));
+            } else {
+                setHeadersText('{}');
+            }
             setHeadersError(false);
         } catch {
             setHeadersText('{}');
@@ -96,8 +93,13 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         }
         try {
             const queryParams = step.apiConfig?.queryParams;
-            const queryParamsJson = queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}';
-            setQueryParamsText(queryParamsJson);
+            if (typeof queryParams === 'string') {
+                setQueryParamsText(queryParams);
+            } else if (queryParams !== undefined && queryParams !== null) {
+                setQueryParamsText(JSON.stringify(queryParams, null, 2));
+            } else {
+                setQueryParamsText('{}');
+            }
             setQueryParamsError(false);
         } catch {
             setQueryParamsText('{}');
@@ -109,9 +111,14 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
     useEffect(() => {
         try {
             const headers = step.apiConfig?.headers;
-            const headersJson = headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}';
-            if (headersJson !== headersText) {
-                setHeadersText(headersJson);
+            let newHeadersText = '{}';
+            if (typeof headers === 'string') {
+                newHeadersText = headers;
+            } else if (headers !== undefined && headers !== null) {
+                newHeadersText = JSON.stringify(headers, null, 2);
+            }
+            if (newHeadersText !== headersText) {
+                setHeadersText(newHeadersText);
                 setHeadersError(false);
             }
         } catch { }
@@ -121,9 +128,14 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
     useEffect(() => {
         try {
             const queryParams = step.apiConfig?.queryParams;
-            const queryParamsJson = queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}';
-            if (queryParamsJson !== queryParamsText) {
-                setQueryParamsText(queryParamsJson);
+            let newQueryParamsText = '{}';
+            if (typeof queryParams === 'string') {
+                newQueryParamsText = queryParams;
+            } else if (queryParams !== undefined && queryParams !== null) {
+                newQueryParamsText = JSON.stringify(queryParams, null, 2);
+            }
+            if (newQueryParamsText !== queryParamsText) {
+                setQueryParamsText(newQueryParamsText);
                 setQueryParamsError(false);
             }
         } catch { }
@@ -147,40 +159,10 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
     const handleImmediateEdit = (updater: (s: any) => any) => {
         if (disabled) return;
         const updated = updater(step);
-        try { setRawJsonText(JSON.stringify(updated, null, 2)); } catch { }
         if (onEditingChange) onEditingChange(true);
         onEdit(step.id, updated, true);
         if (onEditingChange) setTimeout(() => onEditingChange(false), 100);
     };
-
-    const [rawJsonText, setRawJsonText] = useState<string>(() => {
-        try { return JSON.stringify(step, null, 2); } catch { return '{}'; }
-    });
-
-    const isCodeEditingRef = useRef<boolean>(false);
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            try {
-                if (!isCodeEditingRef.current) return; // only react to actual code editor edits
-                const parsed = JSON.parse(rawJsonText);
-                if (onEditingChange) onEditingChange(true);
-                onEdit(step.id, parsed, true);
-                try {
-                    const headers = parsed.apiConfig?.headers;
-                    setHeadersText(headers !== undefined && headers !== null ? JSON.stringify(headers, null, 2) : '{}');
-                    setHeadersError(false);
-                } catch { }
-                try {
-                    const queryParams = parsed.apiConfig?.queryParams;
-                    setQueryParamsText(queryParams !== undefined && queryParams !== null ? JSON.stringify(queryParams, null, 2) : '{}');
-                    setQueryParamsError(false);
-                } catch { }
-                if (onEditingChange) setTimeout(() => onEditingChange(false), 100);
-            } catch { }
-            isCodeEditingRef.current = false;
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [rawJsonText]);
 
     const handleRemove = () => { onRemove(step.id); };
 
@@ -189,24 +171,25 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         return step.apiConfig?.urlHost && integration.urlHost && step.apiConfig.urlHost.includes(integration.urlHost.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, ''));
     });
 
-    const LOOP_ITEMS_DEBOUNCE_MS = 400;
-    const [loopItemsViewMode, setLoopItemsViewMode] = useState<'preview' | 'schema'>('preview');
+    const DATA_SELECTOR_DEBOUNCE_MS = 400;
     const [loopItems, setLoopItems] = useState<any[] | null>(null);
     const [loopItemsError, setLoopItemsError] = useState<string | null>(null);
     const [isLoopItemsEvaluating, setIsLoopItemsEvaluating] = useState<boolean>(false);
     const lastEvalTimerRef = useRef<number | null>(null);
 
+    const loopItemsDisplayValue = useMemo(() => {
+        if (loopItemsError) return JSON.stringify({ error: loopItemsError }, null, 2);
+        const displayData = truncateForDisplay(loopItems || []);
+        return displayData.value;
+    }, [loopItems, loopItemsError]);
+
+    const loopItemsCopyValue = useMemo(() => {
+        const displayData = truncateForDisplay(loopItems || []);
+        return displayData.value;
+    }, [loopItems]);
+
     useEffect(() => {
-        if (step.executionMode !== 'LOOP') {
-            setLoopItems(null);
-            setLoopItemsError(null);
-            return;
-        }
-        if (!stepInput || isEmptyData(stepInput)) {
-            setLoopItems(null);
-            setLoopItemsError(null);
-            return;
-        }
+
         if (lastEvalTimerRef.current) {
             window.clearTimeout(lastEvalTimerRef.current);
             lastEvalTimerRef.current = null;
@@ -215,32 +198,27 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         const t = window.setTimeout(() => {
             setIsLoopItemsEvaluating(true);
             try {
-                const sel = step?.loopSelector;
+                let sel = step?.loopSelector;
                 if (!sel || typeof sel !== 'string') {
                     setLoopItems(null);
                     setLoopItemsError('No loop selector configured');
-                } else {
-                    const raw = ensureSourceDataArrowFunction(sel).trim();
-                    const stripped = raw.replace(/;\s*$/, '');
-                    const body = `const __selector = (${stripped});\nreturn __selector(sourceData);`;
-                    // eslint-disable-next-line no-new-func
-                    const fn = new Function('sourceData', body);
-                    const out = fn(stepInput || {});
-                    if (Array.isArray(out)) {
-                        setLoopItems(out);
-                        setLoopItemsError(null);
-                    } else {
-                        setLoopItems(null);
-                        setLoopItemsError('Loop selector did not return an array');
-                    }
                 }
+                sel = "(sourceData) => { return sourceData; }";
+                const raw = ensureSourceDataArrowFunction(sel).trim();
+                const stripped = raw.replace(/;\s*$/, '');
+                const body = `const __selector = (${stripped});\nreturn __selector(sourceData);`;
+                // eslint-disable-next-line no-new-func
+                const fn = new Function('sourceData', body);
+                const out = fn(stepInput || {});
+                setLoopItems(out);
+                setLoopItemsError(null);
             } catch (err: any) {
                 setLoopItems(null);
                 setLoopItemsError(err?.message ? String(err.message) : 'Error evaluating loop selector');
             } finally {
                 setIsLoopItemsEvaluating(false);
             }
-        }, LOOP_ITEMS_DEBOUNCE_MS);
+        }, DATA_SELECTOR_DEBOUNCE_MS);
         lastEvalTimerRef.current = t as unknown as number;
         return () => { if (lastEvalTimerRef.current) { window.clearTimeout(lastEvalTimerRef.current); lastEvalTimerRef.current = null; } };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -253,7 +231,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                     <div className="flex items-center justify-between min-w-0">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                             <CardTitle className="text-sm font-medium flex items-center gap-2 min-w-0">
-                                {step.executionMode === 'LOOP' && (<RotateCw className="h-4 w-4 text-muted-foreground flex-shrink-0" />)}
                                 <span className="font-mono truncate">{step.id}</span>
                                 {linkedIntegration && (
                                     <Badge variant="outline" className="text-xs flex-shrink-0">
@@ -270,36 +247,11 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                     </Badge>
                                 )}
                             </CardTitle>
-                            <div className="flex items-center gap-1 ml-2">
-                                <Label className="text-xs text-muted-foreground">Code Mode</Label>
-                                <Switch checked={showJson} onCheckedChange={setShowJson} className="custom-switch" disabled={disabled} />
-                            </div>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
-                    {
-                        <>
-                            {showJson ? (
-                                <div className="space-y-2">
-                                    <div className="relative bg-muted/30 rounded-lg border">
-                                        <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 bg-background/80 hover:bg-background" onClick={() => { navigator.clipboard.writeText(rawJsonText); setCopied(true); setTimeout(() => setCopied(false), 1500); }} title="Copy JSON">
-                                                {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                                            </Button>
-                                        </div>
-                                        <JsonSchemaEditor
-                                            value={rawJsonText}
-                                            onChange={(val) => { if (disabled) return; isCodeEditingRef.current = true; setRawJsonText(val || ''); }}
-                                            isOptional={false}
-                                            forceCodeMode={true}
-                                            showModeToggle={false}
-                                            readOnly={disabled}
-                                        />
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
+                    <div className="space-y-2">
                                     <div>
                                         <div className="flex items-center justify-between">
                                             <Label className="text-xs flex items-center gap-1">
@@ -393,39 +345,32 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 </SelectContent>
                                             </Select>
                                         </div>
-                                        <div>
-                                            <div className="flex items-center gap-1">
-                                                <Label className="text-xs">Mode</Label>
-                                                <HelpTooltip text="DIRECT: Execute once with input data. LOOP: Execute multiple times iterating over an array from previous steps." />
-                                            </div>
-                                            <Select value={step.executionMode} onValueChange={(value) => { if (disabled) return; handleImmediateEdit((s) => ({ ...s, executionMode: value })); }}>
-                                                <SelectTrigger className="h-9 w-28 mt-1" disabled={disabled}>
-                                                    <SelectValue placeholder="Mode" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="DIRECT">DIRECT</SelectItem>
-                                                    <SelectItem value="LOOP">LOOP</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
                                     </div>
                                     <div>
                                         <Label className="text-xs flex items-center gap-1">
                                             API Config
-                                            <HelpTooltip text="Configure the HTTP method, host, and endpoint path for this API call. Use variables like {variable} to reference previous step outputs." />
+                                            <HelpTooltip text="Configure the HTTP method and URL for this API call. Use variables like {variable} to reference previous step outputs." />
                                         </Label>
                                         <div className="space-y-2 mt-1">
                                             <div className="flex gap-2">
                                                 <Select value={step.apiConfig.method} onValueChange={(value) => { if (disabled) return; handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, method: value } })); }}>
-                                                    <SelectTrigger className="h-9 flex-1" disabled={disabled}>
+                                                    <SelectTrigger className="h-9 w-28" disabled={disabled}>
                                                         <SelectValue placeholder="Method" />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         {['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map(method => (<SelectItem key={method} value={method}>{method}</SelectItem>))}
                                                     </SelectContent>
                                                 </Select>
-                                                <Input value={step.apiConfig.urlHost} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, urlHost: e.target.value } }))} className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" placeholder="Host" disabled={disabled} />
-                                                <Input value={step.apiConfig.urlPath} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, urlPath: e.target.value } }))} className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" placeholder="Path" disabled={disabled} />
+                                                <Input 
+                                                    value={composeUrl(step.apiConfig.urlHost || '', step.apiConfig.urlPath || '')} 
+                                                    onChange={(e) => {
+                                                        const { urlHost, urlPath } = splitUrl(e.target.value);
+                                                        handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, urlHost, urlPath } }));
+                                                    }} 
+                                                    className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" 
+                                                    placeholder="https://api.example.com/endpoint" 
+                                                    disabled={disabled} 
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -434,24 +379,110 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             Headers (JSON)
                                             <HelpTooltip text="HTTP headers to include with the request. Use JSON format. Common headers include Content-Type, Authorization, etc." />
                                         </Label>
-                                        <Textarea value={headersText} onChange={(e) => { if (disabled) return; const newValue = e.target.value; setHeadersText(newValue); try { const trimmed = newValue.trim(); const headers = trimmed === '' ? {} : JSON.parse(newValue); handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, headers } })); setHeadersError(false); } catch { setHeadersError(true); } }} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" placeholder="{}" disabled={disabled} />
-                                        {headersError && (<div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-1.5 px-2.5 rounded-md mt-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg><span>Invalid JSON format</span></div>)}
+                                        <JsonCodeEditor
+                                            value={headersText}
+                                            onChange={(val) => {
+                                                if (disabled) return;
+                                                setHeadersText(val || '');
+                                                handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, headers: val || '' } }));
+                                            }}
+                                            readOnly={disabled}
+                                            minHeight="100px"
+                                            maxHeight="250px"
+                                            resizable={true}
+                                            placeholder="{}"
+                                        />
                                     </div>
                                     <div>
-                                        <Label className="text-xs flex items-center gap-1">
-                                            Query Parameters (JSON)
-                                            <HelpTooltip text='URL query parameters to append to the request. Use JSON format like {"param1": "value1", "param2": "value2"}' />
+                                        <Label className="text-xs flex items-center gap-1 mb-1">
+                                            Query Parameters
+                                            <HelpTooltip text='URL query parameters to append to the request. Can be JSON object or any text format like "param1=value1&param2=value2"' />
                                         </Label>
-                                        <Textarea value={queryParamsText} onChange={(e) => { if (disabled) return; const newValue = e.target.value; setQueryParamsText(newValue); try { const trimmed = newValue.trim(); const queryParams = trimmed === '' ? {} : JSON.parse(newValue); handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, queryParams } })); setQueryParamsError(false); } catch { setQueryParamsError(true); } }} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" placeholder="{}" disabled={disabled} />
-                                        {queryParamsError && (<div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 py-1.5 px-2.5 rounded-md mt-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg><span>Invalid JSON format</span></div>)}
+                                        <JsonCodeEditor
+                                            value={queryParamsText}
+                                            onChange={(val) => {
+                                                if (disabled) return;
+                                                setQueryParamsText(val || '');
+                                                handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, queryParams: val || '' } }));
+                                            }}
+                                            readOnly={disabled}
+                                            minHeight="100px"
+                                            maxHeight="250px"
+                                            resizable={true}
+                                            placeholder="{}"
+                                        />
                                     </div>
-                                    <div>
-                                        <Label className="text-xs flex items-center gap-1">
-                                            Body
-                                            <HelpTooltip text="Request body content. Can be JSON, form data, or plain text. Use JavaScript expressions to transform data from previous steps." />
-                                        </Label>
-                                        <Textarea value={step.apiConfig.body || ''} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, body: e.target.value } }))} className="font-mono text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0" disabled={disabled} />
-                                    </div>
+                                    {['POST', 'PUT', 'PATCH'].includes(step.apiConfig.method) && (
+                                        <div>
+                                            <Label className="text-xs flex items-center gap-1 mb-1">
+                                                Body
+                                                <HelpTooltip text="Request body content. Can be JSON, form data, plain text, or any format. Use JavaScript expressions to transform data from previous steps." />
+                                            </Label>
+                                            <JsonCodeEditor
+                                                value={step.apiConfig.body || ''}
+                                                onChange={(val) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, body: val || '' } }))}
+                                                readOnly={disabled}
+                                                minHeight="100px"
+                                                maxHeight="250px"
+                                                resizable={true}
+                                                placeholder=""
+                                            />
+                                        </div>
+                                    )}
+                                                                            <div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div>
+                                                    <Label className="text-xs flex items-center gap-1 mb-1">
+                                                        Data Selector (JavaScript)
+                                                        <HelpTooltip text="JavaScript arrow function selecting an array from step input. The step runs once per item; within each iteration sourceData.currentItem is set to that item." />
+                                                    </Label>
+                                                    <JavaScriptCodeEditor
+                                                        value={step.loopSelector || '(sourceData) => { return sourceData; }'}
+                                                        onChange={(val) => handleImmediateEdit((s) => ({ ...s, loopSelector: val }))}
+                                                        readOnly={disabled}
+                                                        minHeight="150px"
+                                                        maxHeight="400px"
+                                                        resizable={true}
+                                                        isTransformEditor={false}
+                                                        autoFormatOnMount={false}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label className="text-xs flex items-center gap-1 mb-1">
+                                                        Selected Data (JSON)
+                                                        <HelpTooltip text="Evaluates the data selector against the step input. The resulting array drives execution (one run per item). During execution, sourceData.currentItem equals the current item." />
+                                                        {isLoopItemsEvaluating && (
+                                                            <div className="ml-1 h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/70 border-t-transparent" />
+                                                        )}
+                                                    </Label>
+                                                        <JsonCodeEditor
+                                                            value={loopItemsDisplayValue}
+                                                            readOnly={true}
+                                                            minHeight="150px"
+                                                            maxHeight="400px"
+                                                            resizable={true}
+                                                            placeholder=""
+                                                            overlay={
+                                                                <div className="flex items-center gap-2">
+                                                                    {!loopItemsError && (
+                                                                        <CopyButton text={loopItemsCopyValue} />
+                                                                    )}
+                                                                    {!loopItemsError && (
+                                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => downloadJson(loopItems || [], `step_${step.id}_loop_items.json`)} title="Download loop items as JSON">
+                                                                            <Download className="h-3 w-3" />
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
+                                                            }
+                                                            bottomRightOverlay={(!loopItemsError && Array.isArray(loopItems)) ? (
+                                                                <div className="px-2 py-1 rounded-md bg-secondary text-muted-foreground text-[11px] font-medium shadow-md">
+                                                                    {loopItems.length} items
+                                                                </div>
+                                                            ) : undefined}
+                                                        />
+                                                </div>
+                                            </div>
+                                        </div>
                                     <div>
                                         <Label className="text-xs flex items-center gap-1">
                                             Pagination
@@ -471,16 +502,18 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             </Select>
                                             {step.apiConfig.pagination && (
                                                 <>
-                                                    <div>
-                                                        <Label className="text-xs">Page Size</Label>
-                                                        <Input value={step.apiConfig.pagination.pageSize || '50'} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), pageSize: e.target.value } } }))} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="50" disabled={disabled} />
-                                                    </div>
-                                                    {step.apiConfig.pagination.type === 'CURSOR_BASED' && (
-                                                        <div>
-                                                            <Label className="text-xs">Cursor Path</Label>
-                                                            <Input value={step.apiConfig.pagination.cursorPath || ''} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), cursorPath: e.target.value } } }))} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="e.g., response.nextCursor" disabled={disabled} />
+                                                    <div className="flex  gap-2">
+                                                        <div className="flex-1">
+                                                            <Label className="text-xs">Page Size</Label>
+                                                            <Input value={step.apiConfig.pagination.pageSize || '50'} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), pageSize: e.target.value } } }))} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="50" disabled={disabled} />
                                                         </div>
-                                                    )}
+                                                        {step.apiConfig.pagination.type === 'CURSOR_BASED' && (
+                                                            <div className="flex-1">
+                                                                <Label className="text-xs">Cursor Path</Label>
+                                                                <Input value={step.apiConfig.pagination.cursorPath || ''} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), cursorPath: e.target.value } } }))} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="e.g., response.nextCursor" disabled={disabled} />
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                     <div>
                                                         <Label className="text-xs flex items-center gap-1">
                                                             Stop Condition (JavaScript)
@@ -509,105 +542,14 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             )}
                                         </div>
                                     </div>
-                                    {step.executionMode === 'LOOP' && (
-                                        <>
-                                            <div>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                    <div>
-                                                        <Label className="text-xs flex items-center gap-1 mb-1">
-                                                            Loop Selector (JavaScript)
-                                                            <HelpTooltip text="JavaScript arrow function selecting an array from step input. The step runs once per item; within each iteration sourceData.currentItem is set to that item." />
-                                                        </Label>
-                                                        <JavaScriptCodeEditor
-                                                            value={step.loopSelector || ''}
-                                                            onChange={(val) => handleImmediateEdit((s) => ({ ...s, loopSelector: val }))}
-                                                            readOnly={disabled}
-                                                            minHeight="150px"
-                                                            maxHeight="400px"
-                                                            resizable={true}
-                                                            isTransformEditor={false}
-                                                            autoFormatOnMount={false}
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <Label className="text-xs flex items-center gap-1 mb-1">
-                                                            Loop Items (JSON)
-                                                            <HelpTooltip text="Evaluates the loop selector against the step input. The resulting array drives LOOP execution (one run per item). During execution, sourceData.currentItem equals the current item." />
-                                                            {isLoopItemsEvaluating && (
-                                                                <div className="ml-1 h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/70 border-t-transparent" />
-                                                            )}
-                                                        </Label>
-                                                        {(!stepInput || isEmptyData(stepInput)) ? (
-                                                            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
-                                                                <div className="text-xs mb-1">No input yet</div>
-                                                                <p className="text-[10px]">Run previous step to see loop items</p>
-                                                            </div>
-                                                        ) : (
-                                                            <JsonCodeEditor
-                                                                value={(() => {
-                                                                    if (loopItemsError) return JSON.stringify({ error: loopItemsError }, null, 2);
-                                                                    if (loopItemsViewMode === 'schema') {
-                                                                        const schemaObj = inferJsonSchema(loopItems || []);
-                                                                        return truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
-                                                                    }
-                                                                    const displayData = truncateForDisplay(loopItems || []);
-                                                                    return displayData.value;
-                                                                })()}
-                                                                readOnly={true}
-                                                                minHeight="150px"
-                                                                maxHeight="400px"
-                                                                resizable={true}
-                                                                placeholder="[]"
-                                                                overlay={
-                                                                    <div className="flex items-center gap-2">
-                                                                        {!loopItemsError && (
-                                                                            <Tabs value={loopItemsViewMode} onValueChange={(v) => setLoopItemsViewMode(v as 'preview' | 'schema')} className="w-auto">
-                                                                                <TabsList className="h-6 p-0.5 rounded-md">
-                                                                                    <TabsTrigger value="preview" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Preview</TabsTrigger>
-                                                                                    <TabsTrigger value="schema" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Schema</TabsTrigger>
-                                                                                </TabsList>
-                                                                            </Tabs>
-                                                                        )}
-                                                                        {!loopItemsError && (
-                                                                            <CopyButton text={(() => {
-                                                                                if (loopItemsViewMode === 'schema') {
-                                                                                    const schemaObj = inferJsonSchema(loopItems || []);
-                                                                                    return truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
-                                                                                }
-                                                                                const displayData = truncateForDisplay(loopItems || []);
-                                                                                return displayData.value;
-                                                                            })()} />
-                                                                        )}
-                                                                        {!loopItemsError && (
-                                                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => downloadJson(loopItems || [], `step_${step.id}_loop_items.json`)} title="Download loop items as JSON">
-                                                                                <Download className="h-3 w-3" />
-                                                                            </Button>
-                                                                        )}
-                                                                    </div>
-                                                                }
-                                                                bottomRightOverlay={(!loopItemsError && Array.isArray(loopItems)) ? (
-                                                                    <div className="px-2 py-1 rounded-md bg-secondary text-muted-foreground text-[11px] font-medium shadow-md">
-                                                                        {loopItems.length} items
-                                                                    </div>
-                                                                ) : undefined}
-                                                            />
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <Label className="text-xs flex items-center gap-1">
-                                                    Max Iterations
-                                                    <HelpTooltip text="Maximum number of loop iterations to prevent infinite loops. Default is 1000." />
-                                                </Label>
-                                                <Input type="number" value={step.loopMaxIters || ''} onChange={(e) => handleImmediateEdit((s) => ({ ...s, loopMaxIters: parseInt(e.target.value) || undefined }))} className="text-xs mt-1 w-32" placeholder="1000" disabled={disabled} />
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                        </>
-                    }
+                                        <div>
+                                            <Label className="text-xs flex items-center gap-1">
+                                                # of max requests
+                                                <HelpTooltip text="Maximum number of requests sent per step to prevent infinite loops. Default is 1000." />
+                                            </Label>
+                                            <Input type="number" value={step.loopMaxIters || ''} onChange={(e) => handleImmediateEdit((s) => ({ ...s, loopMaxIters: parseInt(e.target.value) || undefined }))} className="text-xs mt-1 w-32" placeholder="1000" disabled={disabled} />
+                                        </div>
+                    </div>
                 </CardContent>
             </Card>
             {!isLast && (<div className="my-2 text-muted-foreground"><ArrowDown className="h-4 w-4" /></div>)}

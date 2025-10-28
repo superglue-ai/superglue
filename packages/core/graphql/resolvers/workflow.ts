@@ -120,8 +120,8 @@ export const executeWorkflowResolver = async (
       );
     }
 
-    const executor = new WorkflowExecutor(workflow, metadata, integrationManagers);
-    const result = await executor.execute(args.payload, mergedCredentials, args.options);
+    const executor = new WorkflowExecutor({ workflow, metadata, integrations: integrationManagers });
+    const result = await executor.execute({ payload: args.payload, credentials: mergedCredentials, options: args.options });
 
     // Save run to datastore
     context.datastore.createRun({
