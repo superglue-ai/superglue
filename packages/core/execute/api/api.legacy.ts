@@ -7,11 +7,11 @@ import { server_defaults } from "../../default.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { LanguageModel, LLMMessage } from "../../llm/language-model.js";
 import { parseFile } from "../../utils/file.js";
-import { composeUrl, generateId, maskCredentials, replaceVariables, sample } from "../../utils/tools.js";
+import { composeUrl, generateId, maskCredentials, replaceVariables, sample, smartMergeResponses } from "../../utils/tools.js";
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../../utils/workflow-tools.js";
 import { callFTP } from "../ftp/ftp.legacy.js";
 import { callPostgres } from "../postgres/postgres.legacy.js";
-import { AbortError, ApiCallError, callAxios, checkResponseForErrors, handle2xxStatus, handle429Status, handleErrorStatus } from "./api.js";
+import { ApiCallError, callAxios, checkResponseForErrors, handle2xxStatus, handle429Status, handleErrorStatus } from "./api.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
@@ -189,18 +189,6 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
         throw new ApiCallError(e?.message || String(e), status);
       }
     }
-    if (endpoint.dataPath) {
-      const pathParts = endpoint.dataPath.split('.');
-      for (const part of pathParts) {
-        // sometimes a jsonata expression is used to get the data, so ignore the $
-        // TODO: fix this later
-        if (!responseData[part] && part !== '$') {
-          dataPathSuccess = false;
-          break;
-        }
-        responseData = responseData[part] || responseData;
-      }
-    }
 
     // Handle pagination based on whether stopCondition exists
     if (hasStopCondition) {
@@ -264,10 +252,26 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
 
       if (Array.isArray(responseData)) {
         allResults = allResults.concat(responseData);
-      } else if (responseData) {
+      } else if(!endpoint.dataPath) {
+        allResults = smartMergeResponses(allResults, responseData);
+      }
+      else if (responseData) {
         allResults.push(responseData);
       }
     } else {
+      //Legacy support for data path
+      if (endpoint.dataPath) {
+        const pathParts = endpoint.dataPath.split('.');
+        for (const part of pathParts) {
+          // sometimes a jsonata expression is used to get the data, so ignore the $
+          // TODO: fix this later
+          if (!responseData[part] && part !== '$') {
+            dataPathSuccess = false;
+            break;
+          }
+          responseData = responseData[part] || responseData;
+        }
+      }
       if (Array.isArray(responseData)) {
         const pageSize = parseInt(endpoint.pagination?.pageSize || "50");
         if (!pageSize || responseData.length < pageSize) {
@@ -304,17 +308,6 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
       }
     }
     loopCounter++;
-  }
-
-  if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
-    return {
-      data: {
-        next_cursor: cursor,
-        ...(Array.isArray(allResults) ? { results: allResults } : allResults)
-      },
-      statusCode: lastResponse.status,
-      headers: lastResponse.headers
-    };
   }
 
   return {
@@ -451,7 +444,7 @@ export async function evaluateStopCondition(
   }
 
   const temperature = Math.min(retryCount * 0.1, 1);
-  const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(
+  const { response: generatedConfig, error: generatedConfigError, messages: updatedMessages } = await LanguageModel.generateObject(
     messages,
     submitToolDefinition.arguments,
     temperature,
@@ -459,8 +452,8 @@ export async function evaluateStopCondition(
     { integration: await integrationManager?.getIntegration() }
   );
 
-  if (generatedConfig?.error) {
-    throw new AbortError(generatedConfig.error);
+  if (generatedConfigError || generatedConfig.error) {
+    throw new Error(generatedConfigError || generatedConfig.error);
   }
   // convert the queryParams and headers to an object
   const queryParams = generatedConfig.apiConfig.queryParams ?
@@ -480,7 +473,6 @@ export async function evaluateStopCondition(
       body: generatedConfig.apiConfig.body,
       authentication: generatedConfig.apiConfig.authentication,
       pagination: generatedConfig.apiConfig.pagination,
-      dataPath: generatedConfig.apiConfig.dataPath,
       documentationUrl: apiConfig.documentationUrl,
       responseSchema: apiConfig.responseSchema,
       responseMapping: apiConfig.responseMapping,

@@ -71,7 +71,12 @@ export const generateInstructionsImplementation: ToolImplementation<InstructionG
     items: { type: "string" }
   };
 
-  const { response: generatedInstructions } = await LanguageModel.generateObject(messages, schema, 0.2);
+  const { response: generatedInstructions, error: generatedInstructionsError } = await LanguageModel.generateObject(messages, schema, 0.2);
+
+  if (generatedInstructionsError || generatedInstructions?.error) {
+    throw new Error(`Error generating instructions: ${generatedInstructionsError || generatedInstructions?.error}`);
+  }
+  
   return {
     success: true,
     data: sanitizeInstructionSuggestions(generatedInstructions)

@@ -242,8 +242,7 @@ export class WorkflowExecutor implements Workflow {
           console.warn(`[Step ${step.id}] Input mapping failed, falling back to auto-detection`, err);
         }
       }
-      // Default to simple merging of payload with previous step data
-      return { ...mappingContext };
+      return mappingContext;
     } catch (error) {
       console.error(`[Step ${step.id}] Error preparing input:`, error);
       return { ...originalPayload };
@@ -271,7 +270,8 @@ export class WorkflowExecutor implements Workflow {
   
       const integrationManager = step.integrationId ? this.integrations[step.integrationId] : undefined;
       const loopSelectorResult = await transformAndValidateSchema(payload, step.loopSelector || "$", null);
-      if(Array.isArray(loopSelectorResult.data)) {
+      const isLoopSelectorArray = Array.isArray(loopSelectorResult.data);
+      if(isLoopSelectorArray) {
         loopItems = loopSelectorResult.data;
       }
       else if(loopSelectorResult.data) {
@@ -283,6 +283,7 @@ export class WorkflowExecutor implements Workflow {
   
       if (!loopSelectorResult.success) {
         if (!isSelfHealingEnabled(options, "api")) {
+          logMessage("error", `Loop selector for '${step.id}' failed. ${loopSelectorResult.error}\nCode: ${step.loopSelector}\nPayload: ${JSON.stringify(payload).slice(0, 1000)}...`, this.metadata);
           throw new Error(`Loop selector for '${step.id}' failed. Check the loop selector code or enable self-healing and re-execute to regenerate automatically.`);
         }
   
@@ -335,15 +336,13 @@ export class WorkflowExecutor implements Workflow {
             if (successfulConfig !== step.apiConfig) {
               logMessage("debug", `Loop iteration ${i + 1} updated configuration`, this.metadata);
             }
-          }
-  
+          } 
           const rawData = { currentItem: currentItem, data: apiResponse.data, ...(typeof apiResponse.data === 'object' ? apiResponse.data : {}) };
           const transformedData = await applyJsonata(rawData, step.responseMapping); //LEGACY: New workflow strategy will not use response mappings, default to $
-  
           stepResults.push({
             stepId: step.id,
             success: true,
-            rawData: rawData,
+            rawData: null,
             transformedData: transformedData,
             config: apiResponse.endpoint
           });
@@ -359,8 +358,8 @@ export class WorkflowExecutor implements Workflow {
       }
   
       result.config = step.apiConfig;
-      result.rawData = stepResults.map(r => r.rawData);
-      result.transformedData = stepResults.map(r => r.transformedData);
+      result.rawData = isLoopSelectorArray ? stepResults.map(r => r.rawData) : stepResults[0].rawData;
+      result.transformedData = isLoopSelectorArray ? stepResults.map(r => r.transformedData) : stepResults[0].transformedData;
       result.success = stepResults.every(r => r.success);
       result.error = stepResults.filter(s => s.error).join("\n");
     } catch (error) {
@@ -398,6 +397,9 @@ export class WorkflowExecutor implements Workflow {
       { type: "object", properties: { success: { type: "boolean" }, refactorNeeded: { type: "boolean" }, shortReason: { type: "string" } } },
       0
     );
+    if (response.error) {
+      throw new Error(`Error evaluating config response: ${response.error}`);
+    }
     return response.response;
   }
   

@@ -3,6 +3,7 @@ import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
 import { getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
 import { AssistantModelMessage, TextPart, ToolCallPart, ToolResultPart, generateText, jsonSchema, tool } from "ai";
+import { Validator } from "jsonschema";
 import { server_defaults } from "../default.js";
 import { ToolDefinition } from "../execute/tools.js";
 import { logMessage } from "../utils/logs.js";
@@ -256,6 +257,18 @@ export class AiSdkModel implements LLM {
         content: JSON.stringify(finalResult)
       }];
 
+      if (finalResult) {
+        try {
+          const validator = new Validator();
+          const validation = validator.validate(finalResult, schema);
+          if (!validation.valid) {
+            throw new Error(`Generated result does not match schema ${validation.errors.map(e => e.stack).join(', ')}`);
+          }
+        } catch (validationError) {
+          throw new Error(`Schema validation error: ${validationError.message} for result: ${JSON.stringify(finalResult)}`);
+        }
+      }
+
       return {
         response: finalResult,
         messages: updatedMessages
@@ -268,7 +281,8 @@ export class AiSdkModel implements LLM {
       } as LLMMessage];
 
       return {
-        response: "Error: Vercel AI API Error: " + error.message,
+        response: null,
+        error: "Error: Vercel AI API Error: " + error.message,
         messages: updatedMessages
       };
     }
