@@ -1,7 +1,7 @@
 "use client"
 import { AnimatePresence, motion } from 'framer-motion';
 import { usePathname } from 'next/navigation';
-import { Sidebar } from '../components/Sidebar';
+import { Sidebar } from '../components/sidebar/Sidebar';
 import { Toaster } from '../components/ui/toaster';
 import { LogSidebar } from '../components/utils/LogSidebar';
 import { ServerMonitor } from '../components/utils/ServerMonitor';
