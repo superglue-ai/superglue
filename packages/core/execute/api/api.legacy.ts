@@ -485,7 +485,7 @@ export async function resolveVarReferences(input: resolveVarReferencesInput): Pr
           originalErrorMessage,
           allVariables: input.allVariables
         },
-        { characterBudget: 5000 }
+        { characterBudget: 10000 }
       ));
     }
     // check if the error is a code execution error (which is thrown if a js expression fails to execute)
@@ -502,7 +502,7 @@ export async function resolveVarReferences(input: resolveVarReferencesInput): Pr
           originalErrorMessage,
           allVariables: input.allVariables
         },
-        { characterBudget: 5000 }
+        { characterBudget: 10000 }
       ));
     }
     throw new Error(`Unknown error while replacing variables: ${originalErrorMessage}`);

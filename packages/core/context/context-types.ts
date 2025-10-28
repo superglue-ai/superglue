@@ -146,3 +146,24 @@ export type VarResolverErrorContextInput = {
 export type VarResolverErrorContextOptions = {
     characterBudget: number;
 };
+
+export type PostgresBodyStructureErrorContextInput = {
+    bodyContent: string;
+    parseError?: string;
+    parsedBody?: any;
+};
+
+export type PostgresBodyStructureErrorContextOptions = {
+    characterBudget: number;
+};
+
+export type PostgresSqlExecutionErrorContextInput = {
+    queryText: string;
+    queryParams?: any[];
+    postgresError: string;
+    allVariables: Record<string, any>;
+};
+
+export type PostgresSqlExecutionErrorContextOptions = {
+    characterBudget: number;
+};

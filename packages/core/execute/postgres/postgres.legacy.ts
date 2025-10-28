@@ -1,9 +1,9 @@
 import { ApiConfig, RequestOptions } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
+import { getPostgresBodyStructureErrorContext, getPostgresSqlExecutionErrorContext } from "../../context/context-error-messages.js";
 import { server_defaults } from "../../default.js";
 import { composeUrl, replaceVariables } from "../../utils/helpers.js";
 import { parseJSON } from "../../utils/json-parser.js";
-
 
 // Pool cache management
 interface PoolCacheEntry {
@@ -100,15 +100,27 @@ function sanitizeDatabaseName(connectionString: string): string {
 
 export async function callPostgres(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {
   const requestVars = { ...payload, ...credentials };
-  let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
-  connectionString = sanitizeDatabaseName(connectionString);
+  const processedUrl = composeUrl(endpoint.urlHost, endpoint.urlPath);
+  const connectionString = sanitizeDatabaseName(processedUrl);
 
   let bodyParsed: any;
   try {
     bodyParsed = parseJSON(await replaceVariables(endpoint.body, requestVars));
   } catch (error) {
-    throw new Error(`Invalid JSON in body: ${error.message} for body: ${JSON.stringify(endpoint.body)}`);
+    const parseError = error instanceof Error ? error.message : String(error);
+    throw new Error(getPostgresBodyStructureErrorContext(
+      { bodyContent: endpoint.body, parseError },
+      { characterBudget: 5000 }
+    ));
   }
+
+  if (!bodyParsed.query) {
+    throw new Error(getPostgresBodyStructureErrorContext(
+      { bodyContent: endpoint.body, parsedBody: bodyParsed },
+      { characterBudget: 5000 }
+    ));
+  }
+
   const queryText = bodyParsed.query;
   const queryParams = bodyParsed.params || bodyParsed.values;
 
@@ -137,10 +149,15 @@ export async function callPostgres(endpoint: ApiConfig, payload: Record<string, 
 
       if (attempts > maxRetries) {
         if (error instanceof Error) {
-          const errorContext = queryParams
-            ? ` for query: ${queryText} with params: ${JSON.stringify(queryParams)}`
-            : ` for query: ${queryText}`;
-          throw new Error(`PostgreSQL error: ${error.message}${errorContext}`);
+          throw new Error(getPostgresSqlExecutionErrorContext(
+            {
+              queryText,
+              queryParams,
+              postgresError: error.message,
+              allVariables: requestVars
+            },
+            { characterBudget: 5000 }
+          ));
         }
         throw new Error('Unknown PostgreSQL error occurred');
       }
