@@ -1168,7 +1168,8 @@
       "instruction": "Parse the fixed-width text data provided in fixedwidth_file. The format is: customer_id (positions 0-9, 10 chars), name (positions 10-39, 30 chars), age (positions 40-42, 3 chars), city (positions 43-62, 20 chars), balance (positions 63-72, 10 chars). Trim whitespace from all fields. Convert age to integer and balance to float. Return JSON: { customers: Array<{ customer_id: string, name: string, age: number, city: string, balance: number }> }",
       "integrationIds": [],
       "payload": {
-        "fixedwidth_file": "customer_records.txt"
+        "fixedwidth_file": "customer_records.txt",
+        "field_widths": [10, 30, 3, 20, 10]
       },
       "validationFunction": "validators/051-fixedwidth-parse-structure.ts",
       "expectedResultDescription": "Should parse fixed-width format correctly. Expected 20 customers with properly extracted fields, trimmed strings, age as integers, and balance as floats. First customer should be Alice Johnson from New York with balance 5250.75."
