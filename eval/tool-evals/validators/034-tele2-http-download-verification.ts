@@ -2,7 +2,7 @@ import assert from 'assert';
 
 const EXPECTED_DATA = {
   "status": "success",
-  "file": "10GB.zip"
+  "file": "10MB.zip"
 };
 
 function isDeepEqual(expected: any, received: any): boolean {
