@@ -45,6 +45,7 @@ export interface WorkflowExecutionContext extends BaseToolContext {
     credentials: Record<string, string>;
     options: RequestOptions;
     integration?: Integration;
+    getIntegration?: () => Promise<Integration>;
 }
 
 export interface WorkflowBuildContext extends BaseToolContext {

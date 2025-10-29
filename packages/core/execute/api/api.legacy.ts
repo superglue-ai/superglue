@@ -1,4 +1,4 @@
-import { ApiConfig, FileType, PaginationType } from "@superglue/client";
+import { ApiConfig, FileType, Integration, PaginationType } from "@superglue/client";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { RequestOptions } from "http";
 import ivm from "isolated-vm";
@@ -451,12 +451,22 @@ export async function evaluateStopCondition(
   }
 
   const temperature = Math.min(retryCount * 0.1, 1);
+  
+  // Lazy loading: only load integration if search_documentation tool is actually called
+  let cachedIntegration: Integration | null = null;
+  const getIntegration = async () => {
+    if (!cachedIntegration) {
+      cachedIntegration = await integrationManager?.getIntegration();
+    }
+    return cachedIntegration;
+  };
+  
   const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(
     messages,
     submitToolDefinition.arguments,
     temperature,
     [searchDocumentationToolDefinition],
-    { integration: await integrationManager?.getIntegration() }
+    { getIntegration }
   );
 
   if (generatedConfig?.error) {
