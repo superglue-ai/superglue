@@ -31,14 +31,14 @@ export default function validate(data: any, payload: any): void {
   }
 
   const topUser = data.order_summary[0];
-  assert(topUser.user_id === 'U003', `Expected U003 (Michael Chen) to have highest total, got ${topUser.user_id}`);
-  assert(topUser.order_count === 3, `Expected Michael Chen to have 3 orders, got ${topUser.order_count}`);
+  assert(topUser.user_id === 'U001', `Expected U001 (John Smith) to have highest total, got ${topUser.user_id}`);
+  assert(topUser.order_count === 2, `Expected John Smith to have 2 orders, got ${topUser.order_count}`);
   
-  const expectedTotal = 949.95;
+  const expectedTotal = 1759.96;
   const tolerance = 0.02;
   assert(
     Math.abs(topUser.total_value - expectedTotal) < tolerance,
-    `Expected Michael Chen's total to be ~${expectedTotal}, got ${topUser.total_value}`
+    `Expected John Smith's total to be ~${expectedTotal}, got ${topUser.total_value}`
   );
 }
 

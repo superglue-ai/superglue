@@ -234,13 +234,21 @@ function displayMetricWithDelta(elementId, current, benchmark, unit, suffix, hig
         return;
     }
     
-    const delta = ((current - benchmark) / benchmark) * 100;
-    const deltaSign = delta > 0 ? '+' : '';
-    const deltaClass = getDeltaClass(delta, higherIsBetter, lowerIsBetter);
+    const benchmarkDisplay = (benchmark / divisor).toFixed(unit === '%' ? 1 : 2);
+    const absoluteDiff = (current - benchmark) / divisor;
+    const percentChange = ((current - benchmark) / benchmark) * 100;
+    
+    const diffSign = absoluteDiff > 0 ? '+' : '';
+    const deltaClass = getDeltaClass(absoluteDiff, higherIsBetter, lowerIsBetter);
+    
+    const pointLabel = unit === '%' ? 'points' : unit;
+    const deltaText = unit === '%' 
+        ? `${diffSign}${absoluteDiff.toFixed(1)} ${pointLabel} vs ${benchmarkDisplay}${unit} (${diffSign}${percentChange.toFixed(1)}% change)`
+        : `${diffSign}${absoluteDiff.toFixed(2)}${unit} vs ${benchmarkDisplay}${unit} (${diffSign}${percentChange.toFixed(1)}%)`;
     
     element.innerHTML = `
         ${displayValue}${unit}${suffixText}
-        <span class="metric-delta ${deltaClass}">${deltaSign}${delta.toFixed(1)}%</span>
+        <span class="metric-delta ${deltaClass}">${deltaText}</span>
     `;
 }
 

@@ -889,7 +889,7 @@
       "name": "Attio Get 15 Oldest People",
       "description": "",
       "type": "retrieval",
-      "instruction": "From Attio, get me the 10 'oldest' people, so the people with the older created at date. I want the final output to be a JSON object with the names of the people and the following structure: { people: string[] }. ",
+      "instruction": "From Attio, get me the 10 'oldest' people, so the people with the oldest created_at date. I want the final output to be a JSON object with the names of the people and the following structure: { people: string[] }. ",
       "integrationIds": ["attio"],
       "payload": {},
       "skipValidationFunction": true,
@@ -956,7 +956,7 @@
       "integrationIds": ["tele2-http"],
       "payload": {},
       "validationFunction": "validators/034-tele2-http-download-verification.ts",
-      "expectedResultDescription": "Should download 10GB.zip file from Tele2 speedtest and verify successful download. Expected status 'success' with file name '10GB.zip'."
+      "expectedResultDescription": "Should download 10MB.zip file from Tele2 speedtest and verify successful download. Expected status 'success' with file name '10MB.zip'."
     },
     {
       "id": "035-tele2-http-upload-berkshire-letter",
@@ -1158,7 +1158,7 @@
         "json_file": "user_profiles.json"
       },
       "validationFunction": "validators/050-json-extract-orders.ts",
-      "expectedResultDescription": "Should extract all orders and calculate totals per user. Expected 9 users with orders (U004 has no orders). Total of 14 orders across all users. Michael Chen (U003) should have highest total at $949.95 with 3 orders."
+      "expectedResultDescription": "Should extract all orders and calculate totals per user. Expected 9 users with orders (U004 has no orders). Total of 14 orders across all users. John Smith (U001) should have highest total at $1759.96 with 2 orders."
     },
     {
       "id": "051-fixedwidth-parse-structure",
@@ -1168,7 +1168,8 @@
       "instruction": "Parse the fixed-width text data provided in fixedwidth_file. The format is: customer_id (positions 0-9, 10 chars), name (positions 10-39, 30 chars), age (positions 40-42, 3 chars), city (positions 43-62, 20 chars), balance (positions 63-72, 10 chars). Trim whitespace from all fields. Convert age to integer and balance to float. Return JSON: { customers: Array<{ customer_id: string, name: string, age: number, city: string, balance: number }> }",
       "integrationIds": [],
       "payload": {
-        "fixedwidth_file": "customer_records.txt"
+        "fixedwidth_file": "customer_records.txt",
+        "field_widths": [10, 30, 3, 20, 10]
       },
       "validationFunction": "validators/051-fixedwidth-parse-structure.ts",
       "expectedResultDescription": "Should parse fixed-width format correctly. Expected 20 customers with properly extracted fields, trimmed strings, age as integers, and balance as floats. First customer should be Alice Johnson from New York with balance 5250.75."
@@ -1197,7 +1198,8 @@
       "payload": {
         "csv_file": "sales_data.csv",
         "json_file": "user_profiles.json",
-        "fixedwidth_file": "customer_records.txt"
+        "fixedwidth_file": "customer_records.txt",
+        "field_widths": [10, 30, 3, 20, 10]
       },
       "validationFunction": "validators/053-multifile-all-summary.ts",
       "expectedResultDescription": "Should generate accurate summary statistics from all three files. CSV: 50 rows, ~$44k revenue, 35 unique products. JSON: 10 users, 9 with orders, 14 total orders, ~$5619.59 total value. Fixed-width: 20 customers, ~$161.5k total balance, avg age ~38.5, 20 unique cities."
@@ -1208,7 +1210,7 @@
     "runOneShotMode": true,
     "runSelfHealingMode": true,
     "attemptsEachMode": 5,
-    "maxConcurrentWorkers": 10
+    "maxConcurrentWorkers": 5
   },
   "validationLlmConfig": {
     "provider": "openai",

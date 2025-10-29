@@ -13,6 +13,8 @@ import { CsvReporter } from "./reporters/csv-reporter.js";
 import { ConsoleReporter } from "./reporters/console-reporter.js";
 import { closeAllPools } from "../../packages/core/execute/postgres/postgres.js";
 import { JsonReporter } from "./reporters/json-reporter.js";
+import { shutdownSharedHtmlMarkdownPool } from "../../packages/core/utils/html-markdown-pool.js";
+import { PlaywrightFetchingStrategy } from "../../packages/core/documentation/strategies/fetching-playwright.js";
 
 const envPath = process.cwd().endsWith('packages/core')
   ? path.join(process.cwd(), '../../.env')
@@ -66,6 +68,8 @@ async function main(): Promise<void> {
     process.exitCode = 1;
   } finally {
     await closeAllPools();
+    await shutdownSharedHtmlMarkdownPool();
+    await PlaywrightFetchingStrategy.closeBrowser();
     await store?.disconnect();
   }
 }
