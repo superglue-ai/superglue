@@ -198,12 +198,13 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         const t = window.setTimeout(() => {
             setIsLoopItemsEvaluating(true);
             try {
-                let sel = step?.loopSelector;
+                const sel = step?.loopSelector || "";
                 if (!sel || typeof sel !== 'string') {
                     setLoopItems(null);
                     setLoopItemsError('No loop selector configured');
+                    setIsLoopItemsEvaluating(false);
+                    return;
                 }
-                sel = "(sourceData) => { return sourceData; }";
                 const raw = ensureSourceDataArrowFunction(sel).trim();
                 const stripped = raw.replace(/;\s*$/, '');
                 const body = `const __selector = (${stripped});\nreturn __selector(sourceData);`;

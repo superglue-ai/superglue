@@ -166,6 +166,9 @@ export class AiSdkModel implements LLM {
   ): Promise<LLMObjectResponse> {
     const dateMessage = this.getDateMessage();
 
+    // Keep original schema for validation (before wrapping arrays)
+    const originalSchema = schema;
+    
     // Clean schema: remove patternProperties, minItems/maxItems, set strict/additionalProperties
     schema = this.cleanSchema(schema);
 
@@ -184,7 +187,7 @@ export class AiSdkModel implements LLM {
 
     try {
       let finalResult: any = null;
-
+      let didAbort = false;
       while (finalResult === null) {
 
         const result = await generateText({
@@ -204,6 +207,7 @@ export class AiSdkModel implements LLM {
           }
           if (toolCall.toolName === 'abort') {
             finalResult = { error: (toolCall.input as any)?.reason || "Unknown error" };
+            didAbort = true;
             break;
           }
         }
@@ -257,10 +261,11 @@ export class AiSdkModel implements LLM {
         content: JSON.stringify(finalResult)
       }];
 
-      if (finalResult) {
+      if (finalResult && !didAbort) {
         try {
           const validator = new Validator();
-          const validation = validator.validate(finalResult, schema);
+          // Validate against original schema (before array wrapping)
+          const validation = validator.validate(finalResult, originalSchema);
           if (!validation.valid) {
             throw new Error(`Generated result does not match schema ${validation.errors.map(e => e.stack).join(', ')}`);
           }
@@ -281,8 +286,7 @@ export class AiSdkModel implements LLM {
       } as LLMMessage];
 
       return {
-        response: null,
-        error: "Error: Vercel AI API Error: " + error.message,
+        response: "Error: Vercel AI API Error: " + error.message,
         messages: updatedMessages
       };
     }
