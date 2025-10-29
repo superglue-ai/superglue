@@ -1,10 +1,12 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
+import { UserRole } from '@superglue/shared';
 
 export interface AuthenticatedFastifyRequest extends FastifyRequest {
-  orgId: string;
   authInfo: {
-    token: string;
-    clientId: string;
+    orgId: string;
+    userId?: string;
+    orgName?: string;
+    orgRole?: UserRole;
   };
   datastore: any;
 }

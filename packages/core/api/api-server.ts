@@ -3,7 +3,7 @@ import { registerAllRoutes } from '../api/index.js';
 import { extractTokenFromFastifyRequest, validateToken } from '../auth/auth.js';
 import { DataStore } from '../datastore/types.js';
 import { logMessage } from "../utils/logs.js";
-
+import { AuthenticatedFastifyRequest } from './types.js';
 
 export async function startApiServer(datastore: DataStore) {
   // Get REST API port
@@ -60,15 +60,16 @@ export async function startApiServer(datastore: DataStore) {
       });
     }
 
-    // Add orgId and auth info to request context
-    (request as any).orgId = authResult.orgId;
-    (request as any).authInfo = { 
-      token: token, 
-      clientId: authResult.orgId 
+    // Add auth info including orgId to request context
+    (request as AuthenticatedFastifyRequest).authInfo = { 
+      orgId: authResult.orgId,
+      userId: authResult.userId,
+      orgName: authResult.orgName,
+      orgRole: authResult.orgRole
     };
 
     // Add datastore to request context
-    (request as any).datastore = datastore;
+    (request as AuthenticatedFastifyRequest).datastore = datastore;
   });
 
   // Register all API routes from modules

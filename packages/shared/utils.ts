@@ -1,5 +1,6 @@
 import { Integration } from "@superglue/client";
 import { toJsonSchema } from './json-schema.js';
+import { UserRole } from "./types.js";
 
 // Re-export cron utilities
 export * from './utils/cron.js';
@@ -232,3 +233,13 @@ export function inferJsonSchema(data: any): any {
     return buildArraySchemaFromData(data);
 }
 
+export function mapUserRole(role: string): UserRole {
+    switch (role) {
+        case 'admin':
+            return UserRole.ADMIN;
+        case 'member':
+            return UserRole.MEMBER;
+        default:
+            return UserRole.MEMBER;
+    }
+}

@@ -1,33 +1,38 @@
 import { logMessage } from "../utils/logs.js";
-import { ApiKeyManager } from "./apiKeyManager.js";
+import { AuthManager, AuthResult } from "./types.js";
 
-export class SupabaseKeyManager implements ApiKeyManager {
+export class SupabaseKeyManager implements AuthManager {
   private cachedApiKeys: { key: string; orgId: string }[] = [];
-  private lastFetchTime = 0;
   private readonly API_KEY_CACHE_TTL = 60000; // 1 minute cache
-  private refreshInterval: NodeJS.Timeout;
+  private initialRefreshPromise: Promise<void>;
 
   constructor() {
-    this.refreshApiKeys();
-    this.refreshInterval = setInterval(
+    this.initialRefreshPromise = this.refreshApiKeys();
+    setInterval(
       () => this.refreshApiKeys(),
       this.API_KEY_CACHE_TTL
     );
   }
 
-  public async getApiKeys(): Promise<{ orgId: string; key: string }[]> {
-    return this.cachedApiKeys;
-  }
-
-  public async authenticate(apiKey: string): Promise<{ orgId: string; success: boolean }> {
+  public async authenticate(token: string): Promise<AuthResult> {
+    await this.initialRefreshPromise;
+    
     let keys = await this.getApiKeys();
-    let key = keys.find(k => k.key === apiKey);
+    let key = keys.find(k => k.key === token);
     if (!key) {
       await this.refreshApiKeys();
       keys = await this.getApiKeys();
-      key = keys.find(k => k.key === apiKey);
+      key = keys.find(k => k.key === token);
     }
-    return { orgId: key?.orgId || '', success: !!key };
+
+    return { 
+      success: !!key,
+      orgId: key?.orgId || ''
+    };
+  }
+
+  private async getApiKeys(): Promise<{ orgId: string; key: string }[]> {
+    return this.cachedApiKeys;
   }
 
   private async fetchApiKeys(): Promise<{ orgId: string; key: string }[]> {
@@ -77,13 +82,9 @@ export class SupabaseKeyManager implements ApiKeyManager {
   private async refreshApiKeys(): Promise<void> {
     try {
       this.cachedApiKeys = await this.fetchApiKeys();
-      this.lastFetchTime = Date.now();
     } catch (error) {
       console.error('Failed to refresh API keys:', error);
+      this.cachedApiKeys = [];
     }
-  }
-
-  public cleanup(): void {
-    clearInterval(this.refreshInterval);
   }
 }
