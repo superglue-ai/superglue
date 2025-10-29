@@ -63,8 +63,7 @@ export class SuperglueToolAttemptService {
                 attempt.executionError = this.determineErrorMessage(workflowResult);
                 attempt.failureReason = ToolFailureReason.EXECUTION;
                 attempt.status = AttemptStatus.EXECUTION_FAILED;
-                console.log(`Execution failed: ${attempt.executionError}`);
-                console.log("config", JSON.stringify(workflow, null, 2));
+                console.error(`Execution failed: ${attempt.executionError}`);
                 return attempt;
             }
 

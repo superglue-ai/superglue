@@ -53,6 +53,7 @@ export class WorkflowExecutor implements Workflow {
       config: workflow,
     } as WorkflowResult;
   }
+  
   public async execute(
     { payload, credentials, options }: { payload: Record<string, any>, credentials: Record<string, string>, options?: RequestOptions },
   ): Promise<WorkflowResult> {
