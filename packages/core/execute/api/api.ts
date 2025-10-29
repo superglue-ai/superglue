@@ -1,6 +1,7 @@
 import { RequestOptions } from "@superglue/client";
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import https from 'https';
+import { getDeceptive2xxErrorContext as get2xxErrorContext, getAuthErrorContext, getClientErrorContext } from "../../context/context-error-messages.js";
 import { server_defaults } from "../../default.js";
 import { maskCredentials } from "../../utils/helpers.js";
 import { parseJSON } from "../../utils/json-parser.js";
@@ -182,63 +183,6 @@ function detectHtmlErrorResponse(data: any): { isHtml: boolean; preview?: string
   };
 }
 
-export function checkResponseForErrors(
-  data: any,
-  status: number,
-  ctx: { axiosConfig: AxiosRequestConfig; credentials: Record<string, any>; payload: Record<string, any>; }
-): void {
-  if (!data || typeof data !== 'object') return;
-
-  const d: any = Array.isArray(data) && data.length > 0 ? data[0] : data;
-  if (!d || typeof d !== 'object') return;
-
-  const throwDetected = (reason: string, value?: any) => {
-    const method = (ctx.axiosConfig?.method || 'GET').toString().toUpperCase();
-    const url = String(ctx.axiosConfig?.url || '');
-    const maskedConfig = maskCredentials(JSON.stringify(ctx.axiosConfig || {}), ctx.credentials);
-    const previewSource = JSON.stringify(data);
-    const preview = String(previewSource).slice(0, 2500);
-    const valueStr = value !== undefined ? `='${String(value).slice(0, 120)}'` : '';
-    const message = `${method} ${url} returned ${status} but appears to be an error. Reason: ${reason}${valueStr}\nResponse preview: ${preview}\nconfig: ${maskedConfig}`;
-    throw new ApiCallError(message, status);
-  };
-
-  if (typeof d.code === 'number' && d.code >= 400 && d.code <= 599) {
-    throwDetected(`code`, d.code);
-  }
-  if (typeof d.status === 'number' && d.status >= 400 && d.status <= 599) {
-    throwDetected(`status`, d.status);
-  }
-
-  const errorKeys = new Set(['error', 'errors', 'error_message', 'errormessage', 'failure_reason', 'failure', 'failed']);
-  const maxDepth = 2;
-
-  const traverse = (obj: any, depth: number) => {
-    if (!obj || typeof obj !== 'object') return;
-    for (const key of Object.keys(obj)) {
-      const lower = key.toLowerCase();
-      if (errorKeys.has(lower)) {
-        const v = obj[key];
-        const isNonEmpty = Array.isArray(v)
-          ? v.length > 0
-          : (typeof v === 'string')
-            ? v.trim() !== ''
-            : (typeof v === 'boolean')
-              ? v === true
-              : (v && typeof v === 'object' && Object.keys(v).length > 0);
-        if (isNonEmpty) {
-          throwDetected(`${key} key detected at depth ${depth}`, typeof v === 'string' ? v : undefined);
-        }
-      }
-      const val = obj[key];
-      if (depth < maxDepth && val && typeof val === 'object') {
-        traverse(val, depth + 1);
-      }
-    }
-  };
-
-  traverse(d, 0);
-}
 
 type StatusHandlerInput = {
   response: AxiosResponse;
@@ -252,12 +196,108 @@ type StatusHandlerInput = {
 export function handle2xxStatus(
   input: StatusHandlerInput
 ): StatusHandlerResult {
-  const { response, axiosConfig, credentials = {}, payload = {} } = input;
+  const { response, axiosConfig } = input;
+  const method = (axiosConfig?.method || 'GET').toString().toUpperCase();
+  const url = String(axiosConfig?.url || '');
+  const status = response.status;
+
   const htmlCheck = detectHtmlErrorResponse(response?.data);
   if (htmlCheck.isHtml) {
-    const url = String(axiosConfig?.url || '');
-    const maskedUrl = maskCredentials(url, credentials);
-    const msg = `Received HTML response instead of expected JSON data from ${maskedUrl}. \n        This usually indicates an error page or invalid endpoint.\nResponse: ${htmlCheck.preview}`;
+    const msg = get2xxErrorContext(
+      {
+        statusCode: status,
+        method,
+        url,
+        responseData: htmlCheck.preview,
+        detectionReason: 'Received HTML instead of expedted JSON data.',
+      },
+      { characterBudget: 5000 }
+    );
+    return { shouldFail: true, message: msg };
+  }
+
+  const data = response?.data;
+  if (!data || typeof data !== 'object') {
+    return { shouldFail: false };
+  }
+
+  const d: any = Array.isArray(data) && data.length > 0 ? data[0] : data;
+  if (!d || typeof d !== 'object') {
+    return { shouldFail: false };
+  }
+
+  if (typeof d.code === 'number' && d.code >= 400 && d.code <= 599) {
+    const msg = get2xxErrorContext(
+      {
+        statusCode: status,
+        method,
+        url,
+        responseData: data,
+        detectionReason: 'Response contains error code field',
+        detectedValue: String(d.code)
+      },
+      { characterBudget: 5000 }
+    );
+    return { shouldFail: true, message: msg };
+  }
+
+  if (typeof d.status === 'number' && d.status >= 400 && d.status <= 599) {
+    const msg = get2xxErrorContext(
+      {
+        statusCode: status,
+        method,
+        url,
+        responseData: data,
+        detectionReason: 'Response contains error status field',
+        detectedValue: String(d.status)
+      },
+      { characterBudget: 5000 }
+    );
+    return { shouldFail: true, message: msg };
+  }
+
+  const errorKeys = new Set(['error', 'errors', 'error_message', 'errormessage', 'failure_reason', 'failure', 'failed']);
+  const maxDepth = 2;
+
+  const checkForErrorKeys = (obj: any, depth: number): { found: boolean; key?: string; value?: string } => {
+    if (!obj || typeof obj !== 'object') return { found: false };
+    for (const key of Object.keys(obj)) {
+      const lower = key.toLowerCase();
+      if (errorKeys.has(lower)) {
+        const v = obj[key];
+        const isNonEmpty = Array.isArray(v)
+          ? v.length > 0
+          : (typeof v === 'string')
+            ? v.trim() !== ''
+            : (typeof v === 'boolean')
+              ? v === true
+              : (v && typeof v === 'object' && Object.keys(v).length > 0);
+        if (isNonEmpty) {
+          return { found: true, key, value: typeof v === 'string' ? v : undefined };
+        }
+      }
+      const val = obj[key];
+      if (depth < maxDepth && val && typeof val === 'object') {
+        const nested = checkForErrorKeys(val, depth + 1);
+        if (nested.found) return nested;
+      }
+    }
+    return { found: false };
+  };
+
+  const errorCheck = checkForErrorKeys(d, 0);
+  if (errorCheck.found) {
+    const msg = get2xxErrorContext(
+      {
+        statusCode: status,
+        method,
+        url,
+        responseData: data,
+        detectionReason: `Response contains '${errorCheck.key}' field`,
+        detectedValue: errorCheck.value
+      },
+      { characterBudget: 5000 }
+    );
     return { shouldFail: true, message: msg };
   }
   return { shouldFail: false };
@@ -285,13 +325,51 @@ export function handle429Status(
 export function handleErrorStatus(
   input: StatusHandlerInput
 ): StatusHandlerResult {
-  const { response, axiosConfig, credentials = {}, payload = {} } = input;
+  const { response, axiosConfig, payload = {}, retriesAttempted, lastFailureStatus } = input;
   const method = (axiosConfig?.method || 'GET').toString().toUpperCase();
   const url = String(axiosConfig?.url || '');
   const errorData = response?.data instanceof Buffer ? response.data.toString('utf-8') : response?.data;
+  const status = response.status;
+
+  if (status === 401 || status === 403) {
+    const message = getAuthErrorContext(
+      {
+        statusCode: status,
+        method,
+        url,
+        responseData: errorData,
+        headers: axiosConfig.headers || {},
+        allVariables: payload,
+        retriesAttempted,
+        lastFailureStatus
+      },
+      { characterBudget: 5000 }
+    );
+    return { shouldFail: true, message };
+  }
+
+  if (status >= 400 && status < 500) {
+    const message = getClientErrorContext(
+      {
+        statusCode: status,
+        method,
+        url,
+        responseData: errorData,
+        requestConfig: {
+          queryParams: axiosConfig.params,
+          body: axiosConfig.data,
+          headers: axiosConfig.headers
+        },
+        retriesAttempted,
+        lastFailureStatus
+      },
+      { characterBudget: 5000 }
+    );
+    return { shouldFail: true, message };
+  }
+
+  const retryInfo = retriesAttempted ? ` (retries: ${retriesAttempted}${lastFailureStatus ? `, last failure: ${lastFailureStatus}` : ''})` : '';
   const error = JSON.stringify((errorData as any)?.error || (errorData as any)?.errors || errorData || response?.statusText || "undefined");
-  const maskedConfig = maskCredentials(JSON.stringify(axiosConfig || {}), credentials);
-  const message = `${method} ${url} failed with status ${response.status}.\nResponse: ${String(error).slice(0, 1000)}\nconfig: ${maskedConfig}`;
-  const full = `API call failed with status ${response.status}. Response: ${message}`;
-  return { shouldFail: true, message: full };
+  const message = `${method} ${url} failed with status ${status}${retryInfo}.\nResponse: ${String(error).slice(0, 1000)}`;
+  return { shouldFail: true, message };
 }

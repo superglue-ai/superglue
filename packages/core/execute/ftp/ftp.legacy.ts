@@ -3,6 +3,7 @@ import { Client as FTPClient } from "basic-ftp";
 import * as path from "path";
 import SFTPClient from "ssh2-sftp-client";
 import { URL } from "url";
+import { getFtpBodyStructureErrorContext, getFtpOperationExecutionErrorContext } from "../../context/context-error-messages.js";
 import { server_defaults } from "../../default.js";
 import { composeUrl } from "../../utils/helpers.js";
 import { parseJSON } from "../../utils/json-parser.js";
@@ -278,24 +279,29 @@ export async function callFTP({ endpoint, credentials, options }: { endpoint: Ap
   let connectionString = composeUrl(endpoint.urlHost, endpoint.urlPath);
   const connectionInfo = parseConnectionUrl(connectionString);
 
-  // Parse operation from body
   let operation: FTPOperation;
   try {
     operation = parseJSON(endpoint.body);
   } catch (error) {
-    throw new Error(`Invalid JSON in body: ${error.message}. Body must be a JSON object with an 'operation' field. Supported operations: ${SUPPORTED_OPERATIONS.join(', ')}`);
+    const parseError = error instanceof Error ? error.message : String(error);
+    throw new Error(getFtpBodyStructureErrorContext(
+      { bodyContent: endpoint.body, parseError },
+      { characterBudget: 3000 }
+    ));
   }
 
-  // Validate operation
   if (!operation.operation) {
-    throw new Error(`Missing 'operation' field in request body. Supported operations are: ${SUPPORTED_OPERATIONS.join(', ')}`);
+    throw new Error(getFtpBodyStructureErrorContext(
+      { bodyContent: endpoint.body, parsedBody: operation, missingOperation: true },
+      { characterBudget: 3000 }
+    ));
   }
 
   if (!SUPPORTED_OPERATIONS.includes(operation.operation)) {
-    throw new Error(
-      `Unsupported operation: '${operation.operation}'. ` +
-      `Supported operations are: ${SUPPORTED_OPERATIONS.join(', ')}`
-    );
+    throw new Error(getFtpBodyStructureErrorContext(
+      { bodyContent: endpoint.body, parsedBody: operation, invalidOperation: operation.operation },
+      { characterBudget: 3000 }
+    ));
   }
 
   let attempts = 0;
@@ -368,8 +374,15 @@ export async function callFTP({ endpoint, credentials, options }: { endpoint: Ap
 
       if (attempts > maxRetries) {
         if (error instanceof Error) {
-          const errorContext = ` for operation: ${JSON.stringify(operation)}`;
-          throw new Error(`${connectionInfo.protocol.toUpperCase()} error: ${error.message}${errorContext}`);
+          throw new Error(getFtpOperationExecutionErrorContext(
+            {
+              operation,
+              protocol: connectionInfo.protocol,
+              ftpError: error.message,
+              allVariables: { ...credentials }
+            },
+            { characterBudget: 5000 }
+          ));
         }
         throw new Error(`Unknown ${connectionInfo.protocol.toUpperCase()} error occurred`);
       }

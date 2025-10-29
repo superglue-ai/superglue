@@ -167,3 +167,124 @@ export type PostgresSqlExecutionErrorContextInput = {
 export type PostgresSqlExecutionErrorContextOptions = {
     characterBudget: number;
 };
+
+export type FtpBodyStructureErrorContextInput = {
+    bodyContent: string;
+    parseError?: string;
+    parsedBody?: any;
+    missingOperation?: boolean;
+    invalidOperation?: string;
+};
+
+export type FtpBodyStructureErrorContextOptions = {
+    characterBudget: number;
+};
+
+export type FtpOperationExecutionErrorContextInput = {
+    operation: any;
+    protocol: string;
+    ftpError: string;
+    allVariables: Record<string, any>;
+};
+
+export type FtpOperationExecutionErrorContextOptions = {
+    characterBudget: number;
+};
+
+export type AuthErrorContextInput = {
+    statusCode: number;
+    method: string;
+    url: string;
+    responseData: any;
+    headers: Record<string, any>;
+    allVariables: Record<string, any>;
+    retriesAttempted?: number;
+    lastFailureStatus?: number;
+};
+
+export type AuthErrorContextOptions = {
+    characterBudget: number;
+};
+
+export type ClientErrorContextInput = {
+    statusCode: number;
+    method: string;
+    url: string;
+    responseData: any;
+    requestConfig: any;
+    retriesAttempted?: number;
+    lastFailureStatus?: number;
+};
+
+export type ClientErrorContextOptions = {
+    characterBudget: number;
+};
+
+export type Deceptive2xxErrorContextInput = {
+    statusCode: number;
+    method: string;
+    url: string;
+    responseData: any;
+    detectionReason: string;
+    detectedValue?: string;
+};
+
+export type Deceptive2xxErrorContextOptions = {
+    characterBudget: number;
+};
+
+export type MissingDataErrorContextInput = {
+    endpoint: ApiConfig;
+    statusCode: number;
+    headers: Record<string, any>;
+};
+
+export type MissingDataErrorContextOptions = {
+    characterBudget: number;
+};
+
+export type StepValidationErrorContextInput = {
+    endpoint: ApiConfig;
+    responseData: any;
+    validationReason: string;
+};
+
+export type StepValidationErrorContextOptions = {
+    characterBudget: number;
+};
+
+export type LoopSelectorErrorContextInput = {
+    step: ExecutionStep;
+    payload: any;
+    errorMessage: string;
+    generatedCode?: string;
+};
+
+export type LoopSelectorErrorContextOptions = {
+    characterBudget: number;
+};
+
+export type FinalTransformErrorContextInput = {
+    instruction: string;
+    responseSchema: JSONSchema;
+    sourceData: any;
+    errorMessage: string;
+    generatedCode?: string;
+};
+
+export type FinalTransformErrorContextOptions = {
+    characterBudget: number;
+};
+
+export type PaginationStopConditionErrorContextInput = {
+    paginationType: string;
+    stopCondition: string;
+    pageSize: string;
+    firstRequestParams: Record<string, any>;
+    secondRequestParams: Record<string, any>;
+    responsePreview: any;
+};
+
+export type PaginationStopConditionErrorContextOptions = {
+    characterBudget: number;
+};

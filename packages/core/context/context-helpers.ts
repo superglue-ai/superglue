@@ -115,7 +115,12 @@ export function stringifyWithLimits(value: any, depthLimit: number, arrayLimit: 
         if (v instanceof Date) return v.toISOString();
         return v;
     }
-    try { return JSON.stringify(walk(value, 0)); } catch { return String(value ?? ''); }
+    try {
+        return JSON.stringify(walk(value, 0));
+    } catch (err) {
+        console.error('JSON stringification failed in stringifyWithLimits:', err);
+        return `<JSON stringification failed: ${err instanceof Error ? err.message : String(err)}>`;
+    }
 }
 
 export function ellipsisFor(v: any): any {

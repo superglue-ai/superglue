@@ -1,6 +1,7 @@
 import { ExecutionStep, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { isSelfHealingEnabled, transformAndValidateSchema } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
@@ -116,7 +117,7 @@ export class WorkflowExecutor implements Workflow {
           let currentFinalTransform = this.finalTransform || "(sourceData) => sourceData";
           const finalResult = await transformAndValidateSchema(rawStepData, currentFinalTransform, this.responseSchema);
           if (!finalResult.success) {
-            throw new Error(finalResult.error);
+            throw new Error(`Final transform failed: ${finalResult.error}`);
           }
 
           if (options?.testMode) {
@@ -129,7 +130,7 @@ export class WorkflowExecutor implements Workflow {
               this.metadata
             );
             if (!testResult.success) {
-              throw new Error(testResult.reason);
+              throw new Error(`Final transform evaluation failed: ${testResult.reason}`);
             }
           }
 
@@ -141,7 +142,7 @@ export class WorkflowExecutor implements Workflow {
             inputSchema: this.inputSchema,
             responseSchema: this.responseSchema,
             instruction: this.instruction
-          } as Workflow; // Store the successful transform
+          } as Workflow;
           this.result.error = undefined; // Clear any previous transform error
           this.result.success = true; // Ensure success is true if transform succeeds
         } catch (transformError) {
@@ -159,15 +160,15 @@ export class WorkflowExecutor implements Workflow {
             (this.instruction ? " with the following instruction: " + this.instruction : "") +
             (this.finalTransform ? "\nOriginally, we used the following transformation, fix it without messing up future transformations with the original data: " + this.finalTransform : "");
 
-          const newTransformConfig = await generateTransformCode(this.responseSchema, rawStepData, instruction, this.metadata);
+          const newTransformConfig = await generateTransformCode(this.responseSchema, rawStepData, instruction, this.metadata, "final_transform");
           if (!newTransformConfig) {
-            throw new Error("Failed to generate new final transform");
+            throw new Error(`Failed to generate final transform after ${server_defaults.MAX_TRANSFORMATION_RETRIES} retries.`);
           }
           this.result.data = newTransformConfig.data || {};
           this.result.config = {
             id: this.id,
             steps: this.steps,
-            finalTransform: newTransformConfig.mappingCode,
+            finalTransform: newTransformConfig.transformationCode,
             inputSchema: this.inputSchema,
             responseSchema: this.responseSchema,
             instruction: this.instruction

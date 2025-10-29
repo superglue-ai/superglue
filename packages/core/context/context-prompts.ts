@@ -47,19 +47,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
 }
 \`\`\`
 
-2. Input mapping (prepare data for API call):
-\`\`\`javascript
-(sourceData) => {
-  return {
-    userId: sourceData.currentItem?.id || sourceData.userId,
-    action: 'update',
-    timestamp: new Date().toISOString(),
-    metadata: sourceData.globalMetadata || {}
-  };
-}
-\`\`\`
-
-3. Final transform (shape output):
+2. Final transform (shape output):
 \`\`\`javascript
 (sourceData) => {
   const results = sourceData.getId.map(item => sourceData.getProductForId.find(product => product.id === item.id));
@@ -73,7 +61,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
 
 Return your answer in the following JSON format:
 {
-  "mappingCode": "(sourceData) => { return { id: sourceData.id }; }"
+  "transformationCode": "(sourceData) => { return { id: sourceData.id }; }"
 }
 
 THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
@@ -288,19 +276,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
 }
 \`\`\`
 
-2. Input mapping (prepare data for API call):
-\`\`\`javascript
-(sourceData) => {
-  return {
-    userId: sourceData.currentItem?.id || sourceData.userId,
-    action: 'update',
-    timestamp: new Date().toISOString(),
-    metadata: sourceData.globalMetadata || {}
-  };
-}
-\`\`\`
-
-3. Final transform (shape output):
+2. Final transform (shape output):
 \`\`\`javascript
 (sourceData) => {
   const results = sourceData.getId.map(item => sourceData.getProductForId.find(product => product.id === item.id));
@@ -311,12 +287,6 @@ COMMON WORKFLOW TRANSFORMATIONS:
   };
 }
 \`\`\`
-
-Return your answer in the following JSON format:
-{
-  "mappingCode": "(sourceData) => { return { id: sourceData.id }; }"
-}
-
 THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
 </FINAL_TRANSFORMATION>
 
@@ -717,7 +687,7 @@ Cross-integration: "Sync new Stripe customers to CRM and send welcome email via 
 
 Important: Always generate suggestions based on common patterns for the type of service provided. Use your knowledge of typical API structures and common use cases. Never abort - be creative and helpful.`
 
-export const EVALUATE_TRANSFORM_SYSTEM_PROMPT = `You are a data transformation evaluator assessing if the mapping code correctly implements the transformation logic.
+export const EVALUATE_TRANSFORM_SYSTEM_PROMPT = `You are a data transformation evaluator assessing if the transformation code correctly implements the transformation logic.
 
 ONLY fail the evaluation if you find:
 1. Syntax errors or code that would crash
@@ -735,6 +705,6 @@ DO NOT fail for:
 
 When the instruction specifies exact field names or conditions, trust the instruction even if you don't see those values in the sample. The instruction was written with knowledge of the full dataset.
 
-Focus on data accuracy and completeness of the mapping logic, and adherence to the instruction if provided.
+Focus on data accuracy and completeness of the transformation logic, and adherence to the instruction if provided.
 Be particularly lenient with arrays and filtered data since the samples may not contain all relevant records.
-Return { success: true, reason: "Mapping follows instruction and appears logically sound" } unless you find definitive errors in the code logic itself.`
+Return { success: true, reason: "Transformation follows instruction and appears logically sound" } unless you find definitive errors in the code logic itself.`

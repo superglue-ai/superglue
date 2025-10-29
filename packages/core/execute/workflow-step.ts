@@ -1,5 +1,6 @@
 import { type ApiConfig, type RequestOptions } from "@superglue/client";
 import { getEvaluateStepResponseContext } from "../context/context-builders.js";
+import { getMissingDataErrorContext, getStepValidationErrorContext } from "../context/context-error-messages.js";
 import { EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
 import { Metadata } from "../graphql/types.js";
@@ -93,10 +94,12 @@ export async function executeStep({
       response = await callEndpointLegacyImplementation({ endpoint, payload: stepInput, credentials, options });
 
       if (!response.data) {
-        throw new Error("No data returned from API. This could be due to a configuration error.");
+        throw new Error(getMissingDataErrorContext(
+          { endpoint, statusCode: response.statusCode, headers: response.headers },
+          { characterBudget: 5000 }
+        ));
       }
 
-      // Check if response is valid
       if (retryCount > 0 && isSelfHealing || options.testMode) {
         const result = await evaluateStepResponse({
           data: response.data,
@@ -104,7 +107,12 @@ export async function executeStep({
           docSearchResultsForStepInstruction: await integrationManager?.searchDocumentation(endpoint.instruction)
         });
         success = result.success;
-        if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
+        if (!result.success) {
+          throw new Error(getStepValidationErrorContext(
+            { endpoint, responseData: response.data, validationReason: result.shortReason },
+            { characterBudget: 10000 }
+          ));
+        }
       }
       else {
         success = true;

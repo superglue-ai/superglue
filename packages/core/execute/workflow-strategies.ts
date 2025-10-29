@@ -92,20 +92,33 @@ const loopStrategy: ExecutionStrategy = {
 
       if (!loopSelectorResult.success || !Array.isArray(loopItems)) {
         if (!isSelfHealingEnabled(options, "api")) {
-          throw new Error(`Loop selector for '${step.id}' did not return an array. Check the loop selector code or enable self-healing and re-execute to regenerate automatically.`);
+          throw new Error(`Loop selector for step '${step.id}' ${!loopSelectorResult.success ? 'failed to execute' : 'did not return an array'}. Enable self-healing to auto-fix.`);
         }
         logMessage("error", `Loop selector for '${step.id}' did not return an array. Regenerating loop selector.`, metadata);
 
         const loopPrompt = getLoopSelectorContext({ step: step, payload: payload, instruction: step.apiConfig.instruction }, { characterBudget: LanguageModel.contextLength / 10 });
         const arraySchema = { type: "array", description: "Array of items to iterate over" };
-        const transformResult = await generateTransformCode(arraySchema, payload, loopPrompt, metadata);
+        const transformResult = await generateTransformCode(
+          arraySchema,
+          payload,
+          loopPrompt,
+          metadata,
+          "loop_selector",
+          0,
+          undefined,
+          { stepId: step.id, stepInstruction: step.apiConfig.instruction }
+        );
 
-        step.loopSelector = transformResult.mappingCode;
+        if (!transformResult) {
+          throw new Error(`Failed to generate working loop selector for step '${step.id}' after ${server_defaults.MAX_TRANSFORMATION_RETRIES} retries.`);
+        }
+
+        step.loopSelector = transformResult.transformationCode;
         const retryResult = await transformAndValidateSchema(payload, step.loopSelector, null);
         loopItems = retryResult.data;
 
         if (!retryResult.success || !Array.isArray(loopItems)) {
-          throw new Error("Failed to generate loop selector");
+          throw new Error(`Regenerated loop selector for step '${step.id}' ${!retryResult.success ? 'failed to execute' : 'still did not return an array'}.`);
         }
       }
 

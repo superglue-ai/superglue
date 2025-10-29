@@ -3,17 +3,17 @@ import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { RequestOptions } from "http";
 import ivm from "isolated-vm";
 import { getGenerateApiConfigContext } from "../../context/context-builders.js";
-import { getPaginationErrorContext, getVarResolverErrorContext } from "../../context/context-error-messages.js";
+import { getPaginationErrorContext, getPaginationStopConditionErrorContext, getVarResolverErrorContext } from "../../context/context-error-messages.js";
 import { SELF_HEALING_SYSTEM_PROMPT } from "../../context/context-prompts.js";
 import { server_defaults } from "../../default.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { LanguageModel, LLMMessage } from "../../llm/language-model.js";
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../../llm/llm-tools.js";
 import { parseFile } from "../../utils/file.js";
-import { composeUrl, convertBasicAuthToBase64, generateId, maskCredentials, replaceVariables } from "../../utils/helpers.js";
+import { composeUrl, convertBasicAuthToBase64, generateId, replaceVariables } from "../../utils/helpers.js";
 import { callFTP } from "../ftp/ftp.legacy.js";
 import { callPostgres } from "../postgres/postgres.legacy.js";
-import { AbortError, ApiCallError, callAxios, checkResponseForErrors, handle2xxStatus, handle429Status, handleErrorStatus } from "./api.js";
+import { AbortError, ApiCallError, callAxios, handle2xxStatus, handle429Status, handleErrorStatus } from "./api.js";
 
 export async function callEndpointLegacyImplementation({ endpoint, payload, credentials, options }: { endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<{ data: any; statusCode: number; headers: Record<string, any>; }> {
   const allVariables = { ...payload, ...credentials };
@@ -40,45 +40,10 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
       limit: endpoint.pagination?.pageSize || "50",
       pageSize: endpoint.pagination?.pageSize || "50"
     };
+    //validatePaginationConfig(endpoint);
 
     const requestVars = { ...paginationVars, ...allVariables };
-
-    validatePaginationConfig(endpoint);
-
-    const headersWithReplacedVars = Object.fromEntries(
-      (await Promise.all(
-        Object.entries(endpoint.headers || {})
-          .map(async ([key, value]) => [key, await resolveVarReferences({ apiConfig: endpoint, configField: "header", rawStringWithReferences: String(value), allVariables: requestVars })])
-      )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
-    );
-
-    const processedHeaders = {};
-    for (const [key, value] of Object.entries(headersWithReplacedVars)) {
-      let processedValue = value;
-      if (key.toLowerCase() === 'authorization' && typeof value === 'string') {
-        processedValue = value.replace(/^(Basic|Bearer)\s+(Basic|Bearer)\s+/, '$1 $2');
-      }
-      // Convert Basic Auth to Base64
-      if (key.toLowerCase() === 'authorization' && typeof processedValue === 'string' && processedValue.startsWith('Basic ')) {
-        processedValue = convertBasicAuthToBase64(processedValue);
-      }
-
-      processedHeaders[key] = processedValue;
-    }
-
-    const processedQueryParams = Object.fromEntries(
-      (await Promise.all(
-        Object.entries(endpoint.queryParams || {})
-          .map(async ([key, value]) => [key, await resolveVarReferences({ apiConfig: endpoint, configField: "queryParam", rawStringWithReferences: String(value), allVariables: requestVars })])
-      )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
-    );
-
-    const processedBody = endpoint.body ?
-      await resolveVarReferences({ apiConfig: endpoint, configField: "body", rawStringWithReferences: endpoint.body, allVariables: requestVars }) :
-      "";
-
-    const processedUrlHost = await resolveVarReferences({ apiConfig: endpoint, configField: "urlHost", rawStringWithReferences: endpoint.urlHost, allVariables: requestVars });
-    const processedUrlPath = await resolveVarReferences({ apiConfig: endpoint, configField: "urlPath", rawStringWithReferences: endpoint.urlPath, allVariables: requestVars });
+    const { processedHeaders, processedQueryParams, processedBody, processedUrlHost, processedUrlPath } = await resolveApiConfig(endpoint, requestVars);
 
     if (processedUrlHost.startsWith("postgres://") || processedUrlHost.startsWith("postgresql://")) {
       const postgresEndpoint = {
@@ -119,20 +84,14 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
 
     const retriesAttempted = axiosResult.retriesAttempted || 0;
     const lastFailureStatus = axiosResult.lastFailureStatus;
-    if ([200, 201, 202, 203, 204, 205].includes(status)) {
-      statusHandlerResult = handle2xxStatus({ response: lastResponse, axiosConfig, credentials, payload, retriesAttempted, lastFailureStatus });
-    } else if (status === 429) {
-      statusHandlerResult = handle429Status({ response: lastResponse, axiosConfig, credentials, payload, retriesAttempted, lastFailureStatus });
-    } else {
-      const base = handleErrorStatus({ response: lastResponse, axiosConfig, credentials, payload, retriesAttempted, lastFailureStatus });
-      if (base.shouldFail && base.message) {
-        const suffix = `\nRetries attempted: ${retriesAttempted}${lastFailureStatus ? `; last failure status: ${lastFailureStatus}` : ''}`;
-        statusHandlerResult = { shouldFail: true, message: `${base.message}${suffix}` };
-      } else {
-        statusHandlerResult = base;
-      }
-    }
 
+    if ([200, 201, 202, 203, 204, 205].includes(status)) {
+      statusHandlerResult = handle2xxStatus({ response: lastResponse, axiosConfig, credentials, payload: requestVars, retriesAttempted, lastFailureStatus });
+    } else if (status === 429) {
+      statusHandlerResult = handle429Status({ response: lastResponse, axiosConfig, credentials, payload: requestVars, retriesAttempted, lastFailureStatus });
+    } else {
+      statusHandlerResult = handleErrorStatus({ response: lastResponse, axiosConfig, credentials, payload: requestVars, retriesAttempted, lastFailureStatus });
+    }
     if (statusHandlerResult.shouldFail) {
       throw new ApiCallError(statusHandlerResult.message, status);
     }
@@ -141,26 +100,14 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
     // TODO: we need to remove the data path and just join the data with the next page of data, otherwise we will have to do a lot of gymnastics to get the data path right
     let responseData = lastResponse.data;
 
-    // callAxios now always returns a Buffer, so we always need to parse it
     if (responseData instanceof Buffer) {
       responseData = await parseFile(responseData, FileType.AUTO);
-    }
-    // Fallback for any legacy code paths or special cases - we can remove this later
-    else if (responseData && (responseData instanceof ArrayBuffer)) {
-      responseData = await parseFile(Buffer.from(responseData), FileType.AUTO);
     }
     else if (responseData && typeof responseData === 'string') {
       responseData = await parseFile(Buffer.from(responseData), FileType.AUTO);
     }
     const parsedResponseData = responseData;
 
-    if (status >= 200 && status <= 205) {
-      try {
-        checkResponseForErrors(responseData, status, { axiosConfig, credentials, payload });
-      } catch (e) {
-        throw new ApiCallError(e?.message || String(e), status);
-      }
-    }
     if (endpoint.dataPath) {
       const pathParts = endpoint.dataPath.split('.');
       for (const part of pathParts) {
@@ -186,24 +133,37 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
       }
 
       if (loopCounter === 1 && currentResponseHash === firstResponseHash && hasValidData && currentHasData) {
-        const maskedBody = maskCredentials(processedBody, credentials);
-        const maskedParams = maskCredentials(JSON.stringify(processedQueryParams), credentials);
-        const maskedHeaders = maskCredentials(JSON.stringify(processedHeaders), credentials);
+        const firstRequestParams = { page: 1, offset: 0, cursor: null };
+        const secondRequestParams = { page, offset, cursor };
 
-        throw new Error(
-          `Pagination configuration error: The first two API requests returned identical responses with valid data. ` +
-          `This indicates the pagination parameters are not being applied correctly. ` +
-          `Please check your pagination configuration (type: ${endpoint.pagination?.type}, pageSize: ${endpoint.pagination?.pageSize}), ` +
-          `body: ${maskedBody}, queryParams: ${maskedParams}, headers: ${maskedHeaders}.`
-        );
+        throw new Error(getPaginationStopConditionErrorContext(
+          {
+            paginationType: endpoint.pagination.type,
+            stopCondition: (endpoint.pagination as any).stopCondition,
+            pageSize: endpoint.pagination.pageSize,
+            firstRequestParams,
+            secondRequestParams,
+            responsePreview: responseData
+          },
+          { characterBudget: 5000 }
+        ));
       }
 
       if (loopCounter === 1 && !hasValidData && !currentHasData) {
-        throw new Error(
-          `Stop condition error: The API returned no data on the first request, but the stop condition did not terminate pagination. ` +
-          `The stop condition should detect empty responses and stop immediately. ` +
-          `Current stop condition: ${(endpoint.pagination as any).stopCondition}`
-        );
+        const firstRequestParams = { page: 1, offset: 0, cursor: null };
+        const secondRequestParams = { page, offset, cursor };
+
+        throw new Error(getPaginationStopConditionErrorContext(
+          {
+            paginationType: endpoint.pagination.type,
+            stopCondition: (endpoint.pagination as any).stopCondition,
+            pageSize: endpoint.pagination.pageSize,
+            firstRequestParams,
+            secondRequestParams,
+            responsePreview: responseData
+          },
+          { characterBudget: 5000 }
+        ));
       }
 
       if (loopCounter > 1 && currentResponseHash === previousResponseHash) {
@@ -377,7 +337,7 @@ export async function generateApiConfig({
       stepInput: stepInput,
       credentials,
       integrationManager
-    }, { characterBudget: LanguageModel.contextLength / 4 });
+    }, { characterBudget: LanguageModel.contextLength / 4 + 10000 });
 
     messages.push({
       role: "system",
@@ -389,7 +349,7 @@ export async function generateApiConfig({
     });
   }
 
-  const temperature = Math.min(retryCount * 0.1, 1);
+  const temperature = Math.min(retryCount * 0.1, 1); // TODO: Evaluate whether this helps
   const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(
     messages,
     submitToolDefinition.arguments,
@@ -400,6 +360,10 @@ export async function generateApiConfig({
 
   if (generatedConfig?.error) {
     throw new AbortError(generatedConfig.error);
+  }
+
+  if (!generatedConfig?.apiConfig) {
+    throw new AbortError('LLM did not return apiConfig in response. Response: ' + JSON.stringify(generatedConfig).slice(0, 500));
   }
 
   return {
@@ -428,20 +392,25 @@ export async function generateApiConfig({
 export function validatePaginationConfig(apiConfig: ApiConfig): void {
   if (!apiConfig.pagination?.type) return;
 
-  const request = JSON.stringify(apiConfig);
+  const requestFields = JSON.stringify({
+    queryParams: apiConfig.queryParams,
+    body: apiConfig.body,
+    headers: apiConfig.headers,
+    urlPath: apiConfig.urlPath
+  });
   const paginationType = apiConfig.pagination.type;
   const missingVariables: string[] = [];
 
   if (paginationType === PaginationType.PAGE_BASED) {
-    if (!request.includes('page')) {
+    if (!requestFields.includes('page')) {
       missingVariables.push('page');
     }
   } else if (paginationType === PaginationType.OFFSET_BASED) {
-    if (!request.includes('offset')) {
+    if (!requestFields.includes('offset')) {
       missingVariables.push('offset');
     }
   } else if (paginationType === PaginationType.CURSOR_BASED) {
-    if (!request.includes('cursor')) {
+    if (!requestFields.includes('cursor')) {
       missingVariables.push('cursor');
     }
   }
@@ -463,7 +432,10 @@ type resolveVarReferencesInput = {
 
 export async function resolveVarReferences(input: resolveVarReferencesInput): Promise<string> {
   try {
-    return await replaceVariables(input.rawStringWithReferences, input.allVariables);
+    const stringInput = typeof input.rawStringWithReferences === 'string'
+      ? input.rawStringWithReferences
+      : JSON.stringify(input.rawStringWithReferences);
+    return await replaceVariables(stringInput, input.allVariables);
   } catch (error) {
     const originalErrorMessage = error instanceof Error ? error.message : String(error);
 
@@ -507,4 +479,48 @@ export async function resolveVarReferences(input: resolveVarReferencesInput): Pr
     }
     throw new Error(`Unknown error while replacing variables: ${originalErrorMessage}`);
   }
+}
+
+async function resolveApiConfig(endpoint: ApiConfig, requestVars: Record<string, any>): Promise<{
+  processedHeaders: Record<string, any>;
+  processedQueryParams: Record<string, any>;
+  processedBody: string;
+  processedUrlHost: string;
+  processedUrlPath: string;
+}> {
+  const headersWithReplacedVars = Object.fromEntries(
+    (await Promise.all(
+      Object.entries(endpoint.headers || {})
+        .map(async ([key, value]) => [key, await resolveVarReferences({ apiConfig: endpoint, configField: "header", rawStringWithReferences: String(value), allVariables: requestVars })])
+    )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
+  );
+
+  const processedHeaders = {};
+  for (const [key, value] of Object.entries(headersWithReplacedVars)) {
+    let processedValue = value;
+    if (key.toLowerCase() === 'authorization' && typeof value === 'string') {
+      processedValue = value.replace(/^(Basic|Bearer)\s+(Basic|Bearer)\s+/, '$1 $2');
+    }
+    if (key.toLowerCase() === 'authorization' && typeof processedValue === 'string' && processedValue.startsWith('Basic ')) {
+      processedValue = convertBasicAuthToBase64(processedValue);
+    }
+
+    processedHeaders[key] = processedValue;
+  }
+
+  const processedQueryParams = Object.fromEntries(
+    (await Promise.all(
+      Object.entries(endpoint.queryParams || {})
+        .map(async ([key, value]) => [key, await resolveVarReferences({ apiConfig: endpoint, configField: "queryParam", rawStringWithReferences: String(value), allVariables: requestVars })])
+    )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
+  );
+
+  const processedBody = endpoint.body
+    ? await resolveVarReferences({ apiConfig: endpoint, configField: "body", rawStringWithReferences: endpoint.body, allVariables: requestVars })
+    : "";
+
+  const processedUrlHost = await resolveVarReferences({ apiConfig: endpoint, configField: "urlHost", rawStringWithReferences: endpoint.urlHost, allVariables: requestVars });
+  const processedUrlPath = await resolveVarReferences({ apiConfig: endpoint, configField: "urlPath", rawStringWithReferences: endpoint.urlPath, allVariables: requestVars });
+
+  return { processedHeaders, processedQueryParams, processedBody, processedUrlHost, processedUrlPath };
 }

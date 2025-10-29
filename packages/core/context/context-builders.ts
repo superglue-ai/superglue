@@ -4,6 +4,7 @@ import { DocumentationSearch } from '../documentation/documentation-search.js';
 import { composeUrl } from '../utils/helpers.js';
 import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
 import { BuildToolContextOptions, EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, FindRelevantIntegrationsContextInput, FindRelevantIntegrationsContextOptions, FindRelevantToolsContextInput, FindRelevantToolsContextOptions, GenerateApiConfigContextInput, GenerateApiConfigContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions } from './context-types.js';
+import { LanguageModel } from '../llm/language-model.js';
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
@@ -249,13 +250,19 @@ export async function getGenerateApiConfigContext(input: GenerateApiConfigContex
     const budget = Math.max(0, options.characterBudget | 0);
     if (budget === 0) return '';
 
+    const fullDocs = await input.integrationManager?.getDocumentation();
+    const documentation = fullDocs?.content?.length < LanguageModel.contextLength / 4 ?
+        fullDocs?.content :
+        await input.integrationManager?.searchDocumentation(input.instruction);
+
     const promptStart = `The current step config failed to execute. Generate a corrected API configuration that executes the step instruction:`;
+    const documentationContext = `<documentation>${documentation}</documentation>`;
     const instructionContext = `<step_instruction>${input.instruction}</step_instruction>`;
     const failedStepConfigContext = `<failed_step_config>${JSON.stringify(input.previousStepConfig)}</failed_step_config>`;
     const stepInputContext = `<step_input>${getObjectContext(input.stepInput, { include: { schema: true, preview: false, samples: true }, characterBudget: budget * 0.5 })}</step_input>`;
     const integration_specific_instructions = `<integration_specific_instructions>  ${(await input.integrationManager?.getIntegration())?.specificInstructions}</integration_specific_instructions>`;
     const available_credentials = `<available_credentials>  ${Object.keys(input.credentials || {}).map(v => `<<${v}>>`).join(", ")}</available_credentials>`;
-    const prompt = promptStart + '\n' + ([instructionContext, failedStepConfigContext, stepInputContext, integration_specific_instructions, available_credentials].filter(Boolean).join('\n')).slice(0, budget - promptStart.length);
+    const prompt = promptStart + '\n' + ([documentationContext, instructionContext, failedStepConfigContext, stepInputContext, integration_specific_instructions, available_credentials].filter(Boolean).join('\n')).slice(0, budget - promptStart.length);
     return prompt;
 }
 

@@ -252,7 +252,9 @@ export function composeUrl(host: string, path: string) {
 }
 
 export async function replaceVariables(rawStringWithReferences: string, allVariables: Record<string, any>): Promise<string> {
-  if (!rawStringWithReferences) return "";
+  if (!rawStringWithReferences || typeof rawStringWithReferences !== 'string') {
+    return String(rawStringWithReferences || "");
+  }
 
   const varEscapePattern = /<<([\s\S]*?)>>/g;
 

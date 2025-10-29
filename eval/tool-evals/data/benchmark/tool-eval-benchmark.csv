@@ -1,81 +1,76 @@
 tool_id,tool_name,mode,success,avg_build_time_ms,avg_exec_time_ms
-"001-clickup-task-list","ClickUp Task List",one-shot,true,10023.00,726.20
-"002-clickup-all-lists","ClickUp All Lists",one-shot,true,19941.60,1939.40
-"003-clickup-all-comments-and-replies","ClickUp All Comments and Replies",one-shot,false,16220.80,2172.80
-"003-clickup-all-comments-and-replies","ClickUp All Comments and Replies",self-healing,false,16220.80,202495.60
-"004-clockify-time-entries","Clockify Time Entries",one-shot,true,16356.20,980.60
-"005-clockify-projects","Clockify Projects",one-shot,true,14303.40,1880.60
-"006-clockify-projects-all-workspaces","Clockify Projects All Workspaces",one-shot,false,15299.70,987.20
-"006-clockify-projects-all-workspaces","Clockify Projects All Workspaces",self-healing,false,15299.70,149659.20
-"007-typeform-get-all-forms","Typeform Get All Forms",one-shot,true,28069.80,1002.00
-"008-typeform-get-form-by-id","Typeform Get Form By Id",one-shot,true,24037.80,653.80
-"009-typeform-get-all-workspaces","Typeform Get All Workspaces",one-shot,true,15202.20,772.80
-"010-confluence-get-all-spaces","Confluence Get All Spaces",one-shot,true,15375.60,625.40
-"011-confluence-get-page-content","Confluence Get Page Content",one-shot,true,11639.00,452.60
-"012-confluence-get-all-pages-of-space","Confluence Get All Pages Of Space",one-shot,false,13938.70,336.00
-"012-confluence-get-all-pages-of-space","Confluence Get All Pages Of Space",self-healing,true,13938.70,50272.80
-"013-github-list-repos","GitHub List Repositories",one-shot,true,11278.40,464.60
-"014-github-get-user","GitHub Get User",one-shot,true,9545.00,342.00
-"015-github-get-user-pull-requests","GitHub Get User's Pull Requests",one-shot,true,15956.00,427.40
-"016-linear-get-all-issues","Linear Get All Issues",one-shot,false,15666.80,1468.60
-"016-linear-get-all-issues","Linear Get All Issues",self-healing,true,15666.80,29464.40
-"017-linear-get-issue-by-id","Linear Get Issue By Id",one-shot,false,8468.40,1766.80
-"017-linear-get-issue-by-id","Linear Get Issue By Id",self-healing,true,8468.40,16067.60
-"018-linear-get-all-projects","Linear Get All Projects",one-shot,false,7703.40,1831.60
-"018-linear-get-all-projects","Linear Get All Projects",self-healing,true,7703.40,16905.20
-"019-postgres-lego-inventory-analysis","Postgres LEGO Inventory Analysis",one-shot,false,7337.90,280.60
-"019-postgres-lego-inventory-analysis","Postgres LEGO Inventory Analysis",self-healing,false,7337.90,5591.20
-"020-postgres-lego-get-colors","Postgres LEGO Get Colors",one-shot,true,8249.60,272.20
-"021-postgres-lego-get-ranked-themes","Postgres LEGO Get Ranked Themes",one-shot,true,8152.80,353.20
-"022-timbuk2-paginated-product-fetch","Timbuk2 Paginated Product Fetch",one-shot,true,13253.20,845.40
-"023-timbuk2-vendor-aggregation","Timbuk2 Vendor Aggregation",one-shot,true,11111.60,1177.20
-"024-timbuk2-price-range-analysis","Timbuk2 Price Range Analysis",one-shot,true,16418.00,482.80
-"025-stripe-get-customers","Stripe Get Customers",one-shot,false,8765.30,833.80
-"025-stripe-get-customers","Stripe Get Customers",self-healing,false,8765.30,14170.00
-"026-stripe-calculate-revenue","Stripe Calculate Revenue",one-shot,false,47244.70,256.40
-"026-stripe-calculate-revenue","Stripe Calculate Revenue",self-healing,true,47244.70,15954.00
-"027-stripe-get-all-products","Stripe Get Products",one-shot,true,9003.40,265.20
-"028-attio-get-15-oldest-people","Attio Get 15 Oldest People",one-shot,false,15784.90,2490.60
-"028-attio-get-15-oldest-people","Attio Get 15 Oldest People",self-healing,false,15784.90,19765.00
-"029-attio-get-person-by-id","Attio Get Person",one-shot,false,10858.60,2684.20
-"029-attio-get-person-by-id","Attio Get Person",self-healing,true,10858.60,110838.20
-"030-attio-people-no-email","Attio People No Email",one-shot,false,15042.50,1655.00
-"030-attio-people-no-email","Attio People No Email",self-healing,false,15042.50,282531.00
-"031-openai-structured-output-name-age","OpenAI Structured Output Name and Age",one-shot,true,15784.00,1101.20
-"032-openai-pdf-analysis-with-input-retrieval","OpenAI PDF Analysis with Input Retrieval",one-shot,false,13114.60,1607.80
-"032-openai-pdf-analysis-with-input-retrieval","OpenAI PDF Analysis with Input Retrieval",self-healing,false,13114.60,499022.20
-"033-postgres-lego-openai-table-extraction","PostgreSQL+OpenAI Structured Output",one-shot,false,14101.40,1912.40
-"033-postgres-lego-openai-table-extraction","PostgreSQL+OpenAI Structured Output",self-healing,true,14101.40,42256.00
-"034-tele2-http-download-verification","Tele2 HTTP Download",one-shot,false,7212.20,11542.80
-"034-tele2-http-download-verification","Tele2 HTTP Download",self-healing,false,7212.20,27494.20
-"035-tele2-http-upload-berkshire-letter","Tele2 HTTP Upload Berkshire Letter",one-shot,false,13467.60,521.80
-"035-tele2-http-upload-berkshire-letter","Tele2 HTTP Upload Berkshire Letter",self-healing,false,13467.60,51262.60
-"036-sec-jina-markdown-conversion","SEC Filing to Markdown via Jina Reader",one-shot,false,15693.70,1201.80
-"036-sec-jina-markdown-conversion","SEC Filing to Markdown via Jina Reader",self-healing,true,15693.70,48659.20
-"037-brewery-db-california-count","Open Brewery DB - California Brewery Count",one-shot,false,5645.00,173.80
-"037-brewery-db-california-count","Open Brewery DB - California Brewery Count",self-healing,false,5645.00,5153.00
-"038-openalex-fetch-1000-works-2025","OpenAlex - Fetch 1000 Works from 2025",one-shot,false,7181.90,1968.00
-"038-openalex-fetch-1000-works-2025","OpenAlex - Fetch 1000 Works from 2025",self-healing,true,7181.90,70600.20
-"039-openalex-pagination-1000-works-2025","OpenAlex - Pagination 1000 Works from 2025",one-shot,false,9477.30,2797.20
-"039-openalex-pagination-1000-works-2025","OpenAlex - Pagination 1000 Works from 2025",self-healing,false,9477.30,92962.20
-"040-punkapi-fetch-all-beers","PunkAPI - Fetch All Beers",one-shot,false,9866.40,2287.00
-"040-punkapi-fetch-all-beers","PunkAPI - Fetch All Beers",self-healing,true,9866.40,27008.20
-"041-punkapi-fetch-all-beers-with-pagination-reminder","PunkAPI - Fetch All Beers With Pagination Reminder",one-shot,false,10238.80,2080.20
-"041-punkapi-fetch-all-beers-with-pagination-reminder","PunkAPI - Fetch All Beers With Pagination Reminder",self-healing,true,10238.80,14334.80
-"042-slack-post-eval-message","Slack Post Eval Message",one-shot,true,7019.80,215.80
-"043-slack-list-non-sg-channels","Slack List Non-SG Channels",one-shot,true,9069.60,419.20
-"044-slack-get-last-20-messages","Slack Get Last 20 Messages",one-shot,true,10336.80,1198.80
-"045-slack-get-all-messages","Slack Get All Messages",one-shot,false,8807.00,1056.80
-"045-slack-get-all-messages","Slack Get All Messages",self-healing,false,8807.00,16568.60
-"046-slack-get-all-messages-with-pagination-reminder","Slack Get All Messages",one-shot,false,10655.40,1427.40
-"046-slack-get-all-messages-with-pagination-reminder","Slack Get All Messages",self-healing,false,10655.40,8225.40
-"047-csv-aggregate-filter","CSV Aggregate and Filter",one-shot,false,12233.30,3.40
-"047-csv-aggregate-filter","CSV Aggregate and Filter",self-healing,false,12233.30,3487.40
-"048-csv-top-performers","CSV Top Sales Performers",one-shot,true,14321.80,9.40
-"049-json-flatten-users","JSON Flatten User Profiles",one-shot,true,8454.40,2.00
-"050-json-extract-orders","JSON Extract and Aggregate Orders",one-shot,false,7835.20,3.80
-"050-json-extract-orders","JSON Extract and Aggregate Orders",self-healing,false,7835.20,2293.20
-"051-fixedwidth-parse-structure","Fixed-Width Parse to Structured JSON",one-shot,true,6371.20,2.40
-"052-multifile-csv-json-join","Multi-File CSV-JSON Join",one-shot,true,13579.60,4.60
-"053-multifile-all-summary","Multi-File Summary Statistics",one-shot,false,19782.30,6.60
-"053-multifile-all-summary","Multi-File Summary Statistics",self-healing,false,19782.30,3857.60
+"001-clickup-task-list","ClickUp Task List",one-shot,true,11766.20,529.60
+"002-clickup-all-lists","ClickUp All Lists",one-shot,true,29298.20,3156.00
+"003-clickup-all-comments-and-replies","ClickUp All Comments and Replies",one-shot,false,20310.90,3748.20
+"003-clickup-all-comments-and-replies","ClickUp All Comments and Replies",self-healing,false,20310.90,179645.20
+"004-clockify-time-entries","Clockify Time Entries",one-shot,true,17237.60,385.20
+"005-clockify-projects","Clockify Projects",one-shot,true,14466.40,606.20
+"006-clockify-projects-all-workspaces","Clockify Projects All Workspaces",one-shot,false,15226.00,213.20
+"006-clockify-projects-all-workspaces","Clockify Projects All Workspaces",self-healing,true,15226.00,174161.20
+"007-typeform-get-all-forms","Typeform Get All Forms",one-shot,true,29902.40,1013.80
+"008-typeform-get-form-by-id","Typeform Get Form By Id",one-shot,true,45279.00,311.00
+"009-typeform-get-all-workspaces","Typeform Get All Workspaces",one-shot,true,16376.60,287.80
+"010-confluence-get-all-spaces","Confluence Get All Spaces",one-shot,true,12329.00,384.60
+"011-confluence-get-page-content","Confluence Get Page Content",one-shot,true,10229.20,551.00
+"012-confluence-get-all-pages-of-space","Confluence Get All Pages Of Space",one-shot,false,14395.00,812.60
+"012-confluence-get-all-pages-of-space","Confluence Get All Pages Of Space",self-healing,true,14395.00,59726.40
+"013-github-list-repos","GitHub List Repositories",one-shot,true,11982.20,330.60
+"014-github-get-user","GitHub Get User",one-shot,true,11243.80,234.00
+"015-github-get-user-pull-requests","GitHub Get User's Pull Requests",one-shot,true,13276.40,704.60
+"016-linear-get-all-issues","Linear Get All Issues",one-shot,false,15494.40,1404.80
+"016-linear-get-all-issues","Linear Get All Issues",self-healing,true,15494.40,26437.80
+"017-linear-get-issue-by-id","Linear Get Issue By Id",one-shot,false,15473.20,1413.20
+"017-linear-get-issue-by-id","Linear Get Issue By Id",self-healing,true,15473.20,15526.20
+"018-linear-get-all-projects","Linear Get All Projects",one-shot,false,11759.70,1404.80
+"018-linear-get-all-projects","Linear Get All Projects",self-healing,true,11759.70,19768.40
+"019-postgres-lego-inventory-analysis","Postgres LEGO Inventory Analysis",one-shot,true,9129.20,242.20
+"020-postgres-lego-get-colors","Postgres LEGO Get Colors",one-shot,true,11113.20,253.80
+"021-postgres-lego-get-ranked-themes","Postgres LEGO Get Ranked Themes",one-shot,true,6621.40,100.80
+"022-timbuk2-paginated-product-fetch","Timbuk2 Paginated Product Fetch",one-shot,true,11521.20,553.60
+"023-timbuk2-vendor-aggregation","Timbuk2 Vendor Aggregation",one-shot,true,12010.60,743.80
+"024-timbuk2-price-range-analysis","Timbuk2 Price Range Analysis",one-shot,true,13067.40,346.00
+"025-stripe-get-customers","Stripe Get Customers",one-shot,false,12708.40,512.00
+"025-stripe-get-customers","Stripe Get Customers",self-healing,false,12708.40,17120.00
+"026-stripe-calculate-revenue","Stripe Calculate Revenue",one-shot,false,22245.00,244.60
+"026-stripe-calculate-revenue","Stripe Calculate Revenue",self-healing,true,22245.00,15995.60
+"027-stripe-get-all-products","Stripe Get Products",one-shot,true,14707.60,292.20
+"028-attio-get-15-oldest-people","Attio Get 15 Oldest People",one-shot,false,18959.20,2523.40
+"028-attio-get-15-oldest-people","Attio Get 15 Oldest People",self-healing,false,18959.20,34867.00
+"029-attio-get-person-by-id","Attio Get Person",one-shot,false,14472.30,2113.00
+"029-attio-get-person-by-id","Attio Get Person",self-healing,true,14472.30,203685.40
+"030-attio-people-no-email","Attio People No Email",one-shot,false,18724.60,2007.80
+"030-attio-people-no-email","Attio People No Email",self-healing,false,18724.60,400313.80
+"031-openai-structured-output-name-age","OpenAI Structured Output Name and Age",one-shot,true,38491.00,4579.40
+"032-openai-pdf-analysis-with-input-retrieval","OpenAI PDF Analysis with Input Retrieval",one-shot,false,17322.30,1392.60
+"032-openai-pdf-analysis-with-input-retrieval","OpenAI PDF Analysis with Input Retrieval",self-healing,false,17322.30,768246.60
+"033-postgres-lego-openai-table-extraction","PostgreSQL+OpenAI Structured Output",one-shot,false,23695.40,2186.60
+"033-postgres-lego-openai-table-extraction","PostgreSQL+OpenAI Structured Output",self-healing,true,23695.40,44549.00
+"034-tele2-http-download-verification","Tele2 HTTP Download",one-shot,true,11260.20,17646.00
+"035-tele2-http-upload-berkshire-letter","Tele2 HTTP Upload Berkshire Letter",one-shot,false,20175.50,243.00
+"035-tele2-http-upload-berkshire-letter","Tele2 HTTP Upload Berkshire Letter",self-healing,false,20175.50,48158.60
+"036-sec-jina-markdown-conversion","SEC Filing to Markdown via Jina Reader",one-shot,true,28436.80,1872.40
+"037-brewery-db-california-count","Open Brewery DB - California Brewery Count",one-shot,false,7173.50,930.40
+"037-brewery-db-california-count","Open Brewery DB - California Brewery Count",self-healing,false,7173.50,5926.20
+"038-openalex-fetch-1000-works-2025","OpenAlex - Fetch 1000 Works from 2025",one-shot,false,10540.80,2383.60
+"038-openalex-fetch-1000-works-2025","OpenAlex - Fetch 1000 Works from 2025",self-healing,false,10540.80,380501.20
+"039-openalex-pagination-1000-works-2025","OpenAlex - Pagination 1000 Works from 2025",one-shot,false,10808.40,4109.40
+"039-openalex-pagination-1000-works-2025","OpenAlex - Pagination 1000 Works from 2025",self-healing,false,10808.40,18571.40
+"040-punkapi-fetch-all-beers","PunkAPI - Fetch All Beers",one-shot,false,10926.10,1758.40
+"040-punkapi-fetch-all-beers","PunkAPI - Fetch All Beers",self-healing,true,10926.10,21222.80
+"041-punkapi-fetch-all-beers-with-pagination-reminder","PunkAPI - Fetch All Beers With Pagination Reminder",one-shot,false,10969.10,1664.60
+"041-punkapi-fetch-all-beers-with-pagination-reminder","PunkAPI - Fetch All Beers With Pagination Reminder",self-healing,true,10969.10,16391.20
+"042-slack-post-eval-message","Slack Post Eval Message",one-shot,true,6167.40,530.00
+"043-slack-list-non-sg-channels","Slack List Non-SG Channels",one-shot,true,10672.80,393.40
+"044-slack-get-last-20-messages","Slack Get Last 20 Messages",one-shot,true,9080.40,483.20
+"045-slack-get-all-messages","Slack Get All Messages",one-shot,false,12848.50,371.60
+"045-slack-get-all-messages","Slack Get All Messages",self-healing,false,12848.50,19708.00
+"046-slack-get-all-messages-with-pagination-reminder","Slack Get All Messages",one-shot,false,15120.60,1021.00
+"046-slack-get-all-messages-with-pagination-reminder","Slack Get All Messages",self-healing,false,15120.60,13096.40
+"047-csv-aggregate-filter","CSV Aggregate and Filter",one-shot,true,10547.00,3.00
+"048-csv-top-performers","CSV Top Sales Performers",one-shot,true,10196.80,5.40
+"049-json-flatten-users","JSON Flatten User Profiles",one-shot,true,6772.00,3.20
+"050-json-extract-orders","JSON Extract and Aggregate Orders",one-shot,true,6311.40,2.80
+"051-fixedwidth-parse-structure","Fixed-Width Parse to Structured JSON",one-shot,true,6667.00,3.20
+"052-multifile-csv-json-join","Multi-File CSV-JSON Join",one-shot,true,15370.20,3.80
+"053-multifile-all-summary","Multi-File Summary Statistics",one-shot,false,20625.10,4.00
+"053-multifile-all-summary","Multi-File Summary Statistics",self-healing,false,20625.10,2842.40
