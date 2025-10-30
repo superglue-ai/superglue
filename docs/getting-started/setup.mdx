@@ -1,7 +1,164 @@
 ---
-title: "Setup"
-description: "Get started with superglue"
+title: "Get Started"
+description: "The 5 minute guide to build your first glue code"
 ---
 
-This guide will walk you through setting up superglue in your environment. Whether you're using the hosted version or self-hosting, we'll cover all the necessary steps to get you started.
+## Hosted Version (Recommended)
 
+Get started in under 5 minutes with no infrastructure setup.
+
+<Steps>
+  <Step title="Sign up at app.superglue.cloud">
+    Or [book a demo](https://cal.com/superglue/superglue-demo) to talk to our team first.
+  </Step>
+
+  <Step title="Build a tool">
+    Click "Give me an example" to see sample tools, or describe what you need in the chat:
+
+    <img
+      src="/resources/agent-start.png"
+      alt="Superglue agent interface"
+      style={{ borderRadius: "8px" }}
+    />
+
+    The agent builds and tests the tool automatically.
+
+  </Step>
+
+  <Step title="Execute or schedule">
+    Save the tool, run it on-demand, schedule it, or trigger via webhook.
+  </Step>
+</Steps>
+
+---
+
+## Self-Hosted
+
+Deploy on your infrastructure for complete data control.
+
+### Quick Start
+
+**Prerequisites:** Docker and an LLM API key (OpenAI, Anthropic, or Gemini)
+
+<Steps>
+  <Step title="Create .env file">
+```env
+AUTH_TOKEN=your-secret-token
+LLM_PROVIDER=OPENAI
+OPENAI_API_KEY=sk-proj-xxxxx
+DATASTORE_TYPE=memory
+```
+  </Step>
+
+  <Step title="Run">
+    Run the following command:
+
+```bash
+docker run -d \
+  --name superglue \
+  --env-file .env \
+  -p 3000:3002 \
+  -v superglue_data:/data \
+  superglueai/superglue:latest
+```
+
+  </Step>
+
+  <Step title="Access dashboard and API">
+    Dashboard: 
+```
+http://localhost:3001
+```
+    
+    API: 
+```
+http://localhost:3000?token=your-secret-token
+```
+  </Step>
+</Steps>
+
+### Production Setup
+
+For production deployments, add PostgreSQL and enable credential encryption:
+
+```env
+AUTH_TOKEN=your-secret-token
+LLM_PROVIDER=OPENAI
+OPENAI_API_KEY=sk-proj-xxxxx
+
+# PostgreSQL
+DATASTORE_TYPE=postgres
+POSTGRES_HOST=your-postgres-host
+POSTGRES_PORT=5432
+POSTGRES_USERNAME=superglue
+POSTGRES_PASSWORD=secure-password
+POSTGRES_DB=superglue
+
+# Credential encryption
+MASTER_ENCRYPTION_KEY=generate-with-openssl-rand-hex-32
+
+# Enable scheduled execution
+START_SCHEDULER_SERVER=true
+```
+
+Start PostgreSQL separately:
+
+```bash
+docker run -d \
+  --name postgres \
+  -e POSTGRES_DB=superglue \
+  -e POSTGRES_USER=superglue \
+  -e POSTGRES_PASSWORD=secure-password \
+  -v postgres_data:/var/lib/postgresql/data \
+  postgres:15-alpine
+```
+
+### Local Development
+
+Add an .env file to the root folder, then:
+
+```bash
+git clone https://github.com/superglue-ai/superglue.git
+cd superglue
+npm install
+npm run dev
+```
+
+---
+
+## Environment Variables
+
+| Variable                 | Required  | Description                                                    |
+| ------------------------ | --------- | -------------------------------------------------------------- |
+| `AUTH_TOKEN`             | Yes       | Secret for API authentication                                  |
+| `DATASTORE_TYPE`         | Yes       | `memory` or `postgres` (`postgres` requires additional config) |
+| `LLM_PROVIDER`           | Yes       | `OPENAI`, `ANTHROPIC`, or `GEMINI` (default: `OPENAI`)         |
+| `OPENAI_API_KEY`         | If active | OpenAI API key                                                 |
+| `ANTHROPIC_API_KEY`      | If active | Anthropic API key                                              |
+| `GEMINI_API_KEY`         | If active | Gemini API key                                                 |
+| `MASTER_ENCRYPTION_KEY`  | No        | Encrypt stored credentials (generate: `openssl rand -hex 32`)  |
+| `START_SCHEDULER_SERVER` | No        | Enable scheduled tools (default: `false`)                      |
+
+---
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card
+    title="Core Concepts"
+    icon="lightbulb"
+    href="/getting-started/core-concepts"
+  >
+    Understand integrations, tools, and execution
+  </Card>
+  <Card
+    title="Using the Agent"
+    icon="wand-magic-sparkles"
+    href="/getting-started/using-the-agent"
+  >
+    Build your first integration tool
+  </Card>
+  <Card title="MCP Overview" icon="plug" href="/mcp/overview">
+    Use superglue tools in Cursor or Claude
+  </Card>
+</CardGroup>
