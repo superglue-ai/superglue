@@ -29,7 +29,7 @@ async function main(): Promise<void> {
   let store: FileStore | undefined;
 
   try {
-    const config = await loadConfig();
+    const config = await loadConfig( "../tool-eval-config.json");
     const storePath = join(dirname(fileURLToPath(import.meta.url)), "./.data");
     store = new FileStore(storePath);
 
