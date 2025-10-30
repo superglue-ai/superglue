@@ -50,10 +50,10 @@ const AgentEvalConfigSchema = z.object({
     validationLlmConfig: ValidationLLMConfigSchema.optional(),
 });
 
-export async function loadConfig(): Promise<AgentEvalConfig> {
+export async function loadConfig(path: string): Promise<AgentEvalConfig> {
     const configPath = join(
         dirname(fileURLToPath(import.meta.url)),
-        "../tool-eval-config.json"
+        path || "../tool-eval-config.json"
     );
 
     try {

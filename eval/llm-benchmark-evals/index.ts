@@ -64,7 +64,7 @@ async function main(): Promise<void> {
   logMessage("info", "Starting LLM Benchmark Evaluation...", metadata);
 
   try {
-    const evalConfig = await loadConfig();
+    const evalConfig = await loadConfig("../../llm-benchmark-evals/llm-benchmark-config.json");
     const enabledTools = evalConfig.enabledTools === 'all' 
       ? evalConfig.tools 
       : evalConfig.tools.filter(tool => evalConfig.enabledTools.includes(tool.id));
