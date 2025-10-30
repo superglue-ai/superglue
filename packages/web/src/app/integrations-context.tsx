@@ -50,7 +50,7 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
             // Strip heavy fields from cache (documentation and openApiSchema can be massive)
             const integrationsForCache = items.map(({ documentation, openApiSchema, ...rest }) => rest);
             
-            saveToCache(tokenRegistry.getToken(), CACHE_PREFIX, {
+            saveToCache(CACHE_PREFIX, {
                 integrations: integrationsForCache,
                 pendingDocIds: Array.from(newPendingDocIds),
                 timestamp: Date.now()
@@ -64,7 +64,7 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
     }, [config.superglueEndpoint])
 
     useEffect(() => {
-        const cachedData = loadFromCache<CachedIntegrations>(tokenRegistry.getToken(), CACHE_PREFIX);
+        const cachedData = loadFromCache<CachedIntegrations>(CACHE_PREFIX);
         if (cachedData) {
             setIntegrations(cachedData.integrations);
             setPendingDocIds(new Set(cachedData.pendingDocIds || []));

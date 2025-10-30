@@ -96,7 +96,7 @@ const ConfigTable = () => {
       setTotal(combinedConfigs.length);
       setPage(0);
 
-      saveToCache(tokenRegistry.getToken(), CACHE_PREFIX, {
+      saveToCache(CACHE_PREFIX, {
         configs: combinedConfigs,
         timestamp: Date.now()
       });
@@ -109,7 +109,7 @@ const ConfigTable = () => {
   }, [config.superglueEndpoint]);
 
   React.useEffect(() => {
-    const cachedData = loadFromCache<CachedTools>(tokenRegistry.getToken(), CACHE_PREFIX);
+    const cachedData = loadFromCache<CachedTools>(CACHE_PREFIX);
     if (cachedData) {
       setAllConfigs(cachedData.configs);
       setTotal(cachedData.configs.length);
