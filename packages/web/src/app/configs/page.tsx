@@ -33,7 +33,6 @@ import {
 
 import ToolSchedulesList from '@/src/components/tools/ToolSchedulesList';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
-import EmptyStateActions from '@/src/components/utils/EmptyStateActions';
 import { loadFromCache, saveToCache } from '@/src/lib/cache-utils';
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
 import { ApiConfig, Integration, SuperglueClient, Workflow as Tool } from '@superglue/client';
@@ -42,6 +41,7 @@ import { useRouter } from 'next/navigation';
 import React from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
+import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
 
 const CACHE_PREFIX = 'superglue-tools-cache';
 
@@ -62,16 +62,14 @@ const ConfigTable = () => {
   const { integrations } = useIntegrations();
   const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | Tool | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
-  const [showConfigStepper, setShowConfigStepper] = React.useState(false);
-  const [configStepperProps, setConfigStepperProps] = React.useState<{ prefillData?: any }>({});
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const [expandedToolId, setExpandedToolId] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedIntegration, setSelectedIntegration] = React.useState<string>("all");
+  const [showToolStepper, setShowToolStepper] = React.useState(false);
 
 
   const refreshConfigs = React.useCallback(async () => {
-    setShowConfigStepper(false);
     setIsRefreshing(true);
     try {
       const superglueClient = new SuperglueClient({
@@ -172,7 +170,7 @@ const ConfigTable = () => {
   }, [searchTerm, selectedIntegration]);
 
   const handleTool = () => {
-    router.push('/tools');
+    setShowToolStepper(true);
   };
 
 
@@ -275,23 +273,16 @@ const ConfigTable = () => {
 
   const totalPages = Math.ceil(total / pageSize);
 
-  if (showConfigStepper) {
+  if (showToolStepper) {
     return (
-      <div className="p-8 max-w-none w-full min-h-full">
-        <ConfigCreateStepper
-          mode="create"
-          onComplete={refreshConfigs}
-          prefillData={configStepperProps.prefillData}
-        />
+      <div className="max-w-none w-full min-h-full">
+        <ToolCreateStepper onComplete={() => setShowToolStepper(false)} />
       </div>
     )
   }
 
   if (allConfigs.length === 0 && !loading && !isRefreshing) {
-    if (typeof window !== 'undefined') {
-      router.push('/tools');
-    }
-    return null;
+    setShowToolStepper(true);
   }
 
   return (
