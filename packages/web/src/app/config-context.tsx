@@ -1,5 +1,7 @@
 "use client"
-import { createContext, useContext } from 'react'
+
+import { createContext, useContext, useEffect } from 'react'
+import { tokenRegistry } from '../lib/token-registry'
 
 interface Config {
   superglueEndpoint: string
@@ -8,11 +10,28 @@ interface Config {
   postHogHost: string
 }
 
-const ConfigContext = createContext<Config | null>(null)
+interface ConfigWithoutKey {
+  superglueEndpoint: string
+  postHogKey: string
+  postHogHost: string
+}
+
+const ConfigContext = createContext<ConfigWithoutKey | null>(null)
 
 export function ConfigProvider({ children, config }: { children: React.ReactNode, config: Config }) {
+  tokenRegistry.setToken(config.superglueApiKey);
+
+  useEffect(() => {
+    if (config.superglueApiKey) {
+      tokenRegistry.setToken(config.superglueApiKey)
+    }
+  }, [config.superglueApiKey])
+  
+  // remove it to make sure it won't be used
+  const {superglueApiKey, ...lightConfig} = config;
+
   return (
-    <ConfigContext.Provider value={config}>
+    <ConfigContext.Provider value={lightConfig}>
       {children}
     </ConfigContext.Provider>
   )

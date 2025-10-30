@@ -17,7 +17,7 @@ export default function RootLayout({
     postHogKey: nextConfig.env?.NEXT_PUBLIC_POSTHOG_KEY,
     postHogHost: nextConfig.env?.NEXT_PUBLIC_POSTHOG_HOST,
   }
-  if(!config.superglueApiKey) {
+  if (!config.superglueApiKey) {
     throw new Error('AUTH_TOKEN is not set and no other authentication provider is configured.');
   }
   // Looks like suppressing hydration warning is standard for Next.js. Otherwise we lose user preference mode button.

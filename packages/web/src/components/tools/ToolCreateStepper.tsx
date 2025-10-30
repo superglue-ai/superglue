@@ -1,4 +1,5 @@
 import { useIntegrations } from '@/src/app/integrations-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { useToast } from '@/src/hooks/use-toast';
 import { SuperglueClient, Workflow as Tool } from '@superglue/client';
 import { X } from 'lucide-react';
@@ -37,8 +38,8 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
 
   const client = useMemo(() => new SuperglueClient({
     endpoint: superglueConfig.superglueEndpoint,
-    apiKey: superglueConfig.superglueApiKey,
-  }), [superglueConfig.superglueEndpoint, superglueConfig.superglueApiKey]);
+    apiKey: tokenRegistry.getToken(),
+  }), [superglueConfig.superglueEndpoint]);
 
   const handleToolBuilt = (tool: Tool, context: BuildContext) => {
     setCurrentTool(tool);

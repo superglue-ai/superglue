@@ -2,6 +2,7 @@
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput, computeToolPayload, removeFileKeysFromPayload } from "@/src/lib/general-utils";
 import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
@@ -256,8 +257,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
   const client = useMemo(() => new SuperglueClient({
     endpoint: config.superglueEndpoint,
-    apiKey: config.superglueApiKey,
-  }), [config.superglueEndpoint, config.superglueApiKey]);
+    apiKey: tokenRegistry.getToken(),
+  }), [config.superglueEndpoint]);
 
   const extractIntegrationIds = (steps: ExecutionStep[]): string[] => {
     return Array.from(new Set(

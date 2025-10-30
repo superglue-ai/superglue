@@ -1,4 +1,5 @@
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { useIntegrations } from '@/src/app/integrations-context';
 import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
@@ -164,8 +165,8 @@ export function ToolBuilder({
 
   const client = useMemo(() => new ExtendedSuperglueClient({
     endpoint: superglueConfig.superglueEndpoint,
-    apiKey: superglueConfig.superglueApiKey,
-  }), [superglueConfig.superglueEndpoint, superglueConfig.superglueApiKey]);
+    apiKey: tokenRegistry.getToken(),
+  }), [superglueConfig.superglueEndpoint]);
 
   const { waitForIntegrationReady } = useMemo(() => ({
     waitForIntegrationReady: (integrationIds: string[]) => {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useConfig } from '@/src/app/config-context'
+import { tokenRegistry } from '@/src/lib/token-registry'
 import { useToast } from '@/src/hooks/use-toast'
 import { ApiConfig, CacheMode, SuperglueClient } from '@superglue/client'
 import { Loader2, CopyIcon } from 'lucide-react'
@@ -61,7 +62,7 @@ export function InteractiveApiPlayground({
     try {
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
-        apiKey: superglueConfig.superglueApiKey
+        apiKey: tokenRegistry.getToken()
       })
       const data = await superglueClient.getApi(configId)
       setConfig(data)
@@ -97,7 +98,7 @@ export function InteractiveApiPlayground({
     try {
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
-        apiKey: superglueConfig.superglueApiKey
+        apiKey: tokenRegistry.getToken()
       })
 
       // 1. First upsert the API config with the new schema and instruction

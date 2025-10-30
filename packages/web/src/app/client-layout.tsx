@@ -5,6 +5,7 @@ import { Sidebar } from '../components/sidebar/Sidebar';
 import { Toaster } from '../components/ui/toaster';
 import { LogSidebar } from '../components/utils/LogSidebar';
 import { ServerMonitor } from '../components/utils/ServerMonitor';
+import { tokenRegistry } from '../lib/token-registry';
 import { ConfigProvider } from './config-context';
 import { jetbrainsMono, jetbrainsSans } from './fonts';
 import { IntegrationsProvider } from './integrations-context';
@@ -28,7 +29,7 @@ export function ClientWrapper({ children, config }: Props) {
               children
             ) : (
               <div className="flex h-screen overflow-hidden">
-                {config.superglueApiKey && <Sidebar />}
+                {tokenRegistry.hasToken() && <Sidebar />}
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={pathname}
@@ -40,7 +41,7 @@ export function ClientWrapper({ children, config }: Props) {
                     {children}
                   </motion.div>
                 </AnimatePresence>
-                {config.superglueApiKey && (
+                {tokenRegistry.hasToken() && (
                   <div className="hidden lg:block">
                     <LogSidebar />
                   </div>
@@ -48,7 +49,7 @@ export function ClientWrapper({ children, config }: Props) {
               </div>
             )}
             <Toaster />
-            {config.superglueApiKey && <ServerMonitor />}
+            {tokenRegistry.hasToken() && <ServerMonitor />}
           </div>
         </CSPostHogProvider>
       </IntegrationsProvider>

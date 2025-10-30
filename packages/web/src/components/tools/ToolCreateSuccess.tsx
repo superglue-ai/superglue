@@ -1,4 +1,5 @@
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { getSDKCode } from '@superglue/shared/templates';
 import { Check, Copy } from 'lucide-react';
 import { useState } from 'react';
@@ -26,7 +27,7 @@ export function ToolCreateSuccess({
   const [curlCopied, setCurlCopied] = useState(false)
 
   const sdkCode = getSDKCode({
-    apiKey: superglueConfig.superglueApiKey,
+    apiKey: tokenRegistry.getToken(),
     endpoint: superglueConfig.superglueEndpoint,
     workflowId: currentTool.id,
     payload,
