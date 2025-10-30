@@ -1209,7 +1209,7 @@
   "settings": {
     "runOneShotMode": true,
     "runSelfHealingMode": true,
-    "attemptsEachMode": 5,
+    "attemptsEachMode": 3,
     "maxConcurrentWorkers": 5
   },
   "validationLlmConfig": {

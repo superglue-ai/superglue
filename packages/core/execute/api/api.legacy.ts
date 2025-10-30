@@ -2,6 +2,7 @@ import { ApiConfig, FileType, PaginationType } from "@superglue/client";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { RequestOptions } from "http";
 import ivm from "isolated-vm";
+import { JSONPath } from "jsonpath-plus";
 import { SELF_HEALING_SYSTEM_PROMPT } from "../../context/context-prompts.js";
 import { server_defaults } from "../../default.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
@@ -73,9 +74,20 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
       }
     }
 
+    // Handle headers - might be string or object
+    let headersToProcess = endpoint.headers || {};
+    if (typeof headersToProcess === 'string') {
+      const replacedString = await replaceVariables(headersToProcess, requestVars);
+      try {
+        headersToProcess = JSON.parse(replacedString);
+      } catch {
+        headersToProcess = {};
+      }
+    }
+
     const headersWithReplacedVars = Object.fromEntries(
       (await Promise.all(
-        Object.entries(endpoint.headers || {})
+        Object.entries(headersToProcess)
           .map(async ([key, value]) => [key, await replaceVariables(String(value), requestVars)])
       )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
@@ -94,9 +106,20 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
       processedHeaders[key] = processedValue;
     }
 
+    // Handle query params - might be string or object
+    let queryParamsToProcess = endpoint.queryParams || {};
+    if (typeof queryParamsToProcess === 'string') {
+      const replacedString = await replaceVariables(queryParamsToProcess, requestVars);
+      try {
+        queryParamsToProcess = JSON.parse(replacedString);
+      } catch {
+        queryParamsToProcess = {};
+      }
+    }
+
     const processedQueryParams = Object.fromEntries(
       (await Promise.all(
-        Object.entries(endpoint.queryParams || {})
+        Object.entries(queryParamsToProcess)
           .map(async ([key, value]) => [key, await replaceVariables(String(value), requestVars)])
       )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
@@ -297,12 +320,10 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
     } else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
       offset += parseInt(endpoint.pagination?.pageSize || "50");
     } else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
-      const cursorParts = (endpoint.pagination?.cursorPath || 'next_cursor').split('.');
-      let nextCursor = parsedResponseData;
-      for (const part of cursorParts) {
-        nextCursor = nextCursor?.[part];
-      }
-      cursor = nextCursor;
+      const cursorPath = endpoint.pagination?.cursorPath || 'next_cursor';
+      const jsonPath = cursorPath.startsWith('$') ? cursorPath : `$.${cursorPath}`;
+      const result = JSONPath({ path: jsonPath, json: parsedResponseData, wrap: false });
+      cursor = result;
       if (!cursor) {
         hasMore = false;
       }

@@ -9,7 +9,7 @@ If no target schema is provided, generate an appropriate and concise output base
 CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
 1. In workflow contexts, sourceData contains:
    - Initial payload fields at the root level (e.g., sourceData.date, sourceData.companies)
-   - Previous step results accessed by stepId (e.g., sourceData.getAllContacts, sourceData.fetchUsers)
+   - Previous step results accessed by stepId (e.g., sourceData.getAllContacts.data, sourceData.fetchFriendsForEachContact[#].data)
    - DO NOT use sourceData.payload - initial payload is merged at root level
 
 2. Step result structure - depends on what the loopSelector returned:
@@ -233,7 +233,7 @@ Every step MUST have a loopSelector that determines how it executes:
 - Note: For Basic Authentication, format as "Basic <<integrationId_username>>:<<integrationId_password>>" and the system will automatically convert it to Base64.
 - Headers provided starting with 'x-' are probably headers.
 - Credentials are prefixed with integration ID: <<integrationId_credentialName>>
-- Don't hardcode pagination values like limits in URLs or bodies - use <<>> variables when pagination is configured
+- Don't hardcode pagination values - use Superglue's variables: <<page>>, <<offset>>, <<cursor>>, <<limit>>
 - Access previous step results: depends on what loopSelector returned
   * If returned object: <<(sourceData) => sourceData.fetchUsers.data>> (single result)
   * If returned array: <<(sourceData) => sourceData.fetchUsers.map(item => item.data)>> (array of results)
@@ -283,7 +283,7 @@ Every step has a loopSelector that determines execution mode:
 CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
 1. In workflow contexts, sourceData contains:
    - Initial payload fields at the root level (e.g., sourceData.date, sourceData.companies)
-   - Previous step results accessed by stepId (e.g., sourceData.getAllContacts.data, sourceData.fetchUsers.data[])
+   - Previous step results accessed by stepId (e.g., sourceData.getAllContacts.data, sourceData.fetchFriendsForEachContact[#].data)
    - DO NOT use sourceData.payload - initial payload is merged at root level
 
 2. Step result structure - depends on what the loopSelector returned:
@@ -305,7 +305,7 @@ CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
      * Simple access: <<currentItem>> returns the whole object
      * With transformations: <<(sourceData) => sourceData.currentItem.id>> or <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>
      * Access previous object result: <<(sourceData) => sourceData.myStep.data>>
-     * Access previous array results: <<(sourceData) => sourceData.myStep.map(x => x.currentItem)>>
+     * Access previous array results: <<(sourceData) => sourceData.myStep.map(x => x.data or x.currentItem to get input data used)>>
 
 Requirements:
 - Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
@@ -330,7 +330,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
 \`\`\`javascript
 (sourceData) => {
   return {
-    userId: sourceData.currentItem?.id || sourceData.userId,
+    userId: sourceData.currentItem?.id || sourceData.userId // if userId comes from payload,
     action: 'update',
     timestamp: new Date().toISOString(),
     metadata: sourceData.globalMetadata || {}
@@ -341,7 +341,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
 3. Final transform (shape output):
 \`\`\`javascript
 (sourceData) => {
-  const results = sourceData.getId.data.map(item => sourceData.getProductForId.data.find(product => product.id === item.id));
+  const results = sourceData.getIds.data.map(item => sourceData.getProductForId.data.find(product => product.id === item.id));
   return {
     success: true,
     count: results.length,
@@ -374,10 +374,10 @@ For each step in the plan, you must:
 JAVASCRIPT EXPRESSIONS:
 Use JavaScript expressions within <<>> tags for any dynamic values:
 - Simple variable access: <<userId>>, <<apiKey>>
-- JavaScript functions require arrow syntax: <<(sourceData) => sourceData.user.data.name>>
+- JavaScript functions require arrow syntax: <<(sourceData) => sourceData.getUser.data.name>>
 - Loop item access: Use <<currentItem>> for direct access, or <<(sourceData) => sourceData.currentItem.property>> for specific properties or transformations
-- Array operations (object result): <<(sourceData) => sourceData.users.data.map(u => u.id)>>
-- Array operations (array result): <<(sourceData) => sourceData.users.map(item => item.data.id)>>
+- Array operations (object result): <<(sourceData) => sourceData.getUsers.data.map(u => u.id)>>
+- Array operations (array result): <<(sourceData) => sourceData.getUsers.map(item => item.data.id)>>
 - Complex transformations: <<(sourceData) => JSON.stringify({ ids: sourceData.fetchUsers.data.map(u => u.id) })>>
 - Calculations: <<(sourceData) => sourceData.price * 1.2>>
 - Conditional logic: <<(sourceData) => sourceData.type === 'premium' ? 'pro' : 'basic'>>
@@ -395,7 +395,7 @@ For data access in <<>> tags:
 - Current item: <<currentItem>> for the whole item, or use arrow functions for transformations: <<(sourceData) => sourceData.currentItem.id>>
 
 For special transformation functions:
-- loopSelector returning OBJECT: (sourceData) => ({ userId: sourceData.userId, action: 'create' })
+- loopSelector returning OBJECT: (sourceData) => ({ userId: sourceData.fetchUsers.data.users[0].id, action: 'create' })
 - loopSelector returning ARRAY from object result: (sourceData) => sourceData.fetchUsers.data.users
 - loopSelector returning ARRAY from array result: (sourceData) => sourceData.fetchUsers.flatMap(item => item.data.users)
   * MUST throw error if expected array is missing rather than returning []. Exceptions can be cases if the instruction is "Get all users" and the API returns an empty array, in which case you should return [].
@@ -412,9 +412,6 @@ CRITICAL DATA ACCESS PATTERNS:
    - Array result: <<(sourceData) => sourceData.getAllContacts.map(item => item.data)>>
    
 3. Common mistakes to avoid:
-   - WRONG: <<payload.date>> ❌
-   - RIGHT: <<date>> ✓
-   - WRONG: <<getAllContacts>> ❌ (missing .data access)
    - RIGHT for object result: <<(sourceData) => sourceData.getAllContacts.data>> ✓
    - RIGHT for array result: <<(sourceData) => sourceData.getAllContacts.map(item => item.data)>> ✓
    - To check if array: Array.isArray(sourceData.getAllContacts)
@@ -433,10 +430,10 @@ When you DO configure pagination:
 1. Set the pagination object with type, pageSize, and stopCondition
 2. Add the exact pagination parameters to queryParams/body/headers as specified in the docs
 
-Common patterns (VERIFY IN DOCS FIRST):
-- OFFSET_BASED: Often uses "offset"/"limit" or "skip"/"limit" or "after"/"limit"
-- PAGE_BASED: Often uses "page"/"per_page" or "page"/"pageSize"
-- CURSOR_BASED: Often uses "cursor"/"limit" or "after"/"limit" with a cursor from response
+Superglue provides these variables that you MUST use:
+- OFFSET_BASED: Use <<offset>> and <<limit>> variables
+- PAGE_BASED: Use <<page>> and <<pageSize>> or <<limit>> variables
+- CURSOR_BASED: Use <<cursor>> and <<limit>> variables
 
 ⚠️ WARNING: Incorrect pagination configuration causes infinite loops. When in doubt, leave it unconfigured.
 </PAGINATION_CONFIGURATION>
@@ -696,9 +693,9 @@ For SOAP requests:
 
 <PAGINATION>
 When pagination is configured:
-- Variables become available: <<page>>, <<offset>>, <<limit>>, <<cursor>>
-- Don't hardcode limits - use the variables
-- Use "OFFSET_BASED", "PAGE_BASED", or "CURSOR_BASED" for the type.
+- Superglue provides these variables: <<page>>, <<offset>>, <<limit>>, <<cursor>>
+- ALWAYS use these exact variable names, even if the API parameter name is different.
+- Use "OFFSET_BASED", "PAGE_BASED", or "CURSOR_BASED" for the type
 - stopCondition is required and controls when to stop fetching pages
 </PAGINATION>
 

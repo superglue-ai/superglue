@@ -3,7 +3,6 @@ import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
 import { getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
 import { AssistantModelMessage, TextPart, ToolCallPart, ToolResultPart, generateText, jsonSchema, tool } from "ai";
-import { Validator } from "jsonschema";
 import { server_defaults } from "../default.js";
 import { ToolDefinition } from "../execute/tools.js";
 import { logMessage } from "../utils/logs.js";
@@ -187,7 +186,6 @@ export class AiSdkModel implements LLM {
 
     try {
       let finalResult: any = null;
-      let didAbort = false;
       while (finalResult === null) {
 
         const result = await generateText({
@@ -199,6 +197,10 @@ export class AiSdkModel implements LLM {
           maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
         });
 
+        if(result.finishReason === 'error' || result.finishReason === 'content-filter' || result.finishReason === 'other') {
+          throw new Error("Error generating LLM response: " + JSON.stringify(result.content || "no content"));
+        }
+
         // Check for submit/abort in tool calls
         for (const toolCall of result.toolCalls) {
           if (toolCall.toolName === 'submit') {
@@ -207,7 +209,6 @@ export class AiSdkModel implements LLM {
           }
           if (toolCall.toolName === 'abort') {
             finalResult = { error: (toolCall.input as any)?.reason || "Unknown error" };
-            didAbort = true;
             break;
           }
         }
@@ -261,25 +262,12 @@ export class AiSdkModel implements LLM {
         content: JSON.stringify(finalResult)
       }];
 
-      if (finalResult && !didAbort) {
-        try {
-          const validator = new Validator();
-          // Validate against original schema (before array wrapping)
-          const validation = validator.validate(finalResult, originalSchema);
-          if (!validation.valid) {
-            throw new Error(`Generated result does not match schema ${validation.errors.map(e => e.stack).join(', ')}`);
-          }
-        } catch (validationError) {
-          throw new Error(`Schema validation error: ${validationError.message} for result: ${JSON.stringify(finalResult)}`);
-        }
-      }
-
       return {
         response: finalResult,
         messages: updatedMessages
       };
     } catch (error) {
-      logMessage('error', `Error in Vercel AI generateObject: ${error}`, { orgId: 'ai-sdk' });
+      logMessage('error', `Error generating LLM response: ${error}`, { orgId: 'ai-sdk' });
       const updatedMessages = [...messages, {
         role: "assistant" as const,
         content: "Error: Vercel AI API Error: " + (error as any)?.message

@@ -33,11 +33,8 @@ interface ToolStepConfiguratorProps {
 export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput }: ToolStepConfiguratorProps) {
     const [didFormatLoopSelector, setDidFormatLoopSelector] = useState(false);
     const [localIntegrations, setLocalIntegrations] = useState<Integration[]>([]);
-    const [loadingIntegrations, setLoadingIntegrations] = useState(false);
     const [headersText, setHeadersText] = useState('');
     const [queryParamsText, setQueryParamsText] = useState('');
-    const [headersError, setHeadersError] = useState(false);
-    const [queryParamsError, setQueryParamsError] = useState(false);
     const [isEditingInstruction, setIsEditingInstruction] = useState(false);
     const [instructionCopied, setInstructionCopied] = useState(false);
 
@@ -52,14 +49,12 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
     const loadIntegrations = async () => {
         if (localIntegrations.length > 0) return;
         try {
-            setLoadingIntegrations(true);
             const result = await client.listIntegrations(100, 0);
             setLocalIntegrations(result.items);
         } catch (error: any) {
             console.error("Error loading integrations:", error);
             toast({ title: "Error loading integrations", description: error.message, variant: "destructive" });
         } finally {
-            setLoadingIntegrations(false);
         }
     };
 
@@ -86,10 +81,8 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
             } else {
                 setHeadersText('{}');
             }
-            setHeadersError(false);
         } catch {
             setHeadersText('{}');
-            setHeadersError(false);
         }
         try {
             const queryParams = step.apiConfig?.queryParams;
@@ -100,10 +93,8 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
             } else {
                 setQueryParamsText('{}');
             }
-            setQueryParamsError(false);
         } catch {
             setQueryParamsText('{}');
-            setQueryParamsError(false);
         }
     }, [step.id]);
 
@@ -119,7 +110,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
             }
             if (newHeadersText !== headersText) {
                 setHeadersText(newHeadersText);
-                setHeadersError(false);
             }
         } catch { }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,7 +126,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
             }
             if (newQueryParamsText !== queryParamsText) {
                 setQueryParamsText(newQueryParamsText);
-                setQueryParamsError(false);
             }
         } catch { }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,8 +152,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         onEdit(step.id, updated, true);
         if (onEditingChange) setTimeout(() => onEditingChange(false), 100);
     };
-
-    const handleRemove = () => { onRemove(step.id); };
 
     const linkedIntegration = integrations?.find(integration => {
         if (step.integrationId && integration.id === step.integrationId) return true;
