@@ -2,10 +2,10 @@
 
 import { useConfig } from "@/src/app/config-context";
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
+import { createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput, computeToolPayload, removeFileKeysFromPayload } from "@/src/lib/general-utils";
-import { ExecutionStep, Integration, SuperglueClient, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
+import { ExecutionStep, Integration, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
 import { generateDefaultFromSchema } from "@superglue/shared";
 import isEqual from "lodash.isequal";
 import { Validator } from "jsonschema";
@@ -29,7 +29,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
-import { useSuperglueClient } from "@/src/hooks/use-superglue-client";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -414,7 +413,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           newFiles.push(fileInfo);
           existingKeys.push(key);
 
-          const client = useSuperglueClient(config.superglueEndpoint);
+          const client = createSuperglueClient(config.superglueEndpoint);
           const parsedData = await processAndExtractFile(file, client);
 
           newPayloads[key] = parsedData;
@@ -492,7 +491,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     try {
       setLoading(true);
 
-      const client = useSuperglueClient(config.superglueEndpoint);
+      const client = createSuperglueClient(config.superglueEndpoint);
       const result = await client.listIntegrations(100, 0);
       setIntegrations(result.items);
       return result.items;
@@ -513,7 +512,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       if (!idToLoad) return;
       setLoading(true);
       setResult(null);
-      const client = useSuperglueClient(config.superglueEndpoint);
+      const client = createSuperglueClient(config.superglueEndpoint);
       const tool = await client.getWorkflow(idToLoad);
       if (!tool) {
         throw new Error(`Tool with ID "${idToLoad}" not found.`);
@@ -643,7 +642,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         await onSave(toolToSave);
       } else {
         // In standalone mode, save to backend
-        const client = useSuperglueClient(config.superglueEndpoint);
+        const client = createSuperglueClient(config.superglueEndpoint);
         const savedTool = await client.upsertWorkflow(toolId, toolToSave as any);
 
         if (!savedTool) {
@@ -710,7 +709,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       // Use computed payload for execution (already merged manual + files)
       setCurrentExecutingStepIndex(0);
 
-      const client = useSuperglueClient(config.superglueEndpoint);
+      const client = createSuperglueClient(config.superglueEndpoint);
       const state = await executeToolStepByStep(
         client,
         tool,
@@ -917,7 +916,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       } else {
         setIsExecutingStep(idx);
       }
-      const client = useSuperglueClient(config.superglueEndpoint);
+      const client = createSuperglueClient(config.superglueEndpoint);
       const single = await executeSingleStep(
         client,
         {
@@ -983,7 +982,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         }
       });
       const parsedResponseSchema = schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null;
-      const client = useSuperglueClient(config.superglueEndpoint);
+      const client = createSuperglueClient(config.superglueEndpoint);
       const result = await executeFinalTransform(
         client,
         toolId || 'test',
