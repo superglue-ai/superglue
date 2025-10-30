@@ -23,8 +23,11 @@ const envPath = process.cwd().endsWith('packages/core')
 config({ path: envPath });
 
 const PROVIDERS = [
-//   { name: 'gpt-4.1', envProvider: 'openai', envModel: 'gpt-4.1' },
-  { name: 'gpt-5', envProvider: 'openai', envModel: 'gpt-5' }
+  { name: 'gpt-4.1', envProvider: 'openai', envModel: 'gpt-4.1' },
+  { name: 'gpt-5', envProvider: 'openai', envModel: 'gpt-5' },
+  { name: 'claude-sonnet-4-5', envProvider: 'anthropic', envModel: 'claude-sonnet-4-5' },
+  { name: 'claude-sonnet-4-20250514', envProvider: 'anthropic', envModel: 'claude-sonnet-4-20250514' },
+  { name: 'gemini-2.5-flash-lite', envProvider: 'google', envModel: 'gemini-2.5-flash-lite' },
 ];
 
 function applyEnvironmentVariablesToCredentials(
