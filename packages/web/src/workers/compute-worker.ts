@@ -1,5 +1,5 @@
-import { inferJsonSchema } from '@superglue/shared';
 import { truncateForDisplay, truncateLines } from '@/src/lib/general-utils';
+import { inferJsonSchema } from '@superglue/shared';
 
 const MAX_DISPLAY_LINES = 3000;
 
@@ -56,31 +56,43 @@ const taskHandlers: Record<TaskType, (data: any) => any> = {
   },
 };
 
-// Worker message handler
-self.onmessage = (event: MessageEvent<ComputeRequest>) => {
-  const { id, task } = event.data;
-
-  try {
-    const handler = taskHandlers[task.type];
-    if (!handler) {
-      throw new Error(`Unknown task type: ${task.type}`);
+// Only set up message handler if we're actually in a worker context
+// @ts-ignore - checking for WorkerGlobalScope
+if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope) {
+  // Worker message handler
+  self.onmessage = (event: MessageEvent<ComputeRequest>) => {
+    // Validate message has required structure
+    if (!event.data || !event.data.id || !event.data.task) {
+      console.warn('[Worker] Received invalid message, ignoring:', event.data);
+      return;
     }
 
-    const result = handler(task.data);
+    const { id, task } = event.data;
 
-    const response: ComputeResponse = {
-      id,
-      result,
-    };
+    try {
+      const handler = taskHandlers[task.type];
+      if (!handler) {
+        throw new Error(`Unknown task type: ${task.type}`);
+      }
 
-    self.postMessage(response);
-  } catch (error) {
-    const response: ComputeResponse = {
-      id,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+      const result = handler(task.data);
 
-    self.postMessage(response);
-  }
-};
+      const response: ComputeResponse = {
+        id,
+        result,
+      };
+
+      self.postMessage(response);
+    } catch (error) {
+      const response: ComputeResponse = {
+        id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+
+      self.postMessage(response);
+    }
+  };
+} else {
+  console.warn('[compute-worker] Script loaded in window context, not setting up message handler');
+}
 
