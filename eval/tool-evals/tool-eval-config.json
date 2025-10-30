@@ -1210,11 +1210,11 @@
     "runOneShotMode": true,
     "runSelfHealingMode": true,
     "attemptsEachMode": 5,
-    "maxConcurrentWorkers": 5
+    "maxConcurrentWorkers": 5,
+    "toolAttemptTimeoutMs": 300000
   },
   "validationLlmConfig": {
     "provider": "openai",
     "model": "gpt-4o"
-  },
-  "TOOL_ATTEMPT_TIMEOUT_MS": 300_000
+  }
 }
