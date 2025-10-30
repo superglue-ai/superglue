@@ -1,4 +1,5 @@
 import { Integration, SelfHealingMode, SuperglueClient, Workflow as Tool } from "@superglue/client";
+import { tokenRegistry } from "./token-registry";
 
 export interface StepExecutionResult {
   stepId: string;
@@ -448,4 +449,11 @@ export function generateUUID(): string {
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
+}
+
+export function createSuperglueClient(endpoint: string): SuperglueClient {
+  return new SuperglueClient({
+    endpoint,
+    apiKey: tokenRegistry.getToken(),
+  })
 }
