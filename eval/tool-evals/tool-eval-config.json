@@ -1209,11 +1209,12 @@
   "settings": {
     "runOneShotMode": true,
     "runSelfHealingMode": true,
-    "attemptsEachMode": 3,
+    "attemptsEachMode": 5,
     "maxConcurrentWorkers": 5
   },
   "validationLlmConfig": {
     "provider": "openai",
     "model": "gpt-4o"
-  }
+  },
+  "TOOL_ATTEMPT_TIMEOUT_MS": 300_000
 }

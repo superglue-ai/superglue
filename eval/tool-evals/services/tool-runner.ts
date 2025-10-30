@@ -1,10 +1,9 @@
 import { Integration } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { DataStore } from "../../../packages/core/datastore/types.js";
-import { ToolAttempt, ToolConfig, TestSuiteSettings, ValidationLLMConfig } from "../types.js";
-import { SuperglueToolAttemptService } from "./tool-attempt.js";
+import { TestSuiteSettings, ToolAttempt, ToolConfig, ValidationLLMConfig } from "../types.js";
 import { PromiseQueue } from "../utils/promise-queue.js";
-
+import { SuperglueToolAttemptService } from "./tool-attempt.js";
 
 export class ToolRunnerService {
     constructor(
@@ -17,9 +16,16 @@ export class ToolRunnerService {
     public async runTools(tools: ToolConfig[], integrations: Integration[], settings: TestSuiteSettings): Promise<ToolAttempt[]> {
         const toolAttemptService = new SuperglueToolAttemptService(this.metadata, this.datastore, this.validationLlmConfig);
         const queue = settings.maxConcurrentWorkers ? new PromiseQueue(settings.maxConcurrentWorkers) : null;
+        const timeoutMs = settings.toolAttemptTimeoutMs ?? 300000;
 
         const runAttempt = (fn: () => Promise<ToolAttempt>): Promise<ToolAttempt> => {
-            return queue ? queue.enqueue(fn) : fn();
+            const wrappedFn = async () => {
+                const timeout = new Promise<never>((_, reject) => 
+                    setTimeout(() => reject(new Error(`Tool attempt timed out after ${timeoutMs / 1000}s`)), timeoutMs)
+                );
+                return Promise.race([fn(), timeout]);
+            };
+            return queue ? queue.enqueue(wrappedFn) : wrappedFn();
         };
 
         const allAttempts: ToolAttempt[] = [];
