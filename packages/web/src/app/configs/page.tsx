@@ -1,6 +1,7 @@
 "use client"
 
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { useIntegrations } from '@/src/app/integrations-context';
 import { ConfigCreateStepper } from '@/src/components/api/ConfigCreateStepper';
 import {
@@ -74,7 +75,7 @@ const ConfigTable = () => {
     try {
       const superglueClient = new SuperglueClient({
         endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey
+        apiKey: tokenRegistry.getToken()
       });
 
       const [apiConfigs, toolConfigs] = await Promise.all([
@@ -95,7 +96,7 @@ const ConfigTable = () => {
       setTotal(combinedConfigs.length);
       setPage(0);
 
-      saveToCache(config.superglueApiKey, CACHE_PREFIX, {
+      saveToCache(tokenRegistry.getToken(), CACHE_PREFIX, {
         configs: combinedConfigs,
         timestamp: Date.now()
       });
@@ -105,17 +106,17 @@ const ConfigTable = () => {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [config.superglueEndpoint, config.superglueApiKey]);
+  }, [config.superglueEndpoint]);
 
   React.useEffect(() => {
-    const cachedData = loadFromCache<CachedTools>(config.superglueApiKey, CACHE_PREFIX);
+    const cachedData = loadFromCache<CachedTools>(tokenRegistry.getToken(), CACHE_PREFIX);
     if (cachedData) {
       setAllConfigs(cachedData.configs);
       setTotal(cachedData.configs.length);
       setLoading(false);
     }
     refreshConfigs();
-  }, [refreshConfigs, config.superglueApiKey]);
+  }, [refreshConfigs]);
 
   React.useEffect(() => {
     const filtered = allConfigs.filter(config => {
@@ -202,7 +203,7 @@ const ConfigTable = () => {
     try {
       const superglueClient = new SuperglueClient({
         endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey
+        apiKey: tokenRegistry.getToken()
       });
 
       let deletePromise;

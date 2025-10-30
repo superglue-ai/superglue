@@ -1,4 +1,5 @@
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { Button } from '@/src/components/ui/button';
 import {
     Dialog,
@@ -44,7 +45,7 @@ export function AddStepDialog({
 
     const client = new SuperglueClient({
         endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey,
+        apiKey: tokenRegistry.getToken(),
     });
 
     useEffect(() => {

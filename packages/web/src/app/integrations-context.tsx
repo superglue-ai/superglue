@@ -1,6 +1,7 @@
 import { Integration, SuperglueClient } from '@superglue/client'
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react'
 import { useConfig } from './config-context'
+import { tokenRegistry } from '@/src/lib/token-registry'
 import { loadFromCache, saveToCache } from '@/src/lib/cache-utils'
 
 interface IntegrationsContextType {
@@ -34,7 +35,7 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
         try {
             const client = new SuperglueClient({
                 endpoint: config.superglueEndpoint,
-                apiKey: config.superglueApiKey,
+                apiKey: tokenRegistry.getToken(),
             })
             const { items } = await client.listIntegrations(100, 0)
             setIntegrations(items)
@@ -49,7 +50,7 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
             // Strip heavy fields from cache (documentation and openApiSchema can be massive)
             const integrationsForCache = items.map(({ documentation, openApiSchema, ...rest }) => rest);
             
-            saveToCache(config.superglueApiKey, CACHE_PREFIX, {
+            saveToCache(tokenRegistry.getToken(), CACHE_PREFIX, {
                 integrations: integrationsForCache,
                 pendingDocIds: Array.from(newPendingDocIds),
                 timestamp: Date.now()
@@ -60,10 +61,10 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
             setLoading(false)
             setIsRefreshing(false)
         }
-    }, [config.superglueEndpoint, config.superglueApiKey])
+    }, [config.superglueEndpoint])
 
     useEffect(() => {
-        const cachedData = loadFromCache<CachedIntegrations>(config.superglueApiKey, CACHE_PREFIX);
+        const cachedData = loadFromCache<CachedIntegrations>(tokenRegistry.getToken(), CACHE_PREFIX);
         if (cachedData) {
             setIntegrations(cachedData.integrations);
             setPendingDocIds(new Set(cachedData.pendingDocIds || []));
@@ -72,7 +73,7 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
             setLoading(true);
         }
         refreshIntegrations()
-    }, [config.superglueEndpoint, config.superglueApiKey])
+    }, [config.superglueEndpoint])
 
     return (
         <IntegrationsContext.Provider value={{

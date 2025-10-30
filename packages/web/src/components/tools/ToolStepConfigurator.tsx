@@ -1,4 +1,5 @@
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
 import { useToast } from '@/src/hooks/use-toast';
 import { splitUrl } from '@/src/lib/client-utils';
@@ -41,14 +42,15 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
     const config = useConfig();
     const { toast } = useToast();
 
-    const client = useMemo(() => new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey,
-    }), [config.superglueEndpoint, config.superglueApiKey]);
-
     const loadIntegrations = async () => {
         if (localIntegrations.length > 0) return;
         try {
+            
+            const client = new SuperglueClient({
+                endpoint: config.superglueEndpoint,
+                apiKey: tokenRegistry.getToken(),
+            });
+            
             const result = await client.listIntegrations(100, 0);
             setLocalIntegrations(result.items);
         } catch (error: any) {

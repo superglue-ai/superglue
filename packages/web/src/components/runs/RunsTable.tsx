@@ -1,6 +1,7 @@
 "use client"
 
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { Badge } from "@/src/components/ui/badge";
 import {
   Table,
@@ -55,7 +56,7 @@ const RunsTable = ({ id }: { id?: string }) => {
 
         const superglueClient = new SuperglueClient({
           endpoint: config.superglueEndpoint,
-          apiKey: config.superglueApiKey
+          apiKey: tokenRegistry.getToken()
         })
         const data = await superglueClient.listRuns(pageSize, currentPage * pageSize, id);
         setRuns(data.items);
@@ -88,7 +89,7 @@ const RunsTable = ({ id }: { id?: string }) => {
     try {
       const superglueClient = new SuperglueClient({
         endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey
+        apiKey: tokenRegistry.getToken()
       });
       
       // Get the detailed run data - try to get more details via getRun

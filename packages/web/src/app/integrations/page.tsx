@@ -1,5 +1,6 @@
 "use client";
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { useIntegrations } from '@/src/app/integrations-context';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import {
@@ -79,8 +80,8 @@ export default function IntegrationsPage() {
 
     const client = useMemo(() => new SuperglueClient({
         endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey,
-    }), [config.superglueEndpoint, config.superglueApiKey]);
+        apiKey: tokenRegistry.getToken(),
+    }), [config.superglueEndpoint]);
 
     useEffect(() => {
         refreshIntegrations();
@@ -223,7 +224,7 @@ export default function IntegrationsPage() {
             integration.id,
             oauthFields,
             integration.id,
-            config.superglueApiKey,
+            tokenRegistry.getToken(),
             authType,
             handleOAuthError,
             true,
