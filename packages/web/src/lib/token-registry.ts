@@ -1,23 +1,23 @@
-type Listener = (token: string) => void;
+type Listener = () => void;
 
 // Token registry holding the token for the superglue backend (core). 
 // This avoids visible UI re-renders when updating and propagating the token to the child components.
 class TokenRegistry {
-  private _token: string | undefined;
+  private _token: string | null = null;
   private listeners: Set<Listener> = new Set();
 
-  setToken(next: string) {
+  setToken(next: string | null) {
     if (this._token === next) return;
     this._token = next;
-    for (const l of this.listeners) l(next);
+    
+    // Defer notifications to avoid setState during another component's render
+    Promise.resolve().then(() => {
+      for (const l of this.listeners) l();
+    });
   }
 
-  getToken(): string {
-    if (!this._token) {
-      throw new Error('Cannot get the token before it is set');
-    }
-
-    return this._token;
+  getToken(): string | null {
+    return this._token ?? null;
   }
 
   hasToken(): boolean {
