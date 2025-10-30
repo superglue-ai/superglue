@@ -18,11 +18,27 @@
             "group": "Getting Started",
             "pages": [
               "index",
-              "to-be-moved/comparison"
+              "getting-started/comparison",
+              "getting-started/setup",
+              "getting-started/core-concepts",
+              "getting-started/using-the-agent"
+            ]
+          },
+          {
+            "group": "Guides",
+            "expanded": true,
+            "pages": [
+              "guides/create-an-integration",
+              "guides/create-a-tool",
+              "guides/debugging",
+              "guides/deployment",
+              "sdk/overview",
+              "mcp/overview"
             ]
           },
           {
             "group": "API Reference",
+            "expanded": false,
             "pages": [
               "api-reference/overview",
               "api-reference/types",
