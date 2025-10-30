@@ -1,8 +1,10 @@
-import { readFile, access } from "node:fs/promises";
+import { FileType } from "@superglue/client";
+import { access, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { AgentEvalConfig } from "../types.js";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { parseFile } from "../../../packages/core/utils/file.js";
+import type { AgentEvalConfig } from "../types.js";
 
 const IntegrationConfigSchema = z.object({
     id: z.string(),
@@ -107,10 +109,11 @@ async function processFilePayloads(config: AgentEvalConfig): Promise<void> {
                 const filePath = join(exampleFilesDir, value);
                 try {
                     await access(filePath);
-                    const fileContent = await readFile(filePath, 'utf-8');
-                    tool.payload[key] = fileContent;
+                    const fileBuffer = await readFile(filePath);
+                    const parsedContent = await parseFile(fileBuffer, FileType.AUTO);
+                    tool.payload[key] = parsedContent;
                 } catch (error) {
-                    throw new Error(`Failed to read file ${filePath} for tool ${tool.id}: ${error instanceof Error ? error.message : String(error)}`);
+                    throw new Error(`Failed to parse file ${filePath} for tool ${tool.id}: ${error instanceof Error ? error.message : String(error)}`);
                 }
             }
         }
@@ -119,7 +122,7 @@ async function processFilePayloads(config: AgentEvalConfig): Promise<void> {
 
 function validateIntegrationIds(config: z.infer<typeof AgentEvalConfigSchema>): void {
     const integrationIds = new Set(config.integrations.map(i => i.id));
-    
+
     for (const tool of config.tools) {
         const invalidIds = tool.integrationIds.filter(id => !integrationIds.has(id));
         if (invalidIds.length > 0) {
@@ -132,7 +135,7 @@ function validateEnabledWorkflows(config: AgentEvalConfig): void {
     if (config.enabledTools === 'all') {
         return;
     }
-    
+
     const enabledTools = new Set(config.enabledTools);
     const tools = new Set(config.tools.map(t => t.id));
 

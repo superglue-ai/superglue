@@ -57,8 +57,16 @@ export class JsonReporter {
       results: detailedAttempts,
     };
 
-    writeFileSync(filepath, JSON.stringify(report, null, 2), "utf-8");
-    logMessage("info", `JSON report created: ${filepath}`, this.metadata);
+    try {
+      writeFileSync(filepath, JSON.stringify(report, null, 2), "utf-8");
+      logMessage("info", `JSON report created: ${filepath}`, this.metadata);
+    } catch (error) {
+      logMessage("error", `Failed to write JSON report: ${error}`, this.metadata);
+      
+      const fallbackPath = join(this.baseDir, `data/results/${timestamp}-tool-eval-fallback.txt`);
+      writeFileSync(fallbackPath, String(report), "utf-8");
+      logMessage("info", `Fallback text report created: ${fallbackPath}`, this.metadata);
+    }
   }
 
   private getBackendModel(provider: string): string {
