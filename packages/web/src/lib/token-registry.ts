@@ -1,6 +1,7 @@
 type Listener = (token: string) => void;
 
-// Token registry to avoid UI re-renders when propagating the token to the child components
+// Token registry holding the token for the superglue backend (core). 
+// This avoids visible UI re-renders when updating and propagating the token to the child components.
 class TokenRegistry {
   private _token: string | undefined;
   private listeners: Set<Listener> = new Set();
