@@ -415,4 +415,3 @@ export const searchIntegrationDocumentationResolver = async (
     throw error;
   }
 };
-

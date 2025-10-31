@@ -20,8 +20,8 @@ export class IntegrationSelector {
         const scored = integrations.map(integration => {
             const searchableText = [
                 integration.id,
-                integration.name,
                 integration.specificInstructions,
+                integration.documentationUrl,
                 ...(integration.documentationKeywords || [])
             ].filter(Boolean).join(' ').toLowerCase();
 
