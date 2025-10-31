@@ -509,7 +509,7 @@ const ConfigTable = () => {
                             className="gap-2"
                           >
                             {isTool ? <Hammer className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                            Run
+                            View
                           </Button>
                           {isTool && (
                             <Button
