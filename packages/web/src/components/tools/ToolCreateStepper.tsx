@@ -1,13 +1,14 @@
 import { useIntegrations } from '@/src/app/integrations-context';
 import { useToast } from '@/src/hooks/use-toast';
-import { SuperglueClient, Workflow as Tool } from '@superglue/client';
+import { Workflow as Tool } from '@superglue/client';
 import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { ToolBuilder, type BuildContext } from './ToolBuilder';
 import ToolPlayground, { ToolPlaygroundHandle } from './ToolPlayground';
 import { useConfig } from '@/src/app/config-context';
+import { createSuperglueClient } from '@/src/lib/client-utils';
 
 type ToolCreateStep = 'build' | 'run' | 'publish';
 
@@ -35,11 +36,6 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
   const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
   const [filePayloads, setFilePayloads] = useState<Record<string, any>>({});
 
-  const client = useMemo(() => new SuperglueClient({
-    endpoint: superglueConfig.superglueEndpoint,
-    apiKey: superglueConfig.superglueApiKey,
-  }), [superglueConfig.superglueEndpoint, superglueConfig.superglueApiKey]);
-
   const handleToolBuilt = (tool: Tool, context: BuildContext) => {
     setCurrentTool(tool);
     setBuildContext(context);
@@ -59,6 +55,7 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
       const currentToolState = playgroundRef.current?.getCurrentTool();
       const toolToSave = currentToolState || tool;
 
+      const client = createSuperglueClient(superglueConfig.superglueEndpoint);
       const saved = await client.upsertWorkflow(toolToSave.id, toolToSave as any);
       if (!saved) throw new Error('Failed to save tool');
 

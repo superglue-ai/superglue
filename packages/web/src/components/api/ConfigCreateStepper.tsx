@@ -1,6 +1,7 @@
 'use client'
 
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { useToast } from '@/src/hooks/use-toast';
 import { parseCredentialsHelper, splitUrl } from '@/src/lib/client-utils';
 import { cn, composeUrl, inputErrorStyles } from '@/src/lib/general-utils';
@@ -20,6 +21,7 @@ import { HelpTooltip } from '../utils/HelpTooltip';
 import { API_CREATE_STEPS, StepIndicator, type StepperStep } from '../utils/StepIndicator';
 import { URLField } from '../utils/URLField';
 import { InteractiveApiPlayground } from './InteractiveApiPlayground';
+import { useToken } from '@/src/hooks/use-token';
 
 interface ConfigCreateStepperProps {
   configId?: string
@@ -76,17 +78,27 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
   const [isDraggingDoc, setIsDraggingDoc] = useState(false)
 
   const [latestLog, setLatestLog] = useState<string>('')
+  const token = useToken();
+
   const client = useMemo(() => {
-    const wsLink = new GraphQLWsLink(createClient({
-      url: config.superglueEndpoint?.replace('https', 'wss')?.replace('http', 'ws') || 'ws://localhost:3000/graphql',
-      connectionParams: {
-        Authorization: `Bearer ${config.superglueApiKey}`
-      },
-      retryAttempts: Infinity,
-      shouldRetry: () => true,
-      retryWait: (retries) => new Promise((resolve) => setTimeout(resolve, Math.min(retries * 1000, 5000))),
-      keepAlive: 10000, // Send keep-alive every 10 seconds
-    }))
+    const wsLink = new GraphQLWsLink(
+      createClient({
+        url:
+          config.superglueEndpoint
+            ?.replace("https", "wss")
+            ?.replace("http", "ws") || "ws://localhost:3000/graphql",
+        connectionParams: {
+          Authorization: `Bearer ${tokenRegistry.getToken()}`,
+        },
+        retryAttempts: Infinity,
+        shouldRetry: () => true,
+        retryWait: (retries) =>
+          new Promise((resolve) =>
+            setTimeout(resolve, Math.min(retries * 1000, 5000))
+          ),
+        keepAlive: 10000, // Send keep-alive every 10 seconds
+      })
+    );
 
     return new ApolloClient({
       link: wsLink,
@@ -100,7 +112,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
         },
       },
     })
-  }, [config.superglueEndpoint, config.superglueApiKey])
+  }, [config.superglueEndpoint, token])
 
   useEffect(() => {
     return () => {
@@ -179,7 +191,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
       try {
         const superglueClient = new SuperglueClient({
           endpoint: superglueConfig.superglueEndpoint,
-          apiKey: superglueConfig.superglueApiKey
+          apiKey: tokenRegistry.getToken()
         })
 
         // Call autofill endpoint
@@ -254,7 +266,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
       try {
         const superglueClient = new SuperglueClient({
           endpoint: superglueConfig.superglueEndpoint,
-          apiKey: superglueConfig.superglueApiKey
+          apiKey: tokenRegistry.getToken()
         })
         const url = splitUrl(formData.fullUrl)
         const savedConfig = await superglueClient.upsertApi(configId, {
@@ -331,7 +343,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
 
     const command = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${superglueConfig.superglueApiKey}" \\
+  -H "Authorization: Bearer ${tokenRegistry.getToken()}" \\
   -d '${JSON.stringify(graphqlQuery)}'`
 
     return command
@@ -344,7 +356,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
 // in your app:
 import { SuperglueClient } from "@superglue/client";
 const superglue = new SuperglueClient({
-  apiKey: "${superglueConfig.superglueApiKey}"
+  apiKey: "${tokenRegistry.getToken()}"
 });
 
 // Transform any API response with a single call
@@ -367,7 +379,7 @@ const result = await superglue.call({
     try {
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
-        apiKey: superglueConfig.superglueApiKey
+        apiKey: tokenRegistry.getToken()
       })
 
       // 1. First upsert the API config with the new schema and instruction

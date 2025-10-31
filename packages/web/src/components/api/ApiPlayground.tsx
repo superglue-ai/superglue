@@ -1,6 +1,7 @@
 'use client';
 
 import { useConfig } from "@/src/app/config-context";
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
@@ -111,7 +112,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
       try {
         const superglueClient = new SuperglueClient({
           endpoint: superglueConfig.superglueEndpoint,
-          apiKey: superglueConfig.superglueApiKey
+          apiKey: tokenRegistry.getToken()
         });
         const data = await superglueClient.getApi(id);
         setConfig(data);
@@ -188,7 +189,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
       );
 
       const superglue = new SuperglueClient({
-        apiKey: superglueConfig.superglueApiKey,
+        apiKey: tokenRegistry.getToken(),
         endpoint: superglueConfig.superglueEndpoint
       });
       const response = await superglue.call({

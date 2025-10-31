@@ -1,4 +1,5 @@
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { detectAuthType } from '@/src/app/integrations/page';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card';
@@ -454,7 +455,7 @@ export function IntegrationForm({
                 integrationData.id,
                 ef,
                 selectedIntegration,
-                config.superglueApiKey,
+                tokenRegistry.getToken(),
                 authType,
                 handleOAuthError,
                 true,

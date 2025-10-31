@@ -1,5 +1,7 @@
 "use client";
+
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { useIntegrations } from '@/src/app/integrations-context';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import {
@@ -16,11 +18,11 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { DocStatus } from '@/src/components/utils/DocStatusSpinner';
 import { useToast } from '@/src/hooks/use-toast';
-import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
+import { createSuperglueClient, needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
 import { createOAuthErrorHandler, triggerOAuthFlow } from '@/src/lib/oauth-utils';
 import type { Integration } from '@superglue/client';
-import { SuperglueClient, UpsertMode } from '@superglue/client';
+import { UpsertMode } from '@superglue/client';
 import { integrationOptions } from '@superglue/shared';
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { Clock, FileDown, Globe, Key, Pencil, Plus, RotateCw, Sparkles, Trash2 } from 'lucide-react';
@@ -77,11 +79,6 @@ export default function IntegrationsPage() {
     const router = useRouter();
     const { integrations, pendingDocIds, loading: initialLoading, isRefreshing, refreshIntegrations, setPendingDocIds } = useIntegrations();
 
-    const client = useMemo(() => new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey,
-    }), [config.superglueEndpoint, config.superglueApiKey]);
-
     useEffect(() => {
         refreshIntegrations();
     }, [refreshIntegrations]);
@@ -109,11 +106,14 @@ export default function IntegrationsPage() {
         waitForIntegrationReady: (integrationIds: string[]) => {
             // Create adapter for SuperglueClient to work with shared utility
             const clientAdapter = {
-                getIntegration: (id: string) => client.getIntegration(id)
+                getIntegration: (id: string) => {
+                    const client = createSuperglueClient(config.superglueEndpoint);
+                    return client.getIntegration(id);
+                }
             };
             return waitForIntegrationProcessing(clientAdapter, integrationIds);
         }
-    }), [client]);
+    }), []);
 
     const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
 
@@ -157,6 +157,7 @@ export default function IntegrationsPage() {
 
     const handleDelete = async (id: string) => {
         try {
+            const client = createSuperglueClient(config.superglueEndpoint);
             await client.deleteIntegration(id);
             await refreshIntegrations();
         } catch (error) {
@@ -223,7 +224,7 @@ export default function IntegrationsPage() {
             integration.id,
             oauthFields,
             integration.id,
-            config.superglueApiKey,
+            tokenRegistry.getToken(),
             authType,
             handleOAuthError,
             true,
@@ -254,7 +255,10 @@ export default function IntegrationsPage() {
                 const existingIntegration = integrations.find(i => i.id === integration.id);
                 const mode = existingIntegration ? UpsertMode.UPDATE : UpsertMode.CREATE;
                 const cleanedIntegration = cleanIntegrationForInput(integration);
+
+                const client = createSuperglueClient(config.superglueEndpoint);
                 const savedIntegration = await client.upsertIntegration(integration.id, cleanedIntegration, mode);
+                
                 const willTriggerDocFetch = needsUIToTriggerDocFetch(savedIntegration, existingIntegration);
 
                 if (willTriggerDocFetch) {
@@ -314,6 +318,7 @@ export default function IntegrationsPage() {
                 documentationPending: true // Trigger refresh
             });
 
+            const client = createSuperglueClient(config.superglueEndpoint);
             await client.upsertIntegration(integrationId, upsertData, UpsertMode.UPDATE);
 
             // Use proper polling to wait for docs to be ready
@@ -349,6 +354,8 @@ export default function IntegrationsPage() {
                         documentation: integration.documentation || '',
                         documentationPending: false
                     });
+
+                    const client = createSuperglueClient(config.superglueEndpoint);
                     await client.upsertIntegration(integrationId, resetData, UpsertMode.UPDATE);
                 }
             } catch (resetError) {

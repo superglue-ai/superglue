@@ -1,4 +1,5 @@
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { Switch } from "@/src/components/ui/switch";
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, getGroupedTimezones } from '@/src/lib/general-utils';
@@ -132,7 +133,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
     try {
       const superglueClient = new SuperglueClient({
         endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey
+        apiKey: tokenRegistry.getToken()
       });
 
       const cronExpression = scheduleSelectedItem === 'custom' ? customCronExpression : scheduleSelectedItem;

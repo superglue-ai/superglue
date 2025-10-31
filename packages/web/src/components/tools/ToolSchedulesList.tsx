@@ -4,6 +4,7 @@ import { Edit, Loader2, Plus, Trash2 } from "lucide-react";
 import React from 'react';
 
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { Button } from "@/src/components/ui/button";
 import { Switch } from "@/src/components/ui/switch";
 import {
@@ -37,7 +38,7 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
 
     const superglueClient = new SuperglueClient({
       endpoint: config.superglueEndpoint,
-      apiKey: config.superglueApiKey
+      apiKey: tokenRegistry.getToken()
     });
 
     const schedules = await superglueClient.listWorkflowSchedules(toolId);
@@ -56,7 +57,7 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
 
     const superglueClient = new SuperglueClient({
       endpoint: config.superglueEndpoint,
-      apiKey: config.superglueApiKey
+      apiKey: tokenRegistry.getToken()
     });
 
     await superglueClient.deleteWorkflowSchedule(scheduleId);
@@ -77,7 +78,7 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
 
     const superglueClient = new SuperglueClient({
       endpoint: config.superglueEndpoint,
-      apiKey: config.superglueApiKey
+      apiKey: tokenRegistry.getToken()
     });
 
     await superglueClient.upsertWorkflowSchedule({

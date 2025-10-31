@@ -1,4 +1,5 @@
 import { useConfig } from "@/src/app/config-context";
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { Button } from "@/src/components/ui/button";
 import {
   Dialog,
@@ -51,10 +52,6 @@ const ApiConfigIdEditModal = ({
         return;
       }
 
-      const superglueClient = new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey
-      });
 
       // TODO: Once the client SDK is updated:
       // const result = await superglueClient.updateApiConfigId(configId, newConfigId);
@@ -64,7 +61,7 @@ const ApiConfigIdEditModal = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.superglueApiKey}`
+          'Authorization': `Bearer ${tokenRegistry.getToken()}`
         },
         body: JSON.stringify({
           query: `
