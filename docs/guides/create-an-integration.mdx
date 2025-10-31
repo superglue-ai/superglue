@@ -1,9 +1,9 @@
 ---
 title: "Create an integration"
-description: "Connect superglue to any System with automatic documentation fetching and authentication"
+description: "Connect superglue to any system"
 ---
 
-Create an integration in superglue to provide tools access to external systems. Learn more about how integrations fit into the bigger picture in our [core concepts](/getting-started/core-concepts) page.
+Create an integration in superglue to provide tools access to external systems. Integrations handle authentication and documentation fetching. Learn more about how integrations fit into the bigger picture in our [core concepts](/getting-started/core-concepts) page.
 
 ## Getting started
 
@@ -30,8 +30,8 @@ Create an integration in superglue to provide tools access to external systems. 
 
     [CONTENT NEEDED: Video walkthrough of agent integration creation]
 
-    <Card title="Try it now" icon="rocket" href="https://app.superglue.cloud">
-      Start creating integrations with our agent
+    <Card icon="arrow-right" href="https://app.superglue.cloud" horizontal>
+      Start creating integrations with out agent
     </Card>
   </Tab>
   <Tab title="Via UI Form">
@@ -108,7 +108,7 @@ Create an integration in superglue to provide tools access to external systems. 
 superglue supports multiple authentication methods with automatic token management and refresh. All credentials are encrypted at rest and in transit.
 
 <AccordionGroup>
-  <Accordion title="OAuth" icon="key">
+  <Accordion title="OAuth" icon="user-lock">
     OAuth is used for secure delegated access. superglue supports both client credentials flow and authorization code flow with **automatic token refresh**.
 
     **What superglue handles automatically:**
@@ -172,7 +172,7 @@ superglue supports multiple authentication methods with automatic token manageme
     </Info>
   </Accordion>
 
-  <Accordion title="API keys" icon="lock">
+  <Accordion title="API keys" icon="key">
     The simplest authentication method. Just provide your API key and superglue figures out where to place it based on the API documentation.
 
     ```typescript
@@ -189,38 +189,76 @@ superglue supports multiple authentication methods with automatic token manageme
     ### Examples
 
     <Tabs>
-      <Tab title="Stripe">
+      <Tab title="SendGrid">
         ```typescript
         await superglue.upsertIntegration({
-          id: "stripe",
-          urlHost: "https://api.stripe.com",
+          id: "sendgrid",
+          urlHost: "https://api.sendgrid.com",
+          documentationUrl: "https://docs.sendgrid.com/api-reference",
           credentials: {
-            apiKey: "sk_test_..." // or sk_live_...
+            apiKey: "SG.xxx..."
           }
         });
         ```
+        
+        SendGrid requires the API key in a custom Authorization header with Bearer prefix.
       </Tab>
-      <Tab title="OpenAI">
+      <Tab title="Airtable">
         ```typescript
         await superglue.upsertIntegration({
-          id: "openai",
-          urlHost: "https://api.openai.com",
+          id: "airtable",
+          urlHost: "https://api.airtable.com",
+          documentationUrl: "https://airtable.com/developers/web/api/introduction",
           credentials: {
-            apiKey: "sk-proj-..."
+            apiKey: "pat..." // Personal access token
           }
         });
         ```
+        
+        Airtable uses a personal access token passed as a Bearer token in the Authorization header.
       </Tab>
-      <Tab title="Custom API">
+      <Tab title="Zendesk">
         ```typescript
         await superglue.upsertIntegration({
-          id: "internal-api",
-          urlHost: "https://api.yourcompany.com",
+          id: "zendesk",
+          urlHost: "https://yourcompany.zendesk.com",
+          documentationUrl: "https://developer.zendesk.com/api-reference",
           credentials: {
-            apiKey: "your_custom_api_key"
+            email: "admin@yourcompany.com",
+            apiKey: "your_api_token"
           }
         });
         ```
+        
+        Zendesk requires both email and API token, combined as basic auth: `{email}/token:{apiKey}`.
+      </Tab>
+      <Tab title="Shopify">
+        ```typescript
+        await superglue.upsertIntegration({
+          id: "shopify",
+          urlHost: "https://yourstore.myshopify.com",
+          documentationUrl: "https://shopify.dev/docs/api",
+          credentials: {
+            apiKey: "shpat_..." // Admin API access token
+          }
+        });
+        ```
+        
+        Shopify uses a custom header `X-Shopify-Access-Token` for API authentication.
+      </Tab>
+      <Tab title="Mailchimp">
+        ```typescript
+        await superglue.upsertIntegration({
+          id: "mailchimp",
+          urlHost: "https://us1.api.mailchimp.com", // datacenter varies
+          documentationUrl: "https://mailchimp.com/developer/marketing/api",
+          credentials: {
+            apiKey: "xxxxxxxxxxxxxx-us1" // includes datacenter suffix
+          }
+        });
+        ```
+        
+        Mailchimp uses basic auth with `anystring` as username and API key as password.
       </Tab>
     </Tabs>
   </Accordion>
@@ -316,38 +354,36 @@ superglue supports multiple authentication methods with automatic token manageme
 
         Used by: GitHub (personal access tokens), GitLab, custom auth systems
       </Tab>
-      <Tab title="Multiple Auth Methods">
+      <Tab title="Bot Token">
         ```typescript
         credentials: {
-          apiKey: "primary_key",
-          apiSecret: "primary_secret",
-          accountId: "acc_123456"
+          botToken: "xoxb-XXXXXX"
         }
         ```
 
-        Some APIs require multiple authentication parameters. superglue handles this automatically based on documentation.
+        Used by; Slack and Discord
       </Tab>
     </Tabs>
   </Accordion>
 </AccordionGroup>
 
-<Card title="Not sure what you need?" icon="messages">
-  If you're using the agent, just ask! The agent is excellent at requirements engineering and will tell you exactly what credentials you need and where to find them.
-
-  Example: *"I want to connect to my company's internal API but I'm not sure what authentication it uses"*
+<Card title="Security first" icon="shield">
+  **All secrets are encrypted at rest and in transit.** The LLM never sees actual credentials—only placeholders like `{{API_KEY}}` are visible during workflow building and execution.
 </Card>
 
 <Card title="Not ready to provide credentials yet?" icon="watch">
   You can always create an integration without credentials and then edit the intergration later or provide credentials during tool execution.
 </Card>
 
-<Card title="Security first" icon="shield">
-  **All secrets are encrypted at rest and in transit.** The LLM never sees actual credentials—only placeholders like `{{API_KEY}}` are visible during workflow building and execution.
+<Card title="Not sure what you need?" icon="user-message">
+  If you're using the agent, just ask! The agent is excellent at requirements engineering and will tell you exactly what credentials you need and where to find them.
+
+  Example: *"I want to connect to my company's internal API but I'm not sure what authentication it uses"*
 </Card>
 
-## Background documentation fetching - the magic behind integrations
+## Automatic documentation fetching
 
-One of superglue's key features is separating authentication concerns from tools and workflows. We also handle the information gathering process per integration, so you don't have to manually provide API specifications.
+One of superglue's key features is the handling the information gathering process per integration, so you don't have to manually provide API specifications.
 
 ### Supported documentation formats
 
