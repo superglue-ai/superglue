@@ -164,9 +164,6 @@ export class AiSdkModel implements LLM {
     toolChoice?: 'auto' | 'required' | 'none' | { type: 'tool'; toolName: string }
   ): Promise<LLMObjectResponse> {
     const dateMessage = this.getDateMessage();
-
-    // Keep original schema for validation (before wrapping arrays)
-    const originalSchema = schema;
     
     // Clean schema: remove patternProperties, minItems/maxItems, set strict/additionalProperties
     schema = this.cleanSchema(schema);
