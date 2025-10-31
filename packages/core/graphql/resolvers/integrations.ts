@@ -393,7 +393,7 @@ export const searchIntegrationDocumentationResolver = async (
     const hasOpenApiSchema = integration.openApiSchema && integration.openApiSchema.trim().length > 0;
 
     if (!hasDocumentation && !hasOpenApiSchema) {
-      return `NO_DOCUMENTATION_AVAILABLE\n\nIntegration '${integrationId}' has no documentation available. To enable documentation search:\n\n1. Add a documentation URL to scrape by using 'modify_integration' with a 'documentationUrl' field\n2. Upload documentation files directly using 'modify_integration' with the 'documentation' field (supports file::filename references)\n3. Add an OpenAPI specification URL using 'modify_integration' with an 'openApiUrl' field\n\nUse the 'modify_integration' tool to add documentation to this integration.`;
+      return ``;
     }
 
     const documentationSearch = new DocumentationSearch({ orgId: context.orgId });
