@@ -1,6 +1,7 @@
 'use client';
 
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import ApiConfigIdEditModal from '@/src/components/api/ApiConfigIdEditModal';
 import { ApiPlayground } from '@/src/components/api/ApiPlayground';
 import {
@@ -184,7 +185,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
 
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
-        apiKey: superglueConfig.superglueApiKey
+        apiKey: tokenRegistry.getToken()
       });
       const response = await superglueClient.upsertApi(formData.id, payload);
       if (!response) {
@@ -257,7 +258,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
     try {
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
-        apiKey: superglueConfig.superglueApiKey
+        apiKey: tokenRegistry.getToken()
       });
       const data = await superglueClient.getApi(editingId);
       setFormData({
@@ -333,7 +334,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
       }
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
-        apiKey: superglueConfig.superglueApiKey
+        apiKey: tokenRegistry.getToken()
       });
 
       const response = await superglueClient.call({
@@ -402,7 +403,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
 
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
-        apiKey: superglueConfig.superglueApiKey
+        apiKey: tokenRegistry.getToken()
       });
       await superglueClient.upsertApi(formData.id, payload);
       setHasUnsavedChanges(false);

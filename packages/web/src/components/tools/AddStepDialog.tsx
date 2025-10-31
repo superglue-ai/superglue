@@ -1,4 +1,5 @@
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { Button } from '@/src/components/ui/button';
 import {
     Dialog,
@@ -14,6 +15,7 @@ import { cn } from '@/src/lib/general-utils';
 import { ExecutionStep, SuperglueClient, Workflow as Tool } from '@superglue/client';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { createSuperglueClient } from '@/src/lib/client-utils';
 
 interface AddStepDialogProps {
     open: boolean;
@@ -42,11 +44,6 @@ export function AddStepDialog({
     const [searchQuery, setSearchQuery] = useState('');
     const config = useConfig();
 
-    const client = new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: config.superglueApiKey,
-    });
-
     useEffect(() => {
         if (open && defaultId) {
             setStepId(defaultId);
@@ -64,6 +61,7 @@ export function AddStepDialog({
     const loadTools = async () => {
         setLoadingTools(true);
         try {
+            const client = createSuperglueClient(config.superglueEndpoint);
             const result = await client.listWorkflows(1000, 0);
             setTools(result.items?.filter(tool => tool.steps?.length > 0) || []);
         } catch (error) {

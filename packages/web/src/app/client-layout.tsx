@@ -9,6 +9,7 @@ import { ConfigProvider } from './config-context';
 import { jetbrainsMono, jetbrainsSans } from './fonts';
 import { IntegrationsProvider } from './integrations-context';
 import { CSPostHogProvider } from './providers';
+import { useToken } from '../hooks/use-token';
 
 interface Props {
   children: React.ReactNode
@@ -18,6 +19,7 @@ interface Props {
 export function ClientWrapper({ children, config }: Props) {
   const pathname = usePathname()
   const isAuthPage = pathname?.startsWith('/auth')
+  const token = useToken();
 
   return (
     <ConfigProvider config={config}>
@@ -28,7 +30,7 @@ export function ClientWrapper({ children, config }: Props) {
               children
             ) : (
               <div className="flex h-screen overflow-hidden">
-                {config.superglueApiKey && <Sidebar />}
+                {token && <Sidebar />}
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={pathname}
@@ -40,7 +42,7 @@ export function ClientWrapper({ children, config }: Props) {
                     {children}
                   </motion.div>
                 </AnimatePresence>
-                {config.superglueApiKey && (
+                {token && (
                   <div className="hidden lg:block">
                     <LogSidebar />
                   </div>
@@ -48,7 +50,7 @@ export function ClientWrapper({ children, config }: Props) {
               </div>
             )}
             <Toaster />
-            {config.superglueApiKey && <ServerMonitor />}
+            {token && <ServerMonitor />}
           </div>
         </CSPostHogProvider>
       </IntegrationsProvider>

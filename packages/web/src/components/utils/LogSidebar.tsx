@@ -6,9 +6,11 @@ import { createClient } from 'graphql-ws';
 import { ChevronRight, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConfig } from "../../app/config-context";
+import { tokenRegistry } from "../../lib/token-registry";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Switch } from "../ui/switch";
+import { useToken } from "@/src/hooks/use-token";
 
 export interface LogEntry {
   id: string;
@@ -46,12 +48,13 @@ export function LogSidebar() {
   const [showDebug, setShowDebug] = useState(false)
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
   const config = useConfig();
+  const token = useToken();
 
   const client = useMemo(() => {
     const wsLink = new GraphQLWsLink(createClient({
       url: config.superglueEndpoint?.replace('https', 'wss')?.replace('http', 'ws') || 'ws://localhost:3000/graphql',
       connectionParams: {
-        Authorization: `Bearer ${config.superglueApiKey}`
+        Authorization: `Bearer ${tokenRegistry.getToken()}`
       },
       retryAttempts: Infinity,
       shouldRetry: () => true,
@@ -71,7 +74,7 @@ export function LogSidebar() {
         },
       },
     })
-  }, [config.superglueEndpoint, config.superglueApiKey])
+  }, [config.superglueEndpoint, token])
 
   const filteredLogs = useMemo(
     () => showDebug ? logs : logs.filter(log => log.level !== "DEBUG"),

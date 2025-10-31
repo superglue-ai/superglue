@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { usePostHog } from 'posthog-js/react'
 import { useEffect, useState } from 'react'
 import { useConfig } from '../config-context'
+import { tokenRegistry } from '@/src/lib/token-registry'
 import { Loader2 } from 'lucide-react'
 
 export default function WelcomePage() {
@@ -32,7 +33,7 @@ export default function WelcomePage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${config.superglueApiKey}`,
+            'Authorization': `Bearer ${tokenRegistry.getToken()}`,
           },
           body: JSON.stringify({
             query: `
@@ -66,7 +67,7 @@ export default function WelcomePage() {
     }
     
     checkTenantInfo()
-  }, [router, config.superglueEndpoint, config.superglueApiKey])
+  }, [router, config.superglueEndpoint])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -100,7 +101,7 @@ export default function WelcomePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.superglueApiKey}`,
+          'Authorization': `Bearer ${tokenRegistry.getToken()}`,
         },
         body: JSON.stringify({
           query: `
@@ -154,7 +155,7 @@ export default function WelcomePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.superglueApiKey}`,
+          'Authorization': `Bearer ${tokenRegistry.getToken()}`,
         },
         body: JSON.stringify({
           query: `

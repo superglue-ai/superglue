@@ -1,6 +1,7 @@
 'use client'
 
 import { useConfig } from '@/src/app/config-context';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import {
   Accordion,
   AccordionContent,
@@ -30,7 +31,7 @@ const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void })
           setLoading(true);
           const superglueClient = new SuperglueClient({
             endpoint: superglueConfig.superglueEndpoint,
-            apiKey: superglueConfig.superglueApiKey
+            apiKey: tokenRegistry.getToken()
           })
           const foundConfig = await superglueClient.getApi(id);
           if (!foundConfig) {
