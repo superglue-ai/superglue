@@ -3,29 +3,30 @@ title: "Create an integration"
 description: "Connect superglue to any System with automatic documentation fetching and authentication"
 ---
 
-superglue integrations are individual API, Database, or .... connections that include credentials, authentication, and documentation. Once you create an integration, you can use it across multiple workflows and tools.
-
-Learn more about how integrations fit into the bigger picture in our [core concepts](/getting-started/core-concepts) page.
+Create an integration in superglue to provide tools access to external systems. Learn more about how integrations fit into the bigger picture in our [core concepts](/getting-started/core-concepts) page.
 
 ## Getting started
 
 <Tabs>
   <Tab title="Via Agent">
-    The fastest way to create an integration is by talking to our agent.
+    The fastest way to create an integration is by talking to our agent interface. Navigate to [app.superglue.cloud](app.superglue.cloud) and start chatting with the agent.
 
     **Simple example:**
     ```
-    "Connect me to my Salesforce system"
+    Connect me to my Salesforce system
+    ```
+
+    **Complex example:**
+     ```
+    Create an integration to my ITSM platform under the url: 
+    https://my-company.itsm.com using the attached pdf as documention
     ```
 
     superglue will:
     1. Identify the system you want to connect to
-    2. Guide you through the authentication flow
+    2. Guide you through the authentication flow by asking you for all necessary credentials
     3. Create the integration and make it immediately available
-    4. Fetch the system documentation automatically in the background
-
-    **With OAuth:**
-    When superglue detects an OAuth-based system, it will present an authorization button. Click it to complete the OAuth flow, and your integration will be ready to use.
+    4. Process and analyze the system's documentation automatically in the background
 
     [CONTENT NEEDED: Video walkthrough of agent integration creation]
 
@@ -34,21 +35,21 @@ Learn more about how integrations fit into the bigger picture in our [core conce
     </Card>
   </Tab>
   <Tab title="Via UI Form">
-    Create integrations manually using the integration form in the UI:
+    Create integrations manually using the integration creation form in on the website:
 
     <Steps>
       <Step title="Navigate to integrations">
-        Go to the Integrations page in your superglue dashboard
+        Go to the Integrations page on the superglue cloud
       </Step>
-      <Step title="Click create integration">
-        Click the "Create Integration" button to open the form
+      <Step title="Open form">
+        Click the "Add Integration" button to open the form
       </Step>
       <Step title="Fill required fields">
         - **Template**: Select from our 100+ integration templates or use a custom template. Templates pre-fill the URL, documentation URL, and preferred auth type
         - **URL**: Base URL of the system (e.g., `https://api.stripe.com`)
         - **Documentation URL**: URL to system docs (optional but recommended)
         - **Documentation file**: Upload a documentation file (optional) - could be any file from a Confluence PDF to a OpenAPI YAML file
-        - **Credentials**: Add your authentication details
+        - **Credentials**: Add your authentication details. Find out more in the [authentication](/guides/create-an-integration#authentication-and-credential-management) section
         - **Complete OAuth flow**: If your system requires OAuth, click the "Connect to system" button to complete the OAuth flow and let superglue handle the token exchange
       </Step>
       <Step title="Test and save">
@@ -102,47 +103,77 @@ Learn more about how integrations fit into the bigger picture in our [core conce
   </Tab>
 </Tabs>
 
-## Authentication management
+## Authentication and credential management
 
-superglue supports multiple authentication methods with automatic token management and refresh.
+superglue supports multiple authentication methods with automatic token management and refresh. All credentials are encrypted at rest and in transit.
 
 <AccordionGroup>
-  <Accordion title="OAuth 2.0" icon="key">
-    OAuth is used for secure delegated access. superglue supports both authorization code flow and client credentials flow with automatic token refresh.
+  <Accordion title="OAuth" icon="key">
+    OAuth is used for secure delegated access. superglue supports both client credentials flow and authorization code flow with **automatic token refresh**.
 
-    **Authorization code flow** - for user-facing applications:
+    **What superglue handles automatically:**
+    - OAuth flow management
+    - Scope validation
+    - Error handling for token issues
+    - Token exchange and storage
+    - Token refresh when expired
+
+    ### Authorization code flow
+    For user-facing applications where users grant permission to access their data:
+
     1. User clicks authorize button
     2. Redirected to provider's login page
-    3. User grants permission
+    3. User grants permission with requested scopes
     4. superglue receives authorization code and exchanges it for access token
     5. Tokens are automatically refreshed when they expire
 
-    **Client credentials flow** - for server-to-server communication:
+    **Examples:** HubSpot, Salesforce, Google Workspace
+
+    ### Client credentials flow
+    For server-to-server communication with no user interaction:
+
     1. Application requests access token using client ID and secret
     2. Token is automatically refreshed before expiration
     3. No user authorization required
 
-    **Examples of integrations using OAuth:**
-    - **HubSpot** (authorization code): Access user's CRM data
-    - **Salesforce** (authorization code): Manage customer records
-    - **Google Workspace** (authorization code): Access Gmail, Calendar, Drive
-    - **Twilio** (client credentials): Send SMS messages programmatically
-    - **Auth0 Management API** (client credentials): Manage users and applications
+    **Examples:** Twilio, Auth0 Management API, Microsoft Graph
 
-    **Configuration:**
+    ### Configuration options
+    For custom OAuth integrations, provide all required fields:
+
     ```typescript
-    credentials: {
-      clientId: "your_client_id",
-      clientSecret: "your_client_secret",
-      redirectUri: "https://your-app.com/callback" // only for authorization code flow
-    }
+    await superglue.upsertIntegration({
+        id: "custom-oauth",
+        urlHost: "https://api.example.com",
+        documentationUrl: "https://docs.example.com/quickstart"
+        credentials: {
+            clientId: "your_client_id",
+            clientSecret: "your_client_secret",
+            authorizationUrl: "https://auth.example.com/oauth/authorize",
+            tokenUrl: "https://auth.example.com/oauth/token",
+            scopes: "read:users write:data",
+        }
+    });
     ```
 
-    You can use either superglue's pre-configured OAuth apps for popular services or bring your own client ID and client secret.
+    **Required fields:**
+    - `clientId`: Your OAuth application's client ID
+    - `clientSecret`: Your OAuth application's client secret
+    - `authorizationUrl`: Where users are redirected to authorize
+    - `tokenUrl`: Where superglue exchanges codes for tokens
+
+    **Optional fields:**
+    - `scopes`: String of space seperated OAuth scopes (e.g., `"read:users write:data`)
+    - `redirectUri`: Where users are redirected after authorization
+
+
+    <Info>
+      We have pre-built OAuth templates for 100+ popular APIs including HubSpot, Google Ads, Salesforce, and more. Check the templates dropdown when creating an integration to see what's available.
+    </Info>
   </Accordion>
 
   <Accordion title="API keys" icon="lock">
-    The simplest authentication method. Just provide your API key and superglue figures out where to place it.
+    The simplest authentication method. Just provide your API key and superglue figures out where to place it based on the API documentation.
 
     ```typescript
     credentials: {
@@ -150,70 +181,168 @@ superglue supports multiple authentication methods with automatic token manageme
     }
     ```
 
-    superglue automatically determines where to place the API key based on the API documentation:
+    superglue automatically determines the correct placement:
     - Authorization header: `Authorization: Bearer {key}`
     - Custom header: `X-API-Key: {key}`
     - Query parameter: `?api_key={key}`
 
-    **Common integrations using API keys:**
-    - Stripe
-    - OpenAI
-    - SendGrid
+    ### Examples
+
+    <Tabs>
+      <Tab title="Stripe">
+        ```typescript
+        await superglue.upsertIntegration({
+          id: "stripe",
+          urlHost: "https://api.stripe.com",
+          credentials: {
+            apiKey: "sk_test_..." // or sk_live_...
+          }
+        });
+        ```
+      </Tab>
+      <Tab title="OpenAI">
+        ```typescript
+        await superglue.upsertIntegration({
+          id: "openai",
+          urlHost: "https://api.openai.com",
+          credentials: {
+            apiKey: "sk-proj-..."
+          }
+        });
+        ```
+      </Tab>
+      <Tab title="Custom API">
+        ```typescript
+        await superglue.upsertIntegration({
+          id: "internal-api",
+          urlHost: "https://api.yourcompany.com",
+          credentials: {
+            apiKey: "your_custom_api_key"
+          }
+        });
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+
+  <Accordion title="Database connections" icon="database">
+    Connect to databases by providing connection details. superglue supports PostgreSQL, MySQL, MongoDB, and more.
+
+    ### Configuration
+
+    <Tabs>
+      <Tab title="PostgreSQL">
+        ```typescript
+        await superglue.upsertIntegration({
+          id: "main-db",
+          urlHost: "postgresql://<<user>>:<<password>>@<<host>>:<<port>>",
+          urlPath: "/<<database>>",
+          credentials: {
+            user: "db_user",
+            password: "db_password",
+            host: "db.example.com",
+            port: 5432,
+            database: "production_db"
+          }
+        });
+        ```
+      </Tab>
+      <Tab title="MySQL">
+        ```typescript
+        await superglue.upsertIntegration({
+          id: "mysql-db",
+          urlHost: "mysql://<<user>>:<<password>>@<<host>>:<<port>>",
+          urlPath: "/<<database>>",
+          credentials: {
+            user: "mysql_user",
+            password: "mysql_password",
+            host: "mysql.example.com",
+            port: 3306,
+            database: "app_db"
+          }
+        });
+        ```
+      </Tab>
+      <Tab title="MongoDB">
+        ```typescript
+        await superglue.upsertIntegration({
+          id: "mongodb",
+          urlHost: "mongodb://<<user>>:<<password>>@<<host>>:<<port>>",
+          urlPath: "/<<database>>",
+          credentials: {
+            user: "mongo_user",
+            password: "mongo_password",
+            host: "mongo.example.com",
+            port: 27017,
+            database: "analytics_db"
+          }
+        });
+        ```
+      </Tab>
+    </Tabs>
   </Accordion>
 
   <Accordion title="Custom authentication" icon="code">
-    For systems with custom authentication requirements, superglue supports:
+    For systems with custom authentication requirements, superglue supports various patterns.
 
-    **Basic authentication:**
-    ```typescript
-    credentials: {
-      username: "your_username",
-      password: "your_password"
-    }
-    ```
+    <Tabs>
+      <Tab title="Basic Auth">
+        ```typescript
+        credentials: {
+          username: "your_username",
+          password: "your_password"
+        }
+        ```
 
-    **Custom headers:**
-    ```typescript
-    credentials: {
-      "X-Custom-Auth": "your_auth_token",
-      "X-API-Version": "v2"
-    }
-    ```
+        Used by: Jenkins, Artifactory, legacy APIs
+      </Tab>
+      <Tab title="Custom Headers">
+        ```typescript
+        credentials: {
+          "X-Custom-Auth": "your_auth_token",
+          "X-API-Version": "v2",
+          "X-Tenant-ID": "tenant_123"
+        }
+        ```
 
-    **JWT tokens or bearer tokens:**
-    ```typescript
-    credentials: {
-      bearerToken: "your_jwt_or_bearer_token"
-    }
-    ```
+        Used by: Internal APIs, multi-tenant systems
+      </Tab>
+      <Tab title="JWT/Bearer Tokens">
+        ```typescript
+        credentials: {
+          bearerToken: "eyJhbGciOiJIUzI1NiIs..."
+        }
+        ```
 
-    **Database credentials:**
-    ```typescript
-    credentials: {
-      host: "db.example.com",
-      port: 5432,
-      database: "mydb",
-      username: "dbuser",
-      password: "dbpass"
-    }
-    ```
+        Used by: GitHub (personal access tokens), GitLab, custom auth systems
+      </Tab>
+      <Tab title="Multiple Auth Methods">
+        ```typescript
+        credentials: {
+          apiKey: "primary_key",
+          apiSecret: "primary_secret",
+          accountId: "acc_123456"
+        }
+        ```
 
-    **Common use cases:**
-    - Legacy APIs with custom authentication schemes
-    - Internal APIs with proprietary auth
-    - Database connections (PostgreSQL, MySQL, MongoDB)
-    - APIs requiring multiple authentication headers
+        Some APIs require multiple authentication parameters. superglue handles this automatically based on documentation.
+      </Tab>
+    </Tabs>
   </Accordion>
 </AccordionGroup>
 
-<Card title="Not sure what you need?" icon="comments">
+<Card title="Not sure what you need?" icon="messages">
   If you're using the agent, just ask! The agent is excellent at requirements engineering and will tell you exactly what credentials you need and where to find them.
 
   Example: *"I want to connect to my company's internal API but I'm not sure what authentication it uses"*
 </Card>
 
+<Card title="Not ready to provide credentials yet?" icon="watch">
+  You can always create an integration without credentials and then edit the intergration later or provide credentials during tool execution.
+</Card>
+
 <Card title="Security first" icon="shield">
-  **All secrets are encrypted at rest and in transit.** The LLM never sees actual credentials—only placeholders like `{{API_KEY}}` are visible during workflow building.
+  **All secrets are encrypted at rest and in transit.** The LLM never sees actual credentials—only placeholders like `{{API_KEY}}` are visible during workflow building and execution.
 </Card>
 
 ## Background documentation fetching - the magic behind integrations
