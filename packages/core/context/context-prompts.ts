@@ -151,7 +151,7 @@ Further:
 - Make absolutely sure that each step can be achieved with a single API call (or a loop of the same call)
 - Aggregation, grouping, sorting, filtering is covered by a separate final transformation and does not need to be added as a dedicated step. However, if the API supports e.g. filtering when retrieving, this should be part of the retrieval step, just do not add an extra one.
 - For pure data transformation tasks with no API calls, the workflow may have no steps with a final transformation only
-- Step instructions should DESCRIBE what data to retrieve, and how the response should be structured, without prescribing a rigid response structure.
+- Step instructions should DESCRIBE in detail (2-3 sentences) what this steps goal is (ex. retrieve certain data, trigger an action, etc.), and how the response should be structured, without prescribing a rigid response structure.
 - The API's actual response structure will be discovered during execution - don't prescribe it
 </STEP_CREATION>
 
