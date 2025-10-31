@@ -1,4 +1,5 @@
-import { ExtendedSuperglueClient, OAuthState } from '@/src/lib/oauth-utils';
+import { OAuthState } from '@/src/lib/oauth-utils';
+import { ExtendedSuperglueClient } from '@/src/lib/extended-superglue-client';
 import axios from 'axios';
 import { NextRequest, NextResponse } from 'next/server';
 
