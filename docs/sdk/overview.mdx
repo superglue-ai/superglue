@@ -1,0 +1,83 @@
+---
+title: "Overview"
+description: "Quick start with the superglue SDK"
+---
+
+The superglue SDK lets you build, execute, and manage tools programmatically. Anything you can do in the UI, you can do with code.
+
+## Installation
+
+```bash
+npm install @superglue/client
+```
+
+## Quick start
+
+```typescript
+import { SuperglueClient } from "@superglue/client";
+
+const superglue = new SuperglueClient({
+  apiKey: process.env.SUPERGLUE_API_KEY
+});
+
+// Build a tool with natural language
+const workflow = await superglue.buildWorkflow({
+  integrationIds: ["stripe"],
+  instruction: "Fetch all active customers from Stripe"
+});
+
+// Execute it
+const result = await superglue.executeWorkflow({
+  workflow,
+  payload: {}
+});
+
+console.log(result.data); // Your Stripe customers
+```
+
+## Authentication
+
+Authentication depends on your deployment:
+
+<Tabs>
+  <Tab title="Cloud Platform">
+    Get your API key from the superglue dashboard under Settings → API Keys.
+
+    ```typescript
+    const superglue = new SuperglueClient({
+      apiKey: process.env.SUPERGLUE_API_KEY
+    });
+    ```
+  </Tab>
+  <Tab title="Self-Hosted">
+    Use the `AUTH_TOKEN` environment variable from your `.env` file.
+
+    ```typescript
+    const superglue = new SuperglueClient({
+      apiKey: process.env.AUTH_TOKEN,
+      endpoint: "https://your-self-hosted-instance.com/graphql"
+    });
+    ```
+  </Tab>
+</Tabs>
+
+The client handles authentication automatically for all requests.
+
+## Terminology
+
+In the SDK and API, we use the term **"workflow."** In the web UI, these are called **"tools."** They're the same thing: a sequence of API calls that accomplish a task.
+
+## TypeScript
+
+The SDK is fully typed with TypeScript. All types are exported from `@superglue/client`.
+
+## Next steps
+
+<CardGroup cols={1}>
+  <Card title="Methods Reference" icon="code" href="/sdk/methods">
+    Complete API reference for all SDK methods
+  </Card>
+  <Card title="Types Reference" icon="brackets-curly" href="/sdk/types">
+    TypeScript type definitions for all SDK types
+  </Card>
+</CardGroup>

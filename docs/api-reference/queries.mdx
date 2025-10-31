@@ -41,7 +41,7 @@ Returns a paginated list of execution runs.
     }
     ```
   </Tab>
-  <Tab title="Client">
+  <Tab title="SDK">
     ```typescript
     const { items, total } = await client.listRuns(100, 0);
     ```
@@ -90,7 +90,7 @@ Returns a paginated list of workflow configurations.
     }
     ```
   </Tab>
-  <Tab title="Client">
+  <Tab title="SDK">
     ```typescript
     const { items, total } = await client.listWorkflows(10, 0);
     ```
@@ -126,7 +126,7 @@ Returns a paginated list of integration configurations.
     }
     ```
   </Tab>
-  <Tab title="Client">
+  <Tab title="SDK">
     ```typescript
     const { items, total } = await client.listIntegrations(10, 0);
     ```
@@ -160,7 +160,7 @@ Returns all schedules for a specific workflow.
     }
     ```
   </Tab>
-  <Tab title="Client">
+  <Tab title="SDK">
     ```typescript
     const schedules = await client.listWorkflowSchedules("workflow-id");
     
@@ -214,7 +214,7 @@ Retrieves a specific execution run by ID.
     }
     ```
   </Tab>
-  <Tab title="Client">
+  <Tab title="SDK">
     ```typescript
     const run = await client.getRun("run-id");
     ```
@@ -260,7 +260,7 @@ Retrieves a specific workflow configuration by ID.
     }
     ```
   </Tab>
-  <Tab title="Client">
+  <Tab title="SDK">
     ```typescript
     const workflow = await client.getWorkflow("workflow-id");
     ```
@@ -294,7 +294,7 @@ Retrieves a specific integration configuration by ID.
     }
     ```
   </Tab>
-  <Tab title="Client">
+  <Tab title="SDK">
     ```typescript
     const integration = await client.getIntegration("integration-id");
     ```
@@ -319,7 +319,7 @@ Generates a JSON schema based on instructions and optional response data. Useful
     }
     ```
   </Tab>
-  <Tab title="Client">
+  <Tab title="SDK">
     ```typescript
     const schema = await client.generateSchema(
       "Get me all characters with only their name",
@@ -344,7 +344,7 @@ Generates natural language instructions based on integration configurations. Hel
     }
     ```
   </Tab>
-  <Tab title="Client">
+  <Tab title="SDK">
     ```typescript
     const instructions = await client.generateInstructions([
       {
@@ -373,7 +373,7 @@ Retrieves tenant account information.
     }
     ```
   </Tab>
-  <Tab title="Client">
+  <Tab title="SDK">
     ```typescript
     const tenantInfo = await client.getTenantInfo();
     ```
@@ -399,7 +399,7 @@ Finds integrations relevant to a given natural language instruction. Returns sug
     }
     ```
   </Tab>
-  <Tab title="Client">
+  <Tab title="SDK">
     ```typescript
     const suggestions = await client.findRelevantIntegrations(
       "I need to send emails and track analytics"

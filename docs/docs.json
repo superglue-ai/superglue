@@ -31,8 +31,15 @@
               "guides/create-a-tool",
               "guides/debugging-a-tool",
               "guides/deployment",
-              "sdk/sdk",
               "mcp/using-the-mcp"
+            ]
+          },
+          {
+            "group": "JavaScript SDK",
+            "pages": [
+              "sdk/overview",
+              "sdk/methods",
+              "sdk/types"
             ]
           },
           {
