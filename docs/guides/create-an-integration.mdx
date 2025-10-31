@@ -379,67 +379,67 @@ superglue supports multiple authentication methods with automatic token handling
 
 ## Automatic documentation fetching
 
-superglue automates documentation discovery and parsing so manual uploads are rarely required.
+superglue automatically fetches and processes documentation in the background to understand the connected system. This makes it possible for agents to reason about endpoints, authentication, and data models without manual setup.
+
+When creating an integration, the **`documentationUrl`** or uploaded documentation files (like OpenAPI specs, PDFs, or HTML exports) are used as the primary source for this process. The more complete and accurate the provided material, the better superglue’s internal understanding of the system.
 
 ### Supported documentation formats
 
+superglue’s fetchers handle most modern and legacy documentation types:
+
 <CardGroup cols={2}>
   <Card title="OpenAPI/Swagger" icon="file-code">
-    Automatically parsed for endpoints, parameters, and schemas, with full OpenAPI 3.0+ support.
+    Extracts endpoints, parameters, and schemas from `.json` or `.yaml` specifications.
   </Card>
-  <Card title="Mintlify & structured docs" icon="book-open">
-    Extracted from modern structured documentation sites.
+  <Card title="Mintlify & modern docs" icon="book-open">
+    Fetches content from popular hosted sites like Mintlify, ReadMe, or Docusaurus.
   </Card>
-  <Card title="GraphQL introspection" icon="diagram-project">
-    Discovers schema automatically through introspection queries—no setup required.
+  <Card title="Swagger UI & GraphQL" icon="diagram-project">
+    Captures dynamically rendered content from Swagger UIs or GraphQL playgrounds using specialized extractors.
+  </Card>
+  <Card title="Static HTML & PDFs" icon="file-lines">
+    Parses legacy or self-hosted documentation, including HTML exports and PDF manuals.
   </Card>
   <Card title="Database schemas" icon="database">
-    Analyzes PostgreSQL and MySQL schemas to discover tables, columns, and relationships.
+    Automatically analyzes PostgreSQL and MySQL schemas to identify tables, columns, and relationships.
   </Card>
 </CardGroup>
 
-### Documentation optimization with keywords
+### Documentation filtering with keywords
 
-Large APIs can contain thousands of endpoints. To speed up discovery, specific keywords can be used to focus documentation fetching on relevant sections.
+Large APIs can have hundreds of endpoints. To improve accuracy and reduce processing time, you can provide specific keywords that describe what parts of the documentation are most relevant.
 
 <Tabs>
   <Tab title="Via Chat/Agent">
-    Provide intent context to the agent:
+    The agent automatically focuses documentation fetching based on your intent:
 
     ```
     Connect to Stripe and focus on customer and subscription endpoints
     ```
 
-    The agent prioritizes related documentation, improving accuracy and response time.
+    This ensures that only relevant documentation is prioritized and embedded.
   </Tab>
 
   <Tab title="Via SDK">
-    Keywords can also be provided programmatically:
+    Provide keywords programmatically when creating or updating an integration:
 
     ```typescript
     const integration = await superglue.upsertIntegration({
       id: "stripe",
       urlHost: "https://api.stripe.com",
       documentationUrl: "https://docs.stripe.com/api",
-      specificInstructions: "Focus on customers, subscriptions, and invoices. Ignore payment methods and disputes.",
+      keywords: ["customers", "subscriptions", "invoices"],
       credentials: {
         apiKey: "sk_test_..."
       }
     });
     ```
 
-    These instructions:
-    - Fetch more relevant documentation sections  
-    - Rank endpoints and schemas by relevance  
-    - Improve workflow accuracy
+    Keywords are used to:
+    - Focus fetching and parsing on relevant documentation sections  
+    - Improve ranking and retrieval relevance at runtime  
   </Tab>
 </Tabs>
-
-**Behind the scenes:**
-1. Documentation is fetched  
-2. Sections are ranked based on keywords  
-3. Content is chunked and embedded for semantic search  
-4. Relevant sections are prioritized during workflow creation
 
 ## Next steps
 
