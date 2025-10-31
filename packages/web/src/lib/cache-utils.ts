@@ -12,6 +12,8 @@ const MAX_CACHE_SIZE = 4 * 1024 * 1024; // 4MB limit (localStorage typically all
 export const loadFromCache = <T>(prefix: string): T | null => {
   try {
     const scopeIdentifier = getCacheScopeIdentifier();
+    if (!scopeIdentifier) return null;
+
     const cached = localStorage.getItem(getCacheKey(scopeIdentifier, prefix));
     if (!cached) return null;
     return JSON.parse(cached);
@@ -21,9 +23,10 @@ export const loadFromCache = <T>(prefix: string): T | null => {
   }
 };
 
-export const saveToCache = (prefix: string, data: unknown) => {
+export const saveToCache = (prefix: string, data: unknown): void => {
   const scopeIdentifier = getCacheScopeIdentifier();
-
+  if (!scopeIdentifier) return;
+  
   try {
     const serialized = JSON.stringify(data);
     if (serialized.length > MAX_CACHE_SIZE) {
