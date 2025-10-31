@@ -10,7 +10,7 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
     const [currentHeight, setCurrentHeight] = useState(maxHeight);
     const displayValue = useMemo(() => {
         const base = value || placeholder;
-        if (readOnly && (base?.length || 0) > 150000) return `${base.slice(0, 150000)}\n...truncated...`;
+        if (readOnly && (base?.length || 0) > HIGHLIGHTING_THRESHOLD) return `${base.slice(0, HIGHLIGHTING_THRESHOLD)}\n...truncated...`;
         return base;
     }, [value, placeholder, readOnly]);
     

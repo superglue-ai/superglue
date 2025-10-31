@@ -1210,7 +1210,8 @@
     "runOneShotMode": true,
     "runSelfHealingMode": true,
     "attemptsEachMode": 5,
-    "maxConcurrentWorkers": 5
+    "maxConcurrentWorkers": 5,
+    "toolAttemptTimeoutMs": 300000
   },
   "validationLlmConfig": {
     "provider": "openai",

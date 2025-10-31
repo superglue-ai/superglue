@@ -55,11 +55,14 @@ export class IntegrationSelector {
         ];
 
         try {
-            const { response: rawSelection } = await LanguageModel.generateObject(
+            const { response: rawSelection, error: rawSelectionError } = await LanguageModel.generateObject(
                 messages,
                 selectionSchema
             );
-
+            if (rawSelectionError || rawSelection?.error) {
+                throw new Error(`Error selecting integrations: ${rawSelectionError || rawSelection?.error}`);
+            }
+            
             if (rawSelection && rawSelection.suggestedIntegrations && Array.isArray(rawSelection.suggestedIntegrations)) {
                 // Enrich LLM suggestions with full integration data
                 const suggestions = rawSelection.suggestedIntegrations

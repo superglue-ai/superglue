@@ -42,7 +42,8 @@ export interface LLMResponse {
 }
 
 export interface LLMObjectResponse {
-    response: any;
+    response: any | null;
+    error?: string;
     messages: LLMMessage[];
 }
 

@@ -443,19 +443,22 @@ export default function IntegrationsPage() {
                                     <div key={integration.id} className="relative">
                                         <div className="flex items-center gap-3 border rounded-lg p-4 bg-card">
                                             <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                {getIntegrationIcon(integration) ? (
-                                                    <svg
-                                                        width="20"
-                                                        height="20"
-                                                        viewBox="0 0 24 24"
-                                                        fill={`#${getIntegrationIcon(integration)?.hex}`}
-                                                        className="flex-shrink-0"
-                                                    >
-                                                        <path d={getIntegrationIcon(integration)?.path || ''} />
-                                                    </svg>
-                                                ) : (
-                                                    <Globe className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-                                                )}
+                                                {(() => {
+                                                    const icon = getIntegrationIcon(integration);
+                                                    return icon ? (
+                                                        <svg
+                                                            width="20"
+                                                            height="20"
+                                                            viewBox="0 0 24 24"
+                                                            fill={`#${icon.hex}`}
+                                                            className="flex-shrink-0"
+                                                        >
+                                                            <path d={icon.path || ''} />
+                                                        </svg>
+                                                    ) : (
+                                                        <Globe className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                                                    );
+                                                })()}
                                                 <div className="flex flex-col min-w-0 flex-1">
                                                     <span className="font-medium truncate">{integration.id}</span>
                                                     <span className="text-sm text-muted-foreground truncate">

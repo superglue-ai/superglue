@@ -1,10 +1,10 @@
-import { Integration, Workflow, WorkflowResult } from '@superglue/client';
-import { generateUniqueId } from '@superglue/shared/utils';
+import { WorkflowBuilder } from '@core/build/workflow-builder.js';
 import { DataStore } from '@core/datastore/types.js';
+import { WorkflowExecutor } from '@core/execute/workflow-executor.js';
 import { IntegrationManager } from '@core/integrations/integration-manager.js';
 import { logEmitter, logMessage } from '@core/utils/logs.js';
-import { WorkflowBuilder } from '@core/build/workflow-builder.js';
-import { WorkflowExecutor } from '@core/execute/workflow-executor.js';
+import { Integration, Workflow, WorkflowResult } from '@superglue/client';
+import { generateUniqueId } from '@superglue/shared/utils';
 import { BaseWorkflowConfig } from './config-loader.js';
 import { validateWorkflowResult, type SoftValidationResult } from './soft-validator.js';
 
@@ -270,9 +270,7 @@ export class WorkflowRunner {
                 };
 
                 const executor = new WorkflowExecutor(
-                    workflow,
-                    metadataWithWorkflowId,
-                    IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId)
+                    { workflow, metadata: metadataWithWorkflowId, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId) }
                 );
 
                 // Combine all credentials from integrations
@@ -286,9 +284,7 @@ export class WorkflowRunner {
                 }, {} as Record<string, string>);
 
                 const workflowResult = await executor.execute(
-                    workflowConfig.payload || {},
-                    allCredentials,
-                    {}
+                    { payload: workflowConfig.payload || {}, credentials: allCredentials, options: {} }
                 );
 
                 attempt.executionTime = Date.now() - execStart;

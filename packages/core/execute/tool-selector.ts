@@ -83,10 +83,14 @@ export class ToolSelector {
         ];
 
         try {
-            const { response: rawSelection } = await LanguageModel.generateObject(
+            const { response: rawSelection, error: rawSelectionError } = await LanguageModel.generateObject(
                 messages,
                 selectionSchema
             );
+
+            if (rawSelectionError || rawSelection?.error) {
+                throw new Error(`Error selecting tools: ${rawSelectionError || rawSelection?.error}`);
+            }
 
             if (!rawSelection?.suggestedTools || !Array.isArray(rawSelection.suggestedTools)) {
                 logMessage('warn', "Tool selection returned unexpected format.", this.metadata);

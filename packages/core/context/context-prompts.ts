@@ -9,25 +9,25 @@ If no target schema is provided, generate an appropriate and concise output base
 CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
 1. In workflow contexts, sourceData contains:
    - Initial payload fields at the root level (e.g., sourceData.date, sourceData.companies)
-   - Previous step results accessed by stepId (e.g., sourceData.getAllContacts, sourceData.fetchUsers)
+   - Previous step results accessed by stepId (e.g., sourceData.getAllContacts.data, sourceData.fetchFriendsForEachContact[#].data)
    - DO NOT use sourceData.payload - initial payload is merged at root level
 
-2. Common workflow patterns:
+2. Step result structure - depends on what the loopSelector returned:
+   - If loopSelector returned OBJECT: sourceData.stepId = { currentItem: <object>, data: <API response> }
+   - If loopSelector returned ARRAY: sourceData.stepId = [{ currentItem: <item1>, data: <response1> }, { currentItem: <item2>, data: <response2> }, ...]
+   
+3. Common workflow patterns:
    - Filtering arrays: contacts.filter(c => !excludeList.includes(c.company))
    - Mapping data: items.map(item => ({ id: item.id, name: item.name }))
-   - Extracting nested data: response.data?.items || []
-   - Combining multiple sources: { ...sourceData.step1, ...sourceData.step2 }
-
-3. For LOOP execution contexts:
-   - currentItem is available directly in the payload
-   - For simple access: use <<currentItem>> to access the entire item
+   - For loopSelector object results: sourceData.stepId.data to get the single result
+   - For loopSelector array results: sourceData.stepId.map(item => item.data) to get all results
+   - For the current item of the current step, use sourceData.currentItem.
    - For transformations or complex operations: use <<(sourceData) => sourceData.currentItem...>>
    - Example: if currentItem = { id: 123, name: "test" }:
-     * Simple access: <<currentItem>> returns the whole object
      * With transformations: <<(sourceData) => sourceData.currentItem.id * 2>> or <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>
 
 Requirements:
-- Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
+- Function signature: (sourceData) => { ... }
 - Return statement is REQUIRED - the function must return the transformed data
 - Pure function - no side effects or external dependencies
 - Handle missing/null data gracefully with optional chaining (?.) and defaults - BUT - throw when expected and required data is missing so superglue can self heal
@@ -36,25 +36,27 @@ Requirements:
 
 COMMON WORKFLOW TRANSFORMATIONS:
 
-1. Loop selector (extract array to iterate):
+1. Loop selector that returns ARRAY (to iterate over):
 \`\`\`javascript
 (sourceData) => {
-  const items = sourceData.fetchItems;
+  // fetchItems returned object, so .data contains the result
+  const items = sourceData.fetchItems.data;
   if (!Array.isArray(items)) throw new Error("Expected array of items to iterate over");
   
-  const excludeIds = sourceData.excludeIds || [];
+  // excludeIds returned object, so .data contains the array
+  const excludeIds = sourceData.excludeIds.data || [];
   return items.filter(item => !excludeIds.includes(item.id));
 }
 \`\`\`
 
-2. Input mapping (prepare data for API call):
+2. Loop selector that returns OBJECT (direct execution):
 \`\`\`javascript
 (sourceData) => {
+  // Return an object - step will execute once with this as currentItem
   return {
-    userId: sourceData.currentItem?.id || sourceData.userId,
+    userId: sourceData.getUserId.data.id,
     action: 'update',
-    timestamp: new Date().toISOString(),
-    metadata: sourceData.globalMetadata || {}
+    timestamp: new Date().toISOString()
   };
 }
 \`\`\`
@@ -62,7 +64,12 @@ COMMON WORKFLOW TRANSFORMATIONS:
 3. Final transform (shape output):
 \`\`\`javascript
 (sourceData) => {
-  const results = sourceData.getId.map(item => sourceData.getProductForId.find(product => product.id === item.id));
+  // getId returned array (looped), so it's an array with many items
+  // getProductForId also returned array, so it's an array with many items
+  const results = sourceData.getId.map(idItem => {
+    const product = sourceData.getProductForId.find(p => p.data.id === idItem.currentItem);
+    return product ? product.data : null;
+  });
   return {
     success: true,
     count: results.length,
@@ -73,7 +80,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
 
 Return your answer in the following JSON format:
 {
-  "mappingCode": "(sourceData) => { return { id: sourceData.id }; }"
+  "mappingCode": "(sourceData) => { return { id: sourceData.getId.data.id }; }"
 }
 
 THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
@@ -180,12 +187,30 @@ Before configuring any API step:
 4. If documentation is unclear or missing, make conservative choices
 </DOCUMENTATION_FIRST_APPROACH>
 
-<EXECUTION_MODES>
-Set the execution mode to either:
-- DIRECT: For steps that execute once with specific data. Important: Except if the user explicitly provides an array of items to loop over or a previous step gives you a list of items to loop, direct should be used, particularly for the FIRST STEP. If you use loop on the first step without a source array, it will fail.
-- LOOP: For steps that need to iterate over a collection of items. Use this ONLY if there is a payload to iterate over, e.g. a user / a previous step gives you a list of ids to loop.
-Important: Avoid using LOOP mode for potentially very large data objects. If you need to process many items (e.g., thousands of records), prefer batch operations or APIs that can handle multiple items in a single call. Individual loops over large datasets can result in performance issues and API rate limits.
-</EXECUTION_MODES>
+<LOOP_SELECTOR>
+Every step MUST have a loopSelector that determines how it executes:
+
+1. Return an OBJECT (including empty {}) for DIRECT execution (single API call):
+   - Step executes once with the object as currentItem
+   - Result: sourceData.stepId = { currentItem: <object>, data: <API response> }
+   - Use for: Single operations, fetching one resource, operations without iteration
+   - Example: (sourceData) => ({ userId: sourceData.userId, action: 'create' })
+   - Example: (sourceData) => ({}) // Empty object for steps with no specific input
+
+2. Return an ARRAY for LOOP execution (multiple API calls):
+   - Step executes once per array item, each with its own currentItem
+   - Result: sourceData.stepId = [{ currentItem: <item1>, data: <response1> }, ...]
+   - Use for: Iterating over collections, processing multiple items
+   - Example: (sourceData) => sourceData.getContacts.data.filter(c => c.active)
+   - Example: (sourceData) => sourceData.userIds // If userIds is an array from payload
+
+3. Best practices:
+   - First step typically returns {} or a simple object unless user explicitly provides an array
+   - Avoid loops over very large arrays (thousands). Prefer batch APIs when available.
+   - Access prior object results: sourceData.stepId.data
+   - Access prior array results: sourceData.stepId.map(item => item.data)
+   - Empty arrays are valid and won't error (step skips execution)
+</LOOP_SELECTOR>
 
 <VARIABLES>
 - Use <<variable>> syntax to access variables directly (no JS just plain variables) OR execute JavaScript expressions formatted as <<(sourceData) => sourceData.variable>>:
@@ -208,11 +233,13 @@ Important: Avoid using LOOP mode for potentially very large data objects. If you
 - Note: For Basic Authentication, format as "Basic <<integrationId_username>>:<<integrationId_password>>" and the system will automatically convert it to Base64.
 - Headers provided starting with 'x-' are probably headers.
 - Credentials are prefixed with integration ID: <<integrationId_credentialName>>
-- Don't hardcode pagination values like limits in URLs or bodies - use <<>> variables when pagination is configured
-- Access previous step results via sourceData.stepId (e.g., sourceData.fetchUsers)
+- Don't hardcode pagination values - use Superglue's variables: <<page>>, <<offset>>, <<cursor>>, <<limit>>
+- Access previous step results: depends on what loopSelector returned
+  * If returned object: <<(sourceData) => sourceData.fetchUsers.data>> (single result)
+  * If returned array: <<(sourceData) => sourceData.fetchUsers.map(item => item.data)>> (array of results)
 - Access initial payload via sourceData (e.g., sourceData.userId)
 - Access uploaded files via sourceData (e.g., sourceData.uploadedFile.csvData)
-- Complex transformations can be done inline: <<(sourceData) => sourceData.contacts.filter(c => c.active).map(c => c.email).join(',')>>
+- Complex transformations can be done inline: <<(sourceData) => sourceData.contacts.data.filter(c => c.active).map(c => c.email).join(',')>>
 </VARIABLES>
 
 <AUTHENTICATION_PATTERNS>
@@ -226,48 +253,59 @@ Common authentication patterns are:
 IMPORTANT: Modern APIs (HubSpot, Stripe, etc.) mostly expect authentication in headers, NOT query parameters. Only use query parameter authentication if explicitly required by the documentation.
 </AUTHENTICATION_PATTERNS>
 
-<LOOP_EXECUTION>
-When executionMode is "LOOP":
-1. The loopSelector extracts an array from available data: (sourceData) => sourceData.getContacts.results
-2. Each item in the array becomes available as currentItem in the loop context.
-3. CURRENTITEM ACCESS:
-   - For direct access to the whole item: use <<currentItem>>
+<LOOP_SELECTOR_EXECUTION>
+Every step has a loopSelector that determines execution mode:
+1. loopSelector returns OBJECT (including empty {}): Executes once with object as currentItem
+   - Result: sourceData.stepId = { currentItem: <object>, data: <API response> }
+   - Example: (sourceData) => ({ userId: sourceData.userId, action: 'update' })
+   
+2. loopSelector returns ARRAY: Executes once per array item
+   - Result: sourceData.stepId = [{ currentItem: <item1>, data: <response1> }, ...]
+   - Example: (sourceData) => sourceData.getAllContacts.data.filter(c => c.status === 'active')
+   
+3. Accessing prior step results in loopSelector:
+   - From object result: (sourceData) => sourceData.getContacts.data.results
+   - From array result: (sourceData) => sourceData.getContacts.flatMap(item => item.data.results)
+
+4. CURRENTITEM ACCESS:
    - For transformations or specific properties with operations: use <<(sourceData) => sourceData.currentItem.propertyName>>
-4. Example flow:
-   - loopSelector: (sourceData) => sourceData.getAllContacts.filter(c => c.status === 'active')
-   - URL: /contacts/<<currentItem>>/update (if currentItem is an ID string)
-   - Body: {"contact": <<currentItem>>, "updatedBy": "<<userId>>"}
-   - Or with transformations: {"doubledValue": <<(sourceData) => sourceData.currentItem.value * 2>>, "upperName": <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>}
-5. Previous loop step results structure:
-   - sourceData.<loop_step_id> is an array of objects, one per loop iteration
-   - Each element has: { currentItem: <the loop item>, data: <API response data for that item> }
-   - Use this to access results from earlier loop steps, e.g. sourceData.myLoopStep[0].data or sourceData.myLoopStep.map(x => x.currentItem)
-6. Empty loop selector arrays:
+   - Example flow:
+     * loopSelector: (sourceData) => sourceData.getAllContacts.data.filter(c => c.status === 'active')
+     * URL: /contacts/<<currentItem>>/update (if currentItem is an ID string)
+     * Body: {"contact": <<currentItem>>, "updatedBy": "<<userId>>"}
+     * Or with transformations: {"doubledValue": <<(sourceData) => sourceData.currentItem.value * 2>>}
+
+5. Empty arrays:
    - IMPORTANT: NEVER throw an error when the loop selector returns an empty array.
-</LOOP_EXECUTION>
+</LOOP_SELECTOR_EXECUTION>
 
 <FINAL_TRANSFORMATION>
 CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
 1. In workflow contexts, sourceData contains:
    - Initial payload fields at the root level (e.g., sourceData.date, sourceData.companies)
-   - Previous step results accessed by stepId (e.g., sourceData.getAllContacts, sourceData.fetchUsers)
+   - Previous step results accessed by stepId (e.g., sourceData.getAllContacts.data, sourceData.fetchFriendsForEachContact[#].data)
    - DO NOT use sourceData.payload - initial payload is merged at root level
 
-2. Common workflow patterns:
+2. Step result structure - depends on what the loopSelector returned:
+   - If loopSelector returned OBJECT: sourceData.stepId = { currentItem: <object>, data: <API response> }
+   - If loopSelector returned ARRAY: sourceData.stepId = [{ currentItem: <item1>, data: <response1> }, ...]
+
+3. Common workflow patterns:
    - Filtering arrays: contacts.filter(c => !excludeList.includes(c.company))
    - Mapping data: items.map(item => ({ id: item.id, name: item.name }))
    - Extracting nested data: response.data?.items || []
-   - Combining multiple sources: { ...sourceData.step1, ...sourceData.step2 }
+   - Combining object results: { ...sourceData.step1.data, ...sourceData.step2.data }
+   - Combining array results: sourceData.step1.map(item => item.data)
 
-3. For LOOP execution contexts:
-   - currentItem is available directly in the payload and refers to the currently executing step's loop item
-   - previous loop step results are available in sourceData.<loop_step_id>, where <loop_step_id> is the id of the previous loop step and refers to the array of objects returned by the loop selector
+4. For current step execution:
+   - currentItem is available and refers to the currently executing item (from loopSelector)
    - For simple access: use <<currentItem>> to access the entire item
    - For transformations or complex operations: use <<(sourceData) => sourceData.currentItem...>>
    - Example: if currentItem = { id: 123, name: "test" }:
      * Simple access: <<currentItem>> returns the whole object
      * With transformations: <<(sourceData) => sourceData.currentItem.id>> or <<(sourceData) => sourceData.currentItem.name.toUpperCase()>>
-     * Access previous loop step results: <<(sourceData) => sourceData.myLoopStep[0].data>> or <<(sourceData) => sourceData.myLoopStep.map(x => x.currentItem)>>
+     * Access previous object result: <<(sourceData) => sourceData.myStep.data>>
+     * Access previous array results: <<(sourceData) => sourceData.myStep.map(x => x.data or x.currentItem to get input data used)>>
 
 Requirements:
 - Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
@@ -282,8 +320,8 @@ COMMON WORKFLOW TRANSFORMATIONS:
 1. Loop selector (extract array to iterate):
 \`\`\`javascript
 (sourceData) => {
-  const items = sourceData.fetchItems;
-  const excludeIds = sourceData.excludeIds || [];
+  const items = sourceData.fetchItems.data;
+  const excludeIds = sourceData.excludeIds.data || [];
   return items.filter(item => !excludeIds.includes(item.id));
 }
 \`\`\`
@@ -292,7 +330,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
 \`\`\`javascript
 (sourceData) => {
   return {
-    userId: sourceData.currentItem?.id || sourceData.userId,
+    userId: sourceData.currentItem?.id || sourceData.userId // if userId comes from payload,
     action: 'update',
     timestamp: new Date().toISOString(),
     metadata: sourceData.globalMetadata || {}
@@ -303,7 +341,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
 3. Final transform (shape output):
 \`\`\`javascript
 (sourceData) => {
-  const results = sourceData.getId.map(item => sourceData.getProductForId.find(product => product.id === item.id));
+  const results = sourceData.getIds.data.map(item => sourceData.getProductForId.data.find(product => product.id === item.id));
   return {
     success: true,
     count: results.length,
@@ -314,7 +352,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
 
 Return your answer in the following JSON format:
 {
-  "mappingCode": "(sourceData) => { return { id: sourceData.id }; }"
+  "mappingCode": "(sourceData) => { return { id: sourceData.fetchId.data.id }; }"
 }
 
 THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
@@ -336,10 +374,11 @@ For each step in the plan, you must:
 JAVASCRIPT EXPRESSIONS:
 Use JavaScript expressions within <<>> tags for any dynamic values:
 - Simple variable access: <<userId>>, <<apiKey>>
-- JavaScript functions require arrow syntax: <<(sourceData) => sourceData.user.name>>
+- JavaScript functions require arrow syntax: <<(sourceData) => sourceData.getUser.data.name>>
 - Loop item access: Use <<currentItem>> for direct access, or <<(sourceData) => sourceData.currentItem.property>> for specific properties or transformations
-- Array operations: <<(sourceData) => sourceData.users.map(u => u.id)>>
-- Complex transformations: <<(sourceData) => JSON.stringify({ ids: sourceData.fetchUsers.map(u => u.id) })>>
+- Array operations (object result): <<(sourceData) => sourceData.getUsers.data.map(u => u.id)>>
+- Array operations (array result): <<(sourceData) => sourceData.getUsers.map(item => item.data.id)>>
+- Complex transformations: <<(sourceData) => JSON.stringify({ ids: sourceData.fetchUsers.data.map(u => u.id) })>>
 - Calculations: <<(sourceData) => sourceData.price * 1.2>>
 - Conditional logic: <<(sourceData) => sourceData.type === 'premium' ? 'pro' : 'basic'>>
 </STEP_CONFIGURATION>
@@ -350,30 +389,33 @@ All transformations must be valid JavaScript expressions or arrow functions.
 For data access in <<>> tags:
 - Simple variables: <<userId>>, <<apiKey>>
 - Initial payload fields: <<date>>, <<companies>>
-- Previous step results: <<fetchUsers>>, <<getProducts.data>>
-- Complex expressions: <<(sourceData) => sourceData.users.filter(u => u.active).map(u => u.id)>>
-- Current item in loops: <<currentItem>> for the whole item, or use arrow functions for transformations: <<(sourceData) => sourceData.currentItem.id>>
+- Previous step results (object): <<(sourceData) => sourceData.fetchUsers.data>>
+- Previous step results (array): <<(sourceData) => sourceData.fetchUsers.map(item => item.data)>>
+- Complex expressions: <<(sourceData) => sourceData.users.data.filter(u => u.active).map(u => u.id)>>
+- Current item: <<currentItem>> for the whole item, or use arrow functions for transformations: <<(sourceData) => sourceData.currentItem.id>>
 
 For special transformation functions:
-- loopSelector: (sourceData) => sourceData.fetchUsers.users
+- loopSelector returning OBJECT: (sourceData) => ({ userId: sourceData.fetchUsers.data.users[0].id, action: 'create' })
+- loopSelector returning ARRAY from object result: (sourceData) => sourceData.fetchUsers.data.users
+- loopSelector returning ARRAY from array result: (sourceData) => sourceData.fetchUsers.flatMap(item => item.data.users)
   * MUST throw error if expected array is missing rather than returning []. Exceptions can be cases if the instruction is "Get all users" and the API returns an empty array, in which case you should return [].
-- finalTransform: (sourceData) => ({ results: sourceData.processItems })
+- finalTransform (object result): (sourceData) => ({ results: sourceData.processItems.data })
+- finalTransform (array result): (sourceData) => ({ results: sourceData.processItems.map(item => item.data) })
 
 CRITICAL DATA ACCESS PATTERNS:
 1. Initial payload data: Access directly in <<>> tags
    - <<date>> (NOT <<payload.date>>)
    - <<companies>> (NOT <<payload.companies>>)
    
-2. Previous step results: Access via step ID
-   - <<getAllContacts>> (result from step with id "getAllContacts")
-   - <<fetchUsers.data>> (nested data from step result)
+2. Previous step results: depends on what loopSelector returned
+   - Object result: <<(sourceData) => sourceData.getAllContacts.data>>
+   - Array result: <<(sourceData) => sourceData.getAllContacts.map(item => item.data)>>
    
 3. Common mistakes to avoid:
-   - WRONG: <<payload.date>> ❌
-   - RIGHT: <<date>> ✓
-   - WRONG: <<getAllContacts.results.data>> ❌ 
-   - RIGHT: <<getAllContacts>> ✓ (check actual response structure)
-</TRANSFORMATION_FUNCTIONS>
+   - RIGHT for object result: <<(sourceData) => sourceData.getAllContacts.data>> ✓
+   - RIGHT for array result: <<(sourceData) => sourceData.getAllContacts.map(item => item.data)>> ✓
+   - To check if array: Array.isArray(sourceData.getAllContacts)
+   
 
 <PAGINATION_CONFIGURATION>
 Pagination is OPTIONAL. Only configure it if you have verified the exact pagination mechanism from the documentation or know it really well.
@@ -388,10 +430,10 @@ When you DO configure pagination:
 1. Set the pagination object with type, pageSize, and stopCondition
 2. Add the exact pagination parameters to queryParams/body/headers as specified in the docs
 
-Common patterns (VERIFY IN DOCS FIRST):
-- OFFSET_BASED: Often uses "offset"/"limit" or "skip"/"limit" or "after"/"limit"
-- PAGE_BASED: Often uses "page"/"per_page" or "page"/"pageSize"
-- CURSOR_BASED: Often uses "cursor"/"limit" or "after"/"limit" with a cursor from response
+Superglue provides these variables that you MUST use:
+- OFFSET_BASED: Use <<offset>> and <<limit>> variables
+- PAGE_BASED: Use <<page>> and <<pageSize>> or <<limit>> variables
+- CURSOR_BASED: Use <<cursor>> and <<limit>> variables
 
 ⚠️ WARNING: Incorrect pagination configuration causes infinite loops. When in doubt, leave it unconfigured.
 </PAGINATION_CONFIGURATION>
@@ -651,9 +693,9 @@ For SOAP requests:
 
 <PAGINATION>
 When pagination is configured:
-- Variables become available: <<page>>, <<offset>>, <<limit>>, <<cursor>>
-- Don't hardcode limits - use the variables
-- Use "OFFSET_BASED", "PAGE_BASED", or "CURSOR_BASED" for the type.
+- Superglue provides these variables: <<page>>, <<offset>>, <<limit>>, <<cursor>>
+- ALWAYS use these exact variable names, even if the API parameter name is different.
+- Use "OFFSET_BASED", "PAGE_BASED", or "CURSOR_BASED" for the type
 - stopCondition is required and controls when to stop fetching pages
 </PAGINATION>
 

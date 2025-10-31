@@ -1,5 +1,5 @@
-import { formatJavaScriptCode, isValidSourceDataArrowFunction } from '@/src/lib/general-utils';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
+import { formatJavaScriptCode, isValidSourceDataArrowFunction } from '@/src/lib/general-utils';
 import React, { useEffect, useState } from 'react';
 import Editor from 'react-simple-code-editor';
 import { CopyButton } from '../shared/CopyButton';

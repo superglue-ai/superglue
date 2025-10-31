@@ -3,7 +3,7 @@ import { server_defaults } from '../default.js';
 import { DocumentationSearch } from '../documentation/documentation-search.js';
 import { composeUrl } from '../utils/tools.js';
 import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
-import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, FindRelevantIntegrationsContextInput, FindRelevantIntegrationsContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions, FindRelevantToolsContextInput, FindRelevantToolsContextOptions, BuildToolContextOptions } from './context-types.js';
+import { BuildToolContextOptions, EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, FindRelevantIntegrationsContextInput, FindRelevantIntegrationsContextOptions, FindRelevantToolsContextInput, FindRelevantToolsContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions } from './context-types.js';
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
@@ -212,7 +212,7 @@ export function getEvaluateTransformContext(input: EvaluateTransformContextInput
     if (budget === 0) return '';
 
     const promptStart = input.instruction ? `<instruction>${input.instruction}</instruction>` : 'No specific instruction provided; focus on mapping the source data to the target schema as closely as possible.';
-    const targetSchemaContext = `<target_schema>${JSON.stringify(input.targetSchema)}</target_schema>`;
+    const targetSchemaContext = input.targetSchema ? `<target_schema>${JSON.stringify(input.targetSchema)}</target_schema>` : '';
     const sourceDataContext = `<transform_input>${getObjectContext(input.sourceData, { include: { schema: true, preview: true, samples: true }, characterBudget: budget * 0.4 })}</transform_input>`;
     const transformedDataContext = `<transform_output>${getObjectContext(input.transformedData, { include: { schema: true, preview: true, samples: true }, characterBudget: budget * 0.4 })}</transform_output>`;
     const transformCodeContext = `<transform_code>${input.transformCode}</transform_code>`;
