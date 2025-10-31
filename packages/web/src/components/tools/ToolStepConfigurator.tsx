@@ -161,19 +161,19 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
     });
 
     const DATA_SELECTOR_DEBOUNCE_MS = 400;
-    const [loopItems, setLoopItems] = useState<any[] | null>(null);
+    const [loopItems, setLoopItems] = useState<any | null>(null);
     const [loopItemsError, setLoopItemsError] = useState<string | null>(null);
     const [isLoopItemsEvaluating, setIsLoopItemsEvaluating] = useState<boolean>(false);
     const lastEvalTimerRef = useRef<number | null>(null);
 
     const loopItemsDisplayValue = useMemo(() => {
-        if (loopItemsError) return JSON.stringify({ error: loopItemsError }, null, 2);
-        const displayData = truncateForDisplay(loopItems || []);
+        if (loopItemsError) return '{}';
+        const displayData = truncateForDisplay(loopItems);
         return displayData.value;
     }, [loopItems, loopItemsError]);
 
     const loopItemsCopyValue = useMemo(() => {
-        return JSON.stringify(loopItems || [], null, 2);
+        return JSON.stringify(loopItems, null, 2);
     }, [loopItems]);
 
     useEffect(() => {
@@ -186,19 +186,14 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         const t = window.setTimeout(() => {
             setIsLoopItemsEvaluating(true);
             try {
-                const sel = step?.loopSelector || "";
-                if (!sel || typeof sel !== 'string') {
-                    setLoopItems(null);
-                    setLoopItemsError('No loop selector configured');
-                    setIsLoopItemsEvaluating(false);
-                    return;
-                }
+                let sel = step?.loopSelector || "(sourceData) => { }";
                 const raw = ensureSourceDataArrowFunction(sel).trim();
                 const stripped = raw.replace(/;\s*$/, '');
                 const body = `const __selector = (${stripped});\nreturn __selector(sourceData);`;
                 // eslint-disable-next-line no-new-func
                 const fn = new Function('sourceData', body);
                 const out = fn(stepInput || {});
+                console.log('out', out);
                 setLoopItems(out);
                 setLoopItemsError(null);
             } catch (err: any) {
@@ -436,7 +431,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                         onChange={(val) => handleImmediateEdit((s) => ({ ...s, loopSelector: val }))}
                                                         readOnly={disabled}
                                                         minHeight="150px"
-                                                        maxHeight="400px"
+                                                        maxHeight="300px"
                                                         resizable={true}
                                                         isTransformEditor={false}
                                                         autoFormatOnMount={false}
@@ -450,10 +445,11 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                             <div className="ml-1 h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/70 border-t-transparent" />
                                                         )}
                                                     </Label>
+                                                    <div className="relative">
                                                         <JsonCodeEditor
                                                             value={loopItemsDisplayValue}
                                                             readOnly={true}
-                                                            minHeight="150px"
+                                                            minHeight="276px"
                                                             maxHeight="400px"
                                                             resizable={true}
                                                             placeholder=""
@@ -463,7 +459,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                                         <CopyButton text={loopItemsCopyValue} />
                                                                     )}
                                                                     {!loopItemsError && (
-                                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => downloadJson(loopItems || [], `step_${step.id}_loop_items.json`)} title="Download loop items as JSON">
+                                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => downloadJson(loopItems, `step_${step.id}_loop_items.json`)} title="Download loop items as JSON">
                                                                             <Download className="h-3 w-3" />
                                                                         </Button>
                                                                     )}
@@ -475,6 +471,12 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                                 </div>
                                                             ) : undefined}
                                                         />
+                                                        {loopItemsError && (
+                                                            <div className="absolute bottom-0 left-0 right-0 p-2 bg-destructive/10 text-destructive text-xs max-h-32 overflow-y-auto overflow-x-hidden">
+                                                                Error: {loopItemsError}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

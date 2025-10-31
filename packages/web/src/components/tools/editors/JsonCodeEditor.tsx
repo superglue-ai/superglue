@@ -19,7 +19,7 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
     const finalHtml = shouldHighlight ? jsonHtml : displayValue;
     
     return (
-        <div className={cn("relative rounded-lg border shadow-sm", readOnly ? "bg-muted/30" : "bg-background")}>
+        <div className={cn("relative rounded-lg border shadow-sm bg-muted/30")}>
             {overlay && (<div className="absolute top-1 right-1 z-10 flex items-center gap-1">{overlay}</div>)}
             {bottomRightOverlay && (<div className="absolute bottom-1 right-1 z-10 flex items-center gap-1">{bottomRightOverlay}</div>)}
             {!overlay && (<div className="absolute top-1 right-1 z-10"><CopyButton text={value || placeholder} /></div>)}
