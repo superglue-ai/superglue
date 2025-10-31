@@ -1,7 +1,288 @@
 ---
-title: "Create an Integration"
-description: "How to create custom integrations"
+title: "Create an integration"
+description: "Connect superglue to any System with automatic documentation fetching and authentication"
 ---
 
-Create custom integrations to connect superglue with any API. This guide covers how to add new integrations, configure authentication, and provide API documentation.
+superglue integrations are individual API, Database, or .... connections that include credentials, authentication, and documentation. Once you create an integration, you can use it across multiple workflows and tools.
 
+Learn more about how integrations fit into the bigger picture in our [core concepts](/getting-started/core-concepts) page.
+
+## Getting started
+
+<Tabs>
+  <Tab title="Via Agent">
+    The fastest way to create an integration is by talking to our agent.
+
+    **Simple example:**
+    ```
+    "Connect me to my Salesforce system"
+    ```
+
+    superglue will:
+    1. Identify the system you want to connect to
+    2. Guide you through the authentication flow
+    3. Create the integration and make it immediately available
+    4. Fetch the system documentation automatically in the background
+
+    **With OAuth:**
+    When superglue detects an OAuth-based system, it will present an authorization button. Click it to complete the OAuth flow, and your integration will be ready to use.
+
+    [CONTENT NEEDED: Video walkthrough of agent integration creation]
+
+    <Card title="Try it now" icon="rocket" href="https://app.superglue.cloud">
+      Start creating integrations with our agent
+    </Card>
+  </Tab>
+  <Tab title="Via UI Form">
+    Create integrations manually using the integration form in the UI:
+
+    <Steps>
+      <Step title="Navigate to integrations">
+        Go to the Integrations page in your superglue dashboard
+      </Step>
+      <Step title="Click create integration">
+        Click the "Create Integration" button to open the form
+      </Step>
+      <Step title="Fill required fields">
+        - **Template**: Select from our 100+ integration templates or use a custom template. Templates pre-fill the URL, documentation URL, and preferred auth type
+        - **URL**: Base URL of the system (e.g., `https://api.stripe.com`)
+        - **Documentation URL**: URL to system docs (optional but recommended)
+        - **Documentation file**: Upload a documentation file (optional) - could be any file from a Confluence PDF to a OpenAPI YAML file
+        - **Credentials**: Add your authentication details
+        - **Complete OAuth flow**: If your system requires OAuth, click the "Connect to system" button to complete the OAuth flow and let superglue handle the token exchange
+      </Step>
+      <Step title="Test and save">
+        superglue will verify the connection and fetch documentation in the background
+      </Step>
+    </Steps>
+
+    [CONTENT NEEDED: Video walkthrough of UI integration creation]
+  </Tab>
+  <Tab title="Via SDK">
+    For programmatic integration creation, use the SDK. First, install it:
+
+    ```bash
+    npm install @superglue/client
+    ```
+
+    Then create your integration:
+
+    ```typescript
+    import { SuperglueClient } from "@superglue/client";
+    
+    const superglue = new SuperglueClient({
+      apiKey: "your_api_key_here"
+    });
+    
+    const integration = await superglue.upsertIntegration({
+      id: "my-stripe",
+      urlHost: "https://api.stripe.com",
+      documentationUrl: "https://docs.stripe.com/api",
+      credentials: {
+        apiKey: "sk_test_..."
+      }
+    });
+    ```
+
+    **With OAuth:**
+    ```typescript
+    const integration = await superglue.upsertIntegration({
+      id: "my-hubspot",
+      urlHost: "https://api.hubapi.com",
+      documentationUrl: "https://developers.hubspot.com/docs/api",
+      credentials: {
+        clientId: "your_client_id",
+        clientSecret: "your_client_secret",
+        redirectUri: "https://your-app.com/oauth/callback"
+      }
+    });
+    ```
+
+    See the [SDK documentation](/sdk/overview) for more details.
+  </Tab>
+</Tabs>
+
+## Authentication management
+
+superglue supports multiple authentication methods with automatic token management and refresh.
+
+<AccordionGroup>
+  <Accordion title="OAuth 2.0" icon="key">
+    OAuth is used for secure delegated access. superglue supports both authorization code flow and client credentials flow with automatic token refresh.
+
+    **Authorization code flow** - for user-facing applications:
+    1. User clicks authorize button
+    2. Redirected to provider's login page
+    3. User grants permission
+    4. superglue receives authorization code and exchanges it for access token
+    5. Tokens are automatically refreshed when they expire
+
+    **Client credentials flow** - for server-to-server communication:
+    1. Application requests access token using client ID and secret
+    2. Token is automatically refreshed before expiration
+    3. No user authorization required
+
+    **Examples of integrations using OAuth:**
+    - **HubSpot** (authorization code): Access user's CRM data
+    - **Salesforce** (authorization code): Manage customer records
+    - **Google Workspace** (authorization code): Access Gmail, Calendar, Drive
+    - **Twilio** (client credentials): Send SMS messages programmatically
+    - **Auth0 Management API** (client credentials): Manage users and applications
+
+    **Configuration:**
+    ```typescript
+    credentials: {
+      clientId: "your_client_id",
+      clientSecret: "your_client_secret",
+      redirectUri: "https://your-app.com/callback" // only for authorization code flow
+    }
+    ```
+
+    You can use either superglue's pre-configured OAuth apps for popular services or bring your own client ID and client secret.
+  </Accordion>
+
+  <Accordion title="API keys" icon="lock">
+    The simplest authentication method. Just provide your API key and superglue figures out where to place it.
+
+    ```typescript
+    credentials: {
+      apiKey: "your_api_key_here"
+    }
+    ```
+
+    superglue automatically determines where to place the API key based on the API documentation:
+    - Authorization header: `Authorization: Bearer {key}`
+    - Custom header: `X-API-Key: {key}`
+    - Query parameter: `?api_key={key}`
+
+    **Common integrations using API keys:**
+    - Stripe
+    - OpenAI
+    - SendGrid
+  </Accordion>
+
+  <Accordion title="Custom authentication" icon="code">
+    For systems with custom authentication requirements, superglue supports:
+
+    **Basic authentication:**
+    ```typescript
+    credentials: {
+      username: "your_username",
+      password: "your_password"
+    }
+    ```
+
+    **Custom headers:**
+    ```typescript
+    credentials: {
+      "X-Custom-Auth": "your_auth_token",
+      "X-API-Version": "v2"
+    }
+    ```
+
+    **JWT tokens or bearer tokens:**
+    ```typescript
+    credentials: {
+      bearerToken: "your_jwt_or_bearer_token"
+    }
+    ```
+
+    **Database credentials:**
+    ```typescript
+    credentials: {
+      host: "db.example.com",
+      port: 5432,
+      database: "mydb",
+      username: "dbuser",
+      password: "dbpass"
+    }
+    ```
+
+    **Common use cases:**
+    - Legacy APIs with custom authentication schemes
+    - Internal APIs with proprietary auth
+    - Database connections (PostgreSQL, MySQL, MongoDB)
+    - APIs requiring multiple authentication headers
+  </Accordion>
+</AccordionGroup>
+
+<Card title="Not sure what you need?" icon="comments">
+  If you're using the agent, just ask! The agent is excellent at requirements engineering and will tell you exactly what credentials you need and where to find them.
+
+  Example: *"I want to connect to my company's internal API but I'm not sure what authentication it uses"*
+</Card>
+
+<Card title="Security first" icon="shield">
+  **All secrets are encrypted at rest and in transit.** The LLM never sees actual credentials—only placeholders like `{{API_KEY}}` are visible during workflow building.
+</Card>
+
+## Background documentation fetching - the magic behind integrations
+
+One of superglue's key features is separating authentication concerns from tools and workflows. We also handle the information gathering process per integration, so you don't have to manually provide API specifications.
+
+### Supported documentation formats
+
+superglue automatically fetches and processes documentation from various sources:
+
+<CardGroup cols={2}>
+  <Card title="OpenAPI/Swagger" icon="file-code">
+    Automatically parsed for endpoints, parameters, and schemas. Special handling for OpenAPI 3.0+ specifications.
+  </Card>
+  <Card title="Mintlify & structured docs" icon="book-open">
+    Extracted from modern documentation sites with structured content.
+  </Card>
+  <Card title="GraphQL introspection" icon="diagram-project">
+    Automatic schema discovery via introspection queries. No manual configuration needed.
+  </Card>
+  <Card title="Database schemas" icon="database">
+    PostgreSQL and MySQL schema analysis for SQL integrations. Automatically discovers tables, columns, and relationships.
+  </Card>
+</CardGroup>
+
+### Documentation optimization with keywords
+
+API documentation can be very long (some have thousands of endpoints). When you already know what you want to do, superglue can fetch more specific parts of the documentation for better performance and accuracy.
+
+<Tabs>
+  <Tab title="Via Chat/Agent">
+    Tell superglue what you're trying to do, and it will prioritize relevant documentation:
+
+    ```
+    "Connect to Stripe and focus on customer and subscription endpoints"
+    ```
+
+    The agent will fetch and rank documentation sections related to customers and subscriptions higher, making workflow building faster and more accurate.
+  </Tab>
+  <Tab title="Via SDK">
+    Provide specific keywords when creating or updating an integration:
+
+    ```typescript
+    const integration = await superglue.upsertIntegration({
+      id: "stripe",
+      urlHost: "https://api.stripe.com",
+      documentationUrl: "https://docs.stripe.com/api",
+      specificInstructions: "Focus on customers, subscriptions, and invoices. Ignore payment methods and disputes.",
+      credentials: {
+        apiKey: "sk_test_..."
+      }
+    });
+    ```
+
+    Keywords and instructions will be used to:
+    - Fetch more relevant documentation sections
+    - Rank endpoints and schemas by relevance
+    - Improve workflow building accuracy
+  </Tab>
+</Tabs>
+
+**How it works behind the scenes:**
+1. superglue fetches the API documentation
+2. If keywords are provided, relevant sections are identified and ranked
+3. Documentation is chunked and embedded for semantic search
+4. When building workflows, the most relevant documentation is retrieved first
+
+## Next steps
+
+<Card title="Ready to create your first integration?" icon="rocket" href="https://app.superglue.cloud">
+  Head to superglue and start connecting to your APIs, databases, and systems in minutes.
+</Card>

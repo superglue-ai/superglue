@@ -26,19 +26,17 @@
           },
           {
             "group": "Guides",
-            "expanded": true,
             "pages": [
               "guides/create-an-integration",
               "guides/create-a-tool",
-              "guides/debugging",
+              "guides/debugging-a-tool",
               "guides/deployment",
-              "sdk/overview",
-              "mcp/overview"
+              "sdk/sdk",
+              "mcp/using-the-mcp"
             ]
           },
           {
             "group": "API Reference",
-            "expanded": false,
             "pages": [
               "api-reference/overview",
               "api-reference/types",
