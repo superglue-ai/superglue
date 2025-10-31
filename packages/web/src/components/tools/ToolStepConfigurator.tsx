@@ -171,8 +171,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
     }, [loopItems, loopItemsError]);
 
     const loopItemsCopyValue = useMemo(() => {
-        const displayData = truncateForDisplay(loopItems || []);
-        return displayData.value;
+        return JSON.stringify(loopItems || [], null, 2);
     }, [loopItems]);
 
     useEffect(() => {
@@ -220,20 +219,23 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                             <CardTitle className="text-sm font-medium flex items-center gap-2 min-w-0">
                                 <span className="font-mono truncate">{step.id}</span>
-                                {linkedIntegration && (
-                                    <Badge variant="outline" className="text-xs flex-shrink-0">
-                                        <div className="text-xs flex items-center gap-1">
-                                            {getIntegrationIcon(linkedIntegration) ? (
-                                                <svg width="10" height="10" viewBox="0 0 24 24" fill={`#${getIntegrationIcon(linkedIntegration)?.hex}`} className="flex-shrink-0">
-                                                    <path d={getIntegrationIcon(linkedIntegration)?.path || ''} />
-                                                </svg>
-                                            ) : (
-                                                <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                            )}
-                                            <span className="truncate">{linkedIntegration.id}</span>
-                                        </div>
-                                    </Badge>
-                                )}
+                                {linkedIntegration && (() => {
+                                    const icon = getIntegrationIcon(linkedIntegration);
+                                    return (
+                                        <Badge variant="outline" className="text-xs flex-shrink-0">
+                                            <div className="text-xs flex items-center gap-1">
+                                                {icon ? (
+                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill={`#${icon.hex}`} className="flex-shrink-0">
+                                                        <path d={icon.path || ''} />
+                                                    </svg>
+                                                ) : (
+                                                    <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                                )}
+                                                <span className="truncate">{linkedIntegration.id}</span>
+                                            </div>
+                                        </Badge>
+                                    );
+                                })()}
                             </CardTitle>
                         </div>
                     </div>
@@ -314,21 +316,24 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                     <SelectValue placeholder="Select integration" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {integrations?.map(integration => (
-                                                        <SelectItem key={integration.id} value={integration.id}>
-                                                            <div className="flex items-center gap-2 w-full">
-                                                                {getIntegrationIcon(integration) ? (
-                                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill={`#${getIntegrationIcon(integration)?.hex}`} className="flex-shrink-0">
-                                                                        <path d={getIntegrationIcon(integration)?.path || ''} />
-                                                                    </svg>
-                                                                ) : (
-                                                                    <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                                                )}
-                                                                <span className="flex-grow">{integration.id}</span>
-                                                                {integration.urlHost && (<span className="text-muted-foreground text-xs ml-auto">({integration.urlHost})</span>)}
-                                                            </div>
-                                                        </SelectItem>
-                                                    ))}
+                                                    {integrations?.map(integration => {
+                                                        const icon = getIntegrationIcon(integration);
+                                                        return (
+                                                            <SelectItem key={integration.id} value={integration.id}>
+                                                                <div className="flex items-center gap-2 w-full">
+                                                                    {icon ? (
+                                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill={`#${icon.hex}`} className="flex-shrink-0">
+                                                                            <path d={icon.path || ''} />
+                                                                        </svg>
+                                                                    ) : (
+                                                                        <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                                                    )}
+                                                                    <span className="flex-grow">{integration.id}</span>
+                                                                    {integration.urlHost && (<span className="text-muted-foreground text-xs ml-auto">({integration.urlHost})</span>)}
+                                                                </div>
+                                                            </SelectItem>
+                                                        );
+                                                    })}
                                                     {onCreateIntegration && (<SelectItem value="CREATE_NEW" className="text-primary">+ Add New Integration</SelectItem>)}
                                                 </SelectContent>
                                             </Select>
@@ -425,7 +430,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                         <HelpTooltip text="JavaScript arrow function selecting an array from step input. The step runs once per item; within each iteration sourceData.currentItem is set to that item." />
                                                     </Label>
                                                     <JavaScriptCodeEditor
-                                                        value={step.loopSelector || '(sourceData) => { return sourceData; }'}
+                                                        value={step.loopSelector || '(sourceData) => { }'}
                                                         onChange={(val) => handleImmediateEdit((s) => ({ ...s, loopSelector: val }))}
                                                         readOnly={disabled}
                                                         minHeight="150px"
