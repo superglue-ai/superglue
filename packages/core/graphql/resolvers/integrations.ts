@@ -8,6 +8,7 @@ import { DocumentationFetcher } from '../../documentation/documentation-fetching
 import { IntegrationSelector } from '../../integrations/integration-selector.js';
 import { logMessage } from '../../utils/logs.js';
 import { composeUrl } from '../../utils/tools.js';
+import { DocumentationSearch } from '../../documentation/documentation-search.js';
 
 export const listIntegrationsResolver = async (
   _: any,
@@ -374,3 +375,43 @@ function uniqueKeywords(keywords: string[] | undefined): string[] {
   if (!keywords || keywords.length === 0) return [];
   return [...new Set(keywords)];
 }
+
+export const searchIntegrationDocumentationResolver = async (
+  _: any,
+  { integrationId, keywords }: { integrationId: string; keywords: string },
+  context: Context,
+  info: GraphQLResolveInfo
+) => {
+  if (!integrationId) throw new Error("integrationId is required");
+  if (!keywords) throw new Error("keywords is required");
+
+  try {
+    const integration = await context.datastore.getIntegration({ id: integrationId, includeDocs: true, orgId: context.orgId });
+    if (!integration) throw new Error("Integration not found");
+
+    const hasDocumentation = integration.documentation && integration.documentation.trim().length > 0;
+    const hasOpenApiSchema = integration.openApiSchema && integration.openApiSchema.trim().length > 0;
+
+    if (!hasDocumentation && !hasOpenApiSchema) {
+      return ``;
+    }
+
+    const documentationSearch = new DocumentationSearch({ orgId: context.orgId });
+    const result = documentationSearch.extractRelevantSections(
+      integration.documentation || '',
+      keywords,
+      3,
+      2000,
+      integration.openApiSchema || ''
+    );
+
+    if (!result || result.trim().length === 0) {
+      return `No relevant sections found for keywords: "${keywords}". Try different or broader keywords, or verify that the documentation contains information about what you're looking for.`;
+    }
+
+    return result;
+  } catch (error) {
+    logMessage('error', `Error searching integration documentation for ${integrationId}: ${String(error)}`, { orgId: context.orgId });
+    throw error;
+  }
+};

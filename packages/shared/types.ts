@@ -36,7 +36,7 @@ export interface ToolCall {
   name: string;
   input?: any;
   output?: any;
-  status: 'pending' | 'running' | 'completed' | 'stopped' | 'error';
+  status: 'pending' | 'awaiting_confirmation' | 'running' | 'completed' | 'declined' | 'stopped' | 'error';
   error?: string;
   startTime?: Date;
   endTime?: Date;
@@ -48,7 +48,7 @@ export interface ToolCall {
       runId?: string;
       orgId?: string;
   }>;
-  buildResult?: any; // Optional property for build_and_run workflow build results
+  buildResult?: any;
 }
 
 export enum UserRole {
