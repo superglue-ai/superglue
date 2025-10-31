@@ -1,4 +1,4 @@
-import { RequestOptions, BaseConfig, JSONSchema, JSONata } from "@superglue/client";
+import { BaseConfig, JSONata, JSONSchema, RequestOptions } from "@superglue/client";
 import type { DataStore, Metadata } from "@superglue/shared";
 import prettier from "prettier";
 import { getEvaluateTransformContext, getTransformContext } from "../context/context-builders.js";
@@ -128,7 +128,10 @@ export async function generateTransformCode(
       additionalProperties: false
     };
 
-    const { response, messages: updatedMessages } = await LanguageModel.generateObject(messages, mappingSchema, temperature);
+    const { response, error: responseError, messages: updatedMessages } = await LanguageModel.generateObject(messages, mappingSchema, temperature);
+    if (responseError || response?.error) {
+      throw new Error(`Error generating transform code: ${responseError || response?.error}`);
+    }
     messages = updatedMessages;
     try {
       // Autoformat the generated code
@@ -188,7 +191,10 @@ export async function evaluateTransform(
       required: ["success", "reason"],
       additionalProperties: false
     };
-    const { response } = await LanguageModel.generateObject(messages, llmResponseSchema, 0);
+    const { response, error: responseError } = await LanguageModel.generateObject(messages, llmResponseSchema, 0);
+    if (responseError || response?.error) {
+      throw new Error(`Error evaluating transform: ${responseError || response?.error}`);
+    }
     return response;
 
   } catch (error) {

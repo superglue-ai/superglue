@@ -164,7 +164,7 @@ export class AiSdkModel implements LLM {
     toolChoice?: 'auto' | 'required' | 'none' | { type: 'tool'; toolName: string }
   ): Promise<LLMObjectResponse> {
     const dateMessage = this.getDateMessage();
-
+    
     // Clean schema: remove patternProperties, minItems/maxItems, set strict/additionalProperties
     schema = this.cleanSchema(schema);
 
@@ -183,7 +183,6 @@ export class AiSdkModel implements LLM {
 
     try {
       let finalResult: any = null;
-
       while (finalResult === null) {
 
         const result = await generateText({
@@ -194,6 +193,10 @@ export class AiSdkModel implements LLM {
           temperature: temperatureToUse,
           maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
         });
+
+        if(result.finishReason === 'error' || result.finishReason === 'content-filter' || result.finishReason === 'other') {
+          throw new Error("Error generating LLM response: " + JSON.stringify(result.content || "no content"));
+        }
 
         // Check for submit/abort in tool calls
         for (const toolCall of result.toolCalls) {
@@ -261,7 +264,7 @@ export class AiSdkModel implements LLM {
         messages: updatedMessages
       };
     } catch (error) {
-      logMessage('error', `Error in Vercel AI generateObject: ${error}`, { orgId: 'ai-sdk' });
+      logMessage('error', `Error generating LLM response: ${error}`, { orgId: 'ai-sdk' });
       const updatedMessages = [...messages, {
         role: "assistant" as const,
         content: "Error: Vercel AI API Error: " + (error as any)?.message

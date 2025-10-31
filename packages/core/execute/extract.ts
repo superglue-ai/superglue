@@ -101,6 +101,9 @@ export async function generateExtractConfig(extractConfig: Partial<ExtractConfig
     }
   ];
   const { response: generatedConfig } = await LanguageModel.generateObject(messages, schema);
+  if (generatedConfig.error) {
+    throw new Error(`Error generating extract config: ${generatedConfig.error}`);
+  }
   return {
     id: extractConfig.id,
     instruction: extractConfig.instruction,

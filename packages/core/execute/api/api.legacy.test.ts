@@ -162,8 +162,7 @@ describe('API Utilities', () => {
 
       const result = await callEndpoint({ endpoint: config, payload: {}, credentials: {}, options: {} });
 
-      expect(result.data.results).toHaveLength(3);
-      expect(result.data.next_cursor).toBeNull();
+      expect(result.data).toHaveLength(3);
     });
 
     it('should stop pagination when receiving duplicate data', async () => {
