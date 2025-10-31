@@ -65,7 +65,7 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
                                     <span>Code will be auto-wrapped with (sourceData) =&gt; {'{'} ... {'}'} when executed</span>
                                 </div>
                             )}
-                            <Editor value={displayValue} onValueChange={handleChange} highlight={() => jsHtml} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" textareaId="transform-editor" placeholder="(sourceData) => { return sourceData; }" style={{ background: 'transparent', lineHeight: '18px', minHeight: '100px', whiteSpace: 'pre' }} />
+                            <Editor value={displayValue} onValueChange={handleChange} highlight={() => jsHtml} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px] h-32" textareaClassName="outline-none focus:outline-none" textareaId="transform-editor" placeholder="(sourceData) => { return sourceData; }" style={{ background: 'transparent', lineHeight: '18px', minHeight: '100px', whiteSpace: 'pre' }} />
                         </>
                     ) : (
                         <Editor value={value || ''} onValueChange={onChange || (() => { })} highlight={() => jsHtml} padding={0} disabled={readOnly} className="font-mono text-[11px] leading-[18px]" textareaClassName="outline-none focus:outline-none" style={{ minHeight, background: 'transparent', lineHeight: '18px', whiteSpace: 'pre' }} />
