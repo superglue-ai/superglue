@@ -5,7 +5,7 @@ import { deleteApiResolver } from "./resolvers/delete.js";
 import { extractResolver } from "./resolvers/extract.js";
 import { generateInstructionsResolver, generateSchemaResolver } from "./resolvers/generate.js";
 import { getApiResolver, getRunResolver } from "./resolvers/get.js";
-import { cacheOauthClientCredentialsResolver, deleteIntegrationResolver, findRelevantIntegrationsResolver, getIntegrationResolver, getOAuthClientCredentialsResolver, listIntegrationsResolver, upsertIntegrationResolver } from "./resolvers/integrations.js";
+import { cacheOauthClientCredentialsResolver, deleteIntegrationResolver, findRelevantIntegrationsResolver, getIntegrationResolver, getOAuthClientCredentialsResolver, listIntegrationsResolver, searchIntegrationDocumentationResolver, upsertIntegrationResolver } from "./resolvers/integrations.js";
 import { listApisResolver, listRunsResolver } from "./resolvers/list.js";
 import { logsResolver } from "./resolvers/logs.js";
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
@@ -36,6 +36,7 @@ export const resolvers = {
     generateInstructions: generateInstructionsResolver,
     getIntegration: getIntegrationResolver,
     listIntegrations: listIntegrationsResolver,
+    searchIntegrationDocumentation: searchIntegrationDocumentationResolver,
     findRelevantIntegrations: findRelevantIntegrationsResolver,
     findRelevantTools: findRelevantToolsResolver,
     listWorkflowSchedules: listWorkflowSchedulesResolver,
