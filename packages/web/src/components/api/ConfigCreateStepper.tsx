@@ -21,6 +21,7 @@ import { HelpTooltip } from '../utils/HelpTooltip';
 import { API_CREATE_STEPS, StepIndicator, type StepperStep } from '../utils/StepIndicator';
 import { URLField } from '../utils/URLField';
 import { InteractiveApiPlayground } from './InteractiveApiPlayground';
+import { useToken } from '@/src/hooks/use-token';
 
 interface ConfigCreateStepperProps {
   configId?: string
@@ -77,14 +78,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
   const [isDraggingDoc, setIsDraggingDoc] = useState(false)
 
   const [latestLog, setLatestLog] = useState<string>('')
-  const [tokenVersion, setTokenVersion] = useState(0)
-
-  useEffect(() => {
-    const unsubscribe = tokenRegistry.subscribe(() => {
-      setTokenVersion(v => v + 1)
-    })
-    return unsubscribe
-  }, [])
+  const token = useToken();
 
   const client = useMemo(() => {
     const wsLink = new GraphQLWsLink(
@@ -118,7 +112,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
         },
       },
     })
-  }, [config.superglueEndpoint, tokenVersion])
+  }, [config.superglueEndpoint, token])
 
   useEffect(() => {
     return () => {

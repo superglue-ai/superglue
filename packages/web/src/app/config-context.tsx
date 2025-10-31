@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect } from 'react'
+import { createContext, useContext, useEffect, useRef } from 'react'
 import { tokenRegistry } from '../lib/token-registry'
 
 interface Config {
@@ -19,7 +19,11 @@ interface ConfigWithoutKey {
 const ConfigContext = createContext<ConfigWithoutKey | null>(null)
 
 export function ConfigProvider({ children, config }: { children: React.ReactNode, config: Config }) {
-  tokenRegistry.setToken(config.superglueApiKey);
+  const initialTokenSetRef = useRef(false);
+  if (!initialTokenSetRef.current) {
+    initialTokenSetRef.current = true;
+    tokenRegistry.setToken(config.superglueApiKey);
+  }
 
   useEffect(() => {
     if (config.superglueApiKey) {

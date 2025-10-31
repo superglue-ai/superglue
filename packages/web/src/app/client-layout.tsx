@@ -5,11 +5,11 @@ import { Sidebar } from '../components/sidebar/Sidebar';
 import { Toaster } from '../components/ui/toaster';
 import { LogSidebar } from '../components/utils/LogSidebar';
 import { ServerMonitor } from '../components/utils/ServerMonitor';
-import { tokenRegistry } from '../lib/token-registry';
 import { ConfigProvider } from './config-context';
 import { jetbrainsMono, jetbrainsSans } from './fonts';
 import { IntegrationsProvider } from './integrations-context';
 import { CSPostHogProvider } from './providers';
+import { useToken } from '../hooks/use-token';
 
 interface Props {
   children: React.ReactNode
@@ -19,6 +19,7 @@ interface Props {
 export function ClientWrapper({ children, config }: Props) {
   const pathname = usePathname()
   const isAuthPage = pathname?.startsWith('/auth')
+  const token = useToken();
 
   return (
     <ConfigProvider config={config}>
@@ -29,7 +30,7 @@ export function ClientWrapper({ children, config }: Props) {
               children
             ) : (
               <div className="flex h-screen overflow-hidden">
-                {tokenRegistry.hasToken() && <Sidebar />}
+                {token && <Sidebar />}
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={pathname}
@@ -41,7 +42,7 @@ export function ClientWrapper({ children, config }: Props) {
                     {children}
                   </motion.div>
                 </AnimatePresence>
-                {tokenRegistry.hasToken() && (
+                {token && (
                   <div className="hidden lg:block">
                     <LogSidebar />
                   </div>
@@ -49,7 +50,7 @@ export function ClientWrapper({ children, config }: Props) {
               </div>
             )}
             <Toaster />
-            {tokenRegistry.hasToken() && <ServerMonitor />}
+            {token && <ServerMonitor />}
           </div>
         </CSPostHogProvider>
       </IntegrationsProvider>
