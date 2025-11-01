@@ -1,0 +1,426 @@
+---
+title: "Methods"
+description: "Complete reference for all SDK methods"
+---
+
+## Workflow
+
+### buildWorkflow
+
+Build a workflow (tool) from natural language. superglue analyzes your instruction and automatically generates API call steps.
+
+```typescript
+buildWorkflow({
+  instruction: string;
+  payload?: Record<string, any>;
+  integrationIds?: string[];
+  responseSchema?: JSONSchema;
+  save?: boolean;
+  verbose?: boolean;
+}): Promise<Workflow>
+```
+
+**Parameters:**
+- `instruction` - Natural language description of what the tool should do
+- `payload` - Sample input data (optional, helps superglue understand data shape)
+- `integrationIds` - Array of integration IDs to use (optional, superglue can discover them)
+- `responseSchema` - Expected output schema (optional, helps validate responses)
+- `save` - Whether to save the workflow automatically (default: `true`)
+- `verbose` - Enable real-time log streaming (default: `true`)
+
+**Returns:** `Workflow` object with auto-generated steps
+
+**Example:**
+```typescript
+const workflow = await superglue.buildWorkflow({
+  integrationIds: ["stripe", "slack"],
+  instruction: "Get all Stripe customers and send a Slack message with the count",
+  save: true
+});
+
+console.log(workflow.steps); // Array of ExecutionStep objects
+```
+
+### executeWorkflow
+
+Execute a workflow (tool). Run a saved workflow by ID or pass a workflow object directly.
+
+```typescript
+executeWorkflow<T = any>({
+  id?: string;
+  workflow?: Workflow;
+  payload?: Record<string, any>;
+  credentials?: Record<string, string>;
+  options?: RequestOptions;
+  verbose?: boolean;
+}): Promise<WorkflowResult & { data?: T }>
+```
+
+**Parameters:**
+- `id` - ID of a saved workflow (alternative to `workflow`)
+- `workflow` - Workflow object to execute (alternative to `id`)
+- `payload` - Input data accessible in steps via `<<variableName>>`
+- `credentials` - Runtime credentials to override integration defaults
+- `options` - Execution options (timeout, retries, self-healing, etc.)
+- `verbose` - Enable real-time log streaming (default: `true`)
+
+**Returns:** `WorkflowResult` with execution results and step-by-step details
+
+**Example:**
+```typescript
+// Execute by ID
+const result = await superglue.executeWorkflow({
+  id: "sync-customers",
+  payload: {
+    startDate: "2025-01-01",
+    userId: "user_123"
+  }
+});
+
+// Execute inline workflow
+const result = await superglue.executeWorkflow({
+  workflow: myWorkflow,
+  payload: {},
+  options: {
+    timeout: 60000,
+    retries: 3,
+    selfHealing: "ENABLED"
+  }
+});
+
+if (result.success) {
+  console.log(result.data); // Final output
+  console.log(result.stepResults); // Individual step results
+} else {
+  console.error(result.error);
+}
+```
+
+### getWorkflow
+
+Fetch a saved workflow by ID.
+
+```typescript
+getWorkflow(id: string): Promise<Workflow>
+```
+
+**Parameters:**
+- `id` - The workflow ID
+
+**Returns:** `Workflow` object
+
+**Example:**
+```typescript
+const workflow = await superglue.getWorkflow("sync-customers");
+console.log(workflow.instruction);
+console.log(workflow.steps.length);
+```
+
+### listWorkflows
+
+List all saved workflows.
+
+```typescript
+listWorkflows(limit?: number, offset?: number): Promise<{ items: Workflow[], total: number }>
+```
+
+**Parameters:**
+- `limit` - Max number of workflows to return (default: `10`)
+- `offset` - Number of workflows to skip (default: `0`)
+
+**Returns:** Object with `items` array and `total` count
+
+**Example:**
+```typescript
+const { items, total } = await superglue.listWorkflows(50, 0);
+
+for (const workflow of items) {
+  console.log(`${workflow.id}: ${workflow.instruction}`);
+}
+
+console.log(`Total: ${total}`);
+```
+
+### upsertWorkflow
+
+Save or update a workflow.
+
+```typescript
+upsertWorkflow(id: string, input: Partial<Workflow>): Promise<Workflow>
+```
+
+**Parameters:**
+- `id` - Unique identifier for the workflow
+- `input` - Partial workflow object to save (only include fields to update)
+
+**Returns:** Saved `Workflow` object
+
+**Example:**
+```typescript
+// Create new workflow
+await superglue.upsertWorkflow("my-tool", {
+  instruction: "Sync data daily",
+  steps: [/* ... */],
+  integrationIds: ["stripe"]
+});
+
+// Update existing workflow
+await superglue.upsertWorkflow("my-tool", {
+  instruction: "Sync data hourly", // Only update this field
+  finalTransform: "(sourceData) => { return { count: sourceData.length }; }"
+});
+```
+
+### deleteWorkflow
+
+Delete a saved workflow.
+
+```typescript
+deleteWorkflow(id: string): Promise<boolean>
+```
+
+**Parameters:**
+- `id` - The workflow ID to delete
+
+**Returns:** `true` if successful
+
+**Example:**
+```typescript
+await superglue.deleteWorkflow("old-tool");
+```
+
+## Workflow scheduling
+
+### listWorkflowSchedules
+
+Get all schedules for a workflow.
+
+```typescript
+listWorkflowSchedules(workflowId: string): Promise<WorkflowSchedule[]>
+```
+
+**Parameters:**
+- `workflowId` - The workflow ID
+
+**Returns:** Array of `WorkflowSchedule` objects
+
+**Example:**
+```typescript
+const schedules = await superglue.listWorkflowSchedules("daily-sync");
+
+for (const schedule of schedules) {
+  console.log(`${schedule.cronExpression} - Next run: ${schedule.nextRunAt}`);
+}
+```
+
+### upsertWorkflowSchedule
+
+Create or update a workflow schedule.
+
+```typescript
+upsertWorkflowSchedule(schedule: WorkflowScheduleInput): Promise<WorkflowSchedule>
+```
+
+**Parameters:**
+- `schedule` - Schedule configuration object
+  - `id` - Schedule ID (optional, auto-generated if not provided)
+  - `workflowId` - Which workflow to run
+  - `cronExpression` - Cron expression (e.g., `"0 0 * * *"` for daily at midnight)
+  - `timezone` - Timezone (e.g., `"America/New_York"`)
+  - `enabled` - Whether the schedule is active
+  - `payload` - Input data for each execution
+  - `options` - RequestOptions for executions
+
+**Returns:** Saved `WorkflowSchedule` object
+
+**Example:**
+```typescript
+const schedule = await superglue.upsertWorkflowSchedule({
+  workflowId: "daily-sync",
+  cronExpression: "0 0 * * *", // Daily at midnight
+  timezone: "UTC",
+  enabled: true,
+  payload: {
+    date: "<<(sourceData) => new Date().toISOString()>>"
+  }
+});
+
+console.log(`Next run: ${schedule.nextRunAt}`);
+```
+
+### deleteWorkflowSchedule
+
+Delete a workflow schedule.
+
+```typescript
+deleteWorkflowSchedule(id: string): Promise<boolean>
+```
+
+**Parameters:**
+- `id` - The schedule ID
+
+**Returns:** `true` if successful
+
+**Example:**
+```typescript
+await superglue.deleteWorkflowSchedule("schedule-123");
+```
+
+## Integration
+
+### getIntegration
+
+Get an integration by ID.
+
+```typescript
+getIntegration(id: string): Promise<Integration>
+```
+
+**Parameters:**
+- `id` - The integration ID
+
+**Returns:** `Integration` object
+
+**Example:**
+```typescript
+const integration = await superglue.getIntegration("stripe");
+console.log(integration.name); // "Stripe"
+console.log(integration.urlHost); // "https://api.stripe.com"
+```
+
+### listIntegrations
+
+List all integrations.
+
+```typescript
+listIntegrations(limit?: number, offset?: number): Promise<{ items: Integration[], total: number }>
+```
+
+**Parameters:**
+- `limit` - Max number to return (default: `10`)
+- `offset` - Number to skip (default: `0`)
+
+**Returns:** Object with `items` array and `total` count
+
+**Example:**
+```typescript
+const { items } = await superglue.listIntegrations(50);
+
+for (const integration of items) {
+  console.log(`${integration.id}: ${integration.name}`);
+}
+```
+
+### upsertIntegration
+
+Create or update an integration.
+
+```typescript
+upsertIntegration(
+  id: string,
+  input: Partial<Integration>,
+  mode?: UpsertMode
+): Promise<Integration>
+```
+
+**Parameters:**
+- `id` - Unique identifier
+- `input` - Partial `Integration` object
+- `mode` - Upsert mode: `"CREATE"`, `"UPDATE"`, or `"UPSERT"` (default: `"UPSERT"`)
+
+**Returns:** Saved `Integration` object
+
+**Example:**
+```typescript
+// Create a new integration
+await superglue.upsertIntegration("my-api", {
+  name: "My Custom API",
+  urlHost: "https://api.example.com",
+  credentials: {
+    apiKey: "secret_key_here"
+  }
+});
+
+// Update credentials only
+await superglue.upsertIntegration("my-api", {
+  credentials: {
+    apiKey: "new_secret_key"
+  }
+}, "UPDATE");
+```
+
+### deleteIntegration
+
+Delete an integration.
+
+```typescript
+deleteIntegration(id: string): Promise<boolean>
+```
+
+**Parameters:**
+- `id` - The integration ID
+
+**Returns:** `true` if successful
+
+**Example:**
+```typescript
+await superglue.deleteIntegration("old-integration");
+```
+
+## Run
+
+### getRun
+
+Get detailed information about a specific execution run.
+
+```typescript
+getRun(id: string): Promise<RunResult>
+```
+
+**Parameters:**
+- `id` - The run ID (returned from `executeWorkflow` or `call`)
+
+**Returns:** `RunResult` (either `ApiResult` or `WorkflowResult`)
+
+**Example:**
+```typescript
+const run = await superglue.getRun("run_abc123");
+
+console.log(`Status: ${run.success ? "Success" : "Failed"}`);
+console.log(`Duration: ${run.completedAt.getTime() - run.startedAt.getTime()}ms`);
+
+if ("stepResults" in run) {
+  // It's a WorkflowResult
+  for (const step of run.stepResults) {
+    console.log(`Step ${step.stepId}: ${step.success}`);
+  }
+}
+```
+
+### listRuns
+
+List execution runs with optional filtering.
+
+```typescript
+listRuns(limit?: number, offset?: number, configId?: string): Promise<{ items: RunResult[], total: number }>
+```
+
+**Parameters:**
+- `limit` - Max number to return (default: `100`)
+- `offset` - Number to skip (default: `0`)
+- `configId` - Filter by workflow or API config ID (optional)
+
+**Returns:** Object with `items` array and `total` count
+
+**Example:**
+```typescript
+// Get all runs
+const { items, total } = await superglue.listRuns(50, 0);
+
+// Get runs for specific workflow
+const workflowRuns = await superglue.listRuns(50, 0, "sync-customers");
+
+for (const run of items) {
+  console.log(`${run.id}: ${run.success ? "✓" : "✗"} - ${run.startedAt}`);
+}
+```
