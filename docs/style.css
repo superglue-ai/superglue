@@ -38,3 +38,8 @@ h6 span.cursor-pointer {
 .dark h6 {
     color: rgba(255, 255, 255, 0.95) !important;
 }
+
+/* Rounded corners for videos */
+.rounded-lg {
+    border-radius: 0.5rem;
+}
