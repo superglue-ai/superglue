@@ -31,26 +31,34 @@
 ## Interfaces
 
 You can interact with superglue via three interfaces, regardless of whether you self-host or use the hosted version:
-- **Web application**:
+
+**Web application**
   - The web application is available for self-hosted and superglue-hosted setups
   - If you decide to use a superglue-hosted setup, the web application has features that are not available when self-hosting (e.g. the superglue agent)
   - When doing local development on your self-hosted setup, you can customize the web application to your needs
-- **superglue SDK**:
-  - ```bash
-    npm install @superglue/client 
-    ```
-  - ```javascript
-    // Typescript SDK
-    import { SuperglueClient } from "@superglue/client";
 
-    const superglue = new SuperglueClient({
-      apiKey: "your_api_key_here", // Get from app.superglue.cloud
-      baseUrl: "https://api.superglue.cloud", // Optional, defaults to hosted version but can be localhost when self-hosting
-    });
-    ```
+**superglue SDK**
+
   - The superglue SDK offers CRUD functionality for all superglue data types and lets you execute tools programmatically
+  - For more detailed information on SDK functionality, check our [SDK guide](https://docs.superglue.cloud/agent-builders/sdk-integration)
 
-- **MCP Server**:
+    Install via npm:
+    ```bash
+      npm install @superglue/client 
+    ```
+    
+    Client setup:
+    ```javascript
+      // Typescript SDK
+      import { SuperglueClient } from "@superglue/client";
+
+      const superglue = new SuperglueClient({
+        apiKey: "your_api_key_here", // Get from app.superglue.cloud
+        baseUrl: "https://api.superglue.cloud", // Optional, defaults to hosted version but can be localhost when self-hosting
+      });
+    ```
+
+**MCP Server**
   - Look at our [MCP Guide](https://docs.superglue.cloud/agent-builders/quickstart#mcp-recommended-for-agents) for full installation instructions
   - The MCP interface gives you discoverability tools and execution capabilities for your pre-built superglue tools
   - The MCP does not support ad-hoc integration creation or tool building
