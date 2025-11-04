@@ -25,11 +25,11 @@
           {
             "group": "Guides",
             "pages": [
+              "guides/creating-an-integration",
+              "guides/creating-a-tool",
+              "guides/debugging-a-tool",
+              "guides/deploying-a-tool",
               "guides/using-the-agent",
-              "guides/create-an-integration",
-              "guides/create-a-tool",
-              "guides/debug-a-tool",
-              "guides/deploy-a-tool",
               "mcp/using-the-mcp"
             ]
           },

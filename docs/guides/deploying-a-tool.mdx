@@ -1,0 +1,295 @@
+---
+title: "Deploying a Tool"
+description: "Execute tools on-demand or schedule them for automated runs"
+---
+
+Once you've created a tool, you can deploy it in two ways: execute it on-demand when you need it, or schedule it to run automatically on a recurring basis.
+
+## On-demand execution
+
+Run your tools immediately whenever you need them.
+
+<Tabs>
+  <Tab title="Via UI">
+    Execute tools directly from the tool details page:
+
+    <img
+    src="../resources/run-tool.png"
+    alt="Step input"
+    className="w-full rounded-lg mb-4"
+    />
+
+    <Steps>
+      <Step title="Navigate to your tool">
+        Go to Tools in your dashboard and select the tool you want to run
+      </Step>
+      <Step title="Provide input data">
+        Enter any required input parameters in JSON format. If your tool doesn't require input, use `{}`
+      </Step>
+      <Step title="Execute">
+        Click "Run" to execute immediately. You'll see real-time logs and step-by-step progress
+      </Step>
+      <Step title="Review results">
+        Check the output data and individual step results. All executions are logged for debugging.
+      </Step>
+    </Steps>
+
+  </Tab>
+  <Tab title="Via SDK">
+    For programmatic execution, use the SDK:
+
+    ```bash
+    npm install @superglue/client
+    ```
+
+    **Execute a saved tool:**
+
+    ```typescript
+    import { SuperglueClient } from "@superglue/client";
+
+    const superglue = new SuperglueClient({
+      apiKey: "your_api_key_here",
+      endpoint: "https://graphql.superglue.ai"
+    });
+
+    const result = await superglue.executeWorkflow({
+      id: "sync-customers",
+      payload: {
+        startDate: "2025-01-01",
+        userId: "user_123"
+      }
+    });
+
+    if (result.success) {
+      console.log(result.data); // Final output
+      console.log(result.stepResults); // Step-by-step details
+    } else {
+      console.error(result.error);
+    }
+    ```
+
+    **Execute with advanced options:**
+
+    ```typescript
+    const result = await superglue.executeWorkflow({
+      id: "sync-customers",
+      payload: {},
+      options: {
+        selfHealing: "ENABLED",    // Auto-fix configuration errors
+        retries: 3,                 // Retry failed steps up to 3 times
+        timeout: 120000,            // 2 minute timeout
+        webhookUrl: "https://example.com/webhook" // Send results to webhook
+      }
+    });
+    ```
+
+    **Execute an inline workflow (without saving it):**
+
+    ```typescript
+    const result = await superglue.executeWorkflow({
+      workflow: {
+        id: "temp-workflow",
+        integrationIds: ["stripe"],
+        steps: [
+          {
+            id: "getCustomers",
+            integrationId: "stripe",
+            apiConfig: {
+              method: "GET",
+              urlPath: "/v1/customers",
+              queryParams: { limit: "100" }
+            }
+          }
+        ],
+        finalTransform: "(sourceData) => sourceData.getCustomers.data"
+      },
+      payload: {}
+    });
+    ```
+
+  </Tab>
+  <Tab title="Via GraphQL">
+    Execute tools using the GraphQL API:
+
+    **Endpoint:** `https://graphql.superglue.ai`
+
+    ```graphql
+    mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON) {
+      executeWorkflow(
+        input: $input
+        payload: $payload
+        options: {
+          selfHealing: ENABLED
+          retries: 3
+          timeout: 60000
+        }
+      ) {
+        success
+        data
+        error
+        stepResults {
+          stepId
+          success
+          data
+          error
+        }
+        startedAt
+        completedAt
+      }
+    }
+    ```
+
+    **Variables:**
+    ```json
+    {
+      "input": {
+        "id": "sync-customers"
+      },
+      "payload": {
+        "startDate": "2025-01-01"
+      }
+    }
+    ```
+
+    **Headers:**
+    ```
+    Authorization: Bearer your_superglue_api_key
+    Content-Type: application/json
+    ```
+
+    See [API Reference](/api-reference/mutations#executeWorkflow) for complete documentation.
+
+  </Tab>
+</Tabs>
+
+## Scheduled execution
+
+Schedule tools to run automatically at specific times or intervals.
+
+<Tabs>
+  <Tab title="Via UI">
+
+{" "}
+
+<video autoPlay className="w-full rounded-lg">
+  <source src="/resources/schedule-tool.mp4" type="video/mp4" />
+</video>
+
+    Create schedules from the dashboard:
+
+    <Steps>
+      <Step title="Open schedule modal">
+        Navigate to your tool and click "Add Schedule"
+      </Step>
+      <Step title="Configure frequency">
+        Choose from preset intervals (every 5 minutes, hourly, daily, weekly, monthly) or enter a custom cron expression
+
+        **Common cron examples:**
+        - `*/5 * * * *` - Every 5 minutes
+        - `0 9 * * 1-5` - Weekdays at 9 AM
+        - `0 0 1 * *` - First day of every month
+        - `0 */6 * * *` - Every 6 hours
+
+        <Tip>
+          Visit [crontab.guru](https://crontab.guru) to build and validate cron expressions
+        </Tip>
+      </Step>
+      <Step title="Select timezone">
+        Choose your timezone to ensure the schedule runs at the correct local time
+      </Step>
+      <Step title="Set input payload (optional)">
+        Provide JSON input data that will be passed to each execution.
+      </Step>
+      <Step title="Configure advanced options (optional)">
+        Expand "Advanced Options" to configure:
+
+        - **Self-Healing**: Automatically fix API configuration errors
+
+        - **Retries**: Number of retry attempts (0-10) for failed API calls
+
+        - **Timeout**: Maximum execution time in milliseconds
+
+        - **Webhook URL**: Send execution results to this URL
+      </Step>
+      <Step title="Save and enable">
+        Click "Add Schedule" to save. The schedule will start running at the next scheduled time. You can pause it anytime by toggling "Enable schedule" off.
+      </Step>
+    </Steps>
+
+  </Tab>
+  <Tab title="Via SDK">
+    Create and manage schedules programmatically:
+
+    **Create a schedule:**
+
+    ```typescript
+    import { SuperglueClient } from "@superglue/client";
+
+    const superglue = new SuperglueClient({
+      apiKey: "your_api_key_here",
+      endpoint: "https://graphql.superglue.ai"
+    });
+
+    const schedule = await superglue.upsertWorkflowSchedule({
+      workflowId: "sync-customers",
+      cronExpression: "0 0 * * *",  // Daily at midnight
+      timezone: "America/New_York",
+      enabled: true,
+      payload: {
+        date: "<<(sourceData) => new Date().toISOString()>>",
+        environment: "production"
+      },
+      options: {
+        selfHealing: "ENABLED",
+        retries: 3,
+        timeout: 120000,
+        webhookUrl: "https://example.com/webhook"
+      }
+    });
+
+    console.log(`Next run: ${schedule.nextRunAt}`);
+    ```
+
+  </Tab>
+  <Tab title="Via GraphQL">
+    Manage schedules using GraphQL:
+
+    **Create a schedule:**
+
+    ```graphql
+    mutation UpsertWorkflowSchedule($schedule: WorkflowScheduleInput!) {
+      upsertWorkflowSchedule(schedule: $schedule) {
+        id
+        workflowId
+        cronExpression
+        timezone
+        enabled
+        nextRunAt
+        lastRunAt
+      }
+    }
+    ```
+
+    **Variables:**
+    ```json
+    {
+      "schedule": {
+        "workflowId": "sync-customers",
+        "cronExpression": "0 0 * * *",
+        "timezone": "America/New_York",
+        "enabled": true,
+        "payload": {
+          "environment": "production"
+        },
+        "options": {
+          "selfHealing": "ENABLED",
+          "retries": 3,
+          "timeout": 120000,
+          "webhookUrl": "https://example.com/webhook"
+        }
+      }
+    }
+    ```
+
+  </Tab>
+</Tabs>
