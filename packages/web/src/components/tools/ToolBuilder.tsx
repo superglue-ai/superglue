@@ -3,20 +3,19 @@ import { tokenRegistry } from '@/src/lib/token-registry';
 import { useIntegrations } from '@/src/app/integrations-context';
 import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
+import { FileChip } from '@/src/components/ui/FileChip';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/general-utils';
 import { Integration, IntegrationInput, Workflow as Tool, UpsertMode } from '@superglue/client';
-import { integrationOptions, generateDefaultFromSchema } from "@superglue/shared";
+import { generateDefaultFromSchema, integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { Validator } from 'jsonschema';
 import { Check, Clock, FileJson, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Wrench, X } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../ui/button';
-import { FileChip } from '@/src/components/ui/FileChip';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
@@ -99,10 +98,8 @@ export function ToolBuilder({
   const [isBuilding, setIsBuilding] = useState(false);
   const { toast } = useToast();
   const superglueConfig = useConfig();
-  const searchParams = useSearchParams();
 
   const { integrations, pendingDocIds, loading, setPendingDocIds, refreshIntegrations } = useIntegrations();
-  const preselectedIntegrationId = searchParams.get('integration');
 
   const [instruction, setInstruction] = useState(initialInstruction);
   const [payload, setPayload] = useState(initialPayload);
@@ -152,19 +149,11 @@ export function ToolBuilder({
   }), [client]);
 
   useEffect(() => {
-    if (preselectedIntegrationId && integrations.length > 0 && selectedIntegrationIds.length === 0) {
-      if (integrations.some(i => i.id === preselectedIntegrationId)) {
-        setSelectedIntegrationIds([preselectedIntegrationId]);
-      }
-    }
-  }, [preselectedIntegrationId, integrations, selectedIntegrationIds.length]);
-
-  useEffect(() => {
-    if (view === 'instructions' && selectedIntegrationIds.length > 0) {
+    if (view === 'instructions' && selectedIntegrationIds.length > 0 && !isGeneratingSuggestions) {
       setSuggestions([]);
       handleGenerateInstructions();
     }
-  }, [selectedIntegrationIds, view]);
+  }, [selectedIntegrationIds, view, integrations]);
 
   useEffect(() => {
     if (view !== 'instructions') {
@@ -230,6 +219,12 @@ export function ToolBuilder({
         .map(id => integrations.find(i => i.id === id))
         .filter(Boolean)
         .map(toIntegrationInput);
+      
+      if (selectedIntegrationInputs.length === 0) {
+        setIsGeneratingSuggestions(false);
+        return;
+      }
+      
       try {
         const suggestionsText = await client.generateInstructions(selectedIntegrationInputs);
         const suggestionsArray = suggestionsText.filter(s => s.trim());

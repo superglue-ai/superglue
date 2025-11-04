@@ -3,7 +3,7 @@
   <img src="https://github.com/user-attachments/assets/be0e65d4-dcd8-4133-9841-b08799e087e7" width="350" alt="superglue_logo_white">
 </p>
 
-<h2 align="center">Build production-grade integrations & tools from natural language.</h2>
+<h2 align="center">Build production-grade integrations & tools in natural language.</h2>
 <div align="center">
   
  [![GitHub](https://img.shields.io/github/license/superglue-ai/superglue?style=flat-square)](https://github.com/superglue-ai/superglue/blob/main/LICENSE)
@@ -14,89 +14,66 @@
 
 </div>
 
-## choose your mode
+## What is superglue?
+- superglue is an AI-powered tool builder that works with any API, database or file storage server
+- Abstracts away authentication, documentation handling and data mapping between systems
+- Self‑heals tools: When steps fail due to upstream API changes, superglue can auto-repair failures to keep your tools running
 
-<div align="center">
-  <table>
-    <tr>
-      <td align="center" width="50%" valign="top" style="vertical-align: top; height: 250px;">
-        <div style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
-          <div>
-            <h2>superglue agent mode</h2>
-            <p><strong>generate connectors for any API, with OAuth support</strong></p>
-          </div>
-          <div>
-            <a href="[https://docs.klavis.ai/documentation/concepts/strata](https://docs.superglue.cloud/)">
-            </a>
-          </div>
-        </div>
-      </td>
-      <td align="center" width="50%" valign="top" style="vertical-align: top; height: 250px;">
-        <div style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
-          <div>
-            <h2>superglue toolkits</h2>
-            <p><strong>pre-built and tested tools for your AI agent</strong></p>
-          </div>
-          <div>
-            <a href="[https://docs.klavis.ai/documentation/mcp-server/overview](https://superglue.ai/)">
-            </a>
-          </div>
-        </div>
-      </td>
-    </tr>
-  </table>
-</div>
+## What people build with superglue
+- Lightweight and maintainable data syncing tools across legacy systems
+- Migrations of complex SQL procedures to REST API calls in cloud migrations
+- Enterprise GPT tools: expose tools that work with custom legacy systems in your enterprise GPT
 
-## what is superglue?
-- Lightweight proxy: point it at any REST / GraphQL / SQL / postgres / file endpoint.
-- LLM‑assisted mapping during config; cached Javascript transforms at runtime (no LLM latency).
-- Self‑heals integrations: when the upstream API or schema changes, superglue regenerates the transform automatically, and keeps the integration running.
-- Security‑first: zero data stored; run fully on‑prem or use [our hosted version](https://app.superglue.cloud/).
+## Quick Start
+### Option 1: Sign up to [superglue](https://app.superglue.cloud) and start building immediately
+### Option 2: [Self-host](https://docs.superglue.cloud/guides/self-hosting) for maximum control and customization
 
-## quick start
-### option 1: cloud-hosted [superglue.ai](https://superglue.ai)
-### option 2: self-host 
-### option 3: SDK
-```bash
-npm install @superglue/client 
-```
-```javascript
-// Typescript SDK
-import { SuperglueClient } from "@superglue/client";
+## Interfaces
 
-const superglue = new SuperglueClient({
-  apiKey: "your_api_key_here", // Get from app.superglue.cloud
-  baseUrl: "https://api.superglue.cloud", // Optional, defaults to hosted version
-});
-```
+You can interact with superglue via three interfaces, regardless of whether you self-host or use the hosted version:
 
-## what people build with superglue
-- Enterprise GPT: offer legacy systems inside your enterprise GPT
-- Extend AI assistant/co-pilot: offer more actions than search 
-- Ship connectors 10x faster, without the maintenance overhead
-- Simple interface for legacy API pipelines
-- Transforming SQL queries into Rest API calls
+**Web application**
+  - The web application is available for self-hosted and superglue-hosted setups
+  - If you decide to use a superglue-hosted setup, the web application has features that are not available when self-hosting (e.g. the superglue agent)
+  - When doing local development on your self-hosted setup, you can customize the web application to your needs
 
-## key features
+**superglue SDK**
 
-- **API Proxy**: Configure APIs and intercept responses in real-time with minimal added latency
-- **LLM-Powered Data Mapping**: Automatically generate data transformations using large language models 
-- **Schema Validation**: Ensure data compliance with your specified schemas
-- **File Processing**: Handle various file formats (CSV, JSON, XML) with automatic decompression
-- **Flexible Authentication**: Support for various auth methods including header auth, api keys, oauth, and more
-- **Smart Pagination**: Handle different pagination styles automatically
-- **Caching & Retry Logic**: Built-in caching and configurable retry strategies
+  - The superglue SDK offers CRUD functionality for all superglue data types and lets you execute tools programmatically
+  - For more detailed information on SDK functionality, check our [SDK guide](https://docs.superglue.cloud/agent-builders/sdk-integration)
+
+    Install via npm:
+    ```bash
+      npm install @superglue/client 
+    ```
+    
+    Client setup:
+    ```javascript
+      // Typescript SDK
+      import { SuperglueClient } from "@superglue/client";
+
+      const superglue = new SuperglueClient({
+        apiKey: "your_api_key_here", // Get from app.superglue.cloud
+        baseUrl: "https://api.superglue.cloud", // Optional, defaults to hosted version but can be localhost when self-hosting
+      });
+    ```
+
+**MCP Server**
+  - Look at our [MCP Guide](https://docs.superglue.cloud/agent-builders/quickstart#mcp-recommended-for-agents) for full installation instructions
+  - The MCP interface gives you discoverability tools and execution capabilities for your pre-built superglue tools
+  - The MCP does not support ad-hoc integration creation or tool building
+  - Use MCP in production for agentic use cases and internal GPTs to access and execute pre-built tools with full control
 
 ## 📖 Documentation
 
 For detailed documentation, visit [docs.superglue.cloud](https://docs.superglue.cloud).
 
-## 🤝 contributing
-We love contributions! Feel free to open issues for bugs or feature requests.
+## 🤝 Contributing
+We love contributions! Before making contributions, we ask that all users read through our [contribution guide](https://github.com/superglue-ai/superglue/blob/main/CONTRIBUTING.md) and sign the Contributor License Agreement (CLA). When creating new issues or pull requests, please ensure compliance with the contribution guide.
 
 [//]: # (To contribute to the docs, check out the /docs folder.)
 
-## license
+## License
 
 superglue is GPL licensed. The superglue client SDKs are MIT licensed. See [LICENSE](LICENSE) for details.
 
@@ -104,7 +81,7 @@ superglue is GPL licensed. The superglue client SDKs are MIT licensed. See [LICE
 
 - [Join our Discord](https://discord.gg/vUKnuhHtfW)
 - [Read our docs](https://docs.superglue.cloud/)
-- [Talk to founders](https://cal.com/superglue/superglue-demo)
+- [Talk to us](https://cal.com/superglue/superglue-demo)
 
 Text us! <br>
 [![Twitter Adina](https://img.shields.io/twitter/follow/adinagoerres?style=flat-square&logo=X)](https://twitter.com/adinagoerres)
