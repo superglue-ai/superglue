@@ -1,5 +1,7 @@
+import { useConfig } from '@/src/app/config-context';
 import { useIntegrations } from '@/src/app/integrations-context';
 import { useToast } from '@/src/hooks/use-toast';
+import { createSuperglueClient } from '@/src/lib/client-utils';
 import { Workflow as Tool } from '@superglue/client';
 import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -7,16 +9,21 @@ import { useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { ToolBuilder, type BuildContext } from './ToolBuilder';
 import ToolPlayground, { ToolPlaygroundHandle } from './ToolPlayground';
-import { useConfig } from '@/src/app/config-context';
-import { createSuperglueClient } from '@/src/lib/client-utils';
 
 type ToolCreateStep = 'build' | 'run' | 'publish';
+type ToolBuilderView = 'integrations' | 'instructions';
 
 interface ToolCreateStepperProps {
   onComplete?: () => void;
+  initialIntegrationIds?: string[];
+  initialView?: ToolBuilderView;
 }
 
-export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
+export function ToolCreateStepper({ 
+  onComplete,
+  initialIntegrationIds = [],
+  initialView = 'integrations'
+}: ToolCreateStepperProps) {
   const [step, setStep] = useState<ToolCreateStep>('build');
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -141,6 +148,8 @@ export function ToolCreateStepper({ onComplete }: ToolCreateStepperProps) {
         <div className="overflow-y-auto px-1 min-h-0" style={{ scrollbarGutter: 'stable' }}>
           {step === 'build' && (
             <ToolBuilder
+              initialView={initialView}
+              initialIntegrationIds={initialIntegrationIds}
               onToolBuilt={handleToolBuilt}
               onCancel={handleClose}
             />
