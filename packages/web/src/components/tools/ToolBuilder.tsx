@@ -1,13 +1,14 @@
 import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
 import { useIntegrations } from '@/src/app/integrations-context';
 import { getAuthBadge } from '@/src/app/integrations/page';
 import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { FileChip } from '@/src/components/ui/FileChip';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
+import { ExtendedSuperglueClient } from '@/src/lib/extended-superglue-client';
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/general-utils';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { Integration, IntegrationInput, Workflow as Tool, UpsertMode } from '@superglue/client';
 import { generateDefaultFromSchema, integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
@@ -22,7 +23,6 @@ import { Switch } from '../ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
 import JsonSchemaEditor from '../utils/JsonSchemaEditor';
-import { ExtendedSuperglueClient } from '@/src/lib/extended-superglue-client';
 
 type ToolBuilderView = 'integrations' | 'instructions';
 
