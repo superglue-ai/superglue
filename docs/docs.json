@@ -29,8 +29,8 @@
             "pages": [
               "guides/create-an-integration",
               "guides/create-a-tool",
-              "guides/debugging-a-tool",
-              "guides/deployment",
+              "guides/debug-a-tool",
+              "guides/deploy-a-tool",
               "mcp/using-the-mcp"
             ]
           },

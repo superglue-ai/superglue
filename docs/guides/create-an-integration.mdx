@@ -1,5 +1,5 @@
 ---
-title: "Create an integration"
+title: "Create an Integration"
 description: "Connect superglue to any system"
 ---
 
@@ -18,7 +18,7 @@ Create an integration in superglue to connect tools with external systems. Integ
 
     **Complex example:**
     ```
-    Create an integration to my ITSM platform under the URL: 
+    Create an integration to my ITSM platform under the URL:
     https://my-company.itsm.com using the attached PDF as documentation
     ```
 
@@ -33,6 +33,7 @@ Create an integration in superglue to connect tools with external systems. Integ
     <Card icon="arrow-right" href="https://app.superglue.cloud" horizontal>
       Start creating integrations with the agent
     </Card>
+
   </Tab>
 
   <Tab title="Via UI Form">
@@ -46,11 +47,11 @@ Create an integration in superglue to connect tools with external systems. Integ
         Click **Add Integration** to open the creation form
       </Step>
       <Step title="Fill required fields">
-        - **Template**: Choose from 100+ prebuilt templates or create a custom one. Templates pre-fill the base URL, documentation URL, and authentication type  
-        - **URL**: Base URL of the system (e.g., `https://api.stripe.com`)  
-        - **Documentation URL**: Optional but recommended link to API documentation  
-        - **Documentation file**: Optionally upload a documentation file (PDF, OpenAPI YAML, etc.)  
-        - **Credentials**: Add authentication details. See [authentication and credential management](/guides/create-an-integration#authentication-and-credential-management) for details  
+        - **Template**: Choose from 100+ prebuilt templates or create a custom one. Templates pre-fill the base URL, documentation URL, and authentication type
+        - **URL**: Base URL of the system (e.g., `https://api.stripe.com`)
+        - **Documentation URL**: Optional but recommended link to API documentation
+        - **Documentation file**: Optionally upload a documentation file (PDF, OpenAPI YAML, etc.)
+        - **Credentials**: Add authentication details. See [authentication and credential management](/guides/create-an-integration#authentication-and-credential-management) for details
         - **Complete OAuth flow**: For OAuth systems, click **Connect to system** to complete the flow and let superglue handle the token exchange
       </Step>
       <Step title="Test and save">
@@ -59,6 +60,7 @@ Create an integration in superglue to connect tools with external systems. Integ
     </Steps>
 
     [CONTENT NEEDED: Video walkthrough of UI integration creation]
+
   </Tab>
 
   <Tab title="Via SDK">
@@ -72,11 +74,11 @@ Create an integration in superglue to connect tools with external systems. Integ
 
     ```typescript
     import { SuperglueClient } from "@superglue/client";
-    
+
     const superglue = new SuperglueClient({
       apiKey: "your_api_key_here"
     });
-    
+
     const integration = await superglue.upsertIntegration({
       id: "my-stripe",
       urlHost: "https://api.stripe.com",
@@ -102,6 +104,7 @@ Create an integration in superglue to connect tools with external systems. Integ
     ```
 
     See the [SDK documentation](/sdk/overview) for more details.
+
   </Tab>
 </Tabs>
 
@@ -114,19 +117,19 @@ superglue supports multiple authentication methods with automatic token handling
     OAuth enables secure delegated access. superglue supports both the client credentials flow and authorization code flow with **automatic token refresh**.
 
     **superglue handles automatically:**
-    - OAuth flow orchestration  
-    - Scope validation  
-    - Token exchange and storage  
-    - Error handling for token issues  
+    - OAuth flow orchestration
+    - Scope validation
+    - Token exchange and storage
+    - Error handling for token issues
     - Automatic token refresh
 
     ### Authorization code flow
     Used when end users grant access to their data.
 
-    1. User clicks the authorize button  
-    2. Redirected to the provider’s login page  
-    3. User grants permissions for requested scopes  
-    4. superglue exchanges the authorization code for access tokens  
+    1. User clicks the authorize button
+    2. Redirected to the provider’s login page
+    3. User grants permissions for requested scopes
+    4. superglue exchanges the authorization code for access tokens
     5. Tokens are automatically refreshed on expiration
 
     **Examples:** HubSpot, Salesforce, Google Workspace
@@ -134,8 +137,8 @@ superglue supports multiple authentication methods with automatic token handling
     ### Client credentials flow
     Used for server-to-server communication with no user interaction.
 
-    1. Application requests an access token using client ID and secret  
-    2. Token is automatically refreshed before expiration  
+    1. Application requests an access token using client ID and secret
+    2. Token is automatically refreshed before expiration
     3. No user consent required
 
     **Examples:** Twilio, Auth0 Management API, Microsoft Graph
@@ -156,16 +159,17 @@ superglue supports multiple authentication methods with automatic token handling
     });
     ```
 
-    **Required fields:**  
-    - `clientId`, `clientSecret`, `authorizationUrl`, `tokenUrl`  
+    **Required fields:**
+    - `clientId`, `clientSecret`, `authorizationUrl`, `tokenUrl`
 
-    **Optional fields:**  
-    - `scopes`: space-separated OAuth scopes  
+    **Optional fields:**
+    - `scopes`: space-separated OAuth scopes
     - `redirectUri`: redirect URL after authorization
 
     <Info>
       Prebuilt OAuth templates are available for 100+ APIs including HubSpot, Google Ads, and Salesforce. Check the templates dropdown in the creation form.
     </Info>
+
   </Accordion>
 
   <Accordion title="API keys" icon="key">
@@ -196,7 +200,7 @@ superglue supports multiple authentication methods with automatic token handling
           }
         });
         ```
-        
+
         SendGrid requires the API key in a custom Authorization header with Bearer prefix.
       </Tab>
       <Tab title="Airtable">
@@ -210,7 +214,7 @@ superglue supports multiple authentication methods with automatic token handling
           }
         });
         ```
-        
+
         Airtable uses a personal access token passed as a Bearer token in the Authorization header.
       </Tab>
       <Tab title="Zendesk">
@@ -225,7 +229,7 @@ superglue supports multiple authentication methods with automatic token handling
           }
         });
         ```
-        
+
         Zendesk requires both email and API token, combined as basic auth: `{email}/token:{apiKey}`.
       </Tab>
       <Tab title="Shopify">
@@ -239,7 +243,7 @@ superglue supports multiple authentication methods with automatic token handling
           }
         });
         ```
-        
+
         Shopify uses a custom header `X-Shopify-Access-Token` for API authentication.
       </Tab>
       <Tab title="Mailchimp">
@@ -253,10 +257,11 @@ superglue supports multiple authentication methods with automatic token handling
           }
         });
         ```
-        
+
         Mailchimp uses basic auth with `anystring` as username and API key as password.
       </Tab>
     </Tabs>
+
   </Accordion>
 
   <Accordion title="Database connections" icon="database">
@@ -314,6 +319,7 @@ superglue supports multiple authentication methods with automatic token handling
         ```
       </Tab>
     </Tabs>
+
   </Accordion>
 
   <Accordion title="Custom authentication" icon="code">
@@ -360,21 +366,26 @@ superglue supports multiple authentication methods with automatic token handling
         Used by: Slack and Discord
       </Tab>
     </Tabs>
+
   </Accordion>
 </AccordionGroup>
 
 <Card title="Security first" icon="shield">
-  **All secrets are encrypted at rest and in transit.** The LLM never accesses real credentials—only placeholders such as `{{API_KEY}}` are exposed during workflow setup and execution.
+  **All secrets are encrypted at rest and in transit.** The LLM never accesses
+  real credentials—only placeholders such as `{{ API_KEY }}` are exposed during
+  workflow setup and execution.
 </Card>
 
 <Card title="Not ready to provide credentials?" icon="watch">
-  Integrations can be created without credentials and updated later. Credentials may also be supplied dynamically during tool execution.
+  Integrations can be created without credentials and updated later. Credentials
+  may also be supplied dynamically during tool execution.
 </Card>
 
 <Card title="Need help identifying credentials?" icon="user-message">
   The agent can assist with figuring out which credentials are required and where to find them.
 
-  Example: *"I want to connect to my company’s internal API but I'm not sure what authentication it uses."*
+Example: _"I want to connect to my company’s internal API but I'm not sure what authentication it uses."_
+
 </Card>
 
 ## Automatic documentation fetching
@@ -389,19 +400,24 @@ superglue’s fetchers handle most modern and legacy documentation types:
 
 <CardGroup cols={2}>
   <Card title="OpenAPI/Swagger" icon="file-code">
-    Extracts endpoints, parameters, and schemas from `.json` or `.yaml` specifications.
+    Extracts endpoints, parameters, and schemas from `.json` or `.yaml`
+    specifications.
   </Card>
   <Card title="Mintlify & modern docs" icon="book-open">
-    Fetches content from popular hosted sites like Mintlify, ReadMe, or Docusaurus.
+    Fetches content from popular hosted sites like Mintlify, ReadMe, or
+    Docusaurus.
   </Card>
   <Card title="Swagger UI & GraphQL" icon="diagram-project">
-    Captures dynamically rendered content from Swagger UIs or GraphQL playgrounds using specialized extractors.
+    Captures dynamically rendered content from Swagger UIs or GraphQL
+    playgrounds using specialized extractors.
   </Card>
   <Card title="Static HTML & PDFs" icon="file-lines">
-    Parses legacy or self-hosted documentation, including HTML exports and PDF manuals.
+    Parses legacy or self-hosted documentation, including HTML exports and PDF
+    manuals.
   </Card>
   <Card title="Database schemas" icon="database">
-    Automatically analyzes PostgreSQL and MySQL schemas to identify tables, columns, and relationships.
+    Automatically analyzes PostgreSQL and MySQL schemas to identify tables,
+    columns, and relationships.
   </Card>
 </CardGroup>
 
@@ -418,6 +434,7 @@ Large APIs can have hundreds of endpoints. To improve accuracy and reduce proces
     ```
 
     This ensures that only relevant documentation is prioritized and embedded.
+
   </Tab>
 
   <Tab title="Via SDK">
@@ -436,13 +453,19 @@ Large APIs can have hundreds of endpoints. To improve accuracy and reduce proces
     ```
 
     Keywords are used to:
-    - Focus fetching and parsing on relevant documentation sections  
-    - Improve ranking and retrieval relevance at runtime  
+    - Focus fetching and parsing on relevant documentation sections
+    - Improve ranking and retrieval relevance at runtime
+
   </Tab>
 </Tabs>
 
 ## Next steps
 
-<Card title="Ready to create your first integration?" icon="rocket" href="https://app.superglue.cloud">
-  Go to superglue and start connecting your APIs, databases, and systems in minutes.
+<Card
+  title="Ready to create your first integration?"
+  icon="rocket"
+  href="https://app.superglue.cloud"
+>
+  Go to superglue and start connecting your APIs, databases, and systems in
+  minutes.
 </Card>
