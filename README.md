@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/superglue-ai-superglue-badge.png)](https://mseep.ai/app/superglue-ai-superglue)
+
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/be0e65d4-dcd8-4133-9841-b08799e087e7" width="350" alt="superglue_logo_white">
