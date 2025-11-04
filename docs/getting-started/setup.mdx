@@ -1,6 +1,6 @@
 ---
-title: "Get Started"
-description: "The 5 minute guide to build your first glue code"
+title: "Set Up"
+description: "The 5 minute guide to building your first glue code tool"
 ---
 
 ## Hosted Version (Recommended)
@@ -77,6 +77,19 @@ http://localhost:3000?token=your-secret-token
   </Step>
 </Steps>
 
+### Local Development
+
+Add a .env file to the root folder, then:
+
+```bash
+git clone https://github.com/superglue-ai/superglue.git
+cd superglue
+npm install
+npm run dev
+```
+
+---
+
 ### Production Setup
 
 For production deployments, add PostgreSQL and enable credential encryption:
@@ -112,19 +125,6 @@ docker run -d \
   -v postgres_data:/var/lib/postgresql/data \
   postgres:15-alpine
 ```
-
-### Local Development
-
-Add an .env file to the root folder, then:
-
-```bash
-git clone https://github.com/superglue-ai/superglue.git
-cd superglue
-npm install
-npm run dev
-```
-
----
 
 ## Environment Variables
 

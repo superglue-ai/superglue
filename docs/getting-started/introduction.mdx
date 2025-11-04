@@ -1,39 +1,24 @@
 ---
 title: "Introduction"
-description: "Sync, migrate, integrate, and manage legacy system glue code"
+description: "Sync, migrate, integrate, and manage glue code"
 ---
 
-superglue is an AI-native integration platform for the glue code holding your business together.
+superglue is an AI-native integration platform for the glue code holding your systems together.
 Build tools to sync, migrate, integrate, and manage legacy systems without writing custom integration code in minutes instead of months.
 
-## Why use superglue
+## Why use superglue?
 
 <CardGroup cols={3}>
-  <Card title="AI-Enabled Tool Builder" iconType="duotone">
-    Create reusable tools that connect systems in natural language. Execute them
-    on-demand, schedule them, or expose them via API.
+  <Card title="Works with obscure legacy systems" icon="server">
+    superglue does not rely on templates and pre-built connectors. It understands documentation, custom auth patterns, rate limiting and misleading HTTP 200 status code errors that plague legacy integrations.
   </Card>
-  <Card title="Multi-System Orchestration" iconType="duotone">
-    Single tools can orchestrate across databases, APIs, file systems, and
-    legacy protocols (FTP/SFTP).
+  <Card title="Automated Tool & Workflow Building" icon="wand-magic-sparkles">
+    Stop wiring up endpoints, query parameters and auth headers by hand — superglue does this for you. Specify only what your tool and workflow does in natural language, superglue handles the rest.
   </Card>
-  <Card title="Knowledge Management" iconType="duotone">
-    Ingest documentation from any source. Visualize API structures and
-    dependencies. Intelligence layer for agent-driven integration discovery.
+  <Card title="Talk to your Integrations" icon="comments">
+    Set up authentication, upload documentation, or add custom integration instructions — all via a chat interface. superglue automates requirements gathering by running web search, reading documentation and testing API endpoints.
   </Card>
-  <Card title="Execution Engine" iconType="duotone">
-    Reliable execution with automatic retries, error recovery, and
-    observability. Handle millions of runs.
-  </Card>
-  <Card title="MCP Native" iconType="duotone">
-    First-class MCP support. Use superglue tools directly in your internal GPT,
-    Cursor, or Claude.
-  </Card>
-  <Card title="Self-Hostable" iconType="duotone">
-    Deploy on your infrastructure. Your data never leaves your environment. Full
-    control over credentials and secrets.
-  </Card>
-</CardGroup>
+</CardGroup>  
 
 ---
 
@@ -47,14 +32,13 @@ Build tools to sync, migrate, integrate, and manage legacy systems without writi
   </Step>
 
 <Step title="Build Tools">
-  Describe what you need in natural language. The agent queries the knowledge
-  base to understand your integrations, generates executable tools that
-  coordinate across your systems, and learns from successful patterns. Handles
+  Describe what you need in natural language. The agent understands your integrations and generates executable tools that
+  work across your systems. Handles
   JSON, XML, CSV, fixed-width files, and custom formats.
 </Step>
 
   <Step title="Execute & Observe">
-    Run tools on-demand, schedule them, or trigger via webhooks. Full execution logs, retry logic, and error notifications. Intelligence layer tracks API behavior, identifies breaking changes, and suggests optimizations based on execution patterns.
+    Run tools on-demand, schedule them, or trigger via webhooks. Full execution logs, retry logic, and error notifications. Intelligence layer tracks API behavior, identifies breaking changes, and auto-repairs.
   </Step>
 </Steps>
 
@@ -73,7 +57,7 @@ Build tools to sync, migrate, integrate, and manage legacy systems without writi
     Bi-directional data flows, conflict resolution, and scheduled updates.
     Handle SOAP, XML-RPC, fixed-width files, and FTP/SFTP.
   </Card>
-  <Card title="Legacy Integration Tools" icon="puzzle-piece">
+  <Card title="Legacy Integration Tools" icon="server">
     Build tools that connect legacy ERP, warehouse management systems, and
     legacy SaaS to your modern stack. Support for SOAP, XML-RPC, file-based
     APIs, obscure auth schemes, and poorly documented endpoints.

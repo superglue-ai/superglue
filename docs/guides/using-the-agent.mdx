@@ -1,0 +1,65 @@
+---
+title: "Using the Agent"
+description: "How to interact with the superglue agent"
+---
+
+The superglue agent handles integration setup, API discovery, and tool building through a chat interface. Talk to it in natural language — it handles the technical details.
+
+<Note>
+  The agent is available in the hosted version at [app.superglue.cloud](https://app.superglue.cloud). For self-hosted MCP usage, see the [MCP guide](/mcp/using-the-mcp).
+</Note>
+
+---
+
+## Setting up an integration via OAuth
+
+Configure OAuth flows without touching code. The agent walks you through integration setup, handles the authorization code flow and stores your credentials securely.
+
+<video src="VIDEO_PLACEHOLDER_OAUTH_SETUP" />
+
+**What this shows:**
+- Starting an OAuth integration from chat
+- Agent generates redirect URI and client configuration
+- One-click authorization flow
+- Automatic credential storage and refresh token handling
+
+---
+
+## Discovering obscure API endpoints
+
+Point the agent at undocumented APIs. It can test endpoints, test authentication, and build working tools based on exploration.
+
+<video src="VIDEO_PLACEHOLDER_API_DISCOVERY" />
+
+**What this shows:**
+- Providing API base URL and initial documentation
+- Agent testing authentication schemes
+- Automatic endpoint discovery and parameter inference
+- Building knowledge base from API responses
+
+---
+
+## Building and testing complex tools
+
+Build multi-step workflows that coordinate across systems. Agent generates, tests, and iterates on tools based on natural language descriptions.
+
+<video src="VIDEO_PLACEHOLDER_TOOL_BUILDING" />
+
+**What this shows:**
+- Describing a tool: "Query postgres schema, send to OpenAI for summary, save result"
+- Agent breaks down into steps: DB introspection, LLM call, storage
+- Iterative testing with real data
+- Handling errors and refining tool building instructions
+
+---
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Create an Integration" href="/guides/create-an-integration" icon="plug">
+    Connect your first API, database, or file system
+  </Card>
+  <Card title="Create a Tool" href="/guides/create-a-tool" icon="wrench">
+    Build executable workflows across your integrations
+  </Card>
+</CardGroup>

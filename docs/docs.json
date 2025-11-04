@@ -17,16 +17,15 @@
           {
             "group": "Getting Started",
             "pages": [
-              "index",
-              "getting-started/comparison",
-              "getting-started/setup",
+              "getting-started/introduction",
               "getting-started/core-concepts",
-              "getting-started/using-the-agent"
+              "getting-started/setup"
             ]
           },
           {
             "group": "Guides",
             "pages": [
+              "guides/using-the-agent",
               "guides/create-an-integration",
               "guides/create-a-tool",
               "guides/debug-a-tool",
