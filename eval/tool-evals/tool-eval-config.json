@@ -1210,7 +1210,7 @@
     "runOneShotMode": true,
     "runSelfHealingMode": false,
     "attemptsEachMode": 10,
-    "maxConcurrentWorkers": 5,
+    "maxConcurrentWorkers": 10,
     "toolAttemptTimeoutMs": 300000
   },
   "validationLlmConfig": {
