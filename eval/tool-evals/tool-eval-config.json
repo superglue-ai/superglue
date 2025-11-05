@@ -1205,12 +1205,12 @@
       "expectedResultDescription": "Should generate accurate summary statistics from all three files. CSV: 50 rows, ~$44k revenue, 35 unique products. JSON: 10 users, 9 with orders, 14 total orders, ~$5619.59 total value. Fixed-width: 20 customers, ~$161.5k total balance, avg age ~38.5, 20 unique cities."
     }
   ],
-  "enabledTools": ["036-sec-jina-markdown-conversion"],
+  "enabledTools": "all",
   "settings": {
     "runOneShotMode": true,
-    "runSelfHealingMode": false,
-    "attemptsEachMode": 10,
-    "maxConcurrentWorkers": 10,
+    "runSelfHealingMode": true,
+    "attemptsEachMode": 5,
+    "maxConcurrentWorkers": 5,
     "toolAttemptTimeoutMs": 300000
   },
   "validationLlmConfig": {
