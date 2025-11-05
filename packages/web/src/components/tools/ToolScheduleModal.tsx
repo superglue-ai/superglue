@@ -1,15 +1,13 @@
 import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
 import { Switch } from "@/src/components/ui/switch";
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, getGroupedTimezones } from '@/src/lib/general-utils';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/client';
 import { validateCronExpression } from '@superglue/shared';
 import { Check, CheckCircle, ChevronRight, ChevronsUpDown, Loader2, XCircle } from 'lucide-react';
-import Prism from 'prismjs';
-import 'prismjs/components/prism-json';
 import React, { useMemo, useState } from 'react';
-import Editor from 'react-simple-code-editor';
+import { JsonCodeEditor } from '../editors/JsonCodeEditor';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
@@ -204,10 +202,6 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
     }
   };
 
-  const highlightJson = (code: string) => {
-    if (!code) return '';
-    return Prism.highlight(code, Prism.languages.json, 'json');
-  };
 
   return (
     isOpen && (
@@ -340,30 +334,27 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                 {/* payload */}
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="payload">JSON Input (Optional)</Label>
-                  <div className="border rounded-md p-3 bg-muted/50">
-                    <Editor
-                      value={schedulePayload}
-                      padding={10}
-                      tabSize={2}
-                      highlight={highlightJson}
-                      onValueChange={handlePayloadChange}
-                      insertSpaces={true}
-                      className="font-mono text-sm min-h-[120px] [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    {isJsonValid ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="text-green-600">Valid JSON</span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-4 w-4 text-red-600" />
-                        <span className="text-red-600">Invalid JSON</span>
-                      </>
-                    )}
-                  </div>
+                  <JsonCodeEditor
+                    value={schedulePayload}
+                    onChange={handlePayloadChange}
+                    minHeight="120px"
+                    maxHeight="120px"
+                    overlay={
+                      <div className="flex items-center gap-2 text-sm bg-background/80 px-2 py-1 rounded">
+                        {isJsonValid ? (
+                          <>
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <span className="text-green-600">Valid</span>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="h-4 w-4 text-red-600" />
+                            <span className="text-red-600">Invalid</span>
+                          </>
+                        )}
+                      </div>
+                    }
+                  />
                 </div>
 
                 {/* advanced options */}
@@ -460,7 +451,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                 </div>
               </CardContent>
             </div>
-            <CardFooter className="flex-shrink-0 border-t">
+            <CardFooter className="flex-shrink-0">
               <div className="flex justify-end gap-2 w-full">
                 <Button variant="outline" onClick={onClose}>
                   Cancel

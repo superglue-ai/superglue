@@ -16,13 +16,14 @@ import { Validator } from 'jsonschema';
 import { Check, Clock, FileJson, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Wrench, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { JsonCodeEditor } from '../editors/JsonCodeEditor';
+import JsonSchemaEditor from '../editors/JsonSchemaEditor';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
-import JsonSchemaEditor from '../utils/JsonSchemaEditor';
 
 type ToolBuilderView = 'integrations' | 'instructions';
 
@@ -944,29 +945,38 @@ export function ToolBuilder({
                 </div>
               </div>
 
-              <Textarea
+              <JsonCodeEditor
                 value={payload}
-                onChange={(e) => {
-                  setPayload(e.target.value);
+                onChange={(val) => {
+                  setPayload(val);
                   try {
-                    JSON.parse(e.target.value || '');
+                    JSON.parse(val || '');
                     setValidationErrors(prev => ({ ...prev, payload: false }));
                   } catch {
                     setValidationErrors(prev => ({ ...prev, payload: true }));
                   }
                 }}
-                placeholder=""
-                className={cn(
-                  "font-mono text-xs min-h-[150px]",
-                  validationErrors.payload && inputErrorStyles,
-                  !isPayloadValid && enforceInputSchema && inputSchemaMode === 'custom' && inputSchema && inputErrorStyles
-                )}
+                minHeight="150px"
+                maxHeight="300px"
+                resizable={true}
+                placeholder="{}"
+                showValidation={true}
               />
               
               {!isPayloadValid && enforceInputSchema && inputSchemaMode === 'custom' && inputSchema && (
-                <p className="text-xs text-destructive mt-1">
-                  Payload does not match the custom input schema
-                </p>
+                <div className="mt-2 p-3 bg-destructive/10 border border-destructive/50 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <FileWarning className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-destructive">
+                        Payload Does Not Match Custom Input Schema
+                      </p>
+                      <p className="text-xs text-destructive/90">
+                        The JSON input above does not conform to your custom input schema. Fix the input or adjust the schema below.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               )}
 
               {enforceInputSchema && (

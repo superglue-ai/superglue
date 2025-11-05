@@ -1,12 +1,13 @@
+import JsonSchemaEditor from '@/src/components/editors/JsonSchemaEditor';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { FileChip } from '@/src/components/ui/FileChip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import JsonSchemaEditor from '@/src/components/utils/JsonSchemaEditor';
 import { ALLOWED_EXTENSIONS, formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE_TOOLS, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { Code2, FileJson, Upload } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
+import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
 
 export const PayloadSpotlight = ({
     payloadText,
@@ -158,15 +159,16 @@ export const PayloadSpotlight = ({
                     <span className="text-xs text-muted-foreground">
                         Enter your inputs here manually, or upload files to autofill missing JSON fields.
                     </span>
-                    <JsonSchemaEditor
-                        value={localPayload}
-                        onChange={(val) => handlePayloadChange(val || '')}
-                        isOptional={false}
-                        readOnly={!!readOnly}
-                        forceCodeMode={true}
-                        showModeToggle={false}
-                        errorPrefix="Invalid JSON - no input changes saved. Navigating away will revert to last valid JSON."
-                    />
+                    <div>
+                        <JsonCodeEditor
+                            value={localPayload}
+                            onChange={(val) => handlePayloadChange(val || '')}
+                            readOnly={!!readOnly}
+                            minHeight="300px"
+                            maxHeight="300px"
+                            resizable={true}
+                        />
+                    </div>
                     {!readOnly && onFilesUpload && (
                         <div className="pt-3 border-t border-border/50 space-y-3">
                             <div className="flex flex-col items-center gap-2">

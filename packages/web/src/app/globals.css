@@ -469,3 +469,8 @@ html.dark {
 .scrollbar-thumb-rounded::-webkit-scrollbar-thumb {
   border-radius: 10px;
 }
+
+/* Hide Monaco editor read-only message overlay */
+.monaco-editor-overlaymessage {
+  display: none !important;
+}

@@ -1,13 +1,15 @@
 import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
 import { useToast } from '@/src/hooks/use-toast';
 import { splitUrl } from '@/src/lib/client-utils';
 import { composeUrl, ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, truncateForDisplay } from '@/src/lib/general-utils';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { Integration, SuperglueClient } from "@superglue/client";
 import { ArrowDown, Check, Copy, Download, Edit, Globe } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadJson } from '../../lib/download-utils';
+import { JavaScriptCodeEditor } from '../editors/JavaScriptCodeEditor';
+import { JsonCodeEditor } from '../editors/JsonCodeEditor';
 import { Badge } from "../ui/badge";
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -15,8 +17,6 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { HelpTooltip } from '../utils/HelpTooltip';
-import { JavaScriptCodeEditor } from './editors/JavaScriptCodeEditor';
-import { JsonCodeEditor } from './editors/JsonCodeEditor';
 import { CopyButton } from './shared/CopyButton';
 
 interface ToolStepConfiguratorProps {
@@ -193,7 +193,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                 // eslint-disable-next-line no-new-func
                 const fn = new Function('sourceData', body);
                 const out = fn(stepInput || {});
-                console.log('out', out);
                 setLoopItems(out);
                 setLoopItemsError(null);
             } catch (err: any) {
@@ -378,9 +377,10 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             }}
                                             readOnly={disabled}
                                             minHeight="100px"
-                                            maxHeight="250px"
+                                            maxHeight="150px"
                                             resizable={true}
                                             placeholder="{}"
+                                            showValidation={true}
                                         />
                                     </div>
                                     <div>
@@ -397,9 +397,10 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             }}
                                             readOnly={disabled}
                                             minHeight="100px"
-                                            maxHeight="250px"
+                                            maxHeight="150px"
                                             resizable={true}
                                             placeholder="{}"
+                                            showValidation={true}
                                         />
                                     </div>
                                     {['POST', 'PUT', 'PATCH'].includes(step.apiConfig.method) && (
@@ -413,7 +414,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 onChange={(val) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, body: val || '' } }))}
                                                 readOnly={disabled}
                                                 minHeight="100px"
-                                                maxHeight="250px"
+                                                maxHeight="150px"
                                                 resizable={true}
                                                 placeholder=""
                                             />
@@ -446,11 +447,11 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                         )}
                                                     </Label>
                                                     <div className="relative">
-                                                        <JsonCodeEditor
+                                                    <JsonCodeEditor
                                                             value={loopItemsDisplayValue}
                                                             readOnly={true}
-                                                            minHeight="276px"
-                                                            maxHeight="400px"
+                                                            minHeight="176px"
+                                                            maxHeight="300px"
                                                             resizable={true}
                                                             placeholder=""
                                                             overlay={

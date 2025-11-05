@@ -1,9 +1,10 @@
 'use client';
 
 import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
 import ApiConfigIdEditModal from '@/src/components/api/ApiConfigIdEditModal';
 import { ApiPlayground } from '@/src/components/api/ApiPlayground';
+import { JsonCodeEditor } from '@/src/components/editors/JsonCodeEditor';
+import JsonSchemaEditor from "@/src/components/editors/JsonSchemaEditor";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,16 +52,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
-import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
 import { useToast } from "@/src/hooks/use-toast";
 import { isJsonEmpty } from '@/src/lib/client-utils';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { ApiConfig, AuthType, CacheMode, HttpMethod, PaginationType, SuperglueClient } from '@superglue/client';
 import { ArrowLeft, Info } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import Prism from 'prismjs';
-import 'prismjs/components/prism-json';
 import React from 'react';
-import Editor from 'react-simple-code-editor';
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 const AUTH_TYPES = ['NONE', 'HEADER', 'QUERY_PARAM', 'OAUTH2'];
@@ -79,14 +77,6 @@ const InfoTooltip = ({ text }: { text: string; }) => (
   </TooltipProvider>
 );
 
-const highlightJson = (code: string) => {
-  try {
-    const formatted = JSON.stringify(JSON.parse(code), null, 2);
-    return Prism.highlight(formatted, Prism.languages.json, 'json');
-  } catch {
-    return code;
-  }
-};
 
 const ApiConfigForm = ({ id }: { id?: string; }) => {
   const router = useRouter();
@@ -587,17 +577,13 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                         Headers (JSON)
                         <InfoTooltip text="Request headers in JSON format. Each key-value pair represents a header name and its value." />
                       </Label>
-                      <div className="relative font-mono border rounded-md">
-                        <Editor
-                          value={formData.headers}
-                          onValueChange={handleChange('headers')}
-                          highlight={highlightJson}
-                          padding={10}
-                          tabSize={2}
-                          insertSpaces={true}
-                          className="min-h-[8rem] text-sm [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white"
-                        />
-                      </div>
+                      <JsonCodeEditor
+                        value={formData.headers}
+                        onChange={handleChange('headers')}
+                        minHeight="128px"
+                        maxHeight="128px"
+                        showValidation={true}
+                      />
                     </div>
 
                     <div>
@@ -605,17 +591,13 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                         Query Parameters (JSON)
                         <InfoTooltip text="URL query parameters in JSON format. These will be appended to the URL as ?key=value pairs." />
                       </Label>
-                      <div className="relative font-mono border rounded-md">
-                        <Editor
-                          value={formData.queryParams}
-                          onValueChange={handleChange('queryParams')}
-                          highlight={highlightJson}
-                          padding={10}
-                          tabSize={2}
-                          insertSpaces={true}
-                          className="min-h-[8rem] text-sm [&_textarea]:outline-none [&_textarea]:w-full [&_textarea]:resize-none [&_textarea]:p-0 [&_textarea]:border-0 [&_textarea]:bg-transparent dark:[&_textarea]:text-white"
-                        />
-                      </div>
+                      <JsonCodeEditor
+                        value={formData.queryParams}
+                        onChange={handleChange('queryParams')}
+                        minHeight="128px"
+                        maxHeight="128px"
+                        showValidation={true}
+                      />
                     </div>
 
                     <div>

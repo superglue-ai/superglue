@@ -1,16 +1,16 @@
 'use client'
 
-import { useConfig } from '@/src/app/config-context'
-import { tokenRegistry } from '@/src/lib/token-registry'
-import { useToast } from '@/src/hooks/use-toast'
-import { ApiConfig, CacheMode, SuperglueClient } from '@superglue/client'
-import { Loader2, CopyIcon } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { AutoSizer, List } from 'react-virtualized'
-import JsonSchemaEditor from '../utils/JsonSchemaEditor'
-import { Button } from '../ui/button'
-import { Card, CardContent } from '../ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
+import { useConfig } from '@/src/app/config-context';
+import { useToast } from '@/src/hooks/use-toast';
+import { tokenRegistry } from '@/src/lib/token-registry';
+import { ApiConfig, CacheMode, SuperglueClient } from '@superglue/client';
+import { CopyIcon, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { AutoSizer, List } from 'react-virtualized';
+import JsonSchemaEditor from '../editors/JsonSchemaEditor';
+import { Button } from '../ui/button';
+import { Card, CardContent } from '../ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 
 interface InteractiveApiPlaygroundProps {
   configId: string
