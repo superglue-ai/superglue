@@ -1,0 +1,2 @@
+Hello from FTP server!
+This is a test file.

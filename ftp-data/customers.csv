@@ -1,0 +1,12 @@
+id,name,email,phone,country,status,created_at
+1,John Smith,john.smith@example.com,+1-555-0101,USA,active,2024-01-15
+2,Emma Johnson,emma.j@example.com,+1-555-0102,USA,active,2024-01-20
+3,Michael Brown,m.brown@example.com,+44-20-1234-5678,UK,inactive,2024-02-01
+4,Sophie Martin,sophie.martin@example.fr,+33-1-23-45-67-89,France,active,2024-02-10
+5,Hans Mueller,hans.m@example.de,+49-30-12345678,Germany,active,2024-02-15
+6,Maria Garcia,maria.garcia@example.es,+34-91-123-4567,Spain,pending,2024-03-01
+7,Li Wei,li.wei@example.cn,+86-10-1234-5678,China,active,2024-03-05
+8,Yuki Tanaka,yuki.t@example.jp,+81-3-1234-5678,Japan,active,2024-03-10
+9,Isabella Silva,isabella.s@example.br,+55-11-1234-5678,Brazil,active,2024-03-15
+10,Ahmed Hassan,ahmed.h@example.eg,+20-2-1234-5678,Egypt,inactive,2024-03-20
+

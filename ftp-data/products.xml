@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<products>
+    <product>
+        <id>P001</id>
+        <name>Wireless Mouse</name>
+        <category>Electronics</category>
+        <price currency="USD">29.99</price>
+        <stock>150</stock>
+        <status>available</status>
+        <attributes>
+            <color>Black</color>
+            <brand>TechPro</brand>
+            <warranty>1 year</warranty>
+        </attributes>
+    </product>
+    <product>
+        <id>P002</id>
+        <name>USB-C Hub</name>
+        <category>Electronics</category>
+        <price currency="USD">49.99</price>
+        <stock>85</stock>
+        <status>available</status>
+        <attributes>
+            <color>Silver</color>
+            <brand>TechPro</brand>
+            <ports>7</ports>
+        </attributes>
+    </product>
+    <product>
+        <id>P003</id>
+        <name>Mechanical Keyboard</name>
+        <category>Electronics</category>
+        <price currency="USD">89.99</price>
+        <stock>42</stock>
+        <status>available</status>
+        <attributes>
+            <color>RGB</color>
+            <brand>GameMaster</brand>
+            <switch_type>Cherry MX Blue</switch_type>
+        </attributes>
+    </product>
+    <product>
+        <id>P004</id>
+        <name>Laptop Stand</name>
+        <category>Accessories</category>
+        <price currency="USD">34.99</price>
+        <stock>200</stock>
+        <status>available</status>
+        <attributes>
+            <color>Gray</color>
+            <material>Aluminum</material>
+            <adjustable>true</adjustable>
+        </attributes>
+    </product>
+    <product>
+        <id>P005</id>
+        <name>Noise Cancelling Headphones</name>
+        <category>Electronics</category>
+        <price currency="USD">199.99</price>
+        <stock>5</stock>
+        <status>low_stock</status>
+        <attributes>
+            <color>Black</color>
+            <brand>AudioPro</brand>
+            <wireless>true</wireless>
+            <battery_life>30 hours</battery_life>
+        </attributes>
+    </product>
+    <product>
+        <id>P006</id>
+        <name>Webcam HD</name>
+        <category>Electronics</category>
+        <price currency="USD">79.99</price>
+        <stock>0</stock>
+        <status>out_of_stock</status>
+        <attributes>
+            <resolution>1080p</resolution>
+            <brand>VideoClear</brand>
+            <microphone>built-in</microphone>
+        </attributes>
+    </product>
+    <product>
+        <id>P007</id>
+        <name>Cable Organizer</name>
+        <category>Accessories</category>
+        <price currency="USD">12.99</price>
+        <stock>500</stock>
+        <status>available</status>
+        <attributes>
+            <color>White</color>
+            <material>Silicone</material>
+            <slots>5</slots>
+        </attributes>
+    </product>
+    <product>
+        <id>P008</id>
+        <name>Monitor 27 inch</name>
+        <category>Electronics</category>
+        <price currency="USD">299.99</price>
+        <stock>25</stock>
+        <status>available</status>
+        <attributes>
+            <resolution>4K UHD</resolution>
+            <brand>ViewPerfect</brand>
+            <refresh_rate>144Hz</refresh_rate>
+        </attributes>
+    </product>
+</products>
+
