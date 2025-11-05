@@ -634,7 +634,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
         <div className="flex-1 border rounded-md">
           {isCodeMode ? (
             <div className="h-full font-mono relative bg-transparent px-3">
-              <div className="absolute top-1 right-1 z-10">
+              <div className="absolute top-1 right-1 z-10 mr-5">
                 <IconCopyButton text={value ?? ''} />
               </div>
               <Editor
@@ -685,7 +685,8 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
                   links: false,
                   colorDecorators: false,
                   occurrencesHighlight: 'off',
-                  renderValidationDecorations: 'off'
+                  renderValidationDecorations: 'off',
+                  stickyScroll: { enabled: false }
                 }}
                 theme={theme}
                 className="bg-transparent"
@@ -743,7 +744,7 @@ const IconCopyButton = ({ text }: { text: string }) => {
   return (
     <button
       onClick={handleCopy}
-      className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors bg-background/60 backdrop-blur"
+      className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors backdrop-blur"
       title="Copy"
       type="button"
     >
