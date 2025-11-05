@@ -79,11 +79,15 @@ http://localhost:3000?token=your-secret-token
 
 ### Local Development
 
-Add a .env file to the root folder, then:
-
 ```bash
 git clone https://github.com/superglue-ai/superglue.git
 cd superglue
+```
+
+Rename the `.env.example` in root to `.env` and populate the required fields, then:
+
+
+```bash
 npm install
 npm run dev
 ```
@@ -106,6 +110,8 @@ POSTGRES_PORT=5432
 POSTGRES_USERNAME=superglue
 POSTGRES_PASSWORD=secure-password
 POSTGRES_DB=superglue
+# when using a unsecured postgres db that does not support ssl - like a local docker container, uncomment this:
+# POSTGRES_SSL=false
 
 # Credential encryption
 MASTER_ENCRYPTION_KEY=generate-with-openssl-rand-hex-32
