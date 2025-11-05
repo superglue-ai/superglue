@@ -29,11 +29,11 @@
     "@biomejs/biome": "1.9.4",
     "@types/node": "^20.17.19",
     "mcp-remote": "^0.1.5",
+    "mint": "^4.2.186",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
     "turbo": "^2.5.6",
     "typescript": "^5.8.3",
-    "vitest": "^3.2.4",
-    "mint": "^4.2.185"
+    "vitest": "^3.2.4"
   }
 }
