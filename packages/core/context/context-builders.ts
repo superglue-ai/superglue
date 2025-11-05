@@ -102,7 +102,7 @@ function buildIntegrationContext(integration: Integration, opts: IntegrationCont
 
     const paginationSection = docSearch.extractRelevantSections(
         integration.documentation,
-        "pagination page offset cursor limit per_page pageSize after next previous paging paginated results list",
+        "pagination page offset cursor limit per_page pageSize paginate",
         paginationMaxSections,
         paginationSectionSize,
         integration.openApiSchema
@@ -117,7 +117,7 @@ function buildIntegrationContext(integration: Integration, opts: IntegrationCont
 
     const xml_opening_tag = `<${integration.id}>`;
     const urlSection = '<base_url>: ' + composeUrl(integration.urlHost, integration.urlPath) + '</base_url>';
-    const specificInstructionsSection = '<instructions>: ' + (integration.specificInstructions?.length > 0 ? integration.specificInstructions : "No specific instructions provided.") + '</instructions>';
+    const specificInstructionsSection = '<integration_specific_instructions>: ' + (integration.specificInstructions?.length > 0 ? integration.specificInstructions : "No integration-specific instructions provided.") + '</integration_specific_instructions>';
     const xml_closing_tag = `</${integration.id}>`;
     return xml_opening_tag + '\n' + [urlSection, specificInstructionsSection, authSection, paginationSection, generalDocSection].filter(Boolean).join('\n').slice(0, budget - xml_opening_tag.length - xml_closing_tag.length) + '\n' + xml_closing_tag;
 }
@@ -146,13 +146,13 @@ export function getToolBuilderContext(input: ToolBuilderContextInput, options: T
     if (budget === 0) return '';
     const hasIntegrations = input.integrations.length > 0;
 
-    const prompt_start = `Build a complete workflow to fulfill the user's request.`;
+    const prompt_start = `Build a complete workflow to fulfill the user's instruction.`;
     const userInstructionContext = options.include.userInstruction ? `<instruction>${input.userInstruction}</instruction>` : '';
     const availableVariablesContext = options.include?.availableVariablesContext ? `<available_variables>${buildAvailableVariableContext(input.payload, input.integrations)}</available_variables>` : '';
-    const payloadContext = options.include?.payloadContext ? `<workflow_input>${getObjectContext(input.payload, { include: { schema: true, preview: false, samples: true }, characterBudget: budget * 0.5 })}</workflow_input>` : '';
-    const integrationContext = options.include?.integrationContext ? `<available_integrations_and_documentation>${hasIntegrations ? input.integrations.map(int => buildIntegrationContext(int, { characterBudget: budget })).join('\n') : 'No integrations provided. Build a transform-only workflow using finalTransform to process the payload data.'}</available_integrations_and_documentation>` : '';
+    const payloadContext = options.include?.payloadContext ? `<workflow_input>${getObjectContext(input.payload, { include: { schema: true, preview: false, samples: true }, characterBudget: budget * 0.4 })}</workflow_input>` : '';
+    const integrationContext = options.include?.integrationContext ? `<available_integrations_and_documentation>${hasIntegrations ? input.integrations.map(int => buildIntegrationContext(int, { characterBudget: budget * 0.4 })).join('\n') : 'No integrations provided. Build a transform-only workflow using finalTransform to process the payload data.'}</available_integrations_and_documentation>` : '';
     const availableIntegrationIdsContext = options.include?.integrationContext ? `<available_integration_ids>${input.integrations.map(int => int.id).join(', ')}</available_integration_ids>` : '';
-    const prompt_end = hasIntegrations ? 'IMPORTANT: Ensure that the final output matches the instruction and you use ONLY the available integration ids in the tool steps. DO NOT USE ANY OTHER INTEGRATION IDS.' : 'Since no integrations are provided as input, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.';
+    const prompt_end = hasIntegrations ? 'IMPORTANT: Ensure that the final output matches the instruction and that you DO NOT reference integration IDs not present in the <available_integration_ids> context.' : 'Since no integrations are provided as input, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.';
     const prompt = prompt_start + '\n' + ([userInstructionContext, integrationContext, availableVariablesContext, payloadContext, availableIntegrationIdsContext].filter(Boolean).join('\n')).slice(0, budget - prompt_start.length - prompt_end.length) + '\n' + prompt_end;
     return prompt;
 }

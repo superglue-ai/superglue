@@ -56,7 +56,7 @@ export class WorkflowBuilder {
       responseSchema: this.responseSchema
     }, {
       characterBudget: 100000,
-      include: { integrationContext: true, availableVariablesContext: true, payloadContext: true, userInstruction: true }
+      include: { integrationContext: true, availableVariablesContext: true, payloadContext: Object.keys(this.initialPayload).length > 0 ? true : false, userInstruction: true }
     });
 
     return [
