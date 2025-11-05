@@ -16,11 +16,10 @@ import {
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
 import { cn, MAX_DISPLAY_LINES, MAX_DISPLAY_SIZE } from "@/src/lib/general-utils";
+import Editor from '@monaco-editor/react';
 import { Check, Copy, Plus, Trash2 } from "lucide-react";
-import Prism from 'prismjs';
-import 'prismjs/components/prism-json';
 import React from 'react';
-import Editor from 'react-simple-code-editor';
+import { useMonacoTheme } from "../../hooks/useMonacoTheme";
 
 interface JsonSchemaEditorProps {
   value: string | null;
@@ -70,6 +69,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   showModeToggle = true,
   errorPrefix,
 }) => {
+  const { theme, onMount } = useMonacoTheme();
   const [isCodeMode, setIsCodeMode] = React.useState(forceCodeMode || false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
   const [localIsEnabled, setLocalIsEnabled] = React.useState<boolean>(() => {
@@ -137,13 +137,11 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       setJsonError(null);
       return;
     }
-    // Accept raw JSON strings like "{}" or {} and never re-wrap as quoted JSON strings
     try {
       const val = typeof value === 'string' ? value : String(value);
       const parsed = JSON.parse(val);
       setVisualSchema(parsed);
       setJsonError(null);
-      // Do not auto-normalize content by writing back formatted value here; leave caret/typing intact
     } catch (e) {
       setJsonError((e as Error).message);
     }
@@ -570,14 +568,6 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
     return schema;
   };
 
-  // Add this highlight function
-  const highlightJson = (code: string) => {
-    try {
-      return Prism.highlight(code, Prism.languages.json, 'json');
-    } catch {
-      return code;
-    }
-  };
 
   const handleEnabledChange = (enabled: boolean) => {
     if (isOptional) {
@@ -598,7 +588,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
   const shouldShowHeader = (showModeToggle && (localIsEnabled || !isOptional)) || isOptional;
 
   return (
-    <div className="space-y-1 flex flex-col h-full mb-4 gap-2">
+    <div className="space-y-1 flex flex-col h-full min-h-[300px] mb-4 gap-2">
       {shouldShowHeader && (
         <div className="flex items-center gap-4 ml-auto shrink-0">
           <div className="flex items-center gap-4">
@@ -641,48 +631,65 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
       )}
 
       {localIsEnabled ? (
-        <div className="flex-1 min-h-0 border rounded-md min-h-32">
+        <div className="flex-1 border rounded-md">
           {isCodeMode ? (
-            <div className="h-full font-mono relative bg-transparent">
-              <div className="overflow-auto h-full">
-                <div className="absolute top-1 right-1 z-10">
-                  <IconCopyButton text={value ?? ''} />
-                </div>
-                <Editor
-                  value={value ?? ''}
-                  onValueChange={(code) => {
-                    onChange(code || '');
-                    try {
-                      if (code === '' || code === null) {
-                        setJsonError(null);
-                      } else {
-                        JSON.parse(code);
-                        setJsonError(null);
-                      }
-                    } catch (e) {
-                      setJsonError((e as Error).message);
-                    }
-                  }}
-                  highlight={highlightJson}
-                  padding={10}
-                  tabSize={2}
-                  insertSpaces={true}
-                  disabled={readOnly}
-                  onBlur={onBlur}
-                  className={cn(
-                    "font-mono text-xs w-full h-full border-0 border-transparent outline-none focus:outline-none focus-visible:outline-0 ring-0 focus:ring-0 focus-visible:ring-0"
-                  )}
-                  textareaClassName="border-0 border-transparent focus:border-0 focus:border-transparent outline-none focus:outline-none focus-visible:outline-0 ring-0 focus:ring-0 focus-visible:ring-0 h-full"
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    minHeight: '128px',
-                    height: '100%',
-                    outline: 'none',
-                    boxShadow: 'none',
-                    border: '0',
-                  }}
-                />
+            <div className="h-full font-mono relative bg-transparent px-3">
+              <div className="absolute top-1 right-1 z-10">
+                <IconCopyButton text={value ?? ''} />
               </div>
+              <Editor
+                height="300px"
+                defaultLanguage="json"
+                value={value ?? ''}
+                onChange={(code) => {
+                  try {
+                    if (code === '' || code === null) {
+                      setJsonError(null);
+                      onChange(code || '');
+                    } else {
+                      JSON.parse(code);
+                      setJsonError(null);
+                      onChange(code || '');
+                    }
+                  } catch (e) {
+                    setJsonError((e as Error).message);
+                  }
+                }}
+                onMount={onMount}
+                options={{
+                  readOnly,
+                  minimap: { enabled: false },
+                  fontSize: 12,
+                  lineNumbers: 'off',
+                  glyphMargin: false,
+                  folding: false,
+                  lineDecorationsWidth: 0,
+                  lineNumbersMinChars: 0,
+                  scrollBeyondLastLine: false,
+                  wordWrap: 'on',
+                  contextmenu: false,
+                  renderLineHighlight: 'none',
+                  scrollbar: {
+                    vertical: 'auto',
+                    horizontal: 'auto',
+                    verticalScrollbarSize: 8,
+                    horizontalScrollbarSize: 8,
+                    alwaysConsumeMouseWheel: false
+                  },
+                  overviewRulerLanes: 0,
+                  padding: { top: 12, bottom: 12 },
+                  tabSize: 2,
+                  quickSuggestions: false,
+                  parameterHints: { enabled: false },
+                  codeLens: false,
+                  links: false,
+                  colorDecorators: false,
+                  occurrencesHighlight: 'off',
+                  renderValidationDecorations: 'off'
+                }}
+                theme={theme}
+                className="bg-transparent"
+              />
             </div>
           ) : (
             <div className="h-full flex flex-col min-h-0">

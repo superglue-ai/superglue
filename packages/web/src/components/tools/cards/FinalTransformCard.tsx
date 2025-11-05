@@ -1,3 +1,4 @@
+import JsonSchemaEditor from "@/src/components/editors/JsonSchemaEditor";
 import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
 import {
@@ -7,7 +8,6 @@ import {
   TabsTrigger,
 } from "@/src/components/ui/tabs";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
-import JsonSchemaEditor from "@/src/components/utils/JsonSchemaEditor";
 import { downloadJson } from "@/src/lib/download-utils";
 import {
   ensureSourceDataArrowFunction,
@@ -23,8 +23,8 @@ import {
   Settings,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { JavaScriptCodeEditor } from "../editors/JavaScriptCodeEditor";
-import { JsonCodeEditor } from "../editors/JsonCodeEditor";
+import { JavaScriptCodeEditor } from "../../editors/JavaScriptCodeEditor";
+import { JsonCodeEditor } from "../../editors/JsonCodeEditor";
 import { useDataProcessor } from "../hooks/use-data-processor";
 import { CopyButton } from "../shared/CopyButton";
 

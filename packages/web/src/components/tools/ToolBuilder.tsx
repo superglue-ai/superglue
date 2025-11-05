@@ -16,13 +16,13 @@ import { Validator } from 'jsonschema';
 import { Check, Clock, FileJson, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Wrench, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import JsonSchemaEditor from '../editors/JsonSchemaEditor';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
-import JsonSchemaEditor from '../utils/JsonSchemaEditor';
 
 type ToolBuilderView = 'integrations' | 'instructions';
 

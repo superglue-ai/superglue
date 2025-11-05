@@ -1,3 +1,13 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/src/components/ui/alert-dialog';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
@@ -6,20 +16,10 @@ import { isEmptyData } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
 import { Database, Download, FileJson, Loader2, Package, Play, Settings, Trash2, Wand2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { CopyButton } from '../shared/CopyButton';
-import { JsonCodeEditor } from '../editors/JsonCodeEditor';
+import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
 import { ToolStepConfigurator } from '../ToolStepConfigurator';
 import { useDataProcessor } from '../hooks/use-data-processor';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/src/components/ui/alert-dialog';
+import { CopyButton } from '../shared/CopyButton';
 
 export const SpotlightStepCard = React.memo(({
     step,
@@ -280,7 +280,6 @@ export const SpotlightStepCard = React.memo(({
                                     onRemove={() => { }}
                                     integrations={integrations}
                                     onEditingChange={onConfigEditingChange}
-                                    disabled={!!(isExecuting || isGlobalExecuting)}
                                     stepInput={evolvingPayload}
                                 />
                             </div>
