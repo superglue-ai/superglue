@@ -36,12 +36,12 @@ Once we've discussed your changes and you've got your code ready, make sure that
 ### Tech we use
 
 - Application (this repository)
-  - NextJS 15, App Router (not Pages Router)
+  - Next.js, App Router (not Pages Router)
   - GraphQL backend (TypeScript)
   - Supabase
-  - Redis
+  - Postgres
   - LLMs (OpenAI, Claude, Gemini, etc.)
-- JS SDK ([superglue/superglue-js](https://github.com/superglue-ai/superglue-js))
+- [JS client SDK](https://github.com/superglue-ai/superglue-js))
 
 ### Architecture Overview
 
@@ -64,7 +64,7 @@ See this [diagram](https://docs.superglue.cloud/guides/architecture) for an over
 ```
 
 - **`packages/core`**:  
-  - Contains the backend GraphQL API (`graphql/`), workflow engine (`workflow/`), LLM integration (`llm/`), integration logic (`integrations/`), and datastore implementations (`datastore/` for Redis, FileStore, Memory).
+  - Contains the backend GraphQL API (`graphql/`), workflow engine (`workflow/`), LLM integration (`llm/`), integration logic (`integrations/`), and datastore implementations (`datastore/` for Postgres, FileStore, Memory).
   - Tests are in `tests/` and alongside implementations.
 - **`packages/web`**:  
   - Next.js 15 App Router frontend, using TypeScript, shadcn/ui, and Tailwind CSS.
@@ -72,7 +72,7 @@ See this [diagram](https://docs.superglue.cloud/guides/architecture) for an over
 - **`packages/shared`**:  
   - Shared TypeScript code (types, utils, templates) used by both backend and frontend.
 - **`docs/`**:  
-  - API reference, guides, and architecture docs.
+  - API reference, guides, and docs.
 - **`docker/`**:  
   - Dockerfiles for backend, frontend, and local development.
 - **Monorepo**:  
@@ -83,7 +83,7 @@ See this [diagram](https://docs.superglue.cloud/guides/architecture) for an over
 ### Prerequisites
 
 - Node.js 18+ and npm
-- Docker (for local Redis, Postgres, etc.)
+- Docker (for local Postgres, etc.)
 - (Optional) We highly recommend Cursor/VSCode for best TypeScript/Next.js experience
 
 ### Quickstart

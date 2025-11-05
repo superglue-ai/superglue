@@ -1,0 +1,109 @@
+---
+title: "Subscriptions"
+description: "GraphQL subscriptions for real-time updates."
+---
+
+Subscriptions allow you to receive real-time updates from superglue. Currently, only log streaming is supported.
+
+## Logs
+
+Stream log messages in real time. Useful for monitoring workflow execution and debugging issues.
+
+### Subscription
+
+```graphql
+subscription {
+  logs {
+    id
+    message
+    level
+    timestamp
+    runId
+  }
+}
+```
+
+### Fields
+
+- `id`: ID\!
+- `message`: String\!
+- `level`: LogLevel (DEBUG, INFO, WARN, ERROR)
+- `timestamp`: DateTime\!
+- `runId`: ID (optional)
+
+### Example Usage
+
+**WebSocket Connection:**
+```graphql
+subscription {
+  logs {
+    id
+    message
+    level
+    timestamp
+    runId
+  }
+}
+```
+
+**Client Implementation:**
+```typescript
+import { createClient } from 'graphql-ws';
+import { WebSocket } from 'ws';
+
+const client = createClient({
+  url: 'wss://graphql.superglue.cloud/graphql',
+  webSocketImpl: WebSocket,
+  connectionParams: {
+    Authorization: 'Bearer YOUR_API_KEY'
+  }
+});
+
+client.subscribe(
+  {
+    query: `
+      subscription {
+        logs {
+          id
+          message
+          level
+          timestamp
+          runId
+        }
+      }
+    `,
+  },
+  {
+    next: (data) => {
+      console.log('Log received:', data);
+    },
+    error: (err) => {
+      console.error('Subscription error:', err);
+    },
+    complete: () => {
+      console.log('Subscription completed');
+    },
+  },
+);
+```
+
+### LogLevel enum
+
+- `DEBUG` - Detailed debugging information
+- `INFO` - General information about execution
+- `WARN` - Warning messages that don't stop execution
+- `ERROR` - Error messages indicating failures
+
+### Use Cases
+
+- **Development**: Monitor API calls and transformations in real-time
+- **Debugging**: Track down issues in workflow execution
+- **Production Monitoring**: Watch for errors and performance issues
+- **Auditing**: Keep track of all operations performed
+
+### Notes
+
+- Logs are streamed in real-time as operations occur
+- The `runId` field links logs to specific execution runs
+- WebSocket connection required for subscriptions
+- Authentication via Authorization header in connection params

@@ -1,0 +1,470 @@
+---
+title: "Creating a Tool"
+description: "Create tools to connect your systems and do things"
+---
+
+Tools in superglue are reusable workflows that you can execute on-demand, schedule, or trigger via webhooks. Each tool consists of sequential steps with built-in data transformations, loops, and error handling.
+
+Learn more about how tools fit into the bigger picture in our [core concepts](/getting-started/core-concepts) page.
+
+<Tabs>
+  <Tab title="Via Agent">
+    The fastest way to create a tool is by talking to our agent. Describe what you want to accomplish and the agent will build the tool for you.
+
+    <video
+      autoPlay
+      className="w-full rounded-lg"
+      src="../resources/create-tool.mp4"
+    />
+
+    **Simple example:**
+    ```
+    "Create a tool that fetches all active customers from Stripe"
+    ```
+
+    superglue will:
+    1. Identify which integration to use (or create one if needed)
+    2. Find the relevant API endpoint from the documentation
+    3. Configure the API call with appropriate parameters
+    4. Test it and make it available for execution
+
+    **Complex example:**
+    ```
+    "Create a tool that loops through all contacts in HubSpot,
+    filters those with email domains matching @company.com,
+    and updates their lifecycle stage to 'customer'"
+    ```
+
+    The agent can build multi-step tools with:
+    - Sequential API calls
+    - Data transformations between steps
+    - Loops for batch processing
+    - Error handling and retries
+
+    <Card title="Try it now" icon="hammer" href="https://app.superglue.cloud">
+      Start building tools with our agent
+    </Card>
+
+  </Tab>
+  <Tab title="Via UI">
+    Build tools in the UI:
+
+    <video
+      autoPlay
+      className="w-full rounded-lg"
+      src="../resources/create-tool-ui.mp4"
+    />
+
+    <Steps>
+      <Step title="Navigate to tools">
+        Go to Tools in your superglue dashboard and click "Create Tool"
+      </Step>
+      <Step title="Select integrations">
+        Choose which API integrations this tool will use
+      </Step>
+      <Step title="Add instruction">
+        Describe what the tool should do in natural language. superglue will build the workflow steps automatically.
+      </Step>
+      <Step title="Test and save">
+        Run the tool with sample data to verify it works as expected. See [debugging tools](/guides/debugging-a-tool) for troubleshooting.
+      </Step>
+    </Steps>
+
+  </Tab>
+  <Tab title="Via SDK">
+    For programmatic tool creation, use the SDK:
+
+    ```bash
+    npm install @superglue/client
+    ```
+
+    **Build a tool with natural language:**
+
+    <Tabs>
+      <Tab title="SDK">
+        ```typescript
+        import { SuperglueClient } from "@superglue/client";
+
+        const superglue = new SuperglueClient({
+          apiKey: "your_api_key_here"
+        });
+
+        // Let superglue build the workflow from your instruction
+        const tool = await superglue.buildWorkflow({
+          integrationIds: ["stripe"],
+          instruction: "Fetch all active customers from Stripe"
+        });
+
+        console.log(tool); // Tool with auto-generated steps
+        ```
+      </Tab>
+      <Tab title="GraphQL">
+        ```graphql
+        mutation BuildWorkflow {
+          buildWorkflow(
+            integrationIds: ["stripe"]
+            instruction: "Fetch all active customers from Stripe"
+          ) {
+            id
+            instruction
+            steps {
+              id
+              integrationId
+              apiConfig {
+                method
+                urlPath
+              }
+            }
+            finalTransform
+          }
+        }
+        ```
+      </Tab>
+    </Tabs>
+
+    **Build and execute a tool with natural language:**
+
+    <Tabs>
+      <Tab title="SDK">
+        ```typescript
+        // Build the workflow from natural language
+        const tool = await superglue.buildWorkflow({
+          integrationIds: ["hubspot"],
+          instruction: `Get all contacts from HubSpot where the email domain is
+                        @company.com and update their lifecycle stage to 'customer'`
+        });
+
+        // Test it with sample data
+        const result = await superglue.executeWorkflow({
+          workflow: tool,
+          payload: {}
+        });
+
+        console.log(result); // { success: true, data: { updated: 5, contacts: [...] } }
+
+        // Save it for reuse
+        await superglue.upsertWorkflow({
+          ...result.config,
+          id: "update-company-contacts"
+        });
+        ```
+      </Tab>
+      <Tab title="GraphQL">
+        ```graphql
+        # Step 1: Build the workflow
+        mutation BuildWorkflow {
+          buildWorkflow(
+            integrationIds: ["hubspot"]
+            instruction: """
+            Get all contacts from HubSpot where the email domain is
+            @company.com and update their lifecycle stage to 'customer'
+            """
+          ) {
+            id
+            steps {
+              id
+              integrationId
+              apiConfig {
+                method
+                urlPath
+                body
+              }
+            }
+            finalTransform
+          }
+        }
+
+        # Step 2: Execute the workflow
+        mutation ExecuteWorkflow($workflow: WorkflowInput!) {
+          executeWorkflow(
+            workflow: $workflow
+            payload: {}
+          ) {
+            success
+            data
+            config {
+              id
+              steps {
+                id
+              }
+            }
+          }
+        }
+
+        # Step 3: Save for reuse
+        mutation SaveWorkflow($workflow: WorkflowInput!) {
+          upsertWorkflow(workflow: $workflow) {
+            id
+            instruction
+          }
+        }
+        ```
+      </Tab>
+    </Tabs>
+
+    See the [SDK documentation](/sdk/overview) for more details.
+
+  </Tab>
+</Tabs>
+
+## Tool anatomy
+
+Every tool consists of:
+
+<CardGroup cols={2}>
+  <Card title="Steps" icon="list">
+    Sequential API calls that fetch or modify data. Each step can reference data from previous steps.
+  </Card>
+  <Card title="Execution Mode" icon="play">
+    Steps run with self-healing enabled or disabled. Self-healing can auto-repair failures during execution.
+  </Card>
+  <Card title="Transformations" icon="code">
+    JavaScript functions that shape the step inputs and the final output. Ensures tool results adhere to response schemas.
+  </Card>
+  <Card title="Variables" icon="brackets-curly">
+    Access data from previous steps, credentials, and input payload using `<<variable>>` syntax.
+  </Card>
+</CardGroup>
+
+## Step configuration
+
+Each step in a tool represents a single API call with the following configuration:
+
+### Basic structure
+
+```typescript
+{
+  id: "stepId",                    // Unique identifier for this step
+  integrationId: "stripe",         // Which integration to use
+  loopSelector: "(sourceData) => { return [\"one\", \"two\"]}",  // The data selector for the current step
+  apiConfig: {
+    method: "POST",                 // HTTP method
+    urlPath: "/v1/customers",      // API endpoint path
+    queryParams: {},               // URL query parameters
+    headers: { "Authorization": "Bearer <<stripe_apiKey>>" }, // Custom headers
+    body: ""                       // Request body
+  }
+}
+```
+
+### Variable syntax
+
+Use `<<variable>>` to access dynamic values:
+
+**Access credentials:**
+
+```typescript
+{
+  headers: {
+    "Authorization": "Bearer <<integrationId_access_token>>"
+  }
+}
+```
+
+**Access previous step data:**
+
+```typescript
+{
+  urlPath: "/customers/<<getCustomer.data.id>>",
+  body: {
+    email: "<<getCustomer.data.email>>"
+  }
+}
+```
+
+**Access input payload:**
+
+```typescript
+{
+  queryParams: {
+    user_id: "<<userId>>",
+    date: "<<startDate>>"
+  }
+}
+```
+
+**Execute JavaScript expressions:**
+
+```typescript
+{
+  body: {
+    ids: "<<(sourceData) => JSON.stringify(sourceData.users.map(u => u.id))>>",
+    timestamp: "<<(sourceData) => new Date().toISOString()>>",
+    count: "<<(sourceData) => sourceData.items.length>>",
+    uppercaseName: "<<(sourceData) => sourceData.name.toUpperCase()>>"
+  }
+}
+```
+
+<Note>
+  JavaScript expressions must use the arrow function syntax `(sourceData) => ...`. Direct property access like `<<userId>>` works for simple variables, but not for nested properties or transformations.
+</Note>
+
+## Data transformations
+
+### Data selector
+
+Extract an array to iterate over:
+
+```typescript
+{
+  loopSelector: `(sourceData) => {
+    const items = sourceData.fetchItems.results || [];
+    const excludeIds = sourceData.excludeIds || [];
+    return items.filter(item => !excludeIds.includes(item.id));
+  }`;
+}
+```
+
+### Final transform
+
+Shape the final output of the entire tool:
+
+```typescript
+{
+  finalTransform: `(sourceData) => {
+    const customers = sourceData.getCustomers.data || [];
+    const updated = sourceData.updateCustomers || [];
+    
+    return {
+      success: true,
+      total: customers.length,
+      updated: updated.length,
+      results: updated.map(r => ({
+        id: r.currentItem.id,
+        status: r.data.status
+      }))
+    };
+  }`;
+}
+```
+
+## Special integrations
+
+### PostgreSQL
+
+Query databases using the postgres:// URL scheme:
+
+```typescript
+{
+  id: "queryDatabase",
+  integrationId: "postgres_db",
+  apiConfig: {
+    urlHost: "postgres://<<postgres_db_username>>:<<postgres_db_password>>@<<postgres_db_hostname>>:5432",
+    urlPath: "<<postgres_db_database>>",
+    body: {
+      query: "SELECT * FROM users WHERE status = $1 AND created_at > $2",
+      params: ["active", "<<(sourceData) => sourceData.startDate>>"]
+    }
+  }
+}
+```
+
+**Always use parameterized queries** with `$1`, `$2`, etc. placeholders to prevent SQL injection. Provide values in the `params` array, which can include static values or `<<>>` expressions.
+
+### FTP/SFTP
+
+Access files on FTP servers:
+
+```typescript
+{
+  id: "listFiles",
+  integrationId: "ftp-server",
+  apiConfig: {
+    urlHost: "sftp://<<integrationId_username>>:<<integrationId_password>>@<<integrationId_hostname>>:22",
+    urlPath: "/data",
+    body: {
+      operation: "list",
+      path: "/reports"
+    }
+  }
+}
+```
+
+**Supported operations:**
+
+- `list` - List directory contents
+- `get` - Download file (auto-parses CSV/JSON/XML)
+- `put` - Upload file
+- `delete` - Delete file
+- `rename` - Rename/move file
+- `mkdir` - Create directory
+- `rmdir` - Remove directory
+- `exists` - Check if file exists
+- `stat` - Get file metadata
+
+## Error handling
+
+<CardGroup cols={2}>
+  <Card title="Automatic retries" icon="rotate">
+    Failed steps are automatically retried with exponential backoff
+  </Card>
+  <Card title="Self-healing" icon="wand-magic-sparkles">
+    When enabled, superglue attempts to fix configuration errors automatically
+  </Card>
+  <Card title="Validation" icon="shield-check">
+    Response data is validated against expected schemas
+  </Card>
+  <Card title="Graceful degradation" icon="life-ring">
+    Handle missing data with optional chaining and defaults in transformations
+  </Card>
+</CardGroup>
+
+<Tip>
+**Keep steps focused** - Each step should make a single API call. Use transformations to prepare data, not additional steps.
+
+**Use descriptive IDs** - Step IDs are used to reference data in later steps. Use clear names like `getCustomers`, `updateOrder`, `sendEmail`.
+
+**Avoid unnecessary loops** - Don't loop over thousands of items if the API supports batch operations. Check the documentation first.
+
+**Test with real data** - Test each step incrementally with production-like data before deploying.
+</Tip>
+
+## Input and output schemas
+
+Define schemas to make your tools more robust:
+
+**Input schema** - Validates payload before execution:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "userId": { "type": "string" },
+    "startDate": { "type": "string", "format": "date" }
+  },
+  "required": ["userId"]
+}
+```
+
+**Response schema** - Validates final output:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "success": { "type": "boolean" },
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "email": { "type": "string" }
+        }
+      }
+    }
+  }
+}
+```
+
+## Next steps
+
+<CardGroup cols={1}>
+  <Card title="Debug your tool" icon="bug" href="/guides/debugging-a-tool">
+    Test, troubleshoot, and fix issues with your tools
+  </Card>
+  <Card title="Deploy to production" icon="rocket" href="/guides/deploying-a-tool">
+    Execute tools on-demand, scheduled, or via webhooks
+  </Card>
+</CardGroup>

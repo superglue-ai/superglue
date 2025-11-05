@@ -3,8 +3,6 @@
 }
 
 /* Hide header anchor link buttons */
-h1>div.absolute,
-h2>div.absolute,
 h3>div.absolute,
 h4>div.absolute,
 h5>div.absolute,
@@ -13,12 +11,35 @@ h6>div.absolute {
 }
 
 /* Disable click-to-copy on headers */
-h1 span.cursor-pointer,
-h2 span.cursor-pointer,
 h3 span.cursor-pointer,
 h4 span.cursor-pointer,
 h5 span.cursor-pointer,
 h6 span.cursor-pointer {
     pointer-events: none !important;
     cursor: default !important;
+}
+
+/* Improve text color in dark mode */
+.dark {
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.dark p,
+.dark li,
+.dark span {
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6 {
+    color: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* Rounded corners for videos */
+.rounded-lg {
+    border-radius: 0.5rem;
 }

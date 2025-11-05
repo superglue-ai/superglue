@@ -1,0 +1,247 @@
+---
+title: "Types"
+description: "TypeScript type definitions for the superglue SDK"
+---
+
+## Workflow types
+
+### Workflow
+
+<Note>
+    In some places in the SDK and documentation we may still be referring to **workflows**, which is the now **deprecated** legacy naming for tools. For all intents and purposes, the two phrases **refer to the same** concept.
+</Note>
+
+Represents a tool (called "Workflow" in the SDK, "Tool" in the UI). Contains steps that execute sequentially.
+
+```typescript
+interface Workflow {
+  id: string;
+  version?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  steps: ExecutionStep[];
+  integrationIds?: string[];
+  finalTransform?: string;
+  inputSchema?: JSONSchema;
+  responseSchema?: JSONSchema;
+  instruction?: string;
+  originalResponseSchema?: JSONSchema;
+}
+```
+
+**Fields:**
+- `id` - Unique identifier
+- `steps` - Array of API call steps to execute
+- `integrationIds` - Which integrations this workflow uses
+- `instruction` - Human-readable description
+- `finalTransform` - JavaScript function to shape final output
+- `inputSchema` - JSON schema for input validation
+- `responseSchema` - JSON schema for output validation
+- `version` - Auto-versioned on changes
+- `createdAt` - Creation timestamp
+- `updatedAt` - Last update timestamp
+
+### ExecutionStep
+
+A single API call within a workflow.
+
+```typescript
+interface ExecutionStep {
+  id: string;
+  apiConfig: ApiConfig;
+  integrationId?: string;
+  executionMode?: 'DIRECT' | 'LOOP';
+  loopSelector?: string;
+  loopMaxIters?: number;
+  inputMapping?: string;
+  responseMapping?: string;
+}
+```
+
+**Fields:**
+- `id` - Unique identifier (reference in later steps)
+- `apiConfig` - The API call configuration
+- `integrationId` - Which integration to use
+- `executionMode` - `'DIRECT'` (run once) or `'LOOP'` (iterate over array)
+- `loopSelector` - JavaScript function returning array to iterate
+- `loopMaxIters` - Safety limit for loops
+- `inputMapping` - Transform input before API call
+- `responseMapping` - Transform response after API call
+
+## Workflow result types
+
+### WorkflowResult
+
+Returned from `executeWorkflow()`. Contains the final output and step-by-step results.
+
+```typescript
+interface WorkflowResult {
+  id: string;
+  success: boolean;
+  data?: any;
+  error?: string;
+  headers?: Record<string, any>;
+  statusCode?: number;
+  startedAt: Date;
+  completedAt: Date;
+  config: Workflow;
+  stepResults: WorkflowStepResult[];
+}
+```
+
+**Fields:**
+- `id` - Run ID
+- `success` - Whether execution succeeded
+- `data` - Final output data
+- `error` - Error message if failed
+- `config` - The workflow that was executed
+- `stepResults` - Results for each step
+- `startedAt` - Execution start time
+- `completedAt` - Execution completion time
+
+### WorkflowStepResult
+
+Result for a single step execution.
+
+```typescript
+interface WorkflowStepResult {
+  stepId: string;
+  config?: ApiConfig;
+  success: boolean;
+  rawData?: any;
+  transformedData?: any;
+  error?: string;
+}
+```
+
+**Fields:**
+- `stepId` - Which step this result is for
+- `success` - Whether the step succeeded
+- `rawData` - API response before transformations
+- `transformedData` - API response after transformations
+- `error` - Error message if failed
+- `config` - The actual config used (may differ if self-healing occurred)
+
+## Workflow scheduling types
+
+### WorkflowSchedule
+
+Represents a scheduled/recurring workflow execution.
+
+```typescript
+interface WorkflowSchedule {
+  id: string;
+  workflowId: string;
+  cronExpression: string;
+  timezone: string;
+  enabled: boolean;
+  payload?: Record<string, any>;
+  options?: RequestOptions;
+  lastRunAt?: Date;
+  nextRunAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+**Fields:**
+- `workflowId` - Which workflow to run
+- `cronExpression` - Cron expression (e.g., `"0 0 * * *"` for daily at midnight)
+- `timezone` - Timezone (e.g., `"America/New_York"`)
+- `enabled` - Whether the schedule is active
+- `payload` - Input data for each execution
+- `options` - Execution options
+- `nextRunAt` - When the next execution will run
+- `lastRunAt` - When the last execution ran
+
+### WorkflowScheduleInput
+
+Input type for creating or updating a schedule.
+
+```typescript
+type WorkflowScheduleInput = {
+  id?: string;
+  workflowId?: string;
+  cronExpression?: string;
+  timezone?: string;
+  enabled?: boolean;
+  payload?: Record<string, any>;
+  options?: RequestOptions;
+}
+```
+
+## Integration types
+
+### Integration
+
+Represents an API integration with credentials and configuration.
+
+```typescript
+interface Integration {
+  id: string;
+  version?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  name?: string;
+  type?: string;
+  urlHost?: string;
+  urlPath?: string;
+  credentials?: Record<string, any>;
+  documentationUrl?: string;
+  documentation?: string;
+  documentationPending?: boolean;
+  openApiSchema?: string;
+  openApiUrl?: string;
+  specificInstructions?: string;
+  documentationKeywords?: string[];
+  icon?: string;
+}
+```
+
+**Fields:**
+- `id` - Unique identifier
+- `name` - Display name
+- `urlHost` - Base URL for the API
+- `credentials` - API keys, tokens, etc.
+- `documentationUrl` - Link to API documentation
+- `specificInstructions` - Custom guidance for the agent
+- `version` - Auto-versioned on changes
+- `createdAt` - Creation timestamp
+- `updatedAt` - Last update timestamp
+
+### UpsertMode
+
+Enum for integration creation/update behavior.
+
+```typescript
+enum UpsertMode {
+  CREATE = "CREATE",   // Only create (fail if exists)
+  UPDATE = "UPDATE",   // Only update (fail if doesn't exist)
+  UPSERT = "UPSERT"    // Create or update (default)
+}
+```
+
+
+## RequestOptions
+
+Control workflow execution behavior. Passed to `executeWorkflow()`.
+
+```typescript
+interface RequestOptions {
+  selfHealing?: "ENABLED" | "TRANSFORM_ONLY" | "REQUEST_ONLY" | "DISABLED";
+  timeout?: number;
+  retries?: number;
+  retryDelay?: number;
+  webhookUrl?: string;
+  testMode?: boolean;
+}
+```
+
+**Fields:**
+- `selfHealing` - Auto-fix errors: `"ENABLED"` (default), `"TRANSFORM_ONLY"`, `"REQUEST_ONLY"`, or `"DISABLED"`
+- `timeout` - Max execution time in milliseconds (default: `300000`)
+- `retries` - Number of retry attempts (default: `10`)
+- `retryDelay` - Delay between retries in milliseconds (default: `0`)
+- `testMode` - Validate after each step (default: `false`)
+- `webhookUrl` - POST results here when done
+

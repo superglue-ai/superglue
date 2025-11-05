@@ -17,43 +17,28 @@
           {
             "group": "Getting Started",
             "pages": [
-              "index"
+              "getting-started/introduction",
+              "getting-started/core-concepts",
+              "getting-started/setup"
             ]
           },
           {
-            "group": "For Agent & AI App Builders",
+            "group": "Guides",
             "pages": [
-              "agent-builders/quickstart",
-              "agent-builders/sdk-integration",
-              "agent-builders/credential-management",
-              "mcp/mcp",
-              "mcp/mcp-guide",
-              "mcp/mcp-db",
-              "mcp/mcp-tools"
+              "guides/creating-an-integration",
+              "guides/creating-a-tool",
+              "guides/debugging-a-tool",
+              "guides/deploying-a-tool",
+              "guides/using-the-agent",
+              "mcp/using-the-mcp"
             ]
           },
           {
-            "group": "For Data & Integration Engineers",
+            "group": "JavaScript SDK",
             "pages": [
-              "data-engineers/quickstart",
-              "data-engineers/ui-vs-sdk",
-              "data-engineers/api-ranking",
-              "data-engineers/data-pipelines"
-            ]
-          },
-          {
-            "group": "Guides & Examples",
-            "pages": [
-              "guides/self-hosting",
-              "guides/architecture",
-              "guides/postgres",
-              "guides/ftp-sftp",
-              "guides/oauth-integrations",
-              "guides/webhooks",
-              "guides/hubspot",
-              "guides/google-ads",
-              "guides/instagram-business",
-              "guides/api-testing"
+              "sdk/overview",
+              "sdk/methods",
+              "sdk/types"
             ]
           },
           {
