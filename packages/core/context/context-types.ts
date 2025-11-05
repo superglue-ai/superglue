@@ -1,7 +1,4 @@
-import { Integration, JSONSchema, Workflow } from "@superglue/client";
-import { ExtractConfig } from "@superglue/client";
-import { ExecutionStep } from "@superglue/client";
-import { ApiConfig } from "@superglue/client";
+import { ApiConfig, ExecutionStep, ExtractConfig, Integration, JSONSchema, Workflow } from "@superglue/client";
 
 export type ObjectContextOptions = {
     characterBudget: number;
@@ -25,12 +22,12 @@ export type IntegrationContextOptions = {
     };
 };
 
-export type WorkflowBuilderContextOptions = {
+export type ToolBuilderContextOptions = {
     characterBudget: number;
     include?: { integrationContext?: boolean; availableVariablesContext?: boolean; payloadContext?: boolean; userInstruction?: boolean };
 };
 
-export type WorkflowBuilderContextInput = {
+export type ToolBuilderContextInput = {
     integrations: Integration[];
     payload: any;
     userInstruction: string;

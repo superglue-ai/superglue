@@ -3,7 +3,7 @@ import { server_defaults } from '../default.js';
 import { DocumentationSearch } from '../documentation/documentation-search.js';
 import { composeUrl } from '../utils/tools.js';
 import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
-import { BuildToolContextOptions, EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, FindRelevantIntegrationsContextInput, FindRelevantIntegrationsContextOptions, FindRelevantToolsContextInput, FindRelevantToolsContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions } from './context-types.js';
+import { BuildToolContextOptions, EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, FindRelevantIntegrationsContextInput, FindRelevantIntegrationsContextOptions, FindRelevantToolsContextInput, FindRelevantToolsContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, ToolBuilderContextInput, ToolBuilderContextOptions, TransformContextInput, TransformContextOptions } from './context-types.js';
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
@@ -141,7 +141,7 @@ function buildToolContext(tool: Workflow, opts: BuildToolContextOptions): string
     return toolOpeningTag + '\n' + [toolInstructionContext, integrationsUsedByToolStepsContext].filter(Boolean).join('\n').slice(0, budget - toolOpeningTag.length - toolClosingTag.length) + '\n' + toolClosingTag;
 }
 
-export function getWorkflowBuilderContext(input: WorkflowBuilderContextInput, options: WorkflowBuilderContextOptions): string {
+export function getToolBuilderContext(input: ToolBuilderContextInput, options: ToolBuilderContextOptions): string {
     const budget = Math.max(0, options.characterBudget | 0);
     if (budget === 0) return '';
     const hasIntegrations = input.integrations.length > 0;
@@ -151,8 +151,9 @@ export function getWorkflowBuilderContext(input: WorkflowBuilderContextInput, op
     const availableVariablesContext = options.include?.availableVariablesContext ? `<available_variables>${buildAvailableVariableContext(input.payload, input.integrations)}</available_variables>` : '';
     const payloadContext = options.include?.payloadContext ? `<workflow_input>${getObjectContext(input.payload, { include: { schema: true, preview: false, samples: true }, characterBudget: budget * 0.5 })}</workflow_input>` : '';
     const integrationContext = options.include?.integrationContext ? `<available_integrations_and_documentation>${hasIntegrations ? input.integrations.map(int => buildIntegrationContext(int, { characterBudget: budget })).join('\n') : 'No integrations provided. Build a transform-only workflow using finalTransform to process the payload data.'}</available_integrations_and_documentation>` : '';
-    const prompt_end = hasIntegrations ? 'Ensure that the final output matches the instruction and you use ONLY the available integration ids.' : 'Since no integrations are available, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.';
-    const prompt = prompt_start + '\n' + ([userInstructionContext, integrationContext, availableVariablesContext, payloadContext].filter(Boolean).join('\n')).slice(0, budget - prompt_start.length - prompt_end.length) + '\n' + prompt_end;
+    const availableIntegrationIdsContext = options.include?.integrationContext ? `<available_integration_ids>${input.integrations.map(int => int.id).join(', ')}</available_integration_ids>` : '';
+    const prompt_end = hasIntegrations ? 'IMPORTANT: Ensure that the final output matches the instruction and you use ONLY the available integration ids in the tool steps. DO NOT USE ANY OTHER INTEGRATION IDS.' : 'Since no integrations are provided as input, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.';
+    const prompt = prompt_start + '\n' + ([userInstructionContext, integrationContext, availableVariablesContext, payloadContext, availableIntegrationIdsContext].filter(Boolean).join('\n')).slice(0, budget - prompt_start.length - prompt_end.length) + '\n' + prompt_end;
     return prompt;
 }
 

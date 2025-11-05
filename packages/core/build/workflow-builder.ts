@@ -1,7 +1,7 @@
 import { Integration, Workflow } from "@superglue/client";
-import { Metadata, toJsonSchema, convertRequiredToArray } from "@superglue/shared";
+import { convertRequiredToArray, Metadata, toJsonSchema } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { getWorkflowBuilderContext } from "../context/context-builders.js";
+import { getToolBuilderContext } from "../context/context-builders.js";
 import { BUILD_WORKFLOW_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { executeTool } from "../execute/tools.js";
 import { LLMMessage } from "../llm/language-model.js";
@@ -49,7 +49,7 @@ export class WorkflowBuilder {
   }
 
   private prepareBuildingContext(): LLMMessage[] {
-    const buildingPromptForAgent = getWorkflowBuilderContext({
+    const buildingPromptForAgent = getToolBuilderContext({
       integrations: Object.values(this.integrations),
       payload: this.initialPayload,
       userInstruction: this.instruction,

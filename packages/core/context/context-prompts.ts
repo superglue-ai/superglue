@@ -153,6 +153,8 @@ Further:
 - For pure data transformation tasks with no API calls, the workflow may have no steps with a final transformation only
 - Step instructions should DESCRIBE in detail (2-3 sentences) what this steps goal is (ex. retrieve certain data, trigger an action, etc.), and how the response should be structured, without prescribing a rigid response structure.
 - The API's actual response structure will be discovered during execution - don't prescribe it
+
+CRITICAL: Never use any integration IDs in a step that were not explicitly provided as an available integration in the <available_integration_ids> context.
 </STEP_CREATION>
 
 <FILE_HANDLING>
