@@ -582,6 +582,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                         onChange={handleChange('headers')}
                         minHeight="128px"
                         maxHeight="128px"
+                        showValidation={true}
                       />
                     </div>
 
@@ -595,6 +596,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                         onChange={handleChange('queryParams')}
                         minHeight="128px"
                         maxHeight="128px"
+                        showValidation={true}
                       />
                     </div>
 

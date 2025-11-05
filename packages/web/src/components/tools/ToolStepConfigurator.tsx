@@ -380,6 +380,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             maxHeight="150px"
                                             resizable={true}
                                             placeholder="{}"
+                                            showValidation={true}
                                         />
                                     </div>
                                     <div>
@@ -399,6 +400,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             maxHeight="150px"
                                             resizable={true}
                                             placeholder="{}"
+                                            showValidation={true}
                                         />
                                     </div>
                                     {['POST', 'PUT', 'PATCH'].includes(step.apiConfig.method) && (

@@ -6,9 +6,10 @@ import { CopyButton } from '../tools/shared/CopyButton';
 
 const HIGHLIGHTING_THRESHOLD = 100 * 1024; // 100KB
 
-export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = '150px', maxHeight = '300px', placeholder = '{}', overlay, bottomRightOverlay, resizable = false }: { value: string; onChange?: (value: string) => void; readOnly?: boolean; minHeight?: string; maxHeight?: string; placeholder?: string; overlay?: React.ReactNode; bottomRightOverlay?: React.ReactNode; resizable?: boolean; }) => {
+export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = '150px', maxHeight = '300px', placeholder = '{}', overlay, bottomRightOverlay, resizable = false, showValidation = false }: { value: string; onChange?: (value: string) => void; readOnly?: boolean; minHeight?: string; maxHeight?: string; placeholder?: string; overlay?: React.ReactNode; bottomRightOverlay?: React.ReactNode; resizable?: boolean; showValidation?: boolean; }) => {
     const { theme, onMount } = useMonacoTheme();
     const [currentHeight, setCurrentHeight] = useState(maxHeight);
+    const [jsonError, setJsonError] = useState<string | null>(null);
     const displayValue = useMemo(() => {
         const base = value || placeholder;
         if (readOnly && (base?.length || 0) > HIGHLIGHTING_THRESHOLD) return `${base.slice(0, HIGHLIGHTING_THRESHOLD)}\n...truncated...`;
@@ -36,7 +37,23 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
                     height={resizable ? currentHeight : maxHeight}
                     defaultLanguage="json"
                     value={displayValue}
-                    onChange={(newValue) => onChange?.(newValue || '')}
+                    onChange={(newValue) => {
+                        const val = newValue || '';
+                        onChange?.(val);
+                        
+                        if (showValidation) {
+                            try {
+                                if (val && val.trim()) {
+                                    JSON.parse(val);
+                                    setJsonError(null);
+                                } else {
+                                    setJsonError(null);
+                                }
+                            } catch (e) {
+                                setJsonError((e as Error).message);
+                            }
+                        }
+                    }}
                     onMount={onMount}
                     options={{
                         readOnly,
@@ -74,6 +91,11 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
                     className="bg-transparent"
                 />
             </div>
+            {showValidation && jsonError && (
+                <div className="absolute bottom-0 left-0 right-0 p-2 bg-destructive/10 text-destructive text-xs max-h-32 overflow-y-auto overflow-x-hidden">
+                    Error: {jsonError}
+                </div>
+            )}
         </div>
     );
 };
