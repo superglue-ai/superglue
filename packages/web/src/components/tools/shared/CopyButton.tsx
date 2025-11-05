@@ -12,7 +12,7 @@ export const CopyButton = ({ text, getData }: { text?: string; getData?: () => a
         setTimeout(() => setCopied(false), 1500);
     };
     return (
-        <button onClick={handleCopy} className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors bg-background/60 backdrop-blur" title="Copy" type="button">
+        <button onClick={handleCopy} className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors backdrop-blur" title="Copy" type="button">
             {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
         </button>
     );

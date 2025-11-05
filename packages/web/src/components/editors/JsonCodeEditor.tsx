@@ -18,9 +18,9 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
     
     return (
         <div className={cn("relative rounded-lg border shadow-sm bg-muted/30")}>
-            {overlay && (<div className="absolute top-1 right-1 z-10 flex items-center gap-1">{overlay}</div>)}
-            {bottomRightOverlay && (<div className="absolute bottom-1 right-1 z-10 flex items-center gap-1">{bottomRightOverlay}</div>)}
-            {!overlay && (<div className="absolute top-1 right-1 z-10"><CopyButton text={value || placeholder} /></div>)}
+            {overlay && (<div className="absolute top-1 right-1 z-10 mr-5 flex items-center gap-1">{overlay}</div>)}
+            {bottomRightOverlay && (<div className="absolute bottom-1 right-1 z-10 mr-5 flex items-center gap-1">{bottomRightOverlay}</div>)}
+            {!overlay && (<div className="absolute top-1 right-1 z-10 mr-5"><CopyButton text={value || placeholder} /></div>)}
             {resizable && (
                 <div className="absolute bottom-1 right-1 w-3 h-3 cursor-se-resize z-10" style={{ background: 'linear-gradient(135deg, transparent 50%, rgba(100,100,100,0.3) 50%)' }} onMouseDown={(e) => {
                     e.preventDefault();
@@ -85,7 +85,8 @@ export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = 
                         links: false,
                         colorDecorators: false,
                         occurrencesHighlight: 'off',
-                        renderValidationDecorations: 'off'
+                        renderValidationDecorations: 'off',
+                        stickyScroll: { enabled: false }
                     }}
                     theme={theme}
                     className="bg-transparent"

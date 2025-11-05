@@ -32,7 +32,7 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
     return (
         <div className="relative bg-muted/50 dark:bg-muted/20 rounded-lg border font-mono shadow-sm js-code-editor">
             {(showCopy || isTransformEditor) && (
-                <div className="absolute top-1 right-1 z-10 flex items-center gap-1">
+                <div className="absolute top-1 right-1 z-10 flex items-center gap-1 mr-5">
                     {isTransformEditor && (
                         <HelpTooltip text="The transform must be an arrow function (sourceData) => { ... } that receives step results and returns the final output. Access each step's data via sourceData.stepId." />
                     )}
@@ -89,7 +89,8 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
                         codeLens: false,
                         links: false,
                         colorDecorators: false,
-                        occurrencesHighlight: 'off'
+                        occurrencesHighlight: 'off',
+                        stickyScroll: { enabled: false }
                     }}
                     theme={theme}
                     className="!bg-transparent"
