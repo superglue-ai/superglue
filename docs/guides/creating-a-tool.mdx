@@ -3,7 +3,7 @@ title: "Creating a Tool"
 description: "Create tools to connect your systems and do things"
 ---
 
-Tools in superglue are reusable scripts that you can execute on-demand, schedule, or trigger via webhooks. Each tool consists of sequential API call steps with built-in data transformations, loops, and error handling.
+Tools in superglue are reusable workflows that you can execute on-demand, schedule, or trigger via webhooks. Each tool consists of sequential steps with built-in data transformations, loops, and error handling.
 
 Learn more about how tools fit into the bigger picture in our [core concepts](/getting-started/core-concepts) page.
 
@@ -41,7 +41,7 @@ Learn more about how tools fit into the bigger picture in our [core concepts](/g
     - Loops for batch processing
     - Error handling and retries
 
-    <Card title="Try it now" icon="rocket" href="https://app.superglue.cloud">
+    <Card title="Try it now" icon="hammer" href="https://app.superglue.cloud">
       Start building tools with our agent
     </Card>
 
@@ -216,10 +216,10 @@ Every tool consists of:
     Sequential API calls that fetch or modify data. Each step can reference data from previous steps.
   </Card>
   <Card title="Execution Mode" icon="play">
-    Steps run either DIRECT (once) or LOOP (iterate over an array).
+    Steps run with self-healing enabled or disabled. Self-healing can auto-repair failures during execution.
   </Card>
   <Card title="Transformations" icon="code">
-    JavaScript functions that shape the final output.
+    JavaScript functions that shape the step inputs and the final output. Ensures tool results adhere to response schemas.
   </Card>
   <Card title="Variables" icon="brackets-curly">
     Access data from previous steps, credentials, and input payload using `<<variable>>` syntax.
@@ -296,7 +296,9 @@ Use `<<variable>>` to access dynamic values:
 }
 ```
 
-**Note:** JavaScript expressions must use the arrow function syntax `(sourceData) => ...`. Direct property access like `<<userId>>` works for simple variables, but not for nested properties or transformations.
+<Note>
+  JavaScript expressions must use the arrow function syntax `(sourceData) => ...`. Direct property access like `<<userId>>` works for simple variables, but not for nested properties or transformations.
+</Note>
 
 ## Data transformations
 
@@ -397,7 +399,7 @@ Access files on FTP servers:
   <Card title="Automatic retries" icon="rotate">
     Failed steps are automatically retried with exponential backoff
   </Card>
-  <Card title="Self-healing" icon="wrench">
+  <Card title="Self-healing" icon="wand-magic-sparkles">
     When enabled, superglue attempts to fix configuration errors automatically
   </Card>
   <Card title="Validation" icon="shield-check">
@@ -408,26 +410,15 @@ Access files on FTP servers:
   </Card>
 </CardGroup>
 
-## Best practices
+<Tip>
+**Keep steps focused** - Each step should make a single API call. Use transformations to prepare data, not additional steps.
 
-<Card title="Keep steps focused" icon="bullseye">
-  Each step should make a single API call. Use transformations to prepare data,
-  not additional steps.
-</Card>
+**Use descriptive IDs** - Step IDs are used to reference data in later steps. Use clear names like `getCustomers`, `updateOrder`, `sendEmail`.
 
-<Card title="Use descriptive IDs" icon="tag">
-  Step IDs are used to reference data in later steps. Use clear names like
-  `getCustomers`, `updateOrder`, `sendEmail`.
-</Card>
+**Avoid unnecessary loops** - Don't loop over thousands of items if the API supports batch operations. Check the documentation first.
 
-<Card title="Avoid unnecessary loops" icon="triangle-exclamation">
-  Don't loop over thousands of items if the API supports batch operations. Check
-  the documentation first.
-</Card>
-
-<Card title="Test with real data" icon="vial">
-  Test each step incrementally with production-like data before deploying.
-</Card>
+**Test with real data** - Test each step incrementally with production-like data before deploying.
+</Tip>
 
 ## Input and output schemas
 
@@ -473,7 +464,7 @@ Define schemas to make your tools more robust:
   <Card title="Debug your tool" icon="bug" href="/guides/debugging-a-tool">
     Test, troubleshoot, and fix issues with your tools
   </Card>
-  <Card title="Deploy to production" icon="rocket" href="/guides/deployment">
+  <Card title="Deploy to production" icon="rocket" href="/guides/deploying-a-tool">
     Execute tools on-demand, scheduled, or via webhooks
   </Card>
 </CardGroup>

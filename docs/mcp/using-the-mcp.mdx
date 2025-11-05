@@ -12,17 +12,17 @@ The MCP interface provides **discovery and execution** of pre-built superglue to
 ## When to use MCP
 
 <CardGroup cols={2}>
+  <Card title="Controlled Access" icon="shield-check">
+    Execute only pre-approved, tested tools. No ad-hoc code generation or system modification.
+  </Card>
   <Card title="Tool Execution in Production" icon="rocket">
     Execute saved tools from your custom GPTs with full observability and error handling.
   </Card>
   <Card title="Agent Workflows" icon="robot">
     Give AI agents the ability to discover and execute complex multi-system workflows without manual API wiring.
   </Card>
-  <Card title="Internal Tooling" icon="wrench">
+  <Card title="Internal Tooling" icon="hammer">
     Expose business logic as AI-accessible tools for customer support, ops teams, or automated workflows.
-  </Card>
-  <Card title="Controlled Access" icon="shield-check">
-    Execute only pre-approved, tested tools. No ad-hoc code generation or system modification.
   </Card>
 </CardGroup>
 
@@ -38,9 +38,15 @@ Add to your Cursor MCP settings (`.cursor/config.json` or via Settings → MCP):
 {
   "mcpServers": {
     "superglue": {
-      "url": "https://app.superglue.cloud/mcp",
-      "headers": {
-        "Authorization": "Bearer YOUR_API_KEY"
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://mcp.superglue.ai",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer YOUR_TOKEN_HERE"
       }
     }
   }
@@ -55,9 +61,15 @@ Add to Claude Desktop config (`~/Library/Application Support/Claude/claude_deskt
 {
   "mcpServers": {
     "superglue": {
-      "url": "https://app.superglue.cloud/mcp",
-      "headers": {
-        "Authorization": "Bearer YOUR_API_KEY"
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://mcp.superglue.ai",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer YOUR_TOKEN_HERE"
       }
     }
   }
@@ -72,9 +84,15 @@ Point to your self-hosted instance:
 {
   "mcpServers": {
     "superglue": {
-      "url": "http://localhost:3000/mcp",
-      "headers": {
-        "Authorization": "Bearer YOUR_API_KEY"
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "http://localhost:3000/mcp",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer YOUR_TOKEN_HERE"
       }
     }
   }
@@ -82,7 +100,7 @@ Point to your self-hosted instance:
 ```
 
 <Tip>
-Get your API key from the superglue dashboard under **Settings → API Keys**.
+Get your API key from the superglue web application sidebar under  **API Keys**.
 </Tip>
 
 ---
@@ -99,7 +117,7 @@ Search for pre-built tools using natural language queries.
 
 ```typescript
 {
-  searchTerms: string  // Natural language search query
+  searchTerms: string  // Space separated search terms
 }
 ```
 
@@ -161,9 +179,8 @@ Execute a saved tool by its ID.
 ```
 
 **Behavior:**
-- Executes with saved credentials from integrations
+- Executes with saved credentials from integrations used during build
 - Self-healing disabled by default for deterministic results
-- Large results are automatically truncated
 - Full execution logs available in superglue dashboard
 
 **Example:**
@@ -197,33 +214,6 @@ superglue_execute_tool({
 })
 ```
 
-### Parameterized Execution
-
-Tools can accept dynamic payloads:
-
-```typescript
-superglue_execute_tool({
-  id: "tool_report_generator",
-  payload: {
-    reportType: "monthly_revenue",
-    month: "2024-11",
-    includeCharts: true
-  }
-})
-```
-
-### Error Handling
-
-```typescript
-{
-  "success": false,
-  "error": "Authentication failed for Salesforce integration",
-  "suggestion": "Check that the tool ID exists and all required credentials are provided"
-}
-```
-
----
-
 ## Troubleshooting
 
 ### Connection Issues
@@ -249,16 +239,16 @@ Error: "Tool ID does not exist"
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Create a Tool" href="/guides/create-a-tool" icon="wrench">
+  <Card title="Create a Tool" href="/guides/creating-a-tool" icon="hammer">
     Build tools to expose via MCP
   </Card>
-  <Card title="Using the Agent" href="/guides/using-the-agent" icon="wand-magic-sparkles">
+  <Card title="Using the Agent" href="/guides/using-the-agent" icon="comments">
     Build integrations and tools with the agent
   </Card>
   <Card title="API Reference" href="/api-reference/overview" icon="code">
     Direct API access for custom integrations
   </Card>
-  <Card title="Deployment Guide" href="/guides/deployment" icon="server">
+  <Card title="Set Up Guide" href="/getting-started/setup" icon="server">
     Deploy self-hosted MCP server
   </Card>
 </CardGroup>
