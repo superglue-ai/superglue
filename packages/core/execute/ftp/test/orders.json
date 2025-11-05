@@ -1,0 +1,162 @@
+{
+  "orders": [
+    {
+      "order_id": "ORD-2024-001",
+      "customer_id": 1,
+      "customer_name": "John Smith",
+      "order_date": "2024-03-15T10:30:00Z",
+      "status": "shipped",
+      "total": 149.97,
+      "items": [
+        {
+          "product_id": "P001",
+          "product_name": "Wireless Mouse",
+          "quantity": 2,
+          "price": 29.99
+        },
+        {
+          "product_id": "P002",
+          "product_name": "USB-C Hub",
+          "quantity": 1,
+          "price": 49.99
+        },
+        {
+          "product_id": "P007",
+          "product_name": "Cable Organizer",
+          "quantity": 3,
+          "price": 12.99
+        }
+      ],
+      "shipping": {
+        "address": "123 Main St, New York, NY 10001",
+        "method": "standard",
+        "tracking": "1Z999AA10123456784"
+      }
+    },
+    {
+      "order_id": "ORD-2024-002",
+      "customer_id": 4,
+      "customer_name": "Sophie Martin",
+      "order_date": "2024-03-16T14:22:00Z",
+      "status": "processing",
+      "total": 289.98,
+      "items": [
+        {
+          "product_id": "P003",
+          "product_name": "Mechanical Keyboard",
+          "quantity": 1,
+          "price": 89.99
+        },
+        {
+          "product_id": "P005",
+          "product_name": "Noise Cancelling Headphones",
+          "quantity": 1,
+          "price": 199.99
+        }
+      ],
+      "shipping": {
+        "address": "45 Rue de la Paix, 75002 Paris, France",
+        "method": "express",
+        "tracking": null
+      }
+    },
+    {
+      "order_id": "ORD-2024-003",
+      "customer_id": 9,
+      "customer_name": "Isabella Silva",
+      "order_date": "2024-03-17T09:15:00Z",
+      "status": "delivered",
+      "total": 334.98,
+      "items": [
+        {
+          "product_id": "P004",
+          "product_name": "Laptop Stand",
+          "quantity": 1,
+          "price": 34.99
+        },
+        {
+          "product_id": "P008",
+          "product_name": "Monitor 27 inch",
+          "quantity": 1,
+          "price": 299.99
+        }
+      ],
+      "shipping": {
+        "address": "Av. Paulista, 1578, São Paulo, Brazil",
+        "method": "standard",
+        "tracking": "BR123456789AB"
+      }
+    },
+    {
+      "order_id": "ORD-2024-004",
+      "customer_id": 2,
+      "customer_name": "Emma Johnson",
+      "order_date": "2024-03-18T16:45:00Z",
+      "status": "pending",
+      "total": 79.99,
+      "items": [
+        {
+          "product_id": "P006",
+          "product_name": "Webcam HD",
+          "quantity": 1,
+          "price": 79.99
+        }
+      ],
+      "shipping": {
+        "address": "789 Oak Avenue, Los Angeles, CA 90001",
+        "method": "standard",
+        "tracking": null
+      }
+    },
+    {
+      "order_id": "ORD-2024-005",
+      "customer_id": 7,
+      "customer_name": "Li Wei",
+      "order_date": "2024-03-19T11:00:00Z",
+      "status": "shipped",
+      "total": 142.96,
+      "items": [
+        {
+          "product_id": "P001",
+          "product_name": "Wireless Mouse",
+          "quantity": 1,
+          "price": 29.99
+        },
+        {
+          "product_id": "P002",
+          "product_name": "USB-C Hub",
+          "quantity": 1,
+          "price": 49.99
+        },
+        {
+          "product_id": "P007",
+          "product_name": "Cable Organizer",
+          "quantity": 1,
+          "price": 12.99
+        },
+        {
+          "product_id": "P002",
+          "product_name": "USB-C Hub",
+          "quantity": 1,
+          "price": 49.99
+        }
+      ],
+      "shipping": {
+        "address": "Building 3, Chaoyang District, Beijing 100020, China",
+        "method": "express",
+        "tracking": "CN987654321AB"
+      }
+    }
+  ],
+  "summary": {
+    "total_orders": 5,
+    "total_revenue": 997.88,
+    "status_breakdown": {
+      "pending": 1,
+      "processing": 1,
+      "shipped": 2,
+      "delivered": 1
+    }
+  }
+}
+

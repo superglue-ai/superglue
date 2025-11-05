@@ -1,9 +1,10 @@
-import { ApiConfig, RequestOptions } from "@superglue/client";
+import { ApiConfig, FileType, RequestOptions } from "@superglue/client";
 import { Client as FTPClient } from "basic-ftp";
 import * as path from "path";
 import SFTPClient from "ssh2-sftp-client";
 import { URL } from "url";
 import { server_defaults } from "../../default.js";
+import { parseFile } from "../../utils/file.js";
 import { parseJSON } from "../../utils/json-parser.js";
 import { composeUrl } from "../../utils/tools.js";
 
@@ -71,14 +72,13 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
         }
       });
       await client.downloadTo(writeStream, operation.path);
-      const content = Buffer.concat(chunks).toString();
+      const content = Buffer.concat(chunks);
       
-      // Try to parse as JSON if possible
       try {
-        return parseJSON(content);
+        return await parseFile(content, FileType.AUTO);
       } catch {
         // If not JSON, return as string
-        return content;
+        return content.toString('utf8');
       }
     }
     
@@ -146,7 +146,7 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
       
       return {
         exists: true,
-        path:  operation.path + (operation.path?.endsWith("/") ? "" : "/") + file.name,
+        path: operation.path,
         name: file.name,
         size: file.size,
         type: file.isDirectory ? 'directory' : file.isFile ? 'file' : 'unknown',
