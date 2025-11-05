@@ -6,7 +6,7 @@ import { FileChip } from '@/src/components/ui/FileChip';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { ExtendedSuperglueClient } from '@/src/lib/extended-superglue-client';
-import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { ALLOWED_EXTENSIONS, formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/general-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
 import { Integration, IntegrationInput, Workflow as Tool, UpsertMode } from '@superglue/client';
@@ -1028,7 +1028,7 @@ export function ToolBuilder({
               <input
                 type="file"
                 multiple
-                accept=".json,.csv,.txt,.xml,.xlsx,.xls,.pdf"
+                accept={ALLOWED_EXTENSIONS.join(',')}
                 onChange={async (e) => {
                   const files = Array.from(e.target.files || []);
                   if (files.length > 0) {

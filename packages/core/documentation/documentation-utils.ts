@@ -2,12 +2,12 @@
  * Utility functions for documentation processing
  */
 
+import { Metadata } from "@superglue/shared";
 import axios from "axios";
 import * as yaml from 'js-yaml';
 import { server_defaults } from '../default.js';
-import { parseJSON } from '../utils/json-parser.js';
+import { parseJSON } from '../files/index.js';
 import { logMessage } from '../utils/logs.js';
-import { Metadata } from "@superglue/shared";
 
 /**
  * Validates if an object is a valid OpenAPI 3.x, Swagger 2.0, or Google API Discovery Document specification.
@@ -45,16 +45,16 @@ export function isValidOpenApiSpec(obj: any): boolean {
  * Returns either null if no valid specs are fetched, or a json string of a single spec, or a json string of all specs with metadata.
  */
 export async function fetchMultipleOpenApiSpecs(urls: string[], metadata: Metadata): Promise<string> {
-  let filteredUrls = urls.filter(url => 
-    !url.includes('.png') && !url.includes('.jpg') && !url.includes('.jpeg') && 
-    !url.includes('.gif') && !url.includes('.svg') && !url.includes('.webp') && 
-    !url.includes('.ico') && !url.includes('.woff') && !url.includes('.woff2') && 
-    !url.includes('.ttf') && !url.includes('.eot') && !url.includes('.otf') && 
+  let filteredUrls = urls.filter(url =>
+    !url.includes('.png') && !url.includes('.jpg') && !url.includes('.jpeg') &&
+    !url.includes('.gif') && !url.includes('.svg') && !url.includes('.webp') &&
+    !url.includes('.ico') && !url.includes('.woff') && !url.includes('.woff2') &&
+    !url.includes('.ttf') && !url.includes('.eot') && !url.includes('.otf') &&
     !url.includes('.pdf')
   );
 
   filteredUrls = removeOldVersionFromUrls(filteredUrls);
-  
+
   let specs: any[] = [];
   const MAX_CONCURRENT_FETCHES = server_defaults.DOCUMENTATION.MAX_CONCURRENT_OPENAPI_FETCHES;
   const MAX_SPECS_TO_FETCH = server_defaults.DOCUMENTATION.MAX_OPENAPI_SPECS_TO_FETCH;

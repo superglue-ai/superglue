@@ -2,8 +2,8 @@ import type { Integration } from "@superglue/client";
 import { GENERATE_INSTRUCTIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { BaseToolContext, ToolDefinition, ToolImplementation } from "../execute/tools.js";
+import { parseJSON } from "../files/index.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
-import { parseJSON } from "./json-parser.js";
 
 // Extend context to include integrations
 export interface InstructionGenerationContext extends BaseToolContext {
@@ -76,7 +76,7 @@ export const generateInstructionsImplementation: ToolImplementation<InstructionG
   if (generatedInstructionsError || generatedInstructions?.error) {
     throw new Error(`Error generating instructions: ${generatedInstructionsError || generatedInstructions?.error}`);
   }
-  
+
   return {
     success: true,
     data: sanitizeInstructionSuggestions(generatedInstructions)

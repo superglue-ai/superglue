@@ -7,7 +7,7 @@ import {
   prettyPrintJson,
   RepairStrategy,
   ResilientJsonParser
-} from './json-parser.js';
+} from './json.js';
 
 describe('Resilient JSON Parser', () => {
   describe('parseJsonResilient', () => {

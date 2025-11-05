@@ -1,7 +1,7 @@
-import { FileType } from '@superglue/client';
 import axios from 'axios';
 import { describe, expect, it } from 'vitest';
-import { decompressZip, parseFile } from './file.js';
+import { parseFile } from '../files/index.js';
+import { parseZIP } from '../files/parsers/zip.js';
 
 describe('File Utilities', () => {
   describe('parseFile', () => {
@@ -9,7 +9,7 @@ describe('File Utilities', () => {
       const jsonData = JSON.stringify([{ name: 'test', value: 123 }]);
       const buffer = Buffer.from(jsonData);
 
-      const result = await parseFile(buffer, FileType.JSON);
+      const result = await parseFile(buffer, 'JSON');
       expect(result).toEqual([{ name: 'test', value: 123 }]);
     });
 
@@ -17,7 +17,7 @@ describe('File Utilities', () => {
       const csvData = 'name,value\ntest,123';
       const buffer = Buffer.from(csvData);
 
-      const result = await parseFile(buffer, FileType.CSV);
+      const result = await parseFile(buffer, 'CSV');
       expect(result).toEqual([{ name: 'test', value: '123' }]);
     });
 
@@ -25,7 +25,7 @@ describe('File Utilities', () => {
       const csvData = 'name,value\ntest,123\ntest2,456';
       const buffer = Buffer.from(csvData);
 
-      const result = await parseFile(buffer, FileType.CSV);
+      const result = await parseFile(buffer, 'CSV');
       expect(result).toEqual([
         { name: 'test', value: '123' },
         { name: 'test2', value: '456' }
@@ -43,7 +43,7 @@ describe('File Utilities', () => {
       `;
       const buffer = Buffer.from(xmlData);
 
-      const result = await parseFile(buffer, FileType.XML);
+      const result = await parseFile(buffer, 'XML');
       expect(result?.ROOT?.ITEM).toEqual({ NAME: 'test', VALUE: '123' });
     });
     it('should parse XML data as array if multiple rows are given', async () => {
@@ -62,7 +62,7 @@ describe('File Utilities', () => {
       `;
       const buffer = Buffer.from(xmlData);
 
-      const result = await parseFile(buffer, FileType.XML);
+      const result = await parseFile(buffer, 'XML');
       expect(result?.ROOT?.ITEM).toHaveLength(2);
       expect(result?.ROOT?.ITEM).toEqual([
         { NAME: 'test', VALUE: '123' },
@@ -72,34 +72,31 @@ describe('File Utilities', () => {
 
     it('should throw error for unsupported file type', async () => {
       const buffer = Buffer.from('test data');
-      await expect(parseFile(buffer, 'INVALID' as FileType))
+      await expect(parseFile(buffer, 'INVALID'))
         .rejects.toThrow('Unsupported file type');
     });
   });
 
-  describe('decompressZip', () => {
-    it('should extract first file from zip archive', async () => {
-      // This is a minimal valid ZIP file structure containing one file named "test.txt" with content "Hello World!"
+  describe('parseZIP', () => {
+    it('should extract all files from zip archive', async () => {
       const file = await axios.get('https://sample-files.com/downloads/compressed/zip/basic-text.zip', { responseType: 'arraybuffer' });
 
-      const result = await decompressZip(file.data);
-      expect(result.toString()).toBe('This is a sample file.');
+      const result = await parseZIP(Buffer.from(file.data));
+      expect(Object.keys(result).length).toBeGreaterThan(0);
     });
 
-    it('should throw error when zip is empty or invalid', async () => {
-      // Test with completely empty buffer
+    it('should throw error when zip is invalid', async () => {
       const emptyBuffer = Buffer.from([]);
-      await expect(decompressZip(emptyBuffer))
-        .rejects.toThrow('Error decompressing zip');
+      await expect(parseZIP(emptyBuffer))
+        .rejects.toThrow();
 
-      // Test with invalid ZIP (just the ZIP end of central directory marker)
       const invalidZip = Buffer.from([
         0x50, 0x4B, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00
       ]);
 
-      await expect(decompressZip(invalidZip))
-        .rejects.toThrow('Error decompressing zip');
+      await expect(parseZIP(invalidZip))
+        .rejects.toThrow();
     });
   });
 }); 

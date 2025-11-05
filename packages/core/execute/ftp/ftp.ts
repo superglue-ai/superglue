@@ -1,11 +1,10 @@
-import { ApiConfig, FileType, RequestOptions } from "@superglue/client";
+import { ApiConfig, RequestOptions } from "@superglue/client";
 import { Client as FTPClient } from "basic-ftp";
 import * as path from "path";
 import SFTPClient from "ssh2-sftp-client";
 import { URL } from "url";
 import { server_defaults } from "../../default.js";
-import { parseFile } from "../../utils/file.js";
-import { parseJSON } from "../../utils/json-parser.js";
+import { parseFile, parseJSON } from "../../files/index.js";
 import { composeUrl } from "../../utils/tools.js";
 
 const SUPPORTED_OPERATIONS = ['list', 'get', 'put', 'delete', 'rename', 'mkdir', 'rmdir', 'exists', 'stat'];
@@ -28,6 +27,7 @@ function parseConnectionUrl(urlString: string): {
 } {
   const url = new URL(urlString);
   const protocol = url.protocol.replace(':', '') as 'ftp' | 'ftps' | 'sftp';
+
 
   const defaultPorts = {
     ftp: 21,
@@ -75,9 +75,8 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
       const content = Buffer.concat(chunks);
 
       try {
-        return await parseFile(content, FileType.AUTO);
+        return await parseFile(content, 'AUTO');
       } catch {
-        // If not JSON, return as string
         return content.toString('utf8');
       }
     }
@@ -190,7 +189,7 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
       const buffer = await client.get(operation.path) as Buffer;
 
       try {
-        return await parseFile(buffer, FileType.AUTO);
+        return await parseFile(buffer, 'AUTO');
       } catch {
         return buffer.toString('utf8');
       }
@@ -274,8 +273,7 @@ export async function callFTP({ endpoint, credentials, options }: { endpoint: Ap
   let connectionString = composeUrl(endpoint.urlHost, endpoint.urlPath);
   const connectionInfo = parseConnectionUrl(connectionString);
 
-  // Parse operation from body
-  let operations: FTPOperation[] = [];
+  let operation: FTPOperation;
   try {
     const body = parseJSON(endpoint.body);
     if(!Array.isArray(body)) {

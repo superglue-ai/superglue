@@ -1,14 +1,17 @@
 'use client'
 
+import { useConfig } from '@/src/app/config-context';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
 import { FileChip } from '@/src/components/ui/FileChip';
-import { FileQuestion, FileText, Link, Upload } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
-import { processFile, sanitizeFileName, formatBytes, MAX_TOTAL_FILE_SIZE_DOCUMENTATION, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { cn } from '@/src/lib/general-utils';
 import { Input } from '@/src/components/ui/input';
 import { useToast } from '@/src/hooks/use-toast';
+import { ExtendedSuperglueClient } from '@/src/lib/extended-superglue-client';
+import { formatBytes, MAX_TOTAL_FILE_SIZE_DOCUMENTATION, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { cn } from '@/src/lib/general-utils';
+import { tokenRegistry } from '@/src/lib/token-registry';
+import { FileQuestion, FileText, Link } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface DocumentationFieldProps {
   url: string
@@ -37,14 +40,20 @@ export function DocumentationField({
   const [docFile, setDocFile] = useState<UploadedFileInfo | null>(null)
   const [urlError, setUrlError] = useState(false)
   const { toast } = useToast()
+  const superglueConfig = useConfig()
+
+  const client = useMemo(() => new ExtendedSuperglueClient({
+    endpoint: superglueConfig.superglueEndpoint,
+    apiKey: tokenRegistry.getToken(),
+  }), [superglueConfig.superglueEndpoint])
 
   // Parse multiple files from file:// URL format
   const parseFileUrls = (fileUrl: string): UploadedFileInfo[] => {
     if (!fileUrl.startsWith('file://')) return []
-    
+
     const filesString = fileUrl.replace('file://', '')
     const filenames = filesString.split(',').map(f => f.trim()).filter(Boolean)
-    
+
     // Limit to 5 files for display
     return filenames.slice(0, 5).map(filename => ({
       name: filename,
@@ -98,11 +107,12 @@ export function DocumentationField({
     setDocFile(fileInfo)
 
     try {
-      const text = await processFile(file, file.name)
+      const data = await processAndExtractFile(file, client)
+      const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2)
       setDocFile({ ...fileInfo, status: 'ready' })
       if (onContentChange) onContentChange(text)
       onUrlChange(`file://${fileInfo.key}`)
-      if (typeof onFileUpload === 'function') onFileUpload(text);
+      if (typeof onFileUpload === 'function') onFileUpload(text)
     } catch (error: any) {
       console.error('Error reading file:', error)
       setDocFile({ ...fileInfo, status: 'error', error: error.message })
