@@ -449,14 +449,21 @@ export async function evaluateStopCondition(
       throw new AbortError('LLM did not return apiConfig in response. Response: ' + JSON.stringify(generatedConfig).slice(0, 500));
     }
   
+    const queryParams = generatedConfig.apiConfig.queryParams ?
+    Object.fromEntries(generatedConfig.apiConfig.queryParams.map((p: any) => [p.key, p.value])) :
+    undefined;
+  const headers = generatedConfig.apiConfig.headers ?
+    Object.fromEntries(generatedConfig.apiConfig.headers.map((p: any) => [p.key, p.value])) :
+    undefined;
+    
     return {
       config: {
         instruction: failedConfig.instruction,
         urlHost: generatedConfig.apiConfig.urlHost,
         urlPath: generatedConfig.apiConfig.urlPath,
         method: generatedConfig.apiConfig.method,
-        queryParams: generatedConfig.apiConfig.queryParams,
-        headers: generatedConfig.apiConfig.headers,
+        queryParams: queryParams,
+        headers: headers,
         body: generatedConfig.apiConfig.body,
         authentication: generatedConfig.apiConfig.authentication,
         pagination: generatedConfig.apiConfig.pagination,
