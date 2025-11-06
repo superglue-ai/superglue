@@ -156,13 +156,12 @@ Further:
 </STEP_CREATION>
 
 <FILE_HANDLING>
-IMPORTANT: Superglue automatically parses file API responses:
+IMPORTANT: Superglue automatically parses file API responses.
 
 API Response Parsing:
-- When an API returns a string response, Superglue automatically detects and parses known file formats
+- When an API returns a string response, Superglue automatically detects and parses known file formats to a JSON object
+- XML/HTML responses → parsed to nested object structure  
 - CSV responses → parsed to array of objects with headers as keys
-- JSON responses → parsed to objects/arrays
-- XML responses → parsed to nested object structure  
 - Excel responses → parsed to {sheetName: [rows]} format
 - Other formats (e.g. fixed-width files) → kept as raw strings
 - NEVER add manual parsing steps for these formats in final transforms
@@ -439,47 +438,46 @@ Superglue provides these variables that you MUST use:
 </PAGINATION_CONFIGURATION>
 
 <POSTGRES>
-- You can use the following format to access a postgres database: urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>", urlPath: "<<database>>", body: {query: "<<query>>"}
-- Note that the connection string and database name may be part of the connection string, or not provided at all, or only be provided in the instruction. Look at the input variables and instructions to come up with a best guess.
-- Consider that you might need additional information from tables to process the instruction. E.g. if a user asks for a list of products, you might need to join the products table with the categories table to get the category name and filter on that.
-- In case the query is unclear (user asks for all products that are in a category but you are unsure what the exact category names are), get all category names in step 1 and then create the actual query in step 2.
-- Use parameterized queries for safer and more efficient execution, you can also use <<>> tags to access variables:
-  * body: {query: "SELECT * FROM users WHERE id = $1 AND status = $2", params: [123, "<<(sourceData) => sourceData.status>>"]}
-  * body: {query: "INSERT INTO products (name, price) VALUES ($1, $2) RETURNING *", values: ["Widget", <<(sourceData) => sourceData.price * 1.2>>]}
-  * Parameters prevent SQL injection and improve performance
-  * Use $1, $2, $3, etc. as placeholders in the query
-  * Provide values in the params or values array in the same order
-  * Always wrap js string results in quotes like so: {"name": "<<(sourceData) => sourceData.name>>"}
+Correct PostgreSQL configuration:
+- urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"
+- urlPath: "<<database_name>>"
+- body: {query: "postgres statement", params: ["some string", true]} // Recommended: parameterized query, do not forget to wrap params in quotes uf they are strings.
+- body: {query: "SELECT * FROM users WHERE age > $1", params: [<<(sourceData) => sourceData.age>>, "<<(sourceData) => sourceData.name>>"]}
+- body: {query: "INSERT INTO logs (message, level) VALUES ($1, $2)", params: ["Error occurred", "<<error_level>>"]}
+
+Always use parameterized queries:
+- Use $1, $2, $3, etc. as placeholders in the query string
+- Provide corresponding values in params array
+- Example: {query: "SELECT * FROM users WHERE id = $1 AND status = $2", params: [userId, "active"]}
+- Benefits: Prevents SQL injection, better performance, cleaner code
+- The params/values array can contain static values or dynamic expressions using <<>> syntax
 </POSTGRES>
 
 <FTP_SFTP>
-- You can use the following format to access FTP/SFTP servers:
-  * FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"
-  * FTPS (secure FTP): urlHost: "ftps://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"
-  * SFTP (SSH FTP): urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/basepath"
-- The body must contain a JSON object with an 'operation' field specifying the action to perform
-- Supported operations are: list, get, put, delete, rename, mkdir, rmdir, exists, stat
-- Examples:
-  * List directory: body: {"operation": "list", "path": "/directory"}
-  * Get file (returns content as JSON if possible): body: {"operation": "get", "path": "/file.json"}
-  * Upload file: body: {"operation": "put", "path": "/upload.txt", "content": "<<fileContent>>"}
-  * Delete file: body: {"operation": "delete", "path": "/file.txt"}
-  * Rename/move: body: {"operation": "rename", "path": "/old.txt", "newPath": "/new.txt"}
-  * Create directory: body: {"operation": "mkdir", "path": "/newfolder"}
-  * Remove directory: body: {"operation": "rmdir", "path": "/folder"}
-  * Check existence: body: {"operation": "exists", "path": "/file.txt"}
-  * Get file stats: body: {"operation": "stat", "path": "/file.txt"}
-- All file operations return JSON responses
-- The 'get' operation automatically parses files and returns the parsed data
-- Path variables can use <<>> syntax: {"operation": "get", "path": "/<<folder>>/<<filename>>"}
-</FTP_SFTP>
+Correct FTP/SFTP configuration:
+- FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/"
+- FTPS: urlHost: "ftps://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/"  
+- SFTP: urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/"
+- body: Can be either a single operation object or an array of operation objects for batch operations.
+- If possible, use batch operations for efficiency.
 
-<SOAP>
-For SOAP requests:
-- Put the entire XML envelope in the body as a string
-- Include all namespaces and proper XML structure
-- Example body: "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\">...</soapenv:Envelope>"
-</SOAP>
+SUPPORTED OPERATIONS:
+- list: {"operation": "list", "path": "/directory"} - Returns array of file/directory info
+- get: {"operation": "get", "path": "/file.txt"} - Returns file content (auto-parses every format to a JSON)
+- put: {"operation": "put", "path": "/file.txt", "content": "data"} - Uploads content
+- delete: {"operation": "delete", "path": "/file.txt"} - Deletes file
+- rename: {"operation": "rename", "path": "/old.txt", "newPath": "/new.txt"} - Renames/moves
+- mkdir: {"operation": "mkdir", "path": "/newfolder"} - Creates directory
+- rmdir: {"operation": "rmdir", "path": "/folder"} - Removes directory
+- exists: {"operation": "exists", "path": "/file.txt"} - Checks if file exists
+- stat: {"operation": "stat", "path": "/file.txt"} - Gets file metadata
+
+BATCH OPERATIONS:
+- Multiple operations: [{"operation": "mkdir", "path": "/backup"}, {"operation": "get", "path": "/data.csv"}]
+- Operations execute in sequence, all using the same connection
+- Response: single result for single operation, array of results for multiple operations
+- Use batch operations to perform multiple file operations efficiently in one API call
+</FTP_SFTP>
 `;
 
 export const FIND_RELEVANT_INTEGRATIONS_SYSTEM_PROMPT = `
@@ -552,17 +550,19 @@ export const SELF_HEALING_SYSTEM_PROMPT = `You are an API configuration and exec
 
 You have access to two tools:
 1. submit_tool - Submit an API configuration to execute the call and validate the response
-2. search_documentation - Search for specific information in the integration documentation
+2. search_documentation - Search for specific information in the integration documentation. This is keyword based so pick relevant keywords and synonyms.
 
-<FILE_RESPONSE_HANDLING>
-IMPORTANT: Superglue automatically parses file responses:
-- CSV strings → array of objects with headers as keys
-- JSON strings → parsed objects/arrays
-- XML strings → nested object structure
-- Excel data → {sheetName: [rows]} format
-- If you receive parsed data instead of raw strings, the parsing already happened
-- NEVER attempt to parse these formats manually in transforms
-</FILE_RESPONSE_HANDLING>
+<FILE_HANDLING>
+IMPORTANT: Superglue automatically parses file API responses.
+
+API Response Parsing:
+- When an API returns a string response, Superglue automatically detects and parses known file formats to a JSON object
+- XML/HTML responses → parsed to nested object structure  
+- CSV responses → parsed to array of objects with headers as keys
+- Excel responses → parsed to {sheetName: [rows]} format
+- Other formats (e.g. fixed-width files) → kept as raw strings
+- NEVER add manual parsing steps for these formats in final transforms
+</FILE_HANDLING>
 
 EXECUTION FLOW:
 1. Analyze the initial error and context to understand what went wrong
@@ -577,17 +577,6 @@ EXECUTION FLOW:
 CRITICAL RULES:
 - ALWAYS include a tool call in your response
 - Learn from each error - don't repeat the same mistake
-
-<ERROR_ANALYSIS>
-Understand what each error means:
-- 400 Bad Request: Check request body format, required parameters, data types
-- 401 Unauthorized: Fix authentication method and credential format
-- 403 Forbidden: Check permissions and authentication headers
-- 404 Not Found: Verify URL path, method, and API version
-- 429 Rate Limit: API is rejecting due to too many requests
-- 500 Server Error: May be temporary or request is malformed
-- "Response evaluation failed": Your step instruction doesn't match what the API returned
-</ERROR_ANALYSIS>
 
 <COMMON_ERRORS>
 1. Using non-existent variables:
@@ -621,17 +610,16 @@ ALWAYS verify variables exist in the available list before using them
 For json bodies, always wrap js string results in quotes like so: {"name": "<<(sourceData) => sourceData.name>>"}
 </VARIABLES>
 
-<AUTHENTICATION>
-Common patterns (check documentation for specifics):
-- Bearer Token: Use authentication: "HEADER" with Authorization: "Bearer <<token>>"
-- API Key in header: Use authentication: "HEADER" with header like "X-API-Key: <<api_key>>"
-- API Key in URL: Use authentication: "QUERY_PARAM" with the key in queryParams
-- Basic Auth: Use authentication: "HEADER" with Authorization: "Basic <<username>>:<<password>>"
-- OAuth2: Use authentication: "OAUTH2"
-- No authentication: Use authentication: "NONE"
+<AUTHENTICATION_PATTERNS>
+Always check the documentation for the correct authentication pattern.
+Common authentication patterns are:
+- Bearer Token: headers: { "Authorization": "Bearer <<access_token>>" }
+- API Key in header: headers: { "X-API-Key": "<<api_key>>" }
+- Basic Auth: headers: { "Authorization": "Basic <<username>>:<<password>>" }
+- OAuth: Follow the specific OAuth flow documented for the integration.
 
-Most modern APIs use HEADER authentication type with different header formats.
-</AUTHENTICATION>
+IMPORTANT: Modern APIs (HubSpot, Stripe, etc.) mostly expect authentication in headers, NOT query parameters. Only use query parameter authentication if explicitly required by the documentation.
+</AUTHENTICATION_PATTERNS>
 
 <POSTGRES>
 Correct PostgreSQL configuration:
@@ -647,26 +635,18 @@ ALWAYS USE PARAMETERIZED QUERIES:
 - Example: {query: "SELECT * FROM users WHERE id = $1 AND status = $2", params: [userId, "active"]}
 - Benefits: Prevents SQL injection, better performance, cleaner code
 - The params/values array can contain static values or dynamic expressions using <<>> syntax
-
-Common errors:
-- Duplicate or missing postgres:// prefixes in urlHost 
-- Duplicate or missing prefixes in urlPath (pay special attention to both error sources when using variables, and try removing or adding prefixes in case they are missing/present in the variables)
-- Database not found: Try to extract from connection string or infer from user instruction
-- Incorrect table or column names, make sure to use the ones provided in previous explorative steps rather than guessing table or column names
-- INSERT has more target columns than expressions for query: if there is a mismatch between query params (insert v1, v2), placeholders ($1, $2, etc.), and args. Align them carefully. 
-- Missing or incorrectly ordered parameters when using parameterized queries
 </POSTGRES>
 
 <FTP_SFTP>
 Correct FTP/SFTP configuration:
-- FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"
-- FTPS: urlHost: "ftps://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/basepath"  
-- SFTP: urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/basepath"
-- body: Must be a JSON object with 'operation' field
+- FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/"
+- FTPS: urlHost: "ftps://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/"  
+- SFTP: urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/"
+- body: Can be either a single operation object or an array of operation objects for batch operations
 
 SUPPORTED OPERATIONS:
 - list: {"operation": "list", "path": "/directory"} - Returns array of file/directory info
-- get: {"operation": "get", "path": "/file.txt"} - Returns file content (auto-parses JSON)
+- get: {"operation": "get", "path": "/file.txt"} - Returns file content (auto-parses every format to a JSON)
 - put: {"operation": "put", "path": "/file.txt", "content": "data"} - Uploads content
 - delete: {"operation": "delete", "path": "/file.txt"} - Deletes file
 - rename: {"operation": "rename", "path": "/old.txt", "newPath": "/new.txt"} - Renames/moves
@@ -675,33 +655,33 @@ SUPPORTED OPERATIONS:
 - exists: {"operation": "exists", "path": "/file.txt"} - Checks if file exists
 - stat: {"operation": "stat", "path": "/file.txt"} - Gets file metadata
 
-Common errors:
-- Permission denied in root. This is a common security setting. Try the upload subdirectory instead.
-- Missing 'operation' field in body: Always include the operation type
-- Unsupported operation: Only use the 9 operations listed above
-- Missing required fields: 'get' needs 'path', 'put' needs 'path' and 'content', 'rename' needs 'path' and 'newPath'
-- Incorrect protocol in URL: Ensure ftp://, ftps://, or sftp:// prefix matches the server type
-- Path issues: Paths are relative to the base path in urlPath or absolute from root
+BATCH OPERATIONS:
+- Multiple operations: [{"operation": "mkdir", "path": "/backup"}, {"operation": "get", "path": "/data.csv"}]
+- Operations execute in sequence, all using the same connection
+- Response: single result for single operation, array of results for multiple operations
+- Use batch operations to perform multiple file operations efficiently in one API call
 </FTP_SFTP>
 
-<SOAP>
-For SOAP requests:
-- Put the entire XML envelope in the body as a string
-- Include all namespaces and proper XML structure
-- Example body: "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\">...</soapenv:Envelope>"
-</SOAP>
+<PAGINATION_CONFIGURATION>
+Pagination is OPTIONAL. Only configure it if you have verified the exact pagination mechanism from the documentation or know it really well.
 
-<PAGINATION>
-When pagination is configured:
-- Superglue provides these variables: <<page>>, <<offset>>, <<limit>>, <<cursor>>
-- ALWAYS use these exact variable names, even if the API parameter name is different.
-- Use "OFFSET_BASED", "PAGE_BASED", or "CURSOR_BASED" for the type
-- stopCondition is required and controls when to stop fetching pages
-</PAGINATION>
+BEFORE configuring pagination:
+1. Check the documentation for pagination details
+2. Verify the exact parameter names the API expects
+3. Confirm the pagination type (offset, page, or cursor-based)
+4. If unsure about ANY aspect, DO NOT configure pagination
 
-<DOCUMENTATION_SEARCH>
-This is keyword based so pick relevant keywords and synonyms.
-</DOCUMENTATION_SEARCH>
+When you DO configure pagination:
+1. Set the pagination object with type, pageSize, and stopCondition
+2. Add the exact pagination parameters to queryParams/body/headers as specified in the docs
+
+Superglue provides these variables that you MUST use:
+- OFFSET_BASED: Use <<offset>> and <<limit>> variables
+- PAGE_BASED: Use <<page>> and <<pageSize>> or <<limit>> variables
+- CURSOR_BASED: Use <<cursor>> and <<limit>> variables
+
+⚠️ WARNING: Incorrect pagination configuration causes infinite loops. When in doubt, leave it unconfigured.
+</PAGINATION_CONFIGURATION>
 
 Remember: Each attempt should incorporate lessons from previous errors. Don't just make minor tweaks - understand the root cause and make meaningful changes.`;
 
