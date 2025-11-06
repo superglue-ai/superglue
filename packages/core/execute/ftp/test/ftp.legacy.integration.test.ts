@@ -1,8 +1,18 @@
 import { ApiConfig, HttpMethod, RequestOptions } from '@superglue/client';
-import { beforeAll, describe, expect, it } from 'vitest';
-import { callFTP } from '../ftp.legacy.js';
+import { ChildProcess, spawn } from 'child_process';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { callFTP } from '../ftp.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const SERVER_STARTUP_DELAY_MS = 2000;
 
 describe('FTP File Extraction', () => {
+  let ftpServerProcess: ChildProcess | null = null;
+
   const ftpConfig: ApiConfig = {
     id: 'ftp-test',
     instruction: 'Test FTP server',
@@ -18,7 +28,85 @@ describe('FTP File Extraction', () => {
   };
 
   beforeAll(async () => {
-    console.log('Testing FTP server at ftp://127.0.0.1:2121');
+    console.log('\n🚀 Starting FTP test server...');
+    
+    const serverPath = join(__dirname, 'ftp-test-server.cjs');
+    
+    let serverStarted = false;
+    let serverError: string | null = null;
+
+    ftpServerProcess = spawn('node', [serverPath], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: false
+    });
+
+    ftpServerProcess.stdout?.on('data', (data) => {
+      const output = data.toString();
+      if (output.includes('Listening')) {
+        serverStarted = true;
+      }
+      if (!output.includes('"name":"ftp-srv"')) {
+        console.log(`FTP Server: ${output.trim()}`);
+      }
+    });
+
+    ftpServerProcess.stderr?.on('data', (data) => {
+      const error = data.toString();
+      if (error.includes('EADDRINUSE')) {
+        serverError = 'Port 2121 already in use. Kill existing process or wait for cleanup.';
+      }
+      console.error(`FTP Server Error: ${error}`);
+    });
+
+    ftpServerProcess.on('exit', (code) => {
+      if (code !== 0 && code !== null && !serverStarted) {
+        serverError = serverError || `Server exited with code ${code}`;
+      }
+    });
+
+    await new Promise(resolve => setTimeout(resolve, SERVER_STARTUP_DELAY_MS));
+    
+    if (serverError) {
+      if (ftpServerProcess) {
+        ftpServerProcess.kill('SIGKILL');
+        ftpServerProcess = null;
+      }
+      throw new Error(`Failed to start FTP server: ${serverError}`);
+    }
+    
+    console.log('✓ FTP server ready at ftp://testuser:testpass@127.0.0.1:2121\n');
+  });
+
+  afterAll(async () => {
+    if (ftpServerProcess) {
+      console.log('\n🛑 Stopping FTP test server...');
+      ftpServerProcess.kill('SIGTERM');
+      
+      await new Promise<void>((resolve) => {
+        if (!ftpServerProcess) {
+          resolve();
+          return;
+        }
+
+        const timeout = setTimeout(() => {
+          if (ftpServerProcess && !ftpServerProcess.killed) {
+            console.log('Force killing FTP server...');
+            ftpServerProcess.kill('SIGKILL');
+          }
+          resolve();
+        }, 2000);
+
+        ftpServerProcess.on('exit', () => {
+          clearTimeout(timeout);
+          console.log('✓ FTP server stopped\n');
+          resolve();
+        });
+      });
+      
+      ftpServerProcess = null;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 500));
   });
 
   describe('list operation', () => {
@@ -291,6 +379,150 @@ describe('FTP File Extraction', () => {
       expect(result.size).toBeGreaterThan(0);
       expect(result.type).toBe('file');
       expect(result.path).toBe('/products.xml');
+    });
+  });
+
+  describe('multiple operations (batch)', () => {
+    it('should execute multiple operations in sequence and return array of results', async () => {
+      const config: ApiConfig = {
+        ...ftpConfig,
+        body: JSON.stringify([
+          { operation: 'exists', path: '/customers.csv' },
+          { operation: 'stat', path: '/products.xml' },
+          { operation: 'list', path: '/' }
+        ])
+      };
+
+      const result = await callFTP({
+        endpoint: config,
+        credentials: {},
+        options: requestOptions
+      });
+
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(3);
+
+      expect(result[0].exists).toBe(true);
+      expect(result[0].path).toBe('/customers.csv');
+
+      expect(result[1].exists).toBe(true);
+      expect(result[1].name).toBe('products.xml');
+      expect(result[1].type).toBe('file');
+
+      expect(Array.isArray(result[2])).toBe(true);
+      expect(result[2].length).toBeGreaterThan(0);
+    });
+
+    it('should execute multiple get operations and parse different file types', async () => {
+      const config: ApiConfig = {
+        ...ftpConfig,
+        body: JSON.stringify([
+          { operation: 'get', path: '/test.txt' },
+          { operation: 'get', path: '/orders.json' }
+        ])
+      };
+
+      const result = await callFTP({
+        endpoint: config,
+        credentials: {},
+        options: requestOptions
+      });
+
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(2);
+
+      expect(typeof result[0]).toBe('string');
+      expect(result[0]).toContain('Hello from FTP server!');
+
+      expect(result[1].orders).toBeDefined();
+      expect(Array.isArray(result[1].orders)).toBe(true);
+    });
+
+    it('should handle mixed read and check operations efficiently', async () => {
+      const config: ApiConfig = {
+        ...ftpConfig,
+        body: JSON.stringify([
+          { operation: 'list', path: '/' },
+          { operation: 'exists', path: '/customers.csv' },
+          { operation: 'exists', path: '/nonexistent.txt' },
+          { operation: 'stat', path: '/orders.json' }
+        ])
+      };
+
+      const result = await callFTP({
+        endpoint: config,
+        credentials: {},
+        options: requestOptions
+      });
+
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(4);
+
+      expect(Array.isArray(result[0])).toBe(true);
+      expect(result[1].exists).toBe(true);
+      expect(result[2].exists).toBe(false);
+      expect(result[3].exists).toBe(true);
+      expect(result[3].name).toBe('orders.json');
+    });
+
+    it('should return single result for single operation (not array)', async () => {
+      const config: ApiConfig = {
+        ...ftpConfig,
+        body: JSON.stringify({
+          operation: 'exists',
+          path: '/customers.csv'
+        })
+      };
+
+      const result = await callFTP({
+        endpoint: config,
+        credentials: {},
+        options: requestOptions
+      });
+
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(false);
+      expect(result.exists).toBe(true);
+      expect(result.path).toBe('/customers.csv');
+    });
+
+    it('should fail entire batch if one operation has invalid operation type', async () => {
+      const config: ApiConfig = {
+        ...ftpConfig,
+        body: JSON.stringify([
+          { operation: 'list', path: '/' },
+          { operation: 'invalid', path: '/' }
+        ])
+      };
+
+      await expect(
+        callFTP({
+          endpoint: config,
+          credentials: {},
+          options: requestOptions
+        })
+      ).rejects.toThrow('Unsupported operation');
+    });
+
+    it('should fail if operation in batch is missing required path', async () => {
+      const config: ApiConfig = {
+        ...ftpConfig,
+        body: JSON.stringify([
+          { operation: 'exists', path: '/test.txt' },
+          { operation: 'get' }
+        ])
+      };
+
+      await expect(
+        callFTP({
+          endpoint: config,
+          credentials: {},
+          options: requestOptions
+        })
+      ).rejects.toThrow('path required for get operation');
     });
   });
 
