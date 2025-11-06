@@ -91,25 +91,3 @@ export type EvaluateTransformContextInput = {
 export type EvaluateTransformContextOptions = {
     characterBudget: number;
 };
-
-export type FindRelevantIntegrationsContextInput = {
-    searchTerms: string;
-    availableIntegrations: Integration[];
-};
-
-export type FindRelevantIntegrationsContextOptions = {
-    characterBudget: number;
-};
-
-export type FindRelevantToolsContextInput = {
-    searchTerms: string;
-    availableTools: Workflow[];
-};
-
-export type FindRelevantToolsContextOptions = {
-    characterBudget: number;
-};
-
-export type BuildToolContextOptions = {
-    characterBudget: number;
-};

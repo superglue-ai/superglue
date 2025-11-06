@@ -119,7 +119,7 @@ describe('getObjectContext edge cases for include combinations and strict budget
         expect(out).toMatch(/<schema>/);
         expect(out).not.toMatch(/<object_preview>|<full_object>/);
         expect(out).not.toMatch(/<samples>/);
-        expect(out.length).toBeLessThanOrEqual(200 + 50);
+        expect(out.length).toBeLessThanOrEqual(200);
     });
 
     it('samples only prefers samples, but may fall back to Full Object if small and within budget', () => {
@@ -128,27 +128,27 @@ describe('getObjectContext edge cases for include combinations and strict budget
         expect(out).toMatch(/<samples>|<full_object>/);
         expect(out).not.toMatch(/<schema>/);
         expect(out).not.toMatch(/<object_preview>/);
-        expect(out.length).toBeLessThanOrEqual(250);
+        expect(out.length).toBeLessThanOrEqual(200);
     });
 
     it('preview only may return Full Object if it fits', () => {
         const small = { x: 1 };
         const out = getObjectContext(small, { characterBudget: 500, include: { schema: false, preview: true, samples: false } });
         expect(out).toMatch(/<(object_preview|full_object)>/);
-        expect(out.length).toBeLessThanOrEqual(500 + 50);
+        expect(out.length).toBeLessThanOrEqual(500);
     });
 
     it('handles circular references without throwing', () => {
         const a: any = { x: 1 };
         a.self = a;
         const out = getObjectContext(a, { characterBudget: 300, include: { schema: true, preview: true, samples: true } });
-        expect(out.length).toBeLessThanOrEqual(300 + 50);
+        expect(out.length).toBeLessThanOrEqual(300);
     });
 
     it('handles mixed types including BigInt and Date', () => {
         const obj = { n: BigInt(123), d: new Date('2020-01-01T00:00:00Z'), u: undefined, s: 'x'.repeat(10000) } as any;
         const out = getObjectContext(obj, { characterBudget: 600, include: { schema: true, preview: true, samples: true } });
-        expect(out.length).toBeLessThanOrEqual(650);
+        expect(out.length).toBeLessThanOrEqual(600);
     });
 });
 
@@ -182,14 +182,14 @@ describe('getWorkflowBuilderContext budget and include combinations', () => {
 
     it('no integrations path emits transform-only hint and enforces budget', () => {
         const input = { integrations: [], payload: { q: 1 }, userInstruction: 'Transform data' } as any;
-        const out = getWorkflowBuilderContext(input, { characterBudget: 400, include: { integrationContext: true, availableVariablesContext: false, payloadContext: false, userInstruction: true } });
-        expect(out.length).toBeLessThanOrEqual(420);
+        const out = getWorkflowBuilderContext(input, { characterBudget: 500, include: { integrationContext: true, availableVariablesContext: false, payloadContext: false, userInstruction: true } });
+        expect(out.length).toBeLessThanOrEqual(500);
         expect(out).toMatch(/No integrations provided\. Build a transform-only workflow/);
     });
 
     it('available variables include integration credentials and payload keys when requested', () => {
         const input = { integrations: [{ ...integration, credentials: { apiKey: 'xxx' } }], payload: { foo: 1 }, userInstruction: 'N/A' } as any;
-        const out = getWorkflowBuilderContext(input, { characterBudget: 500, include: { availableVariablesContext: true } as any });
+        const out = getWorkflowBuilderContext(input, { characterBudget: 1000, include: { availableVariablesContext: true } as any });
         expect(out).toMatch(/<<test_integration_apiKey>>/);
         expect(out).toMatch(/<<foo>>/);
     });
@@ -226,8 +226,8 @@ describe('getLoopSelectorContext budgets and content', () => {
     const input = { step, payload: { data: [{ id: 1 }, { id: 2 }] }, instruction: 'loop' } as any;
 
     it('enforces budget and contains step and payload context plus explicit end prompt', () => {
-        const out = getLoopSelectorContext(input, { characterBudget: 500 });
-        expect(out.length).toBeLessThanOrEqual(520);
+        const out = getLoopSelectorContext(input, { characterBudget: 550 });
+        expect(out.length).toBeLessThanOrEqual(550);
         expect(out).toMatch(/<instruction>/);
         expect(out).toMatch(/<loop_selector_input>/);
         expect(out).toMatch(/The function should return an array of items/);
@@ -243,7 +243,7 @@ describe('getEvaluateStepResponseContext budgets and content', () => {
 
     it('enforces budget and includes data, step_config, and doc search tags', () => {
         const out = getEvaluateStepResponseContext(input, { characterBudget: 800 });
-        expect(out.length).toBeLessThanOrEqual(820);
+        expect(out.length).toBeLessThanOrEqual(800);
         expect(out).toMatch(/<step_response>/);
         expect(out).toMatch(/<step_config>/);
         expect(out).toMatch(/<doc_search_results_for_step_instruction>/);
@@ -276,7 +276,7 @@ describe('getEvaluateTransformContext budgets and content', () => {
 
     it('with instruction: includes all tags and enforces budget', () => {
         const out = getEvaluateTransformContext({ ...base, instruction: 'Ensure mapping' }, { characterBudget: 700 });
-        expect(out.length).toBeLessThanOrEqual(720);
+        expect(out.length).toBeLessThanOrEqual(700);
         expect(out).toMatch(/<instruction>/);
         expect(out).toMatch(/<target_schema>/);
         expect(out).toMatch(/<transform_input>/);
@@ -285,8 +285,8 @@ describe('getEvaluateTransformContext budgets and content', () => {
     });
 
     it('without instruction: uses default promptStart and enforces budget', () => {
-        const out = getEvaluateTransformContext({ ...base, instruction: '' }, { characterBudget: 300 });
-        expect(out.length).toBeLessThanOrEqual(320);
+        const out = getEvaluateTransformContext({ ...base, instruction: '' }, { characterBudget: 600 });
+        expect(out.length).toBeLessThanOrEqual(600);
         expect(out).toMatch(/No specific instruction provided/);
     });
 });
