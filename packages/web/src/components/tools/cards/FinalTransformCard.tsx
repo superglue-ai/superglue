@@ -21,39 +21,43 @@ import {
   Package,
   Play,
   Settings,
+  Wand2,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { JavaScriptCodeEditor } from "../../editors/JavaScriptCodeEditor";
 import { JsonCodeEditor } from "../../editors/JsonCodeEditor";
 import { useDataProcessor } from "../hooks/use-data-processor";
 import { CopyButton } from "../shared/CopyButton";
 
-export const FinalTransformMiniStepCard = React.memo(
-  ({
-    transform,
-    responseSchema,
-    onTransformChange,
-    onResponseSchemaChange,
-    readOnly,
-    onExecuteTransform,
-    isExecutingTransform,
-    canExecute,
-    transformResult,
-    stepInputs,
-    hasTransformCompleted
-  }: {
-    transform?: string;
-    responseSchema?: string;
-    onTransformChange?: (value: string) => void;
-    onResponseSchemaChange?: (value: string) => void;
-    readOnly?: boolean;
-    onExecuteTransform?: (schema: string, transform: string) => void;
-    isExecutingTransform?: boolean;
-    canExecute?: boolean;
-    transformResult?: any;
-    stepInputs?: any;
-    hasTransformCompleted?: boolean;
-  }) => {
+export const FinalTransformMiniStepCard = ({
+  transform,
+  responseSchema,
+  onTransformChange,
+  onResponseSchemaChange,
+  readOnly,
+  onExecuteTransform,
+  onFixTransform,
+  isRunningTransform,
+  isFixingTransform,
+  canExecute,
+  transformResult,
+  stepInputs,
+  hasTransformCompleted
+}: {
+  transform?: string;
+  responseSchema?: string;
+  onTransformChange?: (value: string) => void;
+  onResponseSchemaChange?: (value: string) => void;
+  readOnly?: boolean;
+  onExecuteTransform?: (schema: string, transform: string) => void;
+  onFixTransform?: (schema: string, transform: string) => void;
+  isRunningTransform?: boolean;
+  isFixingTransform?: boolean;
+  canExecute?: boolean;
+  transformResult?: any;
+  stepInputs?: any;
+  hasTransformCompleted?: boolean;
+}) => {
     const [activeTab, setActiveTab] = useState("transform");
     const [localTransform, setLocalTransform] = useState(transform || "");
     const [localSchema, setLocalSchema] = useState(responseSchema || "");
@@ -173,6 +177,13 @@ export const FinalTransformMiniStepCard = React.memo(
       if (onResponseSchemaChange) onResponseSchemaChange(localSchema);
       if (onExecuteTransform) onExecuteTransform(localSchema, validTransform);
     }
+
+    function handleFixTransform(): void {
+      const validTransform = ensureValidTransform(localTransform);
+      if (onTransformChange) onTransformChange(localTransform);
+      if (onResponseSchemaChange) onResponseSchemaChange(localSchema);
+      if (onFixTransform) onFixTransform(localSchema, validTransform);
+    }
     
     return (
       <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
@@ -183,34 +194,63 @@ export const FinalTransformMiniStepCard = React.memo(
               <h3 className="text-lg font-semibold">Tool Result</h3>
             </div>
             <div className="flex items-center gap-2">
-              {!readOnly && onExecuteTransform && (
+              {!readOnly && (onExecuteTransform || onFixTransform) && (
                 <>
-                  <span
-                    title={
-                      !canExecute
-                        ? "Execute all steps first"
-                        : isExecutingTransform
-                          ? "Transform is executing..."
-                          : "Test final transform"
-                    }
-                  >
-                    <Button
-                      variant="ghost"
-                      onClick={handleExecuteTransform}
-                      disabled={!canExecute || isExecutingTransform}
-                      className="h-8 px-3 gap-2"
+                  {onExecuteTransform && (
+                    <span
+                      title={
+                        !canExecute
+                          ? "Execute all steps first"
+                          : isRunningTransform
+                            ? "Transform is running..."
+                            : "Test final transform"
+                      }
                     >
-                      {isExecutingTransform ? (
-                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      ) : (
-                        <Play className="h-3 w-3" />
-                      )}
-                      <span className="font-medium text-[13px]">
-                        Run Transform Code
-                      </span>
-                    </Button>
-                  </span>
-                  <HelpTooltip text="Executes the final transform script with step results as input. If a result schema is enabled, the output will be validated against it." />
+                      <Button
+                        variant="ghost"
+                        onClick={handleExecuteTransform}
+                        disabled={!canExecute || isRunningTransform || isFixingTransform}
+                        className="h-8 px-3 gap-2"
+                      >
+                        {isRunningTransform ? (
+                          <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        ) : (
+                          <Play className="h-3 w-3" />
+                        )}
+                        <span className="font-medium text-[13px]">
+                          Run Transform
+                        </span>
+                      </Button>
+                    </span>
+                  )}
+                  {onFixTransform && (
+                    <span
+                      title={
+                        !canExecute
+                          ? "Execute all steps first"
+                          : isFixingTransform
+                            ? "Fixing transform..."
+                            : "Fix transform with auto-repair"
+                      }
+                    >
+                      <Button
+                        variant="ghost"
+                        onClick={handleFixTransform}
+                        disabled={!canExecute || isRunningTransform || isFixingTransform}
+                        className="h-8 px-3 gap-2"
+                      >
+                        {isFixingTransform ? (
+                          <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        ) : (
+                          <Wand2 className="h-3 w-3" />
+                        )}
+                        <span className="font-medium text-[13px]">
+                          Fix Transform
+                        </span>
+                      </Button>
+                    </span>
+                  )}
+                  <HelpTooltip text="Run Transform: executes the transform code with step results. Fix Transform: uses auto-repair to automatically fix transform errors and update the code." />
                 </>
               )}
             </div>
@@ -407,7 +447,7 @@ export const FinalTransformMiniStepCard = React.memo(
                       )}
                       {outputData.truncated && outputViewMode === "preview" && (
                         <div className="mt-2 text-xs text-amber-600 dark:text-amber-300">
-                          Preview truncated for display performance. Use copy
+                          Preview truncated for display performance. Use download
                           button to get full data.
                         </div>
                       )}
@@ -420,5 +460,4 @@ export const FinalTransformMiniStepCard = React.memo(
         </div>
       </Card>
     );
-  }
-);
+};

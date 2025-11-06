@@ -73,21 +73,18 @@ export async function executeSingleStep(
       workflow: singleStepTool,
       payload: executionPayload,
       options: {
-        testMode: false,
-        selfHealing: selfHealing ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED
+        testMode: selfHealing,
+        selfHealing: selfHealing ? SelfHealingMode.REQUEST_ONLY : SelfHealingMode.DISABLED
       }
     });
 
-    const stepResult: any = Array.isArray(result.stepResults)
-      ? result.stepResults[0]
-      : result.stepResults?.[step.id];
+    const stepResult = result.stepResults[0];
 
     return {
       stepId: step.id,
       success: result.success,
-      data: stepResult?.data || stepResult?.transformedData || stepResult || result.data,
+      data: stepResult.transformedData,
       error: result.error,
-      // Capture any updated configuration returned by the API (normalization, self-healing, etc.)
       updatedStep: result.config?.steps?.[0]
     };
   } catch (error: any) {
@@ -233,23 +230,20 @@ export async function executeFinalTransform(
       ...payload,
       ...previousResults
     };
-
     const result = await client.executeWorkflow({
       workflow: {
         id: `${toolId}_final_transform`,
         steps: [],
         finalTransform,
-        // Only include responseSchema if it's actually defined (not null/undefined)
-        ...(responseSchema ? { responseSchema } : {}),
-        inputSchema: inputSchema || { type: 'object' }
+        responseSchema,
+        inputSchema: inputSchema
       },
       payload: finalPayload,
       options: {
-        testMode: !!responseSchema,  // Always use test mode if responseSchema is provided
-        selfHealing: selfHealing ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED
+        testMode: selfHealing,
+        selfHealing: selfHealing ? SelfHealingMode.TRANSFORM_ONLY : SelfHealingMode.DISABLED
       }
     });
-
     return {
       success: result.success,
       data: result.data,

@@ -32,15 +32,16 @@ export interface ToolStepGalleryProps {
     onFixStep?: (stepIndex: number) => Promise<void>;
     onExecuteAllSteps?: () => Promise<void>;
     onExecuteTransform?: (schema: string, transform: string) => Promise<void>;
+    onFixTransform?: (schema: string, transform: string) => Promise<void>;
     completedSteps?: string[];
     failedSteps?: string[];
     integrations?: Integration[];
     isExecuting?: boolean;
     isExecutingStep?: number;
     isFixingWorkflow?: number;
-    isExecutingTransform?: boolean;
+    isRunningTransform?: boolean;
+    isFixingTransform?: boolean;
     currentExecutingStepIndex?: number;
-    transformResult?: any;
     readOnly?: boolean;
     payloadText?: string;
     computedPayload?: any;
@@ -81,15 +82,16 @@ export function ToolStepGallery({
     onFixStep,
     onExecuteAllSteps,
     onExecuteTransform,
+    onFixTransform,
     completedSteps = [],
     failedSteps = [],
     integrations,
     isExecuting,
     isExecutingStep,
     isFixingWorkflow,
-    isExecutingTransform,
+    isRunningTransform,
+    isFixingTransform,
     currentExecutingStepIndex,
-    transformResult,
     readOnly = false,
     payloadText,
     computedPayload,
@@ -241,12 +243,12 @@ export function ToolStepGallery({
     
     // Use computed payload from parent (already merged manual + files)
     const workingPayload = computedPayload || {};
-
+    console.log('stepResults', stepResults);
     const stepResultsMap = useMemo(() => 
         Array.isArray(stepResults)
             ? stepResults.reduce((acc: Record<string, any>, result: any) => {
                 if (result.stepId) {
-                    acc[result.stepId] = result.data || result.transformedData || result;
+                    acc[result.stepId] = result.data;
                 }
                 return acc;
             }, {})
@@ -254,7 +256,7 @@ export function ToolStepGallery({
         [stepResults]
     );
 
-    const hasTransformCompleted = completedSteps.includes('__final_transform__') && (transformResult || finalResult);
+    const hasTransformCompleted = completedSteps.includes('__final_transform__');
 
     const toolItems = useMemo(() => [
         {
@@ -612,7 +614,7 @@ export function ToolStepGallery({
                                                                     isRunningAll={isExecuting && currentExecutingStepIndex === (globalIdx - 1)}
                                                                     isTesting={
                                                                         item.type === 'step' ? (isExecutingStep === (globalIdx - 1) || isFixingWorkflow === (globalIdx - 1)) :
-                                                                            item.type === 'transform' ? isExecutingTransform :
+                                                                            item.type === 'transform' ? (isRunningTransform || isFixingTransform) :
                                                                                 false
                                                                     }
                                                                     completedSteps={completedSteps}
@@ -724,9 +726,11 @@ export function ToolStepGallery({
                                     onResponseSchemaChange={onResponseSchemaChange}
                                     readOnly={readOnly}
                                     onExecuteTransform={onExecuteTransform}
-                                    isExecutingTransform={isExecutingTransform}
+                                    onFixTransform={onFixTransform}
+                                    isRunningTransform={isRunningTransform}
+                                    isFixingTransform={isFixingTransform}
                                     canExecute={canExecuteTransform}
-                                    transformResult={transformResult || finalResult}
+                                    transformResult={finalResult}
                                     stepInputs={currentItem.evolvingPayload}
                                     hasTransformCompleted={hasTransformCompleted}
                                 />
@@ -743,7 +747,7 @@ export function ToolStepGallery({
                                     canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
                                     isExecuting={isExecutingStep === activeIndex - 1}
                                     isFixingWorkflow={isFixingWorkflow === activeIndex - 1}
-                                    isGlobalExecuting={!!(isExecuting || isExecutingTransform)}
+                                    isGlobalExecuting={!!(isExecuting || isRunningTransform || isFixingTransform)}
                                     currentExecutingStepIndex={currentExecutingStepIndex}
                                     integrations={integrations}
                                     readOnly={readOnly}
