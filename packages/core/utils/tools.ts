@@ -161,7 +161,7 @@ export async function applyJsonataWithValidation(data: any, expr: string, schema
 }
 
 export async function executeAndValidateMappingCode(input: any, mappingCode: string, schema: any): Promise<TransformResult> {
-  const isolate = new ivm.Isolate({ memoryLimit: 1024 }); // 32 MB
+  const isolate = new ivm.Isolate({ memoryLimit: 4096 }); // 32 MB
   const context = await isolate.createContext();
 
   // Inject helper functions into the context
