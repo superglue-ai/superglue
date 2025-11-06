@@ -1,9 +1,9 @@
-import { Integration, Workflow } from '@superglue/client';
+import { Integration } from '@superglue/client';
 import { server_defaults } from '../default.js';
 import { DocumentationSearch } from '../documentation/documentation-search.js';
 import { composeUrl } from '../utils/tools.js';
 import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
-import { BuildToolContextOptions, EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions } from './context-types.js';
+import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions } from './context-types.js';
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
@@ -131,39 +131,33 @@ function buildAvailableVariableContext(payload: any, integrations: Integration[]
     return availableVariables || 'No variables available'
 }
 
-function buildToolContext(tool: Workflow, opts: BuildToolContextOptions): string {
-    const budget = Math.max(0, opts.characterBudget | 0);
-
-    const toolOpeningTag = `<${tool.id}>`;
-    const toolInstructionContext = `<tool_instruction>${tool.instruction}</tool_instruction>`;
-    const integrationsUsedByToolStepsContext = `<integrations_used_in_tool_steps>${tool.steps.map(step => step.integrationId).join(', ')}</integrations_used_in_tool_steps>`;;
-    const toolClosingTag = `</${tool.id}>`;
-    return toolOpeningTag + '\n' + [toolInstructionContext, integrationsUsedByToolStepsContext].filter(Boolean).join('\n').slice(0, budget - toolOpeningTag.length - toolClosingTag.length) + '\n' + toolClosingTag;
-}
-
 export function getWorkflowBuilderContext(input: WorkflowBuilderContextInput, options: WorkflowBuilderContextOptions): string {
     const budget = Math.max(0, options.characterBudget | 0);
     if (budget === 0) return '';
     const hasIntegrations = input.integrations.length > 0;
 
     const prompt_start = `Build a complete workflow to fulfill the user's request.`;
-    const prompt_end = hasIntegrations ? 'Ensure that the final output matches the instruction and you use ONLY the available integration ids.' : 'Since no integrations are available, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.'
+    const prompt_end = hasIntegrations ? 'Ensure that the final output matches the instruction and you use ONLY the available integration ids.' : 'Since no integrations are available, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.';
     const userInstructionContext = options.include.userInstruction ? `<instruction>${input.userInstruction}</instruction>` : '';
 
-    const essentialLength = prompt_start.length + prompt_end.length + userInstructionContext.length + 2;
-    if (budget < essentialLength) {
-        throw new Error(`Character budget (${budget}) is less than essential context length (${essentialLength})`);
+    const essentialLength = prompt_start.length + prompt_end.length + userInstructionContext.length;
+    if (budget <= essentialLength) {
+        throw new Error(`Character budget (${budget}) is less than or equal to essential context length (${essentialLength})`);
     }
-    const availableVariablesContext = options.include?.availableVariablesContext ? `<available_variables>${buildAvailableVariableContext(input.payload, input.integrations)}</available_variables>` : '';
-    const payloadContext = options.include?.payloadContext ? `<workflow_input>${getObjectContext(input.payload, { include: { schema: true, preview: false, samples: true }, characterBudget: budget * 0.5 })}</workflow_input>` : '';
-    const integrationContext = options.include?.integrationContext ? `<available_integrations_and_documentation>${hasIntegrations ? input.integrations.map(int => buildIntegrationContext(int, { characterBudget: budget })).join('\n') : 'No integrations provided. Build a transform-only workflow using finalTransform to process the payload data.'}</available_integrations_and_documentation>` : '';
 
-    const availableBudget = budget - essentialLength;
-    const truncatedContext = ([integrationContext, availableVariablesContext, payloadContext].filter(Boolean).join('\n')).slice(0, availableBudget);
-    return prompt_start + '\n' + userInstructionContext + '\n' + truncatedContext + '\n' + prompt_end;
+    const remainingBudget = budget - essentialLength;
+    const availableVariablesBudget = Math.floor(remainingBudget * 0.1);
+    const payloadBudget = Math.floor(remainingBudget * 0.2);
+    const integrationBudget = Math.floor(remainingBudget * 0.7);
+
+    const availableVariablesContext = options.include?.availableVariablesContext ? `<available_variables>${buildAvailableVariableContext(input.payload, input.integrations)}</available_variables>`.slice(0, availableVariablesBudget) : '';
+    const payloadContext = options.include?.payloadContext ? `<workflow_input>${getObjectContext(input.payload, { include: { schema: true, preview: false, samples: true }, characterBudget: payloadBudget })}</workflow_input>` : '';
+    const integrationContext = options.include?.integrationContext ? `<available_integrations_and_documentation>${hasIntegrations ? input.integrations.map(int => buildIntegrationContext(int, { characterBudget: integrationBudget })).join('\n') : 'No integrations provided. Build a transform-only workflow using finalTransform to process the payload data.'}</available_integrations_and_documentation>`.slice(0, integrationBudget) : '';
+
+    return prompt_start + '\n' + userInstructionContext + '\n' + integrationContext + '\n' + availableVariablesContext + '\n' + payloadContext + '\n' + prompt_end;
 }
 
-export function getExtractContext(input: ExtractContextInput, options: ExtractContextOptions): string {
+export function getExtractContext(input: ExtractContextInput, options: ExtractContextOptions): string { // TODO: Remove this function in file handling PR because extract will become a file processing only endpoint
     const budget = Math.max(0, options.characterBudget | 0);
     if (budget === 0) return '';
 
@@ -186,16 +180,15 @@ export function getLoopSelectorContext(input: LoopSelectorContextInput, options:
     const instructionContext = `<instruction>${input.step.apiConfig.instruction}</instruction>`;
     const prompt_end = `The function should return an array of items that this step will iterate over.`;
 
-    const essentialLength = prompt_start.length + instructionContext.length + prompt_end.length + 3;
-    if (budget < essentialLength) {
-        throw new Error(`Character budget (${budget}) is less than essential context length (${essentialLength})`);
+    const essentialLength = prompt_start.length + instructionContext.length + prompt_end.length;
+    if (budget <= essentialLength) {
+        throw new Error(`Character budget (${budget}) is less than or equal to essential context length (${essentialLength})`);
     }
 
-    const payloadContext = `<loop_selector_input>${getObjectContext(input.payload, { include: { schema: true, preview: true, samples: false }, characterBudget: budget * 0.9 })}</loop_selector_input>`;
+    const remainingBudget = budget - essentialLength;
+    const payloadContext = `<loop_selector_input>${getObjectContext(input.payload, { include: { schema: true, preview: true, samples: false }, characterBudget: remainingBudget })}</loop_selector_input>`;
 
-    const availableBudget = budget - essentialLength;
-    const truncatedPayloadContext = payloadContext.slice(0, availableBudget);
-    return prompt_start + '\n' + instructionContext + '\n' + truncatedPayloadContext + '\n' + prompt_end;
+    return prompt_start + '\n' + instructionContext + '\n' + payloadContext + '\n' + prompt_end;
 }
 
 export function getEvaluateStepResponseContext(input: EvaluateStepResponseContextInput, options: EvaluateStepResponseContextOptions): string {
@@ -204,17 +197,20 @@ export function getEvaluateStepResponseContext(input: EvaluateStepResponseContex
 
     const prompt_start = `Evaluate the response returned by the step and return { success: true, shortReason: "", refactorNeeded: false } if the data in the response aligns with the instruction. If the data does not align with the instruction, return { success: false, shortReason: "reason why it does not align", refactorNeeded: false }.`;
     const endpointContext = `<step_config>${JSON.stringify(input.endpoint)}</step_config>`;
-    const dataContext = `<step_response>${getObjectContext(input.data, { include: { schema: true, preview: true, samples: false }, characterBudget: budget * 0.7 })}</step_response>`;
 
-    const essentialLength = prompt_start.length + endpointContext.length + dataContext.length + 2;
-    if (budget < essentialLength) {
-        throw new Error(`Character budget (${budget}) is less than essential context length (${essentialLength})`);
+    const essentialLength = prompt_start.length + endpointContext.length;
+    if (budget <= essentialLength) {
+        throw new Error(`Character budget (${budget}) is less than or equal to essential context length (${essentialLength})`);
     }
-    const docSearchResultsForStepInstructionContext = `<doc_search_results_for_step_instruction>${input.docSearchResultsForStepInstruction}</doc_search_results_for_step_instruction>`;
 
-    const availableBudget = budget - essentialLength;
-    const truncatedContext = ([docSearchResultsForStepInstructionContext].filter(Boolean).join('\n')).slice(0, availableBudget);
-    return prompt_start + '\n' + endpointContext + '\n' + dataContext + '\n' + truncatedContext;
+    const remainingBudget = budget - essentialLength;
+    const dataContextBudget = Math.floor(remainingBudget * 0.8);
+    const docSearchBudget = Math.floor(remainingBudget * 0.2);
+
+    const dataContext = `<step_response>${getObjectContext(input.data, { include: { schema: true, preview: true, samples: false }, characterBudget: dataContextBudget })}</step_response>`;
+    const docSearchResultsForStepInstructionContext = `<doc_search_results_for_step_instruction>${input.docSearchResultsForStepInstruction}</doc_search_results_for_step_instruction>`.slice(0, docSearchBudget);
+
+    return prompt_start + '\n' + endpointContext + '\n' + dataContext + '\n' + docSearchResultsForStepInstructionContext;
 }
 
 export function getTransformContext(input: TransformContextInput, options: TransformContextOptions): string {
@@ -223,18 +219,17 @@ export function getTransformContext(input: TransformContextInput, options: Trans
 
     const prompt_start = `Given a source data object, create a JavaScript function that transforms the input data according to the instruction.`;
     const instructionContext = `<instruction>${input.instruction}</instruction>`;
-    const schemaContext = `<target_schema>${JSON.stringify(input.targetSchema)}</target_schema>`;
+    const schemaContext = input.targetSchema ? `<target_schema>${JSON.stringify(input.targetSchema)}</target_schema>` : '';
 
-    const essentialLength = prompt_start.length + instructionContext.length + schemaContext.length + 3;
-    if (budget < essentialLength) {
-        throw new Error(`Character budget (${budget}) is less than essential context length (${essentialLength})`);
+    const essentialLength = prompt_start.length + instructionContext.length + schemaContext.length;
+    if (budget <= essentialLength) {
+        throw new Error(`Character budget (${budget}) is less than or equal to essential context length (${essentialLength})`);
     }
 
-    const dataContext = `<transform_input>${getObjectContext(input.sourceData, { include: { schema: true, preview: true, samples: true }, characterBudget: budget * 0.7 })}</transform_input>`;
+    const remainingBudget = budget - essentialLength;
+    const dataContext = `<transform_input>${getObjectContext(input.sourceData, { include: { schema: true, preview: true, samples: true }, characterBudget: remainingBudget })}</transform_input>`;
 
-    const availableBudget = budget - essentialLength;
-    const truncatedDataContext = dataContext.slice(0, availableBudget);
-    return prompt_start + '\n' + instructionContext + '\n' + schemaContext + '\n' + truncatedDataContext;
+    return prompt_start + '\n' + instructionContext + '\n' + schemaContext + '\n' + dataContext;
 }
 
 export function getEvaluateTransformContext(input: EvaluateTransformContextInput, options: EvaluateTransformContextOptions): string {
@@ -245,17 +240,20 @@ export function getEvaluateTransformContext(input: EvaluateTransformContextInput
     const transformCodeContext = `<transform_code>${input.transformCode}</transform_code>`;
     const promptEnd = `Please evaluate the transformation based on the criteria in the system prompt, considering that samples may not show all data values present in the full dataset.`;
 
-    const essentialLength = promptStart.length + transformCodeContext.length + promptEnd.length + 3;
-    if (budget < essentialLength) {
-        throw new Error(`Character budget (${budget}) is less than essential context length (${essentialLength})`);
+    const essentialLength = promptStart.length + transformCodeContext.length + promptEnd.length;
+    if (budget <= essentialLength) {
+        throw new Error(`Character budget (${budget}) is less than or equal to essential context length (${essentialLength})`);
     }
 
-    const targetSchemaContext = input.targetSchema ? `<target_schema>${JSON.stringify(input.targetSchema)}</target_schema>` : '';
-    const sourceDataContext = `<transform_input>${getObjectContext(input.sourceData, { include: { schema: true, preview: true, samples: true }, characterBudget: budget * 0.4 })}</transform_input>`;
-    const transformedDataContext = `<transform_output>${getObjectContext(input.transformedData, { include: { schema: true, preview: true, samples: true }, characterBudget: budget * 0.4 })}</transform_output>`;
+    const remainingBudget = budget - essentialLength;
+    const targetSchemaBudget = Math.floor(remainingBudget * 0.2);
+    const sourceDataBudget = Math.floor(remainingBudget * 0.4);
+    const transformedDataBudget = Math.floor(remainingBudget * 0.4);
 
-    const availableBudget = budget - essentialLength;
-    const truncatedContext = ([targetSchemaContext, sourceDataContext, transformedDataContext].filter(Boolean).join('\n')).slice(0, availableBudget);
-    return promptStart + '\n' + truncatedContext + '\n' + transformCodeContext + '\n' + promptEnd;
+    const targetSchemaContext = input.targetSchema ? `<target_schema>${JSON.stringify(input.targetSchema)}</target_schema>`.slice(0, targetSchemaBudget) : '';
+    const sourceDataContext = `<transform_input>${getObjectContext(input.sourceData, { include: { schema: true, preview: true, samples: true }, characterBudget: sourceDataBudget })}</transform_input>`;
+    const transformedDataContext = `<transform_output>${getObjectContext(input.transformedData, { include: { schema: true, preview: true, samples: true }, characterBudget: transformedDataBudget })}</transform_output>`;
+
+    return promptStart + '\n' + targetSchemaContext + '\n' + sourceDataContext + '\n' + transformedDataContext + '\n' + transformCodeContext + '\n' + promptEnd;
 }
 
