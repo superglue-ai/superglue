@@ -1,8 +1,15 @@
 import * as JSZip from 'jszip';
 import * as mammoth from 'mammoth';
-import * as pdfjsLib from 'pdfjs-dist';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+let pdfjsLib: typeof import('pdfjs-dist') | null = null;
+
+async function getPdfLib() {
+    if (!pdfjsLib && typeof window !== 'undefined') {
+        pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+    }
+    return pdfjsLib;
+}
 
 // Context-specific file size limits
 export const MAX_TOTAL_FILE_SIZE_CHAT = 50 * 1024 * 1024;           // 50 MB per message for chat (performance)
@@ -42,26 +49,26 @@ export async function processAndExtractFile(file: File, client: any): Promise<an
 }
 
 export function sanitizeFileName(name: string, options?: {
-  removeExtension?: boolean;
-  lowercase?: boolean;
+    removeExtension?: boolean;
+    lowercase?: boolean;
 }): string {
-  const { removeExtension = true, lowercase = true } = options || {};
-  
-  let base = removeExtension ? name.replace(/\.[^/.]+$/, '') : name;
-  
-  base = base
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-  
-  if (lowercase) {
-    base = base.toLowerCase();
-  }
-  
-  base = base
-    .replace(/[^a-zA-Z0-9_.-]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '');
-  
+    const { removeExtension = true, lowercase = true } = options || {};
+
+    let base = removeExtension ? name.replace(/\.[^/.]+$/, '') : name;
+
+    base = base
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+    if (lowercase) {
+        base = base.toLowerCase();
+    }
+
+    base = base
+        .replace(/[^a-zA-Z0-9_.-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '');
+
     if (/^\d/.test(base)) {
         base = '_' + base;
     }
@@ -74,11 +81,11 @@ export function sanitizeFileName(name: string, options?: {
 }
 
 export function setFileUploadDocumentationURL(fileNames: string[]): string {
-  // Format: file://filename1,filename2,filename3 (single file:// prefix)
-  const sanitizedNames = fileNames.map(fileName => 
-    sanitizeFileName(fileName, { removeExtension: false, lowercase: false })
-  );
-  return `file://${sanitizedNames.join(',')}`;
+    // Format: file://filename1,filename2,filename3 (single file:// prefix)
+    const sanitizedNames = fileNames.map(fileName =>
+        sanitizeFileName(fileName, { removeExtension: false, lowercase: false })
+    );
+    return `file://${sanitizedNames.join(',')}`;
 }
 
 export function generateUniqueKey(baseKey: string, existingKeys: string[]): string {
@@ -114,9 +121,13 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
 
     // Check both MIME type and file extension for PDF detection
     if (fileType === 'application/pdf' || lowerFileName.endsWith('.pdf')) {
-        // Extract text from PDF and convert to markdown
+        const pdfLib = await getPdfLib();
+        if (!pdfLib) {
+            throw new Error('PDF processing is only available in browser environment');
+        }
+
         const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const pdf = await pdfLib.getDocument({ data: arrayBuffer }).promise;
 
         let markdownContent = '';
         const numPages = pdf.numPages;
@@ -187,7 +198,7 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
 
                 for (let i = startIdx; i < lines.length; i++) {
                     const line = lines[i];
-        if (line.items.length < 2) continue;
+                    if (line.items.length < 2) continue;
 
                     const sortedItems = [...line.items].sort((a, b) => a.x - b.x);
                     const lineColumns = sortedItems.map(item => item.x);
@@ -206,11 +217,11 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
                         if (matches >= lineColumns.length * 0.5) {
                             potentialRows.push(line);
                         } else {
-            break;
+                            break;
                         }
                     }
 
-        if (i > startIdx && Math.abs(line.y - lines[i-1].y) > 50) {
+                    if (i > startIdx && Math.abs(line.y - lines[i - 1].y) > 50) {
                         break;
                     }
                 }
@@ -307,7 +318,7 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
                 if (!isHeading && text.length < 80) {
                     if (/^\d+(\.\d+)*\.?\s+[A-Z]/.test(text)) {
                         isHeading = true;
-          headingLevel = text.split('.').length + 1;
+                        headingLevel = text.split('.').length + 1;
                     }
                     else if (text === text.toUpperCase() && text.split(' ').length > 1) {
                         isHeading = true;
@@ -384,37 +395,37 @@ export async function processFile(file: File | Blob, fileName: string): Promise<
 }
 
 export function getFileType(filename: string): 'json' | 'csv' | 'xml' | 'excel' | 'pdf' | 'text' | 'code' | 'archive' | 'other' {
-  const ext = filename.toLowerCase().split('.').pop() || '';
-  switch (ext) {
-    case 'json': return 'json';
-    case 'csv': return 'csv';
-    case 'xml': return 'xml';
-    case 'xlsx':
-    case 'xls': return 'excel';
-    case 'pdf': return 'pdf';
-    case 'txt': return 'text';
-    case 'md':
-    case 'markdown': return 'code';
-    case 'zip': return 'archive';
-    default: return 'other';
-  }
+    const ext = filename.toLowerCase().split('.').pop() || '';
+    switch (ext) {
+        case 'json': return 'json';
+        case 'csv': return 'csv';
+        case 'xml': return 'xml';
+        case 'xlsx':
+        case 'xls': return 'excel';
+        case 'pdf': return 'pdf';
+        case 'txt': return 'text';
+        case 'md':
+        case 'markdown': return 'code';
+        case 'zip': return 'archive';
+        default: return 'other';
+    }
 }
 
 export function truncateFileContent(content: string, maxChars: number): { truncated: string; wasTruncated: boolean } {
-  if (content.length <= maxChars) {
-    return { truncated: content, wasTruncated: false };
-  }
+    if (content.length <= maxChars) {
+        return { truncated: content, wasTruncated: false };
+    }
 
-  const headChars = Math.floor(maxChars * 0.7);
-  const tailChars = Math.floor(maxChars * 0.3);
-  
-  const head = content.slice(0, headChars);
-  const tail = content.slice(-tailChars);
-  
-  const originalChars = content.length;
-  const omittedChars = originalChars - (headChars + tailChars);
-  
-  const truncated = `${head}\n\n... [truncated ${omittedChars.toLocaleString()} characters (~${Math.ceil(omittedChars / 5)} tokens) for context window management] ...\n\n${tail}`;
-  
-  return { truncated, wasTruncated: true };
+    const headChars = Math.floor(maxChars * 0.7);
+    const tailChars = Math.floor(maxChars * 0.3);
+
+    const head = content.slice(0, headChars);
+    const tail = content.slice(-tailChars);
+
+    const originalChars = content.length;
+    const omittedChars = originalChars - (headChars + tailChars);
+
+    const truncated = `${head}\n\n... [truncated ${omittedChars.toLocaleString()} characters (~${Math.ceil(omittedChars / 5)} tokens) for context window management] ...\n\n${tail}`;
+
+    return { truncated, wasTruncated: true };
 }

@@ -110,7 +110,7 @@ export async function generateTransformCode(
     logMessage('info', "Generating Transform Code" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
 
     if (!messages || messages?.length === 0) {
-      const userPrompt = getTransformContext({ instruction, targetSchema: schema, sourceData: payload }, { characterBudget: LanguageModel.contextLength / 10 });
+      const userPrompt = getTransformContext({ instruction, targetSchema: schema, sourceData: payload }, { characterBudget: 20000 });
       messages = [
         { role: "system", content: GENERATE_TRANSFORM_SYSTEM_PROMPT },
         { role: "user", content: userPrompt }
@@ -175,7 +175,7 @@ export async function evaluateTransform(
     logMessage('info', "Evaluating final transform", metadata);
 
     const systemPrompt = EVALUATE_TRANSFORM_SYSTEM_PROMPT;
-    const userPrompt = getEvaluateTransformContext({ instruction, targetSchema, sourceData: sourcePayload, transformedData, transformCode: mappingCode }, { characterBudget: LanguageModel.contextLength / 10 });
+    const userPrompt = getEvaluateTransformContext({ instruction, targetSchema, sourceData: sourcePayload, transformedData, transformCode: mappingCode }, { characterBudget: 20000 });
 
     const messages: LLMMessage[] = [
       { role: "system", content: systemPrompt },

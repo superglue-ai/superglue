@@ -12,7 +12,8 @@ import { composeUrl, generateId, maskCredentials, replaceVariables, sample, smar
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../../utils/workflow-tools.js";
 import { callFTP } from "../ftp/ftp.legacy.js";
 import { callPostgres } from "../postgres/postgres.legacy.js";
-import { ApiCallError, callAxios, checkResponseForErrors, handle2xxStatus, handle429Status, handleErrorStatus } from "./api.js";
+import { AbortError, ApiCallError, callAxios, checkResponseForErrors, handle2xxStatus, handle429Status, handleErrorStatus } from "./api.js";
+import { getGenerateApiConfigContext } from "../../context/context-builders.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
@@ -394,15 +395,15 @@ export async function evaluateStopCondition(
   }
   
   export async function generateApiConfig({
-    apiConfig,
-    payload,
+    failedConfig,
+    stepInput,
     credentials,
     retryCount,
     messages,
     integrationManager,
   }: {
-    apiConfig: Partial<ApiConfig>,
-    payload: Record<string, any>,
+    failedConfig: Partial<ApiConfig>,
+    stepInput: Record<string, any>,
     credentials: Record<string, any>,
     retryCount?: number,
     messages?: LLMMessage[],
@@ -412,95 +413,68 @@ export async function evaluateStopCondition(
     if (!messages) messages = [];
   
     if (messages.length === 0) {
-      const fullDocs = await integrationManager?.getDocumentation();
-      const documentation = fullDocs?.content?.length < LanguageModel.contextLength / 4 ?
-        fullDocs?.content :
-        await integrationManager?.searchDocumentation(apiConfig.urlPath || apiConfig.instruction);
-      let payloadString = JSON.stringify(payload || {});
-      if (payloadString.length > LanguageModel.contextLength / 10) {
-        payloadString = JSON.stringify(sample(payload || {}, 5)).slice(0, LanguageModel.contextLength / 10);
-      }
-      const userPrompt = `Generate API configuration for the following:
   
-  <instruction>
-  ${apiConfig.instruction}
-  </instruction>
+      const userPrompt = await getGenerateApiConfigContext({
+        instruction: failedConfig.instruction,
+        previousStepConfig: failedConfig,
+        stepInput: stepInput,
+        credentials,
+        integrationManager
+      }, { characterBudget: 50000 });
   
-  <user_provided_information>
-  Also, the user provided the following information. Ensure to at least try where it makes sense:
-  Base URL: ${composeUrl(apiConfig.urlHost, apiConfig.urlPath)}
-  ${apiConfig.headers ? `Headers: ${JSON.stringify(apiConfig.headers)}` : ""}
-  ${apiConfig.queryParams ? `Query Params: ${JSON.stringify(apiConfig.queryParams)}` : ""}
-  ${apiConfig.body ? `Body: ${JSON.stringify(apiConfig.body)}` : ''}
-  ${apiConfig.authentication ? `Authentication: ${apiConfig.authentication}` : ''}
-  ${apiConfig.dataPath ? `Data Path: ${apiConfig.dataPath}` : ''}
-  ${apiConfig.pagination ? `Pagination: ${JSON.stringify(apiConfig.pagination)}` : ''}
-  ${apiConfig.method ? `Method: ${apiConfig.method}` : ''}
-  </user_provided_information>
+      messages.push({
+        role: "system",
+        content: SELF_HEALING_SYSTEM_PROMPT
+      });
+      messages.push({
+        role: "user",
+        content: userPrompt
+      });
+    }
   
-  <integration_instructions>  
-  ${(await integrationManager?.getIntegration())?.specificInstructions}
-  </integration_instructions>
+    const temperature = Math.min(retryCount * 0.1, 1);
+    const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(
+      messages,
+      submitToolDefinition.arguments,
+      temperature,
+      [searchDocumentationToolDefinition],
+      { integration: await integrationManager?.getIntegration() }
+    );
   
-  <documentation>
-  ${documentation}
-  </documentation>
+    if (generatedConfig?.error) {
+      throw new AbortError(generatedConfig.error);
+    }
   
-  <available_credentials>
-  ${Object.keys(credentials || {}).map(v => `<<${v}>>`).join(", ")}
-  </available_credentials>
+    if (!generatedConfig?.apiConfig) {
+      throw new AbortError('LLM did not return apiConfig in response. Response: ' + JSON.stringify(generatedConfig).slice(0, 500));
+    }
   
-  <example_payload>
-  ${payloadString}
-  </example_payload>`;
-
-    messages.push({
-      role: "system",
-      content: SELF_HEALING_SYSTEM_PROMPT
-    });
-    messages.push({
-      role: "user",
-      content: userPrompt
-    });
-  }
-
-  const temperature = Math.min(retryCount * 0.1, 1);
-  const { response: generatedConfig, error: generatedConfigError, messages: updatedMessages } = await LanguageModel.generateObject(
-    messages,
-    submitToolDefinition.arguments,
-    temperature,
-    [searchDocumentationToolDefinition],
-    { integration: await integrationManager?.getIntegration() }
-  );
-
-  if (generatedConfigError || generatedConfig.error) {
-    throw new Error(generatedConfigError || generatedConfig.error);
-  }
-  // convert the queryParams and headers to an object
-  const queryParams = generatedConfig.apiConfig.queryParams ?
+    const queryParams = generatedConfig.apiConfig.queryParams ?
     Object.fromEntries(generatedConfig.apiConfig.queryParams.map((p: any) => [p.key, p.value])) :
     undefined;
   const headers = generatedConfig.apiConfig.headers ?
     Object.fromEntries(generatedConfig.apiConfig.headers.map((p: any) => [p.key, p.value])) :
     undefined;
-  return {
-    config: {
-      instruction: apiConfig.instruction,
-      urlHost: generatedConfig.apiConfig.urlHost,
-      urlPath: generatedConfig.apiConfig.urlPath,
-      method: generatedConfig.apiConfig.method,
-      queryParams: queryParams,
-      headers: headers,
-      body: generatedConfig.apiConfig.body,
-      authentication: generatedConfig.apiConfig.authentication,
-      pagination: generatedConfig.apiConfig.pagination,
-      documentationUrl: apiConfig.documentationUrl,
-      responseSchema: apiConfig.responseSchema,
-      responseMapping: apiConfig.responseMapping,
-      createdAt: apiConfig.createdAt || new Date(),
-      updatedAt: new Date(),
-      id: apiConfig.id || generateId(generatedConfig.apiConfig.urlHost, generatedConfig.apiConfig.urlPath),
-    } as ApiConfig,
-    messages: updatedMessages
-  };
-}
+    
+    return {
+      config: {
+        instruction: failedConfig.instruction,
+        urlHost: generatedConfig.apiConfig.urlHost,
+        urlPath: generatedConfig.apiConfig.urlPath,
+        method: generatedConfig.apiConfig.method,
+        queryParams: queryParams,
+        headers: headers,
+        body: generatedConfig.apiConfig.body,
+        authentication: generatedConfig.apiConfig.authentication,
+        pagination: generatedConfig.apiConfig.pagination,
+        dataPath: generatedConfig.apiConfig.dataPath,
+        documentationUrl: failedConfig.documentationUrl,
+        responseSchema: failedConfig.responseSchema,
+        responseMapping: failedConfig.responseMapping,
+        createdAt: failedConfig.createdAt || new Date(),
+        updatedAt: new Date(),
+        id: failedConfig.id || generateId(generatedConfig.apiConfig.urlHost, generatedConfig.apiConfig.urlPath),
+      } as ApiConfig,
+      messages: updatedMessages
+    };
+  }
