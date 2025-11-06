@@ -159,29 +159,6 @@ export class AbortError extends Error {
 }
 type StatusHandlerResult = { shouldFail: boolean; message?: string };
 
-function detectHtmlErrorResponse(data: any): { isHtml: boolean; preview?: string } {
-  const MAX_HTML_CHECK_BYTES = 1024; // Only check first 1KB for efficiency
-  let dataPrefix = '';
-
-  if (data instanceof Buffer) {
-    // Only convert first 1KB to string for HTML detection
-    const bytesToRead = Math.min(data.length, MAX_HTML_CHECK_BYTES);
-    dataPrefix = data.subarray(0, bytesToRead).toString('utf-8');
-  } else if (typeof data === 'string') {
-    dataPrefix = data.slice(0, MAX_HTML_CHECK_BYTES);
-  } else {
-    return { isHtml: false };
-  }
-
-  const trimmedLower = dataPrefix.slice(0, 100).trim().toLowerCase();
-  const isHtml = trimmedLower.startsWith('<!doctype html') || trimmedLower.startsWith('<html');
-
-  return {
-    isHtml,
-    preview: dataPrefix
-  };
-}
-
 export function checkResponseForErrors(
   data: any,
   status: number,
@@ -248,20 +225,6 @@ type StatusHandlerInput = {
   retriesAttempted?: number;
   lastFailureStatus?: number | undefined;
 };
-
-export function handle2xxStatus(
-  input: StatusHandlerInput
-): StatusHandlerResult {
-  const { response, axiosConfig, credentials = {}, payload = {} } = input;
-  const htmlCheck = detectHtmlErrorResponse(response?.data);
-  if (htmlCheck.isHtml) {
-    const url = String(axiosConfig?.url || '');
-    const maskedUrl = maskCredentials(url, credentials);
-    const msg = `Received HTML response instead of expected JSON data from ${maskedUrl}. \n        This usually indicates an error page or invalid endpoint.\nResponse: ${htmlCheck.preview}`;
-    return { shouldFail: true, message: msg };
-  }
-  return { shouldFail: false };
-}
 
 export function handle429Status(
   input: StatusHandlerInput
