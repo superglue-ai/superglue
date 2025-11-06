@@ -474,9 +474,9 @@ export class WorkflowExecutor implements Workflow {
       }
       catch (error) {
         const rawErrorString = error?.message || JSON.stringify(error || {});
-        lastError = maskCredentials(rawErrorString, credentials).slice(0, 2000);
+        lastError = maskCredentials(rawErrorString, credentials).slice(0, 10000);
         if (retryCount > 0) {
-          messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 4000)}` });
+          messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 10000)}` });
           logMessage('info', `API call failed. Last error: ${lastError}`, this.metadata);
         }
   
