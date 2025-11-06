@@ -1,9 +1,10 @@
 import { Integration } from '@superglue/client';
 import { server_defaults } from '../default.js';
 import { DocumentationSearch } from '../documentation/documentation-search.js';
+import { logMessage } from '../utils/logs.js';
 import { composeUrl } from '../utils/tools.js';
 import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
-import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions } from './context-types.js';
+import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, GenerateApiConfigContextInput, GenerateApiConfigContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions } from './context-types.js';
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
@@ -153,7 +154,8 @@ export function getWorkflowBuilderContext(input: WorkflowBuilderContextInput, op
     const essentialLength = prompt_start.length + prompt_end.length + userInstructionContext.length + newlineCount + totalWrapperLength;
 
     if (budget <= essentialLength) {
-        throw new Error(`Character budget (${budget}) is less than or equal to essential context length (${essentialLength})`);
+        logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getWorkflowBuilderContext`, {});
+        return prompt_start + '\n' + userInstructionContext + '\n' + prompt_end;
     }
 
     const remainingBudget = budget - essentialLength;
@@ -196,14 +198,16 @@ export function getLoopSelectorContext(input: LoopSelectorContextInput, options:
     const instructionContext = `<instruction>${input.step.apiConfig.instruction}</instruction>`;
     const prompt_end = `The function should return an array of items that this step will iterate over.`;
 
+    const payloadWrapperLength = '<loop_selector_input>'.length + '</loop_selector_input>'.length;
     const newlineCount = 3;
-    const essentialLength = prompt_start.length + instructionContext.length + prompt_end.length + newlineCount;
+    const essentialLength = prompt_start.length + instructionContext.length + prompt_end.length + newlineCount + payloadWrapperLength;
+
     if (budget <= essentialLength) {
-        throw new Error(`Character budget (${budget}) is less than or equal to essential context length (${essentialLength})`);
+        logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getLoopSelectorContext`, {});
+        return prompt_start + '\n' + instructionContext + '\n' + prompt_end;
     }
 
-    const payloadWrapperLength = '<loop_selector_input>'.length + '</loop_selector_input>'.length;
-    const remainingBudget = budget - essentialLength - payloadWrapperLength;
+    const remainingBudget = budget - essentialLength;
     const payloadContext = `<loop_selector_input>${getObjectContext(input.payload, { include: { schema: true, preview: true, samples: false }, characterBudget: remainingBudget })}</loop_selector_input>`;
 
     return prompt_start + '\n' + instructionContext + '\n' + payloadContext + '\n' + prompt_end;
@@ -216,16 +220,17 @@ export function getEvaluateStepResponseContext(input: EvaluateStepResponseContex
     const prompt_start = `Evaluate the response returned by the step and return { success: true, shortReason: "", refactorNeeded: false } if the data in the response aligns with the instruction. If the data does not align with the instruction, return { success: false, shortReason: "reason why it does not align", refactorNeeded: false }.`;
     const endpointContext = `<step_config>${JSON.stringify(input.endpoint)}</step_config>`;
 
-    const newlineCount = 3;
-    const essentialLength = prompt_start.length + endpointContext.length + newlineCount;
-    if (budget <= essentialLength) {
-        throw new Error(`Character budget (${budget}) is less than or equal to essential context length (${essentialLength})`);
-    }
-
     const dataWrapperLength = '<step_response>'.length + '</step_response>'.length;
     const docSearchWrapperLength = '<doc_search_results_for_step_instruction>'.length + '</doc_search_results_for_step_instruction>'.length;
+    const newlineCount = 3;
+    const essentialLength = prompt_start.length + endpointContext.length + newlineCount + dataWrapperLength + docSearchWrapperLength;
 
-    const remainingBudget = budget - essentialLength - dataWrapperLength - docSearchWrapperLength;
+    if (budget <= essentialLength) {
+        logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getEvaluateStepResponseContext`, {});
+        return prompt_start + '\n' + endpointContext;
+    }
+
+    const remainingBudget = budget - essentialLength;
     const dataContextBudget = Math.floor(remainingBudget * 0.8);
     const docSearchBudget = Math.floor(remainingBudget * 0.2);
 
@@ -243,14 +248,16 @@ export function getTransformContext(input: TransformContextInput, options: Trans
     const instructionContext = `<instruction>${input.instruction}</instruction>`;
     const schemaContext = input.targetSchema ? `<target_schema>${JSON.stringify(input.targetSchema)}</target_schema>` : '';
 
+    const dataWrapperLength = '<transform_input>'.length + '</transform_input>'.length;
     const newlineCount = 3;
-    const essentialLength = prompt_start.length + instructionContext.length + schemaContext.length + newlineCount;
+    const essentialLength = prompt_start.length + instructionContext.length + schemaContext.length + newlineCount + dataWrapperLength;
+
     if (budget <= essentialLength) {
-        throw new Error(`Character budget (${budget}) is less than or equal to essential context length (${essentialLength})`);
+        logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getTransformContext`, {});
+        return prompt_start + '\n' + instructionContext + '\n' + schemaContext;
     }
 
-    const dataWrapperLength = '<transform_input>'.length + '</transform_input>'.length;
-    const remainingBudget = budget - essentialLength - dataWrapperLength;
+    const remainingBudget = budget - essentialLength;
     const dataContext = `<transform_input>${getObjectContext(input.sourceData, { include: { schema: true, preview: true, samples: true }, characterBudget: remainingBudget })}</transform_input>`;
 
     return prompt_start + '\n' + instructionContext + '\n' + schemaContext + '\n' + dataContext;
@@ -264,18 +271,19 @@ export function getEvaluateTransformContext(input: EvaluateTransformContextInput
     const transformCodeContext = `<transform_code>${input.transformCode}</transform_code>`;
     const promptEnd = `Please evaluate the transformation based on the criteria in the system prompt, considering that samples may not show all data values present in the full dataset.`;
 
-    const newlineCount = 5;
-    const essentialLength = promptStart.length + transformCodeContext.length + promptEnd.length + newlineCount;
-    if (budget <= essentialLength) {
-        throw new Error(`Character budget (${budget}) is less than or equal to essential context length (${essentialLength})`);
-    }
-
     const targetSchemaWrapperLength = '<target_schema>'.length + '</target_schema>'.length;
     const sourceDataWrapperLength = '<transform_input>'.length + '</transform_input>'.length;
     const transformedDataWrapperLength = '<transform_output>'.length + '</transform_output>'.length;
     const totalWrapperLength = targetSchemaWrapperLength + sourceDataWrapperLength + transformedDataWrapperLength;
+    const newlineCount = 5;
+    const essentialLength = promptStart.length + transformCodeContext.length + promptEnd.length + newlineCount + totalWrapperLength;
 
-    const remainingBudget = budget - essentialLength - totalWrapperLength;
+    if (budget <= essentialLength) {
+        logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getEvaluateTransformContext`, {});
+        return promptStart + '\n' + transformCodeContext + '\n' + promptEnd;
+    }
+
+    const remainingBudget = budget - essentialLength;
     const targetSchemaBudget = Math.floor(remainingBudget * 0.2);
     const sourceDataBudget = Math.floor(remainingBudget * 0.4);
     const transformedDataBudget = Math.floor(remainingBudget * 0.4);
@@ -285,5 +293,50 @@ export function getEvaluateTransformContext(input: EvaluateTransformContextInput
     const transformedDataContext = `<transform_output>${getObjectContext(input.transformedData, { include: { schema: true, preview: true, samples: true }, characterBudget: transformedDataBudget })}</transform_output>`;
 
     return promptStart + '\n' + targetSchemaContext + '\n' + sourceDataContext + '\n' + transformedDataContext + '\n' + transformCodeContext + '\n' + promptEnd;
+}
+
+
+export async function getGenerateApiConfigContext(input: GenerateApiConfigContextInput, options: GenerateApiConfigContextOptions): Promise<string> {
+    const budget = Math.max(0, options.characterBudget | 0);
+    if (budget === 0) return '';
+
+    const fullDocs = await input.integrationManager?.getDocumentation();
+    const documentation = fullDocs?.content?.length < 40000 ?
+        fullDocs?.content :
+        await input.integrationManager?.searchDocumentation(input.instruction);
+
+    const promptStart = `The current step config failed to execute. Generate a corrected API configuration that executes the step instruction:`;
+    const instructionContext = `<step_instruction>${input.instruction}</step_instruction>`;
+    const failedStepConfigContext = `<failed_step_config>${JSON.stringify(input.previousStepConfig)}</failed_step_config>`;
+
+    const documentationWrapperLength = '<documentation>'.length + '</documentation>'.length;
+    const stepInputWrapperLength = '<step_input>'.length + '</step_input>'.length;
+    const integrationInstructionsWrapperLength = '<integration_specific_instructions>'.length + '</integration_specific_instructions>'.length;
+    const credentialsWrapperLength = '<available_credentials>'.length + '</available_credentials>'.length;
+    const totalWrapperLength = documentationWrapperLength + stepInputWrapperLength + integrationInstructionsWrapperLength + credentialsWrapperLength;
+    const newlineCount = 6;
+    const essentialLength = promptStart.length + instructionContext.length + failedStepConfigContext.length + newlineCount + totalWrapperLength;
+
+    if (budget <= essentialLength) {
+        logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getGenerateApiConfigContext`, {});
+        return promptStart + '\n' + instructionContext + '\n' + failedStepConfigContext;
+    }
+
+    const remainingBudget = budget - essentialLength;
+    const documentationBudget = Math.floor(remainingBudget * 0.4);
+    const stepInputBudget = Math.floor(remainingBudget * 0.3);
+    const integrationInstructionsBudget = Math.floor(remainingBudget * 0.1);
+    const credentialsBudget = Math.floor(remainingBudget * 0.2);
+
+    const documentationContent = (documentation || '').slice(0, documentationBudget);
+    const integrationSpecificInstructions = ((await input.integrationManager?.getIntegration())?.specificInstructions || '').slice(0, integrationInstructionsBudget);
+    const credentialsContent = Object.keys(input.credentials || {}).map(v => `<<${v}>>`).join(", ").slice(0, credentialsBudget);
+
+    const documentationContext = `<documentation>${documentationContent}</documentation>`;
+    const stepInputContext = `<step_input>${getObjectContext(input.stepInput, { include: { schema: true, preview: false, samples: true }, characterBudget: stepInputBudget })}</step_input>`;
+    const integrationInstructionsContext = `<integration_specific_instructions>${integrationSpecificInstructions}</integration_specific_instructions>`;
+    const credentialsContext = `<available_credentials>${credentialsContent}</available_credentials>`;
+
+    return promptStart + '\n' + instructionContext + '\n' + failedStepConfigContext + '\n' + documentationContext + '\n' + stepInputContext + '\n' + integrationInstructionsContext + '\n' + credentialsContext;
 }
 

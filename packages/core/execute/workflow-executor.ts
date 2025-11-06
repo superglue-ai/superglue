@@ -288,7 +288,7 @@ export class WorkflowExecutor implements Workflow {
           throw new Error(`Loop selector for '${step.id}' failed. Check the loop selector code or enable self-healing and re-execute to regenerate automatically.`);
         }
   
-        const loopPrompt = getLoopSelectorContext( { step: step, payload: payload, instruction: step.apiConfig.instruction }, { characterBudget: LanguageModel.contextLength / 10 });
+        const loopPrompt = getLoopSelectorContext( { step: step, payload: payload, instruction: step.apiConfig.instruction }, { characterBudget: 20000 });
         const arraySchema = { type: "array", description: "Array of items to iterate over" };
         const transformResult = await generateTransformCode(arraySchema, payload, loopPrompt, this.metadata);
   
@@ -381,7 +381,7 @@ export class WorkflowExecutor implements Workflow {
     docSearchResultsForStepInstruction?: string
   }): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
   
-    const evaluateStepResponsePrompt = getEvaluateStepResponseContext({ data, endpoint, docSearchResultsForStepInstruction }, { characterBudget: LanguageModel.contextLength / 10 });
+    const evaluateStepResponsePrompt = getEvaluateStepResponseContext({ data, endpoint, docSearchResultsForStepInstruction }, { characterBudget: 20000 });
   
     const request = [
       {
@@ -437,12 +437,12 @@ export class WorkflowExecutor implements Workflow {
         if (retryCount > 0 && isSelfHealing) {
           logMessage('info', `Failed to execute API Call. Self healing the step configuration for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, this.metadata);
           const computedApiCallConfig = await generateApiConfig({
-            apiConfig: endpoint,
-            payload,
+            failedConfig: endpoint,
+            stepInput: payload,
             credentials,
             retryCount,
-            messages,
-            integrationManager
+            messages: messages,
+            integrationManager: integrationManager
           });
           if (!computedApiCallConfig) {
             throw new Error("No API config generated");

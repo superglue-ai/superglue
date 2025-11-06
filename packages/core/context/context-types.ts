@@ -2,6 +2,7 @@ import { Integration, JSONSchema, Workflow } from "@superglue/client";
 import { ExtractConfig } from "@superglue/client";
 import { ExecutionStep } from "@superglue/client";
 import { ApiConfig } from "@superglue/client";
+import { IntegrationManager } from "../integrations/integration-manager.js";
 
 export type ObjectContextOptions = {
     characterBudget: number;
@@ -89,5 +90,17 @@ export type EvaluateTransformContextInput = {
 };
 
 export type EvaluateTransformContextOptions = {
+    characterBudget: number;
+};
+
+export type GenerateApiConfigContextInput = {
+    instruction: string;
+    previousStepConfig: Partial<ApiConfig>;
+    stepInput: any;
+    credentials: Record<string, string>;
+    integrationManager?: IntegrationManager;
+};
+
+export type GenerateApiConfigContextOptions = {
     characterBudget: number;
 };
