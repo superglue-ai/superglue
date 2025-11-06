@@ -7,18 +7,12 @@ import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndEx
 import { computeStepOutput, computeToolPayload, removeFileKeysFromPayload } from "@/src/lib/general-utils";
 import { ExecutionStep, Integration, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
 import { generateDefaultFromSchema } from "@superglue/shared";
-import isEqual from "lodash.isequal";
 import { Validator } from "jsonschema";
+import isEqual from "lodash.isequal";
 import { Check, Hammer, Loader2, Play, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
-import { Button } from "../ui/button";
-import { Label } from "../ui/label";
-import { Switch } from "../ui/switch";
-import { ToolStepGallery } from "./ToolStepGallery";
-import { ToolCreateSuccess } from "./ToolCreateSuccess";
-import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +23,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
+import { Button } from "../ui/button";
+import { Label } from "../ui/label";
+import { Switch } from "../ui/switch";
+import { ToolBuilder, type BuildContext } from "./ToolBuilder";
+import { ToolCreateSuccess } from "./ToolCreateSuccess";
+import { ToolStepGallery } from "./ToolStepGallery";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -152,7 +152,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [showStepOutputSignal, setShowStepOutputSignal] = useState<number>(0);
   const [focusStepId, setFocusStepId] = useState<string | null>(null);
   const [stepResultsMap, setStepResultsMap] = useState<Record<string, any>>({});
-  const [isExecutingTransform, setIsExecutingTransform] = useState<boolean>(false);
   const [finalPreviewResult, setFinalPreviewResult] = useState<any>(null);
   // Track last user-edited step and previous step hashes to drive robust cascades
   const lastUserEditedStepIdRef = useRef<string | null>(null);
@@ -171,6 +170,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [isFixingWorkflow, setIsFixingWorkflow] = useState<number | undefined>(undefined);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndex] = useState<number | undefined>(undefined);
   const [isStopping, setIsStopping] = useState(false);
+  const [isRunningTransform, setIsRunningTransform] = useState(false);
+  const [isFixingTransform, setIsFixingTransform] = useState(false);
+  // Computed: any transform execution in progress
+  const isExecutingTransform = isRunningTransform || isFixingTransform;
   // Single source of truth for stopping across modes (embedded/standalone)
   const stopSignalRef = useRef<boolean>(false);
   const [isPayloadValid, setIsPayloadValid] = useState<boolean>(true);
@@ -771,8 +774,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           .filter(([key]) => key !== '__final_transform__')
           .map(([stepId, result]: [string, StepExecutionResult]) => ({
             stepId,
-            success: result.success || !result.error,
-            data: result.data || result,
+            success: result.success,
+            data: result.data,
             error: result.error
           })),
         config: {
@@ -970,15 +973,19 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     await executeStepByIdx(idx, true);
   };
 
-  const handleExecuteTransform = async (schemaStr: string, transformStr: string) => {
+  const handleExecuteTransform = async (schemaStr: string, transformStr: string, selfHealing: boolean = false) => {
     try {
-      setIsExecutingTransform(true);
+      if (selfHealing) {
+        setIsFixingTransform(true);
+      } else {
+        setIsRunningTransform(true);
+      }
 
       // Build the payload with all step results
       const stepData: Record<string, any> = {};
       Object.entries(stepResultsMap).forEach(([stepId, result]) => {
         if (stepId !== '__final_transform__') {
-          stepData[stepId] = result?.data !== undefined ? result.data : result;
+          stepData[stepId] = result;
         }
       });
       const parsedResponseSchema = schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null;
@@ -991,7 +998,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         inputSchema ? JSON.parse(inputSchema) : null,
         computedPayload,
         stepData,
-        false
+        selfHealing
       );
 
       if (result.success) {
@@ -1000,6 +1007,15 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         setStepResultsMap(prev => ({ ...prev, ['__final_transform__']: result.data }));
         setFinalPreviewResult(result.data);
         setNavigateToFinalSignal(Date.now());
+
+        // Update transform if it was self-healed
+        if (result.updatedTransform && selfHealing) {
+          setFinalTransform(result.updatedTransform);
+          toast({
+            title: "Transform code updated",
+            description: "auto-repair has modified the transform code to fix issues.",
+          });
+        }
       } else {
         setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
         setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
@@ -1015,8 +1031,16 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         });
       }
     } finally {
-      setIsExecutingTransform(false);
+      if (selfHealing) {
+        setIsFixingTransform(false);
+      } else {
+        setIsRunningTransform(false);
+      }
     }
+  };
+
+  const handleFixTransform = async (schemaStr: string, transformStr: string) => {
+    await handleExecuteTransform(schemaStr, transformStr, true);
   };
 
   // Default header actions for standalone mode
@@ -1189,8 +1213,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   steps={steps}
                   stepResults={stepResultsMap}
                   finalTransform={finalTransform}
-                  finalResult={result?.data}
-                  transformResult={finalPreviewResult}
+                  finalResult={finalPreviewResult}
                   responseSchema={responseSchema}
                   toolId={toolId}
                   instruction={instructions}
@@ -1199,6 +1222,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   onExecuteStep={handleExecuteStep}
                   onFixStep={handleFixStep}
                   onExecuteTransform={handleExecuteTransform}
+                  onFixTransform={handleFixTransform}
                   onFinalTransformChange={setFinalTransform}
                   onResponseSchemaChange={setResponseSchema}
                   onPayloadChange={setManualPayloadText}
@@ -1208,7 +1232,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   isExecuting={loading}
                   isExecutingStep={isExecutingStep}
                   isFixingWorkflow={isFixingWorkflow}
-                  isExecutingTransform={isExecutingTransform as any}
+                  isRunningTransform={isRunningTransform}
+                  isFixingTransform={isFixingTransform}
                   currentExecutingStepIndex={currentExecutingStepIndex}
                   completedSteps={completedSteps}
                   failedSteps={failedSteps}
