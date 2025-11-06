@@ -14,7 +14,6 @@ type OAuthFields = {
 export type OAuthState = {
     integrationId: string;
     timestamp: number;
-    apiKey: string;
     redirectUri: string;
     token_url: string;
     templateId?: string;
@@ -46,7 +45,6 @@ const buildOAuthState = (params: {
     return {
         integrationId: params.integrationId,
         timestamp: Date.now(),
-        apiKey: params.apiKey,
         redirectUri: getOAuthCallbackUrl(),
         token_url: params.tokenUrl,
         ...(params.templateId && { templateId: params.templateId }),
@@ -142,8 +140,9 @@ const executeAuthorizationCodeFlow = (params: {
     oauthFields: OAuthFields;
     state: OAuthState;
     callbacks: OAuthCallbacks;
+    apiKey: string;
 }): (() => void) | null => {
-    const { integrationId, oauthFields, state, callbacks } = params;
+    const { integrationId, oauthFields, state, callbacks, apiKey } = params;
     const { onSuccess, onError } = callbacks;
 
     if (!oauthFields.auth_url) {
@@ -158,12 +157,36 @@ const executeAuthorizationCodeFlow = (params: {
         state,
     });
 
-    const popup = openOAuthPopup(authUrl);
-    if (!popup) {
-        onError?.('[OAUTH_STAGE:POPUP] Failed to open OAuth popup window. Please check if popups are blocked by your browser.');
-        return null;
-    }
+    // Set cookie then open popup to avoid race condition
+    fetch('/api/auth/init-oauth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey }),
+        credentials: 'same-origin'
+    }).then(() => {
+        const popup = openOAuthPopup(authUrl);
+        if (!popup) {
+            onError?.('[OAUTH_STAGE:POPUP] Failed to open OAuth popup window. Please check if popups are blocked by your browser.');
+            return;
+        }
+        setupPopupMonitoring(popup, integrationId, callbacks);
+    }).catch(err => {
+        console.error('Failed to set OAuth cookie:', err);
+        onError?.('[OAUTH_STAGE:INITIALIZATION] Failed to initialize OAuth session. Please try again.');
+    });
+    
+    // Return dummy cleanup - actual cleanup set up after popup opens
+    return () => {};
+};
 
+// Helper to set up popup monitoring
+const setupPopupMonitoring = (
+    popup: Window,
+    integrationId: string,
+    callbacks: OAuthCallbacks
+): void => {
+    const { onSuccess, onError } = callbacks;
+    
     // Track if OAuth flow completed (success or error) to prevent "cancelled" error
     let isCompleted = false;
 
@@ -196,12 +219,6 @@ const executeAuthorizationCodeFlow = (params: {
     };
 
     window.addEventListener('message', handleMessage);
-
-    // Return cleanup function
-    return () => {
-        clearInterval(intervalId);
-        window.removeEventListener('message', handleMessage);
-    };
 };
 
 export const triggerOAuthFlow = (
@@ -251,7 +268,7 @@ export const triggerOAuthFlow = (
 
     const state = buildOAuthState({
         integrationId,
-        apiKey: apiKey!,
+        apiKey,
         tokenUrl: oauthFields.token_url!,
         templateId: templateInfo?.templateId,
         clientId: templateInfo?.clientId || oauthFields.client_id,
@@ -269,6 +286,7 @@ export const triggerOAuthFlow = (
         oauthFields: oauthFields as OAuthFields,
         state,
         callbacks,
+        apiKey,
     });
 };
 
