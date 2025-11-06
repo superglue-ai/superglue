@@ -54,7 +54,7 @@ export interface ToolPlaygroundProps {
   totalFileSize?: number;
   filePayloads?: Record<string, any>;
   onFilesChange?: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
-  publishButtonText?: string;
+  saveButtonText?: string;
   showSuccessPage?: boolean;
   onSuccessPageAction?: (action: 'view-tool' | 'view-all') => void;
   hideRebuildButton?: boolean;
@@ -90,7 +90,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   totalFileSize: parentTotalFileSize,
   filePayloads: parentFilePayloads,
   onFilesChange: parentOnFilesChange,
-  publishButtonText = "Publish",
+  saveButtonText = "Save",
   showSuccessPage = false,
   onSuccessPageAction,
   hideRebuildButton = false
@@ -143,7 +143,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [justPublished, setJustPublished] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
   const [result, setResult] = useState<ToolResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
@@ -654,12 +654,12 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         setToolId(savedTool.id);
       }
 
-      setJustPublished(true);
-      setTimeout(() => setJustPublished(false), 3000);
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 3000);
     } catch (error: any) {
       console.error("Error saving tool:", error);
       toast({
-        title: "Error publishing tool",
+        title: "Error saving tool",
         description: error.message,
         variant: "destructive",
       });
@@ -1093,12 +1093,12 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         disabled={saving || loading}
         className="h-9 px-5 shadow-md border border-primary/40"
       >
-        {saving ? "Publishing..." : justPublished ? (
+        {saving ? "Saving..." : justSaved ? (
           <>
             <Check className="mr-1 h-3.5 w-3.5" />
-            Published
+            Saved
           </>
-        ) : publishButtonText}
+        ) : saveButtonText}
       </Button>
     </div>
   );

@@ -44,11 +44,11 @@
           {
             "group": "API Reference",
             "pages": [
-              "api-reference/overview",
-              "api-reference/types",
-              "api-reference/queries",
-              "api-reference/mutations",
-              "api-reference/subscriptions"
+              "api/overview",
+              "api/types",
+              "api/queries",
+              "api/mutations",
+              "api/subscriptions"
             ]
           }
         ]
