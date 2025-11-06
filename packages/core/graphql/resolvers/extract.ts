@@ -1,8 +1,6 @@
-import { CacheMode, DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/client";
+import { DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
-import { DocumentationFetcher } from "../../documentation/documentation-fetching.js";
-import { DocumentationSearch } from "../../documentation/documentation-search.js";
-import { callExtract, generateExtractConfig, processFile } from "../../execute/extract.js";
+import { decompressData, parseFile } from "../../utils/file.js";
 import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
@@ -106,3 +104,21 @@ export const extractResolver = async (
   }
 };
 
+
+export async function processFile(data: Buffer, extractConfig: ExtractConfig) {
+  if (extractConfig.decompressionMethod && extractConfig.decompressionMethod != DecompressionMethod.NONE) {
+    data = await decompressData(data, extractConfig.decompressionMethod);
+  }
+
+  let responseJSON = await parseFile(data, extractConfig.fileType);
+
+  if (extractConfig.dataPath) {
+    // Navigate to the specified data path
+    const pathParts = extractConfig.dataPath.split('.');
+    for (const part of pathParts) {
+      responseJSON = responseJSON[part] || responseJSON;
+    }
+  }
+
+  return responseJSON;
+}
