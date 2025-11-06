@@ -1,10 +1,11 @@
 'use client'
 
 import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
 import { useToast } from '@/src/hooks/use-toast';
+import { useToken } from '@/src/hooks/use-token';
 import { parseCredentialsHelper, splitUrl } from '@/src/lib/client-utils';
 import { cn, composeUrl, inputErrorStyles } from '@/src/lib/general-utils';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { ApolloClient, gql, InMemoryCache, useSubscription } from '@apollo/client';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { Label } from '@radix-ui/react-label';
@@ -21,7 +22,6 @@ import { HelpTooltip } from '../utils/HelpTooltip';
 import { API_CREATE_STEPS, StepIndicator, type StepperStep } from '../utils/StepIndicator';
 import { URLField } from '../utils/URLField';
 import { InteractiveApiPlayground } from './InteractiveApiPlayground';
-import { useToken } from '@/src/hooks/use-token';
 
 interface ConfigCreateStepperProps {
   configId?: string
@@ -294,7 +294,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
       }
     }
 
-    const steps: StepperStep[] = ['basic', 'try_and_output', 'publish']
+    const steps: StepperStep[] = ['basic', 'try_and_output', 'save']
     const currentIndex = steps.indexOf(step)
     if (currentIndex < steps.length - 1) {
       setStep(steps[currentIndex + 1])
@@ -302,7 +302,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
   }
 
   const handleBack = () => {
-    const steps: StepperStep[] = ['basic', 'try_and_output', 'publish']
+    const steps: StepperStep[] = ['basic', 'try_and_output', 'save']
     const currentIndex = steps.indexOf(step)
     if (currentIndex > 0) {
       setStep(steps[currentIndex - 1])
@@ -556,7 +556,7 @@ const result = await superglue.call({
       <div className="flex-none mb-4">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-4">
           <h1 className="text-2xl font-semibold">
-            {step === 'publish' ? 'Configuration Complete!' : 'Create New API Configuration'}
+            {step === 'save' ? 'Configuration Complete!' : 'Create New API Configuration'}
           </h1>
           <div className="flex items-center gap-2">
             {!step.includes('success') && (
@@ -729,7 +729,7 @@ const result = await superglue.call({
           </div>
         )}
 
-        {step === 'publish' && (
+        {step === 'save' && (
           <div className="space-y-4 h-full">
             <p className="text-m font-medium">Done!</p>
             <p className="text-sm font-medium">You can now call the endpoint from your app. The call is proxied to the targeted endpoint without AI inbewteen. Predictable and millisecond latency.</p>
@@ -791,7 +791,7 @@ const result = await superglue.call({
       </div>
 
       <div className="flex-none mt-2 sm:mt-4 flex flex-col lg:flex-row gap-2 justify-between">
-        {step === 'publish' ? (
+        {step === 'save' ? (
           <>
             <Button
               variant="outline"

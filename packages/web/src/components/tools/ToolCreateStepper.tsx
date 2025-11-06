@@ -10,7 +10,7 @@ import { Button } from '../ui/button';
 import { ToolBuilder, type BuildContext } from './ToolBuilder';
 import ToolPlayground, { ToolPlaygroundHandle } from './ToolPlayground';
 
-type ToolCreateStep = 'build' | 'run' | 'publish';
+type ToolCreateStep = 'build' | 'run' | 'save';
 type ToolBuilderView = 'integrations' | 'instructions';
 
 interface ToolCreateStepperProps {
@@ -67,15 +67,15 @@ export function ToolCreateStepper({
       if (!saved) throw new Error('Failed to save tool');
 
       toast({
-        title: 'Tool published',
-        description: `"${saved.id}" published successfully`
+        title: 'Tool saved',
+        description: `"${saved.id}" saved successfully`
       });
 
       setCurrentTool(saved);
-      setStep('publish');
+      setStep('save');
     } catch (e: any) {
       toast({
-        title: 'Error publishing tool',
+        title: 'Error saving tool',
         description: e.message || 'Unknown error',
         variant: 'destructive'
       });
@@ -127,7 +127,7 @@ export function ToolCreateStepper({
       <div className="flex-none mb-4">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold">
-            {step === 'publish' ? 'Tool Created!' : 'Create New Tool'}
+            {step === 'save' ? 'Tool Created!' : 'Create New Tool'}
           </h1>
           <div className="flex items-center gap-2">
             <Button
@@ -177,7 +177,7 @@ export function ToolCreateStepper({
             </div>
           )}
 
-          {step === 'publish' && currentTool && (
+          {step === 'save' && currentTool && (
             <div className="w-full">
               <ToolPlayground
                 embedded={true}
