@@ -610,16 +610,16 @@ ALWAYS verify variables exist in the available list before using them
 For json bodies, always wrap js string results in quotes like so: {"name": "<<(sourceData) => sourceData.name>>"}
 </VARIABLES>
 
-<AUTHENTICATION_PATTERNS>
-Always check the documentation for the correct authentication pattern.
-Common authentication patterns are:
-- Bearer Token: headers: { "Authorization": "Bearer <<access_token>>" }
-- API Key in header: headers: { "X-API-Key": "<<api_key>>" }
-- Basic Auth: headers: { "Authorization": "Basic <<username>>:<<password>>" }
-- OAuth: Follow the specific OAuth flow documented for the integration.
-
-IMPORTANT: Modern APIs (HubSpot, Stripe, etc.) mostly expect authentication in headers, NOT query parameters. Only use query parameter authentication if explicitly required by the documentation.
-</AUTHENTICATION_PATTERNS>
+<AUTHENTICATION>
+Common patterns (check documentation for specifics):
+- Bearer Token: Use authentication: "HEADER" with Authorization: "Bearer <<token>>"
+- API Key in header: Use authentication: "HEADER" with header like "X-API-Key: <<api_key>>"
+- API Key in URL: Use authentication: "QUERY_PARAM" with the key in queryParams
+- Basic Auth: Use authentication: "HEADER" with Authorization: "Basic <<username>>:<<password>>"
+- OAuth2: Use oauth2 token type, usually bearer token
+- No authentication: Use authentication: "NONE"
+Most modern APIs use HEADER authentication type with different header formats.
+</AUTHENTICATION>
 
 <POSTGRES>
 Correct PostgreSQL configuration:
@@ -662,26 +662,13 @@ BATCH OPERATIONS:
 - Use batch operations to perform multiple file operations efficiently in one API call
 </FTP_SFTP>
 
-<PAGINATION_CONFIGURATION>
-Pagination is OPTIONAL. Only configure it if you have verified the exact pagination mechanism from the documentation or know it really well.
-
-BEFORE configuring pagination:
-1. Check the documentation for pagination details
-2. Verify the exact parameter names the API expects
-3. Confirm the pagination type (offset, page, or cursor-based)
-4. If unsure about ANY aspect, DO NOT configure pagination
-
-When you DO configure pagination:
-1. Set the pagination object with type, pageSize, and stopCondition
-2. Add the exact pagination parameters to queryParams/body/headers as specified in the docs
-
-Superglue provides these variables that you MUST use:
-- OFFSET_BASED: Use <<offset>> and <<limit>> variables
-- PAGE_BASED: Use <<page>> and <<pageSize>> or <<limit>> variables
-- CURSOR_BASED: Use <<cursor>> and <<limit>> variables
-
-⚠️ WARNING: Incorrect pagination configuration causes infinite loops. When in doubt, leave it unconfigured.
-</PAGINATION_CONFIGURATION>
+<PAGINATION>
+When pagination is configured:
+- Superglue provides these variables: <<page>>, <<offset>>, <<limit>>, <<cursor>>
+- ALWAYS use these exact variable names, even if the API parameter name is different.
+- Use "OFFSET_BASED", "PAGE_BASED", or "CURSOR_BASED" for the type
+- stopCondition is required and controls when to stop fetching pages
+</PAGINATION>
 
 Remember: Each attempt should incorporate lessons from previous errors. Don't just make minor tweaks - understand the root cause and make meaningful changes.`;
 
