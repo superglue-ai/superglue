@@ -3,17 +3,17 @@ import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { RequestOptions } from "http";
 import ivm from "isolated-vm";
 import { JSONPath } from "jsonpath-plus";
+import { getGenerateApiConfigContext } from "../../context/context-builders.js";
 import { SELF_HEALING_SYSTEM_PROMPT } from "../../context/context-prompts.js";
 import { server_defaults } from "../../default.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { LanguageModel, LLMMessage } from "../../llm/language-model.js";
 import { parseFile } from "../../utils/file.js";
-import { composeUrl, generateId, maskCredentials, replaceVariables, sample, smartMergeResponses } from "../../utils/tools.js";
+import { composeUrl, generateId, maskCredentials, replaceVariables, smartMergeResponses } from "../../utils/tools.js";
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../../utils/workflow-tools.js";
 import { callFTP } from "../ftp/ftp.legacy.js";
 import { callPostgres } from "../postgres/postgres.legacy.js";
-import { AbortError, ApiCallError, callAxios, checkResponseForErrors, handle2xxStatus, handle429Status, handleErrorStatus } from "./api.js";
-import { getGenerateApiConfigContext } from "../../context/context-builders.js";
+import { AbortError, ApiCallError, callAxios, checkResponseForErrors, handle429Status, handleErrorStatus } from "./api.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
@@ -172,7 +172,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
     const retriesAttempted = axiosResult.retriesAttempted || 0;
     const lastFailureStatus = axiosResult.lastFailureStatus;
     if ([200, 201, 202, 203, 204, 205].includes(status)) {
-      statusHandlerResult = handle2xxStatus({ response: lastResponse, axiosConfig, credentials, payload, retriesAttempted, lastFailureStatus });
+      statusHandlerResult = { shouldFail: false };
     } else if (status === 429) {
       statusHandlerResult = handle429Status({ response: lastResponse, axiosConfig, credentials, payload, retriesAttempted, lastFailureStatus });
     } else {
