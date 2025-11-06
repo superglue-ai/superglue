@@ -346,7 +346,7 @@ export async function evaluateStopCondition(
 ): Promise<{ shouldStop: boolean; error?: string }> {
 
 
-  const isolate = new ivm.Isolate({ memoryLimit: 128 });
+  const isolate = new ivm.Isolate({ memoryLimit: 4096 });
 
   try {
     const context = await isolate.createContext();
