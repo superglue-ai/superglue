@@ -1,5 +1,5 @@
-import { OAuthState } from '@/src/lib/oauth-utils';
 import { ExtendedSuperglueClient } from '@/src/lib/extended-superglue-client';
+import { OAuthState } from '@/src/lib/oauth-utils';
 import axios from 'axios';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -224,14 +224,21 @@ export async function GET(request: NextRequest) {
 
     try {
         const stateData = JSON.parse(atob(state)) as OAuthState & { token_url?: string };
-        const { integrationId, apiKey, timestamp, client_credentials_uid, templateId, clientId, token_url, suppressErrorUI } = stateData;
+        const { integrationId, timestamp, client_credentials_uid, templateId, token_url, suppressErrorUI } = stateData;
 
         if (Date.now() - timestamp >= OAUTH_STATE_EXPIRY_MS) {
             throw new Error('[OAUTH_STAGE:VALIDATION] OAuth state expired (older than 5 minutes). Please start the OAuth flow again.');
         }
 
         const endpoint = process.env.GRAPHQL_ENDPOINT;
-        const client = new ExtendedSuperglueClient({ endpoint, apiKey });
+        
+        // Get API key from cookie (set during OAuth init)
+        const apiKey = request.cookies.get('api_key')?.value;
+        if (!apiKey) {
+            throw new Error('[OAUTH_STAGE:AUTHENTICATION] No API key found. OAuth session may have expired or was not properly initialized.');
+        }
+        
+        const client = new ExtendedSuperglueClient({ endpoint, apiKey: apiKey });
         const resolved = await client.getOAuthClientCredentials({ templateId, clientCredentialsUid: client_credentials_uid });
         if (!resolved?.client_secret || !resolved?.client_id) {
             throw new Error('[OAUTH_STAGE:CREDENTIAL_RESOLUTION] OAuth client credentials could not be resolved from backend. The client_id or client_secret may not have been properly stored.');
@@ -267,15 +274,21 @@ export async function GET(request: NextRequest) {
         };
 
         if (grantTypeParam === 'client_credentials') {
-            return NextResponse.json({
+            const response = NextResponse.json({
                 type: 'oauth-success',
                 integrationId,
                 message: 'OAuth connection completed successfully!',
                 tokens
             });
+            // Clear cookie
+            response.cookies.delete('api_key');
+            return response;
         } else {
             const html = createOAuthCallbackHTML('success', 'OAuth connection completed successfully!', integrationId, origin, tokens, suppressErrorUI);
-            return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
+            const response = new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
+            // Clear cookie
+            response.cookies.delete('api_key');
+            return response;
         }
     } catch (error) {
         console.error('OAuth callback error:', error);
@@ -297,14 +310,20 @@ export async function GET(request: NextRequest) {
         }
 
         if (isClientCredentials) {
-            return NextResponse.json({
+            const response = NextResponse.json({
                 type: 'oauth-error',
                 integrationId,
                 message: errorMessage
             }, { status: 400 });
+            // Clear cookie on error too
+            response.cookies.delete('api_key');
+            return response;
         } else {
             const html = createOAuthCallbackHTML('error', errorMessage, integrationId, origin, undefined, suppressErrorUI);
-            return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
+            const response = new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
+            // Clear cookie on error too
+            response.cookies.delete('api_key');
+            return response;
         }
     }
 }
