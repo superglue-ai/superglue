@@ -102,4 +102,177 @@ describe('File Utilities', () => {
         .rejects.toThrow('Error decompressing zip');
     });
   });
+
+  describe('File Type Detection (AUTO)', () => {
+    describe('JSON Detection', () => {
+      it('should detect JSON object', async () => {
+        const buffer = Buffer.from('{"name": "test", "value": 123}');
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toEqual({ name: 'test', value: 123 });
+      });
+
+      it('should detect JSON array', async () => {
+        const buffer = Buffer.from('[{"name": "test"}, {"name": "test2"}]');
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toEqual([{ name: 'test' }, { name: 'test2' }]);
+      });
+
+      it('should detect JSON with leading whitespace', async () => {
+        const buffer = Buffer.from('  \n  {"name": "test"}');
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toEqual({ name: 'test' });
+      });
+    });
+
+    describe('XML Detection', () => {
+      it('should detect XML with declaration', async () => {
+        const xmlData = `<?xml version="1.0"?>
+          <root>
+            <item>test</item>
+          </root>`;
+        const buffer = Buffer.from(xmlData);
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result?.ROOT?.ITEM).toBe('test');
+      });
+
+      it('should detect XML without declaration', async () => {
+        const xmlData = `<root>
+          <item>test</item>
+        </root>`;
+        const buffer = Buffer.from(xmlData);
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result?.ROOT?.ITEM).toBe('test');
+      });
+
+      it('should detect XML with leading whitespace', async () => {
+        const xmlData = `  
+          <?xml version="1.0"?>
+          <root><item>test</item></root>`;
+        const buffer = Buffer.from(xmlData);
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result?.ROOT?.ITEM).toBe('test');
+      });
+    });
+
+    describe('HTML Detection', () => {
+      it('should detect HTML with DOCTYPE', async () => {
+        const htmlData = `<!DOCTYPE html>
+          <html>
+            <head><title>Test</title></head>
+            <body><div id="main">Hello</div></body>
+          </html>`;
+        const buffer = Buffer.from(htmlData);
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toHaveProperty('html');
+      });
+
+      it('should detect HTML with lowercase DOCTYPE', async () => {
+        const htmlData = `<!doctype html>
+          <html>
+            <body>Hello</body>
+          </html>`;
+        const buffer = Buffer.from(htmlData);
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toHaveProperty('html');
+      });
+
+      it('should detect HTML starting with <html>', async () => {
+        const htmlData = `<html>
+          <body><p>Test</p></body>
+        </html>`;
+        const buffer = Buffer.from(htmlData);
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toHaveProperty('html');
+      });
+
+      it('should detect HTML with <html> tag in content', async () => {
+        const htmlData = `  <html lang="en">
+          <head><title>Test</title></head>
+        </html>`;
+        const buffer = Buffer.from(htmlData);
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toHaveProperty('html');
+      });
+
+      it('should not confuse XML with HTML', async () => {
+        const xmlData = `<root>
+          <data>test</data>
+        </root>`;
+        const buffer = Buffer.from(xmlData);
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toHaveProperty('ROOT');
+        expect(result).not.toHaveProperty('html');
+      });
+    });
+
+    describe('CSV Detection', () => {
+      it('should detect CSV with comma delimiter', async () => {
+        const csvData = `name,age,city
+John,30,NYC
+Jane,25,LA`;
+        const buffer = Buffer.from(csvData);
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toHaveLength(2);
+        expect(result[0]).toEqual({ name: 'John', age: '30', city: 'NYC' });
+      });
+
+      it('should detect CSV with semicolon delimiter', async () => {
+        const csvData = `name;age;city
+John;30;NYC
+Jane;25;LA`;
+        const buffer = Buffer.from(csvData);
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toHaveLength(2);
+        expect(result[0]).toEqual({ name: 'John', age: '30', city: 'NYC' });
+      });
+
+      it('should detect CSV with tab delimiter', async () => {
+        const csvData = `name\tage\tcity
+John\t30\tNYC
+Jane\t25\tLA`;
+        const buffer = Buffer.from(csvData);
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toHaveLength(2);
+        expect(result[0]).toEqual({ name: 'John', age: '30', city: 'NYC' });
+      });
+
+      it('should detect CSV with pipe delimiter', async () => {
+        const csvData = `name|age|city
+John|30|NYC
+Jane|25|LA`;
+        const buffer = Buffer.from(csvData);
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toHaveLength(2);
+        expect(result[0]).toEqual({ name: 'John', age: '30', city: 'NYC' });
+      });
+    });
+
+    describe('RAW Detection (Fallback)', () => {
+      it('should fallback to RAW for plain text', async () => {
+        const buffer = Buffer.from('This is just plain text without structure');
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toBe('This is just plain text without structure');
+      });
+
+      it('should fallback to RAW for unstructured data', async () => {
+        const buffer = Buffer.from('Random data\nNo clear format\nJust text');
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toBe('Random data\nNo clear format\nJust text');
+      });
+    });
+
+    describe('Edge Cases', () => {
+      it('should handle empty buffer', async () => {
+        const buffer = Buffer.from('');
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toBeNull();
+      });
+
+      it('should handle whitespace-only content as RAW', async () => {
+        const buffer = Buffer.from('   \n\n   \t   ');
+        const result = await parseFile(buffer, FileType.AUTO);
+        expect(result).toBe('   \n\n   \t   ');
+      });
+    });
+  });
 }); 

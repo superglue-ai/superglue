@@ -263,20 +263,6 @@ describe('API Utilities', () => {
         .rejects.toThrow(/API call failed/);
     });
 
-    it('should handle HTML error responses', async () => {
-      const htmlResponse = {
-        status: 200,
-        data: '<!DOCTYPE html><html><body>Error page</body></html>',
-        statusText: 'OK',
-        headers: {},
-        config: {} as any
-      };
-      mockedTools.callAxios.mockResolvedValueOnce({ response: htmlResponse, retriesAttempted: 0, lastFailureStatus: undefined } );
-
-      await expect(callEndpoint({ endpoint: testEndpoint, payload: {}, credentials: {}, options: {} }))
-        .rejects.toThrow(/Received HTML response/);
-    });
-
     it('should handle data path extraction', async () => {
       const config = {
         ...testEndpoint,
