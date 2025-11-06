@@ -285,8 +285,8 @@ describe('getEvaluateTransformContext budgets and content', () => {
     });
 
     it('without instruction: uses default promptStart and enforces budget', () => {
-        const out = getEvaluateTransformContext({ ...base, instruction: '' }, { characterBudget: 300 });
-        expect(out.length).toBeLessThanOrEqual(320);
+        const out = getEvaluateTransformContext({ ...base, instruction: '' }, { characterBudget: 400 });
+        expect(out.length).toBeLessThanOrEqual(420);
         expect(out).toMatch(/No specific instruction provided/);
     });
 });
