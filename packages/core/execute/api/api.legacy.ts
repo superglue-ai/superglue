@@ -3,17 +3,17 @@ import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { RequestOptions } from "http";
 import ivm from "isolated-vm";
 import { JSONPath } from "jsonpath-plus";
+import { getGenerateApiConfigContext } from "../../context/context-builders.js";
 import { SELF_HEALING_SYSTEM_PROMPT } from "../../context/context-prompts.js";
 import { server_defaults } from "../../default.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { LanguageModel, LLMMessage } from "../../llm/language-model.js";
 import { parseFile } from "../../utils/file.js";
-import { composeUrl, generateId, maskCredentials, replaceVariables, sample, smartMergeResponses } from "../../utils/tools.js";
+import { composeUrl, generateId, maskCredentials, replaceVariables, smartMergeResponses } from "../../utils/tools.js";
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../../utils/workflow-tools.js";
-import { callFTP } from "../ftp/ftp.legacy.js";
+import { callFTP } from "../ftp/ftp.js";
 import { callPostgres } from "../postgres/postgres.legacy.js";
 import { AbortError, ApiCallError, callAxios, checkResponseForErrors, handle2xxStatus, handle429Status, handleErrorStatus } from "./api.js";
-import { getGenerateApiConfigContext } from "../../context/context-builders.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;

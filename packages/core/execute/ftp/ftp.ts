@@ -275,30 +275,34 @@ export async function callFTP({ endpoint, credentials, options }: { endpoint: Ap
   const connectionInfo = parseConnectionUrl(connectionString);
 
   // Parse operation from body
-  let operation: FTPOperation;
+  let operations: FTPOperation[] = [];
   try {
-    operation = parseJSON(endpoint.body);
+    const body = parseJSON(endpoint.body);
+    if(!Array.isArray(body)) {
+      operations.push(body);
+    } else {
+      operations = body;
+    }
   } catch (error) {
     throw new Error(`Invalid JSON in body: ${error.message}. Body must be a JSON object with an 'operation' field. Supported operations: ${SUPPORTED_OPERATIONS.join(', ')}`);
   }
 
   // Validate operation
-  if (!operation.operation) {
-    throw new Error(`Missing 'operation' field in request body. Supported operations are: ${SUPPORTED_OPERATIONS.join(', ')}`);
-  }
-
-  if (!SUPPORTED_OPERATIONS.includes(operation.operation)) {
-    throw new Error(
-      `Unsupported operation: '${operation.operation}'. ` +
-      `Supported operations are: ${SUPPORTED_OPERATIONS.join(', ')}`
-    );
+  for(const operation of operations) {
+    if (!operation.operation) {
+      throw new Error(`Missing 'operation' field in request body. Supported operations are: ${SUPPORTED_OPERATIONS.join(', ')}`);
+    }
+    if (!SUPPORTED_OPERATIONS.includes(operation.operation as 'list' | 'get' | 'put' | 'delete' | 'rename' | 'mkdir' | 'rmdir' | 'exists' | 'stat')) {
+      throw new Error(`Unsupported operation: '${operation.operation}'. Supported operations are: ${SUPPORTED_OPERATIONS.join(', ')}`);
+    }
   }
 
   let attempts = 0;
+  let results: any[] = [];
   const maxRetries = options?.retries || server_defaults.FTP.DEFAULT_RETRIES;
   const timeout = options?.timeout || server_defaults.FTP.DEFAULT_TIMEOUT;
 
-  do {
+  while (attempts <= maxRetries) {
     try {
       if (connectionInfo.protocol === 'sftp') {
         // SFTP Connection
@@ -317,17 +321,10 @@ export async function callFTP({ endpoint, credentials, options }: { endpoint: Ap
             timeout: timeout
           });
 
-          // Prepend base path if specified
-          if (connectionInfo.basePath && operation.path) {
-            if (!operation.path.startsWith('/')) {
-              operation.path = path.join(connectionInfo.basePath, operation.path);
-            }
-          } else if (connectionInfo.basePath && !operation.path) {
-            operation.path = connectionInfo.basePath;
+          for(const operation of operations) {
+            const result = await executeSFTPOperation(sftp, operation);
+            results.push(result);
           }
-
-          const result = await executeSFTPOperation(sftp, operation);
-          return result;
         } finally {
           await sftp.end();
         }
@@ -353,18 +350,22 @@ export async function callFTP({ endpoint, credentials, options }: { endpoint: Ap
             await ftp.cd(connectionInfo.basePath);
           }
 
-          const result = await executeFTPOperation(ftp, operation);
-          return result;
+          for(const operation of operations) {
+            const result = await executeFTPOperation(ftp, operation);
+            results.push(result);
+          }
         } finally {
           ftp.close();
         }
       }
+      
+      break;
     } catch (error) {
       attempts++;
 
       if (attempts > maxRetries) {
         if (error instanceof Error) {
-          const errorContext = ` for operation: ${JSON.stringify(operation)}`;
+          const errorContext = ` for operations: ${JSON.stringify(operations)}`;
           throw new Error(`${connectionInfo.protocol.toUpperCase()} error: ${error.message}${errorContext}`);
         }
         throw new Error(`Unknown ${connectionInfo.protocol.toUpperCase()} error occurred`);
@@ -373,6 +374,8 @@ export async function callFTP({ endpoint, credentials, options }: { endpoint: Ap
       const retryDelay = options?.retryDelay || server_defaults.FTP.DEFAULT_RETRY_DELAY;
       await new Promise(resolve => setTimeout(resolve, retryDelay));
     }
-  } while (attempts <= maxRetries);
+  }
+
+  return results.length === 1 ? results[0] : results;
 }
 
