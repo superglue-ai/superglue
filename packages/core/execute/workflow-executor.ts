@@ -338,7 +338,7 @@ export class WorkflowExecutor implements Workflow {
               logMessage("debug", `Loop iteration ${i + 1} updated configuration`, this.metadata);
             }
           } 
-          const rawData = { currentItem: currentItem, data: apiResponse.data, ...(typeof apiResponse.data === 'object' ? apiResponse.data : {}) };
+          const rawData = { currentItem: currentItem, data: apiResponse.data, ...(typeof apiResponse.data === 'object' && !Array.isArray(apiResponse.data) ? apiResponse.data : {}) };
           const transformedData = await applyJsonata(rawData, step.responseMapping); //LEGACY: New workflow strategy will not use response mappings, default to $
           stepResults.push({
             stepId: step.id,
