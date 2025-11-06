@@ -1,4 +1,5 @@
 import { DecompressionMethod, FileType } from "@superglue/client";
+import * as htmlparser2 from 'htmlparser2';
 import Papa from 'papaparse';
 import sax from 'sax';
 import { Readable } from 'stream';
@@ -68,6 +69,8 @@ export async function parseFile(buffer: Buffer, fileType: FileType): Promise<any
             return parseJSON(buffer);
         case FileType.XML:
             return parseXML(buffer);
+        case FileType.HTML:
+            return parseHTML(buffer);
         case FileType.CSV:
             return parseCSV(buffer);
         case FileType.EXCEL:
@@ -176,7 +179,7 @@ export async function parseXML(buffer: Buffer): Promise<any> {
     const results: any = {};
     let currentElement: any = null;
     const elementStack: any[] = [];
-    let error: any = null;
+
     return new Promise((resolve, reject) => {
         const parser = sax.createStream(false);
 
@@ -251,6 +254,63 @@ export async function parseXML(buffer: Buffer): Promise<any> {
 
         const readStream = Readable.from(buffer);
         readStream.pipe(parser); // Pipe the file stream to the SAX parser
+    });
+}
+
+function parseHTML(buffer: Buffer): Promise<any> {
+    return new Promise((resolve, reject) => {
+        const results: any = {};
+        const elementStack: any[] = [results];
+        let currentPath: string[] = [];
+
+        const parser = new htmlparser2.Parser({
+            onopentag(name, attributes) {
+                const elementName = attributes.id || name;
+                currentPath.push(elementName);
+                const parent = elementStack[elementStack.length - 1];
+                
+                // Remove id from attributes if it's being used as the element name
+                const { id, ...otherAttributes } = attributes;
+                const newElement: any = { ...otherAttributes };
+                
+                // Add to parent
+                if (!parent[elementName]) {
+                    parent[elementName] = newElement;
+                } else if (Array.isArray(parent[elementName])) {
+                    parent[elementName].push(newElement);
+                } else {
+                    parent[elementName] = [parent[elementName], newElement];
+                }
+                
+                elementStack.push(newElement);
+            },
+            ontext(text) {
+                const trimmedText = text.trim();
+                if (!trimmedText) return;
+                
+                const currentElement = elementStack[elementStack.length - 1];
+                if (!currentElement) return;
+                
+                if (!currentElement.content) {
+                    currentElement.content = trimmedText;
+                } else {
+                    currentElement.content += ' ' + trimmedText;
+                }
+            },
+            onclosetag(name) {
+                elementStack.pop();
+                currentPath.pop();
+            },
+            onerror(error) {
+                console.warn('HTML parsing warning:', error.message);
+            },
+            onend() {
+                resolve(results);
+            }
+        }, { decodeEntities: true });
+
+        parser.write(buffer.toString('utf8'));
+        parser.end();
     });
 }
 
@@ -333,40 +393,50 @@ async function parseExcel(buffer: Buffer): Promise<{ [sheetName: string]: any[] 
 }
 
 async function detectFileType(buffer: Buffer): Promise<FileType> {
-    const xlsxSignature = buffer.slice(0, 4).toString('hex');
-    if (xlsxSignature === '504b0304') { // XLSX files are ZIP files
-        try {
-            const zipStream = await unzipper.Open.buffer(buffer);
-            const hasExcelSignature = zipStream.files.some(f =>
-                f.path === '[Content_Types].xml' ||
-                f.path === 'xl/workbook.xml' ||
-                f.path.startsWith('xl/worksheets/')
-            );
-            if (hasExcelSignature) {
-                return FileType.EXCEL;
-            }
-        } catch (error) { 
-            console.error('Failed to detect Excel file:', error);
-        }
-    }
-    const sampleSize = Math.min(buffer.length, 4096);
-    const sample = buffer.slice(0, sampleSize).toString('utf8');
+
+    const SAMPLE_SIZE = 4096;
+    const sample = buffer.slice(0, Math.min(buffer.length, SAMPLE_SIZE)).toString('utf8').trim();
+
+    if (await isExcel(buffer)) return FileType.EXCEL;
+    if (isHTML(sample)) return FileType.HTML;
+    if (isXML(sample)) return FileType.XML;
+    if (isJSON(sample)) return FileType.JSON;
+    if (isLikelyCSV(buffer)) return FileType.CSV;
+
+    return FileType.RAW;
+}
+
+async function isExcel(buffer: Buffer): Promise<boolean> {
+    const ZIP_SIGNATURE = '504b0304';
+    const signature = buffer.slice(0, 4).toString('hex');
+    
+    if (signature !== ZIP_SIGNATURE) return false;
 
     try {
-        const trimmedLine = sample.trim();
-
-        if (trimmedLine.startsWith('{') || trimmedLine.startsWith('[')) {
-            return FileType.JSON;
-        } else if (trimmedLine.startsWith('<?xml') || trimmedLine.startsWith('<')) {
-            return FileType.XML;
-        } else if (isLikelyCSV(buffer)) {
-            return FileType.CSV;
-        } else {
-            return FileType.RAW;
-        }
+        const zipStream = await unzipper.Open.buffer(buffer);
+        return zipStream.files.some(f =>
+            f.path === '[Content_Types].xml' ||
+            f.path === 'xl/workbook.xml' ||
+            f.path.startsWith('xl/worksheets/')
+        );
     } catch (error) {
-        throw new Error(`Error reading file: ${error.message}`);
+        console.error('Failed to detect Excel file:', error);
+        return false;
     }
+}
+
+function isJSON(sample: string): boolean {
+    return sample.startsWith('{') || sample.startsWith('[');
+}
+
+function isXML(sample: string): boolean {
+    return sample.startsWith('<?xml') || sample.startsWith('<');
+}
+
+function isHTML(sample: string): boolean {
+    if (!sample.startsWith('<')) return false;
+    return sample.toLowerCase().startsWith('<!doctype html') || 
+           /<html[\s>]/i.test(sample);
 }
 
 function isLikelyCSV(buffer: Buffer): boolean {
@@ -449,37 +519,4 @@ function countUnescapedDelimiter(text: string, delimiter: string): number {
     }
 
     return count;
-}
-
-function splitRespectingQuotes(text: string): string[] {
-    const rows: string[] = [];
-    let currentRow = '';
-    let inQuotes = false;
-    let prevChar = '';
-
-    for (let i = 0; i < text.length; i++) {
-        const char = text[i];
-
-        // Handle quotes
-        if (char === '"' && prevChar !== '\\') {
-            inQuotes = !inQuotes;
-        }
-
-        // Handle newlines
-        if (char === '\n' && !inQuotes) {
-            rows.push(currentRow);
-            currentRow = '';
-        } else {
-            currentRow += char;
-        }
-
-        prevChar = char;
-    }
-
-    // Don't forget the last row
-    if (currentRow) {
-        rows.push(currentRow);
-    }
-
-    return rows;
 }
