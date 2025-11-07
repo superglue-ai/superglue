@@ -7,7 +7,7 @@ import { FileChip } from '@/src/components/ui/FileChip';
 import { Input } from '@/src/components/ui/input';
 import { useToast } from '@/src/hooks/use-toast';
 import { ExtendedSuperglueClient } from '@/src/lib/extended-superglue-client';
-import { formatBytes, MAX_TOTAL_FILE_SIZE_DOCUMENTATION, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { ALLOWED_EXTENSIONS, formatBytes, MAX_TOTAL_FILE_SIZE_DOCUMENTATION, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn } from '@/src/lib/general-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
 import { FileQuestion, FileText, Link } from 'lucide-react';
@@ -68,17 +68,6 @@ export function DocumentationField({
   useEffect(() => {
     setLocalUrl(url)
   }, [url])
-
-  const isValidUrl = (urlString: string): boolean => {
-    if (!urlString) return true // Empty is valid
-    if (urlString.startsWith('file://')) return true // File uploads are valid
-    try {
-      new URL(urlString)
-      return true
-    } catch {
-      return false
-    }
-  }
 
   const activeType = hasUploadedFile ? 'file' : (url ? 'url' : content ? 'content' : 'empty')
 
@@ -212,7 +201,7 @@ export function DocumentationField({
         id="doc-file-upload"
         hidden
         onChange={handleDocFileUpload}
-        accept="*"
+        accept={ALLOWED_EXTENSIONS.join(',')}
       />
 
       {urlError && !hasUploadedFile && (
