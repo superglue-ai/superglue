@@ -5,13 +5,13 @@ import { createSuperglueClient } from '@/src/lib/client-utils';
 import { Workflow as Tool } from '@superglue/client';
 import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { ToolBuilder, type BuildContext } from './ToolBuilder';
 import ToolPlayground, { ToolPlaygroundHandle } from './ToolPlayground';
 import { ToolDeployModal } from './deploy/ToolDeployModal';
 
-type ToolCreateStep = 'build' | 'run' | 'save';
+type ToolCreateStep = 'build' | 'run';
 type ToolBuilderView = 'integrations' | 'instructions';
 
 interface ToolCreateStepperProps {
@@ -115,7 +115,7 @@ export function ToolCreateStepper({
       <div className="flex-none mb-4">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold">
-            {step === "save" ? "Tool Created!" : "Create New Tool"}
+            Create New Tool
           </h1>
           <div className="flex items-center gap-2">
             <Button
