@@ -27,7 +27,7 @@ import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
-import { ToolDeployModal } from "./ToolDeployModal";
+import { ToolDeployModal } from "./deploy/ToolDeployModal";
 import { ToolStepGallery } from "./ToolStepGallery";
 
 export interface ToolPlaygroundProps {
@@ -1177,8 +1177,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           payload={computedPayload}
           isOpen={true}
           onClose={() => {}}
-          onViewTool={onSuccessPageAction ? () => onSuccessPageAction('view-tool') : () => router.push(`/tools/${currentTool.id}`)}
-          onViewAllTools={onSuccessPageAction ? () => onSuccessPageAction('view-all') : () => router.push('/')}
         />
       </div>
     );
@@ -1314,14 +1312,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         payload={computedPayload}
         isOpen={showDeployModal}
         onClose={() => setShowDeployModal(false)}
-        onViewTool={() => {
-          setShowDeployModal(false);
-          router.push(`/tools/${toolId}`);
-        }}
-        onViewAllTools={() => {
-          setShowDeployModal(false);
-          router.push('/');
-        }}
       />
     </div>
   );
