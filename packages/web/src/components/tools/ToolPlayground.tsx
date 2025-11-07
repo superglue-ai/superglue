@@ -27,7 +27,7 @@ import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
-import { ToolCreateSuccess } from "./ToolCreateSuccess";
+import { ToolDeployModal } from "./ToolDeployModal";
 import { ToolStepGallery } from "./ToolStepGallery";
 
 export interface ToolPlaygroundProps {
@@ -182,6 +182,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const hasGeneratedDefaultPayloadRef = useRef<boolean>(false);
   const [showToolBuilder, setShowToolBuilder] = useState(false);
   const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
+  const [showDeployModal, setShowDeployModal] = useState(false);
 
   // Generate default payload once when schema is available if payload is empty
   useEffect(() => {
@@ -656,6 +657,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 3000);
+      setShowDeployModal(true);
     } catch (error: any) {
       console.error("Error saving tool:", error);
       toast({
@@ -1169,10 +1171,12 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
     return (
       <div className="flex-1 flex flex-col h-full p-6">
-        <ToolCreateSuccess
+        <ToolDeployModal
           currentTool={currentTool}
           credentials={credentials}
           payload={computedPayload}
+          isOpen={true}
+          onClose={() => {}}
           onViewTool={onSuccessPageAction ? () => onSuccessPageAction('view-tool') : () => router.push(`/tools/${currentTool.id}`)}
           onViewAllTools={onSuccessPageAction ? () => onSuccessPageAction('view-all') : () => router.push('/')}
         />
@@ -1283,6 +1287,42 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ToolDeployModal
+        currentTool={{
+          id: toolId,
+          steps: steps.map((step: ExecutionStep) => ({
+            ...step,
+            apiConfig: {
+              id: step.apiConfig.id || step.id,
+              ...step.apiConfig,
+              pagination: step.apiConfig.pagination || null
+            }
+          })),
+          responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
+          inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
+          finalTransform,
+          instruction: instructions
+        }}
+        credentials={integrations.reduce((acc, sys: any) => ({
+          ...acc,
+          ...Object.entries(sys.credentials || {}).reduce(
+            (obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }),
+            {}
+          ),
+        }), {})}
+        payload={computedPayload}
+        isOpen={showDeployModal}
+        onClose={() => setShowDeployModal(false)}
+        onViewTool={() => {
+          setShowDeployModal(false);
+          router.push(`/tools/${toolId}`);
+        }}
+        onViewAllTools={() => {
+          setShowDeployModal(false);
+          router.push('/');
+        }}
+      />
     </div>
   );
 });

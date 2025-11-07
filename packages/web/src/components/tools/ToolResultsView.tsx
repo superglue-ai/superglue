@@ -5,7 +5,7 @@ import { Workflow as Tool, WorkflowResult as ToolResult } from '@superglue/clien
 import { Check, Copy, Loader2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { AutoSizer, List } from 'react-virtualized';
-import { ToolCreateSuccess } from './ToolCreateSuccess';
+import { ToolDeployModal } from './ToolDeployModal';
 import { truncateForDisplay } from '@/src/lib/general-utils';
 
 const MAX_LINES = 10000;
@@ -219,7 +219,7 @@ export function ToolResultsView({
         ) : activeTab === 'instructions' ? (
           showInstructionsTab && (
             <div className="p-4">
-              <ToolCreateSuccess
+              <ToolDeployModal
                 currentTool={currentTool}
                 payload={payload || {}}
                 credentials={credentials}

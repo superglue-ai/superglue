@@ -4,26 +4,31 @@ import { getSDKCode } from '@superglue/shared/templates';
 import { Bot, Calendar, Check, Code, Copy, ExternalLink, Webhook } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '../ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import ToolScheduleModal from './ToolScheduleModal';
 
 type Tool = any // Replace with your actual Tool type
 
-interface ToolCreateSuccessProps {
+interface ToolDeployModalProps {
   currentTool: Tool
   payload: Record<string, any>
   credentials?: Record<string, string>
+  isOpen: boolean
+  onClose: () => void
   onViewTool?: () => void
   onViewAllTools?: () => void
 }
 
-export function ToolCreateSuccess({
+export function ToolDeployModal({
   currentTool,
   payload,
   credentials,
+  isOpen,
+  onClose,
   onViewTool,
   onViewAllTools
-}: ToolCreateSuccessProps) {
+}: ToolDeployModalProps) {
   const superglueConfig = useConfig();
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('schedule')
@@ -112,23 +117,28 @@ const result = await client.executeWorkflow({
   )
 
   return (
-    <div className="space-y-6">
-      {/* Hero section */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Check className="h-6 w-6 text-green-600" />
-          <h2 className="text-2xl font-semibold">Tool Created Successfully!</h2>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-muted-foreground">Tool ID:</span>
-          <span className="font-mono text-base bg-muted px-3 py-1 rounded">
-            {currentTool.id}
-          </span>
-        </div>
-        <p className="text-muted-foreground">
-          Your tool is ready to use in production. Choose how you want to deploy it:
-        </p>
-      </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Check className="h-6 w-6 text-green-600" />
+            Tool Created Successfully!
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {/* Tool ID section */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-muted-foreground">Tool ID:</span>
+              <span className="font-mono text-base bg-muted px-3 py-1 rounded">
+                {currentTool.id}
+              </span>
+            </div>
+            <p className="text-muted-foreground">
+              Your tool is ready to use in production. Choose how you want to deploy it:
+            </p>
+          </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -346,21 +356,29 @@ const result = await client.executeWorkflow({
         </TabsContent>
       </Tabs>
 
-      {/* Action buttons */}
-      {(onViewTool || onViewAllTools) && (
-        <div className="flex gap-2 pt-4 border-t">
-          {onViewTool && (
-            <Button variant="outline" onClick={onViewTool}>
-              View Tool Details
-            </Button>
-          )}
-          {onViewAllTools && (
-            <Button variant="outline" onClick={onViewAllTools}>
-              View All Tools
-            </Button>
+          {/* Action buttons */}
+          {(onViewTool || onViewAllTools) && (
+            <div className="flex gap-2 pt-4 border-t">
+              {onViewTool && (
+                <Button variant="outline" onClick={() => {
+                  onViewTool()
+                  onClose()
+                }}>
+                  View Tool Details
+                </Button>
+              )}
+              {onViewAllTools && (
+                <Button variant="outline" onClick={() => {
+                  onViewAllTools()
+                  onClose()
+                }}>
+                  View All Tools
+                </Button>
+              )}
+            </div>
           )}
         </div>
-      )}
+      </DialogContent>
 
       {/* Schedule Modal */}
       <ToolScheduleModal
@@ -371,6 +389,6 @@ const result = await client.executeWorkflow({
           setScheduleModalOpen(false)
         }}
       />
-    </div>
+    </Dialog>
   )
 } 

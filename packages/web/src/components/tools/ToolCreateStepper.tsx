@@ -26,7 +26,6 @@ export function ToolCreateStepper({
 }: ToolCreateStepperProps) {
   const [step, setStep] = useState<ToolCreateStep>('build');
   const [isSaving, setIsSaving] = useState(false);
-  const [isExecuting, setIsExecuting] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [shouldStopExecution, setShouldStopExecution] = useState(false);
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(true);
@@ -82,18 +81,6 @@ export function ToolCreateStepper({
       throw e;
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleExecuteTool = async () => {
-    try {
-      setIsExecuting(true);
-      setShouldStopExecution(false);
-      setIsStopping(false);
-      await playgroundRef.current?.executeTool({ selfHealing: selfHealingEnabled });
-    } finally {
-      setIsExecuting(false);
-      setIsStopping(false);
     }
   };
 
