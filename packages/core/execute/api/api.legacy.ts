@@ -161,7 +161,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
       headers: processedHeaders,
       data: processedBody,
       params: processedQueryParams,
-      timeout: options?.timeout || 60000,
+      timeout: options?.timeout || server_defaults.HTTP.DEFAULT_TIMEOUT,
     };
 
     const axiosResult = await callAxios(axiosConfig, options);

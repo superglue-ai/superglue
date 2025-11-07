@@ -1,9 +1,9 @@
 import { Metadata } from "@superglue/shared";
 import * as yaml from 'js-yaml';
 
-import { OpenApiFetchingStrategy } from '../types.js';
 import { logMessage } from "../../utils/logs.js";
 import { isValidOpenApiSpec } from '../documentation-utils.js';
+import { OpenApiFetchingStrategy } from '../types.js';
 
 export class DirectOpenApiStrategy implements OpenApiFetchingStrategy {
   async tryFetch(responseData: any, openApiUrl: string, metadata: Metadata): Promise<string | null> {
@@ -32,7 +32,7 @@ export class DirectOpenApiStrategy implements OpenApiFetchingStrategy {
           try {
             parsedData = yaml.load(trimmedData) as any;
           } catch (yamlError) {
-            logMessage('warn', `DirectOpenApiStrategy: Failed to parse content as JSON or YAML from ${openApiUrl}`, metadata);
+            logMessage('debug', `DirectOpenApiStrategy: Failed to parse content as JSON or YAML from ${openApiUrl}`, metadata);
             return null;
           }
         }
