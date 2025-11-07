@@ -7,15 +7,15 @@ import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/cl
 import { validateCronExpression } from '@superglue/shared';
 import { Check, CheckCircle, ChevronRight, ChevronsUpDown, Loader2, XCircle } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
-import { JsonCodeEditor } from '../editors/JsonCodeEditor';
-import { Button } from '../ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { HelpTooltip } from '../utils/HelpTooltip';
+import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
+import { Button } from '../../ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../ui/card';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../../ui/command';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
+import { HelpTooltip } from '../../utils/HelpTooltip';
 
 const DEFAULT_SCHEDULES = [
   { value: '*/5 * * * *', label: 'Every 5 minutes' },
