@@ -66,22 +66,3 @@ export const extractResolver = async (
     };
   }
 };
-
-
-export async function processFile(data: Buffer, extractConfig: ExtractConfig) {
-  if (extractConfig.decompressionMethod && extractConfig.decompressionMethod != DecompressionMethod.NONE) {
-    data = await decompressData(data, extractConfig.decompressionMethod);
-  }
-
-  let responseJSON = await parseFile(data, extractConfig.fileType);
-
-  if (extractConfig.dataPath) {
-    // Navigate to the specified data path
-    const pathParts = extractConfig.dataPath.split('.');
-    for (const part of pathParts) {
-      responseJSON = responseJSON[part] || responseJSON;
-    }
-  }
-
-  return responseJSON;
-}

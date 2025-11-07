@@ -1,7 +1,4 @@
-import { Integration, JSONSchema, Workflow } from "@superglue/client";
-import { ExtractConfig } from "@superglue/client";
-import { ExecutionStep } from "@superglue/client";
-import { ApiConfig } from "@superglue/client";
+import { Integration, JSONSchema, ExecutionStep, ApiConfig } from "@superglue/client";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 
 export type ObjectContextOptions = {
@@ -36,19 +33,6 @@ export type WorkflowBuilderContextInput = {
     payload: any;
     userInstruction: string;
     responseSchema?: JSONSchema;
-};
-
-export type ExtractContextInput = {
-    extractConfig: ExtractConfig;
-    documentation: string;
-    payload: any;
-    credentials: Record<string, string>;
-    lastError: string | null;
-};
-
-export type ExtractContextOptions = {
-    characterBudget: number;
-    include?: { schema?: boolean; preview?: boolean; samples?: boolean };
 };
 
 export type LoopSelectorContextInput = {

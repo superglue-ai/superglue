@@ -273,7 +273,7 @@ export async function callFTP({ endpoint, credentials, options }: { endpoint: Ap
   let connectionString = composeUrl(endpoint.urlHost, endpoint.urlPath);
   const connectionInfo = parseConnectionUrl(connectionString);
 
-  let operation: FTPOperation;
+  let operations: FTPOperation[] = [];
   try {
     const body = parseJSON(endpoint.body);
     if(!Array.isArray(body)) {
