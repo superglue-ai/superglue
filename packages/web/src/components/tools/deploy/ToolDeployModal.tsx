@@ -1,14 +1,11 @@
 import { useConfig } from "@/src/app/config-context";
-import { tokenRegistry } from "@/src/lib/token-registry";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bot,
   Calendar,
-  Check,
   CheckCircle,
   ChevronRight,
   Code,
-  Copy,
   ExternalLink,
   Webhook,
 } from "lucide-react";
@@ -19,13 +16,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
 import { ToolDeployScheduleForm } from "./ToolDeployScheduleForm";
 import { CodeSnippet } from "../../editors/ReadonlyCodeEditor";
 import { cn } from "@/src/lib/general-utils";
-
-type Tool = any; // Replace with your actual Tool type
+import { Workflow } from "@superglue/client";
 
 interface ToolDeployModalProps {
-  currentTool: Tool;
+  currentTool: Workflow;
   payload: Record<string, any>;
-  credentials?: Record<string, string>;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -33,7 +28,6 @@ interface ToolDeployModalProps {
 export function ToolDeployModal({
   currentTool,
   payload,
-  credentials,
   isOpen,
   onClose = () => {}
 }: ToolDeployModalProps) {
@@ -140,32 +134,6 @@ await client.executeWorkflow({
   }
 }`;
 
-  // Copy handlers
-  const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({});
-
-  const handleCopy = (key: string, text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedStates({ ...copiedStates, [key]: true });
-    setTimeout(() => {
-      setCopiedStates({ ...copiedStates, [key]: false });
-    }, 1000);
-  };
-
-  const CopyButton = ({ copyKey, text }: { copyKey: string; text: string }) => (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="h-8 w-8 flex-none"
-      onClick={() => handleCopy(copyKey, text)}
-    >
-      {copiedStates[copyKey] ? (
-        <Check className="h-4 w-4" />
-      ) : (
-        <Copy className="h-4 w-4" />
-      )}
-    </Button>
-  );
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-x-hidden flex flex-col">
@@ -233,7 +201,7 @@ await client.executeWorkflow({
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                   >
                     <div className="flex items-center gap-2 rounded-md border bg-muted text-muted-foreground text-base px-3 py-2">
-                      <CheckCircle className="h-4 w-4 text-foreground" />
+                      <CheckCircle className="h-4 w-4 text-foreground text-green-600" />
                       <span>Schedule created successfully.</span>
                     </div>
                   </motion.div>

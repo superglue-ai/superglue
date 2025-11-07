@@ -37,7 +37,7 @@ export interface ToolPlaygroundProps {
   initialPayload?: string;
   initialInstruction?: string;
   integrations?: Integration[];
-  onSave?: (tool: Tool) => Promise<void>;
+  onSave?: (tool: Tool, payload: Record<string, any>) => Promise<void>;
   onExecute?: (tool: Tool, result: ToolResult) => void;
   onInstructionEdit?: () => void;
   headerActions?: React.ReactNode;
@@ -55,8 +55,6 @@ export interface ToolPlaygroundProps {
   filePayloads?: Record<string, any>;
   onFilesChange?: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
   saveButtonText?: string;
-  showSuccessPage?: boolean;
-  onSuccessPageAction?: (action: 'view-tool' | 'view-all') => void;
   hideRebuildButton?: boolean;
 }
 
@@ -91,8 +89,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   filePayloads: parentFilePayloads,
   onFilesChange: parentOnFilesChange,
   saveButtonText = "Save",
-  showSuccessPage = false,
-  onSuccessPageAction,
   hideRebuildButton = false
 }, ref) => {
   const router = useRouter();
@@ -182,7 +178,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const hasGeneratedDefaultPayloadRef = useRef<boolean>(false);
   const [showToolBuilder, setShowToolBuilder] = useState(false);
   const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
-  const [showDeployModal, setShowDeployModal] = useState(false);
 
   // Generate default payload once when schema is available if payload is empty
   useEffect(() => {
@@ -643,7 +638,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
       // In embedded mode, use the provided onSave callback
       if (embedded && onSave) {
-        await onSave(toolToSave);
+        await onSave(toolToSave, computedPayload);
       } else {
         // In standalone mode, save to backend
         const client = createSuperglueClient(config.superglueEndpoint);
@@ -657,7 +652,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 3000);
-      setShowDeployModal(true);
     } catch (error: any) {
       console.error("Error saving tool:", error);
       toast({
@@ -1141,47 +1135,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       </div>
     );
   }
-
-  if (showSuccessPage) {
-    const currentTool = {
-      id: toolId,
-      steps: steps.map((step: ExecutionStep) => ({
-        ...step,
-        apiConfig: {
-          id: step.apiConfig.id || step.id,
-          ...step.apiConfig,
-          pagination: step.apiConfig.pagination || null
-        }
-      })),
-      responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
-      inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
-      finalTransform,
-      instruction: instructions
-    };
-
-    const credentials = integrations.reduce((acc, sys: any) => {
-      return {
-        ...acc,
-        ...Object.entries(sys.credentials || {}).reduce(
-          (obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }),
-          {}
-        ),
-      };
-    }, {});
-
-    return (
-      <div className="flex-1 flex flex-col h-full p-6">
-        <ToolDeployModal
-          currentTool={currentTool}
-          credentials={credentials}
-          payload={computedPayload}
-          isOpen={true}
-          onClose={() => {}}
-        />
-      </div>
-    );
-  }
-
+  
   return (
     <div className={embedded ? "w-full h-full" : "pt-2 px-6 pb-6 max-w-none w-full h-screen flex flex-col"}>
       {!embedded && !hideHeader && (
@@ -1285,34 +1239,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <ToolDeployModal
-        currentTool={{
-          id: toolId,
-          steps: steps.map((step: ExecutionStep) => ({
-            ...step,
-            apiConfig: {
-              id: step.apiConfig.id || step.id,
-              ...step.apiConfig,
-              pagination: step.apiConfig.pagination || null
-            }
-          })),
-          responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
-          inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
-          finalTransform,
-          instruction: instructions
-        }}
-        credentials={integrations.reduce((acc, sys: any) => ({
-          ...acc,
-          ...Object.entries(sys.credentials || {}).reduce(
-            (obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }),
-            {}
-          ),
-        }), {})}
-        payload={computedPayload}
-        isOpen={showDeployModal}
-        onClose={() => setShowDeployModal(false)}
-      />
     </div>
   );
 });
