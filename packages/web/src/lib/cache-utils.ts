@@ -27,13 +27,12 @@ export const saveToCache = (prefix: string, data: unknown): void => {
   const scopeIdentifier = getCacheScopeIdentifier();
   if (!scopeIdentifier) return;
 
-
-
-
   try {
     const serialized = JSON.stringify(data);
     if (serialized.length > MAX_CACHE_SIZE) {
-      console.warn(`Cache data too large (${(serialized.length / 1024 / 1024).toFixed(2)}MB), skipping cache`,);
+      console.warn(
+        `Cache data too large (${(serialized.length / 1024 / 1024).toFixed(2)}MB), skipping cache`,
+      );
       return;
     }
     localStorage.setItem(getCacheKey(scopeIdentifier, prefix), serialized);
