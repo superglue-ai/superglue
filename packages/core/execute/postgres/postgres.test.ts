@@ -63,7 +63,7 @@ describe('PostgreSQL Utilities', () => {
       // Check Pool was created with correct config
       expect(vi.mocked(Pool)).toHaveBeenCalledWith({
         connectionString: 'postgres://testuser:testpass@localhost:5432/testdb',
-        statement_timeout: 30000,
+        statement_timeout: server_defaults.POSTGRES.DEFAULT_TIMEOUT,
         max: 10,
         idleTimeoutMillis: server_defaults.POSTGRES.DEFAULT_TIMEOUT,
         connectionTimeoutMillis: 5000,
