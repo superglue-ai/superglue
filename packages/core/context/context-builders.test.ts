@@ -5,7 +5,7 @@ import {
     getLoopSelectorContext,
     getObjectContext,
     getTransformContext,
-    getWorkflowBuilderContext
+    getToolBuilderContext
 } from './context-builders.js';
 
 function timeIt<T>(fn: () => T): { ms: number; result: T } {
@@ -165,13 +165,13 @@ describe('getWorkflowBuilderContext budget and include combinations', () => {
 
     it('zero or negative budget returns empty string', () => {
         const input = { integrations: [integration], payload: { x: 1 }, userInstruction: 'Do X' } as any;
-        expect(getWorkflowBuilderContext(input, { characterBudget: 0, include: {} } as any)).toBe('');
-        expect(getWorkflowBuilderContext(input, { characterBudget: -10, include: {} } as any)).toBe('');
+        expect(getToolBuilderContext(input, { characterBudget: 0, include: {} } as any)).toBe('');
+        expect(getToolBuilderContext(input, { characterBudget: -10, include: {} } as any)).toBe('');
     });
 
     it('includes only requested sections and enforces budget', () => {
         const input = { integrations: [integration], payload: { x: 1, y: 2 }, userInstruction: 'Fetch items' } as any;
-        const out = getWorkflowBuilderContext(input, { characterBudget: 800, include: { integrationContext: true, availableVariablesContext: true, payloadContext: true, userInstruction: true } });
+        const out = getToolBuilderContext(input, { characterBudget: 800, include: { integrationContext: true, availableVariablesContext: true, payloadContext: true, userInstruction: true } });
         expect(out.length).toBeLessThanOrEqual(820);
         expect(out).toMatch(/<available_integrations_and_documentation>/);
         expect(out).toMatch(/<available_variables>/);
@@ -181,14 +181,14 @@ describe('getWorkflowBuilderContext budget and include combinations', () => {
 
     it('no integrations path emits transform-only hint and enforces budget', () => {
         const input = { integrations: [], payload: { q: 1 }, userInstruction: 'Transform data' } as any;
-        const out = getWorkflowBuilderContext(input, { characterBudget: 500, include: { integrationContext: true, availableVariablesContext: false, payloadContext: false, userInstruction: true } });
+        const out = getToolBuilderContext(input, { characterBudget: 500, include: { integrationContext: true, availableVariablesContext: false, payloadContext: false, userInstruction: true } });
         expect(out.length).toBeLessThanOrEqual(500);
         expect(out).toMatch(/No integrations provided\. Build a transform-only workflow/);
     });
 
     it('available variables include integration credentials and payload keys when requested', () => {
         const input = { integrations: [{ ...integration, credentials: { apiKey: 'xxx' } }], payload: { foo: 1 }, userInstruction: 'N/A' } as any;
-        const out = getWorkflowBuilderContext(input, { characterBudget: 1000, include: { availableVariablesContext: true } as any });
+        const out = getToolBuilderContext(input, { characterBudget: 1000, include: { availableVariablesContext: true } as any });
         expect(out).toMatch(/<<test_integration_apiKey>>/);
         expect(out).toMatch(/<<foo>>/);
     });
