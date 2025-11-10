@@ -23,12 +23,12 @@ export type IntegrationContextOptions = {
     };
 };
 
-export type WorkflowBuilderContextOptions = {
+export type ToolBuilderContextOptions = {
     characterBudget: number;
     include?: { integrationContext?: boolean; availableVariablesContext?: boolean; payloadContext?: boolean; userInstruction?: boolean };
 };
 
-export type WorkflowBuilderContextInput = {
+export type ToolBuilderContextInput = {
     integrations: Integration[];
     payload: any;
     userInstruction: string;
