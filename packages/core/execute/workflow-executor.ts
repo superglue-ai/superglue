@@ -311,7 +311,7 @@ export class WorkflowExecutor implements Workflow {
         if(loopItems.length > 1) {
           logMessage("debug", `Executing loop iteration ${i + 1}/${loopItems.length} with item: ${JSON.stringify(currentItem).slice(0, 100)}...`, this.metadata);
         }
-        else if(loopItems.length == 1 && loopItems[0] && Object.keys(loopItems[0]).length > 0) {
+        else if(loopItems.length == 1 && currentItem && Object.keys(currentItem).length > 0) {
           logMessage("debug", `Executing step ${step.id} with item: ${JSON.stringify(currentItem).slice(0, 100)}...`, this.metadata);
         }
   
