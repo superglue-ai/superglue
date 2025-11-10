@@ -110,7 +110,7 @@ async function processFilePayloads(config: AgentEvalConfig): Promise<void> {
                 try {
                     await access(filePath);
                     const fileBuffer = await readFile(filePath);
-                    const parsedContent = await parseFile(fileBuffer, FileType.AUTO);
+                    const parsedContent = await parseFile(fileBuffer, 'AUTO');
                     tool.payload[key] = parsedContent;
                 } catch (error) {
                     throw new Error(`Failed to parse file ${filePath} for tool ${tool.id}: ${error instanceof Error ? error.message : String(error)}`);
