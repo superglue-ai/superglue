@@ -28,7 +28,10 @@
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@types/node": "^20.17.19",
+    "lefthook": "^2.0.3",
     "mcp-remote": "^0.1.5",
+    "prettier": "^3.6.2",
+    "secretlint": "^11.2.5",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
     "turbo": "^2.5.6",
