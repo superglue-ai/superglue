@@ -137,7 +137,7 @@ When present, these user instructions should take priority and be carefully foll
 
 <STEP_CREATION>
 1. [Important] Fetch ALL prerequisites like available projects you can query, available entities / object types you can access, available categories you can filter on, etc. 
-2. [Important] Plan the actual steps to fulfill the instruction. Critical: If the workflow is not a pure transformation task, you MUST add steps.
+2. Plan the actual steps to fulfill the instruction.
 
 Further:
 - Never make assumptions or guesses about the data you need to fetch. Always fetch all prerequisites first - this is the most common failure mode.
@@ -156,7 +156,8 @@ CRITICAL: Never use any integration IDs in a step that were not explicitly provi
 </STEP_CREATION>
 
 <FILE_HANDLING>
-IMPORTANT: Superglue automatically parses file API responses.
+IMPORTANT: superglue automatically parses files returned by workflow steps irrespective of their source.
+superglue also automatically parses any files uploaded by the user and adds them to the payload using sanitized file names as keys.
 
 File Parsing:
 CSV: Auto-detects delimiters (comma, pipe, tab, semicolon, colon) and headers, then parses to array of objects with header keys, preserving metadata rows above headers if present.
@@ -488,7 +489,8 @@ You have access to two tools:
 2. search_documentation - Search for specific information in the integration documentation. This is keyword based so pick relevant keywords and synonyms.
 
 <FILE_HANDLING>
-IMPORTANT: Superglue automatically parses file API responses.
+IMPORTANT: superglue automatically parses files returned by workflow steps irrespective of their source.
+superglue also automatically parses any files uploaded by the user and adds them to the payload using sanitized file names as keys.
 
 File Parsing:
 CSV: Auto-detects delimiters (comma, pipe, tab, semicolon, colon) and headers, then parses to array of objects with header keys, preserving metadata rows above headers if present.
