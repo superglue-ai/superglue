@@ -4,7 +4,7 @@ import { DocumentationSearch } from '../documentation/documentation-search.js';
 import { logMessage } from '../utils/logs.js';
 import { composeUrl } from '../utils/tools.js';
 import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
-import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, GenerateApiConfigContextInput, GenerateApiConfigContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions } from './context-types.js';
+import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, GenerateApiConfigContextInput, GenerateApiConfigContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput as ToolBuilderContextInput, WorkflowBuilderContextOptions as ToolBuilderContextOptions } from './context-types.js';
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
@@ -103,7 +103,7 @@ function buildIntegrationContext(integration: Integration, opts: IntegrationCont
 
     const paginationSection = docSearch.extractRelevantSections(
         integration.documentation,
-        "pagination page offset cursor limit per_page pageSize after next previous paging paginated results list",
+        "pagination page offset cursor limit per_page pageSize",
         paginationMaxSections,
         paginationSectionSize,
         integration.openApiSchema
@@ -118,7 +118,7 @@ function buildIntegrationContext(integration: Integration, opts: IntegrationCont
 
     const xml_opening_tag = `<${integration.id}>`;
     const urlSection = '<base_url>: ' + composeUrl(integration.urlHost, integration.urlPath) + '</base_url>';
-    const specificInstructionsSection = '<instructions>: ' + (integration.specificInstructions?.length > 0 ? integration.specificInstructions : "No specific instructions provided.") + '</instructions>';
+    const specificInstructionsSection = '<integration_specific_instructions>: ' + (integration.specificInstructions?.length > 0 ? integration.specificInstructions : "No integration-specific instructions provided.") + '</integration_specific_instructions>';
     const xml_closing_tag = `</${integration.id}>`;
     const newlineCount = 2;
     const availableBudget = budget - xml_opening_tag.length - xml_closing_tag.length - newlineCount;
@@ -134,12 +134,12 @@ function buildAvailableVariableContext(payload: any, integrations: Integration[]
     return availableVariables || 'No variables available'
 }
 
-export function getWorkflowBuilderContext(input: WorkflowBuilderContextInput, options: WorkflowBuilderContextOptions): string {
+export function getToolBuilderContext(input: ToolBuilderContextInput, options: ToolBuilderContextOptions): string {
     const budget = Math.max(0, options.characterBudget | 0);
     if (budget === 0) return '';
     const hasIntegrations = input.integrations.length > 0;
 
-    const prompt_start = `Build a complete workflow to fulfill the user's request.`;
+    const prompt_start = `Build a complete workflow to fulfill the user's instruction.`;
     const prompt_end = hasIntegrations ? 'Ensure that the final output matches the instruction and you use ONLY the available integration ids.' : 'Since no integrations are available, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.';
     const userInstructionContext = options.include.userInstruction ? `<instruction>${input.userInstruction}</instruction>` : '';
 
