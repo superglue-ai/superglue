@@ -430,27 +430,10 @@ const result = await superglue.call({
   }
 
   const extractTextFromFile = async (file: File): Promise<string> => {
-    if (file.type === 'application/pdf') {
-      // For PDFs, use pdf.js
-      const pdfjsLib = await import('pdfjs-dist');
-      // Update worker path to use .mjs extension
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
-
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-      let fullText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(' ');
-        fullText += pageText + '\n';
-      }
-      return fullText;
-    } else {
-      // For text files (.txt, .md, etc)
-      return await file.text();
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      throw new Error('PDF files are not supported in this context. Please use text files only.');
     }
+    return await file.text();
   }
 
   const handleDocDrop = async (e: React.DragEvent) => {

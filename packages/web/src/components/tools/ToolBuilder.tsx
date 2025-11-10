@@ -10,7 +10,7 @@ import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndEx
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/general-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
 import { Integration, IntegrationInput, Workflow as Tool, UpsertMode } from '@superglue/client';
-import { generateDefaultFromSchema, integrationOptions } from "@superglue/shared";
+import { ALLOWED_FILE_EXTENSIONS, generateDefaultFromSchema, integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { Validator } from 'jsonschema';
 import { Check, Clock, FileJson, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Wrench, X } from 'lucide-react';
@@ -1028,7 +1028,7 @@ export function ToolBuilder({
               <input
                 type="file"
                 multiple
-                accept=".json,.csv,.txt,.xml,.xlsx,.xls,.pdf"
+                accept={ALLOWED_FILE_EXTENSIONS.join(',')}
                 onChange={async (e) => {
                   const files = Array.from(e.target.files || []);
                   if (files.length > 0) {

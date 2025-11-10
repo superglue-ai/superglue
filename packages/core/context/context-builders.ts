@@ -4,7 +4,7 @@ import { DocumentationSearch } from '../documentation/documentation-search.js';
 import { logMessage } from '../utils/logs.js';
 import { composeUrl } from '../utils/tools.js';
 import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
-import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, ExtractContextInput, ExtractContextOptions, GenerateApiConfigContextInput, GenerateApiConfigContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions } from './context-types.js';
+import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, GenerateApiConfigContextInput, GenerateApiConfigContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, WorkflowBuilderContextInput, WorkflowBuilderContextOptions } from './context-types.js';
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
@@ -173,21 +173,6 @@ export function getWorkflowBuilderContext(input: WorkflowBuilderContextInput, op
     const integrationContext = options.include?.integrationContext ? `<available_integrations_and_documentation>${integrationContent}</available_integrations_and_documentation>` : '';
 
     return prompt_start + '\n' + userInstructionContext + '\n' + integrationContext + '\n' + availableVariablesContext + '\n' + payloadContext + '\n' + prompt_end;
-}
-
-export function getExtractContext(input: ExtractContextInput, options: ExtractContextOptions): string { // TODO: Remove this function in file handling PR because extract will become a file processing only endpoint
-    const budget = Math.max(0, options.characterBudget | 0);
-    if (budget === 0) return '';
-
-    const prompt_start = `Generate API configuration for the following:`;
-    const instructionContext = `<instruction>${input.extractConfig.instruction}</instruction>`;
-    const baseUrlContext = `<base_url>${composeUrl(input.extractConfig.urlHost, input.extractConfig.urlPath)}</base_url>`;
-    const documentationContext = `<documentation>${input.documentation}</documentation>`;
-    const credentialsContext = `<credentials>${Object.keys(input.credentials || {}).join(", ")}</credentials>`;
-    const payloadContext = `<extract_input>${getObjectContext(input.payload, { include: { schema: true, preview: false, samples: true }, characterBudget: budget * 0.5 })}</extract_input>`;
-    const lastErrorContext = input.lastError ? `<last_error>${input.lastError}</last_error>` : '';
-    const prompt = prompt_start + '\n' + ([instructionContext, baseUrlContext, documentationContext, credentialsContext, payloadContext, lastErrorContext].filter(Boolean).join('\n')).slice(0, budget - prompt_start.length);
-    return prompt;
 }
 
 export function getLoopSelectorContext(input: LoopSelectorContextInput, options: LoopSelectorContextOptions): string {

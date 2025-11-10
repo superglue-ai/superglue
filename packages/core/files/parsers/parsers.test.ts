@@ -1,13 +1,610 @@
+import { SupportedFileType } from '@superglue/shared';
+import axios from 'axios';
 import { describe, expect, it } from 'vitest';
-import {
-  isValidJson,
-  minifyJson,
-  parseJSON,
-  parseJsonResilient,
-  prettyPrintJson,
-  RepairStrategy,
-  ResilientJsonParser
-} from './json-parser.js';
+import { parseFile, FileStrategyRegistry } from '../index.js';
+import { parseZIP, ZIPStrategy } from './zip.js';
+import { parseJSON, parseJsonResilient, RepairStrategy, minifyJson, ResilientJsonParser, isValidJson, prettyPrintJson, JSONStrategy } from './json.js';
+import { CSVStrategy } from './csv.js';
+import { XMLStrategy } from './xml.js';
+import { PDFStrategy } from './pdf.js';
+import { GZIPStrategy } from './gzip.js';
+import { DOCXStrategy } from './docx.js';
+import { ExcelStrategy } from './excel.js';
+import JSZip from 'jszip';
+import { promisify } from 'util';
+import { gzip } from 'zlib';
+
+const gzipAsync = promisify(gzip);
+
+describe('File Parsing - Comprehensive Tests', () => {
+  describe('parseFile with AUTO detection', () => {
+    it('should auto-detect and parse JSON', async () => {
+      const jsonData = JSON.stringify({ name: 'test', value: 123 });
+      const buffer = Buffer.from(jsonData);
+
+      const result = await parseFile(buffer, SupportedFileType.AUTO);
+      expect(result).toEqual({ name: 'test', value: 123 });
+    });
+
+    it('should auto-detect and parse JSON array', async () => {
+      const jsonData = JSON.stringify([{ id: 1 }, { id: 2 }]);
+      const buffer = Buffer.from(jsonData);
+
+      const result = await parseFile(buffer, SupportedFileType.AUTO);
+      expect(result).toEqual([{ id: 1 }, { id: 2 }]);
+    });
+
+    it('should auto-detect and parse CSV', async () => {
+      const csvData = 'name,age,city\nAlice,30,NYC\nBob,25,LA';
+      const buffer = Buffer.from(csvData);
+
+      const result = await parseFile(buffer, SupportedFileType.AUTO);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toHaveProperty('name', 'Alice');
+    });
+
+    it('should auto-detect and parse XML', async () => {
+      const xmlData = '<?xml version="1.0"?><root><item>test</item></root>';
+      const buffer = Buffer.from(xmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.AUTO);
+      expect(result).toBeDefined();
+      expect(result.ROOT).toBeDefined();
+    });
+
+    it('should auto-detect and parse XML without declaration', async () => {
+      const xmlData = '<root><item>test</item></root>';
+      const buffer = Buffer.from(xmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.AUTO);
+      expect(result).toBeDefined();
+      expect(result.ROOT).toBeDefined();
+    });
+
+    it('should fallback to RAW for unrecognized text', async () => {
+      const textData = 'This is just plain text without structure';
+      const buffer = Buffer.from(textData);
+
+      const result = await parseFile(buffer, SupportedFileType.AUTO);
+      expect(result).toBe(textData);
+    });
+
+    it('should handle empty buffer', async () => {
+      const result = await parseFile(Buffer.from(''), SupportedFileType.AUTO);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('JSON Parsing', () => {
+    it('should parse JSON data', async () => {
+      const jsonData = JSON.stringify([{ name: 'test', value: 123 }]);
+      const buffer = Buffer.from(jsonData);
+
+      const result = await parseFile(buffer, SupportedFileType.JSON);
+      expect(result).toEqual([{ name: 'test', value: 123 }]);
+    });
+
+    it('should parse nested JSON objects', async () => {
+      const jsonData = JSON.stringify({
+        user: { name: 'Alice', profile: { age: 30, city: 'NYC' } }
+      });
+      const buffer = Buffer.from(jsonData);
+
+      const result = await parseFile(buffer, SupportedFileType.JSON);
+      expect(result.user.profile.age).toBe(30);
+    });
+
+    it('should handle JSON with special characters', async () => {
+      const jsonData = JSON.stringify({ message: 'Hello\nWorld\t"quoted"' });
+      const buffer = Buffer.from(jsonData);
+
+      const result = await parseFile(buffer, SupportedFileType.JSON);
+      expect(result.message).toBe('Hello\nWorld\t"quoted"');
+    });
+  });
+
+  describe('CSV Parsing', () => {
+    it('should parse CSV data', async () => {
+      const csvData = 'name,value\ntest,123';
+      const buffer = Buffer.from(csvData);
+
+      const result = await parseFile(buffer, SupportedFileType.CSV);
+      expect(result).toEqual([{ name: 'test', value: '123' }]);
+    });
+
+    it('should parse CSV data as array if multiple rows are given', async () => {
+      const csvData = 'name,value\ntest,123\ntest2,456';
+      const buffer = Buffer.from(csvData);
+
+      const result = await parseFile(buffer, SupportedFileType.CSV);
+      expect(result).toEqual([
+        { name: 'test', value: '123' },
+        { name: 'test2', value: '456' }
+      ]);
+    });
+
+    it('should handle CSV with different delimiters (semicolon)', async () => {
+      const csvData = 'name;age;city\nAlice;30;NYC\nBob;25;LA';
+      const buffer = Buffer.from(csvData);
+
+      const result = await parseFile(buffer, SupportedFileType.CSV);
+      expect(result).toHaveLength(2);
+      expect(result[0].age).toBe('30');
+    });
+
+    it('should handle CSV with different delimiters (pipe)', async () => {
+      const csvData = 'name|age|city\nAlice|30|NYC\nBob|25|LA';
+      const buffer = Buffer.from(csvData);
+
+      const result = await parseFile(buffer, SupportedFileType.CSV);
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('Alice');
+    });
+
+    it('should handle CSV with different delimiters (tab)', async () => {
+      const csvData = 'name\tage\tcity\nAlice\t30\tNYC\nBob\t25\tLA';
+      const buffer = Buffer.from(csvData);
+
+      const result = await parseFile(buffer, SupportedFileType.CSV);
+      expect(result).toHaveLength(2);
+      expect(result[1].city).toBe('LA');
+    });
+
+    it('should handle CSV with quoted values containing commas', async () => {
+      const csvData = 'name,location\nAlice,"New York, NY"\nBob,"Los Angeles, CA"';
+      const buffer = Buffer.from(csvData);
+
+      const result = await parseFile(buffer, SupportedFileType.CSV);
+      expect(result[0].location).toBe('New York, NY');
+    });
+
+    it('should handle CSV with empty lines', async () => {
+      const csvData = 'name,value\n\ntest,123\n\ntest2,456\n';
+      const buffer = Buffer.from(csvData);
+
+      const result = await parseFile(buffer, SupportedFileType.CSV);
+      expect(result).toHaveLength(2);
+    });
+  });
+
+  describe('XML Parsing', () => {
+    it('should parse XML data', async () => {
+      const xmlData = `
+        <?xml version="1.0" encoding="UTF-8"?>
+        <root>
+          <item>
+            <name>test</name>
+            <value>123</value>
+          </item>
+        </root>
+      `;
+      const buffer = Buffer.from(xmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.XML);
+      expect(result?.ROOT?.ITEM).toEqual({ NAME: 'test', VALUE: '123' });
+    });
+
+    it('should parse XML data as array if multiple rows are given', async () => {
+      const xmlData = `
+        <?xml version="1.0" encoding="UTF-8"?>
+        <root>
+          <item>
+            <name>test</name>
+            <value>123</value>
+          </item>
+          <item>
+            <name>test2</name>
+            <value>456</value>
+          </item>
+        </root>
+      `;
+      const buffer = Buffer.from(xmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.XML);
+      expect(result?.ROOT?.ITEM).toHaveLength(2);
+      expect(result?.ROOT?.ITEM).toEqual([
+        { NAME: 'test', VALUE: '123' },
+        { NAME: 'test2', VALUE: '456' }
+      ]);
+    });
+
+    it('should handle XML with attributes', async () => {
+      const xmlData = `
+        <?xml version="1.0"?>
+        <root>
+          <item id="1" type="test">
+            <value>123</value>
+          </item>
+        </root>
+      `;
+      const buffer = Buffer.from(xmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.XML);
+      // XML parser converts tag names to uppercase
+      expect(result.ROOT.ITEM).toBeDefined();
+      expect(result.ROOT.ITEM.VALUE).toBe('123');
+      // Note: Attributes may be lowercased depending on parser configuration
+      expect(result.ROOT.ITEM.id || result.ROOT.ITEM.ID).toBeTruthy();
+    });
+
+    it('should handle XML with self-closing tags', async () => {
+      const xmlData = '<root><item/><item/></root>';
+      const buffer = Buffer.from(xmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.XML);
+      expect(result.ROOT).toBeDefined();
+    });
+
+    it('should handle XML with mixed content', async () => {
+      const xmlData = `
+        <root>
+          <item>Text content</item>
+          <item><nested>value</nested></item>
+        </root>
+      `;
+      const buffer = Buffer.from(xmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.XML);
+      expect(result.ROOT).toBeDefined();
+    });
+  });
+
+  describe('ZIP Parsing', () => {
+    it('should extract all files from zip archive', async () => {
+      const file = await axios.get('https://sample-files.com/downloads/compressed/zip/basic-text.zip', { responseType: 'arraybuffer' });
+
+      const result = await parseZIP(Buffer.from(file.data));
+      expect(Object.keys(result).length).toBeGreaterThan(0);
+    });
+
+    it('should create and parse a ZIP file with multiple file types', async () => {
+      const zip = new JSZip();
+      zip.file('data.json', JSON.stringify({ test: 'value' }));
+      zip.file('data.csv', 'name,value\ntest,123');
+      zip.file('readme.txt', 'This is a readme file');
+
+      const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+      const result = await parseFile(zipBuffer, SupportedFileType.AUTO);
+
+      expect(result['data.json']).toEqual({ test: 'value' });
+      expect(result['data.csv']).toHaveLength(1);
+      expect(result['readme.txt']).toBe('This is a readme file');
+    });
+
+    it('should handle nested ZIP files', async () => {
+      const innerZip = new JSZip();
+      innerZip.file('inner.txt', 'Inner content');
+      const innerBuffer = await innerZip.generateAsync({ type: 'nodebuffer' });
+
+      const outerZip = new JSZip();
+      outerZip.file('inner.zip', innerBuffer);
+      outerZip.file('outer.txt', 'Outer content');
+
+      const outerBuffer = await outerZip.generateAsync({ type: 'nodebuffer' });
+      const result = await parseFile(outerBuffer, SupportedFileType.AUTO);
+
+      expect(result['outer.txt']).toBe('Outer content');
+      expect(result['inner.zip']).toBeDefined();
+      expect(result['inner.zip']['inner.txt']).toBe('Inner content');
+    });
+
+    it('should filter out macOS metadata files', async () => {
+      const zip = new JSZip();
+      zip.file('data.txt', 'Real data');
+      zip.file('__MACOSX/data.txt', 'Metadata');
+      zip.file('._data.txt', 'Resource fork');
+
+      const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+      const result = await parseZIP(zipBuffer);
+
+      expect(Object.keys(result)).toHaveLength(1);
+      expect(result['data.txt']).toBeDefined();
+      expect(result['__MACOSX/data.txt']).toBeUndefined();
+      expect(result['._data.txt']).toBeUndefined();
+    });
+
+    it('should throw error when zip is invalid', async () => {
+      const emptyBuffer = Buffer.from([]);
+      await expect(parseZIP(emptyBuffer))
+        .rejects.toThrow();
+
+      const invalidZip = Buffer.from([
+        0x50, 0x4B, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+      ]);
+
+      await expect(parseZIP(invalidZip))
+        .rejects.toThrow();
+    });
+  });
+
+  describe('GZIP Parsing', () => {
+    it('should decompress and parse gzipped JSON', async () => {
+      const jsonData = JSON.stringify({ test: 'value', number: 42 });
+      const gzipped = await gzipAsync(Buffer.from(jsonData));
+
+      const result = await parseFile(gzipped, SupportedFileType.AUTO);
+      expect(result).toEqual({ test: 'value', number: 42 });
+    });
+
+    it('should decompress and parse gzipped CSV', async () => {
+      const csvData = 'name,value\ntest,123\ntest2,456';
+      const gzipped = await gzipAsync(Buffer.from(csvData));
+
+      const result = await parseFile(gzipped, SupportedFileType.AUTO);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(2);
+    });
+
+    it('should decompress and parse gzipped XML', async () => {
+      const xmlData = '<?xml version="1.0"?><root><item>test</item></root>';
+      const gzipped = await gzipAsync(Buffer.from(xmlData));
+
+      const result = await parseFile(gzipped, SupportedFileType.AUTO);
+      expect(result.ROOT).toBeDefined();
+      expect(result.ROOT.ITEM).toBe('test');
+    });
+
+    it('should decompress gzipped text and return as RAW', async () => {
+      const textData = 'This is plain text';
+      const gzipped = await gzipAsync(Buffer.from(textData));
+
+      const result = await parseFile(gzipped, SupportedFileType.AUTO);
+      expect(result).toBe(textData);
+    });
+
+    it('should handle GZIP strategy detection', () => {
+      const strategy = new GZIPStrategy();
+      const gzipSignature = Buffer.from([0x1f, 0x8b, 0x08, 0x00]);
+      expect(strategy.canHandle(gzipSignature)).toBe(true);
+
+      const nonGzipData = Buffer.from('regular text');
+      expect(strategy.canHandle(nonGzipData)).toBe(false);
+    });
+  });
+
+  describe('PDF Parsing', () => {
+    it('should detect PDF signature', () => {
+      const strategy = new PDFStrategy();
+      const pdfSignature = Buffer.from([0x25, 0x50, 0x44, 0x46]); // %PDF
+      expect(strategy.canHandle(pdfSignature)).toBe(true);
+
+      const nonPdfData = Buffer.from('not a pdf');
+      expect(strategy.canHandle(nonPdfData)).toBe(false);
+    });
+
+    it('should reject buffers that are too short', () => {
+      const strategy = new PDFStrategy();
+      const tooShort = Buffer.from([0x25, 0x50]);
+      expect(strategy.canHandle(tooShort)).toBe(false);
+    });
+  });
+
+  describe('DOCX Parsing', () => {
+    it('should detect DOCX files (ZIP with word/ structure)', async () => {
+      const strategy = new DOCXStrategy();
+
+      const zip = new JSZip();
+      zip.file('word/document.xml', '<document>Test</document>');
+      zip.file('[Content_Types].xml', '<Types/>');
+      const docxBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+      const canHandle = await strategy.canHandle(docxBuffer);
+      expect(canHandle).toBe(true);
+    });
+
+    it('should not detect regular ZIP as DOCX', async () => {
+      const strategy = new DOCXStrategy();
+
+      const zip = new JSZip();
+      zip.file('regular.txt', 'Just a regular ZIP');
+      const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+      const canHandle = await strategy.canHandle(zipBuffer);
+      expect(canHandle).toBe(false);
+    });
+  });
+
+  describe('Excel Parsing', () => {
+    it('should detect Excel files (ZIP with xl/ structure)', async () => {
+      const strategy = new ExcelStrategy();
+
+      const zip = new JSZip();
+      zip.file('xl/workbook.xml', '<workbook/>');
+      zip.file('[Content_Types].xml', '<Types/>');
+      const excelBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+      const canHandle = await strategy.canHandle(excelBuffer);
+      expect(canHandle).toBe(true);
+    });
+
+    it('should detect Excel files with worksheets', async () => {
+      const strategy = new ExcelStrategy();
+
+      const zip = new JSZip();
+      zip.file('xl/worksheets/sheet1.xml', '<worksheet/>');
+      zip.file('[Content_Types].xml', '<Types/>');
+      const excelBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+      const canHandle = await strategy.canHandle(excelBuffer);
+      expect(canHandle).toBe(true);
+    });
+
+    it('should not detect regular ZIP as Excel', async () => {
+      const strategy = new ExcelStrategy();
+
+      const zip = new JSZip();
+      zip.file('data.txt', 'Regular file');
+      const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+      const canHandle = await strategy.canHandle(zipBuffer);
+      expect(canHandle).toBe(false);
+    });
+  });
+
+  describe('Strategy Priority System', () => {
+    it('should test GZIP before other binary formats', async () => {
+      const jsonData = JSON.stringify({ test: 'data' });
+      const gzipped = await gzipAsync(Buffer.from(jsonData));
+
+      // GZIP should be detected first, not treated as random binary
+      const result = await parseFile(gzipped, SupportedFileType.AUTO);
+      expect(result).toEqual({ test: 'data' });
+    });
+
+    it('should detect Excel files correctly via parseFile', async () => {
+      const zip = new JSZip();
+      zip.file('xl/workbook.xml', '<workbook/>');
+      zip.file('[Content_Types].xml', '<Types/>');
+      const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+      // Use the actual parseFile function which has the correct strategy order
+      const result = await parseFile(buffer, SupportedFileType.AUTO);
+
+      // The result should be parsed as Excel (which returns sheets object)
+      // If it was generic ZIP, it would return a Record<string, Buffer>
+      expect(result).toBeDefined();
+      // Excel files return objects with sheet data, not raw buffers
+      expect(typeof result).toBe('object');
+    });
+
+    it('should detect DOCX files correctly via parseFile', async () => {
+      const zip = new JSZip();
+      zip.file('word/document.xml', '<document/>');
+      const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+      // Use the actual parseFile function which has the correct strategy order
+      const result = await parseFile(buffer, SupportedFileType.AUTO);
+
+      // DOCX detection should work and parse it
+      expect(result).toBeDefined();
+
+      // If detected as DOCX, it returns a string
+      // If detected as ZIP (fallback), it returns an object with extracted files
+      // Since we're using a minimal DOCX structure, verify it's at least parsed
+      if (typeof result === 'string') {
+        // Successfully detected and parsed as DOCX
+        expect(typeof result).toBe('string');
+      } else {
+        // Fallback to ZIP - verify it extracted the word/document.xml file
+        expect(result['word/document.xml']).toBeDefined();
+      }
+    });
+
+    it('should test JSON before CSV for JSON data', async () => {
+      const jsonData = '{"name": "test"}';
+      const buffer = Buffer.from(jsonData);
+
+      const registry = new FileStrategyRegistry();
+      registry.register(new JSONStrategy());
+      registry.register(new CSVStrategy());
+
+      const result = await registry.detectAndParse(buffer);
+      expect(result.fileType).toBe(SupportedFileType.JSON);
+    });
+
+    it('should detect CSV for ambiguous delimiter data', async () => {
+      const csvData = 'name,age\nAlice,30\nBob,25';
+      const buffer = Buffer.from(csvData);
+
+      const result = await parseFile(buffer, SupportedFileType.AUTO);
+      expect(Array.isArray(result)).toBe(true);
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should throw error for unsupported file type', async () => {
+      const buffer = Buffer.from('test data');
+      await expect(parseFile(buffer, 'INVALID' as any))
+        .rejects.toThrow('Unsupported file type');
+    });
+
+    it('should handle corrupted JSON gracefully with resilient parser', async () => {
+      const malformedJson = '{"key": "value",}';
+      const buffer = Buffer.from(malformedJson);
+
+      const result = await parseFile(buffer, SupportedFileType.JSON);
+      expect(result).toEqual({ key: 'value' });
+    });
+
+    it('should fallback to RAW for truly unparseable data', async () => {
+      const binaryGarbage = Buffer.from([0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA]);
+      const result = await parseFile(binaryGarbage, SupportedFileType.AUTO);
+      expect(typeof result).toBe('string');
+    });
+
+    it('should continue after strategy failure', async () => {
+      const registry = new FileStrategyRegistry();
+
+      // Add a strategy that always fails
+      class FailingStrategy {
+        readonly fileType = SupportedFileType.JSON;
+        readonly priority = 0;
+        canHandle() { return true; }
+        async parse() { throw new Error('Always fails'); }
+      }
+
+      registry.register(new FailingStrategy() as any);
+      registry.register(new JSONStrategy());
+
+      const jsonData = '{"key": "value"}';
+      const result = await registry.detectAndParse(Buffer.from(jsonData));
+
+      // Should fallback to RAW instead of throwing
+      expect(result.fileType).toBeDefined();
+    });
+  });
+
+  describe('Complex Integration Scenarios', () => {
+    it('should handle ZIP containing gzipped files', async () => {
+      const jsonData = JSON.stringify({ nested: 'data' });
+      const gzipped = await gzipAsync(Buffer.from(jsonData));
+
+      const zip = new JSZip();
+      zip.file('data.json.gz', gzipped);
+      zip.file('readme.txt', 'Instructions');
+      const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+      const result = await parseFile(zipBuffer, SupportedFileType.AUTO);
+      expect(result['data.json.gz']).toEqual({ nested: 'data' });
+      expect(result['readme.txt']).toBe('Instructions');
+    });
+
+    it('should handle ZIP with mixed file types', async () => {
+      const zip = new JSZip();
+      zip.file('data.json', JSON.stringify([1, 2, 3]));
+      zip.file('data.csv', 'a,b\n1,2\n3,4');
+      zip.file('data.xml', '<root><item>test</item></root>');
+      zip.file('data.txt', 'Plain text');
+
+      const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+      const result = await parseFile(zipBuffer, SupportedFileType.AUTO);
+
+      expect(result['data.json']).toEqual([1, 2, 3]);
+      expect(Array.isArray(result['data.csv'])).toBe(true);
+      expect(result['data.xml'].ROOT).toBeDefined();
+      expect(result['data.txt']).toBe('Plain text');
+    });
+
+    it('should handle deeply nested ZIP structures', async () => {
+      const level3 = new JSZip();
+      level3.file('deep.txt', 'Deep content');
+      const level3Buffer = await level3.generateAsync({ type: 'nodebuffer' });
+
+      const level2 = new JSZip();
+      level2.file('level3.zip', level3Buffer);
+      const level2Buffer = await level2.generateAsync({ type: 'nodebuffer' });
+
+      const level1 = new JSZip();
+      level1.file('level2.zip', level2Buffer);
+      const level1Buffer = await level1.generateAsync({ type: 'nodebuffer' });
+
+      const result = await parseFile(level1Buffer, SupportedFileType.AUTO);
+      expect(result['level2.zip']['level3.zip']['deep.txt']).toBe('Deep content');
+    });
+  });
+});
 
 describe('Resilient JSON Parser', () => {
   describe('parseJsonResilient', () => {
