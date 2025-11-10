@@ -435,8 +435,6 @@ Superglue provides these variables that you MUST use:
 - OFFSET_BASED: Use <<offset>> and <<limit>> variables
 - PAGE_BASED: Use <<page>> and <<pageSize>> or <<limit>> variables
 - CURSOR_BASED: Use <<cursor>> and <<limit>> variables
-
-WARNING: Incorrect pagination configuration causes infinite loops. When in doubt, leave it unconfigured.
 </PAGINATION_CONFIGURATION>
 
 <POSTGRES>
