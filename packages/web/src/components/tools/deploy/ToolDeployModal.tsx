@@ -186,8 +186,7 @@ await client.executeWorkflow({
               <div className="space-y-2">
                 <p className="text-muted-foreground">
                   Automate your workflow by scheduling it to run at specific
-                  times or intervals. Perfect for data syncs, reports,
-                  monitoring, and recurring tasks.
+                  times or intervals.
                 </p>
               </div>
 
