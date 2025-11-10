@@ -33,9 +33,7 @@ export async function parsePDF(buffer: Buffer): Promise<{ textContent: string; s
 
     return {
         textContent: textResult.text || '',
-        structuredContent: {
-            tables: tableResult.pages || []
-        }
+        structuredContent: tableResult.pages || []
     };
 }
 
