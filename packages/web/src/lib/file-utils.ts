@@ -1,7 +1,4 @@
-import { ALLOWED_FILE_EXTENSIONS } from '@superglue/shared/files';
-
-export { ALLOWED_FILE_EXTENSIONS };
-export const ALLOWED_EXTENSIONS = ALLOWED_FILE_EXTENSIONS;
+import { ALLOWED_FILE_EXTENSIONS } from '@superglue/shared';
 
 export const MAX_TOTAL_FILE_SIZE_CHAT = 50 * 1024 * 1024;
 export const MAX_TOTAL_FILE_SIZE_TOOLS = 1000 * 1024 * 1024;

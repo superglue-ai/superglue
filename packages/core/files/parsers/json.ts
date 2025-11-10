@@ -1,3 +1,31 @@
+import { SupportedFileType } from '@superglue/shared';
+import { DetectionPriority, FileParsingStrategy } from '../strategy.js';
+
+export class JSONStrategy implements FileParsingStrategy {
+    readonly fileType = SupportedFileType.JSON;
+    readonly priority = DetectionPriority.STRUCTURED_TEXT;
+
+    canHandle(buffer: Buffer): boolean {
+        try {
+            const sampleSize = Math.min(buffer.length, 4096);
+            const sample = buffer.subarray(0, sampleSize).toString('utf8').trim();
+
+            if (!sample.startsWith('{') && !sample.startsWith('[')) {
+                return false;
+            }
+
+            const result = defaultParser.parse(buffer);
+            return result.success;
+        } catch {
+            return false;
+        }
+    }
+
+    async parse(buffer: Buffer): Promise<any> {
+        return parseJSON(buffer);
+    }
+}
+
 export interface ParseOptions {
     attemptRepair?: boolean;
     maxDepth?: number;

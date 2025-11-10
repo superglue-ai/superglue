@@ -1,4 +1,5 @@
 import { ApiConfig, PaginationType } from "@superglue/client";
+import { SupportedFileType } from "@superglue/shared";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { RequestOptions } from "http";
 import ivm from "isolated-vm";
@@ -195,14 +196,14 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
 
     // callAxios now always returns a Buffer, so we always need to parse it
     if (responseData instanceof Buffer) {
-      responseData = await parseFile(responseData, 'AUTO');
+      responseData = await parseFile(responseData, SupportedFileType.AUTO);
     }
     // Fallback for any legacy code paths or special cases - we can remove this later
     else if (responseData && (responseData instanceof ArrayBuffer)) {
-      responseData = await parseFile(Buffer.from(responseData), 'AUTO');
+      responseData = await parseFile(Buffer.from(responseData), SupportedFileType.AUTO);
     }
     else if (responseData && typeof responseData === 'string') {
-      responseData = await parseFile(Buffer.from(responseData), 'AUTO');
+      responseData = await parseFile(Buffer.from(responseData), SupportedFileType.AUTO);
     }
     const parsedResponseData = responseData;
 

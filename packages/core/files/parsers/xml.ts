@@ -1,5 +1,32 @@
+import { SupportedFileType } from '@superglue/shared';
 import sax from 'sax';
 import { Readable } from 'stream';
+import { DetectionPriority, FileParsingStrategy } from '../strategy.js';
+
+
+export class XMLStrategy implements FileParsingStrategy {
+    readonly fileType = SupportedFileType.XML;
+    readonly priority = DetectionPriority.STRUCTURED_TEXT;
+
+    canHandle(buffer: Buffer): boolean {
+        try {
+            const sampleSize = Math.min(buffer.length, 4096);
+            const sample = buffer.subarray(0, sampleSize).toString('utf8').trim();
+
+            if (!sample.startsWith('<?xml') && !sample.startsWith('<')) {
+                return false;
+            }
+
+            return sample.includes('</') || sample.includes('/>');
+        } catch {
+            return false;
+        }
+    }
+
+    async parse(buffer: Buffer): Promise<any> {
+        return parseXML(buffer);
+    }
+}
 
 export async function parseXML(buffer: Buffer): Promise<any> {
     const results: any = {};

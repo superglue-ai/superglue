@@ -1,4 +1,37 @@
+import { SupportedFileType } from '@superglue/shared';
 import * as XLSX from 'xlsx';
+import * as unzipper from 'unzipper';
+import { DetectionPriority, FileParsingStrategy } from '../strategy.js';
+
+
+export class ExcelStrategy implements FileParsingStrategy {
+    readonly fileType = SupportedFileType.EXCEL;
+    readonly priority = DetectionPriority.BINARY_SIGNATURE;
+
+    async canHandle(buffer: Buffer): Promise<boolean> {
+        // Must be a ZIP file first (PK signature)
+        if (buffer.length < 4) return false;
+        const signature = buffer.subarray(0, 4).toString('hex');
+        if (signature !== '504b0304') return false;
+
+        // Check for Excel-specific files inside the ZIP
+        try {
+            const zipStream = await unzipper.Open.buffer(buffer);
+            const hasExcelSignature = zipStream.files.some(f =>
+                f.path === '[Content_Types].xml' ||
+                f.path === 'xl/workbook.xml' ||
+                f.path.startsWith('xl/worksheets/')
+            );
+            return hasExcelSignature;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    async parse(buffer: Buffer): Promise<any> {
+        return parseExcel(buffer);
+    }
+}
 
 export async function parseExcel(buffer: Buffer): Promise<{ [sheetName: string]: any[] }> {
     try {

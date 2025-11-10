@@ -1,4 +1,5 @@
 import { ApiConfig, RequestOptions } from "@superglue/client";
+import { SupportedFileType } from "@superglue/shared";
 import { Client as FTPClient } from "basic-ftp";
 import * as path from "path";
 import SFTPClient from "ssh2-sftp-client";
@@ -75,7 +76,7 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
       const content = Buffer.concat(chunks);
 
       try {
-        return await parseFile(content, 'AUTO');
+        return await parseFile(content, SupportedFileType.AUTO);
       } catch {
         return content.toString('utf8');
       }
@@ -189,7 +190,7 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
       const buffer = await client.get(operation.path) as Buffer;
 
       try {
-        return await parseFile(buffer, 'AUTO');
+        return await parseFile(buffer, SupportedFileType.AUTO);
       } catch {
         return buffer.toString('utf8');
       }

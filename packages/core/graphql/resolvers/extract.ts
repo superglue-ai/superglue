@@ -1,4 +1,5 @@
 import { ExtractInputRequest, RequestOptions } from "@superglue/client";
+import { SupportedFileType } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { parseFile } from "../../files/index.js";
 import { logMessage } from "../../utils/logs.js";
@@ -44,7 +45,7 @@ export const extractResolver = async (
     }
     const buffer = Buffer.concat(chunks);
 
-    const data = await parseFile(buffer, 'AUTO');
+    const data = await parseFile(buffer, SupportedFileType.AUTO);
 
     return {
       id: callId,

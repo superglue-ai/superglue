@@ -7,10 +7,11 @@ import { FileChip } from '@/src/components/ui/FileChip';
 import { Input } from '@/src/components/ui/input';
 import { useToast } from '@/src/hooks/use-toast';
 import { ExtendedSuperglueClient } from '@/src/lib/extended-superglue-client';
-import { ALLOWED_EXTENSIONS, formatBytes, MAX_TOTAL_FILE_SIZE_DOCUMENTATION, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { formatBytes, MAX_TOTAL_FILE_SIZE_DOCUMENTATION, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { ALLOWED_FILE_EXTENSIONS } from '@superglue/shared';
 import { cn } from '@/src/lib/general-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
-import { FileQuestion, FileText, Link } from 'lucide-react';
+import { FileQuestion, FileText, Link, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface DocumentationFieldProps {
@@ -39,6 +40,7 @@ export function DocumentationField({
   const [localUrl, setLocalUrl] = useState(url)
   const [docFile, setDocFile] = useState<UploadedFileInfo | null>(null)
   const [urlError, setUrlError] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const { toast } = useToast()
   const superglueConfig = useConfig()
 
@@ -94,6 +96,7 @@ export function DocumentationField({
       status: 'processing'
     }
     setDocFile(fileInfo)
+    setIsUploading(true)
 
     try {
       const data = await processAndExtractFile(file, client)
@@ -110,6 +113,8 @@ export function DocumentationField({
         description: error.message,
         variant: 'destructive'
       })
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -190,8 +195,16 @@ export function DocumentationField({
             size="sm"
             className="shrink-0"
             onClick={() => document.getElementById('doc-file-upload')?.click()}
+            disabled={isUploading}
           >
-            Upload
+            {isUploading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              'Upload'
+            )}
           </Button>
         </div>
       )}
@@ -201,7 +214,7 @@ export function DocumentationField({
         id="doc-file-upload"
         hidden
         onChange={handleDocFileUpload}
-        accept={ALLOWED_EXTENSIONS.join(',')}
+        accept={ALLOWED_FILE_EXTENSIONS.join(',')}
       />
 
       {urlError && !hasUploadedFile && (

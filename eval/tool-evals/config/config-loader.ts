@@ -3,7 +3,7 @@ import { access, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { parseFile } from "../../../packages/core/utils/file.js";
+import { parseFile } from "../../../packages/core/files/index.js";
 import type { AgentEvalConfig } from "../types.js";
 
 const IntegrationConfigSchema = z.object({
