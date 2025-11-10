@@ -9,8 +9,9 @@ import { useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { ToolBuilder, type BuildContext } from './ToolBuilder';
 import ToolPlayground, { ToolPlaygroundHandle } from './ToolPlayground';
+import { ToolDeployModal } from './deploy/ToolDeployModal';
 
-type ToolCreateStep = 'build' | 'run' | 'save';
+type ToolCreateStep = 'build' | 'run';
 type ToolBuilderView = 'integrations' | 'instructions';
 
 interface ToolCreateStepperProps {
@@ -26,7 +27,6 @@ export function ToolCreateStepper({
 }: ToolCreateStepperProps) {
   const [step, setStep] = useState<ToolCreateStep>('build');
   const [isSaving, setIsSaving] = useState(false);
-  const [isExecuting, setIsExecuting] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [shouldStopExecution, setShouldStopExecution] = useState(false);
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(true);
@@ -42,6 +42,9 @@ export function ToolCreateStepper({
   const [buildContext, setBuildContext] = useState<BuildContext | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
   const [filePayloads, setFilePayloads] = useState<Record<string, any>>({});
+  const [toolPayload, setToolPayload] = useState<Record<string, any>>({});
+  const [showDeployModal, setShowDeployModal] = useState(false);
+  const [hasDeployModalBeenShown, setHasDeployModalBeenShown] = useState(false);
 
   const handleToolBuilt = (tool: Tool, context: BuildContext) => {
     setCurrentTool(tool);
@@ -56,7 +59,7 @@ export function ToolCreateStepper({
     setFilePayloads(payloads);
   };
 
-  const handleSaveTool = async (tool: Tool) => {
+  const handleSaveTool = async (tool: Tool, payload: Record<string, any>) => {
     try {
       setIsSaving(true);
       const currentToolState = playgroundRef.current?.getCurrentTool();
@@ -72,7 +75,12 @@ export function ToolCreateStepper({
       });
 
       setCurrentTool(saved);
-      setStep('save');
+      setToolPayload(payload);
+
+      if(!hasDeployModalBeenShown) {
+        setHasDeployModalBeenShown(true);
+        setShowDeployModal(true);
+      }
     } catch (e: any) {
       toast({
         title: 'Error saving tool',
@@ -82,18 +90,6 @@ export function ToolCreateStepper({
       throw e;
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleExecuteTool = async () => {
-    try {
-      setIsExecuting(true);
-      setShouldStopExecution(false);
-      setIsStopping(false);
-      await playgroundRef.current?.executeTool({ selfHealing: selfHealingEnabled });
-    } finally {
-      setIsExecuting(false);
-      setIsStopping(false);
     }
   };
 
@@ -114,30 +110,29 @@ export function ToolCreateStepper({
     }
   };
 
-  const handleSuccessPageAction = (action: 'view-tool' | 'view-all') => {
-    if (action === 'view-tool' && currentTool) {
-      router.push(`/tools/${currentTool.id}`);
-    } else {
-      router.push('/');
-    }
-  };
-
   return (
     <div className="flex-1 flex flex-col h-full p-6">
       <div className="flex-none mb-4">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold">
-            {step === 'save' ? 'Tool Created!' : 'Create New Tool'}
+            Create New Tool
           </h1>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
-              onClick={() => window.open('https://cal.com/superglue/onboarding', '_blank')}
+              onClick={() =>
+                window.open("https://cal.com/superglue/onboarding", "_blank")
+              }
             >
               ✨ Get help from our team
             </Button>
-            <Button variant="ghost" size="icon" className="shrink-0" onClick={handleClose}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={handleClose}
+            >
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -145,8 +140,11 @@ export function ToolCreateStepper({
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="overflow-y-auto px-1 min-h-0" style={{ scrollbarGutter: 'stable' }}>
-          {step === 'build' && (
+        <div
+          className="overflow-y-auto px-1 min-h-0"
+          style={{ scrollbarGutter: "stable" }}
+        >
+          {step === "build" && (
             <ToolBuilder
               initialView={initialView}
               initialIntegrationIds={initialIntegrationIds}
@@ -155,7 +153,7 @@ export function ToolCreateStepper({
             />
           )}
 
-          {step === 'run' && currentTool && buildContext && (
+          {step === "run" && currentTool && buildContext && (
             <div className="w-full">
               <ToolPlayground
                 ref={playgroundRef}
@@ -165,7 +163,7 @@ export function ToolCreateStepper({
                 initialInstruction={buildContext.instruction}
                 integrations={integrations}
                 onSave={handleSaveTool}
-                onInstructionEdit={() => setStep('build')}
+                onInstructionEdit={() => setStep("build")}
                 selfHealingEnabled={selfHealingEnabled}
                 onSelfHealingChange={setSelfHealingEnabled}
                 shouldStopExecution={shouldStopExecution}
@@ -174,18 +172,11 @@ export function ToolCreateStepper({
                 filePayloads={filePayloads}
                 onFilesChange={handleFilesChange}
               />
-            </div>
-          )}
-
-          {step === 'save' && currentTool && (
-            <div className="w-full">
-              <ToolPlayground
-                embedded={true}
-                initialTool={currentTool}
-                integrations={integrations}
-                showSuccessPage={true}
-                onSuccessPageAction={handleSuccessPageAction}
-                readOnly={true}
+              <ToolDeployModal
+                currentTool={currentTool}
+                payload={toolPayload}
+                isOpen={showDeployModal}
+                onClose={() => setShowDeployModal(false)}
               />
             </div>
           )}

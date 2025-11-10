@@ -32,7 +32,7 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 
-import ToolSchedulesList from '@/src/components/tools/ToolSchedulesList';
+import ToolSchedulesList from '@/src/components/tools/schedule/ToolSchedulesList';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { loadFromCache, saveToCache } from '@/src/lib/cache-utils';
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
@@ -277,7 +277,10 @@ const ConfigTable = () => {
   if (showToolStepper) {
     return (
       <div className="max-w-none w-full min-h-full">
-        <ToolCreateStepper onComplete={() => setShowToolStepper(false)} />
+        <ToolCreateStepper onComplete={() => {
+          setShowToolStepper(false);
+          refreshConfigs();
+        }} />
       </div>
     )
   }

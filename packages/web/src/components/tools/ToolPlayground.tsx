@@ -27,7 +27,7 @@ import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
-import { ToolCreateSuccess } from "./ToolCreateSuccess";
+import { ToolDeployModal } from "./deploy/ToolDeployModal";
 import { ToolStepGallery } from "./ToolStepGallery";
 
 export interface ToolPlaygroundProps {
@@ -37,7 +37,7 @@ export interface ToolPlaygroundProps {
   initialPayload?: string;
   initialInstruction?: string;
   integrations?: Integration[];
-  onSave?: (tool: Tool) => Promise<void>;
+  onSave?: (tool: Tool, payload: Record<string, any>) => Promise<void>;
   onExecute?: (tool: Tool, result: ToolResult) => void;
   onInstructionEdit?: () => void;
   headerActions?: React.ReactNode;
@@ -55,8 +55,6 @@ export interface ToolPlaygroundProps {
   filePayloads?: Record<string, any>;
   onFilesChange?: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
   saveButtonText?: string;
-  showSuccessPage?: boolean;
-  onSuccessPageAction?: (action: 'view-tool' | 'view-all') => void;
   hideRebuildButton?: boolean;
 }
 
@@ -91,8 +89,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   filePayloads: parentFilePayloads,
   onFilesChange: parentOnFilesChange,
   saveButtonText = "Save",
-  showSuccessPage = false,
-  onSuccessPageAction,
   hideRebuildButton = false
 }, ref) => {
   const router = useRouter();
@@ -642,7 +638,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
       // In embedded mode, use the provided onSave callback
       if (embedded && onSave) {
-        await onSave(toolToSave);
+        await onSave(toolToSave, computedPayload);
       } else {
         // In standalone mode, save to backend
         const client = createSuperglueClient(config.superglueEndpoint);
@@ -1139,47 +1135,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       </div>
     );
   }
-
-  if (showSuccessPage) {
-    const currentTool = {
-      id: toolId,
-      steps: steps.map((step: ExecutionStep) => ({
-        ...step,
-        apiConfig: {
-          id: step.apiConfig.id || step.id,
-          ...step.apiConfig,
-          pagination: step.apiConfig.pagination || null
-        }
-      })),
-      responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
-      inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
-      finalTransform,
-      instruction: instructions
-    };
-
-    const credentials = integrations.reduce((acc, sys: any) => {
-      return {
-        ...acc,
-        ...Object.entries(sys.credentials || {}).reduce(
-          (obj, [name, value]) => ({ ...obj, [`${sys.id}_${name}`]: value }),
-          {}
-        ),
-      };
-    }, {});
-
-    return (
-      <div className="flex-1 flex flex-col h-full p-6">
-        <ToolCreateSuccess
-          currentTool={currentTool}
-          credentials={credentials}
-          payload={computedPayload}
-          onViewTool={onSuccessPageAction ? () => onSuccessPageAction('view-tool') : () => router.push(`/tools/${currentTool.id}`)}
-          onViewAllTools={onSuccessPageAction ? () => onSuccessPageAction('view-all') : () => router.push('/')}
-        />
-      </div>
-    );
-  }
-
+  
   return (
     <div className={embedded ? "w-full h-full" : "pt-2 px-6 pb-6 max-w-none w-full h-screen flex flex-col"}>
       {!embedded && !hideHeader && (
