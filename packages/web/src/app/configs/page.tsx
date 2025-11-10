@@ -277,7 +277,10 @@ const ConfigTable = () => {
   if (showToolStepper) {
     return (
       <div className="max-w-none w-full min-h-full">
-        <ToolCreateStepper onComplete={() => setShowToolStepper(false)} />
+        <ToolCreateStepper onComplete={() => {
+          setShowToolStepper(false);
+          refreshConfigs();
+        }} />
       </div>
     )
   }
