@@ -16,11 +16,12 @@ import {
 import {
   Code2,
   Download,
-  FileJson,
+  FileBraces,
+  FileBracesCorner,
+  FileInput,
+  FilePlay,
   Loader2,
-  Package,
   Play,
-  Settings,
   Wand2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -175,14 +176,22 @@ export const FinalTransformMiniStepCard = ({
       const validTransform = ensureValidTransform(localTransform);
       if (onTransformChange) onTransformChange(localTransform);
       if (onResponseSchemaChange) onResponseSchemaChange(localSchema);
-      if (onExecuteTransform) onExecuteTransform(localSchema, validTransform);
+      if (onExecuteTransform) {
+        onExecuteTransform(localSchema, validTransform);
+        // Auto-navigate to output tab when transform starts
+        setActiveTab("output");
+      }
     }
 
     function handleFixTransform(): void {
       const validTransform = ensureValidTransform(localTransform);
       if (onTransformChange) onTransformChange(localTransform);
       if (onResponseSchemaChange) onResponseSchemaChange(localSchema);
-      if (onFixTransform) onFixTransform(localSchema, validTransform);
+      if (onFixTransform) {
+        onFixTransform(localSchema, validTransform);
+        // Auto-navigate to output tab when transform starts
+        setActiveTab("output");
+      }
     }
     
     return (
@@ -190,7 +199,7 @@ export const FinalTransformMiniStepCard = ({
         <div className="p-3">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-muted-foreground" />
+              <FilePlay className="h-4 w-4 text-muted-foreground" />
               <h3 className="text-lg font-semibold">Tool Result</h3>
             </div>
             <div className="flex items-center gap-2">
@@ -261,7 +270,7 @@ export const FinalTransformMiniStepCard = ({
                 value="inputs"
                 className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
               >
-                <FileJson className="h-4 w-4" /> Step Inputs
+                <FileInput className="h-4 w-4" /> Step Inputs
               </TabsTrigger>
               <TabsTrigger
                 value="transform"
@@ -273,17 +282,20 @@ export const FinalTransformMiniStepCard = ({
                 value="schema"
                 className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
               >
-                <Settings className="h-4 w-4" /> Result Schema
+                <FileBracesCorner className="h-4 w-4" /> Result Schema
               </TabsTrigger>
-              {hasTransformCompleted && (
-                <TabsTrigger
-                  value="output"
-                  className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
-                  style={{ backgroundColor: "#FFA500", color: "#000" }}
-                >
-                  <Package className="h-4 w-4" /> Tool Result
-                </TabsTrigger>
-              )}
+              <TabsTrigger
+                value="output"
+                className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
+                style={hasTransformCompleted && activeTab === "output" ? { backgroundColor: "#FFA500", color: "#000" } : undefined}
+              >
+                {(isRunningTransform || isFixingTransform) ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FilePlay className="h-4 w-4" />
+                )}
+                Tool Result
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="inputs" className="mt-2">
               {!canExecute ? (
@@ -373,18 +385,27 @@ export const FinalTransformMiniStepCard = ({
                 />
               </div>
             </TabsContent>
-            {hasTransformCompleted && (
-              <TabsContent value="output" className="mt-2">
-                <>
-                  {transformResult === undefined ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border rounded-lg">
-                      <Package className="h-8 w-8 mb-2 opacity-50" />
-                      <p className="text-sm">No result yet</p>
-                      <p className="text-xs mt-1">
-                        Run the tool or test the transform to see results
-                      </p>
-                    </div>
-                  ) : (
+            <TabsContent value="output" className="mt-2">
+              <>
+                {(isRunningTransform || isFixingTransform) ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border rounded-lg">
+                    <Loader2 className="h-8 w-8 mb-2 animate-spin" />
+                    <p className="text-sm">
+                      {isFixingTransform ? "Fixing transform..." : "Running transform..."}
+                    </p>
+                    <p className="text-xs mt-1">
+                      Please wait while the transform executes
+                    </p>
+                  </div>
+                ) : transformResult === undefined ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border rounded-lg">
+                    <FilePlay className="h-8 w-8 mb-2 opacity-50" />
+                    <p className="text-sm">No result yet</p>
+                    <p className="text-xs mt-1">
+                      Run the tool or test the transform to see results
+                    </p>
+                  </div>
+                ) : (
                     <>
                       <JsonCodeEditor
                         value={outputData.displayString}
@@ -455,7 +476,6 @@ export const FinalTransformMiniStepCard = ({
                   )}
                 </>
               </TabsContent>
-            )}
           </Tabs>
         </div>
       </Card>

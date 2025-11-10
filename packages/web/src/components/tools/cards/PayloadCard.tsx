@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/ta
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE_TOOLS, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { ALLOWED_FILE_EXTENSIONS } from '@superglue/shared';
-import { Code2, FileJson, Upload } from 'lucide-react';
+import { Code2, FileJson, Upload, FileBraces, FileBracesCorner } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
 
@@ -132,12 +132,12 @@ export const PayloadSpotlight = ({
                     </TabsTrigger>
                     {isPayloadValid && (
                         <TabsTrigger value="schema" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
-                            <Code2 className="h-4 w-4" /> Input Schema
+                            <FileBracesCorner className="h-4 w-4" /> Input Schema
                         </TabsTrigger>
                     )}
                     {!isPayloadValid && (
                         <TabsTrigger value="schema" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
-                            <Code2 color="#FFA500" className="h-4 w-4" /> Input Schema
+                            <FileBraces color="#FFA500" className="h-4 w-4" /> Input Schema
                         </TabsTrigger>
                     )}
                 </TabsList>
