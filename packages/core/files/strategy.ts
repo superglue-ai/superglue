@@ -1,23 +1,16 @@
 import { SupportedFileType } from '@superglue/shared';
 
-/**
- * Detection priority levels for file parsing strategies
- * Strategies are tested from lowest to highest priority number
- */
 export enum DetectionPriority {
-    /** Binary formats with magic numbers (PDF, Excel, DOCX, ZIP) - tested FIRST */
+    /** Binary formats with magic numbers (PDF, Excel, DOCX, ZIP) - tested first (with priority within formats unimportant) */
     BINARY_SIGNATURE = 1,
-    /** Text formats with clear structure (JSON, XML) - tested SECOND */
+    /** Text formats with clear structure (JSON, XML) - tested second */
     STRUCTURED_TEXT = 2,
-    /** Text formats with heuristic detection (CSV) - tested THIRD */
+    /** Text formats with heuristic detection (CSV) - tested third */
     HEURISTIC_TEXT = 3,
-    /** Fallback to raw string - tested LAST */
+    /** Fallback to raw string */
     FALLBACK = 99
 }
 
-/**
- * Base interface for file detection and parsing strategies.
- */
 export interface FileParsingStrategy {
     /**
      * The file type this strategy handles
@@ -50,27 +43,16 @@ export interface FileParsingStrategy {
 export class FileStrategyRegistry {
     private strategies: FileParsingStrategy[] = [];
 
-    /**
-     * Register a new parsing strategy
-     */
     register(strategy: FileParsingStrategy): void {
         this.strategies.push(strategy);
         // Sort by priority (lower number = higher priority)
         this.strategies.sort((a, b) => a.priority - b.priority);
     }
 
-    /**
-     * Get all registered strategies in priority order
-     */
     getStrategies(): FileParsingStrategy[] {
         return [...this.strategies];
     }
 
-    /**
-     * Detect and parse a buffer using the first matching strategy
-     * @param buffer The file buffer to detect and parse
-     * @returns Object containing the detected file type and parsed data
-     */
     async detectAndParse(buffer: Buffer): Promise<{ fileType: SupportedFileType; data: any }> {
         if (!buffer || buffer.length === 0) {
             return { fileType: SupportedFileType.RAW, data: null };
