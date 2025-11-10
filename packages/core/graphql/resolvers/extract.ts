@@ -1,22 +1,33 @@
-import { DecompressionMethod, ExtractConfig, ExtractInputRequest, FileType, RequestOptions } from "@superglue/client";
+import {
+  DecompressionMethod,
+  ExtractConfig,
+  ExtractInputRequest,
+  FileType,
+  RequestOptions,
+} from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
 import { decompressData, parseFile } from "../../utils/file.js";
 import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { Context, Metadata } from '../types.js';
+import { Context, Metadata } from "../types.js";
 
 export const extractResolver = async (
   _: any,
-  { input, payload, credentials, options }: {
+  {
+    input,
+    payload,
+    credentials,
+    options,
+  }: {
     input: ExtractInputRequest;
     payload: any;
     credentials: Record<string, string>;
     options: RequestOptions;
   },
   context: Context,
-  info: GraphQLResolveInfo
+  info: GraphQLResolveInfo,
 ) => {
   const callId = crypto.randomUUID();
   const startedAt = new Date();
@@ -28,11 +39,11 @@ export const extractResolver = async (
     let lastError: string | null = null;
     const metadata: Metadata = {
       runId: input.id || callId,
-      orgId: context.orgId
+      orgId: context.orgId,
     };
     do {
       if (input.file) {
-        const { createReadStream, filename } = await input.file as any;
+        const { createReadStream, filename } = (await input.file) as any;
         const stream = createReadStream();
         const chunks: Buffer[] = [];
         for await (const chunk of stream) {
@@ -44,11 +55,11 @@ export const extractResolver = async (
           urlHost: filename,
           instruction: "extract from file",
           decompressionMethod: DecompressionMethod.AUTO,
-          fileType: FileType.AUTO
+          fileType: FileType.AUTO,
         };
         response = await processFile(buffer, preparedExtract);
       } else {
-        logMessage('error', "Extract call failed. No file provided", metadata);
+        logMessage("error", "Extract call failed. No file provided", metadata);
         return {
           id: callId,
           success: false,
@@ -56,18 +67,30 @@ export const extractResolver = async (
           config: preparedExtract,
           startedAt,
           completedAt: new Date(),
-        }
+        };
       }
       retryCount++;
     } while (!response && retryCount < 5);
 
     if (!response) {
-      logMessage('error', `Extract call failed after ${retryCount} retries. Last error: ${lastError}`, metadata);
-      telemetryClient?.captureException(new Error(`Extract call failed after ${retryCount} retries. Last error: ${maskCredentials(lastError, credentials)}`), context.orgId, {
-        preparedEndpoint: preparedExtract || input.endpoint,
-        retryCount: retryCount,
-      });
-      throw new Error(`Extract call failed after ${retryCount} retries. Last error: ${lastError}`);
+      logMessage(
+        "error",
+        `Extract call failed after ${retryCount} retries. Last error: ${lastError}`,
+        metadata,
+      );
+      telemetryClient?.captureException(
+        new Error(
+          `Extract call failed after ${retryCount} retries. Last error: ${maskCredentials(lastError, credentials)}`,
+        ),
+        context.orgId,
+        {
+          preparedEndpoint: preparedExtract || input.endpoint,
+          retryCount: retryCount,
+        },
+      );
+      throw new Error(
+        `Extract call failed after ${retryCount} retries. Last error: ${lastError}`,
+      );
     }
 
     const completedAt = new Date();
@@ -80,7 +103,6 @@ export const extractResolver = async (
       startedAt,
       completedAt,
     };
-
   } catch (error) {
     const maskedError = maskCredentials(error.message, credentials);
     telemetryClient?.captureException(maskedError, context.orgId, {
@@ -104,9 +126,11 @@ export const extractResolver = async (
   }
 };
 
-
 export async function processFile(data: Buffer, extractConfig: ExtractConfig) {
-  if (extractConfig.decompressionMethod && extractConfig.decompressionMethod != DecompressionMethod.NONE) {
+  if (
+    extractConfig.decompressionMethod &&
+    extractConfig.decompressionMethod != DecompressionMethod.NONE
+  ) {
     data = await decompressData(data, extractConfig.decompressionMethod);
   }
 
@@ -114,7 +138,7 @@ export async function processFile(data: Buffer, extractConfig: ExtractConfig) {
 
   if (extractConfig.dataPath) {
     // Navigate to the specified data path
-    const pathParts = extractConfig.dataPath.split('.');
+    const pathParts = extractConfig.dataPath.split(".");
     for (const part of pathParts) {
       responseJSON = responseJSON[part] || responseJSON;
     }

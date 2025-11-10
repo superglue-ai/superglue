@@ -1,7 +1,11 @@
 import type { Integration } from "@superglue/client";
 import { GENERATE_INSTRUCTIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
-import { BaseToolContext, ToolDefinition, ToolImplementation } from "../execute/tools.js";
+import {
+  BaseToolContext,
+  ToolDefinition,
+  ToolImplementation,
+} from "../execute/tools.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { parseJSON } from "./json-parser.js";
 
@@ -12,37 +16,42 @@ export interface InstructionGenerationContext extends BaseToolContext {
 
 export const generateInstructionsDefinition: ToolDefinition = {
   name: "generate_instructions",
-  description: "Generate specific, implementable workflow instructions for the available integrations.",
+  description:
+    "Generate specific, implementable workflow instructions for the available integrations.",
   arguments: {
     type: "object",
     properties: {},
-    required: []
-  }
+    required: [],
+  },
 };
 
-export const generateInstructionsImplementation: ToolImplementation<InstructionGenerationContext> = async (args, context) => {
+export const generateInstructionsImplementation: ToolImplementation<
+  InstructionGenerationContext
+> = async (args, context) => {
   const { integrations } = context;
 
   if (!integrations || integrations.length === 0) {
     return {
       success: false,
-      error: "No integrations provided in context"
+      error: "No integrations provided in context",
     };
   }
 
   // Prepare integration summaries with smart documentation truncation
-  const integrationSummaries = integrations.map(integration => {
+  const integrationSummaries = integrations.map((integration) => {
     // Use DocumentationSearch to intelligently truncate documentation
     // Focus on getting started, authentication, and basic operations
-    const documentationSearch = new DocumentationSearch({ orgId: context.orgId });
+    const documentationSearch = new DocumentationSearch({
+      orgId: context.orgId,
+    });
     const truncatedDocs = integration.documentation
       ? documentationSearch.extractRelevantSections(
-        integration.documentation,
-        "getting started overview endpoints reference",
-        10,  // max_chunks
-        1000, // chunk_size - smaller chunks for summaries
-        integration.openApiSchema
-      )
+          integration.documentation,
+          "getting started overview endpoints reference",
+          10, // max_chunks
+          1000, // chunk_size - smaller chunks for summaries
+          integration.openApiSchema,
+        )
       : "";
 
     return {
@@ -50,36 +59,40 @@ export const generateInstructionsImplementation: ToolImplementation<InstructionG
       urlHost: integration.urlHost,
       urlPath: integration.urlPath,
       // Take first 500 chars of truncated docs as summary
-      documentation: truncatedDocs.slice(0, 500) + (truncatedDocs.length > 500 ? "..." : ""),
-      documentationUrl: integration.documentationUrl
+      documentation:
+        truncatedDocs.slice(0, 500) + (truncatedDocs.length > 500 ? "..." : ""),
+      documentationUrl: integration.documentationUrl,
     };
   });
 
   const messages: LLMMessage[] = [
     {
       role: "system",
-      content: GENERATE_INSTRUCTIONS_SYSTEM_PROMPT
+      content: GENERATE_INSTRUCTIONS_SYSTEM_PROMPT,
     },
     {
       role: "user",
-      content: `<integrations>${JSON.stringify(integrationSummaries, null, 2)}</integrations>`
-    }
+      content: `<integrations>${JSON.stringify(integrationSummaries, null, 2)}</integrations>`,
+    },
   ];
 
   const schema = {
     type: "array",
-    items: { type: "string" }
+    items: { type: "string" },
   };
 
-  const { response: generatedInstructions, error: generatedInstructionsError } = await LanguageModel.generateObject(messages, schema, 0.2);
+  const { response: generatedInstructions, error: generatedInstructionsError } =
+    await LanguageModel.generateObject(messages, schema, 0.2);
 
   if (generatedInstructionsError || generatedInstructions?.error) {
-    throw new Error(`Error generating instructions: ${generatedInstructionsError || generatedInstructions?.error}`);
+    throw new Error(
+      `Error generating instructions: ${generatedInstructionsError || generatedInstructions?.error}`,
+    );
   }
-  
+
   return {
     success: true,
-    data: sanitizeInstructionSuggestions(generatedInstructions)
+    data: sanitizeInstructionSuggestions(generatedInstructions),
   };
 };
 
@@ -103,11 +116,12 @@ export function sanitizeInstructionSuggestions(raw: unknown): string[] {
 
   // Flatten any multi-line strings
   arr = arr.flatMap((item) =>
-    typeof item === "string" ? item.split(/\r?\n/).map((s) => s.trim()) : []
+    typeof item === "string" ? item.split(/\r?\n/).map((s) => s.trim()) : [],
   );
 
   // Remove empty, header, or markdown lines
-  const headerRegex = /^(\s*[#>*-]+\s*)?((integration suggestions|individual suggestions|example output|example:|output:)[^a-zA-Z0-9]*|[\-*#_]{2,}|\s*)$/i;
+  const headerRegex =
+    /^(\s*[#>*-]+\s*)?((integration suggestions|individual suggestions|example output|example:|output:)[^a-zA-Z0-9]*|[\-*#_]{2,}|\s*)$/i;
 
   // Remove lines that are just markdown separators or bullets
   const isSeparator = (line: string) => {
@@ -127,7 +141,7 @@ export function sanitizeInstructionSuggestions(raw: unknown): string[] {
         .replace(/^[-*#>\s]+/, "") // Remove leading markdown symbols and whitespace
         .replace(/[-*#>\s]+$/, "") // Remove trailing markdown symbols and whitespace
         .replace(/^"|"$/g, "") // Remove leading/trailing quotes
-        .trim()
+        .trim(),
     )
     .filter(
       (s) =>
@@ -135,7 +149,7 @@ export function sanitizeInstructionSuggestions(raw: unknown): string[] {
         !headerRegex.test(s) &&
         !isSeparator(s) &&
         !seen.has(s) &&
-        seen.add(s)
+        seen.add(s),
     );
 
   return filtered;

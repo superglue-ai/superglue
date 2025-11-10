@@ -1,12 +1,28 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
-import { getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
-import { AssistantModelMessage, TextPart, ToolCallPart, ToolResultPart, generateText, jsonSchema, tool } from "ai";
+import {
+  getModelContextLength,
+  initializeAIModel,
+} from "@superglue/shared/utils";
+import {
+  AssistantModelMessage,
+  TextPart,
+  ToolCallPart,
+  ToolResultPart,
+  generateText,
+  jsonSchema,
+  tool,
+} from "ai";
 import { server_defaults } from "../default.js";
 import { ToolDefinition } from "../execute/tools.js";
 import { logMessage } from "../utils/logs.js";
-import { LLM, LLMMessage, LLMObjectResponse, LLMResponse } from "./language-model.js";
+import {
+  LLM,
+  LLMMessage,
+  LLMObjectResponse,
+  LLMResponse,
+} from "./language-model.js";
 
 export class AiSdkModel implements LLM {
   public contextLength: number;
@@ -14,10 +30,10 @@ export class AiSdkModel implements LLM {
   private modelId: string;
 
   constructor(modelId?: string) {
-    this.modelId = modelId || 'claude-sonnet-4-5';
+    this.modelId = modelId || "claude-sonnet-4-5";
     this.model = initializeAIModel({
-      providerEnvVar: 'LLM_PROVIDER',
-      defaultModel: this.modelId
+      providerEnvVar: "LLM_PROVIDER",
+      defaultModel: this.modelId,
     });
     this.contextLength = getModelContextLength(this.modelId);
   }
@@ -25,43 +41,45 @@ export class AiSdkModel implements LLM {
   private getDateMessage(): LLMMessage {
     return {
       role: "system" as const,
-      content: "The current date and time is " + new Date().toISOString()
+      content: "The current date and time is " + new Date().toISOString(),
     } as LLMMessage;
   }
 
   private buildTools(
     schemaObj: any,
     customTools?: ToolDefinition[],
-    toolContext?: any
+    toolContext?: any,
   ): Record<string, any> {
     const tools: Record<string, any> = {
       submit: tool({
-        description: "Submit the final result in the required format. Submit the result even if it's an error and keep submitting until we stop. Keep non-function messages short and concise because they are only for debugging.",
+        description:
+          "Submit the final result in the required format. Submit the result even if it's an error and keep submitting until we stop. Keep non-function messages short and concise because they are only for debugging.",
         inputSchema: schemaObj,
       }),
       abort: tool({
-        description: "There is absolutely no way given the input to complete the request successfully, abort the request",
+        description:
+          "There is absolutely no way given the input to complete the request successfully, abort the request",
         inputSchema: jsonSchema({
           type: "object",
           properties: {
-            reason: { type: "string", description: "The reason for aborting" }
+            reason: { type: "string", description: "The reason for aborting" },
           },
-          required: ["reason"]
+          required: ["reason"],
         }),
       }),
     };
 
     const provider = process.env.LLM_PROVIDER?.toLowerCase();
     switch (provider) {
-      case 'openai':
+      case "openai":
         tools["web_search"] = openai.tools.webSearch();
         break;
-      case 'anthropic':
+      case "anthropic":
         tools["web_search"] = anthropic.tools.webSearch_20250305({
           maxUses: 5,
         });
         break;
-      case 'gemini':
+      case "gemini":
         tools["web_search"] = google.tools.googleSearch({});
         break;
       default:
@@ -73,9 +91,11 @@ export class AiSdkModel implements LLM {
         tools[customTool.name] = tool({
           description: customTool.description,
           inputSchema: jsonSchema(customTool.arguments),
-          execute: customTool.execute ? async (args) => {
-            return await customTool.execute!(args, toolContext);
-          } : undefined,
+          execute: customTool.execute
+            ? async (args) => {
+                return await customTool.execute!(args, toolContext);
+              }
+            : undefined,
         });
       }
     }
@@ -84,12 +104,12 @@ export class AiSdkModel implements LLM {
   }
 
   private cleanSchema(schema: any, isRoot: boolean = true): any {
-    if (!schema || typeof schema !== 'object') return schema;
+    if (!schema || typeof schema !== "object") return schema;
 
     const cleaned = { ...schema };
 
     // Normalize object/array schemas
-    if (cleaned.type === 'object' || cleaned.type === 'array') {
+    if (cleaned.type === "object" || cleaned.type === "array") {
       cleaned.additionalProperties = false;
       cleaned.strict = true;
 
@@ -97,7 +117,10 @@ export class AiSdkModel implements LLM {
 
       if (cleaned.properties) {
         for (const key in cleaned.properties) {
-          cleaned.properties[key] = this.cleanSchema(cleaned.properties[key], false);
+          cleaned.properties[key] = this.cleanSchema(
+            cleaned.properties[key],
+            false,
+          );
         }
       }
 
@@ -110,14 +133,14 @@ export class AiSdkModel implements LLM {
 
     // Anthropic tool input must be an object at the root. If the root
     // schema is an array, wrap it into an object under `result`.
-    if (isRoot && cleaned.type === 'array') {
+    if (isRoot && cleaned.type === "array") {
       const arraySchema = this.cleanSchema(cleaned, false);
       return {
-        type: 'object',
+        type: "object",
         properties: {
           result: arraySchema,
         },
-        required: ['result'],
+        required: ["result"],
         additionalProperties: false,
         strict: true,
       };
@@ -126,7 +149,10 @@ export class AiSdkModel implements LLM {
     return cleaned;
   }
 
-  async generateText(messages: LLMMessage[], temperature: number = 0): Promise<LLMResponse> {
+  async generateText(
+    messages: LLMMessage[],
+    temperature: number = 0,
+  ): Promise<LLMResponse> {
     const dateMessage = this.getDateMessage();
     messages = [dateMessage, ...messages] as LLMMessage[];
 
@@ -137,14 +163,17 @@ export class AiSdkModel implements LLM {
       maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
     });
 
-    const updatedMessages = [...messages, {
-      role: "assistant" as const,
-      content: result.text
-    } as LLMMessage];
+    const updatedMessages = [
+      ...messages,
+      {
+        role: "assistant" as const,
+        content: result.text,
+      } as LLMMessage,
+    ];
 
     return {
       response: result.text,
-      messages: updatedMessages
+      messages: updatedMessages,
     };
   }
 
@@ -161,51 +190,65 @@ export class AiSdkModel implements LLM {
     temperature: number = 0,
     customTools?: ToolDefinition[],
     toolContext?: any,
-    toolChoice?: 'auto' | 'required' | 'none' | { type: 'tool'; toolName: string }
+    toolChoice?:
+      | "auto"
+      | "required"
+      | "none"
+      | { type: "tool"; toolName: string },
   ): Promise<LLMObjectResponse> {
     const dateMessage = this.getDateMessage();
-    
+
     // Clean schema: remove patternProperties, minItems/maxItems, set strict/additionalProperties
     schema = this.cleanSchema(schema);
 
     // Handle O-model temperature
     let temperatureToUse: number | undefined = temperature;
-    if (this.modelId.startsWith('o')) {
+    if (this.modelId.startsWith("o")) {
       temperatureToUse = undefined;
     }
 
     const schemaObj = jsonSchema(schema);
     const tools = this.buildTools(schemaObj, customTools, toolContext);
 
-    let conversationMessages: LLMMessage[] = String(messages[0]?.content)?.startsWith("The current date and time is")
+    let conversationMessages: LLMMessage[] = String(
+      messages[0]?.content,
+    )?.startsWith("The current date and time is")
       ? messages
       : [dateMessage, ...messages];
 
     try {
       let finalResult: any = null;
       while (finalResult === null) {
-
         const result = await generateText({
           model: this.model,
           messages: conversationMessages,
           tools,
-          toolChoice: toolChoice || 'required',
+          toolChoice: toolChoice || "required",
           temperature: temperatureToUse,
           maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
         });
 
-        if(result.finishReason === 'error' || result.finishReason === 'content-filter' || result.finishReason === 'other') {
-          throw new Error("Error generating LLM response: " + JSON.stringify(result.content || "no content"));
+        if (
+          result.finishReason === "error" ||
+          result.finishReason === "content-filter" ||
+          result.finishReason === "other"
+        ) {
+          throw new Error(
+            "Error generating LLM response: " +
+              JSON.stringify(result.content || "no content"),
+          );
         }
 
         // Check for submit/abort in tool calls
         for (const toolCall of result.toolCalls) {
-          if (toolCall.toolName === 'submit') {
+          if (toolCall.toolName === "submit") {
             finalResult = (toolCall.input as any)?.result ?? toolCall.input;
             break;
           }
-          if (toolCall.toolName === 'abort') {
-            finalResult = { error: (toolCall.input as any)?.reason || "Unknown error" };
+          if (toolCall.toolName === "abort") {
+            finalResult = {
+              error: (toolCall.input as any)?.reason || "Unknown error",
+            };
             break;
           }
         }
@@ -220,31 +263,48 @@ export class AiSdkModel implements LLM {
         for (const toolCall of result.toolCalls) {
           // if we can find the tool id in the toolResults
           conversationMessages.push({
-            role: 'assistant', content: [{
-              type: 'tool-call',
-              toolCallId: toolCall.toolCallId,
-              toolName: toolCall.toolName,
-              input: toolCall.input ?? {}
-            } as ToolCallPart]
+            role: "assistant",
+            content: [
+              {
+                type: "tool-call",
+                toolCallId: toolCall.toolCallId,
+                toolName: toolCall.toolName,
+                input: toolCall.input ?? {},
+              } as ToolCallPart,
+            ],
           } as AssistantModelMessage);
-          const toolResult = result.toolResults.find(tr => tr.toolCallId === toolCall.toolCallId);
+          const toolResult = result.toolResults.find(
+            (tr) => tr.toolCallId === toolCall.toolCallId,
+          );
           if (toolResult) {
             conversationMessages.push({
-              role: 'tool', content: [{
-                type: 'tool-result',
-                toolCallId: toolResult.toolCallId,
-                toolName: toolResult.toolName,
-                output: { "type": "text", "value": toolResult.output?.toString() ?? "" }
-              } as ToolResultPart]
+              role: "tool",
+              content: [
+                {
+                  type: "tool-result",
+                  toolCallId: toolResult.toolCallId,
+                  toolName: toolResult.toolName,
+                  output: {
+                    type: "text",
+                    value: toolResult.output?.toString() ?? "",
+                  },
+                } as ToolResultPart,
+              ],
             });
           } else {
             conversationMessages.push({
-              role: 'tool', content: [{
-                type: 'tool-result',
-                toolCallId: toolCall.toolCallId,
-                toolName: toolCall.toolName,
-                output: { "type": "text", "value": "Tool did not output anything" }
-              } as ToolResultPart]
+              role: "tool",
+              content: [
+                {
+                  type: "tool-result",
+                  toolCallId: toolCall.toolCallId,
+                  toolName: toolCall.toolName,
+                  output: {
+                    type: "text",
+                    value: "Tool did not output anything",
+                  },
+                } as ToolResultPart,
+              ],
             });
           }
         }
@@ -254,27 +314,34 @@ export class AiSdkModel implements LLM {
         }
       }
 
-      const updatedMessages = [...conversationMessages, {
-        role: "assistant" as const,
-        content: JSON.stringify(finalResult)
-      }];
+      const updatedMessages = [
+        ...conversationMessages,
+        {
+          role: "assistant" as const,
+          content: JSON.stringify(finalResult),
+        },
+      ];
 
       return {
         response: finalResult,
-        messages: updatedMessages
+        messages: updatedMessages,
       };
     } catch (error) {
-      logMessage('error', `Error generating LLM response: ${error}`, { orgId: 'ai-sdk' });
-      const updatedMessages = [...messages, {
-        role: "assistant" as const,
-        content: "Error: Vercel AI API Error: " + (error as any)?.message
-      } as LLMMessage];
+      logMessage("error", `Error generating LLM response: ${error}`, {
+        orgId: "ai-sdk",
+      });
+      const updatedMessages = [
+        ...messages,
+        {
+          role: "assistant" as const,
+          content: "Error: Vercel AI API Error: " + (error as any)?.message,
+        } as LLMMessage,
+      ];
 
       return {
         response: "Error: Vercel AI API Error: " + error.message,
-        messages: updatedMessages
+        messages: updatedMessages,
       };
     }
   }
 }
-

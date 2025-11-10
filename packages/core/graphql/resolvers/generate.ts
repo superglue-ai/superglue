@@ -6,17 +6,17 @@ import { parseJSON } from "../../utils/json-parser.js";
 import { generateSchema } from "../../utils/schema.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { getSchemaFromData } from "../../utils/tools.js";
-import { Context, Metadata } from '../types.js';
+import { Context, Metadata } from "../types.js";
 
 export const generateSchemaResolver = async (
   _: any,
-  { instruction, responseData }: { instruction: string; responseData?: string; },
+  { instruction, responseData }: { instruction: string; responseData?: string },
   context: Context,
-  info: GraphQLResolveInfo
+  info: GraphQLResolveInfo,
 ) => {
   const metadata: Metadata = {
     runId: crypto.randomUUID(),
-    orgId: context.orgId
+    orgId: context.orgId,
   };
   if (!instruction) {
     throw new Error("Instruction is required");
@@ -27,7 +27,7 @@ export const generateSchemaResolver = async (
     } catch (error) {
       telemetryClient?.captureException(error, context.orgId, {
         instruction: instruction,
-        responseData: String(responseData)
+        responseData: String(responseData),
       });
       responseData = String(responseData).slice(0, 1000);
     }
@@ -41,20 +41,20 @@ export const generateInstructionsResolver = async (
   _: any,
   { integrations }: { integrations: Integration[] },
   context: Context,
-  info: GraphQLResolveInfo
+  info: GraphQLResolveInfo,
 ) => {
   try {
     const toolCall: ToolCall = {
       id: crypto.randomUUID(),
       name: "generate_instructions",
-      arguments: {}  // No arguments needed
+      arguments: {}, // No arguments needed
     };
 
     // Pass integrations through context
     const toolContext: InstructionGenerationContext = {
       orgId: context.orgId,
       runId: crypto.randomUUID(),
-      integrations: integrations
+      integrations: integrations,
     };
 
     const callResult = await executeTool(toolCall, toolContext);
@@ -70,7 +70,7 @@ export const generateInstructionsResolver = async (
     throw new Error("Failed to generate instructions");
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
-      integrations: integrations
+      integrations: integrations,
     });
     throw error;
   }

@@ -1,43 +1,60 @@
-import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions } from "@superglue/client";
+import {
+  ApiConfig,
+  ApiInputRequest,
+  CacheMode,
+  RequestOptions,
+} from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../execute/workflow-executor.js";
 import { maskCredentials } from "../../utils/tools.js";
 import { executeTransform, TransformConfig } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { Context, Metadata } from '../types.js';
-
+import { Context, Metadata } from "../types.js";
 
 export const callResolver = async (
   _: any,
-  { input, payload, credentials, options }: {
+  {
+    input,
+    payload,
+    credentials,
+    options,
+  }: {
     input: ApiInputRequest;
     payload: any;
     credentials?: Record<string, string>;
     options: RequestOptions;
   },
   context: Context,
-  info: GraphQLResolveInfo
+  info: GraphQLResolveInfo,
 ) => {
   const startedAt = new Date();
   const callId = crypto.randomUUID();
   const metadata: Metadata = {
     runId: callId,
-    orgId: context.orgId
+    orgId: context.orgId,
   };
   let endpoint: ApiConfig;
-  const readCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
-  const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : false;
+  const readCache = options?.cacheMode
+    ? options.cacheMode === CacheMode.ENABLED ||
+      options.cacheMode === CacheMode.READONLY
+    : true;
+  const writeCache = options?.cacheMode
+    ? options.cacheMode === CacheMode.ENABLED ||
+      options.cacheMode === CacheMode.WRITEONLY
+    : false;
 
   try {
-
     // Get the endpoint configuration
     if (input.id) {
-      endpoint = await context.datastore.getApiConfig({ id: input.id, orgId: context.orgId });
+      endpoint = await context.datastore.getApiConfig({
+        id: input.id,
+        orgId: context.orgId,
+      });
       if (!endpoint) {
         return {
           success: false,
           data: null,
-          error: `API configuration with id ${input.id} not found`
+          error: `API configuration with id ${input.id} not found`,
         };
       }
     } else {
@@ -46,7 +63,9 @@ export const callResolver = async (
 
     // Check if response schema is zod and throw an error if it is
     if ((endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
-      throw new Error("zod is not supported for response schema. Please use json schema instead. you can use the zod-to-json-schema package to convert zod to json schema.");
+      throw new Error(
+        "zod is not supported for response schema. Please use json schema instead. you can use the zod-to-json-schema package to convert zod to json schema.",
+      );
     }
     const workflowExecutor = new WorkflowExecutor({
       workflow: {
@@ -54,37 +73,39 @@ export const callResolver = async (
         steps: [
           {
             id: callId,
-            apiConfig: endpoint
-          }
-        ]
+            apiConfig: endpoint,
+          },
+        ],
       },
       metadata,
-      integrations: []
+      integrations: [],
     });
     const callResult = await workflowExecutor.execute({
       payload,
       credentials,
-      options
+      options,
     });
     const data = callResult.data;
 
     // Transform response with built-in retry logic
-    const transformResult = await executeTransform(
-      {
-        datastore: context.datastore,
-        fromCache: readCache,
-        input: { endpoint: endpoint as TransformConfig },
-        data: data,
-        metadata: { runId: callId, orgId: context.orgId },
-        options: options
-      }
-    );
+    const transformResult = await executeTransform({
+      datastore: context.datastore,
+      fromCache: readCache,
+      input: { endpoint: endpoint as TransformConfig },
+      data: data,
+      metadata: { runId: callId, orgId: context.orgId },
+      options: options,
+    });
 
     // Save configuration if requested
     const config = { ...endpoint, ...transformResult?.config };
 
     if (writeCache) {
-      context.datastore.upsertApiConfig({ id: input.id || endpoint.id, config, orgId: context.orgId });
+      context.datastore.upsertApiConfig({
+        id: input.id || endpoint.id,
+        config,
+        orgId: context.orgId,
+      });
     }
 
     // Notify webhook if configured
@@ -107,7 +128,13 @@ export const callResolver = async (
     const maskedError = maskCredentials(error.message, credentials);
 
     if (options?.webhookUrl) {
-      notifyWebhook(options.webhookUrl, callId, false, undefined, error.message);
+      notifyWebhook(
+        options.webhookUrl,
+        callId,
+        false,
+        undefined,
+        error.message,
+      );
     }
     const result = {
       id: callId,

@@ -1,6 +1,10 @@
 import type { DataStore } from "@superglue/shared";
 import { beforeEach, describe, expect, it } from "vitest";
-import { DataStoreFactory, EnvVarManager, MockServerFactory } from "./test-utils.js";
+import {
+  DataStoreFactory,
+  EnvVarManager,
+  MockServerFactory,
+} from "./test-utils.js";
 
 describe("Tenant Info Basic Tests", () => {
   // Create data store factory
@@ -110,7 +114,11 @@ describe("Tenant Info Basic Tests", () => {
       await datastore.setTenantInfo(testEmail, true);
 
       // Create a mock resolver that mimics the actual getTenantInfoResolver
-      const mockGetTenantInfoResolver = async (_: any, __: any, { datastore }: { datastore: DataStore }) => {
+      const mockGetTenantInfoResolver = async (
+        _: any,
+        __: any,
+        { datastore }: { datastore: DataStore },
+      ) => {
         return await datastore.getTenantInfo();
       };
 
@@ -125,7 +133,10 @@ describe("Tenant Info Basic Tests", () => {
       // Create a mock resolver that mimics the actual setTenantInfoResolver
       const mockSetTenantInfoResolver = async (
         _: any,
-        { email, emailEntrySkipped }: { email?: string; emailEntrySkipped?: boolean },
+        {
+          email,
+          emailEntrySkipped,
+        }: { email?: string; emailEntrySkipped?: boolean },
         { datastore }: { datastore: DataStore },
       ) => {
         await datastore.setTenantInfo(email, emailEntrySkipped);
@@ -133,7 +144,11 @@ describe("Tenant Info Basic Tests", () => {
       };
 
       const testEmail = "set-resolver@example.com";
-      await mockSetTenantInfoResolver(null, { email: testEmail, emailEntrySkipped: true }, { datastore });
+      await mockSetTenantInfoResolver(
+        null,
+        { email: testEmail, emailEntrySkipped: true },
+        { datastore },
+      );
 
       const result = await datastore.getTenantInfo();
       expect(result).toEqual({
@@ -149,7 +164,10 @@ describe("Tenant Info Basic Tests", () => {
       // Create a mock resolver that mimics the actual setTenantInfoResolver
       const mockSetTenantInfoResolver = async (
         _: any,
-        { email, emailEntrySkipped }: { email?: string; emailEntrySkipped?: boolean },
+        {
+          email,
+          emailEntrySkipped,
+        }: { email?: string; emailEntrySkipped?: boolean },
         { datastore }: { datastore: DataStore },
       ) => {
         await datastore.setTenantInfo(email, emailEntrySkipped);
@@ -157,7 +175,11 @@ describe("Tenant Info Basic Tests", () => {
       };
 
       // Update only emailEntrySkipped
-      await mockSetTenantInfoResolver(null, { emailEntrySkipped: true }, { datastore });
+      await mockSetTenantInfoResolver(
+        null,
+        { emailEntrySkipped: true },
+        { datastore },
+      );
 
       const result = await datastore.getTenantInfo();
       expect(result).toEqual({
@@ -173,7 +195,11 @@ describe("Tenant Info Basic Tests", () => {
       envManager.set("NEXT_PUBLIC_DISABLE_WELCOME_SCREEN", "true");
 
       // Create a mock resolver that mimics the actual getTenantInfoResolver with env var handling
-      const mockGetTenantInfoResolver = async (_: any, __: any, { datastore }: { datastore: DataStore }) => {
+      const mockGetTenantInfoResolver = async (
+        _: any,
+        __: any,
+        { datastore }: { datastore: DataStore },
+      ) => {
         if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === "true") {
           return {
             email: null,
@@ -186,7 +212,10 @@ describe("Tenant Info Basic Tests", () => {
       // Create a mock resolver that mimics the actual setTenantInfoResolver with env var handling
       const mockSetTenantInfoResolver = async (
         _: any,
-        { email, emailEntrySkipped }: { email?: string; emailEntrySkipped?: boolean },
+        {
+          email,
+          emailEntrySkipped,
+        }: { email?: string; emailEntrySkipped?: boolean },
         { datastore }: { datastore: DataStore },
       ) => {
         if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === "true") {
@@ -200,7 +229,9 @@ describe("Tenant Info Basic Tests", () => {
       };
 
       // Should always return emailEntrySkipped: true regardless of datastore
-      const getResult = await mockGetTenantInfoResolver(null, null, { datastore });
+      const getResult = await mockGetTenantInfoResolver(null, null, {
+        datastore,
+      });
       expect(getResult).toEqual({
         email: null,
         emailEntrySkipped: true,
@@ -245,7 +276,10 @@ describe("Tenant Info Basic Tests", () => {
 
         // Handle setTenantInfo mutation
         if (query.includes("setTenantInfo")) {
-          await datastore.setTenantInfo(variables?.email, variables?.emailEntrySkipped);
+          await datastore.setTenantInfo(
+            variables?.email,
+            variables?.emailEntrySkipped,
+          );
           const updatedInfo = await datastore.getTenantInfo();
           return res.json({
             data: {

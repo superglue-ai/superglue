@@ -31,11 +31,13 @@ The integration testing framework provides automated, multi-attempt reliability 
 ```bash
 npm run test:integration
 ```
+
 - Runs all enabled workflows, generates reports in `test-reports/`, and cleans up after itself.
 
 ## Configuration
 
 Edit `packages/core/tests/integration-test-config.json`:
+
 - Enable/disable integrations and workflows
 - Set number of attempts per workflow
 - Configure API ranking workflows
@@ -43,10 +45,13 @@ Edit `packages/core/tests/integration-test-config.json`:
 ## Environment Variables
 
 Set credentials in your `.env` file using the pattern:
+
 ```
 INTEGRATIONID_CREDENTIALKEY=your_secret
 ```
+
 Example:
+
 ```
 HUBSPOT_PRIVATE_APP_TOKEN=pat-...
 STRIPE_SECRET_KEY=sk_test_...
@@ -76,4 +81,4 @@ STRIPE_SECRET_KEY=sk_test_...
 
 ---
 
-This framework is designed for modern, agentic, and robust integration testing—giving you deep insight into both reliability and root causes of failure, with minimal setup and maximum automation. 
+This framework is designed for modern, agentic, and robust integration testing—giving you deep insight into both reliability and root causes of failure, with minimal setup and maximum automation.

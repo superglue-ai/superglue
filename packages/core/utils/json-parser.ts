@@ -62,8 +62,9 @@ export abstract class RepairStrategy {
  * Strategy to handle Python-style triple quotes
  */
 class TripleQuoteStrategy extends RepairStrategy {
-  name = 'TripleQuoteRepair';
-  description = 'Converts triple-quoted strings to proper JSON, parsing nested JSON content';
+  name = "TripleQuoteRepair";
+  description =
+    "Converts triple-quoted strings to proper JSON, parsing nested JSON content";
 
   canApply(input: string): boolean {
     return /"""/.test(input);
@@ -76,8 +77,10 @@ class TripleQuoteStrategy extends RepairStrategy {
       const trimmed = content.trim();
 
       // Check if it looks like JSON (starts with { or [)
-      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-        (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+      if (
+        (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+        (trimmed.startsWith("[") && trimmed.endsWith("]"))
+      ) {
         try {
           // Parse and re-stringify to ensure valid JSON
           const parsed = JSON.parse(trimmed);
@@ -87,22 +90,22 @@ class TripleQuoteStrategy extends RepairStrategy {
           // If parsing fails, treat as string but clean it up
           // Remove internal quotes that would break JSON
           const cleaned = content
-            .replace(/\\/g, '\\\\')
+            .replace(/\\/g, "\\\\")
             .replace(/"/g, '\\"')
-            .replace(/\n/g, '\\n')
-            .replace(/\r/g, '\\r')
-            .replace(/\t/g, '\\t');
+            .replace(/\n/g, "\\n")
+            .replace(/\r/g, "\\r")
+            .replace(/\t/g, "\\t");
           return `"${cleaned}"`;
         }
       }
 
       // For non-JSON content, escape as string
       const escaped = content
-        .replace(/\\/g, '\\\\')
+        .replace(/\\/g, "\\\\")
         .replace(/"/g, '\\"')
-        .replace(/\n/g, '\\n')
-        .replace(/\r/g, '\\r')
-        .replace(/\t/g, '\\t');
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r")
+        .replace(/\t/g, "\\t");
       return `"${escaped}"`;
     });
   }
@@ -112,8 +115,8 @@ class TripleQuoteStrategy extends RepairStrategy {
  * Strategy to handle Python literals (None, True, False)
  */
 class PythonLiteralStrategy extends RepairStrategy {
-  name = 'PythonLiteralRepair';
-  description = 'Converts Python literals to JavaScript equivalents';
+  name = "PythonLiteralRepair";
+  description = "Converts Python literals to JavaScript equivalents";
 
   canApply(input: string): boolean {
     return /\b(None|True|False)\b/.test(input);
@@ -121,9 +124,9 @@ class PythonLiteralStrategy extends RepairStrategy {
 
   apply(input: string): string {
     return input
-      .replace(/\bNone\b/g, 'null')
-      .replace(/\bTrue\b/g, 'true')
-      .replace(/\bFalse\b/g, 'false');
+      .replace(/\bNone\b/g, "null")
+      .replace(/\bTrue\b/g, "true")
+      .replace(/\bFalse\b/g, "false");
   }
 }
 
@@ -131,15 +134,15 @@ class PythonLiteralStrategy extends RepairStrategy {
  * Strategy to remove trailing commas
  */
 class TrailingCommaStrategy extends RepairStrategy {
-  name = 'TrailingCommaRepair';
-  description = 'Removes trailing commas from objects and arrays';
+  name = "TrailingCommaRepair";
+  description = "Removes trailing commas from objects and arrays";
 
   canApply(input: string): boolean {
     return /,\s*[}\]]/.test(input);
   }
 
   apply(input: string): string {
-    return input.replace(/,(\s*[}\]])/g, '$1');
+    return input.replace(/,(\s*[}\]])/g, "$1");
   }
 }
 
@@ -147,8 +150,8 @@ class TrailingCommaStrategy extends RepairStrategy {
  * Strategy to handle single quotes
  */
 class SingleQuoteStrategy extends RepairStrategy {
-  name = 'SingleQuoteRepair';
-  description = 'Converts single quotes to double quotes';
+  name = "SingleQuoteRepair";
+  description = "Converts single quotes to double quotes";
 
   canApply(input: string): boolean {
     // More sophisticated check to avoid replacing apostrophes
@@ -168,15 +171,18 @@ class SingleQuoteStrategy extends RepairStrategy {
  * Strategy to handle unquoted keys
  */
 class UnquotedKeyStrategy extends RepairStrategy {
-  name = 'UnquotedKeyRepair';
-  description = 'Adds quotes to unquoted object keys';
+  name = "UnquotedKeyRepair";
+  description = "Adds quotes to unquoted object keys";
 
   canApply(input: string): boolean {
     return /[{,]\s*[a-zA-Z_$][a-zA-Z0-9_$]*\s*:/.test(input);
   }
 
   apply(input: string): string {
-    return input.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)(\s*:)/g, '$1"$2"$3');
+    return input.replace(
+      /([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)(\s*:)/g,
+      '$1"$2"$3',
+    );
   }
 }
 
@@ -184,8 +190,8 @@ class UnquotedKeyStrategy extends RepairStrategy {
  * Strategy to handle comments (removes them)
  */
 class CommentStrategy extends RepairStrategy {
-  name = 'CommentRemoval';
-  description = 'Removes JavaScript-style comments';
+  name = "CommentRemoval";
+  description = "Removes JavaScript-style comments";
 
   canApply(input: string): boolean {
     return /\/\/.*$|\/\*[\s\S]*?\*\//m.test(input);
@@ -193,9 +199,9 @@ class CommentStrategy extends RepairStrategy {
 
   apply(input: string): string {
     // Remove single-line comments
-    let result = input.replace(/\/\/.*$/gm, '');
+    let result = input.replace(/\/\/.*$/gm, "");
     // Remove multi-line comments
-    result = result.replace(/\/\*[\s\S]*?\*\//g, '');
+    result = result.replace(/\/\*[\s\S]*?\*\//g, "");
     return result;
   }
 }
@@ -204,8 +210,9 @@ class CommentStrategy extends RepairStrategy {
  * Strategy to escape unescaped control characters in JSON strings
  */
 class UnescapedControlCharactersStrategy extends RepairStrategy {
-  name = 'UnescapedControlCharactersRepair';
-  description = 'Escapes unescaped control characters (newlines, tabs, etc.) in JSON strings';
+  name = "UnescapedControlCharactersRepair";
+  description =
+    "Escapes unescaped control characters (newlines, tabs, etc.) in JSON strings";
 
   canApply(input: string): boolean {
     // Check if there are control characters that aren't properly escaped
@@ -214,21 +221,23 @@ class UnescapedControlCharactersStrategy extends RepairStrategy {
       return false; // If it parses, no need for this strategy
     } catch (e) {
       // Check if error mentions control characters
-      const errorMsg = e.message || '';
-      return errorMsg.includes('control character') ||
-        errorMsg.includes('Bad control') ||
-        errorMsg.includes('Unexpected token') && /[\n\r\t]/.test(input);
+      const errorMsg = e.message || "";
+      return (
+        errorMsg.includes("control character") ||
+        errorMsg.includes("Bad control") ||
+        (errorMsg.includes("Unexpected token") && /[\n\r\t]/.test(input))
+      );
     }
   }
 
   apply(input: string): string {
-    let result = '';
+    let result = "";
     let inString = false;
     let escapeNext = false;
 
     for (let i = 0; i < input.length; i++) {
       const char = input[i];
-      const prevChar = i > 0 ? input[i - 1] : '';
+      const prevChar = i > 0 ? input[i - 1] : "";
 
       if (escapeNext) {
         result += char;
@@ -236,13 +245,13 @@ class UnescapedControlCharactersStrategy extends RepairStrategy {
         continue;
       }
 
-      if (char === '\\' && inString) {
+      if (char === "\\" && inString) {
         result += char;
         escapeNext = true;
         continue;
       }
 
-      if (char === '"' && prevChar !== '\\') {
+      if (char === '"' && prevChar !== "\\") {
         inString = !inString;
         result += char;
         continue;
@@ -251,27 +260,27 @@ class UnescapedControlCharactersStrategy extends RepairStrategy {
       if (inString) {
         // We're inside a string - escape control characters
         switch (char) {
-          case '\n':
-            result += '\\n';
+          case "\n":
+            result += "\\n";
             break;
-          case '\r':
-            result += '\\r';
+          case "\r":
+            result += "\\r";
             break;
-          case '\t':
-            result += '\\t';
+          case "\t":
+            result += "\\t";
             break;
-          case '\b':
-            result += '\\b';
+          case "\b":
+            result += "\\b";
             break;
-          case '\f':
-            result += '\\f';
+          case "\f":
+            result += "\\f";
             break;
           default:
             // Check for other control characters
             const charCode = char.charCodeAt(0);
             if (charCode < 0x20) {
               // Escape other control characters as Unicode
-              result += '\\u' + ('0000' + charCode.toString(16)).slice(-4);
+              result += "\\u" + ("0000" + charCode.toString(16)).slice(-4);
             } else {
               result += char;
             }
@@ -290,8 +299,8 @@ class UnescapedControlCharactersStrategy extends RepairStrategy {
  * Strategy to handle trailing non-JSON characters after valid JSON
  */
 class TrailingCharactersStrategy extends RepairStrategy {
-  name = 'TrailingCharactersRepair';
-  description = 'Removes trailing characters after valid JSON structure';
+  name = "TrailingCharactersRepair";
+  description = "Removes trailing characters after valid JSON structure";
 
   canApply(input: string): boolean {
     const trimmed = input.trim();
@@ -299,7 +308,7 @@ class TrailingCharactersStrategy extends RepairStrategy {
     // We need to properly match balanced braces/brackets with trailing content
 
     // Quick check: does it start with { or [ and have extra content after apparent end?
-    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
       return false;
     }
 
@@ -315,19 +324,29 @@ class TrailingCharactersStrategy extends RepairStrategy {
       if (!inString) {
         if (char === '"') {
           inString = true;
-        } else if (char === '{') {
+        } else if (char === "{") {
           braceCount++;
-        } else if (char === '}') {
+        } else if (char === "}") {
           braceCount--;
-          if (braceCount === 0 && bracketCount === 0 && i > 0 && i < trimmed.length - 1) {
+          if (
+            braceCount === 0 &&
+            bracketCount === 0 &&
+            i > 0 &&
+            i < trimmed.length - 1
+          ) {
             // Found complete JSON with trailing content
             return true;
           }
-        } else if (char === '[') {
+        } else if (char === "[") {
           bracketCount++;
-        } else if (char === ']') {
+        } else if (char === "]") {
           bracketCount--;
-          if (bracketCount === 0 && braceCount === 0 && i > 0 && i < trimmed.length - 1) {
+          if (
+            bracketCount === 0 &&
+            braceCount === 0 &&
+            i > 0 &&
+            i < trimmed.length - 1
+          ) {
             // Found complete JSON with trailing content
             return true;
           }
@@ -335,7 +354,7 @@ class TrailingCharactersStrategy extends RepairStrategy {
       } else {
         if (escapeNext) {
           escapeNext = false;
-        } else if (char === '\\') {
+        } else if (char === "\\") {
           escapeNext = true;
         } else if (char === '"') {
           inString = false;
@@ -362,17 +381,17 @@ class TrailingCharactersStrategy extends RepairStrategy {
       if (!inString) {
         if (char === '"') {
           inString = true;
-        } else if (char === '{') {
+        } else if (char === "{") {
           braceCount++;
-        } else if (char === '}') {
+        } else if (char === "}") {
           braceCount--;
           if (braceCount === 0 && bracketCount === 0 && i > 0) {
             jsonEndIndex = i;
             break;
           }
-        } else if (char === '[') {
+        } else if (char === "[") {
           bracketCount++;
-        } else if (char === ']') {
+        } else if (char === "]") {
           bracketCount--;
           if (bracketCount === 0 && braceCount === 0 && i > 0) {
             jsonEndIndex = i;
@@ -382,7 +401,7 @@ class TrailingCharactersStrategy extends RepairStrategy {
       } else {
         if (escapeNext) {
           escapeNext = false;
-        } else if (char === '\\') {
+        } else if (char === "\\") {
           escapeNext = true;
         } else if (char === '"') {
           inString = false;
@@ -413,7 +432,7 @@ export class ResilientJsonParser {
       maxDepth: 10,
       preserveStringsOnFailure: false,
       logRepairs: false,
-      ...options
+      ...options,
     };
 
     // Initialize default strategies
@@ -428,9 +447,9 @@ export class ResilientJsonParser {
   private initializeDefaultStrategies(): void {
     this.strategies = [
       new TripleQuoteStrategy(),
-      new SingleQuoteStrategy(),  // Convert quotes first so control char fix works
-      new UnescapedControlCharactersStrategy(),  // Now can fix control chars in all strings
-      new TrailingCharactersStrategy(),  // Apply early to clean up trailing content
+      new SingleQuoteStrategy(), // Convert quotes first so control char fix works
+      new UnescapedControlCharactersStrategy(), // Now can fix control chars in all strings
+      new TrailingCharactersStrategy(), // Apply early to clean up trailing content
       new PythonLiteralStrategy(),
       new TrailingCommaStrategy(),
       new UnquotedKeyStrategy(),
@@ -445,7 +464,8 @@ export class ResilientJsonParser {
     const startTime = Date.now();
     this.repairLog = [];
 
-    const jsonString = input instanceof Buffer ? input.toString('utf8') : String(input);
+    const jsonString =
+      input instanceof Buffer ? input.toString("utf8") : String(input);
 
     // Try standard parsing first
     try {
@@ -455,8 +475,8 @@ export class ResilientJsonParser {
         data,
         metadata: {
           parseTime: Date.now() - startTime,
-          strategiesApplied: []
-        }
+          strategiesApplied: [],
+        },
       };
     } catch (initialError) {
       // Continue with repair strategies
@@ -465,8 +485,8 @@ export class ResilientJsonParser {
           success: false,
           error: `JSON parse error: ${initialError}`,
           metadata: {
-            parseTime: Date.now() - startTime
-          }
+            parseTime: Date.now() - startTime,
+          },
         };
       }
     }
@@ -497,8 +517,8 @@ export class ResilientJsonParser {
               repairs: this.repairLog,
               metadata: {
                 parseTime: Date.now() - startTime,
-                strategiesApplied: appliedStrategies
-              }
+                strategiesApplied: appliedStrategies,
+              },
             };
           } catch {
             // Continue with more repairs
@@ -516,8 +536,8 @@ export class ResilientJsonParser {
         repairs: this.repairLog,
         metadata: {
           parseTime: Date.now() - startTime,
-          strategiesApplied: appliedStrategies
-        }
+          strategiesApplied: appliedStrategies,
+        },
       };
     } catch (finalError) {
       // Try aggressive fallback
@@ -525,11 +545,11 @@ export class ResilientJsonParser {
       if (fallbackResult.success) {
         return {
           ...fallbackResult,
-          repairs: [...this.repairLog, 'Applied aggressive fallback'],
+          repairs: [...this.repairLog, "Applied aggressive fallback"],
           metadata: {
             parseTime: Date.now() - startTime,
-            strategiesApplied: [...appliedStrategies, 'AggressiveFallback']
-          }
+            strategiesApplied: [...appliedStrategies, "AggressiveFallback"],
+          },
         };
       }
 
@@ -539,8 +559,8 @@ export class ResilientJsonParser {
         repairs: this.repairLog,
         metadata: {
           parseTime: Date.now() - startTime,
-          strategiesApplied: appliedStrategies
-        }
+          strategiesApplied: appliedStrategies,
+        },
       };
     }
   }
@@ -552,17 +572,20 @@ export class ResilientJsonParser {
     try {
       // First, try to find JSON-like structures more precisely
       // Look for JSON starting patterns
-      const objectStart = input.indexOf('{');
-      const arrayStart = input.indexOf('[');
+      const objectStart = input.indexOf("{");
+      const arrayStart = input.indexOf("[");
 
       if (objectStart === -1 && arrayStart === -1) {
-        return { success: false, error: 'No JSON-like structure found' };
+        return { success: false, error: "No JSON-like structure found" };
       }
 
       // Start from the first JSON-like character
-      const startIdx = objectStart === -1 ? arrayStart :
-        arrayStart === -1 ? objectStart :
-          Math.min(objectStart, arrayStart);
+      const startIdx =
+        objectStart === -1
+          ? arrayStart
+          : arrayStart === -1
+            ? objectStart
+            : Math.min(objectStart, arrayStart);
 
       let extracted = input.substring(startIdx);
 
@@ -592,14 +615,14 @@ export class ResilientJsonParser {
    * Remove a strategy by name
    */
   removeStrategy(name: string): void {
-    this.strategies = this.strategies.filter(s => s.name !== name);
+    this.strategies = this.strategies.filter((s) => s.name !== name);
   }
 
   /**
    * Get list of available strategies
    */
   getStrategies(): string[] {
-    return this.strategies.map(s => s.name);
+    return this.strategies.map((s) => s.name);
   }
 }
 
@@ -611,7 +634,7 @@ const defaultParser = new ResilientJsonParser();
  */
 export function parseJsonResilient<T = any>(
   input: string | Buffer,
-  options?: ParseOptions
+  options?: ParseOptions,
 ): ParseResult<T> {
   const parser = options ? new ResilientJsonParser(options) : defaultParser;
   return parser.parse<T>(input);
@@ -625,7 +648,7 @@ export function parseJSON(input: Buffer | string): any {
 
   if (result.success) {
     if (result.repairs && result.repairs.length > 0) {
-      console.log('JSON parsed with repairs:', result.repairs);
+      console.log("JSON parsed with repairs:", result.repairs);
     }
     return result.data;
   } else {
@@ -663,11 +686,15 @@ export function minifyJson(jsonString: string): string {
     return JSON.stringify(result.data);
   }
 
-  throw new Error('Cannot minify invalid JSON');
+  throw new Error("Cannot minify invalid JSON");
 }
 
 // Export strategy classes for extension
 export {
-  CommentStrategy, PythonLiteralStrategy, SingleQuoteStrategy, TrailingCommaStrategy, TripleQuoteStrategy, UnquotedKeyStrategy
+  CommentStrategy,
+  PythonLiteralStrategy,
+  SingleQuoteStrategy,
+  TrailingCommaStrategy,
+  TripleQuoteStrategy,
+  UnquotedKeyStrategy,
 };
-

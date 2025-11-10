@@ -1,12 +1,15 @@
 import { ApiConfig, Integration, RunResult, Workflow } from "@superglue/client";
-import { createHash } from 'node:crypto';
+import { createHash } from "node:crypto";
 import type { DataStore, WorkflowScheduleInternal } from "./types.js";
 
 export class MemoryStore implements DataStore {
   private storage: {
     apis: Map<string, ApiConfig>;
     runs: Map<string, RunResult>;
-    runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
+    runsIndex: Map<
+      string,
+      { id: string; timestamp: number; configId: string }[]
+    >;
     workflows: Map<string, Workflow>;
     workflowSchedules: Map<string, WorkflowScheduleInternal>;
     integrations: Map<string, Integration>;
@@ -14,7 +17,7 @@ export class MemoryStore implements DataStore {
 
   private tenant: { email: string | null; emailEntrySkipped: boolean } = {
     email: null,
-    emailEntrySkipped: false
+    emailEntrySkipped: false,
   };
 
   constructor() {
@@ -24,79 +27,108 @@ export class MemoryStore implements DataStore {
       runsIndex: new Map(),
       workflows: new Map(),
       workflowSchedules: new Map(),
-      integrations: new Map()
+      integrations: new Map(),
     };
   }
 
   private getKey(prefix: string, id: string, orgId?: string): string {
-    return `${orgId ? `${orgId}:` : ''}${prefix}:${id}`;
+    return `${orgId ? `${orgId}:` : ""}${prefix}:${id}`;
   }
 
-  private getOrgItems<T>(map: Map<string, T>, prefix: string, orgId?: string): T[] {
+  private getOrgItems<T>(
+    map: Map<string, T>,
+    prefix: string,
+    orgId?: string,
+  ): T[] {
     return Array.from(map.entries())
-      .filter(([key]) => key.startsWith(`${orgId ? `${orgId}:` : ''}${prefix}:`))
-      .map(([key, value]) => ({ ...value, id: key.split(':').pop() })) as T[];
+      .filter(([key]) =>
+        key.startsWith(`${orgId ? `${orgId}:` : ""}${prefix}:`),
+      )
+      .map(([key, value]) => ({ ...value, id: key.split(":").pop() })) as T[];
   }
 
   private generateHash(data: any): string {
-    return createHash('md5').update(JSON.stringify(data)).digest('hex');
+    return createHash("md5").update(JSON.stringify(data)).digest("hex");
   }
 
   // API Config Methods
-  async getApiConfig(params: { id: string; orgId?: string }): Promise<ApiConfig | null> {
+  async getApiConfig(params: {
+    id: string;
+    orgId?: string;
+  }): Promise<ApiConfig | null> {
     const { id, orgId } = params;
     if (!id) return null;
-    const key = this.getKey('api', id, orgId);
+    const key = this.getKey("api", id, orgId);
     const config = this.storage.apis.get(key);
     return config ? { ...config, id } : null;
   }
 
-  async listApiConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: ApiConfig[], total: number }> {
+  async listApiConfigs(params?: {
+    limit?: number;
+    offset?: number;
+    orgId?: string;
+  }): Promise<{ items: ApiConfig[]; total: number }> {
     const { limit = 10, offset = 0, orgId } = params || {};
-    const items = this.getOrgItems(this.storage.apis, 'api', orgId).slice(offset, offset + limit);
-    const total = this.getOrgItems(this.storage.apis, 'api', orgId).length;
+    const items = this.getOrgItems(this.storage.apis, "api", orgId).slice(
+      offset,
+      offset + limit,
+    );
+    const total = this.getOrgItems(this.storage.apis, "api", orgId).length;
     return { items, total };
   }
 
-  async upsertApiConfig(params: { id: string; config: ApiConfig; orgId?: string }): Promise<ApiConfig> {
+  async upsertApiConfig(params: {
+    id: string;
+    config: ApiConfig;
+    orgId?: string;
+  }): Promise<ApiConfig> {
     const { id, config, orgId } = params;
     if (!id || !config) return null;
-    const key = this.getKey('api', id, orgId);
+    const key = this.getKey("api", id, orgId);
     this.storage.apis.set(key, config);
     return { ...config, id };
   }
 
-  async deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteApiConfig(params: {
+    id: string;
+    orgId?: string;
+  }): Promise<boolean> {
     const { id, orgId } = params;
     if (!id) return false;
-    const key = this.getKey('api', id, orgId);
+    const key = this.getKey("api", id, orgId);
     return this.storage.apis.delete(key);
   }
 
   // Run Result Methods
-  async getRun(params: { id: string; orgId?: string }): Promise<RunResult | null> {
+  async getRun(params: {
+    id: string;
+    orgId?: string;
+  }): Promise<RunResult | null> {
     const { id, orgId } = params;
     if (!id) return null;
-    const key = this.getKey('run', id, orgId);
+    const key = this.getKey("run", id, orgId);
     const run = this.storage.runs.get(key);
     return run ? { ...run, id } : null;
   }
 
-  async createRun(params: { result: RunResult; orgId?: string }): Promise<RunResult> {
+  async createRun(params: {
+    result: RunResult;
+    orgId?: string;
+  }): Promise<RunResult> {
     const { result: run, orgId } = params;
     if (!run) return null;
-    const key = this.getKey('run', run.id, orgId);
+    const key = this.getKey("run", run.id, orgId);
     this.storage.runs.set(key, run);
 
     // Update index for efficient listing
     const configId = run.config?.id;
     if (configId) {
-      const indexKey = this.getKey('index', configId, orgId);
+      const indexKey = this.getKey("index", configId, orgId);
       const existing = this.storage.runsIndex.get(indexKey) || [];
       existing.push({
         id: run.id,
         timestamp: run.startedAt ? run.startedAt.getTime() : Date.now(),
-        configId
+        configId,
       });
       this.storage.runsIndex.set(indexKey, existing);
     }
@@ -104,26 +136,34 @@ export class MemoryStore implements DataStore {
     return { ...run, id: run.id };
   }
 
-  async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: RunResult[], total: number }> {
+  async listRuns(params?: {
+    limit?: number;
+    offset?: number;
+    configId?: string;
+    orgId?: string;
+  }): Promise<{ items: RunResult[]; total: number }> {
     const { limit = 10, offset = 0, configId, orgId } = params || {};
-    const allRuns = this.getOrgItems(this.storage.runs, 'run', orgId);
+    const allRuns = this.getOrgItems(this.storage.runs, "run", orgId);
 
     // Store total count of ALL runs (including corrupted ones)
     const totalAllRuns = allRuns.length;
 
     // Filter out runs with corrupted data (missing critical fields)
-    const validRuns = allRuns.filter((run): run is RunResult =>
-      run !== null &&
-      run.config &&
-      run.config.id &&
-      run.startedAt instanceof Date
+    const validRuns = allRuns.filter(
+      (run): run is RunResult =>
+        run !== null &&
+        run.config &&
+        run.config.id &&
+        run.startedAt instanceof Date,
     );
 
     // Sort by startedAt date (most recent first)
     validRuns.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
 
     // Filter by configId if provided
-    const filteredRuns = configId ? validRuns.filter(run => run.config?.id === configId) : validRuns;
+    const filteredRuns = configId
+      ? validRuns.filter((run) => run.config?.id === configId)
+      : validRuns;
 
     // Apply pagination
     const items = filteredRuns.slice(offset, offset + limit);
@@ -135,16 +175,16 @@ export class MemoryStore implements DataStore {
   async deleteRun(params: { id: string; orgId?: string }): Promise<boolean> {
     const { id, orgId } = params;
     if (!id) return false;
-    const key = this.getKey('run', id, orgId);
+    const key = this.getKey("run", id, orgId);
     const run = this.storage.runs.get(key);
 
     if (run) {
       // Remove from index
       const configId = run.config?.id;
       if (configId) {
-        const indexKey = this.getKey('index', configId, orgId);
+        const indexKey = this.getKey("index", configId, orgId);
         const existing = this.storage.runsIndex.get(indexKey) || [];
-        const filtered = existing.filter(item => item.id !== id);
+        const filtered = existing.filter((item) => item.id !== id);
         if (filtered.length > 0) {
           this.storage.runsIndex.set(indexKey, filtered);
         } else {
@@ -158,7 +198,7 @@ export class MemoryStore implements DataStore {
 
   async deleteAllRuns(params?: { orgId?: string }): Promise<boolean> {
     const { orgId } = params || {};
-    const prefix = orgId ? `${orgId}:run:` : 'run:';
+    const prefix = orgId ? `${orgId}:run:` : "run:";
     const keysToDelete: string[] = [];
 
     for (const key of this.storage.runs.keys()) {
@@ -168,14 +208,14 @@ export class MemoryStore implements DataStore {
     }
 
     // Also clear index entries
-    const indexPrefix = orgId ? `${orgId}:index:` : 'index:';
+    const indexPrefix = orgId ? `${orgId}:index:` : "index:";
     for (const key of this.storage.runsIndex.keys()) {
       if (key.startsWith(indexPrefix)) {
         this.storage.runsIndex.delete(key);
       }
     }
 
-    keysToDelete.forEach(key => this.storage.runs.delete(key));
+    keysToDelete.forEach((key) => this.storage.runs.delete(key));
 
     return true;
   }
@@ -197,11 +237,17 @@ export class MemoryStore implements DataStore {
     return true;
   }
 
-  async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }> {
+  async getTenantInfo(): Promise<{
+    email: string | null;
+    emailEntrySkipped: boolean;
+  }> {
     return { ...this.tenant };
   }
 
-  async setTenantInfo(params?: { email?: string; emailEntrySkipped?: boolean }): Promise<void> {
+  async setTenantInfo(params?: {
+    email?: string;
+    emailEntrySkipped?: boolean;
+  }): Promise<void> {
     const { email, emailEntrySkipped } = params || {};
     if (email !== undefined) {
       this.tenant.email = email;
@@ -212,131 +258,205 @@ export class MemoryStore implements DataStore {
   }
 
   // Workflow Methods
-  async getWorkflow(params: { id: string; orgId?: string }): Promise<Workflow | null> {
+  async getWorkflow(params: {
+    id: string;
+    orgId?: string;
+  }): Promise<Workflow | null> {
     const { id, orgId } = params;
     if (!id) return null;
-    const key = this.getKey('workflow', id, orgId);
+    const key = this.getKey("workflow", id, orgId);
     const workflow = this.storage.workflows.get(key);
     return workflow ? { ...workflow, id } : null;
   }
 
-  async listWorkflows(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: Workflow[], total: number }> {
+  async listWorkflows(params?: {
+    limit?: number;
+    offset?: number;
+    orgId?: string;
+  }): Promise<{ items: Workflow[]; total: number }> {
     const { limit = 10, offset = 0, orgId } = params || {};
-    const items = this.getOrgItems(this.storage.workflows, 'workflow', orgId).slice(offset, offset + limit);
-    const total = this.getOrgItems(this.storage.workflows, 'workflow', orgId).length;
+    const items = this.getOrgItems(
+      this.storage.workflows,
+      "workflow",
+      orgId,
+    ).slice(offset, offset + limit);
+    const total = this.getOrgItems(
+      this.storage.workflows,
+      "workflow",
+      orgId,
+    ).length;
     return { items, total };
   }
 
-  async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Workflow[]> {
+  async getManyWorkflows(params: {
+    ids: string[];
+    orgId?: string;
+  }): Promise<Workflow[]> {
     const { ids, orgId } = params;
     return ids
-      .map(id => {
-        const key = this.getKey('workflow', id, orgId);
+      .map((id) => {
+        const key = this.getKey("workflow", id, orgId);
         const workflow = this.storage.workflows.get(key);
         return workflow ? { ...workflow, id } : null;
       })
       .filter((w): w is Workflow => w !== null);
   }
 
-  async upsertWorkflow(params: { id: string; workflow: Workflow; orgId?: string }): Promise<Workflow> {
+  async upsertWorkflow(params: {
+    id: string;
+    workflow: Workflow;
+    orgId?: string;
+  }): Promise<Workflow> {
     const { id, workflow, orgId } = params;
     if (!id || !workflow) return null;
-    const key = this.getKey('workflow', id, orgId);
+    const key = this.getKey("workflow", id, orgId);
     this.storage.workflows.set(key, workflow);
   }
 
-  async deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteWorkflow(params: {
+    id: string;
+    orgId?: string;
+  }): Promise<boolean> {
     const { id, orgId } = params;
     if (!id) return false;
-    const key = this.getKey('workflow', id, orgId);
+    const key = this.getKey("workflow", id, orgId);
     return this.storage.workflows.delete(key);
   }
 
   // Integration Methods
-  async getIntegration(params: { id: string; includeDocs?: boolean; orgId?: string }): Promise<Integration | null> {
+  async getIntegration(params: {
+    id: string;
+    includeDocs?: boolean;
+    orgId?: string;
+  }): Promise<Integration | null> {
     const { id, includeDocs = true, orgId } = params;
     if (!id) return null;
-    const key = this.getKey('integration', id, orgId);
+    const key = this.getKey("integration", id, orgId);
     const integration = this.storage.integrations.get(key);
     return integration ? { ...integration, id } : null;
   }
 
-  async listIntegrations(params?: { limit?: number; offset?: number; includeDocs?: boolean; orgId?: string }): Promise<{ items: Integration[], total: number }> {
+  async listIntegrations(params?: {
+    limit?: number;
+    offset?: number;
+    includeDocs?: boolean;
+    orgId?: string;
+  }): Promise<{ items: Integration[]; total: number }> {
     const { limit = 10, offset = 0, includeDocs = true, orgId } = params || {};
-    const items = this.getOrgItems(this.storage.integrations, 'integration', orgId).slice(offset, offset + limit);
-    const total = this.getOrgItems(this.storage.integrations, 'integration', orgId).length;
+    const items = this.getOrgItems(
+      this.storage.integrations,
+      "integration",
+      orgId,
+    ).slice(offset, offset + limit);
+    const total = this.getOrgItems(
+      this.storage.integrations,
+      "integration",
+      orgId,
+    ).length;
     return { items, total };
   }
 
-  async getManyIntegrations(params: { ids: string[]; orgId?: string }): Promise<Integration[]> {
+  async getManyIntegrations(params: {
+    ids: string[];
+    orgId?: string;
+  }): Promise<Integration[]> {
     const { ids, orgId } = params;
     return ids
-      .map(id => {
-        const key = this.getKey('integration', id, orgId);
+      .map((id) => {
+        const key = this.getKey("integration", id, orgId);
         const integration = this.storage.integrations.get(key);
         return integration ? { ...integration, id } : null;
       })
       .filter((i): i is Integration => i !== null);
   }
 
-  async upsertIntegration(params: { id: string; integration: Integration; orgId?: string }): Promise<Integration> {
+  async upsertIntegration(params: {
+    id: string;
+    integration: Integration;
+    orgId?: string;
+  }): Promise<Integration> {
     const { id, integration, orgId } = params;
     if (!id || !integration) return null;
-    const key = this.getKey('integration', id, orgId);
+    const key = this.getKey("integration", id, orgId);
     this.storage.integrations.set(key, integration);
     return { ...integration, id };
   }
 
-  async deleteIntegration(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteIntegration(params: {
+    id: string;
+    orgId?: string;
+  }): Promise<boolean> {
     const { id, orgId } = params;
     if (!id) return false;
-    const key = this.getKey('integration', id, orgId);
+    const key = this.getKey("integration", id, orgId);
     return this.storage.integrations.delete(key);
   }
 
-  async copyTemplateDocumentationToUserIntegration(params: { templateId: string; userIntegrationId: string; orgId?: string }): Promise<boolean> {
+  async copyTemplateDocumentationToUserIntegration(params: {
+    templateId: string;
+    userIntegrationId: string;
+    orgId?: string;
+  }): Promise<boolean> {
     // Not supported for memory store
     return false;
   }
 
   // Workflow Schedule Methods
-  async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]> {
+  async listWorkflowSchedules(params: {
+    workflowId: string;
+    orgId: string;
+  }): Promise<WorkflowScheduleInternal[]> {
     const { workflowId, orgId } = params;
-    return this.getOrgItems(this.storage.workflowSchedules, 'workflow-schedule', orgId)
-      .filter(schedule => schedule.workflowId === workflowId);
+    return this.getOrgItems(
+      this.storage.workflowSchedules,
+      "workflow-schedule",
+      orgId,
+    ).filter((schedule) => schedule.workflowId === workflowId);
   }
 
-  async getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<WorkflowScheduleInternal | null> {
+  async getWorkflowSchedule(params: {
+    id: string;
+    orgId?: string;
+  }): Promise<WorkflowScheduleInternal | null> {
     const { id, orgId } = params;
     if (!id) return null;
-    const key = this.getKey('workflow-schedule', id, orgId);
+    const key = this.getKey("workflow-schedule", id, orgId);
     const schedule = this.storage.workflowSchedules.get(key);
     return schedule ? { ...schedule, id } : null;
   }
 
-  async upsertWorkflowSchedule(params: { schedule: WorkflowScheduleInternal }): Promise<void> {
+  async upsertWorkflowSchedule(params: {
+    schedule: WorkflowScheduleInternal;
+  }): Promise<void> {
     const { schedule } = params;
     if (!schedule || !schedule.id) return;
-    const key = this.getKey('workflow-schedule', schedule.id, schedule.orgId);
+    const key = this.getKey("workflow-schedule", schedule.id, schedule.orgId);
     this.storage.workflowSchedules.set(key, schedule);
   }
 
-  async deleteWorkflowSchedule(params: { id: string, orgId: string }): Promise<boolean> {
+  async deleteWorkflowSchedule(params: {
+    id: string;
+    orgId: string;
+  }): Promise<boolean> {
     const { id, orgId } = params;
     if (!id) return false;
-    const key = this.getKey('workflow-schedule', id, orgId);
+    const key = this.getKey("workflow-schedule", id, orgId);
     return this.storage.workflowSchedules.delete(key);
   }
 
   async listDueWorkflowSchedules(): Promise<WorkflowScheduleInternal[]> {
     const now = new Date();
     return Array.from(this.storage.workflowSchedules.entries())
-      .filter(([key]) => key.includes(':workflow-schedule:'))
-      .map(([key, value]) => ({ ...value, id: key.split(':').pop() }))
-      .filter(schedule => schedule.enabled && schedule.nextRunAt <= now);
+      .filter(([key]) => key.includes(":workflow-schedule:"))
+      .map(([key, value]) => ({ ...value, id: key.split(":").pop() }))
+      .filter((schedule) => schedule.enabled && schedule.nextRunAt <= now);
   }
 
-  async updateScheduleNextRun(params: { id: string; nextRunAt: Date; lastRunAt: Date; }): Promise<boolean> {
+  async updateScheduleNextRun(params: {
+    id: string;
+    nextRunAt: Date;
+    lastRunAt: Date;
+  }): Promise<boolean> {
     const { id, nextRunAt, lastRunAt } = params;
     if (!id) return false;
 
@@ -346,7 +466,7 @@ export class MemoryStore implements DataStore {
           ...schedule,
           nextRunAt,
           lastRunAt,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         };
         this.storage.workflowSchedules.set(key, updatedSchedule);
         return true;
@@ -355,21 +475,33 @@ export class MemoryStore implements DataStore {
     return false;
   }
 
-  async getTemplateOAuthCredentials(params: { templateId: string }): Promise<{ client_id: string; client_secret: string } | null> {
+  async getTemplateOAuthCredentials(params: {
+    templateId: string;
+  }): Promise<{ client_id: string; client_secret: string } | null> {
     return null;
   }
 
-  private oauthSecrets: Map<string, { clientId: string; clientSecret: string; expiresAt: number }> = new Map();
+  private oauthSecrets: Map<
+    string,
+    { clientId: string; clientSecret: string; expiresAt: number }
+  > = new Map();
 
-  async cacheOAuthSecret(params: { uid: string; clientId: string; clientSecret: string; ttlMs: number }): Promise<void> {
+  async cacheOAuthSecret(params: {
+    uid: string;
+    clientId: string;
+    clientSecret: string;
+    ttlMs: number;
+  }): Promise<void> {
     this.oauthSecrets.set(params.uid, {
       clientId: params.clientId,
       clientSecret: params.clientSecret,
-      expiresAt: Date.now() + params.ttlMs
+      expiresAt: Date.now() + params.ttlMs,
     });
   }
 
-  async getOAuthSecret(params: { uid: string }): Promise<{ clientId: string; clientSecret: string } | null> {
+  async getOAuthSecret(params: {
+    uid: string;
+  }): Promise<{ clientId: string; clientSecret: string } | null> {
     const entry = this.oauthSecrets.get(params.uid);
 
     if (!entry || entry.expiresAt <= Date.now()) {
@@ -382,11 +514,11 @@ export class MemoryStore implements DataStore {
 
     return {
       clientId: entry.clientId,
-      clientSecret: entry.clientSecret
+      clientSecret: entry.clientSecret,
     };
   }
 
   async deleteOAuthSecret(params: { uid: string }): Promise<void> {
     this.oauthSecrets.delete(params.uid);
   }
-} 
+}

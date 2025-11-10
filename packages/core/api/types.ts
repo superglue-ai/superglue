@@ -1,5 +1,5 @@
-import { FastifyReply, FastifyRequest } from 'fastify';
-import { UserRole } from '@superglue/shared';
+import { FastifyReply, FastifyRequest } from "fastify";
+import { UserRole } from "@superglue/shared";
 
 export interface AuthenticatedFastifyRequest extends FastifyRequest {
   authInfo: {
@@ -16,7 +16,7 @@ export interface RouteHandler {
 }
 
 export interface RouteConfig {
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   path: string;
   handler: RouteHandler;
   schema?: any;

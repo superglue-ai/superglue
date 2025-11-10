@@ -1,18 +1,41 @@
-import { GraphQLUpload } from 'graphql-upload-ts';
+import { GraphQLUpload } from "graphql-upload-ts";
 import fs from "node:fs";
 import { callResolver } from "./resolvers/call.js";
 import { deleteApiResolver } from "./resolvers/delete.js";
 import { extractResolver } from "./resolvers/extract.js";
-import { generateInstructionsResolver, generateSchemaResolver } from "./resolvers/generate.js";
+import {
+  generateInstructionsResolver,
+  generateSchemaResolver,
+} from "./resolvers/generate.js";
 import { getApiResolver, getRunResolver } from "./resolvers/get.js";
-import { cacheOauthClientCredentialsResolver, deleteIntegrationResolver, findRelevantIntegrationsResolver, getIntegrationResolver, getOAuthClientCredentialsResolver, listIntegrationsResolver, searchIntegrationDocumentationResolver, upsertIntegrationResolver } from "./resolvers/integrations.js";
+import {
+  cacheOauthClientCredentialsResolver,
+  deleteIntegrationResolver,
+  findRelevantIntegrationsResolver,
+  getIntegrationResolver,
+  getOAuthClientCredentialsResolver,
+  listIntegrationsResolver,
+  searchIntegrationDocumentationResolver,
+  upsertIntegrationResolver,
+} from "./resolvers/integrations.js";
 import { listApisResolver, listRunsResolver } from "./resolvers/list.js";
 import { logsResolver } from "./resolvers/logs.js";
-import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
-import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant.js";
+import {
+  JSONResolver,
+  JSONSchemaResolver,
+  JSONataResolver,
+} from "./resolvers/scalars.js";
+import {
+  getTenantInfoResolver,
+  setTenantInfoResolver,
+} from "./resolvers/tenant.js";
 import { updateApiConfigIdResolver } from "./resolvers/update-id.js";
 import { upsertApiResolver } from "./resolvers/upsert.js";
-import { deleteWorkflowScheduleResolver, listWorkflowSchedulesResolver, upsertWorkflowScheduleResolver } from "./resolvers/workflow-scheduler.js";
+import {
+  deleteWorkflowScheduleResolver,
+  listWorkflowSchedulesResolver,
+  upsertWorkflowScheduleResolver,
+} from "./resolvers/workflow-scheduler.js";
 import {
   buildWorkflowResolver,
   deleteWorkflowResolver,
@@ -20,7 +43,7 @@ import {
   findRelevantToolsResolver,
   getWorkflowResolver,
   listWorkflowsResolver,
-  upsertWorkflowResolver
+  upsertWorkflowResolver,
 } from "./resolvers/workflow.js";
 
 export const resolvers = {

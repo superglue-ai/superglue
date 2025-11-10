@@ -1,7 +1,7 @@
-import { FastifyReply } from 'fastify';
-import { logMessage } from '../utils/logs.js';
-import { registerApiModule } from './registry.js';
-import { AuthenticatedFastifyRequest } from './types.js';
+import { FastifyReply } from "fastify";
+import { logMessage } from "../utils/logs.js";
+import { registerApiModule } from "./registry.js";
+import { AuthenticatedFastifyRequest } from "./types.js";
 
 interface WorkflowRequest extends AuthenticatedFastifyRequest {
   params: { id: string };
@@ -10,59 +10,72 @@ interface WorkflowRequest extends AuthenticatedFastifyRequest {
 
 const getWorkflows = async (request: WorkflowRequest, reply: FastifyReply) => {
   try {
-    const { datastore, authInfo: { orgId } } = request;
+    const {
+      datastore,
+      authInfo: { orgId },
+    } = request;
     const workflows = await datastore.listWorkflows({ orgId });
-    
-    logMessage('info', `Listed ${workflows.length} workflows`, { orgId });
-    
+
+    logMessage("info", `Listed ${workflows.length} workflows`, { orgId });
+
     return {
       success: true,
       data: workflows,
-      count: workflows.length
+      count: workflows.length,
     };
   } catch (error) {
-    logMessage('error', `Failed to list workflows: ${error}`, { orgId: request.authInfo.orgId });
+    logMessage("error", `Failed to list workflows: ${error}`, {
+      orgId: request.authInfo.orgId,
+    });
     reply.code(500);
-    return { success: false, error: 'Failed to list workflows' };
+    return { success: false, error: "Failed to list workflows" };
   }
 };
 
 const getWorkflow = async (request: WorkflowRequest, reply: FastifyReply) => {
   try {
-    const { datastore, authInfo: { orgId }, params } = request;
+    const {
+      datastore,
+      authInfo: { orgId },
+      params,
+    } = request;
     const workflow = await datastore.getWorkflow({ id: params.id, orgId });
-    
+
     if (!workflow) {
       reply.code(404);
-      return { success: false, error: 'Workflow not found' };
+      return { success: false, error: "Workflow not found" };
     }
-    
-    logMessage('info', `Retrieved workflow ${params.id}`, { orgId });
-    
+
+    logMessage("info", `Retrieved workflow ${params.id}`, { orgId });
+
     return {
       success: true,
-      data: workflow
+      data: workflow,
     };
   } catch (error) {
-    logMessage('error', `Failed to get workflow ${request.params.id}: ${error}`, { orgId: request.authInfo.orgId });
+    logMessage(
+      "error",
+      `Failed to get workflow ${request.params.id}: ${error}`,
+      { orgId: request.authInfo.orgId },
+    );
     reply.code(500);
-    return { success: false, error: 'Failed to get workflow' };
+    return { success: false, error: "Failed to get workflow" };
   }
 };
 
 // Register the workflow routes
 registerApiModule({
-  name: 'workflows',
+  name: "workflows",
   routes: [
     {
-      method: 'GET',
-      path: '/workflows',
-      handler: getWorkflows
+      method: "GET",
+      path: "/workflows",
+      handler: getWorkflows,
     },
     {
-      method: 'GET',
-      path: '/workflows/:id',
-      handler: getWorkflow
+      method: "GET",
+      path: "/workflows/:id",
+      handler: getWorkflow,
     },
-  ]
+  ],
 });

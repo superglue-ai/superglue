@@ -3,11 +3,11 @@ import { chromium } from "playwright";
 import { Metadata } from "@superglue/shared";
 import { logMessage } from "../../utils/logs.js";
 import { OpenApiFetchingStrategy } from "../types.js";
-import { fetchMultipleOpenApiSpecs } from '../documentation-utils.js';
+import { fetchMultipleOpenApiSpecs } from "../documentation-utils.js";
 
 /**
  * Strategy for extracting OpenAPI spec URLs from SwaggerUI pages
- * 
+ *
  * This strategy:
  * 1. Checks if the provided URL is a SwaggerUI page
  * 2. Uses multiple methods to find the actual OpenAPI spec URL:
@@ -18,20 +18,28 @@ import { fetchMultipleOpenApiSpecs } from '../documentation-utils.js';
  * 3. Returns the discovered OpenAPI spec URLs
  */
 export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
-  async tryFetch(data: any, sourceUrl: string, metadata: Metadata): Promise<string | null> {
+  async tryFetch(
+    data: any,
+    sourceUrl: string,
+    metadata: Metadata,
+  ): Promise<string | null> {
     try {
       // Check if this is a SwaggerUI page
-      const html = typeof data === 'string' ? data : JSON.stringify(data);
+      const html = typeof data === "string" ? data : JSON.stringify(data);
       if (!this.isSwaggerUI(html)) {
         return null;
       }
 
-      logMessage('info', `Detected SwaggerUI page at ${sourceUrl}`, metadata);
+      logMessage("info", `Detected SwaggerUI page at ${sourceUrl}`, metadata);
 
       // Try static fetch first (faster)
       const staticUrls = await this.findByStaticFetch(sourceUrl);
       if (staticUrls.length > 0) {
-        logMessage('info', `Found ${staticUrls.length} OpenAPI spec URL(s) via static analysis`, metadata);
+        logMessage(
+          "info",
+          `Found ${staticUrls.length} OpenAPI spec URL(s) via static analysis`,
+          metadata,
+        );
         const specs = await fetchMultipleOpenApiSpecs(staticUrls, metadata);
         if (specs) {
           return specs;
@@ -41,17 +49,29 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
       // Fall back to Playwright (slower but more thorough)
       const playwrightUrls = await this.findByPlaywright(sourceUrl);
       if (playwrightUrls.length > 0) {
-        logMessage('info', `Found ${playwrightUrls.length} OpenAPI spec URL(s) via Playwright`, metadata);
+        logMessage(
+          "info",
+          `Found ${playwrightUrls.length} OpenAPI spec URL(s) via Playwright`,
+          metadata,
+        );
         const specs = await fetchMultipleOpenApiSpecs(playwrightUrls, metadata);
         if (specs) {
           return specs;
         }
       }
 
-      logMessage('warn', `SwaggerUI page detected but no OpenAPI spec URLs found`, metadata);
+      logMessage(
+        "warn",
+        `SwaggerUI page detected but no OpenAPI spec URLs found`,
+        metadata,
+      );
       return null;
     } catch (error) {
-      logMessage('warn', `SwaggerUIStrategy failed: ${error?.message}`, metadata);
+      logMessage(
+        "warn",
+        `SwaggerUIStrategy failed: ${error?.message}`,
+        metadata,
+      );
       return null;
     }
   }
@@ -72,7 +92,7 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
       /<title[^>]*>.*swagger.*ui.*<\/title>/i,
     ];
 
-    return swaggerIndicators.some(indicator => indicator.test(html));
+    return swaggerIndicators.some((indicator) => indicator.test(html));
   }
 
   private async extractSpecUrls(base: string, text: string): Promise<string[]> {
@@ -95,14 +115,22 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
       let m;
       while ((m = p.exec(text)) !== null) {
         // Skip template variables
-        if (m[1].includes('${') || m[1].includes('{{')) {
+        if (m[1].includes("${") || m[1].includes("{{")) {
           continue;
         }
 
         // Skip obviously invalid matches
-        if (m[1].includes(',We.createElement(') || m[1].includes(',s,i,') || m[1] === '/' || m[1] === 'mailto:' ||
-            m[1].includes(',u.createElement(') || m[1].includes(',O.createElement(') || m[1].includes(',e,t,') ||
-            m[1].includes('createElement') || m[1].includes(',') && !m[1].includes('/')) {
+        if (
+          m[1].includes(",We.createElement(") ||
+          m[1].includes(",s,i,") ||
+          m[1] === "/" ||
+          m[1] === "mailto:" ||
+          m[1].includes(",u.createElement(") ||
+          m[1].includes(",O.createElement(") ||
+          m[1].includes(",e,t,") ||
+          m[1].includes("createElement") ||
+          (m[1].includes(",") && !m[1].includes("/"))
+        ) {
           continue;
         }
 
@@ -110,29 +138,33 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
           const resolved = new URL(m[1], base).href;
 
           // Skip default Swagger Petstore example
-          if (resolved.includes('petstore.swagger.io')) {
+          if (resolved.includes("petstore.swagger.io")) {
             continue;
           }
 
           // Additional validation - must look like a spec URL
-          if (resolved.includes('/swagger/docs/') ||
-              resolved.includes('/swagger-docs') ||
-              resolved.includes('/api/') ||
-              resolved.endsWith('.json') ||
-              resolved.endsWith('.yaml') ||
-              resolved.endsWith('.yml')) {
+          if (
+            resolved.includes("/swagger/docs/") ||
+            resolved.includes("/swagger-docs") ||
+            resolved.includes("/api/") ||
+            resolved.endsWith(".json") ||
+            resolved.endsWith(".yaml") ||
+            resolved.endsWith(".yml")
+          ) {
             results.add(resolved);
           }
 
           // Handle swagger-config URLs
-          if (resolved.includes('/swagger-config')) {
+          if (resolved.includes("/swagger-config")) {
             try {
-              const { data: config } = await axios.get(resolved, { timeout: 10000 });
+              const { data: config } = await axios.get(resolved, {
+                timeout: 10000,
+              });
               if (config.urls && Array.isArray(config.urls)) {
                 for (const item of config.urls) {
                   if (item.url) {
                     const specUrl = new URL(item.url, resolved).href;
-                    if (!specUrl.includes('petstore.swagger.io')) {
+                    if (!specUrl.includes("petstore.swagger.io")) {
                       results.add(specUrl);
                     }
                   }
@@ -144,12 +176,14 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
           }
 
           // Handle config.json URLs (Crossref style)
-          if (resolved.includes('/config.json')) {
+          if (resolved.includes("/config.json")) {
             try {
-              const { data: config } = await axios.get(resolved, { timeout: 10000 });
+              const { data: config } = await axios.get(resolved, {
+                timeout: 10000,
+              });
               if (config.url) {
                 const specUrl = new URL(config.url, resolved).href;
-                if (!specUrl.includes('petstore.swagger.io')) {
+                if (!specUrl.includes("petstore.swagger.io")) {
                   results.add(specUrl);
                 }
               }
@@ -170,7 +204,7 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
     const found = new Set<string>();
     const { data: html } = await axios.get(pageUrl, { timeout: 10000 });
     const urls = await this.extractSpecUrls(pageUrl, html);
-    urls.forEach(u => found.add(u));
+    urls.forEach((u) => found.add(u));
 
     // Extract script src attributes using regex
     const scriptSrcPattern = /<script[^>]*\ssrc=["']([^"']+)["']/gi;
@@ -180,18 +214,19 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
         const scriptUrl = new URL(scriptMatch[1], pageUrl).href;
         const { data: js } = await axios.get(scriptUrl, { timeout: 10000 });
         const urls = await this.extractSpecUrls(scriptUrl, js);
-        urls.forEach(u => found.add(u));
+        urls.forEach((u) => found.add(u));
       } catch {
         // ignore failed script fetches
       }
     }
 
     // Extract inline scripts using regex
-    const inlineScriptPattern = /<script[^>]*>([^<]*(?:(?!<\/script>)<[^<]*)*)<\/script>/gi;
+    const inlineScriptPattern =
+      /<script[^>]*>([^<]*(?:(?!<\/script>)<[^<]*)*)<\/script>/gi;
     let inlineMatch;
     while ((inlineMatch = inlineScriptPattern.exec(html)) !== null) {
       const urls = await this.extractSpecUrls(pageUrl, inlineMatch[1]);
-      urls.forEach(u => found.add(u));
+      urls.forEach((u) => found.add(u));
     }
 
     return Array.from(found);
@@ -246,12 +281,12 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
           'a[href*="/docs"]',
           'a[href*="/openapi.json"]',
           'a[href*="/swagger.json"]',
-          '.information-container a[href]',
-          '.info a[href]',
-          'hgroup a[href]',
-          '.url',
+          ".information-container a[href]",
+          ".info a[href]",
+          "hgroup a[href]",
+          ".url",
           'a[target="_blank"]',
-          'span.url'
+          "span.url",
         ];
 
         const allLinks = new Set();
@@ -260,9 +295,17 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
           const elements = document.querySelectorAll(selector);
 
           for (const element of Array.from(elements)) {
-            const href = element.getAttribute('href') || element.textContent?.trim();
+            const href =
+              element.getAttribute("href") || element.textContent?.trim();
 
-            if (href && (href.includes('/api-docs') || href.includes('/swagger/docs') || href.includes('/docs') || href.includes('.json') || href.includes('.yaml'))) {
+            if (
+              href &&
+              (href.includes("/api-docs") ||
+                href.includes("/swagger/docs") ||
+                href.includes("/docs") ||
+                href.includes(".json") ||
+                href.includes(".yaml"))
+            ) {
               allLinks.add(href);
             }
           }
@@ -288,4 +331,3 @@ export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
     return Array.from(found);
   }
 }
-

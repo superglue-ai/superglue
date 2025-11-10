@@ -86,7 +86,6 @@ Return your answer in the following JSON format:
 THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
 `;
 
-
 export const GENERATE_SCHEMA_SYSTEM_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions.
 If the response data is an array, make the schema an array of objects. If no response data is provided, still generate a schema based on the instruction..
 
@@ -724,7 +723,7 @@ Single integration: "Retrieve all hubspot customers created in the last 30 days 
 Cross-integration: "Sync new Stripe customers to CRM and send welcome email via SendGrid"
 </Examples>
 
-Important: Always generate suggestions based on common patterns for the type of service provided. Use your knowledge of typical API structures and common use cases. Never abort - be creative and helpful.`
+Important: Always generate suggestions based on common patterns for the type of service provided. Use your knowledge of typical API structures and common use cases. Never abort - be creative and helpful.`;
 
 export const EVALUATE_TRANSFORM_SYSTEM_PROMPT = `You are a data transformation evaluator assessing if the mapping code correctly implements the transformation logic.
 
@@ -746,4 +745,4 @@ When the instruction specifies exact field names or conditions, trust the instru
 
 Focus on data accuracy and completeness of the mapping logic, and adherence to the instruction if provided.
 Be particularly lenient with arrays and filtered data since the samples may not contain all relevant records.
-Return { success: true, reason: "Mapping follows instruction and appears logically sound" } unless you find definitive errors in the code logic itself.`
+Return { success: true, reason: "Mapping follows instruction and appears logically sound" } unless you find definitive errors in the code logic itself.`;

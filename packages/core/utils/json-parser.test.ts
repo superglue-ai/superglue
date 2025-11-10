@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
   isValidJson,
   minifyJson,
@@ -6,20 +6,20 @@ import {
   parseJsonResilient,
   prettyPrintJson,
   RepairStrategy,
-  ResilientJsonParser
-} from './json-parser.js';
+  ResilientJsonParser,
+} from "./json-parser.js";
 
-describe('Resilient JSON Parser', () => {
-  describe('parseJsonResilient', () => {
-    it('should parse valid JSON normally', () => {
+describe("Resilient JSON Parser", () => {
+  describe("parseJsonResilient", () => {
+    it("should parse valid JSON normally", () => {
       const validJson = '{"key": "value", "number": 123}';
       const result = parseJsonResilient(validJson);
       expect(result.success).toBe(true);
-      expect(result.data).toEqual({ key: 'value', number: 123 });
+      expect(result.data).toEqual({ key: "value", number: 123 });
       expect(result.repairs).toBeUndefined();
     });
 
-    it('should handle triple quotes from client data', () => {
+    it("should handle triple quotes from client data", () => {
       const malformedJson = `{
         "product.custom_fields": """{"MOQ" : "1", "AI Prompt Version" : "Prompt v1.1"}""",
         "product.title": "APC AP7900B",
@@ -31,23 +31,25 @@ describe('Resilient JSON Parser', () => {
       expect(result.success).toBe(true);
       expect(result.data).toBeDefined();
       // Should parse the inner JSON as an actual object
-      expect(result.data['product.custom_fields']).toEqual({
+      expect(result.data["product.custom_fields"]).toEqual({
         MOQ: "1",
-        "AI Prompt Version": "Prompt v1.1"
+        "AI Prompt Version": "Prompt v1.1",
       });
-      expect(result.data['variant.sourceLinks']).toEqual({
+      expect(result.data["variant.sourceLinks"]).toEqual({
         "25856307": "18688060779",
-        "AP7900B": "17337310486"
+        AP7900B: "17337310486",
       });
-      expect(result.data['variant.custom_fields']).toEqual({
+      expect(result.data["variant.custom_fields"]).toEqual({
         Length: "17.5",
         Width: "4.3",
-        Height: "1.7"
+        Height: "1.7",
       });
-      expect(result.repairs).toContain('Converts triple-quoted strings to proper JSON, parsing nested JSON content');
+      expect(result.repairs).toContain(
+        "Converts triple-quoted strings to proper JSON, parsing nested JSON content",
+      );
     });
 
-    it('should handle the full client JSON example', () => {
+    it("should handle the full client JSON example", () => {
       const clientJson = `{
         "_index": "voomi-products-catalog-latest",
         "_id": "171475694_50b35eb6-1854-4197-8eac-f582ccefe602",
@@ -114,68 +116,81 @@ describe('Resilient JSON Parser', () => {
       expect(result.success).toBe(true);
       expect(result.data).toBeDefined();
       expect(result.data._source).toBeDefined();
-      expect(result.data._source['product.manufacturer']).toBe('APC');
+      expect(result.data._source["product.manufacturer"]).toBe("APC");
       // Verify that triple-quoted arrays are parsed as actual arrays
-      expect(Array.isArray(result.data._source['product.variantSkus'])).toBe(true);
-      expect(result.data._source['product.variantSkus']).toEqual(["50b35eb6-1854-4197-8eac-f582ccefe602"]);
+      expect(Array.isArray(result.data._source["product.variantSkus"])).toBe(
+        true,
+      );
+      expect(result.data._source["product.variantSkus"]).toEqual([
+        "50b35eb6-1854-4197-8eac-f582ccefe602",
+      ]);
       // Verify that triple-quoted objects are parsed as actual objects
-      expect(typeof result.data._source['variant.sourceLinks']).toBe('object');
-      expect(result.data._source['variant.sourceLinks']["25856307"]).toBe("18688060779");
+      expect(typeof result.data._source["variant.sourceLinks"]).toBe("object");
+      expect(result.data._source["variant.sourceLinks"]["25856307"]).toBe(
+        "18688060779",
+      );
       expect(result.repairs).toBeDefined();
       expect(result.repairs!.length).toBeGreaterThan(0);
     });
 
-    it('should handle trailing commas', () => {
+    it("should handle trailing commas", () => {
       const jsonWithTrailingComma = '{"key": "value", "number": 123,}';
       const result = parseJsonResilient(jsonWithTrailingComma);
       expect(result.success).toBe(true);
-      expect(result.data).toEqual({ key: 'value', number: 123 });
-      expect(result.repairs).toContain('Removes trailing commas from objects and arrays');
+      expect(result.data).toEqual({ key: "value", number: 123 });
+      expect(result.repairs).toContain(
+        "Removes trailing commas from objects and arrays",
+      );
     });
 
-    it('should handle Python-style None, True, False', () => {
-      const pythonJson = '{"nullValue": None, "trueValue": True, "falseValue": False}';
+    it("should handle Python-style None, True, False", () => {
+      const pythonJson =
+        '{"nullValue": None, "trueValue": True, "falseValue": False}';
       const result = parseJsonResilient(pythonJson, { attemptRepair: true });
       expect(result.success).toBe(true);
       expect(result.data).toEqual({
         nullValue: null,
         trueValue: true,
-        falseValue: false
+        falseValue: false,
       });
     });
 
-    it('should handle single quotes automatically', () => {
+    it("should handle single quotes automatically", () => {
       const singleQuoteJson = "{'key': 'value', 'number': 123}";
       const result = parseJsonResilient(singleQuoteJson);
       expect(result.success).toBe(true);
-      expect(result.data).toEqual({ key: 'value', number: 123 });
+      expect(result.data).toEqual({ key: "value", number: 123 });
     });
 
-    it('should handle single quotes with control characters', () => {
+    it("should handle single quotes with control characters", () => {
       // Single-quoted strings with newlines and tabs
       const jsonWithControlChars = `{'message': 'Hello\nWorld', 'tab': 'Tab\there'}`;
       const result = parseJsonResilient(jsonWithControlChars);
       expect(result.success).toBe(true);
       expect(result.data).toEqual({
-        message: 'Hello\nWorld',
-        tab: 'Tab\there'
+        message: "Hello\nWorld",
+        tab: "Tab\there",
       });
-      expect(result.repairs).toContain('Converts single quotes to double quotes');
-      expect(result.repairs).toContain('Escapes unescaped control characters (newlines, tabs, etc.) in JSON strings');
+      expect(result.repairs).toContain(
+        "Converts single quotes to double quotes",
+      );
+      expect(result.repairs).toContain(
+        "Escapes unescaped control characters (newlines, tabs, etc.) in JSON strings",
+      );
     });
 
-    it('should preserve apostrophes in double-quoted strings', () => {
+    it("should preserve apostrophes in double-quoted strings", () => {
       // Mix of quotes with apostrophes and control chars
       const mixedQuotes = `{"name": "O'Brien", 'address': 'Line 1\nLine 2'}`;
       const result = parseJsonResilient(mixedQuotes);
       expect(result.success).toBe(true);
       expect(result.data).toEqual({
-        name: "O'Brien",  // Apostrophe preserved
-        address: "Line 1\nLine 2"
+        name: "O'Brien", // Apostrophe preserved
+        address: "Line 1\nLine 2",
       });
     });
 
-    it('should handle control characters in various string contexts', () => {
+    it("should handle control characters in various string contexts", () => {
       // Control chars in different quote styles
       const complexJson = `{
         "double": "Has\ttab",
@@ -187,52 +202,52 @@ describe('Resilient JSON Parser', () => {
       expect(result.data).toEqual({
         double: "Has\ttab",
         single: "Has\nnewline",
-        mixed: "It's\ta\ntest"
+        mixed: "It's\ta\ntest",
       });
     });
 
-    it('should handle unquoted keys automatically', () => {
+    it("should handle unquoted keys automatically", () => {
       const unquotedJson = '{key: "value", number: 123}';
       const result = parseJsonResilient(unquotedJson);
       expect(result.success).toBe(true);
-      expect(result.data).toEqual({ key: 'value', number: 123 });
+      expect(result.data).toEqual({ key: "value", number: 123 });
     });
 
-    it('should return error for completely invalid JSON', () => {
-      const invalidJson = 'this is not json at all';
+    it("should return error for completely invalid JSON", () => {
+      const invalidJson = "this is not json at all";
       const result = parseJsonResilient(invalidJson);
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
     });
 
-    it('should handle edge case with apostrophes in single-quoted strings', () => {
+    it("should handle edge case with apostrophes in single-quoted strings", () => {
       // The SingleQuoteStrategy regex pattern [^']+ doesn't match strings with apostrophes
       // This is a known limitation - it's better to use double quotes for strings with apostrophes
       const jsonWithApostrophe = `{"name": "O'Brien", 'simple': 'value'}`;
       const result = parseJsonResilient(jsonWithApostrophe);
       expect(result.success).toBe(true);
       expect(result.data).toEqual({
-        name: "O'Brien",  // Double quotes preserve apostrophes
-        simple: 'value'   // Single quotes without apostrophes work fine
+        name: "O'Brien", // Double quotes preserve apostrophes
+        simple: "value", // Single quotes without apostrophes work fine
       });
     });
   });
 
-  describe('parseJSON (backwards compatibility)', () => {
-    it('should work with Buffer input', () => {
+  describe("parseJSON (backwards compatibility)", () => {
+    it("should work with Buffer input", () => {
       const validJson = '{"key": "value"}';
-      const buffer = Buffer.from(validJson, 'utf8');
+      const buffer = Buffer.from(validJson, "utf8");
       const result = parseJSON(buffer);
-      expect(result).toEqual({ key: 'value' });
+      expect(result).toEqual({ key: "value" });
     });
 
-    it('should work with string input', () => {
+    it("should work with string input", () => {
       const validJson = '{"key": "value"}';
       const result = parseJSON(validJson);
-      expect(result).toEqual({ key: 'value' });
+      expect(result).toEqual({ key: "value" });
     });
 
-    it('should handle malformed JSON with triple quotes', () => {
+    it("should handle malformed JSON with triple quotes", () => {
       const malformedJson = `{"field": """{"inner": "value"}"""}`;
       const result = parseJSON(malformedJson);
       expect(result).toBeDefined();
@@ -240,76 +255,78 @@ describe('Resilient JSON Parser', () => {
       expect(result.field).toEqual({ inner: "value" });
     });
 
-    it('should throw on completely invalid JSON', () => {
-      const invalidJson = 'not json';
-      expect(() => parseJSON(invalidJson)).toThrow('Failed to parse JSON');
+    it("should throw on completely invalid JSON", () => {
+      const invalidJson = "not json";
+      expect(() => parseJSON(invalidJson)).toThrow("Failed to parse JSON");
     });
   });
 
-  describe('isValidJson', () => {
-    it('should return true for valid JSON', () => {
+  describe("isValidJson", () => {
+    it("should return true for valid JSON", () => {
       expect(isValidJson('{"key": "value"}')).toBe(true);
-      expect(isValidJson('[]')).toBe(true);
-      expect(isValidJson('null')).toBe(true);
-      expect(isValidJson('123')).toBe(true);
+      expect(isValidJson("[]")).toBe(true);
+      expect(isValidJson("null")).toBe(true);
+      expect(isValidJson("123")).toBe(true);
       expect(isValidJson('"string"')).toBe(true);
     });
 
-    it('should return false for invalid JSON', () => {
+    it("should return false for invalid JSON", () => {
       expect(isValidJson('{"key": "value",}')).toBe(false);
       expect(isValidJson("{'key': 'value'}")).toBe(false);
-      expect(isValidJson('undefined')).toBe(false);
-      expect(isValidJson('')).toBe(false);
+      expect(isValidJson("undefined")).toBe(false);
+      expect(isValidJson("")).toBe(false);
     });
   });
 
-  describe('prettyPrintJson', () => {
-    it('should format JSON with indentation', () => {
-      const data = { key: 'value', nested: { inner: 'data' } };
+  describe("prettyPrintJson", () => {
+    it("should format JSON with indentation", () => {
+      const data = { key: "value", nested: { inner: "data" } };
       const pretty = prettyPrintJson(data);
-      expect(pretty).toContain('\n');
-      expect(pretty).toContain('  ');
+      expect(pretty).toContain("\n");
+      expect(pretty).toContain("  ");
     });
 
-    it('should use custom indentation', () => {
-      const data = { key: 'value' };
+    it("should use custom indentation", () => {
+      const data = { key: "value" };
       const pretty = prettyPrintJson(data, 4);
-      expect(pretty).toContain('    ');
+      expect(pretty).toContain("    ");
     });
   });
 
-  describe('minifyJson', () => {
-    it('should remove whitespace from JSON', () => {
+  describe("minifyJson", () => {
+    it("should remove whitespace from JSON", () => {
       const prettyJson = `{
         "key": "value",
         "number": 123
       }`;
       const minified = minifyJson(prettyJson);
       expect(minified).toBe('{"key":"value","number":123}');
-      expect(minified).not.toContain('\\n');
-      expect(minified).not.toContain(' ');
+      expect(minified).not.toContain("\\n");
+      expect(minified).not.toContain(" ");
     });
 
-    it('should repair and minify malformed JSON', () => {
+    it("should repair and minify malformed JSON", () => {
       const malformed = '{"key": "value",}';
       const minified = minifyJson(malformed);
       expect(minified).toBe('{"key":"value"}');
     });
 
-    it('should throw for completely invalid JSON', () => {
-      expect(() => minifyJson('not json')).toThrow('Cannot minify invalid JSON');
+    it("should throw for completely invalid JSON", () => {
+      expect(() => minifyJson("not json")).toThrow(
+        "Cannot minify invalid JSON",
+      );
     });
   });
 
-  describe('ResilientJsonParser class', () => {
-    it('should work with class instantiation', () => {
+  describe("ResilientJsonParser class", () => {
+    it("should work with class instantiation", () => {
       const parser = new ResilientJsonParser();
       const result = parser.parse('{"key": "value"}');
       expect(result.success).toBe(true);
-      expect(result.data).toEqual({ key: 'value' });
+      expect(result.data).toEqual({ key: "value" });
     });
 
-    it('should handle strategy ordering correctly for single quotes with control chars', () => {
+    it("should handle strategy ordering correctly for single quotes with control chars", () => {
       // This test validates that SingleQuoteStrategy runs before UnescapedControlCharactersStrategy
       // If the order were reversed, this would fail because control chars in single-quoted strings
       // wouldn't be detected and fixed
@@ -326,15 +343,17 @@ describe('Resilient JSON Parser', () => {
       const result = parser.parse(problematicJson);
       expect(result.success).toBe(true);
       expect(result.data).toEqual({
-        description: 'Product\nwith\nnewlines',
-        tab_field: 'Has\ttabs\there',
-        comment: 'Already double-quoted\nwith newline'
+        description: "Product\nwith\nnewlines",
+        tab_field: "Has\ttabs\there",
+        comment: "Already double-quoted\nwith newline",
       });
 
       // Verify the strategies were applied in the correct order
       const strategies = result.metadata?.strategiesApplied || [];
-      const singleQuoteIndex = strategies.indexOf('SingleQuoteRepair');
-      const controlCharIndex = strategies.indexOf('UnescapedControlCharactersRepair');
+      const singleQuoteIndex = strategies.indexOf("SingleQuoteRepair");
+      const controlCharIndex = strategies.indexOf(
+        "UnescapedControlCharactersRepair",
+      );
 
       // SingleQuoteRepair should come before UnescapedControlCharactersRepair if both are present
       if (singleQuoteIndex !== -1 && controlCharIndex !== -1) {
@@ -342,32 +361,32 @@ describe('Resilient JSON Parser', () => {
       }
     });
 
-    it('should handle custom strategies', () => {
+    it("should handle custom strategies", () => {
       // Create a custom strategy
       class CustomPrefixStrategy extends RepairStrategy {
-        name = 'CustomPrefix';
-        description = 'Removes custom prefix';
+        name = "CustomPrefix";
+        description = "Removes custom prefix";
 
         canApply(input: string): boolean {
-          return input.startsWith('CUSTOM:');
+          return input.startsWith("CUSTOM:");
         }
 
         apply(input: string): string {
-          return input.replace('CUSTOM:', '');
+          return input.replace("CUSTOM:", "");
         }
       }
 
       const parser = new ResilientJsonParser({
-        customStrategies: [new CustomPrefixStrategy()]
+        customStrategies: [new CustomPrefixStrategy()],
       });
 
       const result = parser.parse('CUSTOM:{"key": "value"}');
       expect(result.success).toBe(true);
-      expect(result.data).toEqual({ key: 'value' });
-      expect(result.metadata?.strategiesApplied).toContain('CustomPrefix');
+      expect(result.data).toEqual({ key: "value" });
+      expect(result.metadata?.strategiesApplied).toContain("CustomPrefix");
     });
 
-    it('should properly parse nested JSON in triple quotes', () => {
+    it("should properly parse nested JSON in triple quotes", () => {
       const parser = new ResilientJsonParser();
       const complexJson = `{
         "simple": "value",
@@ -378,17 +397,21 @@ describe('Resilient JSON Parser', () => {
 
       const result = parser.parse(complexJson);
       expect(result.success).toBe(true);
-      expect(result.data.simple).toBe('value');
+      expect(result.data.simple).toBe("value");
       expect(result.data.regular).toBe(123);
       // Nested JSON should be parsed as actual objects
       expect(result.data.nested_json).toEqual({
         inner: { deep: "value" },
-        array: [1, 2, 3]
+        array: [1, 2, 3],
       });
-      expect(result.data.nested_array).toEqual(["item1", "item2", { key: "value" }]);
+      expect(result.data.nested_array).toEqual([
+        "item1",
+        "item2",
+        { key: "value" },
+      ]);
     });
 
-    it('should provide metadata about parsing', () => {
+    it("should provide metadata about parsing", () => {
       const parser = new ResilientJsonParser({ logRepairs: false });
       const malformed = '{"key": "value",}';
       const result = parser.parse(malformed);
@@ -396,19 +419,21 @@ describe('Resilient JSON Parser', () => {
       expect(result.success).toBe(true);
       expect(result.metadata).toBeDefined();
       expect(result.metadata?.parseTime).toBeGreaterThanOrEqual(0);
-      expect(result.metadata?.strategiesApplied).toContain('TrailingCommaRepair');
+      expect(result.metadata?.strategiesApplied).toContain(
+        "TrailingCommaRepair",
+      );
     });
 
-    it('should handle options correctly', () => {
+    it("should handle options correctly", () => {
       const parser = new ResilientJsonParser({ attemptRepair: false });
       const malformed = '{"key": "value",}';
       const result = parser.parse(malformed);
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('JSON parse error');
+      expect(result.error).toContain("JSON parse error");
     });
 
-    it('should handle trailing non-JSON characters after valid JSON', () => {
+    it("should handle trailing non-JSON characters after valid JSON", () => {
       const parser = new ResilientJsonParser();
 
       // Test with object and trailing tilde
@@ -416,14 +441,18 @@ describe('Resilient JSON Parser', () => {
       const result1 = parser.parse(jsonWithTilde);
       expect(result1.success).toBe(true);
       expect(result1.data).toEqual({ key: "value", number: 42 });
-      expect(result1.metadata?.strategiesApplied).toContain('TrailingCharactersRepair');
+      expect(result1.metadata?.strategiesApplied).toContain(
+        "TrailingCharactersRepair",
+      );
 
       // Test with array and trailing characters
       const jsonArrayWithTrailing = '[1, 2, 3, "test"]random text here';
       const result2 = parser.parse(jsonArrayWithTrailing);
       expect(result2.success).toBe(true);
       expect(result2.data).toEqual([1, 2, 3, "test"]);
-      expect(result2.metadata?.strategiesApplied).toContain('TrailingCharactersRepair');
+      expect(result2.metadata?.strategiesApplied).toContain(
+        "TrailingCharactersRepair",
+      );
 
       // Test with nested object and trailing newline and tilde
       const complexJson = `{
@@ -442,10 +471,12 @@ describe('Resilient JSON Parser', () => {
       expect(result3.success).toBe(true);
       expect(result3.data._index).toBe("test");
       expect(result3.data._source.product.price).toBe(99.99);
-      expect(result3.metadata?.strategiesApplied).toContain('TrailingCharactersRepair');
+      expect(result3.metadata?.strategiesApplied).toContain(
+        "TrailingCharactersRepair",
+      );
     });
 
-    it('should use aggressive fallback for JSON with leading garbage', () => {
+    it("should use aggressive fallback for JSON with leading garbage", () => {
       const parser = new ResilientJsonParser();
 
       // Test with leading text before JSON
@@ -453,14 +484,18 @@ describe('Resilient JSON Parser', () => {
       const result = parser.parse(jsonWithPrefix);
       expect(result.success).toBe(true);
       expect(result.data).toEqual({ status: "ok", code: 200 });
-      expect(result.metadata?.strategiesApplied).toContain('AggressiveFallback');
+      expect(result.metadata?.strategiesApplied).toContain(
+        "AggressiveFallback",
+      );
 
       // Test with debug output around JSON
-      const debugJson = 'DEBUG: Processing data... [1, 2, 3] Done!';
+      const debugJson = "DEBUG: Processing data... [1, 2, 3] Done!";
       const result2 = parser.parse(debugJson);
       expect(result2.success).toBe(true);
       expect(result2.data).toEqual([1, 2, 3]);
-      expect(result2.metadata?.strategiesApplied).toContain('AggressiveFallback');
+      expect(result2.metadata?.strategiesApplied).toContain(
+        "AggressiveFallback",
+      );
     });
   });
 });

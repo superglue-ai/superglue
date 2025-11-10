@@ -39,10 +39,18 @@ describe("Rate Limit Integration Test with real server", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    const result = await callEndpointLegacyImplementation({endpoint: config, payload: {}, credentials: {}, options: {}});
+    const result = await callEndpointLegacyImplementation({
+      endpoint: config,
+      payload: {},
+      credentials: {},
+      options: {},
+    });
     // Should have made 2 requests (one 429, one 200)
     expect(requestCount).toBe(2);
-    expect(result.data).toEqual({ success: true, data: "Rate limit test passed" });
+    expect(result.data).toEqual({
+      success: true,
+      data: "Rate limit test passed",
+    });
   });
 
   it("should fail when rate limit wait time exceeds maximum", async () => {
@@ -57,6 +65,13 @@ describe("Rate Limit Integration Test with real server", () => {
       updatedAt: new Date(),
     };
     // Should throw an error about rate limit exceeded
-    await expect(callEndpointLegacyImplementation({endpoint: config, payload: {}, credentials: {}, options: {}})).rejects.toThrow(/Rate limit exceeded/);
+    await expect(
+      callEndpointLegacyImplementation({
+        endpoint: config,
+        payload: {},
+        credentials: {},
+        options: {},
+      }),
+    ).rejects.toThrow(/Rate limit exceeded/);
   });
 });

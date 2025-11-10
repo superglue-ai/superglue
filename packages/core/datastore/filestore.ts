@@ -1,12 +1,16 @@
-import type { ApiConfig, Integration, RunResult, Workflow } from "@superglue/client";
-import fs from 'node:fs';
-import path from 'node:path';
+import type {
+  ApiConfig,
+  Integration,
+  RunResult,
+  Workflow,
+} from "@superglue/client";
+import fs from "node:fs";
+import path from "node:path";
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
 import type { DataStore, WorkflowScheduleInternal } from "./types.js";
 
 export class FileStore implements DataStore {
-
   private storage: {
     apis: Map<string, ApiConfig>;
     workflows: Map<string, Workflow>;
@@ -23,7 +27,7 @@ export class FileStore implements DataStore {
   private initialized: boolean = false;
   private initPromise: Promise<void> | null = null;
 
-  constructor(storageDir = '/data') {
+  constructor(storageDir = "/data") {
     this.storage = {
       apis: new Map(),
       workflows: new Map(),
@@ -31,15 +35,18 @@ export class FileStore implements DataStore {
       integrations: new Map(),
       tenant: {
         email: null,
-        emailEntrySkipped: false
-      }
+        emailEntrySkipped: false,
+      },
     };
 
-    this.filePath = path.join(storageDir, 'superglue_data.json');
-    this.logsFilePath = path.join(storageDir, 'superglue_logs.jsonl');
+    this.filePath = path.join(storageDir, "superglue_data.json");
+    this.logsFilePath = path.join(storageDir, "superglue_logs.jsonl");
 
     this.ensureInitialized();
-    logMessage('info', `File Datastore: Initial storage path: ${this.filePath}`);
+    logMessage(
+      "info",
+      `File Datastore: Initial storage path: ${this.filePath}`,
+    );
   }
 
   private async ensureInitialized(): Promise<void> {
@@ -57,22 +64,37 @@ export class FileStore implements DataStore {
       try {
         await fs.promises.access(path.dirname(this.filePath));
       } catch {
-        if (this.filePath.startsWith('/data/')) {
-          logMessage('warn', 'File Datastore: "/data" directory not found, switching to local ".superglue" directory');
-          this.filePath = path.join('./.superglue', 'superglue_data.json');
-          this.logsFilePath = path.join('./.superglue', 'superglue_logs.jsonl');
-          logMessage('info', `File Datastore: Updated storage path: ${this.filePath}`);
+        if (this.filePath.startsWith("/data/")) {
+          logMessage(
+            "warn",
+            'File Datastore: "/data" directory not found, switching to local ".superglue" directory',
+          );
+          this.filePath = path.join("./.superglue", "superglue_data.json");
+          this.logsFilePath = path.join("./.superglue", "superglue_logs.jsonl");
+          logMessage(
+            "info",
+            `File Datastore: Updated storage path: ${this.filePath}`,
+          );
         }
       }
 
       // Ensure the directory exists with proper permissions
-      await fs.promises.mkdir(path.dirname(this.filePath), { recursive: true, mode: 0o755 });
-      logMessage('info', `File Datastore: Created/verified directory: ${path.dirname(this.filePath)}`);
+      await fs.promises.mkdir(path.dirname(this.filePath), {
+        recursive: true,
+        mode: 0o755,
+      });
+      logMessage(
+        "info",
+        `File Datastore: Created/verified directory: ${path.dirname(this.filePath)}`,
+      );
 
       try {
-        const data = await fs.promises.readFile(this.filePath, 'utf-8');
+        const data = await fs.promises.readFile(this.filePath, "utf-8");
         const parsed = JSON.parse(data, (key, value) => {
-          if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+          if (
+            typeof value === "string" &&
+            value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+          ) {
             return new Date(value);
           }
           return value;
@@ -81,22 +103,30 @@ export class FileStore implements DataStore {
           ...this.storage,
           apis: new Map(Object.entries(parsed.apis || {})),
           workflows: new Map(Object.entries(parsed.workflows || {})),
-          workflowSchedules: new Map(Object.entries(parsed.workflowSchedules || {})),
+          workflowSchedules: new Map(
+            Object.entries(parsed.workflowSchedules || {}),
+          ),
           integrations: new Map(Object.entries(parsed.integrations || {})),
           tenant: {
             email: parsed.tenant?.email || null,
-            emailEntrySkipped: parsed.tenant?.emailEntrySkipped || false
-          }
+            emailEntrySkipped: parsed.tenant?.emailEntrySkipped || false,
+          },
         };
-        logMessage('info', 'File Datastore: Successfully loaded existing data');
+        logMessage("info", "File Datastore: Successfully loaded existing data");
       } catch (error) {
-        logMessage('error', 'File Datastore: Error loading data: ' + error);
+        logMessage("error", "File Datastore: Error loading data: " + error);
         try {
           await fs.promises.access(this.filePath);
-          logMessage('error', 'COULD NOT LOAD FROM EXISTING FILE. EXITING. ' + error);
+          logMessage(
+            "error",
+            "COULD NOT LOAD FROM EXISTING FILE. EXITING. " + error,
+          );
           process.exit(1);
         } catch {
-          logMessage('info', 'File Datastore: No existing data found, starting with empty storage');
+          logMessage(
+            "info",
+            "File Datastore: No existing data found, starting with empty storage",
+          );
           await this.persist();
         }
       }
@@ -105,23 +135,22 @@ export class FileStore implements DataStore {
       try {
         await fs.promises.access(this.logsFilePath);
       } catch {
-        await fs.promises.writeFile(this.logsFilePath, '');
-        logMessage('info', 'Logs Datastore: Created empty logs file');
+        await fs.promises.writeFile(this.logsFilePath, "");
+        logMessage("info", "Logs Datastore: Created empty logs file");
       }
 
       this.initialized = true;
     } catch (error) {
-      logMessage('error', 'Failed to initialize storage: ' + error);
+      logMessage("error", "Failed to initialize storage: " + error);
       throw error;
     }
   }
-
 
   private isPersisting = false;
   private async persist() {
     try {
       while (this.isPersisting) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
       this.isPersisting = true;
       const serialized = {
@@ -129,30 +158,42 @@ export class FileStore implements DataStore {
         workflows: Object.fromEntries(this.storage.workflows),
         workflowSchedules: Object.fromEntries(this.storage.workflowSchedules),
         integrations: Object.fromEntries(this.storage.integrations),
-        tenant: this.storage.tenant
+        tenant: this.storage.tenant,
       };
-      await fs.promises.writeFile(this.filePath, JSON.stringify(serialized, null, 2), { mode: 0o644 });
+      await fs.promises.writeFile(
+        this.filePath,
+        JSON.stringify(serialized, null, 2),
+        { mode: 0o644 },
+      );
     } catch (error) {
-      logMessage('error', 'Failed to persist data: ' + error);
+      logMessage("error", "Failed to persist data: " + error);
       throw error;
-    }
-    finally {
+    } finally {
       this.isPersisting = false;
     }
   }
 
   private getKey(prefix: string, id: string, orgId?: string): string {
-    return `${orgId ? `${orgId}:` : ''}${prefix}:${id}`;
+    return `${orgId ? `${orgId}:` : ""}${prefix}:${id}`;
   }
 
-  private getOrgItems<T>(map: Map<string, T>, prefix: string, orgId?: string): T[] {
+  private getOrgItems<T>(
+    map: Map<string, T>,
+    prefix: string,
+    orgId?: string,
+  ): T[] {
     return Array.from(map.entries())
-      .filter(([key]) => key.startsWith(`${orgId ? `${orgId}:` : ''}${prefix}:`))
-      .map(([key, value]) => ({ ...value, id: key.split(':').pop() })) as T[];
+      .filter(([key]) =>
+        key.startsWith(`${orgId ? `${orgId}:` : ""}${prefix}:`),
+      )
+      .map(([key, value]) => ({ ...value, id: key.split(":").pop() })) as T[];
   }
 
   // Helper function to read last N lines from file without reading entire file (async version)
-  private async readLastLines(filePath: string, lineCount: number): Promise<string[]> {
+  private async readLastLines(
+    filePath: string,
+    lineCount: number,
+  ): Promise<string[]> {
     try {
       await fs.promises.access(filePath);
     } catch {
@@ -163,7 +204,7 @@ export class FileStore implements DataStore {
     let fileHandle: fs.promises.FileHandle;
 
     try {
-      fileHandle = await fs.promises.open(filePath, 'r');
+      fileHandle = await fs.promises.open(filePath, "r");
       const stats = await fileHandle.stat();
       let fileSize = stats.size;
 
@@ -174,7 +215,7 @@ export class FileStore implements DataStore {
 
       const lines: string[] = [];
       let buffer = Buffer.alloc(BUFFER_SIZE);
-      let leftover = '';
+      let leftover = "";
       let position = fileSize;
 
       while (lines.length < lineCount && position > 0) {
@@ -182,13 +223,18 @@ export class FileStore implements DataStore {
         position = Math.max(0, position - chunkSize);
 
         const result = await fileHandle.read(buffer, 0, chunkSize, position);
-        const chunk = buffer.subarray(0, result.bytesRead).toString('utf-8') + leftover;
+        const chunk =
+          buffer.subarray(0, result.bytesRead).toString("utf-8") + leftover;
 
-        const chunkLines = chunk.split('\n');
-        leftover = chunkLines.shift() || '';
+        const chunkLines = chunk.split("\n");
+        leftover = chunkLines.shift() || "";
 
         // Add lines from end to beginning
-        for (let i = chunkLines.length - 1; i >= 0 && lines.length < lineCount; i--) {
+        for (
+          let i = chunkLines.length - 1;
+          i >= 0 && lines.length < lineCount;
+          i--
+        ) {
           if (chunkLines[i].trim()) {
             lines.unshift(chunkLines[i]);
           }
@@ -206,13 +252,17 @@ export class FileStore implements DataStore {
       if (fileHandle!) {
         await fileHandle.close();
       }
-      logMessage('error', 'Failed to read last lines: ' + error);
+      logMessage("error", "Failed to read last lines: " + error);
       return [];
     }
   }
 
   // Helper function to read runs from logs file
-  private async readRunsFromLogs(orgId?: string, configId?: string, maxRuns?: number): Promise<RunResult[]> {
+  private async readRunsFromLogs(
+    orgId?: string,
+    configId?: string,
+    maxRuns?: number,
+  ): Promise<RunResult[]> {
     try {
       // Read more lines than needed to account for filtering
       const linesToRead = maxRuns ? maxRuns * 3 : 1000;
@@ -223,7 +273,10 @@ export class FileStore implements DataStore {
       for (const line of lines) {
         try {
           const run = JSON.parse(line, (key, value) => {
-            if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+            if (
+              typeof value === "string" &&
+              value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+            ) {
               return new Date(value);
             }
             return value;
@@ -238,12 +291,15 @@ export class FileStore implements DataStore {
           // Stop early if we have enough
           if (maxRuns && runs.length >= maxRuns) break;
         } catch (parseError) {
-          logMessage('warn', `Failed to parse log line: ${line}`);
+          logMessage("warn", `Failed to parse log line: ${line}`);
         }
       }
-      return runs.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+      return runs.sort(
+        (a, b) =>
+          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+      );
     } catch (error) {
-      logMessage('error', 'Failed to read runs from logs: ' + error);
+      logMessage("error", "Failed to read runs from logs: " + error);
       return [];
     }
   }
@@ -252,16 +308,19 @@ export class FileStore implements DataStore {
   private async appendRunToLogs(run: RunResult, orgId: string): Promise<void> {
     try {
       const runWithOrgId = { ...run, orgId };
-      const logLine = JSON.stringify(runWithOrgId) + '\n';
+      const logLine = JSON.stringify(runWithOrgId) + "\n";
       await fs.promises.appendFile(this.logsFilePath, logLine, { mode: 0o644 });
     } catch (error) {
-      logMessage('error', 'Failed to append run to logs: ' + error);
+      logMessage("error", "Failed to append run to logs: " + error);
       throw error;
     }
   }
 
   // Helper function to remove run from logs file
-  private async removeRunFromLogs(id: string, orgId?: string): Promise<boolean> {
+  private async removeRunFromLogs(
+    id: string,
+    orgId?: string,
+  ): Promise<boolean> {
     try {
       try {
         await fs.promises.access(this.logsFilePath);
@@ -269,12 +328,12 @@ export class FileStore implements DataStore {
         return false;
       }
 
-      const content = await fs.promises.readFile(this.logsFilePath, 'utf-8');
+      const content = await fs.promises.readFile(this.logsFilePath, "utf-8");
       if (!content.trim()) {
         return false;
       }
 
-      const lines = content.trim().split('\n');
+      const lines = content.trim().split("\n");
       const filteredLines: string[] = [];
       let found = false;
 
@@ -293,99 +352,129 @@ export class FileStore implements DataStore {
       }
 
       if (found) {
-        const newContent = filteredLines.length > 0 ? filteredLines.join('\n') + '\n' : '';
-        await fs.promises.writeFile(this.logsFilePath, newContent, { mode: 0o644 });
+        const newContent =
+          filteredLines.length > 0 ? filteredLines.join("\n") + "\n" : "";
+        await fs.promises.writeFile(this.logsFilePath, newContent, {
+          mode: 0o644,
+        });
       }
 
       return found;
     } catch (error) {
-      logMessage('error', 'Failed to remove run from logs: ' + error);
+      logMessage("error", "Failed to remove run from logs: " + error);
       return false;
     }
   }
 
   // API Config Methods
-  async getApiConfig(params: { id: string; orgId?: string }): Promise<ApiConfig | null> {
+  async getApiConfig(params: {
+    id: string;
+    orgId?: string;
+  }): Promise<ApiConfig | null> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return null;
-    const key = this.getKey('api', id, orgId);
+    const key = this.getKey("api", id, orgId);
     const config = this.storage.apis.get(key);
     return config ? { ...config, id } : null;
   }
 
-  async listApiConfigs(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: ApiConfig[], total: number }> {
+  async listApiConfigs(params?: {
+    limit?: number;
+    offset?: number;
+    orgId?: string;
+  }): Promise<{ items: ApiConfig[]; total: number }> {
     await this.ensureInitialized();
     const { limit = 10, offset = 0, orgId } = params || {};
-    const orgItems = this.getOrgItems(this.storage.apis, 'api', orgId);
-    const items = orgItems
-      .slice(offset, offset + limit);
+    const orgItems = this.getOrgItems(this.storage.apis, "api", orgId);
+    const items = orgItems.slice(offset, offset + limit);
     const total = orgItems.length;
     return { items, total };
   }
 
-  async upsertApiConfig(params: { id: string; config: ApiConfig; orgId?: string }): Promise<ApiConfig> {
+  async upsertApiConfig(params: {
+    id: string;
+    config: ApiConfig;
+    orgId?: string;
+  }): Promise<ApiConfig> {
     await this.ensureInitialized();
     const { id, config, orgId } = params;
     if (!id || !config) return null;
-    const key = this.getKey('api', id, orgId);
+    const key = this.getKey("api", id, orgId);
     this.storage.apis.set(key, config);
     await this.persist();
     return { ...config, id };
   }
 
-  async deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteApiConfig(params: {
+    id: string;
+    orgId?: string;
+  }): Promise<boolean> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return false;
-    const key = this.getKey('api', id, orgId);
+    const key = this.getKey("api", id, orgId);
     const deleted = this.storage.apis.delete(key);
     await this.persist();
     return deleted;
   }
 
   // Run Result Methods
-  async getRun(params: { id: string; orgId?: string }): Promise<RunResult | null> {
+  async getRun(params: {
+    id: string;
+    orgId?: string;
+  }): Promise<RunResult | null> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return null;
 
     const runs = await this.readRunsFromLogs(orgId);
-    const run = runs.find(r => r.id === id);
+    const run = runs.find((r) => r.id === id);
     if (!run) return null;
     if ((run as any).orgId) delete (run as any).orgId;
     return run || null;
   }
 
-  async createRun(params: { result: RunResult; orgId?: string }): Promise<RunResult> {
+  async createRun(params: {
+    result: RunResult;
+    orgId?: string;
+  }): Promise<RunResult> {
     await this.ensureInitialized();
     const { result: run, orgId } = params;
     if (!run) return null;
     if ((run as any).stepResults) delete (run as any).stepResults;
 
     // Only log runs if disable_logs environment variable is not set
-    if (String(process.env.DISABLE_LOGS).toLowerCase() !== 'true') {
+    if (String(process.env.DISABLE_LOGS).toLowerCase() !== "true") {
       await this.appendRunToLogs(run, orgId);
     }
 
     return run;
   }
 
-  async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: RunResult[], total: number }> {
+  async listRuns(params?: {
+    limit?: number;
+    offset?: number;
+    configId?: string;
+    orgId?: string;
+  }): Promise<{ items: RunResult[]; total: number }> {
     await this.ensureInitialized();
     const { limit = 10, offset = 0, configId, orgId } = params || {};
     const allRuns = await this.readRunsFromLogs(orgId, configId);
 
     // Filter out invalid runs
-    const validRuns = allRuns.filter((run): run is RunResult =>
-      run !== null &&
-      run.config &&
-      run.config.id &&
-      run.startedAt instanceof Date
-    ).map(run => {
-      if ((run as any).orgId) delete (run as any).orgId;
-      return run;
-    });
+    const validRuns = allRuns
+      .filter(
+        (run): run is RunResult =>
+          run !== null &&
+          run.config &&
+          run.config.id &&
+          run.startedAt instanceof Date,
+      )
+      .map((run) => {
+        if ((run as any).orgId) delete (run as any).orgId;
+        return run;
+      });
 
     const items = validRuns.slice(offset, offset + limit);
     return { items, total: validRuns.length };
@@ -410,11 +499,11 @@ export class FileStore implements DataStore {
       }
 
       // Read all existing logs
-      const logs = await fs.promises.readFile(this.logsFilePath, 'utf-8');
-      const lines = logs.split('\n').filter(line => line.trim());
+      const logs = await fs.promises.readFile(this.logsFilePath, "utf-8");
+      const lines = logs.split("\n").filter((line) => line.trim());
 
       // Filter out logs for the specified org
-      const remainingLines = lines.filter(line => {
+      const remainingLines = lines.filter((line) => {
         try {
           const logEntry = JSON.parse(line);
           return logEntry.orgId !== orgId;
@@ -424,10 +513,13 @@ export class FileStore implements DataStore {
       });
 
       // Write back the filtered logs
-      await fs.promises.writeFile(this.logsFilePath, remainingLines.join('\n') + '\n');
+      await fs.promises.writeFile(
+        this.logsFilePath,
+        remainingLines.join("\n") + "\n",
+      );
       return true;
     } catch (error) {
-      logMessage('error', 'Failed to delete all runs: ' + error);
+      logMessage("error", "Failed to delete all runs: " + error);
       return false;
     }
   }
@@ -442,9 +534,9 @@ export class FileStore implements DataStore {
 
     // Clear logs file
     try {
-      await fs.promises.writeFile(this.logsFilePath, '', { mode: 0o644 });
+      await fs.promises.writeFile(this.logsFilePath, "", { mode: 0o644 });
     } catch (error) {
-      logMessage('error', 'Failed to clear logs file: ' + error);
+      logMessage("error", "Failed to clear logs file: " + error);
     }
   }
 
@@ -458,130 +550,187 @@ export class FileStore implements DataStore {
     return true;
   }
 
-  async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }> {
+  async getTenantInfo(): Promise<{
+    email: string | null;
+    emailEntrySkipped: boolean;
+  }> {
     await this.ensureInitialized();
     return this.storage.tenant;
   }
 
-  async setTenantInfo(params?: { email?: string; emailEntrySkipped?: boolean }): Promise<void> {
+  async setTenantInfo(params?: {
+    email?: string;
+    emailEntrySkipped?: boolean;
+  }): Promise<void> {
     await this.ensureInitialized();
     const { email, emailEntrySkipped } = params || {};
     const currentInfo = this.storage.tenant;
     this.storage.tenant = {
       email: email !== undefined ? email : currentInfo.email,
-      emailEntrySkipped: emailEntrySkipped !== undefined ? emailEntrySkipped : currentInfo.emailEntrySkipped
+      emailEntrySkipped:
+        emailEntrySkipped !== undefined
+          ? emailEntrySkipped
+          : currentInfo.emailEntrySkipped,
     };
     await this.persist();
   }
 
   // Workflow Methods
-  async getWorkflow(params: { id: string; orgId?: string }): Promise<Workflow | null> {
+  async getWorkflow(params: {
+    id: string;
+    orgId?: string;
+  }): Promise<Workflow | null> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return null;
-    const key = this.getKey('workflow', id, orgId);
+    const key = this.getKey("workflow", id, orgId);
     const workflow = this.storage.workflows.get(key);
     return workflow ? { ...workflow, id } : null;
   }
 
-  async listWorkflows(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: Workflow[], total: number }> {
+  async listWorkflows(params?: {
+    limit?: number;
+    offset?: number;
+    orgId?: string;
+  }): Promise<{ items: Workflow[]; total: number }> {
     await this.ensureInitialized();
     const { limit = 10, offset = 0, orgId } = params || {};
-    const items = this.getOrgItems(this.storage.workflows, 'workflow', orgId)
-      .slice(offset, offset + limit);
-    const total = this.getOrgItems(this.storage.workflows, 'workflow', orgId).length;
+    const items = this.getOrgItems(
+      this.storage.workflows,
+      "workflow",
+      orgId,
+    ).slice(offset, offset + limit);
+    const total = this.getOrgItems(
+      this.storage.workflows,
+      "workflow",
+      orgId,
+    ).length;
     return { items, total };
   }
 
-  async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Workflow[]> {
+  async getManyWorkflows(params: {
+    ids: string[];
+    orgId?: string;
+  }): Promise<Workflow[]> {
     await this.ensureInitialized();
     const { ids, orgId } = params;
     return ids
-      .map(id => {
-        const key = this.getKey('workflow', id, orgId);
+      .map((id) => {
+        const key = this.getKey("workflow", id, orgId);
         const workflow = this.storage.workflows.get(key);
         return workflow ? { ...workflow, id } : null;
       })
       .filter((w): w is Workflow => w !== null);
   }
 
-  async upsertWorkflow(params: { id: string; workflow: Workflow; orgId?: string }): Promise<Workflow> {
+  async upsertWorkflow(params: {
+    id: string;
+    workflow: Workflow;
+    orgId?: string;
+  }): Promise<Workflow> {
     await this.ensureInitialized();
     const { id, workflow, orgId } = params;
     if (!id || !workflow) return null;
-    const key = this.getKey('workflow', id, orgId);
+    const key = this.getKey("workflow", id, orgId);
     this.storage.workflows.set(key, workflow);
     await this.persist();
     return { ...workflow, id };
   }
 
-  async deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteWorkflow(params: {
+    id: string;
+    orgId?: string;
+  }): Promise<boolean> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return false;
-    const key = this.getKey('workflow', id, orgId);
+    const key = this.getKey("workflow", id, orgId);
     const deleted = this.storage.workflows.delete(key);
     await this.persist();
     return deleted;
   }
 
   // Integration Methods
-  async getIntegration(params: { id: string; includeDocs?: boolean; orgId?: string }): Promise<Integration | null> {
+  async getIntegration(params: {
+    id: string;
+    includeDocs?: boolean;
+    orgId?: string;
+  }): Promise<Integration | null> {
     await this.ensureInitialized();
     const { id, includeDocs = true, orgId } = params;
     if (!id) return null;
-    const key = this.getKey('integration', id, orgId);
+    const key = this.getKey("integration", id, orgId);
     const integration = this.storage.integrations.get(key);
     if (!integration) return null;
 
     // Decrypt credentials if encryption is enabled
     const decryptedIntegration = { ...integration, id };
     if (decryptedIntegration.credentials) {
-      decryptedIntegration.credentials = credentialEncryption.decrypt(decryptedIntegration.credentials);
+      decryptedIntegration.credentials = credentialEncryption.decrypt(
+        decryptedIntegration.credentials,
+      );
     }
 
     return decryptedIntegration;
   }
 
-  async listIntegrations(params?: { limit?: number; offset?: number; includeDocs?: boolean; orgId?: string }): Promise<{ items: Integration[], total: number }> {
+  async listIntegrations(params?: {
+    limit?: number;
+    offset?: number;
+    includeDocs?: boolean;
+    orgId?: string;
+  }): Promise<{ items: Integration[]; total: number }> {
     await this.ensureInitialized();
     const { limit = 10, offset = 0, includeDocs = true, orgId } = params || {};
-    const orgItems = this.getOrgItems(this.storage.integrations, 'integration', orgId);
-    const items = orgItems
-      .slice(offset, offset + limit)
-      .map(integration => {
-        const decrypted = { ...integration };
-        if (decrypted.credentials) {
-          decrypted.credentials = credentialEncryption.decrypt(decrypted.credentials);
-        }
-        return decrypted;
-      });
+    const orgItems = this.getOrgItems(
+      this.storage.integrations,
+      "integration",
+      orgId,
+    );
+    const items = orgItems.slice(offset, offset + limit).map((integration) => {
+      const decrypted = { ...integration };
+      if (decrypted.credentials) {
+        decrypted.credentials = credentialEncryption.decrypt(
+          decrypted.credentials,
+        );
+      }
+      return decrypted;
+    });
     const total = orgItems.length;
     return { items, total };
   }
 
-  async getManyIntegrations(params: { ids: string[]; orgId?: string }): Promise<Integration[]> {
+  async getManyIntegrations(params: {
+    ids: string[];
+    orgId?: string;
+  }): Promise<Integration[]> {
     await this.ensureInitialized();
     const { ids, orgId } = params;
     return ids
-      .map(id => {
-        const key = this.getKey('integration', id, orgId);
+      .map((id) => {
+        const key = this.getKey("integration", id, orgId);
         const integration = this.storage.integrations.get(key);
         if (!integration) return null;
         const decrypted = { ...integration, id };
         if (decrypted.credentials) {
-          decrypted.credentials = credentialEncryption.decrypt(decrypted.credentials);
+          decrypted.credentials = credentialEncryption.decrypt(
+            decrypted.credentials,
+          );
         }
         return decrypted;
       })
       .filter((i): i is Integration => i !== null);
   }
 
-  async upsertIntegration(params: { id: string; integration: Integration; orgId?: string }): Promise<Integration> {
+  async upsertIntegration(params: {
+    id: string;
+    integration: Integration;
+    orgId?: string;
+  }): Promise<Integration> {
     await this.ensureInitialized();
     const { id, integration, orgId } = params;
     if (!id || !integration) return null;
-    const key = this.getKey('integration', id, orgId);
+    const key = this.getKey("integration", id, orgId);
 
     // Encrypt credentials if encryption is enabled and credentials exist
     const toStore = { ...integration };
@@ -594,52 +743,73 @@ export class FileStore implements DataStore {
     return { ...integration, id };
   }
 
-  async deleteIntegration(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteIntegration(params: {
+    id: string;
+    orgId?: string;
+  }): Promise<boolean> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return false;
-    const key = this.getKey('integration', id, orgId);
+    const key = this.getKey("integration", id, orgId);
     const deleted = this.storage.integrations.delete(key);
     await this.persist();
     return deleted;
   }
 
-  async copyTemplateDocumentationToUserIntegration(params: { templateId: string; userIntegrationId: string; orgId?: string }): Promise<boolean> {
+  async copyTemplateDocumentationToUserIntegration(params: {
+    templateId: string;
+    userIntegrationId: string;
+    orgId?: string;
+  }): Promise<boolean> {
     // Not supported for file store
     return false;
   }
 
   // Workflow Schedule Methods
-  async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]> {
+  async listWorkflowSchedules(params: {
+    workflowId: string;
+    orgId: string;
+  }): Promise<WorkflowScheduleInternal[]> {
     await this.ensureInitialized();
     const { workflowId, orgId } = params;
-    return this.getOrgItems(this.storage.workflowSchedules, 'workflow-schedule', orgId)
-      .filter(schedule => schedule.workflowId === workflowId);
+    return this.getOrgItems(
+      this.storage.workflowSchedules,
+      "workflow-schedule",
+      orgId,
+    ).filter((schedule) => schedule.workflowId === workflowId);
   }
 
-  async getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<WorkflowScheduleInternal | null> {
+  async getWorkflowSchedule(params: {
+    id: string;
+    orgId?: string;
+  }): Promise<WorkflowScheduleInternal | null> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return null;
-    const key = this.getKey('workflow-schedule', id, orgId);
+    const key = this.getKey("workflow-schedule", id, orgId);
     const schedule = this.storage.workflowSchedules.get(key);
     return schedule ? { ...schedule, id } : null;
   }
 
-  async upsertWorkflowSchedule(params: { schedule: WorkflowScheduleInternal }): Promise<void> {
+  async upsertWorkflowSchedule(params: {
+    schedule: WorkflowScheduleInternal;
+  }): Promise<void> {
     await this.ensureInitialized();
     const { schedule } = params;
     if (!schedule || !schedule.id) return;
-    const key = this.getKey('workflow-schedule', schedule.id, schedule.orgId);
+    const key = this.getKey("workflow-schedule", schedule.id, schedule.orgId);
     this.storage.workflowSchedules.set(key, schedule);
     await this.persist();
   }
 
-  async deleteWorkflowSchedule(params: { id: string, orgId: string }): Promise<boolean> {
+  async deleteWorkflowSchedule(params: {
+    id: string;
+    orgId: string;
+  }): Promise<boolean> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return false;
-    const key = this.getKey('workflow-schedule', id, orgId);
+    const key = this.getKey("workflow-schedule", id, orgId);
     const deleted = this.storage.workflowSchedules.delete(key);
     await this.persist();
     return deleted;
@@ -649,12 +819,16 @@ export class FileStore implements DataStore {
     await this.ensureInitialized();
     const now = new Date();
     return Array.from(this.storage.workflowSchedules.entries())
-      .filter(([key]) => key.includes('workflow-schedule:'))
-      .map(([key, value]) => ({ ...value, id: key.split(':').pop() }))
-      .filter(schedule => schedule.enabled && schedule.nextRunAt <= now);
+      .filter(([key]) => key.includes("workflow-schedule:"))
+      .map(([key, value]) => ({ ...value, id: key.split(":").pop() }))
+      .filter((schedule) => schedule.enabled && schedule.nextRunAt <= now);
   }
 
-  async updateScheduleNextRun(params: { id: string; nextRunAt: Date; lastRunAt: Date; }): Promise<boolean> {
+  async updateScheduleNextRun(params: {
+    id: string;
+    nextRunAt: Date;
+    lastRunAt: Date;
+  }): Promise<boolean> {
     await this.ensureInitialized();
     const { id, nextRunAt, lastRunAt } = params;
     if (!id) return false;
@@ -666,7 +840,7 @@ export class FileStore implements DataStore {
           ...schedule,
           nextRunAt,
           lastRunAt,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         };
         this.storage.workflowSchedules.set(key, updatedSchedule);
         await this.persist();
@@ -676,21 +850,33 @@ export class FileStore implements DataStore {
     return false;
   }
 
-  async getTemplateOAuthCredentials(params: { templateId: string }): Promise<{ client_id: string; client_secret: string } | null> {
+  async getTemplateOAuthCredentials(params: {
+    templateId: string;
+  }): Promise<{ client_id: string; client_secret: string } | null> {
     return null;
   }
 
-  private oauthSecrets: Map<string, { clientId: string; clientSecret: string; expiresAt: number }> = new Map();
+  private oauthSecrets: Map<
+    string,
+    { clientId: string; clientSecret: string; expiresAt: number }
+  > = new Map();
 
-  async cacheOAuthSecret(params: { uid: string; clientId: string; clientSecret: string; ttlMs: number }): Promise<void> {
+  async cacheOAuthSecret(params: {
+    uid: string;
+    clientId: string;
+    clientSecret: string;
+    ttlMs: number;
+  }): Promise<void> {
     this.oauthSecrets.set(params.uid, {
       clientId: params.clientId,
       clientSecret: params.clientSecret,
-      expiresAt: Date.now() + params.ttlMs
+      expiresAt: Date.now() + params.ttlMs,
     });
   }
 
-  async getOAuthSecret(params: { uid: string }): Promise<{ clientId: string; clientSecret: string } | null> {
+  async getOAuthSecret(params: {
+    uid: string;
+  }): Promise<{ clientId: string; clientSecret: string } | null> {
     const entry = this.oauthSecrets.get(params.uid);
 
     if (!entry || entry.expiresAt <= Date.now()) {
@@ -703,11 +889,11 @@ export class FileStore implements DataStore {
 
     return {
       clientId: entry.clientId,
-      clientSecret: entry.clientSecret
+      clientSecret: entry.clientSecret,
     };
   }
 
   async deleteOAuthSecret(params: { uid: string }): Promise<void> {
     this.oauthSecrets.delete(params.uid);
   }
-} 
+}

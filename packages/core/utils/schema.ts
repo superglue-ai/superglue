@@ -4,35 +4,47 @@ import { GENERATE_SCHEMA_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { logMessage } from "./logs.js";
 
-export async function generateSchema(instruction: string, responseData: string, metadata: Metadata): Promise<string> {
+export async function generateSchema(
+  instruction: string,
+  responseData: string,
+  metadata: Metadata,
+): Promise<string> {
   const messages: LLMMessage[] = [
     {
       role: "system",
-      content: GENERATE_SCHEMA_SYSTEM_PROMPT
+      content: GENERATE_SCHEMA_SYSTEM_PROMPT,
     },
     {
       role: "user",
-      content: `<instruction>${instruction}</instruction>${responseData ? `<response_data>${responseData}</response_data>` : ""}`
-    }
+      content: `<instruction>${instruction}</instruction>${responseData ? `<response_data>${responseData}</response_data>` : ""}`,
+    },
   ];
   const MAX_RETRIES = 3;
   let retryCount = 0;
 
   while (retryCount <= MAX_RETRIES) {
     try {
-      logMessage('info', `Generating schema${retryCount ? `: (retry ${retryCount})` : ""}`, metadata);
+      logMessage(
+        "info",
+        `Generating schema${retryCount ? `: (retry ${retryCount})` : ""}`,
+        metadata,
+      );
       const schema = await attemptSchemaGeneration(messages, retryCount);
       return schema;
     } catch (error) {
       retryCount++;
       if (retryCount > MAX_RETRIES) {
-        logMessage('error', `Schema generation failed after ${MAX_RETRIES} retries. Last error: ${error.message}`, metadata);
+        logMessage(
+          "error",
+          `Schema generation failed after ${MAX_RETRIES} retries. Last error: ${error.message}`,
+          metadata,
+        );
         throw error;
       }
-      logMessage('warn', `Schema generation failed. Retrying...`, metadata);
+      logMessage("warn", `Schema generation failed. Retrying...`, metadata);
       messages.push({
         role: "user",
-        content: `The previous attempt failed with error: ${error.message}. Please try again.`
+        content: `The previous attempt failed with error: ${error.message}. Please try again.`,
       });
     }
   }
@@ -41,10 +53,14 @@ export async function generateSchema(instruction: string, responseData: string, 
 
 async function attemptSchemaGeneration(
   messages: LLMMessage[],
-  retry: number
+  retry: number,
 ): Promise<string> {
   let temperature = Math.min(0.3 * retry, 1.0);
-  const { response: generatedSchema } = await LanguageModel.generateObject(messages, null, temperature);
+  const { response: generatedSchema } = await LanguageModel.generateObject(
+    messages,
+    null,
+    temperature,
+  );
   if (!generatedSchema || Object.keys(generatedSchema).length === 0) {
     throw new Error("No schema generated");
   }
