@@ -1,5 +1,9 @@
-import type { ComputeRequest, ComputeResponse, TaskType } from './compute-worker';
-import { globalCache } from '../lib/weak-cache';
+import type {
+  ComputeRequest,
+  ComputeResponse,
+  TaskType,
+} from "./compute-worker";
+import { globalCache } from "../lib/weak-cache";
 
 interface PendingRequest {
   resolve: (result: any) => void;
@@ -18,8 +22,8 @@ class WorkerManager {
 
     try {
       this.worker = new Worker(
-        new URL('./compute-worker.ts', import.meta.url),
-        { type: 'module' }
+        new URL("./compute-worker.ts", import.meta.url),
+        { type: "module" },
       );
 
       this.worker.onmessage = (event: MessageEvent<ComputeResponse>) => {
@@ -27,11 +31,11 @@ class WorkerManager {
       };
 
       this.worker.onerror = (error) => {
-        console.error('Worker error:', error);
+        console.error("Worker error:", error);
         this.restartWorker();
       };
     } catch (error) {
-      console.error('Failed to create worker:', error);
+      console.error("Failed to create worker:", error);
     }
   }
 
@@ -53,12 +57,12 @@ class WorkerManager {
 
   private restartWorker() {
     const failedRequests = Array.from(this.pendingRequests.values());
-    
+
     this.terminate();
     this.initWorker();
 
     for (const req of failedRequests) {
-      req.reject(new Error('Worker restarted'));
+      req.reject(new Error("Worker restarted"));
     }
   }
 
@@ -67,8 +71,8 @@ class WorkerManager {
   }
 
   async compute<T = any>(taskType: TaskType, data: any): Promise<T> {
-    if (!data || typeof data !== 'object') {
-      throw new Error('Data must be an object');
+    if (!data || typeof data !== "object") {
+      throw new Error("Data must be an object");
     }
 
     const cached = this.getCached(data, taskType);
@@ -78,7 +82,7 @@ class WorkerManager {
 
     this.initWorker();
     if (!this.worker) {
-      throw new Error('Worker not available');
+      throw new Error("Worker not available");
     }
 
     const id = `req_${++this.requestId}`;
@@ -86,7 +90,7 @@ class WorkerManager {
     return new Promise<T>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pendingRequests.delete(id);
-        reject(new Error('Computation timeout'));
+        reject(new Error("Computation timeout"));
       }, this.TIMEOUT_MS);
 
       this.pendingRequests.set(id, { resolve, reject, timeout });

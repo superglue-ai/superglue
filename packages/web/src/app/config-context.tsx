@@ -1,24 +1,30 @@
-"use client"
+"use client";
 
-import { createContext, useContext, useEffect, useRef } from 'react'
-import { tokenRegistry } from '../lib/token-registry'
+import { createContext, useContext, useEffect, useRef } from "react";
+import { tokenRegistry } from "../lib/token-registry";
 
 interface Config {
-  superglueEndpoint: string
-  superglueApiKey: string
-  postHogKey: string
-  postHogHost: string
+  superglueEndpoint: string;
+  superglueApiKey: string;
+  postHogKey: string;
+  postHogHost: string;
 }
 
 interface ConfigWithoutKey {
-  superglueEndpoint: string
-  postHogKey: string
-  postHogHost: string
+  superglueEndpoint: string;
+  postHogKey: string;
+  postHogHost: string;
 }
 
-const ConfigContext = createContext<ConfigWithoutKey | null>(null)
+const ConfigContext = createContext<ConfigWithoutKey | null>(null);
 
-export function ConfigProvider({ children, config }: { children: React.ReactNode, config: Config }) {
+export function ConfigProvider({
+  children,
+  config,
+}: {
+  children: React.ReactNode;
+  config: Config;
+}) {
   const initialTokenSetRef = useRef(false);
   if (!initialTokenSetRef.current) {
     initialTokenSetRef.current = true;
@@ -27,24 +33,24 @@ export function ConfigProvider({ children, config }: { children: React.ReactNode
 
   useEffect(() => {
     if (config.superglueApiKey) {
-      tokenRegistry.setToken(config.superglueApiKey)
+      tokenRegistry.setToken(config.superglueApiKey);
     }
-  }, [config.superglueApiKey])
-  
+  }, [config.superglueApiKey]);
+
   // remove it to make sure it won't be used
-  const {superglueApiKey, ...lightConfig} = config;
+  const { superglueApiKey, ...lightConfig } = config;
 
   return (
     <ConfigContext.Provider value={lightConfig}>
       {children}
     </ConfigContext.Provider>
-  )
+  );
 }
 
 export function useConfig() {
-  const config = useContext(ConfigContext)
+  const config = useContext(ConfigContext);
   if (!config) {
-    throw new Error('useConfig must be used within a ConfigProvider')
+    throw new Error("useConfig must be used within a ConfigProvider");
   }
-  return config
-} 
+  return config;
+}

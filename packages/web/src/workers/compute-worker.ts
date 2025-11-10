@@ -1,12 +1,12 @@
-import { truncateForDisplay, truncateLines } from '@/src/lib/general-utils';
-import { inferJsonSchema } from '@superglue/shared';
+import { truncateForDisplay, truncateLines } from "@/src/lib/general-utils";
+import { inferJsonSchema } from "@superglue/shared";
 
 const MAX_DISPLAY_LINES = 3000;
 
 export enum TaskType {
-  STRINGIFY = 'STRINGIFY',
-  COMPUTE_SCHEMA = 'COMPUTE_SCHEMA',
-  COMPUTE_PREVIEW = 'COMPUTE_PREVIEW',
+  STRINGIFY = "STRINGIFY",
+  COMPUTE_SCHEMA = "COMPUTE_SCHEMA",
+  COMPUTE_PREVIEW = "COMPUTE_PREVIEW",
 }
 
 export type ComputeTask =
@@ -34,7 +34,7 @@ const taskHandlers: Record<TaskType, (data: any) => any> = {
     const schemaObj = inferJsonSchema(data);
     const schemaString = truncateLines(
       JSON.stringify(schemaObj, null, 2),
-      MAX_DISPLAY_LINES
+      MAX_DISPLAY_LINES,
     );
     return {
       schema: schemaObj,
@@ -47,7 +47,7 @@ const taskHandlers: Record<TaskType, (data: any) => any> = {
     const displayData = truncateForDisplay(data);
     const jsonString = JSON.stringify(data, null, 2);
     const bytes = new Blob([jsonString]).size;
-    
+
     return {
       displayString: displayData.value,
       truncated: displayData.truncated,
@@ -58,12 +58,15 @@ const taskHandlers: Record<TaskType, (data: any) => any> = {
 
 // Only set up message handler if we're actually in a worker context
 // @ts-ignore - checking for WorkerGlobalScope
-if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope) {
+if (
+  typeof WorkerGlobalScope !== "undefined" &&
+  self instanceof WorkerGlobalScope
+) {
   // Worker message handler
   self.onmessage = (event: MessageEvent<ComputeRequest>) => {
     // Validate message has required structure
     if (!event.data || !event.data.id || !event.data.task) {
-      console.warn('[Worker] Received invalid message, ignoring:', event.data);
+      console.warn("[Worker] Received invalid message, ignoring:", event.data);
       return;
     }
 
@@ -86,13 +89,14 @@ if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScop
     } catch (error) {
       const response: ComputeResponse = {
         id,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
       };
 
       self.postMessage(response);
     }
   };
 } else {
-  console.warn('[compute-worker] Script loaded in window context, not setting up message handler');
+  console.warn(
+    "[compute-worker] Script loaded in window context, not setting up message handler",
+  );
 }
-

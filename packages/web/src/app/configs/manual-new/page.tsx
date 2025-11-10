@@ -1,7 +1,7 @@
-'use client'
+"use client";
 
-import ApiConfigForm from '@/src/components/api/ApiConfigForm'
+import ApiConfigForm from "@/src/components/api/ApiConfigForm";
 
 export default function CreateManualConfigPage() {
-  return <ApiConfigForm />
+  return <ApiConfigForm />;
 }

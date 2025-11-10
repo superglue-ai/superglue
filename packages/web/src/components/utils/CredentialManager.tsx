@@ -1,21 +1,21 @@
-'use client'
+"use client";
 
-import { Button } from '@/src/components/ui/button';
-import { Input } from '@/src/components/ui/input';
-import { parseCredentialsHelper } from '@/src/lib/client-utils';
-import { cn } from '@/src/lib/general-utils';
-import { Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Button } from "@/src/components/ui/button";
+import { Input } from "@/src/components/ui/input";
+import { parseCredentialsHelper } from "@/src/lib/client-utils";
+import { cn } from "@/src/lib/general-utils";
+import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 type Credential = {
-  key: string
-  value: string
-}
+  key: string;
+  value: string;
+};
 
 interface CredentialsManagerProps {
-  value: string
-  onChange: (value: string) => void
-  className?: string
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
 }
 
 function getDuplicateIndexesExceptFirst(creds: Credential[]): Set<number> {
@@ -29,33 +29,41 @@ function getDuplicateIndexesExceptFirst(creds: Credential[]): Set<number> {
   for (const arr of keyMap.values()) {
     if (arr.length > 1) {
       // highlight all except the first
-      arr.slice(1).forEach(idx => dups.add(idx));
+      arr.slice(1).forEach((idx) => dups.add(idx));
     }
   }
   return dups;
 }
 
-export function CredentialsManager({ value, onChange, className }: CredentialsManagerProps) {
+export function CredentialsManager({
+  value,
+  onChange,
+  className,
+}: CredentialsManagerProps) {
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [showValues, setShowValues] = useState<Record<number, boolean>>({});
 
   // Only set default row on first mount
   useEffect(() => {
     try {
-      const parsedCreds = parseCredentialsHelper(value)
+      const parsedCreds = parseCredentialsHelper(value);
       const entries = Object.entries(parsedCreds).map(([key, value]) => ({
         key,
-        value: String(value)
-      }))
-      setCredentials(entries.length > 0 ? entries : [{ key: 'apiKey', value: '' }])
+        value: String(value),
+      }));
+      setCredentials(
+        entries.length > 0 ? entries : [{ key: "apiKey", value: "" }],
+      );
     } catch (e) {
-      setCredentials([{ key: '', value: '' }])
+      setCredentials([{ key: "", value: "" }]);
     }
-
-  }, [])
+  }, []);
 
   // Compute duplicate indexes for UI and output
-  const duplicateIndexes = useMemo(() => getDuplicateIndexesExceptFirst(credentials), [credentials]);
+  const duplicateIndexes = useMemo(
+    () => getDuplicateIndexesExceptFirst(credentials),
+    [credentials],
+  );
 
   // Update the parent component when credentials change
   const updateCredentials = (newCredentials: Credential[]) => {
@@ -68,16 +76,19 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
       seen.add(cred.key);
       return true;
     });
-    const credObject = validCreds.reduce((obj, cred) => {
-      obj[cred.key] = cred.value;
-      return obj;
-    }, {} as Record<string, string>);
+    const credObject = validCreds.reduce(
+      (obj, cred) => {
+        obj[cred.key] = cred.value;
+        return obj;
+      },
+      {} as Record<string, string>,
+    );
     onChange(JSON.stringify(credObject, null, 2));
   };
 
   // Add a new credential
   const addCredential = () => {
-    updateCredentials([...credentials, { key: '', value: '' }]);
+    updateCredentials([...credentials, { key: "", value: "" }]);
   };
 
   // Remove a credential
@@ -86,15 +97,19 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
   };
 
   // Update a credential key or value
-  const updateCredential = (index: number, field: 'key' | 'value', newValue: string) => {
+  const updateCredential = (
+    index: number,
+    field: "key" | "value",
+    newValue: string,
+  ) => {
     const newCredentials = credentials.map((cred, i) =>
-      i === index ? { ...cred, [field]: newValue } : cred
+      i === index ? { ...cred, [field]: newValue } : cred,
     );
     updateCredentials(newCredentials);
   };
 
   const toggleShowValue = (index: number) => {
-    setShowValues(prev => ({ ...prev, [index]: !prev[index] }));
+    setShowValues((prev) => ({ ...prev, [index]: !prev[index] }));
   };
 
   return (
@@ -104,7 +119,12 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
           <div className="overflow-x-auto w-full">
             {credentials.length === 0 ? (
               <div className="flex justify-center py-2 border rounded-md border-dashed">
-                <Button variant="outline" size="sm" onClick={addCredential} className="h-7 text-xs">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addCredential}
+                  className="h-7 text-xs"
+                >
                   <Plus className="w-3 h-3 mr-1" />
                   Add
                 </Button>
@@ -112,21 +132,29 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
             ) : (
               <div className="flex flex-col gap-2 min-w-[400px] p-1">
                 {credentials.map((cred, index) => (
-                  <div key={index} className="flex gap-1 w-full min-w-0 items-center">
+                  <div
+                    key={index}
+                    className="flex gap-1 w-full min-w-0 items-center"
+                  >
                     <Input
                       value={cred.key}
-                      onChange={(e) => updateCredential(index, 'key', e.target.value)}
+                      onChange={(e) =>
+                        updateCredential(index, "key", e.target.value)
+                      }
                       placeholder="apiKey"
                       className={cn(
                         "flex-1 h-7 text-xs min-w-0",
-                        duplicateIndexes.has(index) && 'border-2 border-red-500 bg-red-100/30'
+                        duplicateIndexes.has(index) &&
+                          "border-2 border-red-500 bg-red-100/30",
                       )}
                     />
                     <div className="relative flex-[2]">
                       <Input
                         type={showValues[index] ? "text" : "password"}
                         value={cred.value}
-                        onChange={(e) => updateCredential(index, 'value', e.target.value)}
+                        onChange={(e) =>
+                          updateCredential(index, "value", e.target.value)
+                        }
                         placeholder="Enter your API key"
                         className="h-7 text-xs min-w-0 pr-8"
                       />
@@ -153,7 +181,9 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
                       <Trash2 className="h-3 w-3" />
                     </Button>
                     {duplicateIndexes.has(index) && cred.key.trim() && (
-                      <span className="ml-2 text-xs text-red-600 whitespace-nowrap">Credential "{cred.key}" already defined</span>
+                      <span className="ml-2 text-xs text-red-600 whitespace-nowrap">
+                        Credential "{cred.key}" already defined
+                      </span>
                     )}
                   </div>
                 ))}

@@ -1,20 +1,20 @@
-import type { TaskType } from '../workers/compute-worker';
+import type { TaskType } from "../workers/compute-worker";
 
 export class WeakCacheManager {
   private cache = new WeakMap<object, Map<TaskType, any>>();
 
   get(data: any, taskType: TaskType): any | null {
-    if (!data || typeof data !== 'object') return null;
-    
+    if (!data || typeof data !== "object") return null;
+
     const taskCache = this.cache.get(data);
     if (!taskCache) return null;
-    
+
     return taskCache.get(taskType) || null;
   }
 
   set(data: any, taskType: TaskType, result: any): void {
-    if (!data || typeof data !== 'object') return;
-    
+    if (!data || typeof data !== "object") return;
+
     let taskCache = this.cache.get(data);
     if (!taskCache) {
       taskCache = new Map();
@@ -32,7 +32,7 @@ export class WeakCacheManager {
   }
 
   clearForData(data: any): void {
-    if (!data || typeof data !== 'object') return;
+    if (!data || typeof data !== "object") return;
     this.cache.delete(data);
   }
 }

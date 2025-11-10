@@ -1,29 +1,58 @@
-import { useConfig } from '@/src/app/config-context';
+import { useConfig } from "@/src/app/config-context";
 import { Switch } from "@/src/components/ui/switch";
-import { useToast } from '@/src/hooks/use-toast';
-import { cn, getGroupedTimezones } from '@/src/lib/general-utils';
-import { tokenRegistry } from '@/src/lib/token-registry';
-import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/client';
-import { validateCronExpression } from '@superglue/shared';
-import { Check, CheckCircle, ChevronRight, ChevronsUpDown, Loader2, XCircle } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
-import { JsonCodeEditor } from '../editors/JsonCodeEditor';
-import { Button } from '../ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { HelpTooltip } from '../utils/HelpTooltip';
+import { useToast } from "@/src/hooks/use-toast";
+import { cn, getGroupedTimezones } from "@/src/lib/general-utils";
+import { tokenRegistry } from "@/src/lib/token-registry";
+import {
+  SuperglueClient,
+  WorkflowSchedule as ToolSchedule,
+} from "@superglue/client";
+import { validateCronExpression } from "@superglue/shared";
+import {
+  Check,
+  CheckCircle,
+  ChevronRight,
+  ChevronsUpDown,
+  Loader2,
+  XCircle,
+} from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { JsonCodeEditor } from "../editors/JsonCodeEditor";
+import { Button } from "../ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "../ui/command";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import { HelpTooltip } from "../utils/HelpTooltip";
 
 const DEFAULT_SCHEDULES = [
-  { value: '*/5 * * * *', label: 'Every 5 minutes' },
-  { value: '*/30 * * * *', label: 'Every 30 minutes' },
-  { value: '0 * * * *', label: 'Hourly' },
-  { value: '0 0 * * *', label: 'Daily at midnight' },
-  { value: '0 0 * * 0', label: 'Weekly on Sunday at midnight' },
-  { value: '0 0 1 * *', label: 'Monthly on the 1st' },
+  { value: "*/5 * * * *", label: "Every 5 minutes" },
+  { value: "*/30 * * * *", label: "Every 30 minutes" },
+  { value: "0 * * * *", label: "Hourly" },
+  { value: "0 0 * * *", label: "Daily at midnight" },
+  { value: "0 0 * * 0", label: "Weekly on Sunday at midnight" },
+  { value: "0 0 1 * *", label: "Monthly on the 1st" },
 ];
 
 interface ToolScheduleModalProps {
@@ -34,25 +63,36 @@ interface ToolScheduleModalProps {
   onSave?: () => void;
 }
 
-const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolScheduleModalProps) => {
+const ToolScheduleModal = ({
+  toolId,
+  isOpen,
+  schedule,
+  onClose,
+  onSave,
+}: ToolScheduleModalProps) => {
   const [enabled, setEnabled] = useState(true);
-  const [scheduleSelectedItem, setScheduleSelectedItem] = React.useState<string>('0 0 * * *'); // default to daily
-  const [customCronExpression, setCustomCronExpression] = React.useState<string>('');
+  const [scheduleSelectedItem, setScheduleSelectedItem] =
+    React.useState<string>("0 0 * * *"); // default to daily
+  const [customCronExpression, setCustomCronExpression] =
+    React.useState<string>("");
   const [isCustomCronValid, setIsCustomCronValid] = React.useState(true);
   const [timezoneOpen, setTimezoneOpen] = useState(false);
-  const [selectedTimezone, setTimezone] = useState<{ value: string, label: string }>({
-    value: 'Europe/Berlin',
-    label: 'Europe/Berlin'
+  const [selectedTimezone, setTimezone] = useState<{
+    value: string;
+    label: string;
+  }>({
+    value: "Europe/Berlin",
+    label: "Europe/Berlin",
   });
-  const [schedulePayload, setPayload] = useState<string>('{}');
+  const [schedulePayload, setPayload] = useState<string>("{}");
   const [isJsonValid, setIsJsonValid] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [selfHealing, setSelfHealing] = useState<string>('DISABLED');
-  const [retries, setRetries] = useState<string>('');
+  const [selfHealing, setSelfHealing] = useState<string>("DISABLED");
+  const [retries, setRetries] = useState<string>("");
   const [isRetriesValid, setIsRetriesValid] = useState(true);
-  const [timeout, setTimeout] = useState<string>('');
-  const [webhookUrl, setWebhookUrl] = useState<string>('');
+  const [timeout, setTimeout] = useState<string>("");
+  const [webhookUrl, setWebhookUrl] = useState<string>("");
 
   const config = useConfig();
   const { toast } = useToast();
@@ -68,27 +108,35 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
     if (DEFAULT_SCHEDULES.some((s) => s.value === schedule.cronExpression)) {
       setScheduleSelectedItem(schedule.cronExpression);
     } else {
-      setScheduleSelectedItem('custom');
+      setScheduleSelectedItem("custom");
       setCustomCronExpression(schedule.cronExpression);
     }
 
-    const payload = schedule.payload ? JSON.stringify(schedule.payload, null, 2) : '{}';
+    const payload = schedule.payload
+      ? JSON.stringify(schedule.payload, null, 2)
+      : "{}";
     setPayload(payload);
     validateJson(payload);
 
-    setSelfHealing(schedule.options?.selfHealing || 'DISABLED');
-    setRetries(schedule.options?.retries?.toString() || '');
-    setTimeout(schedule.options?.timeout?.toString() || '');
-    setWebhookUrl(schedule.options?.webhookUrl || '');
+    setSelfHealing(schedule.options?.selfHealing || "DISABLED");
+    setRetries(schedule.options?.retries?.toString() || "");
+    setTimeout(schedule.options?.timeout?.toString() || "");
+    setWebhookUrl(schedule.options?.webhookUrl || "");
 
-    if (schedule.options && (schedule.options.selfHealing !== 'DISABLED' || schedule.options.retries || schedule.options.timeout || schedule.options.webhookUrl)) {
+    if (
+      schedule.options &&
+      (schedule.options.selfHealing !== "DISABLED" ||
+        schedule.options.retries ||
+        schedule.options.timeout ||
+        schedule.options.webhookUrl)
+    ) {
       setShowAdvanced(true);
     }
   }, [schedule]);
 
   React.useEffect(() => {
-    if (scheduleSelectedItem === 'custom') {
-      if (customCronExpression === '') {
+    if (scheduleSelectedItem === "custom") {
+      if (customCronExpression === "") {
         setIsCustomCronValid(true);
       } else {
         setIsCustomCronValid(validateCronExpression(customCronExpression));
@@ -112,16 +160,16 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
       toast({
         title: "Invalid JSON",
         description: "Please fix the JSON payload before saving.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
-    if (scheduleSelectedItem === 'custom' && !isCustomCronValid) {
+    if (scheduleSelectedItem === "custom" && !isCustomCronValid) {
       toast({
         title: "Invalid Cron Expression",
         description: "Please fix the cron expression before saving.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -131,14 +179,18 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
     try {
       const superglueClient = new SuperglueClient({
         endpoint: config.superglueEndpoint,
-        apiKey: tokenRegistry.getToken()
+        apiKey: tokenRegistry.getToken(),
       });
 
-      const cronExpression = scheduleSelectedItem === 'custom' ? customCronExpression : scheduleSelectedItem;
-      const payload = schedulePayload.trim() === '{}' ? null : JSON.parse(schedulePayload);
+      const cronExpression =
+        scheduleSelectedItem === "custom"
+          ? customCronExpression
+          : scheduleSelectedItem;
+      const payload =
+        schedulePayload.trim() === "{}" ? null : JSON.parse(schedulePayload);
 
       const options: any = {
-        selfHealing
+        selfHealing,
       };
       if (retries) options.retries = parseInt(retries);
       if (timeout) options.timeout = parseInt(timeout);
@@ -151,22 +203,24 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
         timezone: selectedTimezone.value,
         enabled,
         payload,
-        options
+        options,
       });
 
       toast({
         title: "Schedule saved",
-        description: schedule ? "Schedule updated successfully." : "Schedule created successfully."
+        description: schedule
+          ? "Schedule updated successfully."
+          : "Schedule created successfully.",
       });
 
       onClose();
       onSave?.();
     } catch (error) {
-      console.error('Failed to save schedule:', error);
+      console.error("Failed to save schedule:", error);
       toast({
         title: "Error",
         description: "Failed to save schedule. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
@@ -176,16 +230,16 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
   const onCustomCronChange = (newValue: string) => {
     setCustomCronExpression(newValue);
 
-    if (newValue.trim() === '') {
+    if (newValue.trim() === "") {
       setIsCustomCronValid(true);
     } else {
       setIsCustomCronValid(validateCronExpression(newValue));
     }
-  }
+  };
 
   const handleEnabledChange = (newState: boolean) => {
     setEnabled(newState);
-  }
+  };
 
   const handlePayloadChange = (code: string) => {
     setPayload(code);
@@ -194,14 +248,13 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
 
   const handleRetriesChange = (value: string) => {
     setRetries(value);
-    if (value === '') {
+    if (value === "") {
       setIsRetriesValid(true);
     } else {
       const numValue = parseInt(value);
       setIsRetriesValid(!isNaN(numValue) && numValue >= 0 && numValue <= 10);
     }
   };
-
 
   return (
     isOpen && (
@@ -306,7 +359,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                                       setTimezone(
                                         currentValue === selectedTimezone?.value
                                           ? selectedTimezone
-                                          : timezone
+                                          : timezone,
                                       );
                                       setTimezoneOpen(false);
                                     }}
@@ -314,16 +367,17 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                                     <Check
                                       className={cn(
                                         "mr-2 h-4 w-4",
-                                        selectedTimezone?.value === timezone.value
+                                        selectedTimezone?.value ===
+                                          timezone.value
                                           ? "opacity-100"
-                                          : "opacity-0"
+                                          : "opacity-0",
                                       )}
                                     />
                                     {timezone.label}
                                   </CommandItem>
                                 ))}
                               </CommandGroup>
-                            )
+                            ),
                           )}
                         </CommandList>
                       </Command>
@@ -365,14 +419,19 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                     tabIndex={0}
                     onClick={() => setShowAdvanced(!showAdvanced)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
+                      if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         setShowAdvanced(!showAdvanced);
                       }
                     }}
                     className="flex items-center gap-2 text-sm text-muted-foreground select-none cursor-pointer outline-none focus:outline-none"
                   >
-                    <ChevronRight className={cn("h-4 w-4 transition-transform", showAdvanced && "rotate-90")} />
+                    <ChevronRight
+                      className={cn(
+                        "h-4 w-4 transition-transform",
+                        showAdvanced && "rotate-90",
+                      )}
+                    />
                     <span>Advanced Options</span>
                   </div>
 
@@ -383,15 +442,22 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                           <Label htmlFor="selfHealing">Self-Healing</Label>
                           <HelpTooltip text="When enabled, superglue automatically retries and fixes API configuration errors. ENABLED: fixes both requests and transforms. REQUEST_ONLY: only fixes API calls. TRANSFORM_ONLY: only fixes data transforms. DISABLED: no automatic fixes." />
                         </div>
-                        <Select value={selfHealing} onValueChange={setSelfHealing}>
+                        <Select
+                          value={selfHealing}
+                          onValueChange={setSelfHealing}
+                        >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="DISABLED">Disabled</SelectItem>
                             <SelectItem value="ENABLED">Enabled</SelectItem>
-                            <SelectItem value="TRANSFORM_ONLY">Transform Only</SelectItem>
-                            <SelectItem value="REQUEST_ONLY">Request Only</SelectItem>
+                            <SelectItem value="TRANSFORM_ONLY">
+                              Transform Only
+                            </SelectItem>
+                            <SelectItem value="REQUEST_ONLY">
+                              Request Only
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -409,7 +475,9 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                             max="10"
                             placeholder="Default: 1"
                             value={retries}
-                            onChange={(e) => handleRetriesChange(e.target.value)}
+                            onChange={(e) =>
+                              handleRetriesChange(e.target.value)
+                            }
                           />
                           {!isRetriesValid && (
                             <p className="text-sm text-destructive mt-1">
@@ -456,8 +524,20 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                 <Button variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button onClick={handleSubmit} disabled={!isJsonValid || isSubmitting || !isCustomCronValid || !isRetriesValid || (scheduleSelectedItem === 'custom' && customCronExpression.trim() === '')}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button
+                  onClick={handleSubmit}
+                  disabled={
+                    !isJsonValid ||
+                    isSubmitting ||
+                    !isCustomCronValid ||
+                    !isRetriesValid ||
+                    (scheduleSelectedItem === "custom" &&
+                      customCronExpression.trim() === "")
+                  }
+                >
+                  {isSubmitting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   {schedule ? "Save Changes" : "Add Schedule"}
                 </Button>
               </div>

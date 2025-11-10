@@ -1,27 +1,45 @@
-import { Button } from '@/src/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
-import { Textarea } from '@/src/components/ui/textarea';
-import { Workflow as Tool, WorkflowResult as ToolResult } from '@superglue/client';
-import { Check, Copy, Loader2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { AutoSizer, List } from 'react-virtualized';
-import { ToolCreateSuccess } from './ToolCreateSuccess';
-import { truncateForDisplay } from '@/src/lib/general-utils';
+import { Button } from "@/src/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/src/components/ui/card";
+import { Textarea } from "@/src/components/ui/textarea";
+import {
+  Workflow as Tool,
+  WorkflowResult as ToolResult,
+} from "@superglue/client";
+import { Check, Copy, Loader2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AutoSizer, List } from "react-virtualized";
+import { ToolCreateSuccess } from "./ToolCreateSuccess";
+import { truncateForDisplay } from "@/src/lib/general-utils";
 
 const MAX_LINES = 10000;
-const getResponseLines = (response: any): { lines: string[], truncated: boolean } => {
-  if (!response) return { lines: ['No results yet...'], truncated: false };
+const getResponseLines = (
+  response: any,
+): { lines: string[]; truncated: boolean } => {
+  if (!response) return { lines: ["No results yet..."], truncated: false };
   const display = truncateForDisplay(response);
-  const lines = display.value.split('\n');
+  const lines = display.value.split("\n");
   if (lines.length > MAX_LINES) {
-    return { lines: [...lines.slice(0, MAX_LINES), '... [Output truncated - too many lines]'], truncated: true };
+    return {
+      lines: [
+        ...lines.slice(0, MAX_LINES),
+        "... [Output truncated - too many lines]",
+      ],
+      truncated: true,
+    };
   }
   return { lines, truncated: display.truncated };
 };
 
 interface ToolResultsViewProps {
-  activeTab: 'results' | 'transform' | 'final' | 'instructions';
-  setActiveTab: (tab: 'results' | 'transform' | 'final' | 'instructions') => void;
+  activeTab: "results" | "transform" | "final" | "instructions";
+  setActiveTab: (
+    tab: "results" | "transform" | "final" | "instructions",
+  ) => void;
   executionResult: ToolResult | null;
   finalTransform: string;
   setFinalTransform: (transform: string) => void;
@@ -46,17 +64,17 @@ export function ToolResultsView({
   showInstructionsTab = false,
   currentTool,
   credentials,
-  payload
+  payload,
 }: ToolResultsViewProps) {
   // Memoize the line processing to avoid recalculation on every render
-  const rawResultsData = useMemo(() =>
-    getResponseLines(executionResult?.stepResults),
-    [executionResult?.stepResults]
+  const rawResultsData = useMemo(
+    () => getResponseLines(executionResult?.stepResults),
+    [executionResult?.stepResults],
   );
 
-  const finalResultsData = useMemo(() =>
-    getResponseLines(finalResult),
-    [finalResult]
+  const finalResultsData = useMemo(
+    () => getResponseLines(finalResult),
+    [finalResult],
   );
 
   const [rawCopied, setRawCopied] = useState(false);
@@ -64,7 +82,9 @@ export function ToolResultsView({
 
   const handleCopyRaw = () => {
     if (executionResult?.stepResults) {
-      navigator.clipboard.writeText(JSON.stringify(executionResult.stepResults, null, 2));
+      navigator.clipboard.writeText(
+        JSON.stringify(executionResult.stepResults, null, 2),
+      );
       setRawCopied(true);
       setTimeout(() => setRawCopied(false), 1000);
     }
@@ -85,31 +105,31 @@ export function ToolResultsView({
           <CardTitle>Results</CardTitle>
           <div className="flex gap-2">
             <Button
-              variant={activeTab === 'results' ? 'default' : 'ghost'}
+              variant={activeTab === "results" ? "default" : "ghost"}
               size="sm"
-              onClick={() => setActiveTab('results')}
+              onClick={() => setActiveTab("results")}
             >
               Raw Results
             </Button>
             <Button
-              variant={activeTab === 'final' ? 'default' : 'ghost'}
+              variant={activeTab === "final" ? "default" : "ghost"}
               size="sm"
-              onClick={() => setActiveTab('final')}
+              onClick={() => setActiveTab("final")}
             >
               Final Results
             </Button>
             <Button
-              variant={activeTab === 'transform' ? 'default' : 'ghost'}
+              variant={activeTab === "transform" ? "default" : "ghost"}
               size="sm"
-              onClick={() => setActiveTab('transform')}
+              onClick={() => setActiveTab("transform")}
             >
               Transformation
             </Button>
             {showInstructionsTab && (
               <Button
-                variant={activeTab === 'instructions' ? 'default' : 'ghost'}
+                variant={activeTab === "instructions" ? "default" : "ghost"}
                 size="sm"
-                onClick={() => setActiveTab('instructions')}
+                onClick={() => setActiveTab("instructions")}
               >
                 Instructions
               </Button>
@@ -124,7 +144,11 @@ export function ToolResultsView({
             <div className="flex flex-col gap-1">
               <div className="flex items-center">
                 <span className="font-semibold mr-2">Status:</span>
-                <span className={executionResult.success ? "text-green-600" : "text-red-600"}>
+                <span
+                  className={
+                    executionResult.success ? "text-green-600" : "text-red-600"
+                  }
+                >
                   {executionResult.success ? "Success" : "Failed"}
                 </span>
               </div>
@@ -149,22 +173,41 @@ export function ToolResultsView({
             </div>
           </div>
         )}
-        {activeTab === 'results' ? (
+        {activeTab === "results" ? (
           executionResult ? (
             <div className="flex-grow overflow-hidden p-1 relative">
               {executionResult.stepResults && (
-                <Button variant="ghost" size="icon" className="absolute top-2 right-2 z-10 h-8 w-8" onClick={handleCopyRaw}>
-                  {rawCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 z-10 h-8 w-8"
+                  onClick={handleCopyRaw}
+                >
+                  {rawCopied ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
                 </Button>
               )}
               {rawResultsData.truncated && (
                 <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mb-2">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                     <line x1="12" y1="9" x2="12" y2="13" />
                     <line x1="12" y1="17" x2="12.01" y2="17" />
                   </svg>
-                  Large dataset detected - display has been truncated for performance
+                  Large dataset detected - display has been truncated for
+                  performance
                 </div>
               )}
               <AutoSizer>
@@ -177,14 +220,16 @@ export function ToolResultsView({
                     rowRenderer={({ index, key, style }) => {
                       const line = rawResultsData.lines[index];
                       const indentMatch = line?.match(/^(\s*)/);
-                      const indentLevel = indentMatch ? indentMatch[0].length : 0;
+                      const indentLevel = indentMatch
+                        ? indentMatch[0].length
+                        : 0;
 
                       return (
                         <div
                           key={key}
                           style={{
                             ...style,
-                            whiteSpace: 'pre',
+                            whiteSpace: "pre",
                             paddingLeft: `${indentLevel * 8}px`,
                           }}
                           className="font-mono text-xs overflow-hidden text-ellipsis px-4"
@@ -203,11 +248,13 @@ export function ToolResultsView({
             <div className="h-full flex items-center justify-center p-4">
               <p className="text-gray-500 italic flex items-center gap-2">
                 {isExecuting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isExecuting ? 'Executing...' : 'No results yet. Test the tool to see results here.'}
+                {isExecuting
+                  ? "Executing..."
+                  : "No results yet. Test the tool to see results here."}
               </p>
             </div>
           )
-        ) : activeTab === 'transform' ? (
+        ) : activeTab === "transform" ? (
           <div className="flex-grow overflow-auto p-4">
             <Textarea
               value={finalTransform}
@@ -216,7 +263,7 @@ export function ToolResultsView({
               spellCheck={false}
             />
           </div>
-        ) : activeTab === 'instructions' ? (
+        ) : activeTab === "instructions" ? (
           showInstructionsTab && (
             <div className="p-4">
               <ToolCreateSuccess
@@ -226,64 +273,84 @@ export function ToolResultsView({
               />
             </div>
           )
-        ) : ( // activeTab === 'final'
-          finalResult ? (
-            <div className="flex-grow overflow-hidden p-1 relative">
-              <Button variant="ghost" size="icon" className="absolute top-2 right-2 z-10 h-8 w-8" onClick={handleCopyFinal}>
-                {finalCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              </Button>
-              {finalResultsData.truncated && (
-                <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mb-2">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                  Large dataset detected - display has been truncated for performance
-                </div>
+        ) : // activeTab === 'final'
+        finalResult ? (
+          <div className="flex-grow overflow-hidden p-1 relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 z-10 h-8 w-8"
+              onClick={handleCopyFinal}
+            >
+              {finalCopied ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Copy className="h-4 w-4" />
               )}
-              <AutoSizer>
-                {({ height, width }) => (
-                  <List
-                    width={width}
-                    height={height}
-                    rowCount={finalResultsData.lines.length}
-                    rowHeight={18}
-                    rowRenderer={({ index, key, style }) => {
-                      const line = finalResultsData.lines[index];
-                      const indentMatch = line?.match(/^(\s*)/);
-                      const indentLevel = indentMatch ? indentMatch[0].length : 0;
+            </Button>
+            {finalResultsData.truncated && (
+              <div className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5 bg-amber-500/10 py-1 px-2 rounded mb-2">
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                Large dataset detected - display has been truncated for
+                performance
+              </div>
+            )}
+            <AutoSizer>
+              {({ height, width }) => (
+                <List
+                  width={width}
+                  height={height}
+                  rowCount={finalResultsData.lines.length}
+                  rowHeight={18}
+                  rowRenderer={({ index, key, style }) => {
+                    const line = finalResultsData.lines[index];
+                    const indentMatch = line?.match(/^(\s*)/);
+                    const indentLevel = indentMatch ? indentMatch[0].length : 0;
 
-                      return (
-                        <div
-                          key={key}
-                          style={{
-                            ...style,
-                            whiteSpace: 'pre',
-                            paddingLeft: `${indentLevel * 8}px`,
-                          }}
-                          className="font-mono text-xs overflow-hidden text-ellipsis px-4"
-                        >
-                          {line?.trimLeft()}
-                        </div>
-                      );
-                    }}
-                    overscanRowCount={20}
-                    className="overflow-auto"
-                  />
-                )}
-              </AutoSizer>
-            </div>
-          ) : (
-            <div className="h-full flex items-center justify-center p-4">
-              <p className="text-gray-500 italic flex items-center gap-2">
-                {isExecuting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isExecuting ? 'Executing...' : 'No final results yet. Test the tool to see results here.'}
-              </p>
-            </div>
-          )
+                    return (
+                      <div
+                        key={key}
+                        style={{
+                          ...style,
+                          whiteSpace: "pre",
+                          paddingLeft: `${indentLevel * 8}px`,
+                        }}
+                        className="font-mono text-xs overflow-hidden text-ellipsis px-4"
+                      >
+                        {line?.trimLeft()}
+                      </div>
+                    );
+                  }}
+                  overscanRowCount={20}
+                  className="overflow-auto"
+                />
+              )}
+            </AutoSizer>
+          </div>
+        ) : (
+          <div className="h-full flex items-center justify-center p-4">
+            <p className="text-gray-500 italic flex items-center gap-2">
+              {isExecuting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isExecuting
+                ? "Executing..."
+                : "No final results yet. Test the tool to see results here."}
+            </p>
+          </div>
         )}
       </CardContent>
     </Card>
   );
-} 
+}

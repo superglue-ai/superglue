@@ -1,18 +1,18 @@
-import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
-import { getSDKCode } from '@superglue/shared/templates';
-import { Check, Copy } from 'lucide-react';
-import { useState } from 'react';
-import { Button } from '../ui/button';
+import { useConfig } from "@/src/app/config-context";
+import { tokenRegistry } from "@/src/lib/token-registry";
+import { getSDKCode } from "@superglue/shared/templates";
+import { Check, Copy } from "lucide-react";
+import { useState } from "react";
+import { Button } from "../ui/button";
 
-type Tool = any // Replace with your actual Tool type
+type Tool = any; // Replace with your actual Tool type
 
 interface ToolCreateSuccessProps {
-  currentTool: Tool
-  payload: Record<string, any>
-  credentials?: Record<string, string>
-  onViewTool?: () => void
-  onViewAllTools?: () => void
+  currentTool: Tool;
+  payload: Record<string, any>;
+  credentials?: Record<string, string>;
+  onViewTool?: () => void;
+  onViewAllTools?: () => void;
 }
 
 export function ToolCreateSuccess({
@@ -20,11 +20,11 @@ export function ToolCreateSuccess({
   payload,
   credentials,
   onViewTool,
-  onViewAllTools
+  onViewAllTools,
 }: ToolCreateSuccessProps) {
   const superglueConfig = useConfig();
-  const [sdkCopied, setSdkCopied] = useState(false)
-  const [curlCopied, setCurlCopied] = useState(false)
+  const [sdkCopied, setSdkCopied] = useState(false);
+  const [curlCopied, setCurlCopied] = useState(false);
 
   const sdkCode = getSDKCode({
     apiKey: tokenRegistry.getToken(),
@@ -32,7 +32,7 @@ export function ToolCreateSuccess({
     workflowId: currentTool.id,
     payload,
     credentials: credentials || {},
-  })
+  });
 
   const curlCommand = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
   -H "Content-Type: application/json" \\
@@ -51,19 +51,20 @@ export function ToolCreateSuccess({
       },
       payload: payload,
     },
-  })}'`
+  })}'`;
 
   return (
     <div className="space-y-4">
       <p className="text-lg font-medium">
-        Tool{' '}
+        Tool{" "}
         <span className="font-mono text-base bg-muted px-2 py-0.5 rounded">
           {currentTool.id}
-        </span>{' '}
+        </span>{" "}
         created successfully!
       </p>
       <p>
-        You can now use this tool ID in the "Tools" page or call it via the API/SDK.
+        You can now use this tool ID in the "Tools" page or call it via the
+        API/SDK.
       </p>
 
       <div className="rounded-md bg-muted p-4">
@@ -76,12 +77,16 @@ export function ToolCreateSuccess({
                 size="icon"
                 className="h-8 w-8 flex-none"
                 onClick={() => {
-                  navigator.clipboard.writeText(sdkCode.typescript)
-                  setSdkCopied(true)
-                  setTimeout(() => setSdkCopied(false), 1000)
+                  navigator.clipboard.writeText(sdkCode.typescript);
+                  setSdkCopied(true);
+                  setTimeout(() => setSdkCopied(false), 1000);
                 }}
               >
-                {sdkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {sdkCopied ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
               </Button>
             </div>
             <div className="bg-secondary rounded-md overflow-hidden">
@@ -103,12 +108,16 @@ export function ToolCreateSuccess({
                 size="icon"
                 className="h-8 w-8 flex-none"
                 onClick={() => {
-                  navigator.clipboard.writeText(curlCommand)
-                  setCurlCopied(true)
-                  setTimeout(() => setCurlCopied(false), 1000)
+                  navigator.clipboard.writeText(curlCommand);
+                  setCurlCopied(true);
+                  setTimeout(() => setCurlCopied(false), 1000);
                 }}
               >
-                {curlCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {curlCopied ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
               </Button>
             </div>
             <div className="bg-secondary rounded-md overflow-hidden">
@@ -135,5 +144,5 @@ export function ToolCreateSuccess({
         </div>
       )}
     </div>
-  )
-} 
+  );
+}

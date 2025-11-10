@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
 import { Edit, Loader2, Plus, Trash2 } from "lucide-react";
-import React from 'react';
+import React from "react";
 
-import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
+import { useConfig } from "@/src/app/config-context";
+import { tokenRegistry } from "@/src/lib/token-registry";
 import { Button } from "@/src/components/ui/button";
 import { Switch } from "@/src/components/ui/switch";
 import {
@@ -15,17 +15,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/client';
-import cronstrue from 'cronstrue';
-import ToolScheduleModal from './ToolScheduleModal';
-
+import {
+  SuperglueClient,
+  WorkflowSchedule as ToolSchedule,
+} from "@superglue/client";
+import cronstrue from "cronstrue";
+import ToolScheduleModal from "./ToolScheduleModal";
 
 const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
   const config = useConfig();
   const [toolSchedules, setToolSchedules] = React.useState<ToolSchedule[]>([]);
   const [loadingSchedules, setLoadingSchedules] = React.useState(false);
   const [modalOpen, setModalOpen] = React.useState(false);
-  const [modalSchedule, setModalSchedule] = React.useState<ToolSchedule | null>(null);
+  const [modalSchedule, setModalSchedule] = React.useState<ToolSchedule | null>(
+    null,
+  );
 
   React.useEffect(() => {
     loadSchedules();
@@ -38,7 +42,7 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
 
     const superglueClient = new SuperglueClient({
       endpoint: config.superglueEndpoint,
-      apiKey: tokenRegistry.getToken()
+      apiKey: tokenRegistry.getToken(),
     });
 
     const schedules = await superglueClient.listWorkflowSchedules(toolId);
@@ -47,17 +51,20 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
     setLoadingSchedules(false);
   };
 
-  const handleScheduleDelete = async (e: React.MouseEvent, scheduleId: string) => {
+  const handleScheduleDelete = async (
+    e: React.MouseEvent,
+    scheduleId: string,
+  ) => {
     e.stopPropagation();
 
     // optimistic update
-    setToolSchedules(prevSchedules =>
-      prevSchedules.filter(schedule => schedule.id !== scheduleId)
+    setToolSchedules((prevSchedules) =>
+      prevSchedules.filter((schedule) => schedule.id !== scheduleId),
     );
 
     const superglueClient = new SuperglueClient({
       endpoint: config.superglueEndpoint,
-      apiKey: tokenRegistry.getToken()
+      apiKey: tokenRegistry.getToken(),
     });
 
     await superglueClient.deleteWorkflowSchedule(scheduleId);
@@ -66,24 +73,27 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
     loadSchedules(false);
   };
 
-  const handleScheduleStateToggle = async (newState: boolean, scheduleId: string) => {
+  const handleScheduleStateToggle = async (
+    newState: boolean,
+    scheduleId: string,
+  ) => {
     // optimistic update
-    setToolSchedules(prevSchedules =>
-      prevSchedules.map(schedule =>
+    setToolSchedules((prevSchedules) =>
+      prevSchedules.map((schedule) =>
         schedule.id === scheduleId
           ? { ...schedule, enabled: newState }
-          : schedule
-      )
+          : schedule,
+      ),
     );
 
     const superglueClient = new SuperglueClient({
       endpoint: config.superglueEndpoint,
-      apiKey: tokenRegistry.getToken()
+      apiKey: tokenRegistry.getToken(),
     });
 
     await superglueClient.upsertWorkflowSchedule({
       id: scheduleId,
-      enabled: newState
+      enabled: newState,
     });
 
     // make sure server and client state are in sync (e.g. for nextRunAt)
@@ -100,7 +110,7 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
     setModalSchedule(null);
   };
 
-  return (loadingSchedules ? (
+  return loadingSchedules ? (
     <div className="flex items-center justify-center py-8">
       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
     </div>
@@ -147,25 +157,43 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
                 <TableCell className="w-[200px] pl-0">
                   <Switch
                     checked={schedule.enabled}
-                    onCheckedChange={(newState) => handleScheduleStateToggle(newState, schedule.id)}
+                    onCheckedChange={(newState) =>
+                      handleScheduleStateToggle(newState, schedule.id)
+                    }
                     className="custom-switch"
                   />
                 </TableCell>
-                <TableCell className="w-[200px]">{cronstrue.toString(schedule.cronExpression)}</TableCell>
-                <TableCell className="w-[200px]">{schedule.cronExpression}</TableCell>
+                <TableCell className="w-[200px]">
+                  {cronstrue.toString(schedule.cronExpression)}
+                </TableCell>
+                <TableCell className="w-[200px]">
+                  {schedule.cronExpression}
+                </TableCell>
                 <TableCell className="w-[200px]">{schedule.timezone}</TableCell>
-                <TableCell className="w-[300px]">{schedule.lastRunAt ? new Date(schedule.lastRunAt).toLocaleString() : 'Never'}</TableCell>
                 <TableCell className="w-[300px]">
-                  {!schedule.enabled ? 'Disabled' : (new Date(schedule.nextRunAt).toLocaleString())}
+                  {schedule.lastRunAt
+                    ? new Date(schedule.lastRunAt).toLocaleString()
+                    : "Never"}
+                </TableCell>
+                <TableCell className="w-[300px]">
+                  {!schedule.enabled
+                    ? "Disabled"
+                    : new Date(schedule.nextRunAt).toLocaleString()}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => handleModalOpen(schedule)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleModalOpen(schedule)}
+                    >
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost"
+                    <Button
+                      variant="ghost"
                       size="icon"
-                      onClick={(e) => handleScheduleDelete(e, schedule.id)}>
+                      onClick={(e) => handleScheduleDelete(e, schedule.id)}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -175,9 +203,15 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
           </TableBody>
         </Table>
       )}
-      <ToolScheduleModal isOpen={modalOpen} toolId={toolId} schedule={modalSchedule} onClose={handleModalClose} onSave={loadSchedules} />
+      <ToolScheduleModal
+        isOpen={modalOpen}
+        toolId={toolId}
+        schedule={modalSchedule}
+        onClose={handleModalClose}
+        onSave={loadSchedules}
+      />
     </div>
-  ));
+  );
 };
 
 export default ToolSchedulesList;

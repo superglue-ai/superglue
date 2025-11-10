@@ -1,40 +1,44 @@
-import { findMatchingIntegration, integrations } from '@superglue/shared';
+import { findMatchingIntegration, integrations } from "@superglue/shared";
 import { clsx, type ClassValue } from "clsx";
-import prettierPluginBabel from 'prettier/plugins/babel';
-import prettierPluginEstree from 'prettier/plugins/estree';
-import prettier from 'prettier/standalone';
-import type { SimpleIcon } from 'simple-icons';
-import * as simpleIcons from 'simple-icons';
+import prettierPluginBabel from "prettier/plugins/babel";
+import prettierPluginEstree from "prettier/plugins/estree";
+import prettier from "prettier/standalone";
+import type { SimpleIcon } from "simple-icons";
+import * as simpleIcons from "simple-icons";
 import { twMerge } from "tailwind-merge";
-import { StepExecutionResult } from './client-utils';
+import { StepExecutionResult } from "./client-utils";
 
-export const inputErrorStyles = "border-red-500 focus:border-red-500 focus:ring-red-500";
+export const inputErrorStyles =
+  "border-red-500 focus:border-red-500 focus:ring-red-500";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 export function composeUrl(host: string, path: string | undefined) {
-  if (!host && !path) return '';
+  if (!host && !path) return "";
   // Handle empty/undefined inputs
-  if (!host) host = '';
-  if (!path) path = '';
+  if (!host) host = "";
+  if (!path) path = "";
 
   // Trim slashes in one pass
-  const cleanHost = host.endsWith('/') ? host.slice(0, -1) : host;
-  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+  const cleanHost = host.endsWith("/") ? host.slice(0, -1) : host;
+  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
 
   return `${cleanHost}/${cleanPath}`;
 }
 
-export function getIntegrationIcon(integration: { id: string; urlHost?: string }): string | null {
+export function getIntegrationIcon(integration: {
+  id: string;
+  urlHost?: string;
+}): string | null {
   // First try exact ID match with known integrations
   if (integrations[integration.id]) {
     return integrations[integration.id].icon;
   }
 
   // Second try: strip any numeric suffix (e.g., "firebase-1" -> "firebase")
-  const baseId = integration.id.replace(/-\d+$/, '');
+  const baseId = integration.id.replace(/-\d+$/, "");
   if (baseId !== integration.id && integrations[baseId]) {
     return integrations[baseId].icon;
   }
@@ -53,11 +57,11 @@ export function getIntegrationIcon(integration: { id: string; urlHost?: string }
 export const isEmptyData = (value: any): boolean => {
   if (value === null || value === undefined) return true;
 
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed.length === 0) return true;
     const first = trimmed[0];
-    if (first === '{' || first === '[') {
+    if (first === "{" || first === "[") {
       try {
         const parsed = JSON.parse(trimmed);
         return isEmptyData(parsed);
@@ -69,22 +73,26 @@ export const isEmptyData = (value: any): boolean => {
   }
 
   if (Array.isArray(value)) return value.length === 0;
-  if (typeof value === 'object') return Object.keys(value).length === 0;
+  if (typeof value === "object") return Object.keys(value).length === 0;
   return false;
 };
 
 export const computeStepOutput = (
-  result: StepExecutionResult
+  result: StepExecutionResult,
 ): { output: any; failed: boolean; emptyHint?: boolean; error?: string } => {
   const failed = !result?.success;
   if (failed) {
-    return { output: result?.error || 'Step execution failed', failed: true, error: result?.error };
+    return {
+      output: result?.error || "Step execution failed",
+      failed: true,
+      error: result?.error,
+    };
   }
   return {
     output: result?.data,
     failed: false,
     emptyHint: isEmptyData(result?.data),
-    error: result?.error
+    error: result?.error,
   };
 };
 
@@ -98,26 +106,34 @@ export const MAX_OBJECT_PREVIEW_KEYS = 100; // Max object keys to show before tr
 
 export const truncateValue = (value: any, depth: number = 0): any => {
   if (depth > MAX_TRUNCATION_DEPTH) {
-    if (Array.isArray(value)) return '[...]';
-    if (typeof value === 'object' && value !== null) return '{...}';
-    return '...';
+    if (Array.isArray(value)) return "[...]";
+    if (typeof value === "object" && value !== null) return "{...}";
+    return "...";
   }
 
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     if (value.length > MAX_STRING_PREVIEW_LENGTH) {
-      return value.substring(0, MAX_STRING_PREVIEW_LENGTH) + `... [${value.length.toLocaleString()} chars total]`;
+      return (
+        value.substring(0, MAX_STRING_PREVIEW_LENGTH) +
+        `... [${value.length.toLocaleString()} chars total]`
+      );
     }
     return value;
   }
 
   if (Array.isArray(value)) {
     if (value.length > MAX_ARRAY_PREVIEW_ITEMS) {
-      return [...value.slice(0, MAX_ARRAY_PREVIEW_ITEMS).map(v => truncateValue(v, depth + 1)), `... ${value.length - MAX_ARRAY_PREVIEW_ITEMS} more items`];
+      return [
+        ...value
+          .slice(0, MAX_ARRAY_PREVIEW_ITEMS)
+          .map((v) => truncateValue(v, depth + 1)),
+        `... ${value.length - MAX_ARRAY_PREVIEW_ITEMS} more items`,
+      ];
     }
-    return value.map(v => truncateValue(v, depth + 1));
+    return value.map((v) => truncateValue(v, depth + 1));
   }
 
-  if (typeof value === 'object' && value !== null) {
+  if (typeof value === "object" && value !== null) {
     const result: any = {};
     const keys = Object.keys(value);
     const keysToShow = keys.slice(0, MAX_OBJECT_PREVIEW_KEYS);
@@ -125,7 +141,8 @@ export const truncateValue = (value: any, depth: number = 0): any => {
       result[key] = truncateValue(value[key], depth + 1);
     }
     if (keys.length > MAX_OBJECT_PREVIEW_KEYS) {
-      result['...'] = `${(keys.length - MAX_OBJECT_PREVIEW_KEYS).toLocaleString()} more keys`;
+      result["..."] =
+        `${(keys.length - MAX_OBJECT_PREVIEW_KEYS).toLocaleString()} more keys`;
     }
     return result;
   }
@@ -133,15 +150,20 @@ export const truncateValue = (value: any, depth: number = 0): any => {
   return value;
 };
 
-export const truncateForDisplay = (data: any): { value: string, truncated: boolean } => {
+export const truncateForDisplay = (
+  data: any,
+): { value: string; truncated: boolean } => {
   if (data === null || data === undefined) {
-    return { value: '{}', truncated: false };
+    return { value: "{}", truncated: false };
   }
-  if (typeof data === 'string') {
+  if (typeof data === "string") {
     if (data.length > MAX_STRING_PREVIEW_LENGTH) {
       const truncatedString = data.substring(0, MAX_STRING_PREVIEW_LENGTH);
-      const lastNewline = truncatedString.lastIndexOf('\n');
-      const cleanTruncated = truncatedString.substring(0, lastNewline > 0 ? lastNewline : MAX_STRING_PREVIEW_LENGTH);
+      const lastNewline = truncatedString.lastIndexOf("\n");
+      const cleanTruncated = truncatedString.substring(
+        0,
+        lastNewline > 0 ? lastNewline : MAX_STRING_PREVIEW_LENGTH,
+      );
       const note = `\n\n... [String truncated - showing ${MAX_STRING_PREVIEW_LENGTH.toLocaleString()} of ${data.length.toLocaleString()} characters]`;
       const combined = `${cleanTruncated}${note}`;
       return { value: JSON.stringify(combined), truncated: true };
@@ -153,13 +175,21 @@ export const truncateForDisplay = (data: any): { value: string, truncated: boole
     let jsonString = JSON.stringify(truncatedData, null, 2);
     if (jsonString.length > MAX_DISPLAY_SIZE) {
       jsonString = jsonString.substring(0, MAX_DISPLAY_SIZE);
-      const lastNewline = jsonString.lastIndexOf('\n');
+      const lastNewline = jsonString.lastIndexOf("\n");
       if (lastNewline > 0) jsonString = jsonString.substring(0, lastNewline);
-      return { value: jsonString + '\n\n... [Data truncated - exceeds size limit]', truncated: true };
+      return {
+        value: jsonString + "\n\n... [Data truncated - exceeds size limit]",
+        truncated: true,
+      };
     }
-    const lines = jsonString.split('\n');
+    const lines = jsonString.split("\n");
     if (lines.length > MAX_DISPLAY_LINES) {
-      return { value: lines.slice(0, MAX_DISPLAY_LINES).join('\n') + '\n\n... [Truncated - too many lines]', truncated: true };
+      return {
+        value:
+          lines.slice(0, MAX_DISPLAY_LINES).join("\n") +
+          "\n\n... [Truncated - too many lines]",
+        truncated: true,
+      };
     }
     const originalJson = JSON.stringify(data, null, 2);
     const wasTruncated = originalJson !== jsonString;
@@ -167,7 +197,8 @@ export const truncateForDisplay = (data: any): { value: string, truncated: boole
   } catch {
     const stringValue = String(data);
     if (stringValue.length > MAX_STRING_PREVIEW_LENGTH) {
-      const preview = stringValue.substring(0, MAX_STRING_PREVIEW_LENGTH) + '... [Truncated]';
+      const preview =
+        stringValue.substring(0, MAX_STRING_PREVIEW_LENGTH) + "... [Truncated]";
       return { value: JSON.stringify(preview), truncated: true };
     }
     return { value: JSON.stringify(stringValue), truncated: false };
@@ -176,9 +207,12 @@ export const truncateForDisplay = (data: any): { value: string, truncated: boole
 
 export const truncateLines = (text: string, maxLines: number): string => {
   if (!text) return text;
-  const lines = text.split('\n');
+  const lines = text.split("\n");
   if (lines.length <= maxLines) return text;
-  return lines.slice(0, maxLines).join('\n') + `\n... truncated ${lines.length - maxLines} more lines ...`;
+  return (
+    lines.slice(0, maxLines).join("\n") +
+    `\n... truncated ${lines.length - maxLines} more lines ...`
+  );
 };
 
 export function getSimpleIcon(name: string): SimpleIcon | null {
@@ -196,9 +230,12 @@ export function getSimpleIcon(name: string): SimpleIcon | null {
 }
 
 // Computes the execution-ready payload by merging manual JSON with file payloads
-export const computeToolPayload = (manualPayloadText: string, filePayloads: Record<string, any>): any => {
+export const computeToolPayload = (
+  manualPayloadText: string,
+  filePayloads: Record<string, any>,
+): any => {
   try {
-    const manualPayload = JSON.parse(manualPayloadText || '{}');
+    const manualPayload = JSON.parse(manualPayloadText || "{}");
     return { ...manualPayload, ...filePayloads };
   } catch {
     return { ...filePayloads };
@@ -206,12 +243,15 @@ export const computeToolPayload = (manualPayloadText: string, filePayloads: Reco
 };
 
 // Removes file keys from the manual payload text
-export const removeFileKeysFromPayload = (payloadText: string, fileKeys: string[]): string => {
+export const removeFileKeysFromPayload = (
+  payloadText: string,
+  fileKeys: string[],
+): string => {
   if (fileKeys.length === 0) return payloadText;
-  
+
   try {
-    const parsed = JSON.parse(payloadText || '{}');
-    fileKeys.forEach(key => {
+    const parsed = JSON.parse(payloadText || "{}");
+    fileKeys.forEach((key) => {
       delete parsed[key];
     });
     return JSON.stringify(parsed, null, 2);
@@ -220,20 +260,26 @@ export const removeFileKeysFromPayload = (payloadText: string, fileKeys: string[
   }
 };
 
-export const buildEvolvingPayload = (initialPayload: any, steps: any[], stepResults: Record<string, any>, upToIndex: number) => {
+export const buildEvolvingPayload = (
+  initialPayload: any,
+  steps: any[],
+  stepResults: Record<string, any>,
+  upToIndex: number,
+) => {
   let evolvingPayload = { ...initialPayload };
 
   for (let i = 0; i <= upToIndex && i < steps.length; i++) {
     const step = steps[i];
     const result = stepResults[step.id];
     if (result !== undefined && result !== null) {
-      const dataToMerge = (typeof result === 'object' && 'data' in result && 'success' in result)
-        ? result.data
-        : result;
+      const dataToMerge =
+        typeof result === "object" && "data" in result && "success" in result
+          ? result.data
+          : result;
 
       evolvingPayload = {
         ...evolvingPayload,
-        [`${step.id}`]: dataToMerge
+        [`${step.id}`]: dataToMerge,
       };
     }
   }
@@ -247,55 +293,65 @@ const PRETTIER_PLUGINS = [
 ];
 
 export async function formatJavaScriptCode(code: string): Promise<string> {
-  if (!code || typeof code !== 'string') return code;
+  if (!code || typeof code !== "string") return code;
   try {
     const formatted = await prettier.format(code, {
-      parser: 'babel',
+      parser: "babel",
       plugins: PRETTIER_PLUGINS,
       semi: true,
       singleQuote: true,
-      trailingComma: 'es5',
+      trailingComma: "es5",
       tabWidth: 2,
       printWidth: 100,
-      arrowParens: 'always'
+      arrowParens: "always",
     });
     return formatted.trimEnd();
   } catch (error) {
-    console.debug('Code formatting failed:', error);
+    console.debug("Code formatting failed:", error);
     return code;
   }
 }
 
-export function getGroupedTimezones(): Record<string, Array<{ value: string, label: string }>> {
-  const timezones = Intl.supportedValuesOf('timeZone').map(tz => ({
+export function getGroupedTimezones(): Record<
+  string,
+  Array<{ value: string; label: string }>
+> {
+  const timezones = Intl.supportedValuesOf("timeZone").map((tz) => ({
     value: tz,
-    label: tz.replace(/_/g, ' ')
+    label: tz.replace(/_/g, " "),
   }));
 
-  return timezones.reduce((acc, timezone) => {
-    const group = timezone.value.split('/')[0]; // Use value instead of label for grouping
-    if (!acc[group]) {
-      acc[group] = [];
-    }
-    acc[group].push(timezone);
-    return acc;
-  }, {} as Record<string, Array<{ value: string, label: string }>>);
+  return timezones.reduce(
+    (acc, timezone) => {
+      const group = timezone.value.split("/")[0]; // Use value instead of label for grouping
+      if (!acc[group]) {
+        acc[group] = [];
+      }
+      acc[group].push(timezone);
+      return acc;
+    },
+    {} as Record<string, Array<{ value: string; label: string }>>,
+  );
 }
 
-export function isValidSourceDataArrowFunction(code: string | undefined | null): boolean {
+export function isValidSourceDataArrowFunction(
+  code: string | undefined | null,
+): boolean {
   if (!code) return false;
   const text = String(code);
   const patterns = [
     /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*\)?\s*;?\s*$/, // block body
     /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>\s*\([\s\S]*\)\s*\)?\s*;?\s*$/, // parenthesized expr
-    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>[\s\S]*\)?\s*;?\s*$/              // tolerant bare expr
+    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>[\s\S]*\)?\s*;?\s*$/, // tolerant bare expr
   ];
   return patterns.some((re) => re.test(text));
 }
 
-export function ensureSourceDataArrowFunction(code: string | undefined | null): string {
+export function ensureSourceDataArrowFunction(
+  code: string | undefined | null,
+): string {
   const fallback = `(sourceData) => {\n  return sourceData;\n}`;
-  const text = (code ?? '').trim();
+  const text = (code ?? "").trim();
   if (!text) return fallback;
   if (isValidSourceDataArrowFunction(text)) return text;
   return `(sourceData) => {\n${text}\n}`;

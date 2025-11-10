@@ -4,7 +4,9 @@ export type Theme = "light" | "dark" | "system";
 
 export function useTheme(): [Theme, (theme: Theme) => void, "light" | "dark"] {
   const getSystemTheme = () =>
-    window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
 
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === "undefined") return "dark";

@@ -12,4 +12,3 @@ export const jetbrainsSans = localFont({
   src: "../../public/fonts/jetbrains-sans/JetBrainsSans.woff2",
   variable: "--font-jetbrains-sans",
 });
-

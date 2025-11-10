@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
-import { useIntegrations } from '@/src/app/integrations-context';
-import { ConfigCreateStepper } from '@/src/components/api/ConfigCreateStepper';
+import { useConfig } from "@/src/app/config-context";
+import { tokenRegistry } from "@/src/lib/token-registry";
+import { useIntegrations } from "@/src/app/integrations-context";
+import { ConfigCreateStepper } from "@/src/components/api/ConfigCreateStepper";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,19 +32,44 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 
-import ToolSchedulesList from '@/src/components/tools/ToolSchedulesList';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
-import { loadFromCache, saveToCache } from '@/src/lib/cache-utils';
-import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
-import { ApiConfig, Integration, SuperglueClient, Workflow as Tool } from '@superglue/client';
-import { Calendar, Check, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2 } from "lucide-react";
-import { useRouter } from 'next/navigation';
-import React from 'react';
-import type { SimpleIcon } from 'simple-icons';
-import * as simpleIcons from 'simple-icons';
-import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
+import ToolSchedulesList from "@/src/components/tools/ToolSchedulesList";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/src/components/ui/tooltip";
+import { loadFromCache, saveToCache } from "@/src/lib/cache-utils";
+import { getIntegrationIcon as getIntegrationIconName } from "@/src/lib/general-utils";
+import {
+  ApiConfig,
+  Integration,
+  SuperglueClient,
+  Workflow as Tool,
+} from "@superglue/client";
+import {
+  Calendar,
+  Check,
+  Copy,
+  Filter,
+  Globe,
+  Hammer,
+  History,
+  Loader2,
+  Play,
+  Plus,
+  RotateCw,
+  Search,
+  Settings,
+  Trash2,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import React from "react";
+import type { SimpleIcon } from "simple-icons";
+import * as simpleIcons from "simple-icons";
+import { ToolCreateStepper } from "@/src/components/tools/ToolCreateStepper";
 
-const CACHE_PREFIX = 'superglue-tools-cache';
+const CACHE_PREFIX = "superglue-tools-cache";
 
 interface CachedTools {
   configs: (ApiConfig | Tool)[];
@@ -61,21 +86,25 @@ const ConfigTable = () => {
   const [pageSize] = React.useState(20);
   const config = useConfig();
   const { integrations } = useIntegrations();
-  const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | Tool | null>(null);
+  const [configToDelete, setConfigToDelete] = React.useState<
+    ApiConfig | Tool | null
+  >(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
-  const [expandedToolId, setExpandedToolId] = React.useState<string | null>(null);
+  const [expandedToolId, setExpandedToolId] = React.useState<string | null>(
+    null,
+  );
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [selectedIntegration, setSelectedIntegration] = React.useState<string>("all");
+  const [selectedIntegration, setSelectedIntegration] =
+    React.useState<string>("all");
   const [showToolStepper, setShowToolStepper] = React.useState(false);
-
 
   const refreshConfigs = React.useCallback(async () => {
     setIsRefreshing(true);
     try {
       const superglueClient = new SuperglueClient({
         endpoint: config.superglueEndpoint,
-        apiKey: tokenRegistry.getToken()
+        apiKey: tokenRegistry.getToken(),
       });
 
       const [apiConfigs, toolConfigs] = await Promise.all([
@@ -84,8 +113,11 @@ const ConfigTable = () => {
       ]);
 
       const combinedConfigs = [
-        ...apiConfigs.items.map(item => ({ ...item, type: 'api' as const })),
-        ...toolConfigs.items.map((item: any) => ({ ...item, type: 'tool' as const }))
+        ...apiConfigs.items.map((item) => ({ ...item, type: "api" as const })),
+        ...toolConfigs.items.map((item: any) => ({
+          ...item,
+          type: "tool" as const,
+        })),
       ].sort((a, b) => {
         const dateA = new Date(a.updatedAt || a.createdAt).getTime();
         const dateB = new Date(b.updatedAt || b.createdAt).getTime();
@@ -98,10 +130,10 @@ const ConfigTable = () => {
 
       saveToCache(CACHE_PREFIX, {
         configs: combinedConfigs,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     } catch (error) {
-      console.error('Error fetching configs:', error);
+      console.error("Error fetching configs:", error);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -119,7 +151,7 @@ const ConfigTable = () => {
   }, [refreshConfigs]);
 
   React.useEffect(() => {
-    const filtered = allConfigs.filter(config => {
+    const filtered = allConfigs.filter((config) => {
       if (!config) return false;
 
       // Search filter
@@ -132,7 +164,7 @@ const ConfigTable = () => {
       // Integration filter
       if (selectedIntegration !== "all") {
         const configType = (config as any).type;
-        const isTool = configType === 'tool';
+        const isTool = configType === "tool";
 
         if (!isTool) return false;
 
@@ -140,7 +172,7 @@ const ConfigTable = () => {
         const allIntegrationIds = new Set<string>();
 
         if (tool.integrationIds) {
-          tool.integrationIds.forEach(id => allIntegrationIds.add(id));
+          tool.integrationIds.forEach((id) => allIntegrationIds.add(id));
         }
 
         if (tool.steps) {
@@ -174,7 +206,6 @@ const ConfigTable = () => {
     setShowToolStepper(true);
   };
 
-
   const handleEdit = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     router.push(`/configs/${id}/edit`);
@@ -184,7 +215,6 @@ const ConfigTable = () => {
     e.stopPropagation();
     router.push(`/configs/${id}/run`);
   };
-
 
   const handleViewLogs = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -203,20 +233,23 @@ const ConfigTable = () => {
     try {
       const superglueClient = new SuperglueClient({
         endpoint: config.superglueEndpoint,
-        apiKey: tokenRegistry.getToken()
+        apiKey: tokenRegistry.getToken(),
       });
 
       let deletePromise;
 
       switch ((configToDelete as any)?.type) {
-        case 'api':
+        case "api":
           deletePromise = superglueClient.deleteApi(configToDelete.id);
           break;
-        case 'tool':
+        case "tool":
           deletePromise = superglueClient.deleteWorkflow(configToDelete.id);
           break;
         default:
-          console.error('Unknown config type for deletion:', (configToDelete as any)?.type);
+          console.error(
+            "Unknown config type for deletion:",
+            (configToDelete as any)?.type,
+          );
           return;
       }
 
@@ -224,10 +257,10 @@ const ConfigTable = () => {
 
       const deletedId = configToDelete.id;
       setConfigToDelete(null);
-      setAllConfigs(prev => prev.filter(c => c.id !== deletedId));
-      setTotal(prev => prev - 1);
+      setAllConfigs((prev) => prev.filter((c) => c.id !== deletedId));
+      setTotal((prev) => prev - 1);
     } catch (error) {
-      console.error('Error deleting config:', error);
+      console.error("Error deleting config:", error);
     }
   };
 
@@ -256,7 +289,8 @@ const ConfigTable = () => {
 
   const getSimpleIcon = (name: string): SimpleIcon | null => {
     if (!name || name === "default") return null;
-    const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+    const formatted =
+      name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
     const iconKey = `si${formatted}`;
     try {
       // @ts-ignore
@@ -279,7 +313,7 @@ const ConfigTable = () => {
       <div className="max-w-none w-full min-h-full">
         <ToolCreateStepper onComplete={() => setShowToolStepper(false)} />
       </div>
-    )
+    );
   }
 
   if (allConfigs.length === 0 && !loading && !isRefreshing) {
@@ -308,7 +342,10 @@ const ConfigTable = () => {
             className="pl-10"
           />
         </div>
-        <Select value={selectedIntegration} onValueChange={setSelectedIntegration}>
+        <Select
+          value={selectedIntegration}
+          onValueChange={setSelectedIntegration}
+        >
           <SelectTrigger className="w-[200px]">
             <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
             <SelectValue placeholder="Filter by integration" />
@@ -342,7 +379,9 @@ const ConfigTable = () => {
                         onClick={refreshConfigs}
                         className="transition-transform"
                       >
-                        <RotateCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        <RotateCw
+                          className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+                        />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -362,15 +401,18 @@ const ConfigTable = () => {
               </TableRow>
             ) : configs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={5}
+                  className="h-24 text-center text-muted-foreground"
+                >
                   No results found
                 </TableCell>
               </TableRow>
             ) : (
               configs.map((config) => {
                 const configType = (config as any).type;
-                const isApi = configType === 'api';
-                const isTool = configType === 'tool';
+                const isApi = configType === "api";
+                const isTool = configType === "tool";
 
                 const handleRunClick = (e: React.MouseEvent) => {
                   if (isApi) handlePlay(e, config.id);
@@ -382,68 +424,77 @@ const ConfigTable = () => {
                     <TableRow
                       key={`${configType}-${config.id}`}
                       className="hover:bg-secondary"
-                    // Consider adding onClick={() => handleRowClick(config)} if needed
+                      // Consider adding onClick={() => handleRowClick(config)} if needed
                     >
                       <TableCell className="w-[60px]">
-                        {isTool && (() => {
-                          const tool = config as Tool;
-                          const allIntegrationIds = new Set<string>();
+                        {isTool &&
+                          (() => {
+                            const tool = config as Tool;
+                            const allIntegrationIds = new Set<string>();
 
-                          if (tool.integrationIds) {
-                            tool.integrationIds.forEach(id => allIntegrationIds.add(id));
-                          }
+                            if (tool.integrationIds) {
+                              tool.integrationIds.forEach((id) =>
+                                allIntegrationIds.add(id),
+                              );
+                            }
 
-                          if (tool.steps) {
-                            tool.steps.forEach((step: any) => {
-                              if (step.integrationId) {
-                                allIntegrationIds.add(step.integrationId);
-                              }
-                            });
-                          }
+                            if (tool.steps) {
+                              tool.steps.forEach((step: any) => {
+                                if (step.integrationId) {
+                                  allIntegrationIds.add(step.integrationId);
+                                }
+                              });
+                            }
 
-                          const integrationIdsArray = Array.from(allIntegrationIds);
+                            const integrationIdsArray =
+                              Array.from(allIntegrationIds);
 
-                          return integrationIdsArray.length > 0 ? (
-                            <div className="flex items-center justify-center gap-1 flex-shrink-0">
-                              {integrationIdsArray.map((integrationId: string) => {
-                                const integration = integrations.find(i => i.id === integrationId);
-                                if (!integration) return null;
-                                const icon = getIntegrationIcon(integration);
-                                return icon ? (
-                                  <TooltipProvider key={integrationId}>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <svg
-                                          width="14"
-                                          height="14"
-                                          viewBox="0 0 24 24"
-                                          fill={`#${icon.hex}`}
-                                          className="flex-shrink-0"
-                                        >
-                                          <path d={icon.path} />
-                                        </svg>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>{integration.id}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                ) : (
-                                  <TooltipProvider key={integrationId}>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>{integration.id}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                );
-                              })}
-                            </div>
-                          ) : null;
-                        })()}
+                            return integrationIdsArray.length > 0 ? (
+                              <div className="flex items-center justify-center gap-1 flex-shrink-0">
+                                {integrationIdsArray.map(
+                                  (integrationId: string) => {
+                                    const integration = integrations.find(
+                                      (i) => i.id === integrationId,
+                                    );
+                                    if (!integration) return null;
+                                    const icon =
+                                      getIntegrationIcon(integration);
+                                    return icon ? (
+                                      <TooltipProvider key={integrationId}>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <svg
+                                              width="14"
+                                              height="14"
+                                              viewBox="0 0 24 24"
+                                              fill={`#${icon.hex}`}
+                                              className="flex-shrink-0"
+                                            >
+                                              <path d={icon.path} />
+                                            </svg>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>{integration.id}</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    ) : (
+                                      <TooltipProvider key={integrationId}>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>{integration.id}</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    );
+                                  },
+                                )}
+                              </div>
+                            ) : null;
+                          })()}
                       </TableCell>
                       <TableCell className="font-medium max-w-[200px] truncate relative group">
                         <div className="flex items-center space-x-1">
@@ -465,7 +516,11 @@ const ConfigTable = () => {
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent side="top">
-                                <p>{copiedId === config.id ? "Copied!" : "Copy ID"}</p>
+                                <p>
+                                  {copiedId === config.id
+                                    ? "Copied!"
+                                    : "Copy ID"}
+                                </p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -481,7 +536,12 @@ const ConfigTable = () => {
                                   variant="ghost"
                                   size="icon"
                                   className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={(e) => handleCopyDetails(e, config.instruction || '')}
+                                  onClick={(e) =>
+                                    handleCopyDetails(
+                                      e,
+                                      config.instruction || "",
+                                    )
+                                  }
                                 >
                                   {copiedDetails === config.instruction ? (
                                     <Check className="h-3.5 w-3.5 text-green-500" />
@@ -491,14 +551,22 @@ const ConfigTable = () => {
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent side="top">
-                                <p>{copiedDetails === config.instruction ? "Copied!" : "Copy details"}</p>
+                                <p>
+                                  {copiedDetails === config.instruction
+                                    ? "Copied!"
+                                    : "Copy details"}
+                                </p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
                         </div>
                       </TableCell>
                       <TableCell className="w-[150px]">
-                        {config.updatedAt ? new Date(config.updatedAt).toLocaleDateString() : (config.createdAt ? new Date(config.createdAt).toLocaleDateString() : '')}
+                        {config.updatedAt
+                          ? new Date(config.updatedAt).toLocaleDateString()
+                          : config.createdAt
+                            ? new Date(config.createdAt).toLocaleDateString()
+                            : ""}
                       </TableCell>
                       <TableCell className="w-[100px]">
                         <div className="flex justify-end gap-2">
@@ -508,7 +576,11 @@ const ConfigTable = () => {
                             onClick={handleRunClick}
                             className="gap-2"
                           >
-                            {isTool ? <Hammer className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                            {isTool ? (
+                              <Hammer className="h-4 w-4" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
                             View
                           </Button>
                           {isTool && (
@@ -530,7 +602,9 @@ const ConfigTable = () => {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={(e) => handleViewLogs(e, config.id)}
+                                    onClick={(e) =>
+                                      handleViewLogs(e, config.id)
+                                    }
                                   >
                                     <History className="h-4 w-4" />
                                   </Button>
@@ -573,7 +647,7 @@ const ConfigTable = () => {
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>Delete {isApi ? 'Configuration' : 'Tool'}</p>
+                                <p>Delete {isApi ? "Configuration" : "Tool"}</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -599,7 +673,7 @@ const ConfigTable = () => {
       <div className="flex items-center justify-center space-x-2 py-4">
         <Button
           variant="outline"
-          onClick={() => setPage(p => Math.max(0, p - 1))}
+          onClick={() => setPage((p) => Math.max(0, p - 1))}
           disabled={page === 0}
         >
           Previous
@@ -609,19 +683,23 @@ const ConfigTable = () => {
         </div>
         <Button
           variant="outline"
-          onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+          onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
           disabled={page >= totalPages - 1}
         >
           Next
         </Button>
       </div>
 
-      <AlertDialog open={!!configToDelete} onOpenChange={(open) => !open && setConfigToDelete(null)}>
+      <AlertDialog
+        open={!!configToDelete}
+        onOpenChange={(open) => !open && setConfigToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this configuration. This action cannot be undone.
+              This will permanently delete this configuration. This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
