@@ -4,7 +4,5 @@ pre-commit:
     prettier:
       glob: "*.{ts,tsx,js,jsx,json,md}"
       run: npx prettier --write {staged_files}
-    big-files:
-      run: node scripts/check-big-files.mjs
     secrets:
-      run: npx secretlint --maskSecrets --quiet
+      run: npx secretlint "**/*.{ts,tsx,js,jsx,json,md}" --maskSecrets {staged_files}

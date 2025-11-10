@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
+    "@secretlint/secretlint-rule-preset-recommend": "^11.2.5",
     "@types/node": "^20.17.19",
     "lefthook": "^2.0.3",
     "mcp-remote": "^0.1.5",
