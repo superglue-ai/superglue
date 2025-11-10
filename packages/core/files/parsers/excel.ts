@@ -6,7 +6,7 @@ import { DetectionPriority, FileParsingStrategy } from '../strategy.js';
 
 export class ExcelStrategy implements FileParsingStrategy {
     readonly fileType = SupportedFileType.EXCEL;
-    readonly priority = DetectionPriority.BINARY_SIGNATURE;
+    readonly priority = DetectionPriority.ZIP_BASED_SPECIFIC;
 
     async canHandle(buffer: Buffer): Promise<boolean> {
         // Must be a ZIP file first (PK signature)

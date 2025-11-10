@@ -64,6 +64,7 @@ export enum SupportedFileType {
   PDF = 'PDF',
   DOCX = 'DOCX',
   ZIP = 'ZIP',
+  GZIP = 'GZIP',
   RAW = 'RAW',
   AUTO = 'AUTO'
 }

@@ -5,9 +5,18 @@ import { DetectionPriority, FileParsingStrategy } from '../strategy.js';
 
 const gunzipAsync = promisify(gunzip);
 
+type ParseFileFunction = (buffer: Buffer, fileType: SupportedFileType) => Promise<any>;
+
+// Store parseFile function to avoid circular import (set by index.ts)
+let parseFileFunction: ParseFileFunction | null = null;
+
+export function setGzipParseFileFunction(fn: ParseFileFunction): void {
+    parseFileFunction = fn;
+}
+
 export class GZIPStrategy implements FileParsingStrategy {
     readonly fileType = SupportedFileType.RAW; // GZIP is a container, not a final type
-    readonly priority = DetectionPriority.BINARY_SIGNATURE;
+    readonly priority = DetectionPriority.GZIP;
 
     canHandle(buffer: Buffer): boolean {
         // GZIP files start with 1f8b signature
@@ -17,6 +26,18 @@ export class GZIPStrategy implements FileParsingStrategy {
     }
 
     async parse(buffer: Buffer): Promise<any> {
-        return gunzipAsync(buffer);
+        return parseGZIP(buffer);
     }
+}
+
+export async function parseGZIP(buffer: Buffer): Promise<any> {
+    const decompressed = await gunzipAsync(buffer);
+
+    // Recursively parse the decompressed content using the injected parseFile function
+    if (parseFileFunction) {
+        return parseFileFunction(decompressed, SupportedFileType.AUTO);
+    }
+
+    // Fallback: return raw buffer if parseFile function not set
+    return decompressed;
 }

@@ -2,46 +2,26 @@ import { SupportedFileType } from '@superglue/shared';
 import { CSVStrategy, parseCSV } from './parsers/csv.js';
 import { DOCXStrategy, parseDOCX } from './parsers/docx.js';
 import { ExcelStrategy, parseExcel } from './parsers/excel.js';
-import { GZIPStrategy } from './parsers/gzip.js';
+import { GZIPStrategy, parseGZIP, setGzipParseFileFunction } from './parsers/gzip.js';
 import { JSONStrategy, parseJSON } from './parsers/json.js';
 import { PDFStrategy, parsePDF } from './parsers/pdf.js';
 import { XMLStrategy, parseXML } from './parsers/xml.js';
-import { ZIPStrategy, parseZIP } from './parsers/zip.js';
+import { setZipParseFileFunction, ZIPStrategy, parseZIP } from './parsers/zip.js';
 import { FileStrategyRegistry } from './strategy.js';
 
 const fileStrategyRegistry = new FileStrategyRegistry();
 
-// Register all strategies (registry auto-sorts by priority)
-fileStrategyRegistry.register(new GZIPStrategy());
-fileStrategyRegistry.register(new PDFStrategy());
-fileStrategyRegistry.register(new ExcelStrategy());
-fileStrategyRegistry.register(new DOCXStrategy());
-fileStrategyRegistry.register(new ZIPStrategy());
-fileStrategyRegistry.register(new JSONStrategy());
-fileStrategyRegistry.register(new XMLStrategy());
-fileStrategyRegistry.register(new CSVStrategy());
+fileStrategyRegistry.register(new GZIPStrategy());        // Priority 1: GZIP
+fileStrategyRegistry.register(new ExcelStrategy());       // Priority 2: ZIP_BASED_SPECIFIC
+fileStrategyRegistry.register(new DOCXStrategy());        // Priority 2: ZIP_BASED_SPECIFIC
+fileStrategyRegistry.register(new PDFStrategy());         // Priority 10: BINARY_SIGNATURE
+fileStrategyRegistry.register(new ZIPStrategy());         // Priority 11: ZIP_GENERIC
+fileStrategyRegistry.register(new JSONStrategy());        // Priority 20: STRUCTURED_TEXT
+fileStrategyRegistry.register(new XMLStrategy());         // Priority 20: STRUCTURED_TEXT
+fileStrategyRegistry.register(new CSVStrategy());         // Priority 30: HEURISTIC_TEXT
 
 export async function parseFile(buffer: Buffer, fileType: SupportedFileType = SupportedFileType.AUTO): Promise<any> {
     if (!buffer || buffer.length === 0) return null;
-
-    // If fileType is AUTO, use strategy pattern for detection
-    if (fileType === SupportedFileType.AUTO) {
-        const result = await fileStrategyRegistry.detectAndParse(buffer);
-
-        if (result.fileType === SupportedFileType.ZIP) {
-            const extractedFiles = result.data as Record<string, Buffer>;
-            const processed: Record<string, any> = {};
-            for (const [filename, content] of Object.entries(extractedFiles)) {
-                processed[filename] = await parseFile(content, SupportedFileType.AUTO);
-            }
-            return processed;
-        } else if (result.data instanceof Buffer) {
-            // GZIP or other decompressed data - recursively parse the decompressed content
-            return parseFile(result.data, SupportedFileType.AUTO);
-        }
-
-        return result.data;
-    }
 
     switch (fileType) {
         case SupportedFileType.JSON:
@@ -56,20 +36,22 @@ export async function parseFile(buffer: Buffer, fileType: SupportedFileType = Su
             return parsePDF(buffer);
         case SupportedFileType.DOCX:
             return parseDOCX(buffer);
-        case SupportedFileType.ZIP: {
-            const extractedFiles = await parseZIP(buffer);
-            const processed: Record<string, any> = {};
-            for (const [filename, content] of Object.entries(extractedFiles)) {
-                processed[filename] = await parseFile(content, SupportedFileType.AUTO);
-            }
-            return processed;
-        }
+        case SupportedFileType.GZIP:
+            return parseGZIP(buffer);
+        case SupportedFileType.ZIP:
+            return parseZIP(buffer);
         case SupportedFileType.RAW:
             return buffer.toString('utf8');
+        case SupportedFileType.AUTO:
+            return (await fileStrategyRegistry.detectAndParse(buffer)).data;
         default:
             throw new Error(`Unsupported file type: ${fileType}`);
     }
 }
+
+// Inject parseFile function into GZIP and ZIP parsers to avoid circular imports
+setGzipParseFileFunction(parseFile);
+setZipParseFileFunction(parseFile);
 
 export * from './parsers/csv.js';
 export * from './parsers/docx.js';

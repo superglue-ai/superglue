@@ -6,7 +6,7 @@ import { DetectionPriority, FileParsingStrategy } from '../strategy.js';
 
 export class DOCXStrategy implements FileParsingStrategy {
     readonly fileType = SupportedFileType.DOCX;
-    readonly priority = DetectionPriority.BINARY_SIGNATURE;
+    readonly priority = DetectionPriority.ZIP_BASED_SPECIFIC;
 
     async canHandle(buffer: Buffer): Promise<boolean> {
         // Must be a ZIP file first (PK signature)

@@ -1,12 +1,25 @@
 import { SupportedFileType } from '@superglue/shared';
 
+
 export enum DetectionPriority {
-    /** Binary formats with magic numbers (PDF, Excel, DOCX, ZIP) - tested first (with priority within formats unimportant) */
-    BINARY_SIGNATURE = 1,
-    /** Text formats with clear structure (JSON, XML) - tested second */
-    STRUCTURED_TEXT = 2,
-    /** Text formats with heuristic detection (CSV) - tested third */
-    HEURISTIC_TEXT = 3,
+    /** GZIP - Must be tested first to decompress before other formats */
+    GZIP = 1,
+
+    /** ZIP-based formats with specific internal structure (Excel, DOCX) - tested before generic ZIP */
+    ZIP_BASED_SPECIFIC = 2,
+
+    /** Binary formats with simple magic number signatures (PDF) */
+    BINARY_SIGNATURE = 10,
+
+    /** Generic ZIP - tested after specific ZIP-based formats (Excel, DOCX) */
+    ZIP_GENERIC = 11,
+
+    /** Text formats with clear structure (JSON, XML) */
+    STRUCTURED_TEXT = 20,
+
+    /** Text formats with heuristic detection (CSV) */
+    HEURISTIC_TEXT = 30,
+
     /** Fallback to raw string */
     FALLBACK = 99
 }
@@ -37,9 +50,6 @@ export interface FileParsingStrategy {
     parse(buffer: Buffer): Promise<any>;
 }
 
-/**
- * Registry for file parsing strategies
- */
 export class FileStrategyRegistry {
     private strategies: FileParsingStrategy[] = [];
 
