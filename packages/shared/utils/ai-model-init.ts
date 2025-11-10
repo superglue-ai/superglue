@@ -1,7 +1,7 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createAzure } from '@ai-sdk/azure';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createOpenAI } from '@ai-sdk/openai';
 
 /**
  * Initializes the AI model provider.
@@ -37,7 +37,7 @@ export function initializeAIModel(options?: {
 
     switch (providerType) {
         case 'anthropic': {
-            const anthropicOptions: any = { apiKey: process.env.ANTHROPIC_API_KEY };
+            const anthropicOptions: any = { apiKey: process.env.ANTHROPIC_API_KEY, headers: {'anthropic-beta': 'context-1m-2025-08-07'}};
             if (process.env.ANTHROPIC_BASE_URL) {
                 anthropicOptions.baseURL = process.env.ANTHROPIC_BASE_URL;
             }
