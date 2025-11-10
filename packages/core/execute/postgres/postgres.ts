@@ -1,7 +1,7 @@
 import { ApiConfig, RequestOptions } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
 import { server_defaults } from "../../default.js";
-import { parseJSON } from "../../utils/json-parser.js";
+import { parseJSON } from "../../files/index.js";
 import { composeUrl, replaceVariables } from "../../utils/tools.js";
 
 
@@ -28,7 +28,7 @@ function startCleanupInterval() {
         }
       }
     }, server_defaults.POSTGRES.POOL_CLEANUP_INTERVAL);
-    
+
     // Prevent the interval from keeping the process alive
     if (cleanupInterval.unref) {
       cleanupInterval.unref();
@@ -39,35 +39,35 @@ function startCleanupInterval() {
 function getOrCreatePool(connectionString: string, poolConfig: PoolConfig): Pool {
   const cacheKey = connectionString;
   const existingEntry = poolCache.get(cacheKey);
-  
+
   if (existingEntry) {
     existingEntry.lastUsed = Date.now();
     return existingEntry.pool;
   }
-  
+
   const pool = new Pool({
     ...poolConfig,
     max: 10, // Maximum number of clients in the pool
     idleTimeoutMillis: server_defaults.POSTGRES.DEFAULT_TIMEOUT, // How long a client can sit idle before being removed
     connectionTimeoutMillis: 5000, // How long to wait for a connection
   });
-  
+
   // Add error handler to prevent unhandled errors
   pool.on('error', (err) => {
     console.error('Unexpected pool error:', err);
     // Remove from cache if pool has an error
     poolCache.delete(cacheKey);
   });
-  
+
   poolCache.set(cacheKey, {
     pool,
     lastUsed: Date.now(),
     connectionString
   });
-  
+
   // Start cleanup interval if not already running
   startCleanupInterval();
-  
+
   return pool;
 }
 
@@ -77,11 +77,11 @@ export async function closeAllPools(): Promise<void> {
     clearInterval(cleanupInterval);
     cleanupInterval = null;
   }
-  
-  const closePromises = Array.from(poolCache.values()).map(entry => 
+
+  const closePromises = Array.from(poolCache.values()).map(entry =>
     entry.pool.end().catch(console.error)
   );
-  
+
   await Promise.all(closePromises);
   poolCache.clear();
 }
@@ -105,11 +105,11 @@ function sanitizeDatabaseName(connectionString: string): string {
   return baseUrl + cleanDbName;
 }
 
-export async function callPostgres({endpoint, payload, credentials, options}: {endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions}): Promise<any> {
+export async function callPostgres({ endpoint, payload, credentials, options }: { endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
   const requestVars = { ...payload, ...credentials };
   let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
   connectionString = sanitizeDatabaseName(connectionString);
-  
+
   let bodyParsed: any;
   try {
     bodyParsed = parseJSON(await replaceVariables(endpoint.body, requestVars));
@@ -122,7 +122,7 @@ export async function callPostgres({endpoint, payload, credentials, options}: {e
   const poolConfig: PoolConfig = {
     connectionString,
     statement_timeout: options?.timeout || server_defaults.POSTGRES.DEFAULT_TIMEOUT,
-    ssl: connectionString.includes('sslmode=') || connectionString.includes('localhost') === false 
+    ssl: connectionString.includes('sslmode=') || connectionString.includes('localhost') === false
       ? { rejectUnauthorized: false }
       : false
   };
@@ -134,19 +134,19 @@ export async function callPostgres({endpoint, payload, credentials, options}: {e
 
   do {
     try {
-      
+
       // Use parameterized query if params are provided, otherwise fall back to simple query
-      const result = queryParams 
+      const result = queryParams
         ? await pool.query(queryText, queryParams)
         : await pool.query(queryText);
-        return result.rows;
+      return result.rows;
     } catch (error) {
-      
+
       attempts++;
 
       if (attempts > maxRetries) {
         if (error instanceof Error) {
-          const errorContext = queryParams 
+          const errorContext = queryParams
             ? ` for query: ${queryText} with params: ${JSON.stringify(queryParams)}`
             : ` for query: ${queryText}`;
           throw new Error(`PostgreSQL error: ${error.message}${errorContext}`);

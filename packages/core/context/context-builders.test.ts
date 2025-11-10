@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
     getEvaluateStepResponseContext,
     getEvaluateTransformContext,
-    getExtractContext,
     getLoopSelectorContext,
     getObjectContext,
     getTransformContext,
@@ -192,32 +191,6 @@ describe('getWorkflowBuilderContext budget and include combinations', () => {
         const out = getWorkflowBuilderContext(input, { characterBudget: 1000, include: { availableVariablesContext: true } as any });
         expect(out).toMatch(/<<test_integration_apiKey>>/);
         expect(out).toMatch(/<<foo>>/);
-    });
-});
-
-describe('getExtractContext budgets and tags', () => {
-    const extractInput = {
-        extractConfig: { instruction: 'List items', urlHost: 'https://api.example.com', urlPath: '/v1/items' },
-        documentation: 'Docs',
-        payload: { a: 1 },
-        credentials: { token: 'T' },
-        lastError: 'Bad request'
-    } as any;
-
-    it('enforces budget and includes expected tags', () => {
-        const out = getExtractContext(extractInput, { characterBudget: 600, include: {} } as any);
-        expect(out.length).toBeLessThanOrEqual(600);
-        expect(out).toMatch(/<instruction>/);
-        expect(out).toMatch(/<base_url>/);
-        expect(out).toMatch(/<documentation>/);
-        expect(out).toMatch(/<credentials>/);
-        expect(out).toMatch(/<extract_input>/);
-        expect(out).toMatch(/<last_error>/);
-    });
-
-    it('omits last_error when null', () => {
-        const out = getExtractContext({ ...extractInput, lastError: null }, { characterBudget: 300, include: {} } as any);
-        expect(out).not.toMatch(/<last_error>/);
     });
 });
 

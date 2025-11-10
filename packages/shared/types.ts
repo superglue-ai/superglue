@@ -55,3 +55,16 @@ export enum UserRole {
   ADMIN = 'admin',
   MEMBER = 'member'
 }
+
+export enum SupportedFileType {
+  JSON = 'JSON',
+  CSV = 'CSV',
+  XML = 'XML',
+  EXCEL = 'EXCEL',
+  PDF = 'PDF',
+  DOCX = 'DOCX',
+  ZIP = 'ZIP',
+  GZIP = 'GZIP',
+  RAW = 'RAW',
+  AUTO = 'AUTO'
+}

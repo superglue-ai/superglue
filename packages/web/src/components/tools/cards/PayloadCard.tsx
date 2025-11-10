@@ -4,7 +4,8 @@ import { Card } from '@/src/components/ui/card';
 import { FileChip } from '@/src/components/ui/FileChip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { ALLOWED_EXTENSIONS, formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE_TOOLS, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE_TOOLS, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { ALLOWED_FILE_EXTENSIONS } from '@superglue/shared';
 import { Code2, FileJson, Upload } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
@@ -120,7 +121,7 @@ export const PayloadSpotlight = ({
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept={ALLOWED_EXTENSIONS.join(',')}
+                accept={ALLOWED_FILE_EXTENSIONS.join(',')}
                 onChange={handleFileInputChange}
                 className="hidden"
             />

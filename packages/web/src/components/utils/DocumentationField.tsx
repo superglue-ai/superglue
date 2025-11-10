@@ -1,14 +1,18 @@
 'use client'
 
+import { useConfig } from '@/src/app/config-context';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
 import { FileChip } from '@/src/components/ui/FileChip';
-import { FileQuestion, FileText, Link, Upload } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
-import { processFile, sanitizeFileName, formatBytes, MAX_TOTAL_FILE_SIZE_DOCUMENTATION, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { cn } from '@/src/lib/general-utils';
 import { Input } from '@/src/components/ui/input';
 import { useToast } from '@/src/hooks/use-toast';
+import { ExtendedSuperglueClient } from '@/src/lib/extended-superglue-client';
+import { formatBytes, MAX_TOTAL_FILE_SIZE_DOCUMENTATION, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { ALLOWED_FILE_EXTENSIONS } from '@superglue/shared';
+import { cn } from '@/src/lib/general-utils';
+import { tokenRegistry } from '@/src/lib/token-registry';
+import { FileQuestion, FileText, Link, Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface DocumentationFieldProps {
   url: string
@@ -36,15 +40,22 @@ export function DocumentationField({
   const [localUrl, setLocalUrl] = useState(url)
   const [docFile, setDocFile] = useState<UploadedFileInfo | null>(null)
   const [urlError, setUrlError] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const { toast } = useToast()
+  const superglueConfig = useConfig()
+
+  const client = useMemo(() => new ExtendedSuperglueClient({
+    endpoint: superglueConfig.superglueEndpoint,
+    apiKey: tokenRegistry.getToken(),
+  }), [superglueConfig.superglueEndpoint])
 
   // Parse multiple files from file:// URL format
   const parseFileUrls = (fileUrl: string): UploadedFileInfo[] => {
     if (!fileUrl.startsWith('file://')) return []
-    
+
     const filesString = fileUrl.replace('file://', '')
     const filenames = filesString.split(',').map(f => f.trim()).filter(Boolean)
-    
+
     // Limit to 5 files for display
     return filenames.slice(0, 5).map(filename => ({
       name: filename,
@@ -59,17 +70,6 @@ export function DocumentationField({
   useEffect(() => {
     setLocalUrl(url)
   }, [url])
-
-  const isValidUrl = (urlString: string): boolean => {
-    if (!urlString) return true // Empty is valid
-    if (urlString.startsWith('file://')) return true // File uploads are valid
-    try {
-      new URL(urlString)
-      return true
-    } catch {
-      return false
-    }
-  }
 
   const activeType = hasUploadedFile ? 'file' : (url ? 'url' : content ? 'content' : 'empty')
 
@@ -96,13 +96,15 @@ export function DocumentationField({
       status: 'processing'
     }
     setDocFile(fileInfo)
+    setIsUploading(true)
 
     try {
-      const text = await processFile(file, file.name)
+      const data = await processAndExtractFile(file, client)
+      const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2)
       setDocFile({ ...fileInfo, status: 'ready' })
       if (onContentChange) onContentChange(text)
       onUrlChange(`file://${fileInfo.key}`)
-      if (typeof onFileUpload === 'function') onFileUpload(text);
+      if (typeof onFileUpload === 'function') onFileUpload(text)
     } catch (error: any) {
       console.error('Error reading file:', error)
       setDocFile({ ...fileInfo, status: 'error', error: error.message })
@@ -111,6 +113,8 @@ export function DocumentationField({
         description: error.message,
         variant: 'destructive'
       })
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -191,8 +195,16 @@ export function DocumentationField({
             size="sm"
             className="shrink-0"
             onClick={() => document.getElementById('doc-file-upload')?.click()}
+            disabled={isUploading}
           >
-            Upload
+            {isUploading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              'Upload'
+            )}
           </Button>
         </div>
       )}
@@ -202,7 +214,7 @@ export function DocumentationField({
         id="doc-file-upload"
         hidden
         onChange={handleDocFileUpload}
-        accept="*"
+        accept={ALLOWED_FILE_EXTENSIONS.join(',')}
       />
 
       {urlError && !hasUploadedFile && (

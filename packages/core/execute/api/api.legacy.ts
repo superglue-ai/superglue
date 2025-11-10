@@ -1,4 +1,5 @@
-import { ApiConfig, FileType, PaginationType } from "@superglue/client";
+import { ApiConfig, PaginationType } from "@superglue/client";
+import { SupportedFileType } from "@superglue/shared";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { RequestOptions } from "http";
 import ivm from "isolated-vm";
@@ -6,10 +7,10 @@ import { JSONPath } from "jsonpath-plus";
 import { getGenerateApiConfigContext } from "../../context/context-builders.js";
 import { SELF_HEALING_SYSTEM_PROMPT } from "../../context/context-prompts.js";
 import { server_defaults } from "../../default.js";
+import { parseFile } from "../../files/index.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { LanguageModel, LLMMessage } from "../../llm/language-model.js";
-import { parseFile } from "../../utils/file.js";
-import { composeUrl, generateId, maskCredentials, replaceVariables, smartMergeResponses } from "../../utils/tools.js";
+import { composeUrl, generateId, maskCredentials, replaceVariables, sample, smartMergeResponses } from "../../utils/tools.js";
 import { searchDocumentationToolDefinition, submitToolDefinition } from "../../utils/workflow-tools.js";
 import { callFTP } from "../ftp/ftp.js";
 import { callPostgres } from "../postgres/postgres.legacy.js";
@@ -195,14 +196,14 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
 
     // callAxios now always returns a Buffer, so we always need to parse it
     if (responseData instanceof Buffer) {
-      responseData = await parseFile(responseData, FileType.AUTO);
+      responseData = await parseFile(responseData, SupportedFileType.AUTO);
     }
     // Fallback for any legacy code paths or special cases - we can remove this later
     else if (responseData && (responseData instanceof ArrayBuffer)) {
-      responseData = await parseFile(Buffer.from(responseData), FileType.AUTO);
+      responseData = await parseFile(Buffer.from(responseData), SupportedFileType.AUTO);
     }
     else if (responseData && typeof responseData === 'string') {
-      responseData = await parseFile(Buffer.from(responseData), FileType.AUTO);
+      responseData = await parseFile(Buffer.from(responseData), SupportedFileType.AUTO);
     }
     const parsedResponseData = responseData;
 
@@ -276,7 +277,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
 
       if (Array.isArray(responseData)) {
         allResults = allResults.concat(responseData);
-      } else if(!endpoint.dataPath) {
+      } else if (!endpoint.dataPath) {
         allResults = smartMergeResponses(allResults, responseData);
       }
       else if (responseData) {

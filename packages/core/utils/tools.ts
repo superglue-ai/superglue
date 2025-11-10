@@ -4,7 +4,7 @@ import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
 import { z } from "zod";
-import { parseJSON } from "./json-parser.js";
+import { parseJSON } from "../files/index.js";
 import { injectVMHelpersIndividually } from "./vm-helpers.js";
 
 export interface TransformResult {
@@ -438,21 +438,21 @@ export function smartMergeResponses(accumulated: any, newResponse: any): any {
 
   // Both are objects (not arrays) - merge properties
   if (
-    typeof accumulated === 'object' && 
-    typeof newResponse === 'object' && 
-    !Array.isArray(accumulated) && 
+    typeof accumulated === 'object' &&
+    typeof newResponse === 'object' &&
+    !Array.isArray(accumulated) &&
     !Array.isArray(newResponse) &&
     accumulated !== null &&
     newResponse !== null
   ) {
     const merged: Record<string, any> = { ...accumulated };
-    
+
     for (const key in newResponse) {
       if (Object.prototype.hasOwnProperty.call(newResponse, key)) {
         // Recursively merge nested structures
         if (
-          key in merged && 
-          typeof merged[key] === 'object' && 
+          key in merged &&
+          typeof merged[key] === 'object' &&
           typeof newResponse[key] === 'object' &&
           merged[key] !== null &&
           newResponse[key] !== null
@@ -464,7 +464,7 @@ export function smartMergeResponses(accumulated: any, newResponse: any): any {
         }
       }
     }
-    
+
     return merged;
   }
 

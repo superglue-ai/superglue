@@ -6,7 +6,8 @@
   "exports": {
     ".": "./dist/index.js",
     "./templates": "./dist/templates.js",
-    "./utils": "./dist/utils.js"
+    "./utils": "./dist/utils.js",
+    "./files": "./dist/files/index.js"
   },
   "scripts": {
     "build": "tsc",

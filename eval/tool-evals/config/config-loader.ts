@@ -3,7 +3,7 @@ import { access, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { parseFile } from "../../../packages/core/utils/file.js";
+import { parseFile } from "../../../packages/core/files/index.js";
 import type { AgentEvalConfig } from "../types.js";
 
 const IntegrationConfigSchema = z.object({
@@ -110,7 +110,7 @@ async function processFilePayloads(config: AgentEvalConfig): Promise<void> {
                 try {
                     await access(filePath);
                     const fileBuffer = await readFile(filePath);
-                    const parsedContent = await parseFile(fileBuffer, FileType.AUTO);
+                    const parsedContent = await parseFile(fileBuffer, 'AUTO');
                     tool.payload[key] = parsedContent;
                 } catch (error) {
                     throw new Error(`Failed to parse file ${filePath} for tool ${tool.id}: ${error instanceof Error ? error.message : String(error)}`);
