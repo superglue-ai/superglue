@@ -5,7 +5,7 @@ import { tokenRegistry } from '@/src/lib/token-registry';
 import { SuperglueClient } from '@superglue/client';
 import { validateCronExpression } from '@superglue/shared';
 import { Check, CheckCircle, ChevronRight, ChevronsUpDown, Loader2, Plus, XCircle } from 'lucide-react';
-import React, { useImperativeHandle, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
 import { Button } from '../../ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../../ui/command';
