@@ -270,7 +270,7 @@ export const FinalTransformMiniStepCard = ({
                 value="inputs"
                 className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
               >
-                <FileInput className="h-4 w-4" /> Step Inputs
+                <FileInput className="h-4 w-4" /> Step Input
               </TabsTrigger>
               <TabsTrigger
                 value="transform"
