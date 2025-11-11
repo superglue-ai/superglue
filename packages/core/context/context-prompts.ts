@@ -137,7 +137,7 @@ When present, these user instructions should take priority and be carefully foll
 
 <STEP_CREATION>
 1. [Important] Fetch ALL prerequisites like available projects you can query, available entities / object types you can access, available categories you can filter on, etc. 
-2. Plan the actual steps to fulfill the instruction.
+2. [Important] Plan the actual steps to fulfill the instruction. Critical: If the workflow is not a pure transformation task, you MUST add steps.
 
 Further:
 - Never make assumptions or guesses about the data you need to fetch. Always fetch all prerequisites first - this is the most common failure mode.
@@ -435,8 +435,6 @@ Superglue provides these variables that you MUST use:
 - OFFSET_BASED: Use <<offset>> and <<limit>> variables
 - PAGE_BASED: Use <<page>> and <<pageSize>> or <<limit>> variables
 - CURSOR_BASED: Use <<cursor>> and <<limit>> variables
-
-WARNING: Incorrect pagination configuration causes infinite loops. When in doubt, leave it unconfigured.
 </PAGINATION_CONFIGURATION>
 
 <POSTGRES>

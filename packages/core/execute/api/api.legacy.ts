@@ -161,7 +161,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
       headers: processedHeaders,
       data: processedBody,
       params: processedQueryParams,
-      timeout: options?.timeout || 60000,
+      timeout: options?.timeout || server_defaults.HTTP.DEFAULT_TIMEOUT,
     };
 
     const axiosResult = await callAxios(axiosConfig, options);
@@ -190,8 +190,6 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
       throw new ApiCallError(statusHandlerResult.message, status);
     }
 
-    let dataPathSuccess = true;
-    // TODO: we need to remove the data path and just join the data with the next page of data, otherwise we will have to do a lot of gymnastics to get the data path right
     let responseData = lastResponse.data;
 
     // callAxios now always returns a Buffer, so we always need to parse it
@@ -209,7 +207,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
 
     if (status >= 200 && status <= 205) {
       try {
-        checkResponseForErrors(responseData, status, { axiosConfig, credentials, payload });
+        checkResponseForErrors(parsedResponseData, status, { axiosConfig, credentials, payload });
       } catch (e) {
         throw new ApiCallError(e?.message || String(e), status);
       }
@@ -217,9 +215,9 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
 
     // Handle pagination based on whether stopCondition exists
     if (hasStopCondition) {
-      const currentResponseHash = JSON.stringify(responseData);
-      const currentHasData = Array.isArray(responseData) ? responseData.length > 0 :
-        responseData && Object.keys(responseData).length > 0;
+      const currentResponseHash = JSON.stringify(parsedResponseData);
+      const currentHasData = Array.isArray(parsedResponseData) ? parsedResponseData.length > 0 :
+        parsedResponseData && Object.keys(parsedResponseData).length > 0;
 
       if (loopCounter === 0) {
         firstResponseHash = currentResponseHash;
@@ -259,7 +257,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
 
         const stopEval = await evaluateStopCondition(
           (endpoint.pagination as any).stopCondition,
-          lastResponse,
+          { ...lastResponse, data: parsedResponseData },
           pageInfo
         );
 
@@ -275,42 +273,29 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
 
       previousResponseHash = currentResponseHash;
 
-      if (Array.isArray(responseData)) {
-        allResults = allResults.concat(responseData);
+      if (Array.isArray(parsedResponseData)) {
+        allResults = allResults.concat(parsedResponseData);
       } else if (!endpoint.dataPath) {
-        allResults = smartMergeResponses(allResults, responseData);
+        allResults = smartMergeResponses(allResults, parsedResponseData);
       }
-      else if (responseData) {
-        allResults.push(responseData);
+      else if (parsedResponseData) {
+        allResults.push(parsedResponseData);
       }
     } else {
-      //Legacy support for data path
-      if (endpoint.dataPath) {
-        const pathParts = endpoint.dataPath.split('.');
-        for (const part of pathParts) {
-          // sometimes a jsonata expression is used to get the data, so ignore the $
-          // TODO: fix this later
-          if (!responseData[part] && part !== '$') {
-            dataPathSuccess = false;
-            break;
-          }
-          responseData = responseData[part] || responseData;
-        }
-      }
-      if (Array.isArray(responseData)) {
+      if (Array.isArray(parsedResponseData)) {
         const pageSize = parseInt(endpoint.pagination?.pageSize || "50");
-        if (!pageSize || responseData.length < pageSize) {
+        if (!pageSize || parsedResponseData.length < pageSize) {
           hasMore = false;
         }
-        const currentResponseHash = JSON.stringify(responseData);
+        const currentResponseHash = JSON.stringify(parsedResponseData);
         if (!seenResponseHashes.has(currentResponseHash)) {
           seenResponseHashes.add(currentResponseHash);
-          allResults = allResults.concat(responseData);
+          allResults = allResults.concat(parsedResponseData);
         } else {
           hasMore = false;
         }
-      } else if (responseData && allResults.length === 0) {
-        allResults.push(responseData);
+      } else if (parsedResponseData && allResults.length === 0) {
+        allResults.push(parsedResponseData);
         hasMore = false;
       } else {
         hasMore = false;
@@ -354,7 +339,7 @@ export async function evaluateStopCondition(
 
     // Inject the response and pageInfo as JSON strings
     // legacy support for direct response data access
-    await context.global.set('responseJSON', JSON.stringify({ data: response.data, headers: response.headers, ...response.data }));
+    await context.global.set('responseJSON', JSON.stringify({ data: response.data, headers: response.headers }));
     await context.global.set('pageInfoJSON', JSON.stringify(pageInfo));
 
     // if the stop condition code starts with return or is not a function, we need to wrap it in a function

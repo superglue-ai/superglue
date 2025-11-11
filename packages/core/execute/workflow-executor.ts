@@ -70,7 +70,7 @@ export class WorkflowExecutor implements Workflow {
       if (!payload) payload = {};
       if (!credentials) credentials = {};
       this.validate({ payload, credentials });
-      logMessage("info", `Executing workflow ${this.id}`, this.metadata);
+      logMessage("debug", `Executing workflow ${this.id}`, this.metadata);
 
       // Execute each step in order
       for (const step of this.steps) {
@@ -307,10 +307,10 @@ export class WorkflowExecutor implements Workflow {
       for (let i = 0; i < loopItems.length; i++) {
         const currentItem = loopItems[i] || "";
         if(loopItems.length > 1) {
-          logMessage("debug", `Executing loop iteration ${i + 1}/${loopItems.length} with item: ${JSON.stringify(currentItem).slice(0, 50)}...`, this.metadata);
+          logMessage("debug", `Executing loop iteration ${i + 1}/${loopItems.length} with item: ${JSON.stringify(currentItem).slice(0, 100)}...`, this.metadata);
         }
-        else {
-          logMessage("debug", `Executing step ${step.id} with item: ${JSON.stringify(currentItem).slice(0, 50)}...`, this.metadata);
+        else if(loopItems.length == 1 && currentItem && Object.keys(currentItem).length > 0) {
+          logMessage("debug", `Executing step ${step.id} with item: ${JSON.stringify(currentItem).slice(0, 100)}...`, this.metadata);
         }
   
         const loopPayload: Record<string, any> = {
@@ -433,7 +433,7 @@ export class WorkflowExecutor implements Workflow {
     do {
       try {
         if (retryCount > 0 && isSelfHealing) {
-          logMessage('info', `Failed to execute API Call. Self healing the step configuration for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, this.metadata);
+          logMessage('info', `Self healing the step configuration for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, this.metadata);
           const computedApiCallConfig = await generateApiConfig({
             failedConfig: endpoint,
             stepInput: payload,

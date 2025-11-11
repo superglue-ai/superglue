@@ -227,7 +227,7 @@ export function checkResponseForErrors(
               ? v === true
               : (v && typeof v === 'object' && Object.keys(v).length > 0);
         if (isNonEmpty) {
-          throwDetected(`${key} key detected at depth ${depth}`, typeof v === 'string' ? v : undefined);
+          throwDetected(`${key} detected: ${JSON.stringify(v).slice(0, 1000)}`, typeof v === 'string' ? v : undefined);
         }
       }
       const val = obj[key];
