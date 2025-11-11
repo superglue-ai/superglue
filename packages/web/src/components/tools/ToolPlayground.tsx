@@ -794,12 +794,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         if (firstFailed) {
           setFocusStepId(firstFailed);
           setShowStepOutputSignal(Date.now());
-          const err = (state.stepResults[firstFailed] as any)?.error || 'Step execution failed';
-          toast({
-            title: "Step failed",
-            description: `${firstFailed}: ${typeof err === 'string' ? err : 'Execution error'}`,
-            variant: "destructive"
-          });
         }
       }
 
@@ -946,13 +940,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setStepResultsMap(prev => ({ ...prev, [sid]: normalized.output }));
       setFocusStepId(sid);
       setShowStepOutputSignal(Date.now());
-      if (isFailure) {
-        toast({
-          title: "Step failed",
-          description: `${sid}: ${single.error || 'Execution error'}`,
-          variant: "destructive"
-        });
-      }
     } finally {
       setIsExecutingStep(undefined);
       setIsFixingWorkflow(undefined);
@@ -1018,11 +1005,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           ...prev,
           ['__final_transform__']: result.error || 'Transform execution failed'
         }));
-        toast({
-          title: "Transform execution failed",
-          description: result.error || "Failed to execute final transform",
-          variant: "destructive",
-        });
       }
     } finally {
       if (selfHealing) {
