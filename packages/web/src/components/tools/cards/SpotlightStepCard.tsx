@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { downloadJson } from '@/src/lib/download-utils';
 import { isEmptyData } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
-import { Database, Download, FileJson, Loader2, Package, Play, Settings, Trash2, Wand2 } from 'lucide-react';
+import { Download, FileBraces, FileInput, FileOutput, FilePlay, Loader2, Play, Route, Trash2, Wand2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
 import { ToolStepConfigurator } from '../ToolStepConfigurator';
@@ -126,7 +126,7 @@ export const SpotlightStepCard = React.memo(({
             <div className="p-3">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                        <Database className="h-4 w-4 text-muted-foreground" />
+                        <Route className="h-4 w-4 text-muted-foreground" />
                         <h3 className="text-lg font-semibold">
                             {step.id || `Step ${stepIndex + 1}`}
                         </h3>
@@ -191,13 +191,13 @@ export const SpotlightStepCard = React.memo(({
                         <Tabs value={activePanel} onValueChange={(v) => setActivePanel(v as 'input' | 'config' | 'output')}>
                             <TabsList className="h-9 p-1 rounded-md">
                                 <TabsTrigger value="input" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
-                                    <FileJson className="h-4 w-4" /> Step Input
+                                    <FileInput className="h-4 w-4" /> Step Input
                                 </TabsTrigger>
                                 <TabsTrigger value="config" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
-                                    <Settings className="h-4 w-4" /> Step Config
+                                    <FileBraces className="h-4 w-4" /> Step Config
                                 </TabsTrigger>
                                 <TabsTrigger value="output" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
-                                    <Package className="h-4 w-4" /> Step Result
+                                    <FileOutput className="h-4 w-4" /> Step Result
                                 </TabsTrigger>
 
                             </TabsList>

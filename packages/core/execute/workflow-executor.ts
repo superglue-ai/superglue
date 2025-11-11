@@ -34,7 +34,7 @@ export class WorkflowExecutor implements Workflow {
   ) {
     this.id = workflow.id;
     this.steps = workflow.steps;
-    this.finalTransform = workflow.finalTransform || "(sourceData) => sourceData";
+    this.finalTransform = workflow.finalTransform;
     this.responseSchema = workflow.responseSchema;
     this.instruction = workflow.instruction;
     this.metadata = metadata;
@@ -112,7 +112,7 @@ export class WorkflowExecutor implements Workflow {
         };
         try {
           // Apply the final transform using the original data
-          let currentFinalTransform = this.finalTransform || "(sourceData) => sourceData";
+          let currentFinalTransform = this.finalTransform;
           const finalResult = await transformAndValidateSchema(rawStepData, currentFinalTransform, this.responseSchema);
           if (!finalResult.success) {
             throw new Error(finalResult.error);
@@ -141,8 +141,6 @@ export class WorkflowExecutor implements Workflow {
             responseSchema: this.responseSchema,
             instruction: this.instruction
           } as Workflow; // Store the successful transform
-          this.result.error = undefined; // Clear any previous transform error
-          this.result.success = true; // Ensure success is true if transform succeeds
         } catch (transformError) {
           // Check if self-healing is enabled before regenerating
           if (!isSelfHealingEnabled(options, "transform")) {
@@ -171,10 +169,10 @@ export class WorkflowExecutor implements Workflow {
             responseSchema: this.responseSchema,
             instruction: this.instruction
           } as Workflow; // Store the successful transform
-          this.result.error = undefined; // Clear any previous transform error
-          this.result.success = true; // Ensure success is true if transform succeeds
         }
       }
+      this.result.error = undefined;
+      this.result.success = true;
       this.result.completedAt = new Date();
       return this.result;
     } catch (error) {

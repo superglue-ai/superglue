@@ -42,7 +42,7 @@ export function createSingleStepTool(
   const singleStepTool: any = {
     id: `${tool.id}_step_${stepIndex}`,
     steps: [step],
-    finalTransform: '(sourceData) => sourceData'
+    finalTransform: ''
   };
 
   return singleStepTool;

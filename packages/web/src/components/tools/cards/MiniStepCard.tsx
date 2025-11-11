@@ -1,7 +1,7 @@
 import { Card } from '@/src/components/ui/card';
 import { cn, getIntegrationIcon, getSimpleIcon } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
-import { FileJson, Globe, Package, RotateCw } from 'lucide-react';
+import { FileJson, FilePlay, Globe, RotateCw } from 'lucide-react';
 import React from 'react';
 
 const getStatusInfo = (isRunning: boolean, isFailed: boolean, isCompleted: boolean) => {
@@ -97,7 +97,7 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
                     <div className="h-[88px] flex flex-col items-center justify-between leading-tight">
                         <div className="flex-1 flex flex-col items-center justify-center">
                             <div className="p-2 rounded-full bg-primary/10">
-                                <Package className="h-4 w-4 text-primary" />
+                                <FilePlay className="h-4 w-4 text-primary" />
                             </div>
                             <span className="text-[11px] font-semibold mt-1.5">Tool Result</span>
                             <span className="text-[9px] text-muted-foreground">Transform</span>
