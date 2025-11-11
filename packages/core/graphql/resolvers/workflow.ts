@@ -138,8 +138,16 @@ export const executeWorkflowResolver = async (
     });
 
     // Notify webhook if configured (fire-and-forget)
-    if (args.options?.webhookUrl) {
+    if (args.options?.webhookUrl?.startsWith('http')) {
       notifyWebhook(args.options.webhookUrl, runId, result.success, result.data, result.error);
+    }
+    else if(args.options?.webhookUrl?.startsWith('tool:')) {
+      const toolId = args.options.webhookUrl.split(':')[1];
+      if(toolId == args.input.id) {
+        logMessage('warn', "Tool cannot trigger itself", metadata);
+        return;
+      }
+      executeWorkflowResolver(_, { input: { id: toolId }, payload: result.data, credentials: args.credentials, options: { ...args.options, webhookUrl: undefined } }, context, info);
     }
 
     return result;
@@ -161,6 +169,14 @@ export const executeWorkflowResolver = async (
     // Notify webhook if configured (for failure, fire-and-forget)
     if (args.options?.webhookUrl) {
       notifyWebhook(args.options.webhookUrl, runId, false, undefined, String(error));
+    }
+    else if(args.options?.webhookUrl?.startsWith('tool:')) {
+      const toolId = args.options.webhookUrl.split(':')[1];
+      if(toolId == args.input.id) {
+        logMessage('warn', "Tool cannot trigger itself", metadata);
+        return;
+      }
+      executeWorkflowResolver(_, { input: { id: toolId }, payload: result.error, credentials: args.credentials, options: { ...args.options, webhookUrl: undefined } }, context, info);
     }
 
     return { ...result, data: {}, stepResults: [] } as WorkflowResult;
