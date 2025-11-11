@@ -164,7 +164,15 @@ export async function injectVMHelpersIndividually(context: any): Promise<void> {
             }
           };
         }
-        return { toString: function() { return str; } };
+        // Default: treat as string to encode
+        return { 
+          toString: function(enc) { 
+            if (enc === 'base64') {
+              return btoa(str);
+            }
+            return str; 
+          } 
+        };
       }
     };
   `);
