@@ -103,9 +103,9 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
                             <span className="text-[9px] text-muted-foreground">Transform</span>
                         </div>
                         <div className="flex items-center gap-1 mt-1">
-                            <span className={cn("text-[9px] font-medium flex items-center gap-1", statusInfo.color)}>
+                            <span className={cn("text-[10px] font-semibold flex items-center gap-1.5", statusInfo.color)}>
                                 <span className={cn(
-                                    "w-1.5 h-1.5 rounded-full",
+                                    "w-2 h-2 rounded-full",
                                     statusInfo.dotColor,
                                     statusInfo.animate && "animate-pulse"
                                 )} />
@@ -165,9 +165,9 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
                             )}
                         </div>
                         <div className="flex items-center gap-1 mt-1">
-                            <span className={cn("text-[9px] font-medium flex items-center gap-1", statusInfo.color)}>
+                            <span className={cn("text-[10px] font-semibold flex items-center gap-1.5", statusInfo.color)}>
                                 <span className={cn(
-                                    "w-1.5 h-1.5 rounded-full",
+                                    "w-2 h-2 rounded-full",
                                     statusInfo.dotColor,
                                     statusInfo.animate && "animate-pulse"
                                 )} />
