@@ -1,7 +1,6 @@
 "use client";
 
 import { useConfig } from "@/src/app/config-context";
-import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput, computeToolPayload, removeFileKeysFromPayload } from "@/src/lib/general-utils";
@@ -24,8 +23,6 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
-import { Label } from "../ui/label";
-import { Switch } from "../ui/switch";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 import { ToolDeployModal } from "./deploy/ToolDeployModal";
 import { ToolStepGallery } from "./ToolStepGallery";
@@ -43,8 +40,6 @@ export interface ToolPlaygroundProps {
   headerActions?: React.ReactNode;
   hideHeader?: boolean;
   readOnly?: boolean;
-  selfHealingEnabled?: boolean;
-  onSelfHealingChange?: (enabled: boolean) => void;
   shouldStopExecution?: boolean;
   onStopExecution?: () => void;
   uploadedFiles?: UploadedFileInfo[];
@@ -62,7 +57,7 @@ export interface ToolPlaygroundProps {
 }
 
 export interface ToolPlaygroundHandle {
-  executeTool: (opts?: { selfHealing?: boolean }) => Promise<void>;
+  executeTool: () => Promise<void>;
   saveTool: () => Promise<void>;
   getCurrentTool: () => Tool;
   closeRebuild: () => void;
@@ -81,8 +76,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   headerActions,
   hideHeader = false,
   readOnly = false,
-  selfHealingEnabled: externalSelfHealingEnabled,
-  onSelfHealingChange,
   shouldStopExecution: externalShouldStop,
   onStopExecution,
   uploadedFiles: parentUploadedFiles,
@@ -168,7 +161,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setInstructions(initialInstruction);
     }
   }, [embedded, initialInstruction]);
-  const [selfHealingEnabled, setSelfHealingEnabled] = useState(externalSelfHealingEnabled ?? true);
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
   const [isFixingWorkflow, setIsFixingWorkflow] = useState<number | undefined>(undefined);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndex] = useState<number | undefined>(undefined);
@@ -205,19 +197,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       }
     }
   }, [inputSchema, manualPayloadText, hasUserEditedPayload]);
-
-  useEffect(() => {
-    if (externalSelfHealingEnabled !== undefined) {
-      setSelfHealingEnabled(externalSelfHealingEnabled);
-    }
-  }, [externalSelfHealingEnabled]);
-
-  const handleSelfHealingChange = (enabled: boolean) => {
-    setSelfHealingEnabled(enabled);
-    if (onSelfHealingChange) {
-      onSelfHealingChange(enabled);
-    }
-  };
 
   // Track latest external stop signal (embedded mode) in the single ref
   useEffect(() => {
@@ -690,7 +669,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
   };
 
-  const executeTool = async (opts?: { selfHealing?: boolean }) => {
+  const executeTool = async () => {
     setLoading(true);
     // Fully clear any stale stop signals from a previous run (both modes)
     stopSignalRef.current = false;
@@ -710,7 +689,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       // Always use the current steps for execution
       const executionSteps = steps;
       const currentResponseSchema = responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null;
-      const effectiveSelfHealing = opts?.selfHealing ?? selfHealingEnabled;
+      // Auto-repair disabled for "Run All Steps" - individual steps and final transform still support it
+      const effectiveSelfHealing = false;
 
       const tool = {
         id: toolId,
@@ -1060,17 +1040,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   // Default header actions for standalone mode
   const defaultHeaderActions = (
     <div className="flex items-center gap-2">
-      <div className="flex items-center gap-2 mr-2">
-        <Label htmlFor="selfHealing-top" className="text-xs flex items-center gap-1">
-          <span>auto-repair</span>
-        </Label>
-        <div className="flex items-center">
-          <Switch className="custom-switch" id="selfHealing-top" checked={selfHealingEnabled} onCheckedChange={handleSelfHealingChange} />
-          <div className="ml-1 flex items-center">
-            <HelpTooltip text="Enable auto-repair during execution. Slower, but can auto-fix failures in tool steps and transformation code." />
-          </div>
-        </div>
-      </div>
       {loading ? (
         <Button
           variant="destructive"
@@ -1232,7 +1201,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   isProcessingFiles={isProcessingFiles}
                   totalFileSize={totalFileSize}
                   filePayloads={filePayloads}
-                  stepSelfHealingEnabled={selfHealingEnabled}
                   isPayloadValid={isPayloadValid}
                   onPayloadUserEdit={() => setHasUserEditedPayload(true)}
                   embedded={embedded}

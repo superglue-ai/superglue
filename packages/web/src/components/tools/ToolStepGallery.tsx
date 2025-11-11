@@ -57,7 +57,6 @@ export interface ToolStepGalleryProps {
     isProcessingFiles?: boolean;
     totalFileSize?: number;
     filePayloads?: Record<string, any>;
-    stepSelfHealingEnabled?: boolean;
     isPayloadValid?: boolean;
     onPayloadUserEdit?: () => void;
     embedded?: boolean;
@@ -107,7 +106,6 @@ export function ToolStepGallery({
     isProcessingFiles,
     totalFileSize,
     filePayloads,
-    stepSelfHealingEnabled,
     isPayloadValid = true,
     onPayloadUserEdit,
     embedded = false

@@ -29,7 +29,6 @@ export function ToolCreateStepper({
   const [isSaving, setIsSaving] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [shouldStopExecution, setShouldStopExecution] = useState(false);
-  const [selfHealingEnabled, setSelfHealingEnabled] = useState(true);
   const [isRebuildingFromPlayground, setIsRebuildingFromPlayground] = useState(false);
   
   const { toast } = useToast();
@@ -173,8 +172,6 @@ export function ToolCreateStepper({
                 integrations={integrations}
                 onSave={handleSaveTool}
                 onInstructionEdit={() => setStep("build")}
-                selfHealingEnabled={selfHealingEnabled}
-                onSelfHealingChange={setSelfHealingEnabled}
                 shouldStopExecution={shouldStopExecution}
                 onStopExecution={handleStopExecution}
                 uploadedFiles={uploadedFiles}
