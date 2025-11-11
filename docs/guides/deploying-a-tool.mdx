@@ -78,10 +78,26 @@ Run your tools immediately whenever you need them.
         selfHealing: "ENABLED",    // Auto-fix configuration errors
         retries: 3,                 // Retry failed steps up to 3 times
         timeout: 120000,            // 2 minute timeout
-        webhookUrl: "https://example.com/webhook" // Send results to webhook
+        webhookUrl: "https://example.com/webhook" // Send results to webhook URL
       }
     });
     ```
+
+    **Chain tools together:**
+
+    Trigger another tool when this one completes using the `tool:` prefix:
+
+    ```typescript
+    const result = await superglue.executeWorkflow({
+      id: "sync-customers",
+      payload: {},
+      options: {
+        webhookUrl: "tool:send-email-report" // Trigger another tool with results
+      }
+    });
+    ```
+
+    The output of the first tool becomes the payload for the chained tool. This enables powerful multi-stage workflows.
 
     **Execute an inline workflow (without saving it):**
 
@@ -209,7 +225,7 @@ Schedule tools to run automatically at specific times or intervals.
 
         - **Timeout**: Maximum execution time in milliseconds
 
-        - **Webhook URL**: Send execution results to this URL
+        - **Webhook**: Send execution results to a URL or trigger another tool
       </Step>
       <Step title="Save and enable">
         Click "Add Schedule" to save. The schedule will start running at the next scheduled time. You can pause it anytime by toggling "Enable schedule" off.
@@ -243,11 +259,26 @@ Schedule tools to run automatically at specific times or intervals.
         selfHealing: "ENABLED",
         retries: 3,
         timeout: 120000,
-        webhookUrl: "https://example.com/webhook"
+        webhookUrl: "https://example.com/webhook" // Send to external URL
       }
     });
 
     console.log(`Next run: ${schedule.nextRunAt}`);
+    ```
+
+    **Create a schedule that chains tools:**
+
+    ```typescript
+    const schedule = await superglue.upsertWorkflowSchedule({
+      workflowId: "sync-customers",
+      cronExpression: "0 0 * * *",
+      timezone: "America/New_York",
+      enabled: true,
+      payload: {},
+      options: {
+        webhookUrl: "tool:send-email-report" // Trigger another tool
+      }
+    });
     ```
 
   </Tab>
