@@ -162,7 +162,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
   }, [embedded, initialInstruction]);
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
-  const [isFixingWorkflow, setIsFixingWorkflow] = useState<number | undefined>(undefined);
+  const [isFixingStep, setIsFixingStep] = useState<number | undefined>(undefined);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndex] = useState<number | undefined>(undefined);
   const [isStopping, setIsStopping] = useState(false);
   const [isRunningTransform, setIsRunningTransform] = useState(false);
@@ -903,7 +903,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const executeStepByIdx = async (idx: number, selfHealing: boolean = false) => {
     try {
       if (selfHealing) {
-        setIsFixingWorkflow(idx);
+        setIsFixingStep(idx);
       } else {
         setIsExecutingStep(idx);
       }
@@ -942,7 +942,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setShowStepOutputSignal(Date.now());
     } finally {
       setIsExecutingStep(undefined);
-      setIsFixingWorkflow(undefined);
+      setIsFixingStep(undefined);
     }
   };
 
@@ -1026,7 +1026,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         <Button
           variant="destructive"
           onClick={handleStopExecution}
-          disabled={saving || (isExecutingStep !== undefined) || isExecutingTransform || isStopping}
+          disabled={saving || (isExecutingStep !== undefined) || (isFixingStep !== undefined) || isExecutingTransform || isStopping}
           className="h-9 px-4"
         >
           {isStopping ? "Stopping..." : "Stop Execution"}
@@ -1035,7 +1035,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         <Button
           variant="success"
           onClick={handleRunAllSteps}
-          disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
+          disabled={loading || saving || (isExecutingStep !== undefined) || (isFixingStep !== undefined) || isExecutingTransform}
           className="h-9 px-4"
         >
           <Play className="h-4 w-4 fill-current" strokeWidth="3px" strokeLinejoin="round" strokeLinecap="round" />
@@ -1162,7 +1162,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   integrations={integrations}
                   isExecuting={loading}
                   isExecutingStep={isExecutingStep}
-                  isFixingWorkflow={isFixingWorkflow}
+                  isFixingStep={isFixingStep}
                   isRunningTransform={isRunningTransform}
                   isFixingTransform={isFixingTransform}
                   currentExecutingStepIndex={currentExecutingStepIndex}
