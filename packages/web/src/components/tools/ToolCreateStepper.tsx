@@ -30,6 +30,7 @@ export function ToolCreateStepper({
   const [isStopping, setIsStopping] = useState(false);
   const [shouldStopExecution, setShouldStopExecution] = useState(false);
   const [selfHealingEnabled, setSelfHealingEnabled] = useState(true);
+  const [isRebuildingFromPlayground, setIsRebuildingFromPlayground] = useState(false);
   
   const { toast } = useToast();
   const router = useRouter();
@@ -45,12 +46,14 @@ export function ToolCreateStepper({
   const [toolPayload, setToolPayload] = useState<Record<string, any>>({});
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [hasDeployModalBeenShown, setHasDeployModalBeenShown] = useState(false);
+  const [userSelectedIntegrations, setUserSelectedIntegrations] = useState<string[]>(initialIntegrationIds);
 
   const handleToolBuilt = (tool: Tool, context: BuildContext) => {
     setCurrentTool(tool);
     setBuildContext(context);
     setUploadedFiles(context.uploadedFiles);
     setFilePayloads(context.filePayloads);
+    setUserSelectedIntegrations(context.integrationIds);
     setStep('run');
   };
 
@@ -103,6 +106,12 @@ export function ToolCreateStepper({
   };
 
   const handleClose = () => {
+    if (isRebuildingFromPlayground) {
+      playgroundRef.current?.closeRebuild();
+      setIsRebuildingFromPlayground(false);
+      return;
+    }
+    
     if (onComplete) {
       onComplete();
     } else {
@@ -171,6 +180,9 @@ export function ToolCreateStepper({
                 uploadedFiles={uploadedFiles}
                 filePayloads={filePayloads}
                 onFilesChange={handleFilesChange}
+                userSelectedIntegrationIds={userSelectedIntegrations}
+                onRebuildStart={() => setIsRebuildingFromPlayground(true)}
+                onRebuildEnd={() => setIsRebuildingFromPlayground(false)}
               />
               <ToolDeployModal
                 currentTool={currentTool}

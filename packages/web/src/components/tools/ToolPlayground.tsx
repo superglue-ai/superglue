@@ -56,12 +56,16 @@ export interface ToolPlaygroundProps {
   onFilesChange?: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
   saveButtonText?: string;
   hideRebuildButton?: boolean;
+  userSelectedIntegrationIds?: string[];
+  onRebuildStart?: () => void;
+  onRebuildEnd?: () => void;
 }
 
 export interface ToolPlaygroundHandle {
   executeTool: (opts?: { selfHealing?: boolean }) => Promise<void>;
   saveTool: () => Promise<void>;
   getCurrentTool: () => Tool;
+  closeRebuild: () => void;
 }
 
 const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
@@ -89,7 +93,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   filePayloads: parentFilePayloads,
   onFilesChange: parentOnFilesChange,
   saveButtonText = "Save",
-  hideRebuildButton = false
+  hideRebuildButton = false,
+  userSelectedIntegrationIds = [],
+  onRebuildStart,
+  onRebuildEnd
 }, ref) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -251,13 +258,23 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
       finalTransform,
       instruction: instructions
-    })
-  }), [toolId, steps, responseSchema, inputSchema, finalTransform, instructions]);
+    }),
+    closeRebuild: () => {
+      setShowToolBuilder(false);
+      onRebuildEnd?.();
+    }
+  }), [toolId, steps, responseSchema, inputSchema, finalTransform, instructions, onRebuildEnd]);
   
   const extractIntegrationIds = (steps: ExecutionStep[]): string[] => {
     return Array.from(new Set(
       steps.map(s => s.integrationId).filter(Boolean) as string[]
     ));
+  };
+
+  const getMergedIntegrationIds = (): string[] => {
+    const integrationsFromSteps = extractIntegrationIds(steps);
+    const integrationsFromCreateStepper = userSelectedIntegrationIds || [];
+    return Array.from(new Set([...integrationsFromSteps, ...integrationsFromCreateStepper]));
   };
 
   const handleToolRebuilt = (tool: Tool, context: BuildContext) => {
@@ -290,6 +307,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     setFinalPreviewResult(null);
     
     setShowToolBuilder(false);
+    onRebuildEnd?.();
   };
 
   // Extract payload schema from full input schema
@@ -1076,7 +1094,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       {!readOnly && !hideRebuildButton && (
         <Button
           variant="outline"
-          onClick={() => setShowToolBuilder(true)}
+          onClick={() => {
+            onRebuildStart?.();
+            setShowToolBuilder(true);
+          }}
           className="h-9 px-5"
         >
           <Hammer fill="currentColor" className="h-4 w-4" />
@@ -1112,7 +1133,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setShowToolBuilder(false)}
+              onClick={() => {
+                setShowToolBuilder(false);
+                onRebuildEnd?.();
+              }}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -1121,7 +1145,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         <div className="flex-1 overflow-hidden">
         <ToolBuilder
           initialView="instructions"
-          initialIntegrationIds={extractIntegrationIds(steps)}
+          initialIntegrationIds={getMergedIntegrationIds()}
           initialInstruction={instructions}
           initialPayload={manualPayloadText}
           initialResponseSchema={responseSchema}
