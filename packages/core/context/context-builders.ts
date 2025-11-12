@@ -286,13 +286,13 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
     if (budget === 0) return '';
 
     const promptStart = options.mode === 'create'
-        ? `Generate a new API configuration to execute this instruction:`
+        ? `Generate a new API config to execute this step instruction:`
         : options.mode === 'self-healing'
-        ? `The previous step config failed. Generate a corrected configuration that executes the step instruction:`
-        : `Edit the step configuration according to the edit instructions:`;
+        ? `The previous step config failed. Generate a corrected config that executes the step instruction:`
+        : `Edit the step config according to the edit instructions:`;
 
     const instructionContext = `<step_instruction>${input.instruction}</step_instruction>`;
-    const stepConfigContext = input.previousStepConfig ? `<previous_step_config>${JSON.stringify(input.previousStepConfig)}</previous_step_config>` : '';
+    const previousStepConfigContext = input.previousStepConfig ? `<previous_step_config>${JSON.stringify(input.previousStepConfig)}</previous_step_config>` : '';
     const errorContext = input.errorMessage ? `<error_message>${input.errorMessage}</error_message>` : '';
     const editInstructionsContext = input.editInstruction ? `<edit_instructions>${input.editInstruction}</edit_instructions>` : '';
 
@@ -303,17 +303,17 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
     const totalWrapperLength = documentationWrapperLength + stepInputWrapperLength + integrationInstructionsWrapperLength + credentialsWrapperLength;
 
     let newlineCount = 6;
-    if (stepConfigContext) newlineCount += 1;
+    if (previousStepConfigContext) newlineCount += 1;
     if (errorContext) newlineCount += 1;
     if (editInstructionsContext) newlineCount += 1;
 
-    const essentialLength = promptStart.length + instructionContext.length + stepConfigContext.length + errorContext.length + editInstructionsContext.length + newlineCount + totalWrapperLength;
+    const essentialLength = promptStart.length + instructionContext.length + previousStepConfigContext.length + errorContext.length + editInstructionsContext.length + newlineCount + totalWrapperLength;
 
     if (budget <= essentialLength) {
         logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getGenerateStepConfigContext`, {});
         let minimalContext = promptStart + '\n' + instructionContext;
         if (editInstructionsContext) minimalContext += '\n' + editInstructionsContext;
-        if (stepConfigContext) minimalContext += '\n' + stepConfigContext;
+        if (previousStepConfigContext) minimalContext += '\n' + previousStepConfigContext;
         if (errorContext) minimalContext += '\n' + errorContext;
         return minimalContext;
     }
@@ -326,16 +326,16 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
 
     const documentationContent = input.integrationDocumentation.slice(0, documentationBudget);
     const integrationSpecificInstructions = input.integrationSpecificInstructions.slice(0, integrationInstructionsBudget);
-    const credentialsContent = Object.keys(input.credentials).map(v => `<<${v}>>`).join(", ").slice(0, credentialsBudget);
+    const credentialsContent = Object.keys(input.credentials || {}).map(v => `<<${v}>>`).join(", ").slice(0, credentialsBudget);
 
     const documentationContext = `<documentation>${documentationContent}</documentation>`;
-    const stepInputContext = `<step_input>${getObjectContext(input.stepInput, { include: { schema: true, preview: false, samples: true }, characterBudget: stepInputBudget })}</step_input>`;
+    const stepInputContext = `<step_input>${getObjectContext(input.stepInput || {}, { include: { schema: true, preview: false, samples: true }, characterBudget: stepInputBudget })}</step_input>`;
     const integrationInstructionsContext = `<integration_specific_instructions>${integrationSpecificInstructions}</integration_specific_instructions>`;
     const credentialsContext = `<available_credentials>${credentialsContent}</available_credentials>`;
 
     let contextParts = [promptStart, instructionContext];
     if (editInstructionsContext) contextParts.push(editInstructionsContext);
-    if (stepConfigContext) contextParts.push(stepConfigContext);
+    if (previousStepConfigContext) contextParts.push(previousStepConfigContext);
     if (errorContext) contextParts.push(errorContext);
     contextParts.push(documentationContext, stepInputContext, integrationInstructionsContext, credentialsContext);
 

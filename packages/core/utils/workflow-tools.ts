@@ -14,12 +14,15 @@ export const generateStepConfigToolImplementation: ToolImplementation<StepConfig
     if (!integration) {
         return {
             success: false,
-            error: "Integration not provided in context. The generate_step_config tool requires an integration to be passed in the tool executor context."
+            error: "Integration not provided in context. The generate_step_config tool requires an integration to be passed in the tool executor context.",
+            data: {
+                messages: messages
+            }
         };
     }
 
     const temperature = Math.min(retryCount * 0.1, 1);
-    const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(
+    const { response: generatedConfig, error, messages: updatedMessages } = await LanguageModel.generateObject(
         messages,
         submitToolDefinition.arguments,
         temperature,
@@ -27,34 +30,62 @@ export const generateStepConfigToolImplementation: ToolImplementation<StepConfig
         { integration: integration }
       );
     
+      if (error) {
+        return {
+            success: false,
+            error: `LLM API error: ${error}`,
+            data: {
+                messages: updatedMessages
+            }
+        };
+      }
+
+      if (typeof generatedConfig === 'string') {
+        return {
+            success: false,
+            error: `LLM returned error string: ${generatedConfig}`,
+            data: {
+                messages: updatedMessages
+            }
+        };
+      }
+    
       if (generatedConfig?.error) {
         return {
             success: false,
-            error: generatedConfig.error
+            error: `LLM aborted: ${generatedConfig.error}`,
+            data: {
+                messages: updatedMessages
+            }
         };
       }
     
       if (!generatedConfig?.apiConfig) {
         return {
             success: false,
-            error: 'LLM did not return apiConfig in response. Response: ' + JSON.stringify(generatedConfig).slice(0, 5000)
+            error: `LLM did not return apiConfig. Response type: ${typeof generatedConfig}, keys: ${generatedConfig ? Object.keys(generatedConfig).join(', ') : 'null'}, full response: ${JSON.stringify(generatedConfig).slice(0, 3000)}`,
+            data: {
+                messages: updatedMessages
+            }
         };
       }
       
       return {
         success: true,
         data: {
-          instruction: configInstruction,
-          urlHost: generatedConfig.apiConfig.urlHost,
-          urlPath: generatedConfig.apiConfig.urlPath,
-          method: generatedConfig.apiConfig.method,
-          queryParams: generatedConfig.apiConfig.queryParams,
-          headers: generatedConfig.apiConfig.headers,
-          body: generatedConfig.apiConfig.body,
-          authentication: generatedConfig.apiConfig.authentication,
-          pagination: generatedConfig.apiConfig.pagination,
-        },
-        messages: updatedMessages
+          config: {
+            instruction: configInstruction,
+            urlHost: generatedConfig.apiConfig.urlHost,
+            urlPath: generatedConfig.apiConfig.urlPath,
+            method: generatedConfig.apiConfig.method,
+            queryParams: generatedConfig.apiConfig.queryParams,
+            headers: generatedConfig.apiConfig.headers,
+            body: generatedConfig.apiConfig.body,
+            authentication: generatedConfig.apiConfig.authentication,
+            pagination: generatedConfig.apiConfig.pagination,
+          },
+          messages: updatedMessages
+        }
       };
 };
 

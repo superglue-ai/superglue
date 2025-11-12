@@ -77,15 +77,16 @@ export const generateStepConfigResolver = async (
       : editInstruction ? 'edit' 
       : 'create';
     
-    const integrationDocsTruncated = (await integrationManager.getDocumentation()).content?.slice(0,40000);
-    const integrationSpecificInstructions = integration.specificInstructions;
+    const docs = await integrationManager.getDocumentation();
+    const integrationDocs = docs.content?.slice(0, 40000) || '';
+    const integrationSpecificInstructions = integration.specificInstructions || '';
     
     const userPrompt = getGenerateStepConfigContext({
       instruction,
       previousStepConfig: currentStepConfig,
       stepInput,
       credentials,
-      integrationDocumentation: integrationDocsTruncated,
+      integrationDocumentation: integrationDocs,
       integrationSpecificInstructions: integrationSpecificInstructions,
       errorMessage,
       editInstruction

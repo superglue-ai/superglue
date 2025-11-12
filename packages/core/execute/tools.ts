@@ -3,6 +3,8 @@ import { generateInstructionsDefinition, generateInstructionsImplementation } fr
 import {
     buildWorkflowImplementation,
     buildWorkflowToolDefinition,
+    generateStepConfigToolDefinition,
+    generateStepConfigToolImplementation,
     searchDocumentationToolDefinition,
     searchDocumentationToolImplementation,
     submitToolDefinition
@@ -69,14 +71,16 @@ export type ToolImplementation<TContext extends BaseToolContext = BaseToolContex
 const toolRegistry: Record<string, ToolImplementation<any>> = {
     generate_instructions: generateInstructionsImplementation,
     search_documentation: searchDocumentationToolImplementation,
-    build_workflow: buildWorkflowImplementation
+    build_workflow: buildWorkflowImplementation,
+    generate_step_config: generateStepConfigToolImplementation
 };
 
 export const allToolDefinitions = [
     generateInstructionsDefinition,
     searchDocumentationToolDefinition,
     submitToolDefinition,
-    buildWorkflowToolDefinition
+    buildWorkflowToolDefinition,
+    generateStepConfigToolDefinition
 ];
 
 export async function executeTool<TContext extends BaseToolContext>(toolCall: ToolCall, context: TContext): Promise<ToolCallResult> {

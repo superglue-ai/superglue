@@ -439,15 +439,16 @@ export class WorkflowExecutor implements Workflow {
   
           if (messages.length === 0) {
             integration = await integrationManager.getIntegration();
-            const integrationDocsTruncated = (await integrationManager.getDocumentation()).content?.slice(0,40000);
-            const integrationSpecificInstructions = integration.specificInstructions;
+            const docs = await integrationManager.getDocumentation();
+            const integrationDocs = docs?.content?.slice(0, 40000) || '';
+            const integrationSpecificInstructions = integration.specificInstructions || '';
             
             const userPrompt = getGenerateStepConfigContext({
               instruction: config.instruction,
               previousStepConfig: config,
               stepInput: payload,
               credentials,
-              integrationDocumentation: integrationDocsTruncated,
+              integrationDocumentation: integrationDocs,
               integrationSpecificInstructions: integrationSpecificInstructions
             }, { characterBudget: 50000, mode: 'self-healing' });
         
@@ -461,18 +462,18 @@ export class WorkflowExecutor implements Workflow {
             });
           }
 
-          const generatedStepConfig = await executeTool({
+          const generateStepConfigResult = await executeTool({
             id: crypto.randomUUID(),
             name: "generate_step_config",
             arguments: { configInstruction: config.instruction, retryCount },
           }, 
           { runId: crypto.randomUUID(), orgId: this.metadata.orgId, messages, integration });
           
-          if (!generatedStepConfig.success || !generatedStepConfig.data) {
+          if (!generateStepConfigResult.success || !generateStepConfigResult.data) {
             throw new Error("No API config generated");
           }
-          config = generatedStepConfig.data.config;
-          messages = generatedStepConfig.data.messages;
+          config = generateStepConfigResult.data.config;
+          messages = generateStepConfigResult.data.messages;
         }
   
         response = await runStepConfig({ config, payload, credentials, options });
@@ -489,7 +490,7 @@ export class WorkflowExecutor implements Workflow {
             docSearchResultsForStepInstruction: await integrationManager?.searchDocumentation(config.instruction)
           });
           success = result.success;
-          if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
+          if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 10000));
         }
         else {
           success = true;
@@ -500,7 +501,7 @@ export class WorkflowExecutor implements Workflow {
         const rawErrorString = error?.message || JSON.stringify(error || {});
         lastError = maskCredentials(rawErrorString, credentials).slice(0, 10000);
         if (retryCount > 0) {
-          messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 10000)}` });
+          messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${lastError}` });
           logMessage('info', `API call failed. Last error: ${lastError}`, this.metadata);
         }
   
