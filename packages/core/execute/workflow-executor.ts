@@ -1,4 +1,4 @@
-import { ApiConfig, ExecutionStep, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
+import { ApiConfig, ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { getEvaluateStepResponseContext, getGenerateStepConfigContext, getLoopSelectorContext } from "../context/context-builders.js";
@@ -11,7 +11,7 @@ import { telemetryClient } from "../utils/telemetry.js";
 import { applyJsonata, isSelfHealingEnabled, maskCredentials, transformAndValidateSchema } from "../utils/tools.js";
 import { evaluateTransform, generateTransformCode } from "../utils/transform.js";
 import { AbortError, ApiCallError } from "./api/api.js";
-import { callEndpointLegacyImplementation } from "./api/api.legacy.js";
+import { runStepConfig } from "./api/api.legacy.js";
 import { executeTool } from "./tools.js";
 
 export interface WorkflowExecutorOptions {
@@ -427,6 +427,7 @@ export class WorkflowExecutor implements Workflow {
     let messages: LLMMessage[] = [];
     let success = false;
     let isSelfHealing = isSelfHealingEnabled(options, "api");
+    let integration: Integration | undefined;
   
     // If self healing is enabled, use the retries from the options or the default max of 10 if not specified, otherwise use 1 (no self-healing case)
     const effectiveMaxRetries = isSelfHealing ? (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES) : 1;
@@ -437,15 +438,17 @@ export class WorkflowExecutor implements Workflow {
           logMessage('info', `Self healing the step configuration for ${config?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, this.metadata);
   
           if (messages.length === 0) {
-            const { documentation, specificInstructions } = await integrationManager.getContextDocumentation(config.instruction);
+            integration = await integrationManager.getIntegration();
+            const integrationDocsTruncated = (await integrationManager.getDocumentation()).content?.slice(0,40000);
+            const integrationSpecificInstructions = integration.specificInstructions;
             
             const userPrompt = getGenerateStepConfigContext({
               instruction: config.instruction,
               previousStepConfig: config,
               stepInput: payload,
               credentials,
-              integrationDocumentation: documentation,
-              integrationSpecificInstructions: specificInstructions
+              integrationDocumentation: integrationDocsTruncated,
+              integrationSpecificInstructions: integrationSpecificInstructions
             }, { characterBudget: 50000, mode: 'self-healing' });
         
             messages.push({
@@ -463,7 +466,7 @@ export class WorkflowExecutor implements Workflow {
             name: "generate_step_config",
             arguments: { configInstruction: config.instruction, retryCount },
           }, 
-          { runId: crypto.randomUUID(), orgId: this.metadata.orgId, messages, integration: await integrationManager.getIntegration() });
+          { runId: crypto.randomUUID(), orgId: this.metadata.orgId, messages, integration });
           
           if (!generatedStepConfig.success || !generatedStepConfig.data) {
             throw new Error("No API config generated");
@@ -472,7 +475,7 @@ export class WorkflowExecutor implements Workflow {
           messages = generatedStepConfig.data.messages;
         }
   
-        response = await callEndpointLegacyImplementation({ config, payload, credentials, options });
+        response = await runStepConfig({ config, payload, credentials, options });
   
         if (!response.data) {
           throw new Error("No data returned from API. This could be due to a configuration error.");

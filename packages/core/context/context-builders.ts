@@ -288,10 +288,10 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
     const promptStart = options.mode === 'create'
         ? `Generate a new API configuration to execute this instruction:`
         : options.mode === 'self-healing'
-        ? `The current step config failed. Generate a corrected configuration that executes the original instruction:`
+        ? `The previous step config failed. Generate a corrected configuration that executes the step instruction:`
         : `Edit the step configuration according to the edit instructions:`;
 
-    const instructionContext = `<instruction>${input.instruction}</instruction>`;
+    const instructionContext = `<step_instruction>${input.instruction}</step_instruction>`;
     const stepConfigContext = input.previousStepConfig ? `<previous_step_config>${JSON.stringify(input.previousStepConfig)}</previous_step_config>` : '';
     const errorContext = input.errorMessage ? `<error_message>${input.errorMessage}</error_message>` : '';
     const editInstructionsContext = input.editInstruction ? `<edit_instructions>${input.editInstruction}</edit_instructions>` : '';
@@ -320,16 +320,16 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
 
     const remainingBudget = budget - essentialLength;
     const documentationBudget = Math.floor(remainingBudget * 0.4);
-    const stepInputBudget = Math.floor(remainingBudget * 0.3);
+    const stepInputBudget = Math.floor(remainingBudget * 0.4);
     const integrationInstructionsBudget = Math.floor(remainingBudget * 0.1);
-    const credentialsBudget = Math.floor(remainingBudget * 0.2);
+    const credentialsBudget = Math.floor(remainingBudget * 0.1);
 
     const documentationContent = input.integrationDocumentation.slice(0, documentationBudget);
     const integrationSpecificInstructions = input.integrationSpecificInstructions.slice(0, integrationInstructionsBudget);
-    const credentialsContent = Object.keys(input.credentials || {}).map(v => `<<${v}>>`).join(", ").slice(0, credentialsBudget);
+    const credentialsContent = Object.keys(input.credentials).map(v => `<<${v}>>`).join(", ").slice(0, credentialsBudget);
 
     const documentationContext = `<documentation>${documentationContent}</documentation>`;
-    const stepInputContext = `<step_input>${getObjectContext(input.stepInput || {}, { include: { schema: true, preview: false, samples: true }, characterBudget: stepInputBudget })}</step_input>`;
+    const stepInputContext = `<step_input>${getObjectContext(input.stepInput, { include: { schema: true, preview: false, samples: true }, characterBudget: stepInputBudget })}</step_input>`;
     const integrationInstructionsContext = `<integration_specific_instructions>${integrationSpecificInstructions}</integration_specific_instructions>`;
     const credentialsContext = `<available_credentials>${credentialsContent}</available_credentials>`;
 

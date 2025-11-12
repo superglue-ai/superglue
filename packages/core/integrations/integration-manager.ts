@@ -113,18 +113,6 @@ export class IntegrationManager {
         return result;
     }
 
-    async getContextDocumentation(instruction: string): Promise<{ documentation: string; specificInstructions: string }> {
-        const integration = await this.getIntegration();
-        const fullDocs = await this.getDocumentation();
-        const truncatedDocs = fullDocs.content?.slice(0, 40000) || '';
-        //const truncatedDocs = fullDocs.content.length < 40000 ? fullDocs.content : await this.searchDocumentation(instruction);
-        
-        return {
-            documentation: truncatedDocs,
-            specificInstructions: integration?.specificInstructions || ''
-        };
-    }
-
     // Sync version of toIntegration for backward compatibility (may return incomplete data)
     toIntegrationSync(): Integration {
         return this._integration;

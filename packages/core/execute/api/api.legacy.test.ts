@@ -2,7 +2,7 @@ import { ApiConfig, HttpMethod, PaginationType, SelfHealingMode } from '@supergl
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
 import { isSelfHealingEnabled } from '../../utils/tools.js';
 import * as api from './api.js';
-import { callEndpointLegacyImplementation as callEndpoint, convertBasicAuthToBase64 } from './api.legacy.js';
+import { runStepConfig as callEndpoint, convertBasicAuthToBase64 } from './api.legacy.js';
 
 vi.mock('axios');
 vi.mock('openai');

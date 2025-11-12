@@ -26,7 +26,7 @@ export function convertBasicAuthToBase64(headerValue: string) {
   return headerValue;
 }
 
-export async function callEndpointLegacyImplementation({ config, payload, credentials, options }: { config: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<{ data: any; statusCode: number; headers: Record<string, any>; }> {
+export async function runStepConfig({ config, payload, credentials, options }: { config: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<{ data: any; statusCode: number; headers: Record<string, any>; }> {
   const allVariables = { ...payload, ...credentials };
 
   let allResults = [];
