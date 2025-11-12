@@ -52,6 +52,10 @@ export interface WorkflowBuildContext extends BaseToolContext {
     integrations?: Integration[];
 }
 
+export interface StepConfigGenerationContext extends BaseToolContext {
+    messages: any[];
+    integration?: Integration;
+}
 
 export type ToolImplementation<TContext extends BaseToolContext = BaseToolContext> = (
     args: any,
@@ -75,7 +79,7 @@ export const allToolDefinitions = [
     buildWorkflowToolDefinition
 ];
 
-export async function executeTool(toolCall: ToolCall, context: BaseToolContext): Promise<ToolCallResult> {
+export async function executeTool<TContext extends BaseToolContext>(toolCall: ToolCall, context: TContext): Promise<ToolCallResult> {
     const implementation = toolRegistry[toolCall.name];
 
     if (!implementation) {

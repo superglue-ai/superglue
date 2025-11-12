@@ -2,9 +2,72 @@ import { HttpMethod } from "@superglue/client";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
-import { ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../execute/tools.js";
+import { StepConfigGenerationContext, ToolDefinition, ToolImplementation, WorkflowBuildContext, WorkflowExecutionContext } from "../execute/tools.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { logMessage } from "./logs.js";
+
+
+export const generateStepConfigToolImplementation: ToolImplementation<StepConfigGenerationContext> = async (args, context) => {
+    const { configInstruction, retryCount } = args;
+    const { integration, messages } = context;
+
+    if (!integration) {
+        return {
+            success: false,
+            error: "Integration not provided in context. The generate_step_config tool requires an integration to be passed in the tool executor context."
+        };
+    }
+
+    const temperature = Math.min(retryCount * 0.1, 1);
+    const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(
+        messages,
+        submitToolDefinition.arguments,
+        temperature,
+        [searchDocumentationToolDefinition],
+        { integration: integration }
+      );
+    
+      if (generatedConfig?.error) {
+        return {
+            success: false,
+            error: generatedConfig.error
+        };
+      }
+    
+      if (!generatedConfig?.apiConfig) {
+        return {
+            success: false,
+            error: 'LLM did not return apiConfig in response. Response: ' + JSON.stringify(generatedConfig).slice(0, 5000)
+        };
+      }
+      
+      return {
+        success: true,
+        data: {
+          instruction: configInstruction,
+          urlHost: generatedConfig.apiConfig.urlHost,
+          urlPath: generatedConfig.apiConfig.urlPath,
+          method: generatedConfig.apiConfig.method,
+          queryParams: generatedConfig.apiConfig.queryParams,
+          headers: generatedConfig.apiConfig.headers,
+          body: generatedConfig.apiConfig.body,
+          authentication: generatedConfig.apiConfig.authentication,
+          pagination: generatedConfig.apiConfig.pagination,
+        },
+        messages: updatedMessages
+      };
+};
+
+export const generateStepConfigToolDefinition: ToolDefinition = {
+    name: "generate_step_config",
+    description: "Generate a complete API configuration for a step in a workflow.",
+    arguments: {
+        type: "object",
+        properties: {},
+        required: []
+    },
+    execute: generateStepConfigToolImplementation
+};
 
 export const searchDocumentationToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
     const { query } = args;
@@ -55,6 +118,22 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
             error: error instanceof Error ? error.message : String(error)
         };
     }
+};
+
+export const searchDocumentationToolDefinition: ToolDefinition = {
+    name: "search_documentation",
+    description: "Search documentation for specific information about API structure, endpoints, authentication patterns, etc. Use this when you need to understand how an API works, what endpoints are available, or how to authenticate. Returns relevant documentation excerpts matching your search query.",
+    arguments: {
+        type: "object",
+        properties: {
+            query: {
+                type: "string",
+                description: "What to search for in the documentation (e.g., 'authentication', 'batch processing', 'rate limits')"
+            }
+        },
+        required: ["query"]
+    },
+    execute: searchDocumentationToolImplementation
 };
 
 
@@ -172,21 +251,17 @@ export const buildWorkflowImplementation: ToolImplementation<WorkflowBuildContex
     }
 };
 
-export const searchDocumentationToolDefinition: ToolDefinition = {
-    name: "search_documentation",
-    description: "Search documentation for specific information about API structure, endpoints, authentication patterns, etc. Use this when you need to understand how an API works, what endpoints are available, or how to authenticate. Returns relevant documentation excerpts matching your search query.",
+export const buildWorkflowToolDefinition: ToolDefinition = {
+    name: "build_workflow",
+    description: "Build a complete executable workflow from user instructions.",
     arguments: {
         type: "object",
-        properties: {
-            query: {
-                type: "string",
-                description: "What to search for in the documentation (e.g., 'authentication', 'batch processing', 'rate limits')"
-            }
-        },
-        required: ["query"]
+        properties: {},
+        required: []
     },
-    execute: searchDocumentationToolImplementation
+    execute: buildWorkflowImplementation
 };
+
 
 export const submitToolDefinition: ToolDefinition = {
     name: "submit_tool",
@@ -268,15 +343,4 @@ export const submitToolDefinition: ToolDefinition = {
         },
         required: ["apiConfig"]
     }
-};
-
-export const buildWorkflowToolDefinition: ToolDefinition = {
-    name: "build_workflow",
-    description: "Build a complete executable workflow from user instructions.",
-    arguments: {
-        type: "object",
-        properties: {},
-        required: []
-    },
-    execute: buildWorkflowImplementation
 };

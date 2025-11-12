@@ -4,17 +4,12 @@ import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { RequestOptions } from "http";
 import ivm from "isolated-vm";
 import { JSONPath } from "jsonpath-plus";
-import { getGenerateApiConfigContext } from "../../context/context-builders.js";
-import { SELF_HEALING_SYSTEM_PROMPT } from "../../context/context-prompts.js";
 import { server_defaults } from "../../default.js";
 import { parseFile } from "../../files/index.js";
-import { IntegrationManager } from "../../integrations/integration-manager.js";
-import { LanguageModel, LLMMessage } from "../../llm/language-model.js";
-import { composeUrl, generateId, maskCredentials, replaceVariables, sample, smartMergeResponses } from "../../utils/tools.js";
-import { searchDocumentationToolDefinition, submitToolDefinition } from "../../utils/workflow-tools.js";
+import { composeUrl, maskCredentials, replaceVariables, smartMergeResponses } from "../../utils/tools.js";
 import { callFTP } from "../ftp/ftp.js";
 import { callPostgres } from "../postgres/postgres.legacy.js";
-import { AbortError, ApiCallError, callAxios, checkResponseForErrors, handle2xxStatus, handle429Status, handleErrorStatus } from "./api.js";
+import { ApiCallError, callAxios, checkResponseForErrors, handle2xxStatus, handle429Status, handleErrorStatus } from "./api.js";
 
 export function convertBasicAuthToBase64(headerValue: string) {
   if (!headerValue) return headerValue;
@@ -31,7 +26,7 @@ export function convertBasicAuthToBase64(headerValue: string) {
   return headerValue;
 }
 
-export async function callEndpointLegacyImplementation({ endpoint, payload, credentials, options }: { endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<{ data: any; statusCode: number; headers: Record<string, any>; }> {
+export async function callEndpointLegacyImplementation({ config, payload, credentials, options }: { config: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<{ data: any; statusCode: number; headers: Record<string, any>; }> {
   const allVariables = { ...payload, ...credentials };
 
   let allResults = [];
@@ -45,7 +40,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
   let firstResponseHash: string | null = null;
   let hasValidData = false;
   let lastResponse: AxiosResponse = null;
-  const hasStopCondition = endpoint.pagination && (endpoint.pagination as any).stopCondition;
+  const hasStopCondition = config.pagination && (config.pagination as any).stopCondition;
   const maxRequests = hasStopCondition ? server_defaults.MAX_PAGINATION_REQUESTS : 500;
 
   while (hasMore && loopCounter < maxRequests) {
@@ -53,31 +48,31 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
       page,
       offset,
       cursor,
-      limit: endpoint.pagination?.pageSize || "50",
-      pageSize: endpoint.pagination?.pageSize || "50"
+      limit: config.pagination?.pageSize || "50",
+      pageSize: config.pagination?.pageSize || "50"
     };
 
     const requestVars = { ...paginationVars, ...allVariables };
 
-    if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
-      const request = JSON.stringify(endpoint);
+    if (config.pagination?.type === PaginationType.PAGE_BASED) {
+      const request = JSON.stringify(config);
       if (!request.includes('page')) {
         throw new Error(`Pagination type is ${PaginationType.PAGE_BASED} but no page parameter is provided in the request. Please provide a page parameter in the request.`);
       }
-    } else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
-      const request = JSON.stringify(endpoint);
+    } else if (config.pagination?.type === PaginationType.OFFSET_BASED) {
+      const request = JSON.stringify(config);
       if (!request.includes('offset')) {
         throw new Error(`Pagination type is ${PaginationType.OFFSET_BASED} but no offset parameter is provided in the request. Please provide an offset parameter in the request.`);
       }
-    } else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
-      const request = JSON.stringify(endpoint);
+    } else if (config.pagination?.type === PaginationType.CURSOR_BASED) {
+      const request = JSON.stringify(config);
       if (!request.includes('cursor')) {
         throw new Error(`Pagination type is ${PaginationType.CURSOR_BASED} but no cursor parameter is provided in the request. Please provide a cursor parameter in the request.`);
       }
     }
 
     // Handle headers - might be string or object
-    let headersToProcess = endpoint.headers || {};
+    let headersToProcess = config.headers || {};
     if (typeof headersToProcess === 'string') {
       const replacedString = await replaceVariables(headersToProcess, requestVars);
       try {
@@ -109,7 +104,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
     }
 
     // Handle query params - might be string or object
-    let queryParamsToProcess = endpoint.queryParams || {};
+    let queryParamsToProcess = config.queryParams || {};
     if (typeof queryParamsToProcess === 'string') {
       const replacedString = await replaceVariables(queryParamsToProcess, requestVars);
       try {
@@ -126,16 +121,16 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
       )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
     );
 
-    const processedBody = endpoint.body ?
-      await replaceVariables(endpoint.body, requestVars) :
+    const processedBody = config.body ?
+      await replaceVariables(config.body, requestVars) :
       "";
 
-    const processedUrlHost = await replaceVariables(endpoint.urlHost, requestVars);
-    const processedUrlPath = await replaceVariables(endpoint.urlPath, requestVars);
+    const processedUrlHost = await replaceVariables(config.urlHost, requestVars);
+    const processedUrlPath = await replaceVariables(config.urlPath, requestVars);
 
     if (processedUrlHost.startsWith("postgres://") || processedUrlHost.startsWith("postgresql://")) {
       const postgresEndpoint = {
-        ...endpoint,
+        ...config,
         urlHost: processedUrlHost,
         urlPath: processedUrlPath,
         body: processedBody
@@ -145,7 +140,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
 
     if (processedUrlHost.startsWith("ftp://") || processedUrlHost.startsWith("ftps://") || processedUrlHost.startsWith("sftp://")) {
       const ftpEndpoint = {
-        ...endpoint,
+        ...config,
         urlHost: processedUrlHost,
         urlPath: processedUrlPath,
         body: processedBody
@@ -156,7 +151,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
     const processedUrl = composeUrl(processedUrlHost, processedUrlPath);
 
     const axiosConfig: AxiosRequestConfig = {
-      method: endpoint.method,
+      method: config.method,
       url: processedUrl,
       headers: processedHeaders,
       data: processedBody,
@@ -232,7 +227,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
         throw new Error(
           `Pagination configuration error: The first two API requests returned identical responses with valid data. ` +
           `This indicates the pagination parameters are not being applied correctly. ` +
-          `Please check your pagination configuration (type: ${endpoint.pagination?.type}, pageSize: ${endpoint.pagination?.pageSize}), ` +
+          `Please check your pagination configuration (type: ${config.pagination?.type}, pageSize: ${config.pagination?.pageSize}), ` +
           `body: ${maskedBody}, queryParams: ${maskedParams}, headers: ${maskedHeaders}.`
         );
       }
@@ -241,7 +236,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
         throw new Error(
           `Stop condition error: The API returned no data on the first request, but the stop condition did not terminate pagination. ` +
           `The stop condition should detect empty responses and stop immediately. ` +
-          `Current stop condition: ${(endpoint.pagination as any).stopCondition}`
+          `Current stop condition: ${(config.pagination as any).stopCondition}`
         );
       }
 
@@ -256,7 +251,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
         };
 
         const stopEval = await evaluateStopCondition(
-          (endpoint.pagination as any).stopCondition,
+          (config.pagination as any).stopCondition,
           { ...lastResponse, data: parsedResponseData },
           pageInfo
         );
@@ -264,7 +259,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
         if (stopEval.error) {
           throw new Error(
             `Pagination stop condition error: ${stopEval.error}\n` +
-            `Stop condition: ${(endpoint.pagination as any).stopCondition}`
+            `Stop condition: ${(config.pagination as any).stopCondition}`
           );
         }
 
@@ -275,7 +270,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
 
       if (Array.isArray(parsedResponseData)) {
         allResults = allResults.concat(parsedResponseData);
-      } else if (!endpoint.dataPath) {
+      } else if (!config.dataPath) {
         allResults = smartMergeResponses(allResults, parsedResponseData);
       }
       else if (parsedResponseData) {
@@ -283,7 +278,7 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
       }
     } else {
       if (Array.isArray(parsedResponseData)) {
-        const pageSize = parseInt(endpoint.pagination?.pageSize || "50");
+        const pageSize = parseInt(config.pagination?.pageSize || "50");
         if (!pageSize || parsedResponseData.length < pageSize) {
           hasMore = false;
         }
@@ -302,12 +297,12 @@ export async function callEndpointLegacyImplementation({ endpoint, payload, cred
       }
     }
 
-    if (endpoint.pagination?.type === PaginationType.PAGE_BASED) {
+    if (config.pagination?.type === PaginationType.PAGE_BASED) {
       page++;
-    } else if (endpoint.pagination?.type === PaginationType.OFFSET_BASED) {
-      offset += parseInt(endpoint.pagination?.pageSize || "50");
-    } else if (endpoint.pagination?.type === PaginationType.CURSOR_BASED) {
-      const cursorPath = endpoint.pagination?.cursorPath || 'next_cursor';
+    } else if (config.pagination?.type === PaginationType.OFFSET_BASED) {
+      offset += parseInt(config.pagination?.pageSize || "50");
+    } else if (config.pagination?.type === PaginationType.CURSOR_BASED) {
+      const cursorPath = config.pagination?.cursorPath || 'next_cursor';
       const jsonPath = cursorPath.startsWith('$') ? cursorPath : `$.${cursorPath}`;
       const result = JSONPath({ path: jsonPath, json: parsedResponseData, wrap: false });
       cursor = result;
@@ -378,89 +373,4 @@ export async function evaluateStopCondition(
         console.error("Error disposing isolate", error);
       }
     }
-  }
-  
-  export async function generateApiConfig({
-    failedConfig,
-    stepInput,
-    credentials,
-    retryCount,
-    messages,
-    integrationManager,
-  }: {
-    failedConfig: Partial<ApiConfig>,
-    stepInput: Record<string, any>,
-    credentials: Record<string, any>,
-    retryCount?: number,
-    messages?: LLMMessage[],
-    integrationManager: IntegrationManager,
-  }): Promise<{ config: ApiConfig; messages: LLMMessage[]; }> {
-    if (!retryCount) retryCount = 0;
-    if (!messages) messages = [];
-  
-    if (messages.length === 0) {
-  
-      const userPrompt = await getGenerateApiConfigContext({
-        instruction: failedConfig.instruction,
-        previousStepConfig: failedConfig,
-        stepInput: stepInput,
-        credentials,
-        integrationManager
-      }, { characterBudget: 50000 });
-  
-      messages.push({
-        role: "system",
-        content: SELF_HEALING_SYSTEM_PROMPT
-      });
-      messages.push({
-        role: "user",
-        content: userPrompt
-      });
-    }
-  
-    const temperature = Math.min(retryCount * 0.1, 1);
-    const { response: generatedConfig, messages: updatedMessages } = await LanguageModel.generateObject(
-      messages,
-      submitToolDefinition.arguments,
-      temperature,
-      [searchDocumentationToolDefinition],
-      { integration: await integrationManager?.getIntegration() }
-    );
-  
-    if (generatedConfig?.error) {
-      throw new AbortError(generatedConfig.error);
-    }
-  
-    if (!generatedConfig?.apiConfig) {
-      throw new AbortError('LLM did not return apiConfig in response. Response: ' + JSON.stringify(generatedConfig).slice(0, 500));
-    }
-  
-    const queryParams = generatedConfig.apiConfig.queryParams ?
-    Object.fromEntries(generatedConfig.apiConfig.queryParams.map((p: any) => [p.key, p.value])) :
-    undefined;
-  const headers = generatedConfig.apiConfig.headers ?
-    Object.fromEntries(generatedConfig.apiConfig.headers.map((p: any) => [p.key, p.value])) :
-    undefined;
-    
-    return {
-      config: {
-        instruction: failedConfig.instruction,
-        urlHost: generatedConfig.apiConfig.urlHost,
-        urlPath: generatedConfig.apiConfig.urlPath,
-        method: generatedConfig.apiConfig.method,
-        queryParams: queryParams,
-        headers: headers,
-        body: generatedConfig.apiConfig.body,
-        authentication: generatedConfig.apiConfig.authentication,
-        pagination: generatedConfig.apiConfig.pagination,
-        dataPath: generatedConfig.apiConfig.dataPath,
-        documentationUrl: failedConfig.documentationUrl,
-        responseSchema: failedConfig.responseSchema,
-        responseMapping: failedConfig.responseMapping,
-        createdAt: failedConfig.createdAt || new Date(),
-        updatedAt: new Date(),
-        id: failedConfig.id || generateId(generatedConfig.apiConfig.urlHost, generatedConfig.apiConfig.urlPath),
-      } as ApiConfig,
-      messages: updatedMessages
-    };
   }

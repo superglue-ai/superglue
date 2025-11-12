@@ -1,5 +1,4 @@
 import { HttpMethod, RequestOptions, SelfHealingMode } from "@superglue/client";
-import { inferJsonSchema } from '@superglue/shared';
 import ivm from 'isolated-vm';
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
@@ -381,13 +380,6 @@ export function addNullableToOptional(schema: any, required: boolean = true): an
   }
 
   return newSchema;
-}
-
-export function getSchemaFromData(data: any): string {
-  if (!data) return null;
-
-  const schema = inferJsonSchema(data);
-  return JSON.stringify(schema, null, 2).slice(0, 50000);
 }
 
 export function safeHttpMethod(method: any): HttpMethod {

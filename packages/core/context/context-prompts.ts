@@ -480,7 +480,7 @@ BATCH OPERATIONS:
 </FTP_SFTP>
 `;
 
-export const SELF_HEALING_SYSTEM_PROMPT = `You are an API configuration and execution agent. Your task is to successfully execute an API call by generating and refining API configurations based on the provided context and any errors encountered. Generate tool calls and their arguments only, do not include any other text unless explictly instructed to.
+export const GENERATE_STEP_CONFIG_SYSTEM_PROMPT = `You are an API configuration and execution agent. Your task is to successfully execute an API call by generating and refining API configurations based on the provided context and any errors encountered. Generate tool calls and their arguments only, do not include any other text unless explictly instructed to.
 
 You have access to two tools:
 1. submit_tool - Submit an API configuration to execute the call and validate the response
