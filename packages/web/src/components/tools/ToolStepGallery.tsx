@@ -38,7 +38,7 @@ export interface ToolStepGalleryProps {
     integrations?: Integration[];
     isExecuting?: boolean;
     isExecutingStep?: number;
-    isFixingWorkflow?: number;
+    isFixingStep?: number;
     isRunningTransform?: boolean;
     isFixingTransform?: boolean;
     currentExecutingStepIndex?: number;
@@ -57,7 +57,6 @@ export interface ToolStepGalleryProps {
     isProcessingFiles?: boolean;
     totalFileSize?: number;
     filePayloads?: Record<string, any>;
-    stepSelfHealingEnabled?: boolean;
     isPayloadValid?: boolean;
     onPayloadUserEdit?: () => void;
     embedded?: boolean;
@@ -88,7 +87,7 @@ export function ToolStepGallery({
     integrations,
     isExecuting,
     isExecutingStep,
-    isFixingWorkflow,
+    isFixingStep,
     isRunningTransform,
     isFixingTransform,
     currentExecutingStepIndex,
@@ -107,7 +106,6 @@ export function ToolStepGallery({
     isProcessingFiles,
     totalFileSize,
     filePayloads,
-    stepSelfHealingEnabled,
     isPayloadValid = true,
     onPayloadUserEdit,
     embedded = false
@@ -613,7 +611,7 @@ export function ToolStepGallery({
                                                                     isTransform={item.type === 'transform'}
                                                                     isRunningAll={isExecuting && currentExecutingStepIndex === (globalIdx - 1)}
                                                                     isTesting={
-                                                                        item.type === 'step' ? (isExecutingStep === (globalIdx - 1) || isFixingWorkflow === (globalIdx - 1)) :
+                                                                        item.type === 'step' ? (isExecutingStep === (globalIdx - 1) || isFixingStep === (globalIdx - 1)) :
                                                                             item.type === 'transform' ? (isRunningTransform || isFixingTransform) :
                                                                                 false
                                                                     }
@@ -746,7 +744,7 @@ export function ToolStepGallery({
                                     onFixStep={onFixStep ? () => onFixStep(activeIndex - 1) : undefined}
                                     canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
                                     isExecuting={isExecutingStep === activeIndex - 1}
-                                    isFixingWorkflow={isFixingWorkflow === activeIndex - 1}
+                                    isFixingStep={isFixingStep === activeIndex - 1}
                                     isGlobalExecuting={!!(isExecuting || isRunningTransform || isFixingTransform)}
                                     currentExecutingStepIndex={currentExecutingStepIndex}
                                     integrations={integrations}

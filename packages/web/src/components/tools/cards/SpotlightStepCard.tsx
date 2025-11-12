@@ -32,7 +32,7 @@ export const SpotlightStepCard = React.memo(({
     onFixStep,
     canExecute,
     isExecuting,
-    isFixingWorkflow,
+    isFixingStep,
     isGlobalExecuting,
     currentExecutingStepIndex,
     integrations,
@@ -53,7 +53,7 @@ export const SpotlightStepCard = React.memo(({
     onFixStep?: () => Promise<void>;
     canExecute?: boolean;
     isExecuting?: boolean;
-    isFixingWorkflow?: boolean;
+    isFixingStep?: boolean;
     isGlobalExecuting?: boolean;
     currentExecutingStepIndex?: number;
     integrations?: Integration[];
@@ -141,7 +141,7 @@ export const SpotlightStepCard = React.memo(({
                                     <Button
                                         variant="ghost"
                                         onClick={handleRunStepClick}
-                                        disabled={!canExecute || isExecuting || isFixingWorkflow}
+                                        disabled={!canExecute || isExecuting || isFixingStep}
                                         className="h-8 px-3 gap-2"
                                     >
                                         {isExecuting ? (
@@ -156,14 +156,14 @@ export const SpotlightStepCard = React.memo(({
                         )}
                         {!readOnly && onFixStep && (
                             <>
-                                <span title={!canExecute ? "Execute previous steps first" : isFixingWorkflow ? "Step is self-healing..." : "Run and fix this step with AI"}>
+                                <span title={!canExecute ? "Execute previous steps first" : isFixingStep ? "Step is self-healing..." : "Run and fix this step with AI"}>
                                     <Button
                                         variant="ghost"
                                         onClick={onFixStep}
-                                        disabled={!canExecute || isExecuting || isFixingWorkflow}
+                                        disabled={!canExecute || isExecuting || isFixingStep}
                                         className="h-8 px-3 gap-2"
                                     >
-                                        {isFixingWorkflow ? (
+                                        {isFixingStep ? (
                                             <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                                         ) : (
                                             <Wand2 className="h-3 w-3" />

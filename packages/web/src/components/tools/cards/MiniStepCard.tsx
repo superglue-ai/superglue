@@ -4,6 +4,12 @@ import { Integration } from '@superglue/client';
 import { FileJson, FilePlay, Globe, RotateCw } from 'lucide-react';
 import React from 'react';
 
+const ACTIVE_CARD_STYLE = "ring-1 shadow-lg" as const;
+const ACTIVE_CARD_INLINE_STYLE = {
+    borderColor: '#FFA500',
+    boxShadow: '0 10px 15px -3px rgba(255, 165, 0, 0.1), 0 4px 6px -4px rgba(255, 165, 0, 0.1), 0 0 0 1px #FFA500'
+};
+
 const getStatusInfo = (isRunning: boolean, isFailed: boolean, isCompleted: boolean) => {
     if (isRunning) return {
         text: "Running",
@@ -35,13 +41,15 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
     if (isPayload) {
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
-                <Card className={cn(
-                    "w-[180px] h-[110px] flex-shrink-0",
-                    isActive ? "pt-3 px-3 pb-3" : "pt-3 px-3 pb-[18px]",
-                    isActive && "ring-2 ring-primary shadow-lg",
-                    isFirstCard && "rounded-l-2xl bg-gradient-to-br from-primary/5 to-transparent",
-                    !isPayloadValid && !isActive && "ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/20"
-                )}>
+                <Card 
+                    className={cn(
+                        "w-[180px] h-[110px] flex-shrink-0",
+                        isActive ? "pt-3 px-3 pb-3" : "pt-3 px-3 pb-[18px]",
+                        isActive && ACTIVE_CARD_STYLE,
+                        isFirstCard && "rounded-l-2xl bg-gradient-to-br from-primary/5 to-transparent"
+                    )}
+                    style={isActive ? ACTIVE_CARD_INLINE_STYLE : undefined}
+                >
                     <div className="h-[88px] flex flex-col items-center justify-between leading-tight">
                         <div className="flex-1 flex flex-col items-center justify-center">
                             <div className={cn(
@@ -63,7 +71,10 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
                         </div>
                         <div className="flex items-center gap-1 mt-1">
                             {!isPayloadValid ? (
-                                <span className="text-[9px] font-medium text-amber-600 dark:text-amber-400">Tool Input Required</span>
+                                <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600 dark:bg-amber-400 animate-pulse" />
+                                    Input Required
+                                </span>
                             ) : (() => {
                                 const isEmptyPayload = !payloadData ||
                                     (typeof payloadData === 'object' && Object.keys(payloadData).length === 0) ||
@@ -88,12 +99,15 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
         const statusInfo = getStatusInfo(isRunning, isFailed, isCompleted);
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
-                <Card className={cn(
-                    "w-[180px] h-[110px] flex-shrink-0",
-                    isActive ? "pt-3 px-3 pb-3" : "pt-3 px-3 pb-[18px]",
-                    isActive && "ring-2 ring-primary shadow-lg",
-                    isLastCard && !hasTransformCompleted && "rounded-r-2xl bg-gradient-to-bl from-purple-500/5 to-transparent"
-                )}>
+                <Card 
+                    className={cn(
+                        "w-[180px] h-[110px] flex-shrink-0",
+                        isActive ? "pt-3 px-3 pb-3" : "pt-3 px-3 pb-[18px]",
+                        isActive && ACTIVE_CARD_STYLE,
+                        isLastCard && !hasTransformCompleted && "rounded-r-2xl bg-gradient-to-bl from-purple-500/5 to-transparent"
+                    )}
+                    style={isActive ? ACTIVE_CARD_INLINE_STYLE : undefined}
+                >
                     <div className="h-[88px] flex flex-col items-center justify-between leading-tight">
                         <div className="flex-1 flex flex-col items-center justify-center">
                             <div className="p-2 rounded-full bg-primary/10">
@@ -103,9 +117,9 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
                             <span className="text-[9px] text-muted-foreground">Transform</span>
                         </div>
                         <div className="flex items-center gap-1 mt-1">
-                            <span className={cn("text-[9px] font-medium flex items-center gap-1", statusInfo.color)}>
+                            <span className={cn("text-[10px] font-semibold flex items-center gap-1.5", statusInfo.color)}>
                                 <span className={cn(
-                                    "w-1.5 h-1.5 rounded-full",
+                                    "w-2 h-2 rounded-full",
                                     statusInfo.dotColor,
                                     statusInfo.animate && "animate-pulse"
                                 )} />
@@ -132,11 +146,14 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
 
     return (
         <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick}>
-            <Card className={cn(
-                "w-[180px] h-[110px] flex-shrink-0",
-                isActive ? "pt-3 px-3 pb-3" : "pt-3 px-3 pb-[18px]",
-                isActive && "ring-2 ring-primary shadow-lg"
-            )}>
+            <Card 
+                className={cn(
+                    "w-[180px] h-[110px] flex-shrink-0",
+                    isActive ? "pt-3 px-3 pb-3" : "pt-3 px-3 pb-[18px]",
+                    isActive && ACTIVE_CARD_STYLE
+                )}
+                style={isActive ? ACTIVE_CARD_INLINE_STYLE : undefined}
+            >
                 <div className="h-[88px] flex flex-col relative">
                     <div className="absolute top-0 left-0 flex items-center h-5">
                         <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-primary/10 text-primary">
@@ -165,9 +182,9 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
                             )}
                         </div>
                         <div className="flex items-center gap-1 mt-1">
-                            <span className={cn("text-[9px] font-medium flex items-center gap-1", statusInfo.color)}>
+                            <span className={cn("text-[10px] font-semibold flex items-center gap-1.5", statusInfo.color)}>
                                 <span className={cn(
-                                    "w-1.5 h-1.5 rounded-full",
+                                    "w-2 h-2 rounded-full",
                                     statusInfo.dotColor,
                                     statusInfo.animate && "animate-pulse"
                                 )} />
