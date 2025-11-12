@@ -82,26 +82,10 @@ export async function closeAllPools(): Promise<void> {
   poolCache.clear();
 }
 
-function sanitizeDatabaseName(connectionString: string): string {
-  let cleanUrl = connectionString.replace(/\/+$/, '');
-
-  const lastSlashIndex = cleanUrl.lastIndexOf('/');
-  if (lastSlashIndex === -1) return cleanUrl;
-
-  const baseUrl = cleanUrl.substring(0, lastSlashIndex + 1);
-  const dbName = cleanUrl.substring(lastSlashIndex + 1);
-
-  const cleanDbName = dbName
-    .replace(/[^a-zA-Z0-9_$-]/g, '')
-    .replace(/^-+|-+$/g, '');
-
-  return baseUrl + cleanDbName;
-}
 
 export async function callPostgres(endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions): Promise<any> {
   const requestVars = { ...payload, ...credentials };
   let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
-  connectionString = sanitizeDatabaseName(connectionString);
 
   let bodyParsed: any;
   try {
