@@ -4,7 +4,7 @@ import { DocumentationSearch } from '../documentation/documentation-search.js';
 import { logMessage } from '../utils/logs.js';
 import { composeUrl } from '../utils/tools.js';
 import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
-import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, GenerateApiConfigContextInput, GenerateApiConfigContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, ToolBuilderContextInput, ToolBuilderContextOptions } from './context-types.js';
+import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, ToolBuilderContextInput, ToolBuilderContextOptions, GenerateStepConfigContextInput, GenerateStepConfigContextOptions } from './context-types.js';
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
@@ -203,16 +203,16 @@ export function getEvaluateStepResponseContext(input: EvaluateStepResponseContex
     if (budget === 0) return '';
 
     const prompt_start = `Evaluate the response returned by the step and return { success: true, shortReason: "", refactorNeeded: false } if the data in the response aligns with the instruction. If the data does not align with the instruction, return { success: false, shortReason: "reason why it does not align", refactorNeeded: false }.`;
-    const endpointContext = `<step_config>${JSON.stringify(input.endpoint)}</step_config>`;
+    const configContext = `<step_config>${JSON.stringify(input.config)}</step_config>`;
 
     const dataWrapperLength = '<step_response>'.length + '</step_response>'.length;
     const docSearchWrapperLength = '<doc_search_results_for_step_instruction>'.length + '</doc_search_results_for_step_instruction>'.length;
     const newlineCount = 3;
-    const essentialLength = prompt_start.length + endpointContext.length + newlineCount + dataWrapperLength + docSearchWrapperLength;
+    const essentialLength = prompt_start.length + configContext.length + newlineCount + dataWrapperLength + docSearchWrapperLength;
 
     if (budget <= essentialLength) {
         logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getEvaluateStepResponseContext`, {});
-        return prompt_start + '\n' + endpointContext;
+        return prompt_start + '\n' + configContext;
     }
 
     const remainingBudget = budget - essentialLength;
@@ -222,7 +222,7 @@ export function getEvaluateStepResponseContext(input: EvaluateStepResponseContex
     const dataContext = `<step_response>${getObjectContext(input.data, { include: { schema: true, preview: true, samples: false }, characterBudget: dataContextBudget })}</step_response>`;
     const docSearchResultsForStepInstructionContext = `<doc_search_results_for_step_instruction>${input.docSearchResultsForStepInstruction.slice(0, docSearchBudget)}</doc_search_results_for_step_instruction>`;
 
-    return prompt_start + '\n' + endpointContext + '\n' + dataContext + '\n' + docSearchResultsForStepInstructionContext;
+    return prompt_start + '\n' + configContext + '\n' + dataContext + '\n' + docSearchResultsForStepInstructionContext;
 }
 
 export function getTransformContext(input: TransformContextInput, options: TransformContextOptions): string {
@@ -281,47 +281,64 @@ export function getEvaluateTransformContext(input: EvaluateTransformContextInput
 }
 
 
-export async function getGenerateApiConfigContext(input: GenerateApiConfigContextInput, options: GenerateApiConfigContextOptions): Promise<string> {
+export function getGenerateStepConfigContext(input: GenerateStepConfigContextInput, options: GenerateStepConfigContextOptions): string {
     const budget = Math.max(0, options.characterBudget | 0);
     if (budget === 0) return '';
 
-    const fullDocs = await input.integrationManager?.getDocumentation();
-    const documentation = fullDocs?.content?.length < 40000 ?
-        fullDocs?.content :
-        await input.integrationManager?.searchDocumentation(input.instruction);
+    const promptStart = options.mode === 'create'
+        ? `Generate a new API config to execute this step instruction:`
+        : options.mode === 'self-healing'
+        ? `The previous step config failed. Generate a corrected config that executes the step instruction:`
+        : `Edit the step config according to the edit instructions:`;
 
-    const promptStart = `The current step config failed to execute. Generate a corrected API configuration that executes the step instruction:`;
     const instructionContext = `<step_instruction>${input.instruction}</step_instruction>`;
-    const failedStepConfigContext = `<failed_step_config>${JSON.stringify(input.previousStepConfig)}</failed_step_config>`;
+    const previousStepConfigContext = input.previousStepConfig ? `<previous_step_config>${JSON.stringify(input.previousStepConfig)}</previous_step_config>` : '';
+    const errorContext = input.errorMessage ? `<error_message>${input.errorMessage}</error_message>` : '';
+    const editInstructionsContext = input.editInstruction ? `<edit_instructions>${input.editInstruction}</edit_instructions>` : '';
 
     const documentationWrapperLength = '<documentation>'.length + '</documentation>'.length;
     const stepInputWrapperLength = '<step_input>'.length + '</step_input>'.length;
     const integrationInstructionsWrapperLength = '<integration_specific_instructions>'.length + '</integration_specific_instructions>'.length;
     const credentialsWrapperLength = '<available_credentials>'.length + '</available_credentials>'.length;
     const totalWrapperLength = documentationWrapperLength + stepInputWrapperLength + integrationInstructionsWrapperLength + credentialsWrapperLength;
-    const newlineCount = 6;
-    const essentialLength = promptStart.length + instructionContext.length + failedStepConfigContext.length + newlineCount + totalWrapperLength;
+
+    let newlineCount = 6;
+    if (previousStepConfigContext) newlineCount += 1;
+    if (errorContext) newlineCount += 1;
+    if (editInstructionsContext) newlineCount += 1;
+
+    const essentialLength = promptStart.length + instructionContext.length + previousStepConfigContext.length + errorContext.length + editInstructionsContext.length + newlineCount + totalWrapperLength;
 
     if (budget <= essentialLength) {
-        logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getGenerateApiConfigContext`, {});
-        return promptStart + '\n' + instructionContext + '\n' + failedStepConfigContext;
+        logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getGenerateStepConfigContext`, {});
+        let minimalContext = promptStart + '\n' + instructionContext;
+        if (editInstructionsContext) minimalContext += '\n' + editInstructionsContext;
+        if (previousStepConfigContext) minimalContext += '\n' + previousStepConfigContext;
+        if (errorContext) minimalContext += '\n' + errorContext;
+        return minimalContext;
     }
 
     const remainingBudget = budget - essentialLength;
     const documentationBudget = Math.floor(remainingBudget * 0.4);
-    const stepInputBudget = Math.floor(remainingBudget * 0.3);
+    const stepInputBudget = Math.floor(remainingBudget * 0.4);
     const integrationInstructionsBudget = Math.floor(remainingBudget * 0.1);
-    const credentialsBudget = Math.floor(remainingBudget * 0.2);
+    const credentialsBudget = Math.floor(remainingBudget * 0.1);
 
-    const documentationContent = (documentation || '').slice(0, documentationBudget);
-    const integrationSpecificInstructions = ((await input.integrationManager?.getIntegration())?.specificInstructions || '').slice(0, integrationInstructionsBudget);
+    const documentationContent = input.integrationDocumentation.slice(0, documentationBudget);
+    const integrationSpecificInstructions = input.integrationSpecificInstructions.slice(0, integrationInstructionsBudget);
     const credentialsContent = Object.keys(input.credentials || {}).map(v => `<<${v}>>`).join(", ").slice(0, credentialsBudget);
 
     const documentationContext = `<documentation>${documentationContent}</documentation>`;
-    const stepInputContext = `<step_input>${getObjectContext(input.stepInput, { include: { schema: true, preview: false, samples: true }, characterBudget: stepInputBudget })}</step_input>`;
+    const stepInputContext = `<step_input>${getObjectContext(input.stepInput || {}, { include: { schema: true, preview: false, samples: true }, characterBudget: stepInputBudget })}</step_input>`;
     const integrationInstructionsContext = `<integration_specific_instructions>${integrationSpecificInstructions}</integration_specific_instructions>`;
     const credentialsContext = `<available_credentials>${credentialsContent}</available_credentials>`;
 
-    return promptStart + '\n' + instructionContext + '\n' + failedStepConfigContext + '\n' + documentationContext + '\n' + stepInputContext + '\n' + integrationInstructionsContext + '\n' + credentialsContext;
+    let contextParts = [promptStart, instructionContext];
+    if (editInstructionsContext) contextParts.push(editInstructionsContext);
+    if (previousStepConfigContext) contextParts.push(previousStepConfigContext);
+    if (errorContext) contextParts.push(errorContext);
+    contextParts.push(documentationContext, stepInputContext, integrationInstructionsContext, credentialsContext);
+
+    return contextParts.join('\n');
 }
 

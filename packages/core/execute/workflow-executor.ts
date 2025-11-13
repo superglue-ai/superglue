@@ -1,8 +1,8 @@
-import { ApiConfig, ExecutionStep, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
+import { ApiConfig, ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { getEvaluateStepResponseContext, getLoopSelectorContext } from "../context/context-builders.js";
-import { EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT } from "../context/context-prompts.js";
+import { getEvaluateStepResponseContext, getGenerateStepConfigContext, getLoopSelectorContext } from "../context/context-builders.js";
+import { EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT, GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
@@ -11,7 +11,8 @@ import { telemetryClient } from "../utils/telemetry.js";
 import { applyJsonata, isSelfHealingEnabled, maskCredentials, transformAndValidateSchema } from "../utils/tools.js";
 import { evaluateTransform, generateTransformCode } from "../utils/transform.js";
 import { AbortError, ApiCallError } from "./api/api.js";
-import { callEndpointLegacyImplementation, generateApiConfig } from "./api/api.legacy.js";
+import { runStepConfig } from "./api/api.legacy.js";
+import { executeTool } from "./tools.js";
 
 export interface WorkflowExecutorOptions {
   workflow: Workflow;
@@ -320,7 +321,7 @@ export class WorkflowExecutor implements Workflow {
   
         try {
           const apiResponse = await this.executeConfig({
-            endpoint: successfulConfig || step.apiConfig,
+            config: successfulConfig || step.apiConfig,
             integrationManager,
             payload: loopPayload,
             credentials,
@@ -330,8 +331,8 @@ export class WorkflowExecutor implements Workflow {
             }
           });
   
-          if (apiResponse.endpoint) {
-            successfulConfig = apiResponse.endpoint;
+          if (apiResponse.config) {
+            successfulConfig = apiResponse.config;
             if (successfulConfig !== step.apiConfig) {
               logMessage("debug", `Loop iteration ${i + 1} updated configuration`, this.metadata);
             }
@@ -343,11 +344,11 @@ export class WorkflowExecutor implements Workflow {
             success: true,
             rawData: null,
             transformedData: transformedData,
-            config: apiResponse.endpoint
+            config: apiResponse.config
           });
   
-          // update the apiConfig with the new endpoint
-          step.apiConfig = apiResponse.endpoint;
+          // update the apiConfig with the new config
+          step.apiConfig = apiResponse.config;
   
         } catch (callError) {
           const errorMessage = `Error processing item ${i + 1}/${loopItems.length} '${JSON.stringify(currentItem).slice(0, 50)}...': ${String(callError)}`;
@@ -371,15 +372,15 @@ export class WorkflowExecutor implements Workflow {
   }
   private async evaluateConfigResponse({
     data,
-    endpoint,
+    config,
     docSearchResultsForStepInstruction
   }: {
     data: any,
-    endpoint: ApiConfig,
+    config: ApiConfig,
     docSearchResultsForStepInstruction?: string
   }): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
   
-    const evaluateStepResponsePrompt = getEvaluateStepResponseContext({ data, endpoint, docSearchResultsForStepInstruction }, { characterBudget: 20000 });
+    const evaluateStepResponsePrompt = getEvaluateStepResponseContext({ data, config, docSearchResultsForStepInstruction }, { characterBudget: 20000 });
   
     const request = [
       {
@@ -403,20 +404,20 @@ export class WorkflowExecutor implements Workflow {
   }
   
   private async executeConfig({
-    endpoint,
+    config,
     integrationManager,
     payload,
     credentials,
     options
   }: {
-    endpoint: ApiConfig,
+    config: ApiConfig,
     integrationManager: IntegrationManager,
     payload: any,
     credentials: Record<string, string>,
     options: RequestOptions
   }): Promise<{
     data: any;
-    endpoint: ApiConfig;
+    config: ApiConfig;
     statusCode: number;
     headers: Record<string, any>;
   }> {
@@ -426,6 +427,7 @@ export class WorkflowExecutor implements Workflow {
     let messages: LLMMessage[] = [];
     let success = false;
     let isSelfHealing = isSelfHealingEnabled(options, "api");
+    let integration: Integration | undefined;
   
     // If self healing is enabled, use the retries from the options or the default max of 10 if not specified, otherwise use 1 (no self-healing case)
     const effectiveMaxRetries = isSelfHealing ? (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES) : 1;
@@ -433,23 +435,47 @@ export class WorkflowExecutor implements Workflow {
     do {
       try {
         if (retryCount > 0 && isSelfHealing) {
-          logMessage('info', `Self healing the step configuration for ${endpoint?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, this.metadata);
-          const computedApiCallConfig = await generateApiConfig({
-            failedConfig: endpoint,
-            stepInput: payload,
-            credentials,
-            retryCount,
-            messages: messages,
-            integrationManager: integrationManager
-          });
-          if (!computedApiCallConfig) {
-            throw new Error("No API config generated");
+          logMessage('info', `Self healing the step configuration for ${config?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, this.metadata);
+  
+          if (messages.length === 0) {
+            integration = await integrationManager.getIntegration();
+            const docs = await integrationManager.getDocumentation();
+            const integrationSpecificInstructions = integration.specificInstructions || '';
+            
+            const userPrompt = getGenerateStepConfigContext({
+              instruction: config.instruction,
+              previousStepConfig: config,
+              stepInput: payload,
+              credentials,
+              integrationDocumentation: docs?.content || '',
+              integrationSpecificInstructions: integrationSpecificInstructions
+            }, { characterBudget: 50000, mode: 'self-healing' });
+        
+            messages.push({
+              role: "system",
+              content: GENERATE_STEP_CONFIG_SYSTEM_PROMPT
+            });
+            messages.push({
+              role: "user",
+              content: userPrompt
+            });
           }
-          endpoint = computedApiCallConfig.config;
-          messages = computedApiCallConfig.messages;
+
+          const generateStepConfigResult = await executeTool({
+            id: crypto.randomUUID(),
+            name: "generate_step_config",
+            arguments: { configInstruction: config.instruction, retryCount },
+          }, 
+          { runId: crypto.randomUUID(), orgId: this.metadata.orgId, messages, integration });
+          
+          if (!generateStepConfigResult.success || !generateStepConfigResult.data) {
+            throw new Error(generateStepConfigResult.error || "No API config generated");
+          }
+          config = generateStepConfigResult.data.config;
+          messages = generateStepConfigResult.data.messages;
         }
   
-        response = await callEndpointLegacyImplementation({ endpoint, payload, credentials, options });
+        response = await runStepConfig({ config, payload, credentials, options });
   
         if (!response.data) {
           throw new Error("No data returned from API. This could be due to a configuration error.");
@@ -459,11 +485,11 @@ export class WorkflowExecutor implements Workflow {
         if (retryCount > 0 && isSelfHealing || options.testMode) {
           const result = await this.evaluateConfigResponse({
             data: response.data,
-            endpoint: endpoint,
-            docSearchResultsForStepInstruction: await integrationManager?.searchDocumentation(endpoint.instruction)
+            config: config,
+            docSearchResultsForStepInstruction: await integrationManager?.searchDocumentation(config.instruction)
           });
           success = result.success;
-          if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 1000));
+          if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 10000));
         }
         else {
           success = true;
@@ -474,7 +500,7 @@ export class WorkflowExecutor implements Workflow {
         const rawErrorString = error?.message || JSON.stringify(error || {});
         lastError = maskCredentials(rawErrorString, credentials).slice(0, 10000);
         if (retryCount > 0) {
-          messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${rawErrorString.slice(0, 10000)}` });
+          messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${lastError}` });
           logMessage('info', `API call failed. Last error: ${lastError}`, this.metadata);
         }
   
@@ -491,12 +517,12 @@ export class WorkflowExecutor implements Workflow {
     } while (retryCount < effectiveMaxRetries);
     if (!success) {
       telemetryClient?.captureException(new Error(`API call failed. Last error: ${lastError}`), this.metadata?.orgId, {
-        endpoint: endpoint,
+        config: config,
         retryCount: retryCount,
       });
       throw new ApiCallError(`API call failed. Last error: ${lastError}`, response?.statusCode);
     }
   
-    return { data: response?.data, endpoint, statusCode: response?.statusCode, headers: response?.headers };
+    return { data: response?.data, config: config, statusCode: response?.statusCode, headers: response?.headers };
   }  
 }
