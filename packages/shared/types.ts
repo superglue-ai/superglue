@@ -17,7 +17,7 @@ export interface MessagePart {
 export interface Message {
   id: string;
   content: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   timestamp: Date;
   tools?: ToolCall[];
   parts?: MessagePart[];
