@@ -153,7 +153,7 @@ export class ToolBuilder {
         ? [searchDocumentationToolDefinition, { web_search: webSearchTool }]
         : [searchDocumentationToolDefinition];
       
-      const generateToolResult = await LanguageModel.generateObject<z.infer<typeof builtToolSchema>>({
+      const generateToolResult = await LanguageModel.generateObject<Tool>({
         messages: messages,
         schema: zodToJsonSchema(builtToolSchema),
         temperature: 0.0,
@@ -166,7 +166,7 @@ export class ToolBuilder {
         throw new Error(`Error generating tool: ${generateToolResult.response}`);
       }
 
-      const generatedTool = generateToolResult.response as Tool;
+      const generatedTool = generateToolResult.response;
 
       const validation = this.validateTool(generatedTool);
         if (!validation.valid) {

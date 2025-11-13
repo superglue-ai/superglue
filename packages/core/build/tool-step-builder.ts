@@ -43,13 +43,13 @@ export async function generateStepConfig(retryCount: number, messages: LLMMessag
         ? [searchDocumentationToolDefinition, { web_search: webSearchTool }]
         : [searchDocumentationToolDefinition];
 
-    const generateStepConfigResult = await LanguageModel.generateObject<z.infer<typeof stepConfigSchema>>({
+    const generateStepConfigResult = await LanguageModel.generateObject<Partial<ApiConfig>>({
         messages,
         schema: zodToJsonSchema(stepConfigSchema),
         temperature,
         tools
     });
-    
+
     
     if (!generateStepConfigResult.success) {
         return {
@@ -59,20 +59,20 @@ export async function generateStepConfig(retryCount: number, messages: LLMMessag
         };
     }
 
-    const generatedConfig = generateStepConfigResult.response as z.infer<typeof stepConfigSchema>;
+    const generatedConfig = generateStepConfigResult.response;
     
     const config: Partial<ApiConfig> = {
-        urlHost: generatedConfig.apiConfig.urlHost,
-        urlPath: generatedConfig.apiConfig.urlPath,
-        method: generatedConfig.apiConfig.method as HttpMethod,
-        queryParams: generatedConfig.apiConfig.queryParams ?
-            Object.fromEntries(generatedConfig.apiConfig.queryParams.map((p: any) => [p.key, p.value])) :
+        urlHost: generatedConfig.urlHost,
+        urlPath: generatedConfig.urlPath,
+        method: generatedConfig.method as HttpMethod,
+        queryParams: generatedConfig.queryParams ?
+            Object.fromEntries(generatedConfig.queryParams.map((p: any) => [p.key, p.value])) :
             undefined,
-        headers: generatedConfig.apiConfig.headers ?
-            Object.fromEntries(generatedConfig.apiConfig.headers.map((p: any) => [p.key, p.value])) :
+        headers: generatedConfig.headers ?
+            Object.fromEntries(generatedConfig.headers.map((p: any) => [p.key, p.value])) :
             undefined,
-        body: generatedConfig.apiConfig.body,
-        pagination: generatedConfig.apiConfig.pagination as Pagination,
+        body: generatedConfig.body,
+        pagination: generatedConfig.pagination as Pagination,
     };
     
     return {
