@@ -7,6 +7,8 @@ import { server_defaults } from "../default.js";
 import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { logMessage } from "./logs.js";
 import { isSelfHealingEnabled, transformAndValidateSchema } from "./tools.js";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 export interface TransformConfig extends BaseConfig {
   instruction: string;
@@ -118,40 +120,39 @@ export async function generateTransformCode(
     }
     const temperature = Math.min(retry * 0.1, 1);
 
-    // Schema for the expected LLM response
-    const mappingSchema = {
-      type: "object",
-      properties: {
-        mappingCode: { type: "string", description: "JS function as string" },
-      },
-      required: ["mappingCode"],
-      additionalProperties: false
-    };
+    const mappingSchema = z.object({
+      mappingCode: z.string().describe("JS function as string")
+    });
 
-    const { response, error: responseError, messages: updatedMessages } = await LanguageModel.generateObject(messages, mappingSchema, temperature);
-    if (responseError || response?.error) {
-      throw new Error(`Error generating transform code: ${responseError || response?.error}`);
+    const result = await LanguageModel.generateObject<z.infer<typeof mappingSchema>>({messages, schema: zodToJsonSchema(mappingSchema), temperature: temperature});
+    messages = result.messages;
+    
+    if (!result.success) {
+      throw new Error(`Error generating transform code: ${result.response}`);
     }
-    messages = updatedMessages;
+
+    let mappingCode = result.response.mappingCode;
+    let transformedData: any;
+    
     try {
-      // Autoformat the generated code
-      response.mappingCode = await prettier.format(response.mappingCode, { parser: "babel" });
-      const validation = await transformAndValidateSchema(payload, response.mappingCode, schema);
-      if (!validation.success) {
-        throw new Error(`Validation failed: ${validation.error}`);
+      mappingCode = await prettier.format(mappingCode, { parser: "babel" });
+      const transformResult = await transformAndValidateSchema(payload, mappingCode, schema);
+      
+      if (!transformResult.success) {
+        throw new Error(`Transform failed: ${transformResult.error}`);
       }
-      response.data = validation.data;
+
+      transformedData = transformResult.data;
     } catch (err) {
       throw new Error(`Generated code is invalid JS: ${err.message}`);
     }
 
-    // Optionally, evaluate mapping quality as before
-    const evaluation = await evaluateTransform(response.data, response.mappingCode, payload, schema, instruction, metadata);
+    const evaluation = await evaluateTransform(transformedData, mappingCode, payload, schema, instruction, metadata);
     if (!evaluation.success) {
       throw new Error(`Mapping evaluation failed: ${evaluation.reason}`);
     }
     logMessage('info', `Mapping generated successfully`, metadata);
-    return response;
+    return { mappingCode, data: transformedData };
   } catch (error) {
     if (retry < server_defaults.MAX_TRANSFORMATION_RETRIES) {
       const errorMessage = String(error.message);
@@ -170,7 +171,7 @@ export async function evaluateTransform(
   targetSchema: any,
   instruction: string,
   metadata: Metadata
-): Promise<{ success: boolean; reason: string }> {
+) {
   try {
     logMessage('info', "Evaluating final transform", metadata);
 
@@ -182,21 +183,17 @@ export async function evaluateTransform(
       { role: "user", content: userPrompt }
     ];
 
-    const llmResponseSchema = {
-      type: "object",
-      properties: {
-        success: { type: "boolean", description: "True if the mapping is good, false otherwise." },
-        reason: { type: "string", description: "Reasoning for the success status. If success is false, explain what is wrong with the mapping. If success is true, confirm correct transformation." }
-      },
-      required: ["success", "reason"],
-      additionalProperties: false
-    };
-    const { response, error: responseError } = await LanguageModel.generateObject(messages, llmResponseSchema, 0);
-    if (responseError || response?.error) {
-      throw new Error(`Error evaluating transform: ${responseError || response?.error}`);
+    const llmResponseSchema = z.object({
+      success: z.boolean().describe("True if the mapping is good, false otherwise."),
+      reason: z.string().describe("Reasoning for the success status. If success is false, explain what is wrong with the mapping. If success is true, confirm correct transformation.")
+    });
+    
+    const result = await LanguageModel.generateObject<z.infer<typeof llmResponseSchema>>({messages, schema: zodToJsonSchema(llmResponseSchema), temperature: 0});
+    
+    if (!result.success) {
+      throw new Error(`Error evaluating transform: ${result.response}`);
     }
-    return response;
-
+    return result.response;
   } catch (error) {
     const errorMessage = String(error instanceof Error ? error.message : error);
     logMessage('error', `Error evaluating transform: ${errorMessage.slice(0, 250)}`, metadata);

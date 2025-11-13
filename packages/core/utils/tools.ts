@@ -463,3 +463,62 @@ export function smartMergeResponses(accumulated: any, newResponse: any): any {
   // Type conflict or primitives - take the most recent value
   return newResponse;
 }
+
+
+export function sanitizeInstructionSuggestions(raw: unknown): string[] {
+  let arr: string[] = [];
+
+  // Try to parse JSON if it's a string
+  if (typeof raw === "string") {
+    try {
+      const parsed = parseJSON(raw);
+      if (Array.isArray(parsed)) arr = parsed;
+      else arr = [parsed];
+    } catch {
+      arr = [raw];
+    }
+  } else if (Array.isArray(raw)) {
+    arr = raw;
+  } else {
+    return [];
+  }
+
+  // Flatten any multi-line strings
+  arr = arr.flatMap((item) =>
+    typeof item === "string" ? item.split(/\r?\n/).map((s) => s.trim()) : []
+  );
+
+  // Remove empty, header, or markdown lines
+  const headerRegex = /^(\s*[#>*-]+\s*)?((integration suggestions|individual suggestions|example output|example:|output:)[^a-zA-Z0-9]*|[\-*#_]{2,}|\s*)$/i;
+
+  // Remove lines that are just markdown separators or bullets
+  const isSeparator = (line: string) => {
+    const trimmed = line.trim();
+    // Remove if only made up of separator chars, or is a single separator char
+    return (
+      /^[\s\-_*>#]+$/.test(trimmed) ||
+      ["_", "-", "*", ">", "#"].includes(trimmed)
+    );
+  };
+
+  // Format, filter, and deduplicate
+  const seen = new Set<string>();
+  const filtered = arr
+    .map((s) =>
+      s
+        .replace(/^[-*#>\s]+/, "") // Remove leading markdown symbols and whitespace
+        .replace(/[-*#>\s]+$/, "") // Remove trailing markdown symbols and whitespace
+        .replace(/^"|"$/g, "") // Remove leading/trailing quotes
+        .trim()
+    )
+    .filter(
+      (s) =>
+        s.length > 0 &&
+        !headerRegex.test(s) &&
+        !isSeparator(s) &&
+        !seen.has(s) &&
+        seen.add(s)
+    );
+
+  return filtered;
+}

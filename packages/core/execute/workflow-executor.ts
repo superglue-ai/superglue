@@ -12,13 +12,16 @@ import { applyJsonata, isSelfHealingEnabled, maskCredentials, transformAndValida
 import { evaluateTransform, generateTransformCode } from "../utils/transform.js";
 import { AbortError, ApiCallError } from "./api/api.js";
 import { runStepConfig } from "./api/api.legacy.js";
-import { executeTool } from "./tools.js";
+import { generateStepConfig } from "../build/tool-step-builder.js";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 export interface WorkflowExecutorOptions {
   workflow: Workflow;
   metadata: Metadata;
   integrations: IntegrationManager[];
 }
+
 export class WorkflowExecutor implements Workflow {
   public id: string;
   public steps: ExecutionStep[];
@@ -358,18 +361,22 @@ export class WorkflowExecutor implements Workflow {
       }
   
       result.config = step.apiConfig;
-      result.rawData = isLoopSelectorArray ? stepResults.map(r => r.rawData) : stepResults[0].rawData;
-      result.transformedData = isLoopSelectorArray ? stepResults.map(r => r.transformedData) : stepResults[0].transformedData;
+      result.rawData = isLoopSelectorArray ? stepResults.map(r => r.rawData) : stepResults[0]?.rawData || null;
+      result.transformedData = isLoopSelectorArray ? stepResults.map(r => r.transformedData) : stepResults[0]?.transformedData || null;
       result.success = stepResults.every(r => r.success);
       result.error = stepResults.filter(s => s.error).join("\n");
     } catch (error) {
       result.config = step.apiConfig;
       result.success = false;
       result.error = error.message || error;
+      result.rawData = null;
+      result.transformedData = null;
     }
     logMessage("info", `'${step.id}' ${result.success ? "Complete" : "Failed"}`, this.metadata);
     return result;
   }
+
+
   private async evaluateConfigResponse({
     data,
     config,
@@ -378,11 +385,11 @@ export class WorkflowExecutor implements Workflow {
     data: any,
     config: ApiConfig,
     docSearchResultsForStepInstruction?: string
-  }): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
+  }): Promise<{ success?: boolean; refactorNeeded?: boolean; shortReason?: string }> {
   
     const evaluateStepResponsePrompt = getEvaluateStepResponseContext({ data, config, docSearchResultsForStepInstruction }, { characterBudget: 20000 });
   
-    const request = [
+    const messages = [
       {
         role: "system",
         content: EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT
@@ -392,16 +399,22 @@ export class WorkflowExecutor implements Workflow {
       }
     ] as LLMMessage[];
   
-    const response = await LanguageModel.generateObject(
-      request,
-      { type: "object", properties: { success: { type: "boolean" }, refactorNeeded: { type: "boolean" }, shortReason: { type: "string" } } },
-      0
-    );
-    if (response.error) {
-      throw new Error(`Error evaluating config response: ${response.error}`);
+    const evaluationSchema = z.object({
+      success: z.boolean().describe("Whether the step execution was successful"),
+      refactorNeeded: z.boolean().describe("Whether the configuration needs to be refactored"),
+      shortReason: z.string().describe("Brief reason for the evaluation result")
+    });
+
+    const evaluationResult = await LanguageModel.generateObject<z.infer<typeof evaluationSchema>>(
+      { messages: messages, schema: zodToJsonSchema(evaluationSchema), temperature: 0 });
+    
+    if (!evaluationResult.success) {
+      throw new Error(`Error evaluating config response: ${evaluationResult.response}`);
     }
-    return response.response;
+    
+    return evaluationResult.response;
   }
+
   
   private async executeConfig({
     config,
@@ -461,27 +474,25 @@ export class WorkflowExecutor implements Workflow {
             });
           }
 
-          const generateStepConfigResult = await executeTool({
-            id: crypto.randomUUID(),
-            name: "generate_step_config",
-            arguments: { configInstruction: config.instruction, retryCount },
-          }, 
-          { runId: crypto.randomUUID(), orgId: this.metadata.orgId, messages, integration });
+          const generateStepConfigResult = await generateStepConfig(retryCount, messages);
+          messages = generateStepConfigResult.messages;
           
-          if (!generateStepConfigResult.success || !generateStepConfigResult.data) {
-            throw new Error(generateStepConfigResult.error || "No API config generated");
+          if (!generateStepConfigResult.success) {
+            throw new Error(generateStepConfigResult.error);
           }
-          config = generateStepConfigResult.data.config;
-          messages = generateStepConfigResult.data.messages;
+          
+          config = {
+            ...config,
+            ...generateStepConfigResult.config
+          } as ApiConfig;
         }
   
         response = await runStepConfig({ config, payload, credentials, options });
   
         if (!response.data) {
-          throw new Error("No data returned from API. This could be due to a configuration error.");
+          throw new Error("No data returned from step. This could be due to a configuration error.");
         }
   
-        // Check if response is valid
         if (retryCount > 0 && isSelfHealing || options.testMode) {
           const result = await this.evaluateConfigResponse({
             data: response.data,
