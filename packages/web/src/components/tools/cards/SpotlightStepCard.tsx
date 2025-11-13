@@ -12,14 +12,18 @@ import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { downloadJson } from '@/src/lib/download-utils';
-import { isEmptyData } from '@/src/lib/general-utils';
+import { ensureSourceDataArrowFunction, formatJavaScriptCode, isEmptyData, truncateForDisplay } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
 import { Download, FileBraces, FileInput, FileOutput, FilePlay, Loader2, Play, Route, Trash2, Wand2 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { JavaScriptCodeEditor } from '../../editors/JavaScriptCodeEditor';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
 import { ToolStepConfigurator } from '../ToolStepConfigurator';
 import { useDataProcessor } from '../hooks/use-data-processor';
 import { CopyButton } from '../shared/CopyButton';
+import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 
 export const SpotlightStepCard = React.memo(({
     step,
@@ -69,6 +73,13 @@ export const SpotlightStepCard = React.memo(({
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
     const [outputViewMode, setOutputViewMode] = useState<'preview' | 'schema'>('preview');
     const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
+    const [didFormatLoopSelector, setDidFormatLoopSelector] = useState(false);
+    
+    const DATA_SELECTOR_DEBOUNCE_MS = 400;
+    const [loopItems, setLoopItems] = useState<any | null>(null);
+    const [loopItemsError, setLoopItemsError] = useState<string | null>(null);
+    const [isLoopItemsEvaluating, setIsLoopItemsEvaluating] = useState<boolean>(false);
+    const lastEvalTimerRef = useRef<number | null>(null);
 
     const inputProcessor = useDataProcessor(
         evolvingPayload,
@@ -79,6 +90,16 @@ export const SpotlightStepCard = React.memo(({
         stepResult,
         activePanel === 'output'
     );
+
+    const loopItemsDisplayValue = useMemo(() => {
+        if (loopItemsError) return '{}';
+        const displayData = truncateForDisplay(loopItems);
+        return displayData.value;
+    }, [loopItems, loopItemsError]);
+
+    const loopItemsCopyValue = useMemo(() => {
+        return JSON.stringify(loopItems, null, 2);
+    }, [loopItems]);
 
     const handleInputViewModeChange = (mode: 'preview' | 'schema') => {
         setInputViewMode(mode);
@@ -112,6 +133,72 @@ export const SpotlightStepCard = React.memo(({
             outputProcessor.computeSchema();
         }
     }, [stepResult, outputViewMode, activePanel, outputProcessor]);
+
+    useEffect(() => {
+        if (!didFormatLoopSelector && step.loopSelector) {
+            formatJavaScriptCode(step.loopSelector).then(formatted => {
+                if (formatted !== step.loopSelector && onEdit) {
+                    const updated = { ...step, loopSelector: formatted } as any;
+                    onEdit(step.id, updated, false);
+                }
+                setDidFormatLoopSelector(true);
+            });
+        }
+    }, [step.loopSelector, didFormatLoopSelector, step, onEdit]);
+
+    useEffect(() => {
+        if (activePanel !== 'input') return;
+
+        if (lastEvalTimerRef.current) {
+            window.clearTimeout(lastEvalTimerRef.current);
+            lastEvalTimerRef.current = null;
+        }
+        setLoopItemsError(null);
+        const t = window.setTimeout(() => {
+            setIsLoopItemsEvaluating(true);
+            try {
+                let sel = step?.loopSelector || "(sourceData) => { }";
+                const raw = ensureSourceDataArrowFunction(sel).trim();
+                const stripped = raw.replace(/;\s*$/, '');
+                const body = `const __selector = (${stripped});\nreturn __selector(sourceData);`;
+                // eslint-disable-next-line no-new-func
+                const fn = new Function('sourceData', body);
+                const out = fn(evolvingPayload || {});
+                // Normalize the result - if it's a function, that's likely an error (user returned a function reference)
+                if (typeof out === 'function') {
+                    throw new Error('Data selector returned a function. Did you forget to call it?');
+                }
+                // Normalize undefined to null for consistency
+                const normalizedOut = out === undefined ? null : out;
+                setLoopItems(normalizedOut);
+                setLoopItemsError(null);
+            } catch (err: any) {
+                setLoopItems(null);
+                let errorMessage = 'Error evaluating loop selector';
+                if (err) {
+                    if (err instanceof Error) {
+                        errorMessage = err.message || errorMessage;
+                    } else if (typeof err === 'string') {
+                        errorMessage = err;
+                    } else if (err?.message && typeof err.message === 'string') {
+                        errorMessage = err.message;
+                    } else {
+                        errorMessage = String(err);
+                    }
+                }
+                setLoopItemsError(errorMessage);
+            } finally {
+                setIsLoopItemsEvaluating(false);
+            }
+        }, DATA_SELECTOR_DEBOUNCE_MS);
+        lastEvalTimerRef.current = t as unknown as number;
+        return () => { 
+            if (lastEvalTimerRef.current) { 
+                window.clearTimeout(lastEvalTimerRef.current); 
+                lastEvalTimerRef.current = null; 
+            } 
+        };
+    }, [step.executionMode, step.loopSelector, step.loopMaxIters, evolvingPayload, activePanel]);
 
     const handleRunStepClick = () => {
         if (isFirstStep && !isPayloadValid) {
@@ -233,8 +320,8 @@ export const SpotlightStepCard = React.memo(({
                                             <JsonCodeEditor
                                                 value={inputData.displayString}
                                                 readOnly={true}
-                                                minHeight="300px"
-                                                maxHeight="600px"
+                                                minHeight="200px"
+                                                maxHeight="400px"
                                                 resizable={true}
                                                 overlay={
                                                     <div className="flex items-center gap-1">
@@ -265,6 +352,108 @@ export const SpotlightStepCard = React.memo(({
                                                     Preview truncated for display performance
                                                 </div>
                                             )}
+
+                                            <div className="mt-6 space-y-4">
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground mb-3">
+                                                        The Data Selector gets the step input and returns data necessary for this step. If the Data Selector returns an array, that means this step is executed multiple times. Once for each item in the array.
+                                                    </p>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        <div>
+                                                            <Label className="text-xs flex items-center gap-1 mb-1">
+                                                                Data Selector (JavaScript)
+                                                                <HelpTooltip text="JavaScript anonymized arrow function selecting specific step inputs. If the output in an array, the step runs once per item; within each iteration sourceData.currentItem is set to that item." />
+                                                            </Label>
+                                                            <JavaScriptCodeEditor
+                                                                value={step.loopSelector || '(sourceData) => { }'}
+                                                                onChange={(val) => {
+                                                                    if (onEdit && !readOnly) {
+                                                                        onEdit(step.id, { ...step, loopSelector: val }, true);
+                                                                    }
+                                                                }}
+                                                                readOnly={readOnly}
+                                                                minHeight="150px"
+                                                                maxHeight="300px"
+                                                                resizable={true}
+                                                                isTransformEditor={false}
+                                                                autoFormatOnMount={false}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <Label className="text-xs flex items-center gap-1 mb-1">
+                                                                Selected Data (JSON)
+                                                                <HelpTooltip text="Evaluates the Data Selector against the step input. The resulting array drives execution (one run per item). During execution, sourceData.currentItem equals the current item." />
+                                                                {isLoopItemsEvaluating && (
+                                                                    <div className="ml-1 h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/70 border-t-transparent" />
+                                                                )}
+                                                            </Label>
+                                                            <div className="relative">
+                                                                <JsonCodeEditor
+                                                                    value={loopItemsDisplayValue}
+                                                                    readOnly={true}
+                                                                    minHeight="176px"
+                                                                    maxHeight="300px"
+                                                                    resizable={true}
+                                                                    placeholder=""
+                                                                    overlay={
+                                                                        <div className="flex items-center gap-2">
+                                                                            {!loopItemsError && (
+                                                                                <CopyButton text={loopItemsCopyValue} />
+                                                                            )}
+                                                                            {!loopItemsError && (
+                                                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => downloadJson(loopItems, `step_${step.id}_loop_items.json`)} title="Download loop items as JSON">
+                                                                                    <Download className="h-3 w-3" />
+                                                                                </Button>
+                                                                            )}
+                                                                        </div>
+                                                                    }
+                                                                    bottomRightOverlay={(!loopItemsError && Array.isArray(loopItems)) ? (
+                                                                        <div className="px-2 py-1 rounded-md bg-secondary text-muted-foreground text-[11px] font-medium shadow-md">
+                                                                            {loopItems.length} items
+                                                                        </div>
+                                                                    ) : undefined}
+                                                                />
+                                                                {loopItemsError && (
+                                                                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-destructive/10 text-destructive text-xs max-h-32 overflow-y-auto overflow-x-hidden">
+                                                                        Error: {loopItemsError}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {!loopItemsError && Array.isArray(loopItems) && step.loopMaxIters && loopItems.length > step.loopMaxIters && (
+                                                                <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
+                                                                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                                                                        Warning: The Data Selector returned {loopItems.length} items, but only the first {step.loopMaxIters === 1 ? 'one' : step.loopMaxIters} will be executed due to the max requests limit setting below.
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground mb-2">
+                                                        If the result of the data selector is an array, in this box you can give a maximum number of times you want this to execute.
+                                                    </p>
+                                                    <div>
+                                                        <Label className="text-xs flex items-center gap-1">
+                                                            # of max requests
+                                                            <HelpTooltip text="Maximum number of requests sent per step to prevent infinite loops. Default is 1000." />
+                                                        </Label>
+                                                        <Input 
+                                                            type="number" 
+                                                            value={step.loopMaxIters || ''} 
+                                                            onChange={(e) => {
+                                                                if (onEdit && !readOnly) {
+                                                                    onEdit(step.id, { ...step, loopMaxIters: parseInt(e.target.value) || undefined }, true);
+                                                                }
+                                                            }} 
+                                                            className="text-xs mt-1 w-32" 
+                                                            placeholder="1000" 
+                                                            disabled={readOnly} 
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </>
                                     );
                                 })()}
