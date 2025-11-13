@@ -287,8 +287,6 @@ type Query {
   getWorkflow(id: ID!): Workflow
   getIntegration(id: ID!): Integration
   searchIntegrationDocumentation(integrationId: ID!, keywords: String!): String!
-
-  generateSchema(instruction: String!, responseData: String): JSONSchema!
   generateInstructions(integrations: [IntegrationInput!]!): [String!]!
   getTenantInfo: TenantInfo
 
