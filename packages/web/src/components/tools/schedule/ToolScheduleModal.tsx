@@ -1,11 +1,12 @@
 import { useConfig } from '@/src/app/config-context';
 import { Switch } from "@/src/components/ui/switch";
 import { useToast } from '@/src/hooks/use-toast';
+import { createSuperglueClient } from '@/src/lib/client-utils';
 import { cn, getGroupedTimezones } from '@/src/lib/general-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
-import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/client';
+import { SuperglueClient, Workflow as Tool, WorkflowSchedule as ToolSchedule } from '@superglue/client';
 import { validateCronExpression } from '@superglue/shared';
-import { Check, CheckCircle, ChevronRight, ChevronsUpDown, Loader2, XCircle } from 'lucide-react';
+import { Check, ChevronRight, ChevronsUpDown, Loader2 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
 import { Button } from '../../ui/button';
@@ -53,6 +54,11 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
   const [isRetriesValid, setIsRetriesValid] = useState(true);
   const [timeout, setTimeout] = useState<string>('');
   const [webhookUrl, setWebhookUrl] = useState<string>('');
+  const [webhookType, setWebhookType] = useState<'url' | 'tool'>('url');
+  const [selectedWebhookTool, setSelectedWebhookTool] = useState<string>('');
+  const [tools, setTools] = useState<Tool[]>([]);
+  const [loadingTools, setLoadingTools] = useState(false);
+  const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
 
   const config = useConfig();
   const { toast } = useToast();
@@ -79,7 +85,17 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
     setSelfHealing(schedule.options?.selfHealing || 'DISABLED');
     setRetries(schedule.options?.retries?.toString() || '');
     setTimeout(schedule.options?.timeout?.toString() || '');
-    setWebhookUrl(schedule.options?.webhookUrl || '');
+    
+    const savedWebhook = schedule.options?.webhookUrl || '';
+    if (savedWebhook.startsWith('tool:')) {
+      setWebhookType('tool');
+      setSelectedWebhookTool(savedWebhook.substring(5));
+      setWebhookUrl('');
+    } else {
+      setWebhookType('url');
+      setWebhookUrl(savedWebhook);
+      setSelectedWebhookTool('');
+    }
 
     if (schedule.options && (schedule.options.selfHealing !== 'DISABLED' || schedule.options.retries || schedule.options.timeout || schedule.options.webhookUrl)) {
       setShowAdvanced(true);
@@ -97,6 +113,20 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
       setIsCustomCronValid(true);
     }
   }, [scheduleSelectedItem, customCronExpression]);
+
+  const loadTools = async () => {
+    if (tools.length > 0) return;
+    setLoadingTools(true);
+    try {
+      const client = createSuperglueClient(config.superglueEndpoint);
+      const result = await client.listWorkflows(1000, 0);
+      setTools(result.items?.filter(tool => tool.steps?.length > 0) || []);
+    } catch (error) {
+      console.error('Error loading tools:', error);
+    } finally {
+      setLoadingTools(false);
+    }
+  };
 
   const validateJson = (jsonString: string) => {
     try {
@@ -142,7 +172,12 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
       };
       if (retries) options.retries = parseInt(retries);
       if (timeout) options.timeout = parseInt(timeout);
-      if (webhookUrl.trim()) options.webhookUrl = webhookUrl.trim();
+      
+      if (webhookType === 'tool' && selectedWebhookTool) {
+        options.webhookUrl = `tool:${selectedWebhookTool}`;
+      } else if (webhookType === 'url' && webhookUrl.trim()) {
+        options.webhookUrl = webhookUrl.trim();
+      }
 
       await superglueClient.upsertWorkflowSchedule({
         id: schedule?.id,
@@ -339,22 +374,110 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                     onChange={handlePayloadChange}
                     minHeight="120px"
                     maxHeight="120px"
-                    overlay={
-                      <div className="flex items-center gap-2 text-sm bg-background/80 px-2 py-1 rounded">
-                        {isJsonValid ? (
-                          <>
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                            <span className="text-green-600">Valid</span>
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="h-4 w-4 text-red-600" />
-                            <span className="text-red-600">Invalid</span>
-                          </>
-                        )}
-                      </div>
-                    }
+                    showValidation={true}
                   />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Label>Webhook</Label>
+                      <HelpTooltip text="Send execution results to an external URL or trigger another tool." />
+                    </div>
+                    
+                    <div className="inline-flex h-8 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground">
+                      <button
+                        type="button"
+                        onClick={() => setWebhookType('url')}
+                        className={cn(
+                          "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                          webhookType === 'url' 
+                            ? "bg-background text-foreground shadow" 
+                            : "hover:bg-background/50"
+                        )}
+                      >
+                        URL
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWebhookType('tool')}
+                        className={cn(
+                          "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                          webhookType === 'tool' 
+                            ? "bg-background text-foreground shadow" 
+                            : "hover:bg-background/50"
+                        )}
+                      >
+                        Tool
+                      </button>
+                    </div>
+                  </div>
+
+                  {webhookType === 'url' ? (
+                    <Input
+                      type="url"
+                      placeholder="https://example.com/webhook"
+                      value={webhookUrl}
+                      onChange={(e) => setWebhookUrl(e.target.value)}
+                    />
+                  ) : (
+                    <Popover open={toolDropdownOpen} onOpenChange={setToolDropdownOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={toolDropdownOpen}
+                          className="w-full justify-between font-normal"
+                          onClick={() => !toolDropdownOpen && loadTools()}
+                        >
+                          {selectedWebhookTool || "Select tool..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                        <Command>
+                          <CommandInput placeholder="Search tools..." />
+                          <CommandList>
+                            {loadingTools ? (
+                              <div className="flex items-center justify-center py-6">
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                              </div>
+                            ) : (
+                              <>
+                                <CommandEmpty>No tools found.</CommandEmpty>
+                                <CommandGroup>
+                                  {tools.filter(tool => tool.id !== toolId).map((tool) => (
+                                    <CommandItem
+                                      key={tool.id}
+                                      value={tool.id}
+                                      onSelect={() => {
+                                        setSelectedWebhookTool(tool.id);
+                                        setToolDropdownOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          selectedWebhookTool === tool.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <div className="flex flex-col overflow-hidden w-full">
+                                        <div className="font-medium truncate">{tool.id}</div>
+                                        {tool.instruction && (
+                                          <div className="text-xs text-muted-foreground truncate">
+                                            {tool.instruction}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </>
+                            )}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  )}
                 </div>
 
                 {/* advanced options */}
@@ -431,20 +554,6 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                             onChange={(e) => setTimeout(e.target.value)}
                           />
                         </div>
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor="webhookUrl">Webhook URL</Label>
-                          <HelpTooltip text="Send execution results to this webhook URL." />
-                        </div>
-                        <Input
-                          id="webhookUrl"
-                          type="url"
-                          placeholder="https://example.com/webhook"
-                          value={webhookUrl}
-                          onChange={(e) => setWebhookUrl(e.target.value)}
-                        />
                       </div>
                     </div>
                   )}

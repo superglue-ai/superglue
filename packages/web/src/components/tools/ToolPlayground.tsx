@@ -1,7 +1,6 @@
 "use client";
 
 import { useConfig } from "@/src/app/config-context";
-import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { computeStepOutput, computeToolPayload, removeFileKeysFromPayload } from "@/src/lib/general-utils";
@@ -24,8 +23,6 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
-import { Label } from "../ui/label";
-import { Switch } from "../ui/switch";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 import { ToolDeployModal } from "./deploy/ToolDeployModal";
 import { ToolStepGallery } from "./ToolStepGallery";
@@ -43,8 +40,6 @@ export interface ToolPlaygroundProps {
   headerActions?: React.ReactNode;
   hideHeader?: boolean;
   readOnly?: boolean;
-  selfHealingEnabled?: boolean;
-  onSelfHealingChange?: (enabled: boolean) => void;
   shouldStopExecution?: boolean;
   onStopExecution?: () => void;
   uploadedFiles?: UploadedFileInfo[];
@@ -56,12 +51,16 @@ export interface ToolPlaygroundProps {
   onFilesChange?: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
   saveButtonText?: string;
   hideRebuildButton?: boolean;
+  userSelectedIntegrationIds?: string[];
+  onRebuildStart?: () => void;
+  onRebuildEnd?: () => void;
 }
 
 export interface ToolPlaygroundHandle {
-  executeTool: (opts?: { selfHealing?: boolean }) => Promise<void>;
+  executeTool: () => Promise<void>;
   saveTool: () => Promise<void>;
   getCurrentTool: () => Tool;
+  closeRebuild: () => void;
 }
 
 const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
@@ -77,8 +76,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   headerActions,
   hideHeader = false,
   readOnly = false,
-  selfHealingEnabled: externalSelfHealingEnabled,
-  onSelfHealingChange,
   shouldStopExecution: externalShouldStop,
   onStopExecution,
   uploadedFiles: parentUploadedFiles,
@@ -89,7 +86,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   filePayloads: parentFilePayloads,
   onFilesChange: parentOnFilesChange,
   saveButtonText = "Save",
-  hideRebuildButton = false
+  hideRebuildButton = false,
+  userSelectedIntegrationIds = [],
+  onRebuildStart,
+  onRebuildEnd
 }, ref) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -161,9 +161,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setInstructions(initialInstruction);
     }
   }, [embedded, initialInstruction]);
-  const [selfHealingEnabled, setSelfHealingEnabled] = useState(externalSelfHealingEnabled ?? true);
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
-  const [isFixingWorkflow, setIsFixingWorkflow] = useState<number | undefined>(undefined);
+  const [isFixingStep, setIsFixingStep] = useState<number | undefined>(undefined);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndex] = useState<number | undefined>(undefined);
   const [isStopping, setIsStopping] = useState(false);
   const [isRunningTransform, setIsRunningTransform] = useState(false);
@@ -198,19 +197,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       }
     }
   }, [inputSchema, manualPayloadText, hasUserEditedPayload]);
-
-  useEffect(() => {
-    if (externalSelfHealingEnabled !== undefined) {
-      setSelfHealingEnabled(externalSelfHealingEnabled);
-    }
-  }, [externalSelfHealingEnabled]);
-
-  const handleSelfHealingChange = (enabled: boolean) => {
-    setSelfHealingEnabled(enabled);
-    if (onSelfHealingChange) {
-      onSelfHealingChange(enabled);
-    }
-  };
 
   // Track latest external stop signal (embedded mode) in the single ref
   useEffect(() => {
@@ -251,13 +237,23 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
       finalTransform,
       instruction: instructions
-    })
-  }), [toolId, steps, responseSchema, inputSchema, finalTransform, instructions]);
+    }),
+    closeRebuild: () => {
+      setShowToolBuilder(false);
+      onRebuildEnd?.();
+    }
+  }), [toolId, steps, responseSchema, inputSchema, finalTransform, instructions, onRebuildEnd]);
   
   const extractIntegrationIds = (steps: ExecutionStep[]): string[] => {
     return Array.from(new Set(
       steps.map(s => s.integrationId).filter(Boolean) as string[]
     ));
+  };
+
+  const getMergedIntegrationIds = (): string[] => {
+    const integrationsFromSteps = extractIntegrationIds(steps);
+    const integrationsFromCreateStepper = userSelectedIntegrationIds || [];
+    return Array.from(new Set([...integrationsFromSteps, ...integrationsFromCreateStepper]));
   };
 
   const handleToolRebuilt = (tool: Tool, context: BuildContext) => {
@@ -290,6 +286,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     setFinalPreviewResult(null);
     
     setShowToolBuilder(false);
+    onRebuildEnd?.();
   };
 
   // Extract payload schema from full input schema
@@ -672,7 +669,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
   };
 
-  const executeTool = async (opts?: { selfHealing?: boolean }) => {
+  const executeTool = async () => {
     setLoading(true);
     // Fully clear any stale stop signals from a previous run (both modes)
     stopSignalRef.current = false;
@@ -692,7 +689,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       // Always use the current steps for execution
       const executionSteps = steps;
       const currentResponseSchema = responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null;
-      const effectiveSelfHealing = opts?.selfHealing ?? selfHealingEnabled;
+      // Auto-repair disabled for "Run All Steps" - individual steps and final transform still support it
+      const effectiveSelfHealing = false;
 
       const tool = {
         id: toolId,
@@ -796,12 +794,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         if (firstFailed) {
           setFocusStepId(firstFailed);
           setShowStepOutputSignal(Date.now());
-          const err = (state.stepResults[firstFailed] as any)?.error || 'Step execution failed';
-          toast({
-            title: "Step failed",
-            description: `${firstFailed}: ${typeof err === 'string' ? err : 'Execution error'}`,
-            variant: "destructive"
-          });
         }
       }
 
@@ -911,7 +903,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const executeStepByIdx = async (idx: number, selfHealing: boolean = false) => {
     try {
       if (selfHealing) {
-        setIsFixingWorkflow(idx);
+        setIsFixingStep(idx);
       } else {
         setIsExecutingStep(idx);
       }
@@ -948,16 +940,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setStepResultsMap(prev => ({ ...prev, [sid]: normalized.output }));
       setFocusStepId(sid);
       setShowStepOutputSignal(Date.now());
-      if (isFailure) {
-        toast({
-          title: "Step failed",
-          description: `${sid}: ${single.error || 'Execution error'}`,
-          variant: "destructive"
-        });
-      }
     } finally {
       setIsExecutingStep(undefined);
-      setIsFixingWorkflow(undefined);
+      setIsFixingStep(undefined);
     }
   };
 
@@ -1020,11 +1005,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           ...prev,
           ['__final_transform__']: result.error || 'Transform execution failed'
         }));
-        toast({
-          title: "Transform execution failed",
-          description: result.error || "Failed to execute final transform",
-          variant: "destructive",
-        });
       }
     } finally {
       if (selfHealing) {
@@ -1042,22 +1022,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   // Default header actions for standalone mode
   const defaultHeaderActions = (
     <div className="flex items-center gap-2">
-      <div className="flex items-center gap-2 mr-2">
-        <Label htmlFor="selfHealing-top" className="text-xs flex items-center gap-1">
-          <span>auto-repair</span>
-        </Label>
-        <div className="flex items-center">
-          <Switch className="custom-switch" id="selfHealing-top" checked={selfHealingEnabled} onCheckedChange={handleSelfHealingChange} />
-          <div className="ml-1 flex items-center">
-            <HelpTooltip text="Enable auto-repair during execution. Slower, but can auto-fix failures in tool steps and transformation code." />
-          </div>
-        </div>
-      </div>
       {loading ? (
         <Button
           variant="destructive"
           onClick={handleStopExecution}
-          disabled={saving || (isExecutingStep !== undefined) || isExecutingTransform || isStopping}
+          disabled={saving || (isExecutingStep !== undefined) || (isFixingStep !== undefined) || isExecutingTransform || isStopping}
           className="h-9 px-4"
         >
           {isStopping ? "Stopping..." : "Stop Execution"}
@@ -1066,7 +1035,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         <Button
           variant="success"
           onClick={handleRunAllSteps}
-          disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
+          disabled={loading || saving || (isExecutingStep !== undefined) || (isFixingStep !== undefined) || isExecutingTransform}
           className="h-9 px-4"
         >
           <Play className="h-4 w-4 fill-current" strokeWidth="3px" strokeLinejoin="round" strokeLinecap="round" />
@@ -1076,7 +1045,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       {!readOnly && !hideRebuildButton && (
         <Button
           variant="outline"
-          onClick={() => setShowToolBuilder(true)}
+          onClick={() => {
+            onRebuildStart?.();
+            setShowToolBuilder(true);
+          }}
           className="h-9 px-5"
         >
           <Hammer fill="currentColor" className="h-4 w-4" />
@@ -1112,7 +1084,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setShowToolBuilder(false)}
+              onClick={() => {
+                setShowToolBuilder(false);
+                onRebuildEnd?.();
+              }}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -1121,7 +1096,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         <div className="flex-1 overflow-hidden">
         <ToolBuilder
           initialView="instructions"
-          initialIntegrationIds={extractIntegrationIds(steps)}
+          initialIntegrationIds={getMergedIntegrationIds()}
           initialInstruction={instructions}
           initialPayload={manualPayloadText}
           initialResponseSchema={responseSchema}
@@ -1187,7 +1162,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   integrations={integrations}
                   isExecuting={loading}
                   isExecutingStep={isExecutingStep}
-                  isFixingWorkflow={isFixingWorkflow}
+                  isFixingStep={isFixingStep}
                   isRunningTransform={isRunningTransform}
                   isFixingTransform={isFixingTransform}
                   currentExecutingStepIndex={currentExecutingStepIndex}
@@ -1208,7 +1183,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   isProcessingFiles={isProcessingFiles}
                   totalFileSize={totalFileSize}
                   filePayloads={filePayloads}
-                  stepSelfHealingEnabled={selfHealingEnabled}
                   isPayloadValid={isPayloadValid}
                   onPayloadUserEdit={() => setHasUserEditedPayload(true)}
                   embedded={embedded}

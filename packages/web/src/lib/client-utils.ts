@@ -54,7 +54,7 @@ export async function executeSingleStep(
   stepIndex: number,
   payload: any,
   previousResults: Record<string, any> = {},
-  selfHealing: boolean = true
+  selfHealing: boolean = false
 ): Promise<StepExecutionResult> {
   const step = tool.steps[stepIndex];
 
@@ -101,7 +101,7 @@ export async function executeToolStepByStep(
   tool: Tool,
   payload: any,
   onStepComplete?: (stepIndex: number, result: StepExecutionResult) => void,
-  selfHealing: boolean = true,
+  selfHealing: boolean = false,
   shouldStop?: () => boolean
 ): Promise<ToolExecutionState> {
   const state: ToolExecutionState = {

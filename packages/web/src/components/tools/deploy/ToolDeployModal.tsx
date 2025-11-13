@@ -1,4 +1,6 @@
 import { useConfig } from "@/src/app/config-context";
+import { cn } from "@/src/lib/general-utils";
+import { Workflow } from "@superglue/client";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bot,
@@ -10,13 +12,11 @@ import {
   Webhook,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { CodeSnippet } from "../../editors/ReadonlyCodeEditor";
 import { Button } from "../../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
 import { ToolDeployScheduleForm } from "./ToolDeployScheduleForm";
-import { CodeSnippet } from "../../editors/ReadonlyCodeEditor";
-import { cn } from "@/src/lib/general-utils";
-import { Workflow } from "@superglue/client";
 
 interface ToolDeployModalProps {
   currentTool: Workflow;
@@ -112,7 +112,7 @@ await client.executeWorkflow({
   id: "${currentTool.id}",
   payload: ${JSON.stringify(payload, null, 2)},
   options: {
-    webhookUrl: "https://your-app.com/webhook" // TODO: Replace with your actual webhook URL
+    webhookUrl: "https://your-app.com/webhook" // TODO: Replace with your actual webhook
   }
 });`;
 
@@ -388,7 +388,7 @@ await client.executeWorkflow({
               >
               <div className="space-y-2">
                 <p className="text-muted-foreground">
-                  Get notified when your tool execution completes. Specify a webhook URL when executing the tool, and superglue will send the results to that endpoint automatically.
+                  Get notified when your tool execution completes. Specify a webhook when executing the tool, and superglue will send the results to that endpoint automatically.
                 </p>
               </div>
 

@@ -125,11 +125,11 @@ describe('API Utilities', () => {
     it('should handle cursor-based pagination', async () => {
       const config = {
         ...testEndpoint,
-        dataPath: 'data',
         pagination: {
           type: PaginationType.CURSOR_BASED,
           pageSize: "2",
-          cursorPath: 'meta.next_cursor'
+          cursorPath: 'meta.next_cursor',
+          stopCondition: '!response.data.meta.next_cursor'
         }
       } as ApiConfig;
 
@@ -162,7 +162,11 @@ describe('API Utilities', () => {
 
       const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {} });
 
-      expect(result.data).toHaveLength(3);
+      // Without dataPath, responses are merged via smartMergeResponses
+      expect(result.data).toEqual({
+        data: [{ id: 1 }, { id: 2 }, { id: 3 }],
+        meta: { next_cursor: null }
+      });
     });
 
     it('should stop pagination when receiving duplicate data', async () => {
@@ -275,30 +279,6 @@ describe('API Utilities', () => {
 
       await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/Received HTML response/);
-    });
-
-    it('should handle data path extraction', async () => {
-      const config = {
-        ...testEndpoint,
-        dataPath: 'response.items'
-      };
-
-      const mockResponse = {
-        status: 200,
-        data: {
-          response: {
-            items: [{ id: 1 }, { id: 2 }]
-          }
-        },
-        statusText: 'OK',
-        headers: {},
-        config: {} as any
-      };
-      mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
-
-      const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {} });
-
-      expect(result.data).toEqual([{ id: 1 }, { id: 2 }]);
     });
 
     it('should handle GraphQL error responses', async () => {

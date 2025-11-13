@@ -4,7 +4,7 @@ import { Edit, Loader2, Plus, Trash2 } from "lucide-react";
 import React from 'react';
 
 import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
+import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Switch } from "@/src/components/ui/switch";
 import {
@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/client';
 import cronstrue from 'cronstrue';
 import ToolScheduleModal from './ToolScheduleModal';
@@ -106,7 +107,7 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
     </div>
   ) : (
     <div className="p-4">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold">Schedules</h3>
         <Button size="sm" onClick={() => handleModalOpen()}>
           <Plus className="h-4 w-4 mr-2" />
@@ -120,13 +121,15 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
           </div>
         </div>
       ) : (
-        <Table className="mt-1">
+        <div className="w-full overflow-x-auto">
+          <Table className="w-full">
           <TableHeader>
             <TableRow className="!border-b">
               <TableHead className="pl-0">Enabled</TableHead>
               <TableHead>Schedule</TableHead>
               <TableHead>Cron</TableHead>
               <TableHead>Timezone</TableHead>
+              <TableHead>Webhook</TableHead>
               <TableHead>
                 Last Run
                 <div className="text-xs text-muted-foreground font-normal">
@@ -154,12 +157,29 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
                 <TableCell className="w-[200px]">{cronstrue.toString(schedule.cronExpression)}</TableCell>
                 <TableCell className="w-[200px]">{schedule.cronExpression}</TableCell>
                 <TableCell className="w-[200px]">{schedule.timezone}</TableCell>
+                <TableCell className="max-w-[300px]">
+                  {schedule.options?.webhookUrl ? (
+                    schedule.options.webhookUrl.startsWith('tool:') ? (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">Tool</Badge>
+                        <span className="text-xs font-mono truncate">{schedule.options.webhookUrl.substring(5)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">URL</Badge>
+                        <span className="text-xs font-mono truncate">{schedule.options.webhookUrl}</span>
+                      </div>
+                    )
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </TableCell>
                 <TableCell className="w-[300px]">{schedule.lastRunAt ? new Date(schedule.lastRunAt).toLocaleString() : 'Never'}</TableCell>
                 <TableCell className="w-[300px]">
                   {!schedule.enabled ? 'Disabled' : (new Date(schedule.nextRunAt).toLocaleString())}
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center justify-end gap-1">
                     <Button variant="ghost" size="icon" onClick={() => handleModalOpen(schedule)}>
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -174,6 +194,7 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
             ))}
           </TableBody>
         </Table>
+        </div>
       )}
       <ToolScheduleModal isOpen={modalOpen} toolId={toolId} schedule={modalSchedule} onClose={handleModalClose} onSave={loadSchedules} />
     </div>

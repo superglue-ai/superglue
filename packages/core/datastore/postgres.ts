@@ -15,7 +15,7 @@ export class PostgresService implements DataStore {
             ...config,
             max: 20,
             min: 2,
-            ssl: config.ssl === false ? false : { rejectUnauthorized: false }
+            ssl: config.ssl === false || config.host.includes('localhost') || config.host.includes('127.0.0.1') ? false : { rejectUnauthorized: false }
         });
 
         this.pool.on('error', (err) => {
