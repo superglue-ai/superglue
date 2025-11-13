@@ -14,7 +14,7 @@ export interface GenerateStepConfigResult {
 }
 
 const stepConfigSchema = z.object({
-    apiConfig: z.object({
+    stepConfig: z.object({
       urlHost: z.string().describe("The base URL host (e.g., https://api.example.com). Must not be empty."),
       urlPath: z.string().describe("The API endpoint path (e.g., /v1/users)."),
       method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"] as [string, ...string[]]).describe("HTTP method: GET, POST, PUT, DELETE, or PATCH"),
@@ -43,7 +43,7 @@ export async function generateStepConfig(retryCount: number, messages: LLMMessag
         ? [searchDocumentationToolDefinition, { web_search: webSearchTool }]
         : [searchDocumentationToolDefinition];
 
-    const generateStepConfigResult = await LanguageModel.generateObject<Partial<ApiConfig>>({
+    const generateStepConfigResult = await LanguageModel.generateObject<z.infer<typeof stepConfigSchema>>({
         messages,
         schema: zodToJsonSchema(stepConfigSchema),
         temperature,
@@ -59,7 +59,7 @@ export async function generateStepConfig(retryCount: number, messages: LLMMessag
         };
     }
 
-    const generatedConfig = generateStepConfigResult.response;
+    const generatedConfig = generateStepConfigResult.response.stepConfig;
     
     const config: Partial<ApiConfig> = {
         urlHost: generatedConfig.urlHost,
