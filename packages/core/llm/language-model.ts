@@ -1,4 +1,4 @@
-import type { AssistantModelMessage, SystemModelMessage, ToolModelMessage, UserModelMessage } from "ai";
+import type { AssistantModelMessage, SystemModelMessage, Tool, ToolModelMessage, UserModelMessage } from "ai";
 import { ToolCall, ToolCallResult, ToolDefinition } from "../execute/tools.js";
 import { AiSdkModel } from "./ai-sdk-model.js";
 
@@ -49,7 +49,7 @@ export interface LLMObjectGeneratorInput {
     messages: LLMMessage[];
     schema: any;
     temperature?: number;
-    tools?: (ToolDefinition | any)[];
+    tools?: (ToolDefinition | Record<string, Tool>)[];
     toolContext?: any;
     toolChoice?: 'auto' | 'required' | 'none' | { type: 'tool'; toolName: string };
 }

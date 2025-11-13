@@ -555,6 +555,23 @@
       ]
     },
     {
+      "id": "openalex",
+      "name": "OpenAlex",
+      "urlHost": "https://api.openalex.org",
+      "urlPath": "",
+      "documentationUrl": "https://docs.openalex.org",
+      "credentials": {},
+      "description": "Open catalog of scholarly papers, authors, institutions, and more",
+      "keywords": [
+        "works",
+        "authors",
+        "institutions",
+        "publications",
+        "research",
+        "papers"
+      ]
+    },
+    {
       "id": "punkapi",
       "name": "PunkAPI",
       "urlHost": "https://punkapi.online",
@@ -912,6 +929,16 @@
       "expectedResultDescription": "Should extract 5 people from unstructured text and sort alphabetically. Expected in order: Chris (19), David (41), Emma (22), Mike (35), and Sarah (28)."
     },
     {
+      "id": "032-openai-pdf-analysis-with-input-retrieval",
+      "name": "OpenAI PDF Analysis with Input Retrieval",
+      "type": "retrieval",
+      "instruction": "Call the OpenAI API to analyze a PDF file. First, make a request to the responses API endpoint with a file attachment pointing to this PDF: https://arxiv.org/pdf/2501.14426 and add exactly this prompt: Please provide a one sentence summary of this paper. Then, make a second call to the OpenAI input_items endpoint using the response ID from the first request to retrieve what inputs were provided to that request. The final output should be a list of the content from the second request, showing the inputs that were provided to the first OpenAI request. Final Transform Output JSON: { \"content\": Array<{ \"type\": string, (\"text\": string) | (\"file_url\": string) }> }.",
+      "integrationIds": ["openai"],
+      "payload": {},
+      "validationFunction": "validators/032-openai-pdf-analysis-with-input-retrieval.ts",
+      "expectedResultDescription": "Should retrieve OpenAI request inputs showing 2 items: one text input with prompt '1-sentence summary' and one file input pointing to arxiv.org/pdf/2501.14426."
+    },
+    {
       "id": "033-postgres-lego-openai-table-extraction",
       "name": "PostgreSQL+OpenAI Structured Output",
       "type": "retrieval",
@@ -963,6 +990,32 @@
       "payload": {},
       "validationFunction": "validators/037-brewery-db-california-count.ts",
       "expectedResultDescription": "Should count all breweries in California state. Expected total of 919 breweries."
+    },
+    {
+      "id": "038-openalex-fetch-1000-works-2025",
+      "name": "OpenAlex - Fetch 1000 Works from 2025",
+      "description": "Fetch exactly 1000 scholarly works published in 2025 using pagination",
+      "type": "retrieval",
+      "instruction": "Fetch exactly 1000 works published in 2025 from the OpenAlex API. Filter by publication_year:2025. Return a JSON object with this structure: { total_fetched: number, publication_year: number}> }",
+      "integrationIds": [
+        "openalex"
+      ],
+      "payload": {},
+      "validationFunction": "validators/038-openalex-fetch-1000-works-2025.ts",
+      "expectedResultDescription": "Should fetch exactly 1000 scholarly works from 2025 using OpenAlex pagination. Expected count 1000 with publication_year 2025."
+    },
+    {
+      "id": "039-openalex-pagination-1000-works-2025",
+      "name": "OpenAlex - Pagination 1000 Works from 2025",
+      "description": "Fetch exactly 1000 scholarly works published in 2025 using pagination with a reminder to use pagination",
+      "type": "retrieval",
+      "instruction": "Fetch exactly 1000 works published in 2025 from the OpenAlex API. Remember to use pagination and configure it correctly. Return a JSON object with this structure: { total_fetched: number, publication_year: number}> }",
+      "integrationIds": [
+        "openalex"
+      ],
+      "payload": {},
+      "validationFunction": "validators/039-openalex-pagination-1000-works-2025.ts",
+      "expectedResultDescription": "Should fetch exactly 1000 scholarly works from 2025 with explicit pagination reminder. Expected count 1000 with publication_year 2025."
     },
     {
       "id": "040-punkapi-fetch-all-beers",

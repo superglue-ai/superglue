@@ -385,7 +385,7 @@ export class WorkflowExecutor implements Workflow {
     data: any,
     config: ApiConfig,
     docSearchResultsForStepInstruction?: string
-  }) {
+  }): Promise<{ success?: boolean; refactorNeeded?: boolean; shortReason?: string }> {
   
     const evaluateStepResponsePrompt = getEvaluateStepResponseContext({ data, config, docSearchResultsForStepInstruction }, { characterBudget: 20000 });
   

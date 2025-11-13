@@ -1,5 +1,5 @@
 import { getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
-import { AssistantModelMessage, TextPart, ToolCallPart, ToolResultPart, generateText, jsonSchema, tool } from "ai";
+import { AssistantModelMessage, TextPart, ToolCallPart, ToolResultPart, Tool, generateText, jsonSchema, tool } from "ai";
 import { server_defaults } from "../default.js";
 import { ToolDefinition } from "../execute/tools.js";
 import { logMessage } from "../utils/logs.js";
@@ -28,10 +28,10 @@ export class AiSdkModel implements LLM {
 
   private buildTools(
     schemaObj: any,
-    tools?: (ToolDefinition | any)[],
+    tools?: (ToolDefinition | Record<string, Tool>)[],
     toolContext?: any
-  ): Record<string, any> {
-    const defaultTools: Record<string, any> = {
+  ): Record<string, Tool> {
+    const defaultTools: Record<string, Tool> = {
       submit: tool({
         description: "Submit the final result in the required format. Submit the result even if it's an error and keep submitting until we stop. Keep non-function messages short and concise because they are only for debugging.",
         inputSchema: schemaObj,

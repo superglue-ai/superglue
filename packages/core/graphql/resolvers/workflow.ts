@@ -2,7 +2,7 @@ import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglu
 import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { ToolBuilder as WorkflowBuilder } from "../../build/tool-builder.js";
+import { ToolBuilder } from "../../build/tool-builder.js";
 import { ToolSelector } from "../../execute/tool-selector.js";
 import { WorkflowExecutor } from "../../execute/workflow-executor.js";
 import { parseJSON } from "../../files/index.js";
@@ -310,7 +310,7 @@ export const buildWorkflowResolver = async (
       resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds);
     }
 
-    const builder = new WorkflowBuilder(
+    const builder = new ToolBuilder(
       instruction,
       resolvedIntegrations,
       payload,
