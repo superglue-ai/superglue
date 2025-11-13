@@ -25,6 +25,7 @@ import {
 import { Button } from "../ui/button";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 import { ToolStepGallery } from "./ToolStepGallery";
+import { ToolDeployModal } from "./deploy/ToolDeployModal";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -176,6 +177,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const hasGeneratedDefaultPayloadRef = useRef<boolean>(false);
   const [showToolBuilder, setShowToolBuilder] = useState(false);
   const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
+  const [showDeployModal, setShowDeployModal] = useState(false);
 
   // Generate default payload once when schema is available if payload is empty
   useEffect(() => {
@@ -1067,6 +1069,15 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           </>
         ) : saveButtonText}
       </Button>
+      {!readOnly && (
+        <Button
+          variant="default"
+          onClick={() => setShowDeployModal(true)}
+          className="h-9 px-5"
+        >
+          Deploy
+        </Button>
+      )}
     </div>
   );
 
@@ -1212,6 +1223,27 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ToolDeployModal
+        currentTool={{
+          id: toolId,
+          steps: steps.map((step: ExecutionStep) => ({
+            ...step,
+            apiConfig: {
+              id: step.apiConfig.id || step.id,
+              ...step.apiConfig,
+              pagination: step.apiConfig.pagination || null
+            }
+          })),
+          responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
+          inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
+          finalTransform,
+          instruction: instructions
+        }}
+        payload={computedPayload}
+        isOpen={showDeployModal}
+        onClose={() => setShowDeployModal(false)}
+      />
     </div>
   );
 });

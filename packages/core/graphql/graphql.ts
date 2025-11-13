@@ -12,7 +12,7 @@ import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/s
 import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant.js";
 import { updateApiConfigIdResolver } from "./resolvers/update-id.js";
 import { upsertApiResolver } from "./resolvers/upsert.js";
-import { deleteWorkflowScheduleResolver, listWorkflowSchedulesResolver, upsertWorkflowScheduleResolver } from "./resolvers/workflow-scheduler.js";
+import { deleteWorkflowScheduleResolver, listWorkflowSchedulesResolver, triggerScheduleNowResolver, upsertWorkflowScheduleResolver } from "./resolvers/workflow-scheduler.js";
 import {
   buildWorkflowResolver,
   deleteWorkflowResolver,
@@ -57,6 +57,7 @@ export const resolvers = {
     deleteIntegration: deleteIntegrationResolver,
     upsertWorkflowSchedule: upsertWorkflowScheduleResolver,
     deleteWorkflowSchedule: deleteWorkflowScheduleResolver,
+    triggerScheduleNow: triggerScheduleNowResolver,
     generateStepConfig: generateStepConfigResolver,
   },
   Subscription: {

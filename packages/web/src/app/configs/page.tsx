@@ -1,9 +1,7 @@
 "use client"
 
 import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
 import { useIntegrations } from '@/src/app/integrations-context';
-import { ConfigCreateStepper } from '@/src/components/api/ConfigCreateStepper';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,8 +29,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
+import { tokenRegistry } from '@/src/lib/token-registry';
 
 import ToolSchedulesList from '@/src/components/tools/schedule/ToolSchedulesList';
+import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { loadFromCache, saveToCache } from '@/src/lib/cache-utils';
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
@@ -42,7 +42,6 @@ import { useRouter } from 'next/navigation';
 import React from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
-import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
 
 const CACHE_PREFIX = 'superglue-tools-cache';
 
@@ -68,6 +67,7 @@ const ConfigTable = () => {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedIntegration, setSelectedIntegration] = React.useState<string>("all");
   const [showToolStepper, setShowToolStepper] = React.useState(false);
+  const [scheduleRefreshTrigger, setScheduleRefreshTrigger] = React.useState(0);
 
 
   const refreshConfigs = React.useCallback(async () => {
@@ -100,13 +100,18 @@ const ConfigTable = () => {
         configs: combinedConfigs,
         timestamp: Date.now()
       });
+      
+      // Trigger schedule refresh if a schedule section is open
+      if (expandedToolId) {
+        setScheduleRefreshTrigger(prev => prev + 1);
+      }
     } catch (error) {
       console.error('Error fetching configs:', error);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [config.superglueEndpoint]);
+  }, [config.superglueEndpoint, expandedToolId]);
 
   React.useEffect(() => {
     const cachedData = loadFromCache<CachedTools>(CACHE_PREFIX);
@@ -588,7 +593,7 @@ const ConfigTable = () => {
                     {expandedToolId === config.id && (
                       <TableRow>
                         <TableCell colSpan={5} className="p-0">
-                          <ToolSchedulesList toolId={config.id} />
+                          <ToolSchedulesList toolId={config.id} refreshTrigger={scheduleRefreshTrigger} />
                         </TableCell>
                       </TableRow>
                     )}

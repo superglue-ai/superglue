@@ -437,6 +437,7 @@ type Mutation {
 
   upsertWorkflowSchedule(schedule: WorkflowScheduleInput!): WorkflowSchedule!
   deleteWorkflowSchedule(id: ID!): Boolean!
+  triggerScheduleNow(id: ID!): Boolean!
 
   upsertApi(id: ID!, input: JSON!): ApiConfig!
   deleteApi(id: ID!): Boolean!

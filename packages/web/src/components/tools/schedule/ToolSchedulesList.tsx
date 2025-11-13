@@ -1,6 +1,6 @@
 "use client"
 
-import { Edit, Loader2, Plus, Trash2 } from "lucide-react";
+import { Edit, Loader2, Play, Plus, Trash2 } from "lucide-react";
 import React from 'react';
 
 import { useConfig } from '@/src/app/config-context';
@@ -15,14 +15,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
+import { useToast } from '@/src/hooks/use-toast';
 import { tokenRegistry } from '@/src/lib/token-registry';
 import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/client';
 import cronstrue from 'cronstrue';
 import ToolScheduleModal from './ToolScheduleModal';
 
 
-const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
+const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refreshTrigger?: number }) => {
   const config = useConfig();
+  const { toast } = useToast();
   const [toolSchedules, setToolSchedules] = React.useState<ToolSchedule[]>([]);
   const [loadingSchedules, setLoadingSchedules] = React.useState(false);
   const [modalOpen, setModalOpen] = React.useState(false);
@@ -31,6 +33,12 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
   React.useEffect(() => {
     loadSchedules();
   }, [toolId]);
+
+  React.useEffect(() => {
+    if (refreshTrigger !== undefined && refreshTrigger > 0) {
+      loadSchedules(false);
+    }
+  }, [refreshTrigger]);
 
   const loadSchedules = async (showLoading = true) => {
     if (showLoading) {
@@ -89,6 +97,44 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
 
     // make sure server and client state are in sync (e.g. for nextRunAt)
     loadSchedules(false);
+  };
+
+  const handleRunNow = async (e: React.MouseEvent, scheduleId: string) => {
+    e.stopPropagation();
+
+    try {
+      const query = `
+        mutation TriggerScheduleNow($id: ID!) {
+          triggerScheduleNow(id: $id)
+        }
+      `;
+
+      await fetch(config.superglueEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${tokenRegistry.getToken()}`
+        },
+        body: JSON.stringify({
+          query,
+          variables: { id: scheduleId }
+        })
+      });
+
+      toast({
+        title: 'Schedule triggered',
+        description: 'The tool will run within the next minute'
+      });
+
+      // refresh schedules to show updated nextRunAt
+      loadSchedules(false);
+    } catch (error: any) {
+      toast({
+        title: 'Error triggering schedule',
+        description: error.message || 'Unknown error',
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleModalOpen = (schedule?: ToolSchedule) => {
@@ -180,6 +226,15 @@ const ToolSchedulesList = ({ toolId }: { toolId: string }) => {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={(e) => handleRunNow(e, schedule.id)}
+                      title="Run Now"
+                      disabled={!schedule.enabled}
+                    >
+                      <Play className="h-4 w-4" />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => handleModalOpen(schedule)}>
                       <Edit className="h-4 w-4" />
                     </Button>
