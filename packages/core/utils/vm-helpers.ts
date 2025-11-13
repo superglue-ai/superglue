@@ -1,8 +1,10 @@
+import ivm from 'isolated-vm';
+
 /**
  * Inject individual helper functions using context.global.set
  * This is the most reliable method for isolated-vm
  */
-export async function injectVMHelpersIndividually(context: any): Promise<void> {
+export async function injectVMHelpersIndividually(context: ivm.Context): Promise<void> {
   // Use evalSync to inject all helpers at once
   // The code will run in the context and create global functions
   context.evalSync(`
@@ -176,4 +178,46 @@ export async function injectVMHelpersIndividually(context: any): Promise<void> {
       }
     };
   `);
+  
+  // Inject Node's native URL constructor for full spec compliance
+  const urlParser = new ivm.Callback((urlString: string, base?: string) => {
+    try {
+      const parsed = new URL(urlString, base);
+      return new ivm.ExternalCopy({
+        href: parsed.href,
+        protocol: parsed.protocol,
+        host: parsed.host,
+        hostname: parsed.hostname,
+        port: parsed.port,
+        pathname: parsed.pathname,
+        search: parsed.search,
+        hash: parsed.hash,
+        origin: parsed.origin,
+        searchParams: Object.fromEntries(parsed.searchParams.entries())
+      }).copyInto();
+    } catch (error: any) {
+      throw new Error(error.message);
+    }
+  });
+  
+  await context.global.set('_nativeURLParser', urlParser);
+  
+  // Create URL constructor wrapper in VM context
+  context.evalSync(`
+    URL = function(url, base) {
+      const parsed = _nativeURLParser(url, base);
+      Object.assign(this, parsed);
+      this.toString = function() { return this.href; };
+      this.toJSON = function() { return this.href; };
+    };
+  `);
+  
+  // Inject crypto.randomUUID
+  const randomUUIDCallback = new ivm.Callback(() => {
+    return crypto.randomUUID();
+  });
+  
+  await context.global.set('crypto', new ivm.ExternalCopy({
+    randomUUID: randomUUIDCallback
+  }).copyInto());
 }
