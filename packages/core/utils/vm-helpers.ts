@@ -180,7 +180,7 @@ export async function injectVMHelpersIndividually(context: ivm.Context): Promise
   `);
   
   // Inject Node's native URL constructor for full spec compliance
-  const urlParser = new ivm.Callback((urlString: string, base?: string) => {
+  await context.global.set('_nativeURLParser', new ivm.Reference(function(urlString: string, base?: string) {
     try {
       const parsed = new URL(urlString, base);
       return new ivm.ExternalCopy({
@@ -198,14 +198,12 @@ export async function injectVMHelpersIndividually(context: ivm.Context): Promise
     } catch (error: any) {
       throw new Error(error.message);
     }
-  });
-  
-  await context.global.set('_nativeURLParser', urlParser);
+  }));
   
   // Create URL constructor wrapper in VM context
   context.evalSync(`
     URL = function(url, base) {
-      const parsed = _nativeURLParser(url, base);
+      const parsed = _nativeURLParser.applySync(undefined, [url, base]);
       Object.assign(this, parsed);
       this.toString = function() { return this.href; };
       this.toJSON = function() { return this.href; };
@@ -213,11 +211,16 @@ export async function injectVMHelpersIndividually(context: ivm.Context): Promise
   `);
   
   // Inject crypto.randomUUID
-  const randomUUIDCallback = new ivm.Callback(() => {
+  await context.global.set('_nativeRandomUUID', new ivm.Reference(function() {
     return crypto.randomUUID();
-  });
+  }));
   
-  await context.global.set('crypto', new ivm.ExternalCopy({
-    randomUUID: randomUUIDCallback
-  }).copyInto());
+  // Wrap it in a crypto object
+  context.evalSync(`
+    crypto = {
+      randomUUID: function() {
+        return _nativeRandomUUID.applySync(undefined, []);
+      }
+    };
+  `);
 }

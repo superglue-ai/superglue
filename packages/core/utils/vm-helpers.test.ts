@@ -174,5 +174,81 @@ describe('VM Helpers', () => {
             const threeChars = await context.eval(`btoa('abc')`);
             expect(threeChars).toBe('YWJj'); // Should have no padding
         });
+
+        it('should inject URL constructor that parses URLs', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            // Test basic URL parsing
+            const result = await context.eval(`
+                const url = new URL('https://example.com:8080/path?query=value#hash');
+                JSON.stringify({
+                    href: url.href,
+                    protocol: url.protocol,
+                    hostname: url.hostname,
+                    port: url.port,
+                    pathname: url.pathname,
+                    search: url.search,
+                    hash: url.hash
+                })
+            `);
+            
+            const parsed = JSON.parse(result);
+            expect(parsed.protocol).toBe('https:');
+            expect(parsed.hostname).toBe('example.com');
+            expect(parsed.port).toBe('8080');
+            expect(parsed.pathname).toBe('/path');
+            expect(parsed.search).toBe('?query=value');
+            expect(parsed.hash).toBe('#hash');
+        });
+
+        it('should handle URL with base parameter', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            // Test URL with base
+            const result = await context.eval(`
+                const url = new URL('/api/users', 'https://example.com');
+                url.href
+            `);
+            
+            expect(result).toBe('https://example.com/api/users');
+        });
+
+        it('should inject crypto.randomUUID that generates UUIDs', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            // Test crypto.randomUUID
+            const uuid = await context.eval(`crypto.randomUUID()`);
+            
+            // UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            expect(uuid).toMatch(uuidRegex);
+        });
+
+        it('should generate unique UUIDs', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            // Generate multiple UUIDs and ensure they're unique
+            const result = await context.eval(`
+                const uuid1 = crypto.randomUUID();
+                const uuid2 = crypto.randomUUID();
+                const uuid3 = crypto.randomUUID();
+                JSON.stringify({ uuid1, uuid2, uuid3, allUnique: uuid1 !== uuid2 && uuid2 !== uuid3 && uuid1 !== uuid3 })
+            `);
+            
+            const parsed = JSON.parse(result);
+            expect(parsed.allUnique).toBe(true);
+        });
     });
 }); 
