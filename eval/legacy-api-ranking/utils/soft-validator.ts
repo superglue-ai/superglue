@@ -1,4 +1,4 @@
-import { parseJSON } from '@core/utils/json-parser.js';
+import { parseJSON } from '@core/files/parsers/json.js';
 import { logMessage } from '@core/utils/logs.js';
 import { sample } from '@core/utils/tools.js';
 import { LLMMessage } from '@core/llm/language-model.js';
@@ -97,7 +97,7 @@ Please validate if the actual result reasonably aligns with the expected criteri
             additionalProperties: false
         };
 
-        const response = await LanguageModel.generateObject(messages, schema, 0.1);
+        const response = await LanguageModel.generateObject({ messages: messages, schema: schema, temperature: 0.1 });
 
         logMessage('debug',
             `Soft validation result: success=${response.response.success}`,

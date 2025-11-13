@@ -128,7 +128,7 @@ export async function generateTransformCode(
       additionalProperties: false
     };
 
-    const { response, error: responseError, messages: updatedMessages } = await LanguageModel.generateObject(messages, mappingSchema, temperature);
+    const { response, error: responseError, messages: updatedMessages } = await LanguageModel.generateObject({messages, schema: mappingSchema, temperature: temperature});
     if (responseError || response?.error) {
       throw new Error(`Error generating transform code: ${responseError || response?.error}`);
     }
@@ -191,7 +191,7 @@ export async function evaluateTransform(
       required: ["success", "reason"],
       additionalProperties: false
     };
-    const { response, error: responseError } = await LanguageModel.generateObject(messages, llmResponseSchema, 0);
+    const { response, error: responseError } = await LanguageModel.generateObject({messages, schema: llmResponseSchema, temperature: 0});
     if (responseError || response?.error) {
       throw new Error(`Error evaluating transform: ${responseError || response?.error}`);
     }

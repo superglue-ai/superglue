@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageModel } from '../llm/language-model.js';
-import { generateInstructionsImplementation, sanitizeInstructionSuggestions } from './instructions.js';
+import { generateInstructionsImplementation } from './workflow-tools.js';
+import { sanitizeInstructionSuggestions } from './tools.js';
 
 vi.mock('../llm/language-model.js', () => {
   return {

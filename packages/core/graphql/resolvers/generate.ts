@@ -1,7 +1,7 @@
 import { ApiConfig, Integration } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
 import { executeTool, ToolCall } from "../../execute/tools.js";
-import { InstructionGenerationContext } from "../../utils/instructions.js";
+import { InstructionGenerationContext } from "../../utils/workflow-tools.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { Context, Metadata } from '../types.js';
 import { IntegrationManager } from "../../integrations/integration-manager.js";
@@ -9,6 +9,7 @@ import { getGenerateStepConfigContext } from "../../context/context-builders.js"
 import { LLMMessage } from "../../llm/language-model.js";
 import { GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../../context/context-prompts.js";
 import { logMessage } from "../../utils/logs.js";
+import { generateStepConfig } from "../../build/tool-step-builder.js";
 
 interface GenerateStepConfigArgs {
   integrationId?: string;
@@ -84,9 +85,7 @@ export const generateStepConfigResolver = async (
         logMessage('info', `Generating step config for integration ${integrationId}`, metadata);
         const integrationManager = new IntegrationManager(integrationId, context.datastore, context.orgId);
         integration = await integrationManager.getIntegration();
-        
-        const docs = await integrationManager.getDocumentation();
-        integrationDocs = docs.content|| '';
+        integrationDocs = (await integrationManager.getDocumentation())?.content || '';
         integrationSpecificInstructions = integration.specificInstructions || '';
       } catch (error) {
         telemetryClient?.captureException(error, context.orgId, {
@@ -121,36 +120,17 @@ export const generateStepConfigResolver = async (
       }
     ];
 
-    const generatedStepConfig = await executeTool({
-      id: crypto.randomUUID(),
-      name: "generate_step_config",
-      arguments: { configInstruction: instruction, retryCount: 0 },
-    }, 
-    { runId: metadata.runId, orgId: metadata.orgId, messages, integration });
-  
-    if (!generatedStepConfig.success || !generatedStepConfig.data?.config) {
-      return {
-        success: false,
-        error: generatedStepConfig.error || "Failed to generate step config",
-        config: {}
-      };
+    const generateStepConfigResult = await generateStepConfig(0, messages);
+          
+    if (!generateStepConfigResult.success || !generateStepConfigResult.config) {
+      throw new Error(generateStepConfigResult.error || "No step config generated");
     }
-
-    return {
-      success: true,
-      config: generatedStepConfig.data.config
-    };
+          
+    return generateStepConfigResult.config;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
     telemetryClient?.captureException(error, context.orgId, {
-      integrationId,
-      error: errorMessage
+      integrationId
     });
-    
-    return {
-      success: false,
-      error: errorMessage,
-      config: {}
-    };
+    throw error;
   }
 };

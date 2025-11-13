@@ -1,12 +1,9 @@
-import { anthropic } from "@ai-sdk/anthropic";
-import { google } from "@ai-sdk/google";
-import { openai } from "@ai-sdk/openai";
 import { getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
 import { AssistantModelMessage, TextPart, ToolCallPart, ToolResultPart, generateText, jsonSchema, tool } from "ai";
 import { server_defaults } from "../default.js";
 import { ToolDefinition } from "../execute/tools.js";
 import { logMessage } from "../utils/logs.js";
-import { LLM, LLMMessage, LLMObjectResponse, LLMResponse } from "./language-model.js";
+import { LLM, LLMMessage, LLMObjectGeneratorInput, LLMObjectResponse, LLMResponse } from "./language-model.js";
 
 export class AiSdkModel implements LLM {
   public contextLength: number;
@@ -31,10 +28,10 @@ export class AiSdkModel implements LLM {
 
   private buildTools(
     schemaObj: any,
-    customTools?: ToolDefinition[],
+    tools?: (ToolDefinition | any)[],
     toolContext?: any
   ): Record<string, any> {
-    const tools: Record<string, any> = {
+    const defaultTools: Record<string, any> = {
       submit: tool({
         description: "Submit the final result in the required format. Submit the result even if it's an error and keep submitting until we stop. Keep non-function messages short and concise because they are only for debugging.",
         inputSchema: schemaObj,
@@ -51,36 +48,27 @@ export class AiSdkModel implements LLM {
       }),
     };
 
-    const provider = process.env.LLM_PROVIDER?.toLowerCase();
-    switch (provider) {
-      case 'openai':
-        tools["web_search"] = openai.tools.webSearch();
-        break;
-      case 'anthropic':
-        tools["web_search"] = anthropic.tools.webSearch_20250305({
-          maxUses: 5,
-        });
-        break;
-      case 'gemini':
-        tools["web_search"] = google.tools.googleSearch({});
-        break;
-      default:
-        break;
-    }
-
-    if (customTools && customTools.length > 0) {
-      for (const customTool of customTools) {
-        tools[customTool.name] = tool({
-          description: customTool.description,
-          inputSchema: jsonSchema(customTool.arguments),
-          execute: customTool.execute ? async (args) => {
-            return await customTool.execute!(args, toolContext);
-          } : undefined,
-        });
+    if (tools && tools.length > 0) {
+      for (const item of tools) {
+        
+        const isCustomTool = item.name && item.arguments && item.description;
+        
+        if (isCustomTool) {
+          const toolDef = item as ToolDefinition;
+          defaultTools[toolDef.name] = tool({
+            description: toolDef.description,
+            inputSchema: jsonSchema(toolDef.arguments),
+            execute: toolDef.execute ? async (args) => {
+              return await toolDef.execute!(args, toolContext);
+            } : undefined,
+          });
+        } else {
+          Object.assign(defaultTools, item);
+        }
       }
     }
 
-    return tools;
+    return defaultTools;
   }
 
   private cleanSchema(schema: any, isRoot: boolean = true): any {
@@ -156,30 +144,25 @@ export class AiSdkModel implements LLM {
    If the LLM does not return a submit tool call, we try again.
    */
   async generateObject(
-    messages: LLMMessage[],
-    schema: any,
-    temperature: number = 0,
-    customTools?: ToolDefinition[],
-    toolContext?: any,
-    toolChoice?: 'auto' | 'required' | 'none' | { type: 'tool'; toolName: string }
+    input: LLMObjectGeneratorInput
   ): Promise<LLMObjectResponse> {
     const dateMessage = this.getDateMessage();
     
     // Clean schema: remove patternProperties, minItems/maxItems, set strict/additionalProperties
-    schema = this.cleanSchema(schema);
+    const schema = this.cleanSchema(input.schema);
 
     // Handle O-model temperature
-    let temperatureToUse: number | undefined = temperature;
+    let temperatureToUse: number | undefined = input.temperature;
     if (this.modelId.startsWith('o')) {
       temperatureToUse = undefined;
     }
 
     const schemaObj = jsonSchema(schema);
-    const tools = this.buildTools(schemaObj, customTools, toolContext);
+    const availableTools = this.buildTools(schemaObj, input.tools, input.toolContext);
 
-    let conversationMessages: LLMMessage[] = String(messages[0]?.content)?.startsWith("The current date and time is")
-      ? messages
-      : [dateMessage, ...messages];
+    let conversationMessages: LLMMessage[] = String(input.messages[0]?.content)?.startsWith("The current date and time is")
+      ? input.messages
+      : [dateMessage, ...input.messages];
 
     try {
       let finalResult: any = null;
@@ -188,8 +171,8 @@ export class AiSdkModel implements LLM {
         const result = await generateText({
           model: this.model,
           messages: conversationMessages,
-          tools,
-          toolChoice: toolChoice || 'required',
+          tools: availableTools,
+          toolChoice: input.toolChoice || 'required',
           temperature: temperatureToUse,
           maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
         });
@@ -265,7 +248,7 @@ export class AiSdkModel implements LLM {
       };
     } catch (error) {
       logMessage('error', `Error generating LLM response: ${error}`, { orgId: 'ai-sdk' });
-      const updatedMessages = [...messages, {
+      const updatedMessages = [...input.messages, {
         role: "assistant" as const,
         content: "Error: Vercel AI API Error: " + (error as any)?.message
       } as LLMMessage];
@@ -277,4 +260,3 @@ export class AiSdkModel implements LLM {
     }
   }
 }
-

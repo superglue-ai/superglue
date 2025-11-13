@@ -12,7 +12,7 @@ import { applyJsonata, isSelfHealingEnabled, maskCredentials, transformAndValida
 import { evaluateTransform, generateTransformCode } from "../utils/transform.js";
 import { AbortError, ApiCallError } from "./api/api.js";
 import { runStepConfig } from "./api/api.legacy.js";
-import { executeTool } from "./tools.js";
+import { generateStepConfig } from "../build/tool-step-builder.js";
 
 export interface WorkflowExecutorOptions {
   workflow: Workflow;
@@ -358,14 +358,16 @@ export class WorkflowExecutor implements Workflow {
       }
   
       result.config = step.apiConfig;
-      result.rawData = isLoopSelectorArray ? stepResults.map(r => r.rawData) : stepResults[0].rawData;
-      result.transformedData = isLoopSelectorArray ? stepResults.map(r => r.transformedData) : stepResults[0].transformedData;
+      result.rawData = isLoopSelectorArray ? stepResults.map(r => r.rawData) : stepResults[0]?.rawData || null;
+      result.transformedData = isLoopSelectorArray ? stepResults.map(r => r.transformedData) : stepResults[0]?.transformedData || null;
       result.success = stepResults.every(r => r.success);
       result.error = stepResults.filter(s => s.error).join("\n");
     } catch (error) {
       result.config = step.apiConfig;
       result.success = false;
       result.error = error.message || error;
+      result.rawData = null;
+      result.transformedData = null;
     }
     logMessage("info", `'${step.id}' ${result.success ? "Complete" : "Failed"}`, this.metadata);
     return result;
@@ -382,7 +384,7 @@ export class WorkflowExecutor implements Workflow {
   
     const evaluateStepResponsePrompt = getEvaluateStepResponseContext({ data, config, docSearchResultsForStepInstruction }, { characterBudget: 20000 });
   
-    const request = [
+    const messages = [
       {
         role: "system",
         content: EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT
@@ -393,10 +395,7 @@ export class WorkflowExecutor implements Workflow {
     ] as LLMMessage[];
   
     const response = await LanguageModel.generateObject(
-      request,
-      { type: "object", properties: { success: { type: "boolean" }, refactorNeeded: { type: "boolean" }, shortReason: { type: "string" } } },
-      0
-    );
+      { messages: messages, schema: { type: "object", properties: { success: { type: "boolean" }, refactorNeeded: { type: "boolean" }, shortReason: { type: "string" } } }, temperature: 0 });
     if (response.error) {
       throw new Error(`Error evaluating config response: ${response.error}`);
     }
@@ -461,27 +460,21 @@ export class WorkflowExecutor implements Workflow {
             });
           }
 
-          const generateStepConfigResult = await executeTool({
-            id: crypto.randomUUID(),
-            name: "generate_step_config",
-            arguments: { configInstruction: config.instruction, retryCount },
-          }, 
-          { runId: crypto.randomUUID(), orgId: this.metadata.orgId, messages, integration });
+          const generateStepConfigResult = await generateStepConfig(retryCount, messages);
           
-          if (!generateStepConfigResult.success || !generateStepConfigResult.data) {
-            throw new Error(generateStepConfigResult.error || "No API config generated");
+          if (!generateStepConfigResult.success || !generateStepConfigResult.config) {
+            throw new Error(generateStepConfigResult.error || "No step config generated");
           }
-          config = generateStepConfigResult.data.config;
-          messages = generateStepConfigResult.data.messages;
+          config = generateStepConfigResult.config;
+          messages = generateStepConfigResult.messages || [];
         }
   
         response = await runStepConfig({ config, payload, credentials, options });
   
         if (!response.data) {
-          throw new Error("No data returned from API. This could be due to a configuration error.");
+          throw new Error("No data returned from step. This could be due to a configuration error.");
         }
   
-        // Check if response is valid
         if (retryCount > 0 && isSelfHealing || options.testMode) {
           const result = await this.evaluateConfigResponse({
             data: response.data,

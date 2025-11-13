@@ -1,7 +1,7 @@
 import { Metadata } from "@playwright/test";
 import { Integration, SelfHealingMode, Workflow, WorkflowResult } from "@superglue/client";
 import { generateUniqueId } from "@superglue/shared/utils";
-import { WorkflowBuilder } from "../../../packages/core/build/workflow-builder.js";
+import { ToolBuilder } from "../../../packages/core/build/tool-builder.js";
 import { DataStore } from "../../../packages/core/datastore/types.js";
 import { WorkflowExecutor } from "../../../packages/core/execute/workflow-executor.js";
 import { IntegrationManager } from "../../../packages/core/integrations/integration-manager.js";
@@ -95,7 +95,7 @@ export class SuperglueToolAttemptService {
         toolConfig: ToolConfig,
         integrations: Integration[]
     ): Promise<Workflow> {
-        const builder = new WorkflowBuilder(
+        const builder = new ToolBuilder(
             toolConfig.instruction,
             integrations,
             toolConfig.payload || {},
@@ -103,7 +103,7 @@ export class SuperglueToolAttemptService {
             this.metadata
         );
 
-        const workflow = await builder.buildWorkflow();
+        const workflow = await builder.buildTool();
         workflow.id = await generateUniqueId({
             baseId: workflow.id,
             exists: async (id) =>

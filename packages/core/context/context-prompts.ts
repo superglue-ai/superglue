@@ -122,7 +122,7 @@ Schema:
 
 Make this fast and do not think too hard, this is just an approximation.`;
 
-export const BUILD_WORKFLOW_SYSTEM_PROMPT = `You are an expert AI assistant responsible for building executable workflows from user instructions.
+export const BUILD_TOOL_SYSTEM_PROMPT = `You are an expert AI assistant responsible for building executable workflows from user instructions.
 Your goal is to analyze the user's request, break it down into logical steps, and create a complete executable workflow with fully populated API configurations.
 
 <INTEGRATION_INSTRUCTIONS>

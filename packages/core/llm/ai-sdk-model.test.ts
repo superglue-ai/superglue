@@ -136,7 +136,7 @@ describe('AiSdkModel', () => {
         { role: 'user', content: 'test' }
       ] as LLMMessage[];
 
-      const result = await model.generateObject(messages, schema);
+      const result = await model.generateObject({ messages: messages, schema: schema });
 
       expect(mockGenerateText).toHaveBeenCalled();
       const lastCall = mockGenerateText.mock.calls[mockGenerateText.mock.calls.length - 1][0];
@@ -173,7 +173,7 @@ describe('AiSdkModel', () => {
         }
       };
 
-      const result = await model.generateObject([{ role: 'user', content: 'test' }], schema);
+      const result = await model.generateObject({ messages: [{ role: 'user', content: 'test' }], schema: schema });
 
       expect(result.response).toEqual(responseObj);
     });
@@ -198,7 +198,7 @@ describe('AiSdkModel', () => {
         }
       };
 
-      const result = await model.generateObject([{ role: 'user', content: 'test' }], schema);
+      const result = await model.generateObject({ messages: [{ role: 'user', content: 'test' }], schema: schema });
 
       expect(result.response).toEqual({ error: 'Cannot complete request' });
     });
@@ -223,7 +223,7 @@ describe('AiSdkModel', () => {
         }
       };
 
-      await model.generateObject([{ role: 'user', content: 'test' }], schema, 0.5);
+      await model.generateObject({ messages: [{ role: 'user', content: 'test' }], schema: schema, temperature: 0.5 });
 
       expect(mockGenerateText).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -246,7 +246,7 @@ describe('AiSdkModel', () => {
         toolResults: []
       } as any);
 
-      await model.generateObject([{ role: 'user', content: 'test' }], { type: 'object', properties: {} });
+      await model.generateObject({ messages: [{ role: 'user', content: 'test' }], schema: { type: 'object', properties: {} } });
 
       expect(openai.tools.webSearch).toHaveBeenCalled();
       expect(mockGenerateText).toHaveBeenCalledWith(
@@ -274,7 +274,7 @@ describe('AiSdkModel', () => {
         toolResults: []
       } as any);
 
-      await model.generateObject([{ role: 'user', content: 'test' }], { type: 'object', properties: {} });
+      await model.generateObject({ messages: [{ role: 'user', content: 'test' }], schema: { type: 'object', properties: {} } });
 
       expect(anthropic.tools.webSearch_20250305).toHaveBeenCalledWith({ maxUses: 5 });
       expect(mockGenerateText).toHaveBeenCalledWith(
@@ -302,7 +302,7 @@ describe('AiSdkModel', () => {
         toolResults: []
       } as any);
 
-      await model.generateObject([{ role: 'user', content: 'test' }], { type: 'object', properties: {} });
+      await model.generateObject({ messages: [{ role: 'user', content: 'test' }], schema: { type: 'object', properties: {} } });
 
       expect(google.tools.googleSearch).toHaveBeenCalledWith({});
       expect(mockGenerateText).toHaveBeenCalledWith(
@@ -343,11 +343,7 @@ describe('AiSdkModel', () => {
       }];
 
       await model.generateObject(
-        [{ role: 'user', content: 'test' }],
-        { type: 'object', properties: {} },
-        0,
-        customTools,
-        { contextData: 'test' }
+        { messages: [{ role: 'user', content: 'test' }], schema: { type: 'object', properties: {} }, tools: customTools, toolContext: { contextData: 'test' } }
       );
 
       expect(mockGenerateText).toHaveBeenCalled();
@@ -388,7 +384,7 @@ describe('AiSdkModel', () => {
         }
       };
 
-      const result = await model.generateObject([{ role: 'user', content: 'test' }], schema);
+      const result = await model.generateObject({ messages: [{ role: 'user', content: 'test' }], schema: schema });
 
       expect(mockGenerateText).toHaveBeenCalledTimes(2);
       expect(result.response).toEqual({ key: 'value' });
@@ -418,7 +414,7 @@ describe('AiSdkModel', () => {
         }
       };
 
-      await model.generateObject([{ role: 'user', content: 'test' }], schema);
+      await model.generateObject({ messages: [{ role: 'user', content: 'test' }], schema: schema });
 
       // Schema should be cleaned - we can't directly verify this but can check it doesn't throw
       expect(mockGenerateText).toHaveBeenCalled();
@@ -447,7 +443,7 @@ describe('AiSdkModel', () => {
         }
       };
 
-      const result = await model.generateObject([{ role: 'user', content: 'test' }], schema);
+      const result = await model.generateObject({ messages: [{ role: 'user', content: 'test' }], schema: schema });
 
       expect(result.response).toEqual([{ key: 'value' }]);
     });
@@ -464,7 +460,7 @@ describe('AiSdkModel', () => {
         }
       };
 
-      const result = await model.generateObject([{ role: 'user', content: 'test' }], schema);
+      const result = await model.generateObject({ messages: [{ role: 'user', content: 'test' }], schema: schema });
 
       expect(result.response).toContain('Error: Vercel AI API Error');
       expect(result.messages[result.messages.length - 1].content).toContain('Error: Vercel AI API Error');
@@ -491,12 +487,7 @@ describe('AiSdkModel', () => {
       };
 
       await model.generateObject(
-        [{ role: 'user', content: 'test' }],
-        schema,
-        0,
-        undefined,
-        undefined,
-        'auto'
+        { messages: [{ role: 'user', content: 'test' }], schema: schema, toolChoice: 'auto' }
       );
 
       expect(mockGenerateText).toHaveBeenCalledWith(
@@ -522,7 +513,7 @@ describe('AiSdkModel', () => {
         }
       };
 
-      const result = await model.generateObject([{ role: 'user', content: 'test' }], schema);
+      const result = await model.generateObject({ messages: [{ role: 'user', content: 'test' }], schema: schema });
 
       expect(result.response).toContain('Error: Vercel AI API Error');
     });

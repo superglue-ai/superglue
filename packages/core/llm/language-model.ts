@@ -7,7 +7,7 @@ export type LLMMessage = SystemModelMessage | UserModelMessage | AssistantModelM
 export interface LLM {
     contextLength: number;
     generateText(messages: LLMMessage[], temperature?: number): Promise<LLMResponse>;
-    generateObject(messages: LLMMessage[], schema: any, temperature?: number, customTools?: ToolDefinition[], context?: any): Promise<LLMObjectResponse>;
+    generateObject(input: LLMObjectGeneratorInput): Promise<LLMObjectResponse>;
 }
 
 export interface LLMToolResponse {
@@ -47,6 +47,15 @@ export interface LLMObjectResponse {
     messages: LLMMessage[];
 }
 
+export interface LLMObjectGeneratorInput {
+    messages: LLMMessage[];
+    schema: any;
+    temperature?: number;
+    tools?: (ToolDefinition | any)[];
+    toolContext?: any;
+    toolChoice?: 'auto' | 'required' | 'none' | { type: 'tool'; toolName: string };
+}
+
 // Lazy initialization to ensure environment variables are loaded
 let _languageModel: LLM | null = null;
 
@@ -59,8 +68,8 @@ export const LanguageModel = {
         return this._getInstance().generateText(messages, temperature);
     },
 
-    generateObject(messages: LLMMessage[], schema: any, temperature?: number, customTools?: ToolDefinition[], toolContext?: any): Promise<LLMObjectResponse> {
-        return this._getInstance().generateObject(messages, schema, temperature, customTools, toolContext);
+    generateObject(input: LLMObjectGeneratorInput): Promise<LLMObjectResponse> {
+        return this._getInstance().generateObject(input);
     },
 
     _getInstance(): LLM {
