@@ -143,9 +143,9 @@ export class AiSdkModel implements LLM {
    When the LLM returns, we check for the submit tool call and return the result.
    If the LLM does not return a submit tool call, we try again.
    */
-  async generateObject(
+  async generateObject<T>(
     input: LLMObjectGeneratorInput
-  ): Promise<LLMObjectResponse> {
+  ): Promise<LLMObjectResponse<T>> {
     const dateMessage = this.getDateMessage();
     
     // Clean schema: remove patternProperties, minItems/maxItems, set strict/additionalProperties
@@ -188,8 +188,17 @@ export class AiSdkModel implements LLM {
             break;
           }
           if (toolCall.toolName === 'abort') {
-            finalResult = { error: (toolCall.input as any)?.reason || "Unknown error" };
-            break;
+
+            const updatedMessages = [...conversationMessages, {
+              role: "assistant" as const,
+              content: JSON.stringify(finalResult)
+            }];
+
+            return {
+              success: false,
+              response: (toolCall.input as any)?.reason,
+              messages: updatedMessages
+            };
           }
         }
 
@@ -243,6 +252,7 @@ export class AiSdkModel implements LLM {
       }];
 
       return {
+        success: true,
         response: finalResult,
         messages: updatedMessages
       };
@@ -254,7 +264,8 @@ export class AiSdkModel implements LLM {
       } as LLMMessage];
 
       return {
-        response: "Error: Vercel AI API Error: " + error.message,
+        success: false,
+        response: "Error: Vercel AI API Error: " + (error as Error).message,
         messages: updatedMessages
       };
     }

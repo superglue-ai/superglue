@@ -1,13 +1,17 @@
 import { ToolConfig, ValidationResult, ValidationLLMConfig, AttemptStatus } from "../types.js";
 import { WorkflowResult } from "@superglue/client";
 import { pathToFileURL } from "node:url";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { generateObject } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
+import { join } from "node:path";
 import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { LanguageModel } from "@core/llm/language-model.js";
 
 const MAX_OUTPUT_FOR_LLM = 3000;
+
+const llmJudgmentSchema = z.object({
+    judgment: z.enum(["passes", "partial", "failed"]).describe("Whether the output passes, partially passes, or fails validation"),
+    reason: z.string().max(200).describe("Brief one-sentence reason for the judgment")
+});
 
 export class ToolValidationService {
     private validationLlmConfig: ValidationLLMConfig;
@@ -117,8 +121,7 @@ export class ToolValidationService {
             return;
         }
 
-        const baseDir = dirname(fileURLToPath(import.meta.url));
-        const validatorPath = join(baseDir, "..", toolConfig.validationFunction);
+        const validatorPath = join(__dirname, "..", toolConfig.validationFunction);
         const validatorUrl = pathToFileURL(validatorPath).href;
 
         const validatorModule = await import(validatorUrl);
@@ -135,7 +138,7 @@ export class ToolValidationService {
         toolConfig: ToolConfig,
         workflowResult: WorkflowResult,
         functionError?: string
-    ): Promise<{ judgment: "passes" | "partial" | "failed"; reason: string }> {
+    ): Promise<z.infer<typeof llmJudgmentSchema>> {
         const outputStr = JSON.stringify(workflowResult.data);
         const truncatedOutput = outputStr.length > MAX_OUTPUT_FOR_LLM 
             ? outputStr.substring(0, MAX_OUTPUT_FOR_LLM) + "... (truncated)"
@@ -148,20 +151,20 @@ export class ToolValidationService {
             functionError
         );
 
-        const openai = createOpenAI({
-            apiKey: process.env.OPENAI_API_KEY,
+        const result = await LanguageModel.generateObject<z.infer<typeof llmJudgmentSchema>>({
+            messages: [{ role: 'user', content: prompt }],
+            schema: zodToJsonSchema(llmJudgmentSchema),
+            temperature: 0
         });
 
-        const { object } = await generateObject({
-            model: openai(this.validationLlmConfig.model),
-            schema: z.object({
-                judgment: z.enum(["passes", "partial", "failed"]),
-                reason: z.string().max(200),
-            }),
-            prompt,
-        });
+        if (!result.success || typeof result.response === 'string') {
+            return {
+                judgment: "failed",
+                reason: `LLM validation error: ${result.response}`
+            };
+        }
 
-        return object;
+        return result.response;
     }
 
     private buildLLMPrompt(

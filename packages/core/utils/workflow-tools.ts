@@ -143,15 +143,15 @@ export const generateInstructionsImplementation: ToolImplementation<InstructionG
       items: { type: "string" }
     };
   
-    const { response: generatedInstructions, error: generatedInstructionsError } = await LanguageModel.generateObject({messages, schema, temperature: 0.2});
+    const result = await LanguageModel.generateObject<string[]>({messages, schema, temperature: 0.2});
   
-    if (generatedInstructionsError || generatedInstructions?.error) {
-      throw new Error(`Error generating instructions: ${generatedInstructionsError || generatedInstructions?.error}`);
+    if (!result.success) {
+      throw new Error(`Error generating instructions: ${result.response}`);
     }
   
     return {
       success: true,
-      data: sanitizeInstructionSuggestions(generatedInstructions)
+      data: sanitizeInstructionSuggestions(result.response)
     };
 };
 

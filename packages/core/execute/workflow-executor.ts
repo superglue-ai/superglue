@@ -13,12 +13,15 @@ import { evaluateTransform, generateTransformCode } from "../utils/transform.js"
 import { AbortError, ApiCallError } from "./api/api.js";
 import { runStepConfig } from "./api/api.legacy.js";
 import { generateStepConfig } from "../build/tool-step-builder.js";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 export interface WorkflowExecutorOptions {
   workflow: Workflow;
   metadata: Metadata;
   integrations: IntegrationManager[];
 }
+
 export class WorkflowExecutor implements Workflow {
   public id: string;
   public steps: ExecutionStep[];
@@ -372,6 +375,8 @@ export class WorkflowExecutor implements Workflow {
     logMessage("info", `'${step.id}' ${result.success ? "Complete" : "Failed"}`, this.metadata);
     return result;
   }
+
+
   private async evaluateConfigResponse({
     data,
     config,
@@ -380,7 +385,7 @@ export class WorkflowExecutor implements Workflow {
     data: any,
     config: ApiConfig,
     docSearchResultsForStepInstruction?: string
-  }): Promise<{ success: boolean, refactorNeeded: boolean, shortReason: string; }> {
+  }) {
   
     const evaluateStepResponsePrompt = getEvaluateStepResponseContext({ data, config, docSearchResultsForStepInstruction }, { characterBudget: 20000 });
   
@@ -394,13 +399,22 @@ export class WorkflowExecutor implements Workflow {
       }
     ] as LLMMessage[];
   
-    const response = await LanguageModel.generateObject(
-      { messages: messages, schema: { type: "object", properties: { success: { type: "boolean" }, refactorNeeded: { type: "boolean" }, shortReason: { type: "string" } } }, temperature: 0 });
-    if (response.error) {
-      throw new Error(`Error evaluating config response: ${response.error}`);
+    const evaluationSchema = z.object({
+      success: z.boolean().describe("Whether the step execution was successful"),
+      refactorNeeded: z.boolean().describe("Whether the configuration needs to be refactored"),
+      shortReason: z.string().describe("Brief reason for the evaluation result")
+    });
+
+    const evaluationResult = await LanguageModel.generateObject<z.infer<typeof evaluationSchema>>(
+      { messages: messages, schema: zodToJsonSchema(evaluationSchema), temperature: 0 });
+    
+    if (!evaluationResult.success) {
+      throw new Error(`Error evaluating config response: ${evaluationResult.response}`);
     }
-    return response.response;
+    
+    return evaluationResult.response;
   }
+
   
   private async executeConfig({
     config,
@@ -461,12 +475,16 @@ export class WorkflowExecutor implements Workflow {
           }
 
           const generateStepConfigResult = await generateStepConfig(retryCount, messages);
+          messages = generateStepConfigResult.messages;
           
-          if (!generateStepConfigResult.success || !generateStepConfigResult.config) {
-            throw new Error(generateStepConfigResult.error || "No step config generated");
+          if (!generateStepConfigResult.success) {
+            throw new Error(generateStepConfigResult.error);
           }
-          config = generateStepConfigResult.config;
-          messages = generateStepConfigResult.messages || [];
+          
+          config = {
+            ...config,
+            ...generateStepConfigResult.config
+          } as ApiConfig;
         }
   
         response = await runStepConfig({ config, payload, credentials, options });

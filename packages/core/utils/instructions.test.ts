@@ -8,6 +8,7 @@ vi.mock('../llm/language-model.js', () => {
     LanguageModel: {
       generateObject: vi.fn().mockImplementation(async (messages, _, temperature) => {
         return {
+          success: true,
           response: [
             "Process a payment using Stripe",
             "Send a welcome email via SendGrid",
@@ -57,7 +58,7 @@ describe('generateInstructionsImplementation', () => {
 
   it('should generate valid instructions (happy path)', async () => {
     const generateObject = vi.mocked(LanguageModel.generateObject)
-    generateObject.mockResolvedValueOnce({ response: expectedInstructions, messages: [] })
+    generateObject.mockResolvedValueOnce({ success: true, response: expectedInstructions, messages: [] })
 
     const result = await generateInstructionsImplementation({ integrations }, { orgId: 'test-org', runId: 'test-run', integrations })
     expect(result.success).toBe(true)
@@ -67,7 +68,7 @@ describe('generateInstructionsImplementation', () => {
 
   it('should handle empty response gracefully', async () => {
     const generateObject = vi.mocked(LanguageModel.generateObject)
-    generateObject.mockResolvedValueOnce({ response: [], messages: [] })
+    generateObject.mockResolvedValueOnce({ success: true, response: [], messages: [] })
 
     const result = await generateInstructionsImplementation({ integrations }, { orgId: 'test-org', runId: 'test-run', integrations })
     expect(result.success).toBe(true)
@@ -76,23 +77,19 @@ describe('generateInstructionsImplementation', () => {
 
   it('should handle malformed response', async () => {
     const generateObject = vi.mocked(LanguageModel.generateObject)
-    generateObject.mockResolvedValueOnce({ response: "not an array", messages: [] })
+    generateObject.mockResolvedValueOnce({ success: false, response: "not an array", messages: [] })
 
-    const result = await generateInstructionsImplementation({ integrations }, { orgId: 'test-org', runId: 'test-run', integrations })
-    expect(result.success).toBe(true)
-    expect(result.data).toEqual(["not an array"])
+    await expect(generateInstructionsImplementation({ integrations }, { orgId: 'test-org', runId: 'test-run', integrations })).rejects.toThrow("Error generating instructions: not an array")
   })
 
   it('should use correct temperature', async () => {
     const generateObject = vi.mocked(LanguageModel.generateObject)
-    generateObject.mockResolvedValueOnce({ response: expectedInstructions, messages: [] })
+    generateObject.mockResolvedValueOnce({ success: true, response: expectedInstructions, messages: [] })
 
     await generateInstructionsImplementation({ integrations }, { orgId: 'test-org', runId: 'test-run', integrations })
 
     expect(generateObject).toHaveBeenCalledWith(
-      expect.any(Array),
-      expect.any(Object),
-      0.2
+      expect.objectContaining({ temperature: 0.2 })
     )
   })
 })

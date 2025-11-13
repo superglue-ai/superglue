@@ -111,7 +111,7 @@ export class ToolBuilder {
       try {
         logMessage('info', `Building tool${retryCount > 0 ? ` (attempt ${retryCount + 1}/${maxRetries})` : ''}`, this.metadata);
 
-        const builtToolSchema = zodToJsonSchema(z.object({
+        const builtToolSchema = z.object({
           id: z.string().describe("The tool ID (e.g., 'stripe-create-order')"),
           steps: z.array(z.object({
               id: z.string().describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails')"),
@@ -141,7 +141,7 @@ export class ToolBuilder {
               }).describe("Complete API configuration for this step")
           })).describe("Array of workflow steps. Can be empty ([]) for transform-only workflows that just process the input payload without API calls"),
           finalTransform: z.string().describe("JavaScript function to transform the final workflow output to match responseSchema. Check if result is object or array: if object use sourceData.stepId.data, if array use sourceData.stepId.map(item => item.data). Example: (sourceData) => ({ result: Array.isArray(sourceData.stepId) ? sourceData.stepId.map(item => item.data) : sourceData.stepId.data })"),
-      }));
+      });
 
       messages.push({
         role: "user",
@@ -153,20 +153,20 @@ export class ToolBuilder {
         ? [searchDocumentationToolDefinition, { web_search: webSearchTool }]
         : [searchDocumentationToolDefinition];
       
-      const { response: generatedTool, error: generatedToolError } = await LanguageModel.generateObject({
+      const generateToolResult = await LanguageModel.generateObject<z.infer<typeof builtToolSchema>>({
         messages: messages,
-        schema:builtToolSchema,
+        schema: zodToJsonSchema(builtToolSchema),
         temperature: 0.0,
         tools
       });
 
-      if (generatedToolError || generatedTool?.error) {
-        throw new Error(`Error generating tool: ${generatedToolError || generatedTool?.error}`);
+      messages = generateToolResult.messages;
+
+      if (!generateToolResult.success) {
+        throw new Error(`Error generating tool: ${generateToolResult.response}`);
       }
 
-      if (typeof generatedTool === 'string') {
-        throw new Error(`Tool builder aborted with the following message: ${generatedTool}`)
-      }
+      const generatedTool = generateToolResult.response as Tool;
 
       const validation = this.validateTool(generatedTool);
         if (!validation.valid) {

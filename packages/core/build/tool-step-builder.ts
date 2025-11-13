@@ -1,11 +1,19 @@
-import { ApiConfig } from "@superglue/client";
+import { ApiConfig, HttpMethod, Pagination } from "@superglue/client";
 import { LLMMessage } from "../llm/language-model.js";
 import { LanguageModel } from "../llm/language-model.js";
 import { getWebSearchTool, searchDocumentationToolDefinition } from "../utils/workflow-tools.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
-const stepConfigSchema = zodToJsonSchema(z.object({
+
+export interface GenerateStepConfigResult {
+    success: boolean;
+    error?: string;
+    config?: Partial<ApiConfig>;
+    messages?: LLMMessage[];
+}
+
+const stepConfigSchema = z.object({
     apiConfig: z.object({
       urlHost: z.string().describe("The base URL host (e.g., https://api.example.com). Must not be empty."),
       urlPath: z.string().describe("The API endpoint path (e.g., /v1/users)."),
@@ -26,14 +34,7 @@ const stepConfigSchema = zodToJsonSchema(z.object({
         stopCondition: z.string().describe("REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number). response is the axios response object, access response data via response.data. Return true to STOP. E.g. (response, pageInfo) => !response.data.pagination.has_more")
       }).optional().describe("OPTIONAL: Only configure if you are using pagination variables in the URL, headers, or body. For OFFSET_BASED, ALWAYS use <<offset>>. If PAGE_BASED, ALWAYS use <<page>>. If CURSOR_BASED, ALWAYS use <<cursor>>.")
     }).describe("Complete API configuration to execute")
-  }));
-
-export interface GenerateStepConfigResult {
-    success: boolean;
-    error?: string;
-    config?: ApiConfig;
-    messages?: LLMMessage[];
-}
+  });
 
 export async function generateStepConfig(retryCount: number, messages: LLMMessage[]): Promise<GenerateStepConfigResult> {
     const temperature = Math.min(retryCount * 0.1, 1);
@@ -42,39 +43,28 @@ export async function generateStepConfig(retryCount: number, messages: LLMMessag
         ? [searchDocumentationToolDefinition, { web_search: webSearchTool }]
         : [searchDocumentationToolDefinition];
 
-    const { response: generatedConfig, error, messages: updatedMessages } = await LanguageModel.generateObject({
+    const generateStepConfigResult = await LanguageModel.generateObject<z.infer<typeof stepConfigSchema>>({
         messages,
-        schema: stepConfigSchema,
+        schema: zodToJsonSchema(stepConfigSchema),
         temperature,
         tools
     });
     
-    if (error) {
-        return { success: false, error, messages: updatedMessages };
-    }
-
-    if (typeof generatedConfig === 'string') {
-        return { success: false, error: generatedConfig, messages: updatedMessages };
-    }
     
-    if (generatedConfig?.error) {
-        return { success: false, error: generatedConfig.error, messages: updatedMessages };
-    }
-    
-    if (!generatedConfig?.apiConfig) {
-        return { 
-            error: `LLM did not return apiConfig. Response: ${JSON.stringify(generatedConfig).slice(0, 10000)}`,
+    if (!generateStepConfigResult.success) {
+        return {
             success: false,
-            messages: updatedMessages
+            error: generateStepConfigResult.response as string,
+            messages: generateStepConfigResult.messages
         };
     }
+
+    const generatedConfig = generateStepConfigResult.response as z.infer<typeof stepConfigSchema>;
     
-    const config: ApiConfig = {
-        id: generatedConfig.apiConfig.id || crypto.randomUUID(),
-        instruction: generatedConfig.apiConfig.instruction,
+    const config: Partial<ApiConfig> = {
         urlHost: generatedConfig.apiConfig.urlHost,
         urlPath: generatedConfig.apiConfig.urlPath,
-        method: generatedConfig.apiConfig.method,
+        method: generatedConfig.apiConfig.method as HttpMethod,
         queryParams: generatedConfig.apiConfig.queryParams ?
             Object.fromEntries(generatedConfig.apiConfig.queryParams.map((p: any) => [p.key, p.value])) :
             undefined,
@@ -82,13 +72,12 @@ export async function generateStepConfig(retryCount: number, messages: LLMMessag
             Object.fromEntries(generatedConfig.apiConfig.headers.map((p: any) => [p.key, p.value])) :
             undefined,
         body: generatedConfig.apiConfig.body,
-        authentication: generatedConfig.apiConfig.authentication,
-        pagination: generatedConfig.apiConfig.pagination,
+        pagination: generatedConfig.apiConfig.pagination as Pagination,
     };
     
     return {
         success: true,
         config,
-        messages: updatedMessages
+        messages: generateStepConfigResult.messages
     };
 };

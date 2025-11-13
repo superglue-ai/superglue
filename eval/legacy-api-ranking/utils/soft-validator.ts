@@ -2,21 +2,23 @@ import { parseJSON } from '@core/files/parsers/json.js';
 import { logMessage } from '@core/utils/logs.js';
 import { sample } from '@core/utils/tools.js';
 import { LLMMessage } from '@core/llm/language-model.js';
+import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
-export interface SoftValidationResult {
-    success: boolean;
-    reason: string;
-}
+const softValidationSchema = z.object({
+    success: z.boolean().describe('True if the actual result reasonably aligns with the expected criteria (be lenient)'),
+    reason: z.string().describe('Brief explanation of why it passes or fails validation (focus on core objectives, not minor differences)')
+});
+
+export type SoftValidationResult = z.infer<typeof softValidationSchema>;
 
 export async function validateWorkflowResult(
     actualResult: any,
     expectedResult: string,
     workflowInstruction: string,
     metadata: { orgId: string; userId: string }
-): Promise<SoftValidationResult> {
-    try {
-        // use top-level import for LanguageModel
-        const { LanguageModel } = await import('@core/llm/language-model.js');
+): Promise<z.infer<typeof softValidationSchema>> {
+    const { LanguageModel } = await import('@core/llm/language-model.js');
 
         let actualContent = JSON.stringify(actualResult, null, 2);
         if (actualContent.length > 10000) {
@@ -81,38 +83,19 @@ Please validate if the actual result reasonably aligns with the expected criteri
             { role: 'user', content: userPrompt }
         ];
 
-        const schema = {
-            type: 'object',
-            properties: {
-                success: {
-                    type: 'boolean',
-                    description: 'True if the actual result reasonably aligns with the expected criteria (be lenient)'
-                },
-                reason: {
-                    type: 'string',
-                    description: 'Brief explanation of why it passes or fails validation (focus on core objectives, not minor differences)'
-                }
-            },
-            required: ['success', 'reason'],
-            additionalProperties: false
-        };
+        const result = await LanguageModel.generateObject<z.infer<typeof softValidationSchema>>({
+            messages,
+            schema: zodToJsonSchema(softValidationSchema),
+            temperature: 0.1
+        });
 
-        const response = await LanguageModel.generateObject({ messages: messages, schema: schema, temperature: 0.1 });
+        if (!result.success) {
+            logMessage('error', `Soft validation failed: ${result.response}`, metadata);
+            return {
+                success: false,
+                reason: `Validation error: ${result.response}`
+            };
+        }
 
-        logMessage('debug',
-            `Soft validation result: success=${response.response.success}`,
-            metadata
-        );
-
-        return response.response;
-
-    } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        logMessage('error', `Soft validation failed: ${errorMsg}`, metadata);
-
-        return {
-            success: false,
-            reason: `Validation error: ${errorMsg}`
-        };
-    }
+        return result.response;
 }

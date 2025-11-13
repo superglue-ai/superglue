@@ -7,7 +7,7 @@ export type LLMMessage = SystemModelMessage | UserModelMessage | AssistantModelM
 export interface LLM {
     contextLength: number;
     generateText(messages: LLMMessage[], temperature?: number): Promise<LLMResponse>;
-    generateObject(input: LLMObjectGeneratorInput): Promise<LLMObjectResponse>;
+    generateObject<T>(input: LLMObjectGeneratorInput): Promise<LLMObjectResponse<T>>;
 }
 
 export interface LLMToolResponse {
@@ -41,11 +41,9 @@ export interface LLMResponse {
     messages: LLMMessage[];
 }
 
-export interface LLMObjectResponse {
-    response: any | null;
-    error?: string;
-    messages: LLMMessage[];
-}
+export type LLMObjectResponse<T> = 
+    | { success: true; response: T; messages: LLMMessage[] }
+    | { success: false; response: string; messages: LLMMessage[] };
 
 export interface LLMObjectGeneratorInput {
     messages: LLMMessage[];
@@ -68,8 +66,8 @@ export const LanguageModel = {
         return this._getInstance().generateText(messages, temperature);
     },
 
-    generateObject(input: LLMObjectGeneratorInput): Promise<LLMObjectResponse> {
-        return this._getInstance().generateObject(input);
+    generateObject<T>(input: LLMObjectGeneratorInput): Promise<LLMObjectResponse<T>> {
+        return this._getInstance().generateObject(input) as Promise<LLMObjectResponse<T>>;
     },
 
     _getInstance(): LLM {
