@@ -424,6 +424,16 @@ type Mutation {
     responseSchema: JSONSchema
   ): Workflow!
 
+  generateStepConfig(
+    instruction: String!
+    integrationId: String
+    currentStepConfig: JSON
+    stepInput: JSON
+    credentials: JSON
+    errorMessage: String
+    editInstruction: String
+  ): GenerateStepConfigResult!
+
   upsertWorkflow(id: ID!, input: JSON!): Workflow!
   deleteWorkflow(id: ID!): Boolean!
 
@@ -472,4 +482,10 @@ type Integration {
 type OAuthClientCredentials {
   client_id: String!
   client_secret: String!
+}
+
+type GenerateStepConfigResult {
+  success: Boolean!
+  error: String
+  config: JSON!
 }

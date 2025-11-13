@@ -470,7 +470,7 @@ export class WorkflowExecutor implements Workflow {
           { runId: crypto.randomUUID(), orgId: this.metadata.orgId, messages, integration });
           
           if (!generateStepConfigResult.success || !generateStepConfigResult.data) {
-            throw new Error("No API config generated");
+            throw new Error(generateStepConfigResult.error || "No API config generated");
           }
           config = generateStepConfigResult.data.config;
           messages = generateStepConfigResult.data.messages;

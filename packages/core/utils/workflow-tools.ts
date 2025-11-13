@@ -11,16 +11,6 @@ export const generateStepConfigToolImplementation: ToolImplementation<StepConfig
     const { configInstruction, retryCount } = args;
     const { integration, messages } = context;
 
-    if (!integration) {
-        return {
-            success: false,
-            error: "Integration not provided in context. The generate_step_config tool requires an integration to be passed in the tool executor context.",
-            data: {
-                messages: messages
-            }
-        };
-    }
-
     const temperature = Math.min(retryCount * 0.1, 1);
     const { response: generatedConfig, error, messages: updatedMessages } = await LanguageModel.generateObject(
         messages,
@@ -78,8 +68,12 @@ export const generateStepConfigToolImplementation: ToolImplementation<StepConfig
             urlHost: generatedConfig.apiConfig.urlHost,
             urlPath: generatedConfig.apiConfig.urlPath,
             method: generatedConfig.apiConfig.method,
-            queryParams: generatedConfig.apiConfig.queryParams,
-            headers: generatedConfig.apiConfig.headers,
+            queryParams: generatedConfig.apiConfig.queryParams ?
+                Object.fromEntries(generatedConfig.apiConfig.queryParams.map((p: any) => [p.key, p.value])) :
+                undefined,
+            headers: generatedConfig.apiConfig.headers ?
+                Object.fromEntries(generatedConfig.apiConfig.headers.map((p: any) => [p.key, p.value])) :
+                undefined,
             body: generatedConfig.apiConfig.body,
             authentication: generatedConfig.apiConfig.authentication,
             pagination: generatedConfig.apiConfig.pagination,

@@ -8,9 +8,10 @@ import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { getGenerateStepConfigContext } from "../../context/context-builders.js";
 import { LLMMessage } from "../../llm/language-model.js";
 import { GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../../context/context-prompts.js";
+import { logMessage } from "../../utils/logs.js";
 
 interface GenerateStepConfigArgs {
-  integrationId: string;
+  integrationId?: string;
   instruction: string;
   currentStepConfig?: Partial<ApiConfig>;
   stepInput?: Record<string, any>;
@@ -66,20 +67,37 @@ export const generateStepConfigResolver = async (
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
     
-    const integrationManager = new IntegrationManager(integrationId, context.datastore, context.orgId);
-    const integration = await integrationManager.getIntegration();
+    let integration: Integration | undefined;
+    let integrationDocs = '';
+    let integrationSpecificInstructions = '';
+
+    if (editInstruction && editInstruction.length < 100) {
+      logMessage('error', `Edit instruction must be at least 100 characters long`, metadata);
+      throw new Error('Edit instruction must be at least 100 characters long');
+    }
+    if (errorMessage && errorMessage.length < 100) {
+      throw new Error('Error message must be at least 100 characters long');
+    }
     
-    if (!integration) {
-      throw new Error(`Integration with id ${integrationId} not found`);
+    if (integrationId) {
+      try {
+        logMessage('info', `Generating step config for integration ${integrationId}`, metadata);
+        const integrationManager = new IntegrationManager(integrationId, context.datastore, context.orgId);
+        integration = await integrationManager.getIntegration();
+        
+        const docs = await integrationManager.getDocumentation();
+        integrationDocs = docs.content?.slice(0, 40000) || '';
+        integrationSpecificInstructions = integration.specificInstructions || '';
+      } catch (error) {
+        telemetryClient?.captureException(error, context.orgId, {
+          integrationId
+        });
+      }
     }
     
     const mode = errorMessage ? 'self-healing' 
       : editInstruction ? 'edit' 
       : 'create';
-    
-    const docs = await integrationManager.getDocumentation();
-    const integrationDocs = docs.content?.slice(0, 40000) || '';
-    const integrationSpecificInstructions = integration.specificInstructions || '';
     
     const userPrompt = getGenerateStepConfigContext({
       instruction,
@@ -110,11 +128,29 @@ export const generateStepConfigResolver = async (
     }, 
     { runId: metadata.runId, orgId: metadata.orgId, messages, integration });
   
-    return generatedStepConfig.data;
+    if (!generatedStepConfig.success || !generatedStepConfig.data?.config) {
+      return {
+        success: false,
+        error: generatedStepConfig.error || "Failed to generate step config",
+        config: {}
+      };
+    }
+
+    return {
+      success: true,
+      config: generatedStepConfig.data.config
+    };
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     telemetryClient?.captureException(error, context.orgId, {
-      integrationId
+      integrationId,
+      error: errorMessage
     });
-    throw error;
+    
+    return {
+      success: false,
+      error: errorMessage,
+      config: {}
+    };
   }
 };

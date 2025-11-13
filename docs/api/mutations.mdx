@@ -150,6 +150,103 @@ Builds a workflow automatically based on instructions and available integrations
   </Tab>
 </Tabs>
 
+### generateStepConfig
+
+Generates or refines an API configuration for a single workflow step using AI. Supports creating configurations from scratch, editing existing ones, or self-healing failed configurations. Can work with or without an integration context.
+
+**Use Cases:**
+- **Create**: Generate a new API config from an instruction (e.g., "Get all active users from the database")
+- **Edit**: Modify an existing config with new requirements (e.g., "Add pagination")
+- **Self-Healing**: Fix a failed config automatically when errors occur
+
+**Parameters:**
+- `instruction`: String! - Description of what the API call should do (required)
+- `integrationId`: ID - Integration to use for context/documentation (optional)
+- `currentStepConfig`: JSON - Existing API config to edit or fix (optional)
+- `stepInput`: JSON - Sample input data available to the step (optional)
+- `credentials`: JSON - Available credentials for variable context (optional)
+- `errorMessage`: String - Error from failed execution (triggers self-healing mode)
+- `editInstruction`: String - Specific changes to make (triggers edit mode)
+
+**Returns:** `GenerateStepConfigResult` containing:
+- `success`: Boolean - Whether the generation was successful
+- `error`: String (optional) - Error message if generation failed
+- `config`: JSON - The generated `ApiConfig` (empty object if failed)
+
+<Tabs>
+  <Tab title="GraphQL">
+    ```graphql
+    mutation GenerateStepConfig(
+      $instruction: String!,
+      $integrationId: ID,
+      $currentStepConfig: JSON,
+      $stepInput: JSON,
+      $credentials: JSON,
+      $errorMessage: String,
+      $editInstruction: String
+    ) {
+      generateStepConfig(
+        instruction: $instruction,
+        integrationId: $integrationId,
+        currentStepConfig: $currentStepConfig,
+        stepInput: $stepInput,
+        credentials: $credentials,
+        errorMessage: $errorMessage,
+        editInstruction: $editInstruction
+      ) {
+        success
+        error
+        config
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Client">
+    ```typescript
+    // Create mode: Generate new config from scratch
+    const result = await client.generateStepConfig({
+      instruction: "Get all products from the inventory database",
+      integrationId: "postgres-inventory",
+      stepInput: { warehouseId: "WH-001" },
+      credentials: { api_key: "..." }
+    });
+    
+    if (result.success) {
+      console.log("Generated config:", result.config);
+    } else {
+      console.error("Generation failed:", result.error);
+    }
+
+    // Edit mode: Modify existing config
+    const editedConfig = await client.generateStepConfig({
+      instruction: "Get all products from the inventory database",
+      integrationId: "postgres-inventory",
+      currentStepConfig: existingConfig,
+      editInstruction: "Add filtering for products with stock > 0"
+    });
+
+    // Self-healing mode: Fix failed config
+    const fixedConfig = await client.generateStepConfig({
+      instruction: "Get all products from the inventory database",
+      integrationId: "postgres-inventory",
+      currentStepConfig: failedConfig,
+      stepInput: { warehouseId: "WH-001" },
+      errorMessage: "API call failed with status 401"
+    });
+
+    // Without integration: Generic API config
+    const genericConfig = await client.generateStepConfig({
+      instruction: "Make a POST request to create a new order",
+      currentStepConfig: {
+        urlHost: "https://api.example.com",
+        urlPath: "/orders"
+      },
+      stepInput: { orderId: "123", items: [...] }
+    });
+    ```
+  </Tab>
+</Tabs>
+
 ## Configuration Management
 
 ### upsertWorkflow
