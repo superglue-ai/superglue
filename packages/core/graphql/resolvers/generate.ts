@@ -86,7 +86,7 @@ export const generateStepConfigResolver = async (
         integration = await integrationManager.getIntegration();
         
         const docs = await integrationManager.getDocumentation();
-        integrationDocs = docs.content?.slice(0, 40000) || '';
+        integrationDocs = docs.content|| '';
         integrationSpecificInstructions = integration.specificInstructions || '';
       } catch (error) {
         telemetryClient?.captureException(error, context.orgId, {

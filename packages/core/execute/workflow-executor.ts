@@ -440,7 +440,6 @@ export class WorkflowExecutor implements Workflow {
           if (messages.length === 0) {
             integration = await integrationManager.getIntegration();
             const docs = await integrationManager.getDocumentation();
-            const integrationDocs = docs?.content?.slice(0, 40000) || '';
             const integrationSpecificInstructions = integration.specificInstructions || '';
             
             const userPrompt = getGenerateStepConfigContext({
@@ -448,7 +447,7 @@ export class WorkflowExecutor implements Workflow {
               previousStepConfig: config,
               stepInput: payload,
               credentials,
-              integrationDocumentation: integrationDocs,
+              integrationDocumentation: docs?.content || '',
               integrationSpecificInstructions: integrationSpecificInstructions
             }, { characterBudget: 50000, mode: 'self-healing' });
         
