@@ -168,6 +168,19 @@ export class ToolBuilder {
 
       const generatedTool = generateToolResult.response;
 
+      generatedTool.steps = generatedTool.steps.map(step => ({
+        ...step,
+        apiConfig: {
+          ...step.apiConfig,
+          queryParams: step.apiConfig.queryParams
+            ? Object.fromEntries(step.apiConfig.queryParams.map((p: any) => [p.key, p.value]))
+            : undefined,
+          headers: step.apiConfig.headers
+            ? Object.fromEntries(step.apiConfig.headers.map((h: any) => [h.key, h.value]))
+            : undefined,
+        }
+      }));
+
       const validation = this.validateTool(generatedTool);
         if (!validation.valid) {
           const errorDetails = validation.errors.join('\n');
