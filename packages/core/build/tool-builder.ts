@@ -171,7 +171,7 @@ export class ToolBuilder {
 
       generatedTool.steps = generatedTool.steps.map(step => ({
         ...step,
-        modify: (step as any).modify || false,
+        modify: step.modify || false,
         apiConfig: {
           ...step.apiConfig,
           queryParams: step.apiConfig.queryParams
