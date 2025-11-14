@@ -1,0 +1,73 @@
+name: Sync to Hosted Repo
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  sync-to-hosted:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Clone hosted repo
+        env:
+          HOSTED_TOKEN: ${{ secrets.HOSTED_REPO_TOKEN }}
+        run: |
+          git clone https://x-access-token:${HOSTED_TOKEN}@github.com/superglueai/superglue-hosted.git hosted-repo
+
+      - name: Create branch and sync changes
+        working-directory: hosted-repo
+        run: |
+          BRANCH_NAME="sync-from-main-$(date +%s)"
+          git checkout -b "${BRANCH_NAME}"
+
+          rsync -av --exclude='.git' --exclude='hosted-repo' --exclude='node_modules' ../ ./
+
+          git add .
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git commit -m "Sync from main: ${{ github.event.pull_request.title }}" \
+                     -m "Original PR: ${{ github.event.pull_request.html_url }}" \
+                     -m "Merged by: @${{ github.event.pull_request.merged_by.login }}"
+
+          git push origin "${BRANCH_NAME}"
+
+          echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
+
+      - name: Create Pull Request
+        if: success()
+        env:
+          HOSTED_TOKEN: ${{ secrets.HOSTED_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOSTED_REPO_TOKEN }}
+        run: |
+          cd hosted-repo
+
+          gh pr create \
+            --repo superglueai/superglue-hosted \
+            --base main \
+            --head "${BRANCH_NAME}" \
+            --title "Sync: ${{ github.event.pull_request.title }}" \
+            --body "**Auto-synced from main repository**
+
+          Original PR: ${{ github.event.pull_request.html_url }}
+          Merged by: @${{ github.event.pull_request.merged_by.login }}
+
+          ---
+
+          ${{ github.event.pull_request.body }}"
