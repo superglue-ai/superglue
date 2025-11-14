@@ -16,6 +16,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { HelpTooltip } from '../utils/HelpTooltip';
+import { OctagonAlert } from 'lucide-react';
 
 interface ToolStepConfiguratorProps {
     step: any;
@@ -169,6 +170,12 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                 })()}
                             </CardTitle>
                         </div>
+                        {(step.modify === true) && (
+                            <Badge variant="outline" className="flex items-center gap-1 bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/30 text-amber-800 dark:text-amber-400 flex-shrink-0">
+                                <OctagonAlert className="h-3 w-3 text-amber-800 dark:text-amber-400" aria-label="Modifies data" />
+                                <span className="text-xs font-normal">Step modifies data on system</span>
+                            </Badge>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
@@ -212,6 +219,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 </div>
                                             )}
                                         </div>
+                                        
                                         {isEditingInstruction ? (
                                             <Textarea
                                                 value={step.apiConfig.instruction || ''}
@@ -235,6 +243,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 )}
                                             </div>
                                         )}
+                                        
                                     </div>
                                     <div className="flex gap-2">
                                         <div className="flex-1">

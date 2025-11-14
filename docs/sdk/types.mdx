@@ -48,6 +48,7 @@ A single API call within a workflow.
 ```typescript
 interface ExecutionStep {
   id: string;
+  modify?: boolean;
   apiConfig: ApiConfig;
   integrationId?: string;
   executionMode?: 'DIRECT' | 'LOOP';
@@ -60,6 +61,7 @@ interface ExecutionStep {
 
 **Fields:**
 - `id` - Unique identifier (reference in later steps)
+- `modify` - Whether this operation modifies data on the system (creates, updates, or deletes). Read-only operations should be `false`. Default is `false`.
 - `apiConfig` - The API call configuration
 - `integrationId` - Which integration to use
 - `executionMode` - `'DIRECT'` (run once) or `'LOOP'` (iterate over array)
