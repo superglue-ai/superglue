@@ -1,7 +1,7 @@
 import { Card } from '@/src/components/ui/card';
 import { cn, getIntegrationIcon, getSimpleIcon } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
-import { FileJson, FilePlay, Globe, RotateCw } from 'lucide-react';
+import { FileJson, FilePlay, Globe, RotateCw, OctagonAlert } from 'lucide-react';
 import React from 'react';
 
 const ACTIVE_CARD_STYLE = "ring-1 shadow-lg" as const;
@@ -160,11 +160,14 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
                             {index}
                         </span>
                     </div>
-                    {step?.executionMode === 'LOOP' && (
-                        <div className="absolute top-0 right-0 flex items-center h-5">
+                    <div className="absolute top-0 right-0 flex items-center gap-1 h-5">
+                        {(step?.modify === true) && (
+                            <OctagonAlert className="h-4 w-4 text-amber-500 dark:text-amber-400" aria-label="Modifies data" />
+                        )}
+                        {step?.executionMode === 'LOOP' && (
                             <RotateCw className="h-3 w-3 text-muted-foreground" aria-label="Loop step" />
-                        </div>
-                    )}
+                        )}
+                    </div>
                     <div className="flex-1 flex flex-col items-center justify-between leading-tight">
                         <div className="flex-1 flex flex-col items-center justify-center">
                             <div className="p-2 rounded-full bg-white dark:bg-gray-100 border border-border/50">
