@@ -111,11 +111,11 @@ const ConfigTable = () => {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [config.superglueEndpoint, expandedToolId]);
+  }, [config.superglueEndpoint]);
 
   React.useEffect(() => {
     const cachedData = loadFromCache<CachedTools>(CACHE_PREFIX);
-    if (cachedData) {
+    if (cachedData?.configs) {
       setAllConfigs(cachedData.configs);
       setTotal(cachedData.configs.length);
       setLoading(false);
@@ -592,7 +592,7 @@ const ConfigTable = () => {
                     {/* Expanded Details Row */}
                     {expandedToolId === config.id && (
                       <TableRow>
-                        <TableCell colSpan={5} className="p-0">
+                        <TableCell colSpan={5} className="p-4">
                           <ToolSchedulesList toolId={config.id} refreshTrigger={scheduleRefreshTrigger} />
                         </TableCell>
                       </TableRow>

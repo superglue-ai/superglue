@@ -241,7 +241,6 @@ export function ToolStepGallery({
     
     // Use computed payload from parent (already merged manual + files)
     const workingPayload = computedPayload || {};
-    console.log('stepResults', stepResults);
     const stepResultsMap = useMemo(() => 
         Array.isArray(stepResults)
             ? stepResults.reduce((acc: Record<string, any>, result: any) => {

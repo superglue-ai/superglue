@@ -6,6 +6,7 @@ import React from 'react';
 import { useConfig } from '@/src/app/config-context';
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
+import { StatusTooltip } from "@/src/components/ui/status-tooltip";
 import { Switch } from "@/src/components/ui/switch";
 import {
   Table,
@@ -15,13 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/src/components/ui/tooltip";
-import { useToast } from '@/src/hooks/use-toast';
 import { tokenRegistry } from '@/src/lib/token-registry';
 import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/client';
 import cronstrue from 'cronstrue';
@@ -30,13 +24,12 @@ import ToolScheduleModal from './ToolScheduleModal';
 
 const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refreshTrigger?: number }) => {
   const config = useConfig();
-  const { toast } = useToast();
   const [toolSchedules, setToolSchedules] = React.useState<ToolSchedule[]>([]);
   const [loadingSchedules, setLoadingSchedules] = React.useState(false);
-  const [modalOpen, setModalOpen] = React.useState(false);
-  const [modalSchedule, setModalSchedule] = React.useState<ToolSchedule | null>(null);
+  const [showForm, setShowForm] = React.useState(false);
+  const [editingSchedule, setEditingSchedule] = React.useState<ToolSchedule | null>(null);
   const [executingSchedules, setExecutingSchedules] = React.useState<Record<string, 'loading' | 'success' | 'error'>>({});
-  const [scheduleErrors, setScheduleErrors] = React.useState<Record<string, string>>({});
+  const [scheduleStatus, setScheduleStatus] = React.useState<Record<string, { status: 'success' | 'error', message: string }>>({});
 
   React.useEffect(() => {
     loadSchedules();
@@ -134,13 +127,7 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
 
       if (result.success) {
         setExecutingSchedules(prev => ({ ...prev, [scheduleId]: 'success' }));
-        
-        setTimeout(() => {
-          setExecutingSchedules(prev => {
-            const { [scheduleId]: _, ...rest } = prev;
-            return rest;
-          });
-        }, 3000);
+        setScheduleStatus(prev => ({ ...prev, [scheduleId]: { status: 'success', message: 'Executed successfully' } }));
       } else {
         throw new Error(result.error || 'Execution failed');
       }
@@ -149,40 +136,50 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       setExecutingSchedules(prev => ({ ...prev, [scheduleId]: 'error' }));
-      setScheduleErrors(prev => ({ ...prev, [scheduleId]: errorMessage }));
-      
-      setTimeout(() => {
-        setExecutingSchedules(prev => {
-          const { [scheduleId]: _, ...rest } = prev;
-          return rest;
-        });
-        setScheduleErrors(prev => {
-          const { [scheduleId]: _, ...rest } = prev;
-          return rest;
-        });
-      }, 10000);
+      setScheduleStatus(prev => ({ ...prev, [scheduleId]: { status: 'error', message: errorMessage } }));
     }
   };
 
-  const handleModalOpen = (schedule?: ToolSchedule) => {
-    setModalSchedule(schedule);
-    setModalOpen(true);
+  const handleFormOpen = (schedule?: ToolSchedule) => {
+    setEditingSchedule(schedule || null);
+    setShowForm(true);
   };
 
-  const handleModalClose = () => {
-    setModalOpen(false);
-    setModalSchedule(null);
+  const handleFormClose = () => {
+    setShowForm(false);
+    setEditingSchedule(null);
   };
 
-  return (loadingSchedules ? (
-    <div className="flex items-center justify-center py-8">
-      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-    </div>
-  ) : (
-    <div className="p-4">
+  const handleFormSave = () => {
+    handleFormClose();
+    loadSchedules();
+  };
+
+  if (loadingSchedules) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (showForm) {
+    return (
+      <ToolScheduleModal 
+      isOpen={true} 
+      toolId={toolId} 
+      schedule={editingSchedule || undefined} 
+      onClose={handleFormClose} 
+      onSave={handleFormSave} 
+    />
+);
+  }
+
+  return (
+    <div className="">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold">Schedules</h3>
-        <Button size="sm" onClick={() => handleModalOpen()}>
+        <Button size="sm" onClick={() => handleFormOpen()}>
           <Plus className="h-4 w-4 mr-2" />
           Add Schedule
         </Button>
@@ -200,7 +197,6 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
             <TableRow className="!border-b">
               <TableHead className="pl-0 w-[60px]">Active</TableHead>
               <TableHead>Schedule</TableHead>
-              <TableHead>Cron</TableHead>
               <TableHead>On Success</TableHead>
               <TableHead>
                 Last Run
@@ -227,7 +223,6 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
                   />
                 </TableCell>
                 <TableCell className="w-[200px]">{cronstrue.toString(schedule.cronExpression)}</TableCell>
-                <TableCell className="w-[200px]">{schedule.cronExpression}</TableCell>
                 <TableCell className="max-w-[300px]">
                   {schedule.options?.webhookUrl ? (
                     schedule.options.webhookUrl.startsWith('tool:') ? (
@@ -251,30 +246,35 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-1">
-                    <TooltipProvider delayDuration={0}>
-                      <Tooltip open={executingSchedules[schedule.id] === 'success' || executingSchedules[schedule.id] === 'error'}>
-                        <TooltipTrigger asChild>
-                          <span className="inline-block">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={(e) => handleRunNow(e, schedule.id)}
-                              disabled={!!executingSchedules[schedule.id]}
-                            >
-                              {executingSchedules[schedule.id] === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
-                              {executingSchedules[schedule.id] === 'success' && <Check className="h-4 w-4 text-green-500" />}
-                              {executingSchedules[schedule.id] === 'error' && <X className="h-4 w-4 text-red-500" />}
-                              {!executingSchedules[schedule.id] && <Play className="h-4 w-4" />}
-                            </Button>
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          {executingSchedules[schedule.id] === 'success' && 'Executed successfully'}
-                          {executingSchedules[schedule.id] === 'error' && scheduleErrors[schedule.id]}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <Button variant="ghost" size="icon" onClick={() => handleModalOpen(schedule)}>
+                    <StatusTooltip
+                      status={scheduleStatus[schedule.id]?.status || null}
+                      message={scheduleStatus[schedule.id]?.message}
+                      onDismiss={() => {
+                        setExecutingSchedules(prev => {
+                          const { [schedule.id]: _, ...rest } = prev;
+                          return rest;
+                        });
+                        setScheduleStatus(prev => {
+                          const { [schedule.id]: _, ...rest } = prev;
+                          return rest;
+                        });
+                      }}
+                    >
+                      <span className="inline-block">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => handleRunNow(e, schedule.id)}
+                          disabled={!!executingSchedules[schedule.id]}
+                        >
+                          {executingSchedules[schedule.id] === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
+                          {executingSchedules[schedule.id] === 'success' && <Check className="h-4 w-4 text-green-500" />}
+                          {executingSchedules[schedule.id] === 'error' && <X className="h-4 w-4 text-red-500" />}
+                          {!executingSchedules[schedule.id] && <Play className="h-4 w-4" />}
+                        </Button>
+                      </span>
+                    </StatusTooltip>
+                    <Button variant="ghost" size="icon" onClick={() => handleFormOpen(schedule)}>
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost"
@@ -290,9 +290,8 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
         </Table>
         </div>
       )}
-      <ToolScheduleModal isOpen={modalOpen} toolId={toolId} schedule={modalSchedule} onClose={handleModalClose} onSave={loadSchedules} />
     </div>
-  ));
+  );
 };
 
 export default ToolSchedulesList;

@@ -10,13 +10,14 @@ import {
   Code,
   ExternalLink,
   Webhook,
+  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CodeSnippet } from "../../editors/ReadonlyCodeEditor";
 import { Button } from "../../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
-import { ToolDeployScheduleForm } from "./ToolDeployScheduleForm";
+import ToolSchedulesList from "../schedule/ToolSchedulesList";
 
 interface ToolDeployModalProps {
   currentTool: Workflow;
@@ -138,8 +139,16 @@ await client.executeWorkflow({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-x-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Deploy your Tool
+          <DialogTitle className="flex items-center justify-between">
+            <span>Deploy your Tool</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </DialogTitle>
         </DialogHeader>
 
@@ -212,11 +221,8 @@ await client.executeWorkflow({
                     exit={{ opacity: 0, height: 0, overflow: "hidden" }}
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                   >
-                    <ToolDeployScheduleForm
+                    <ToolSchedulesList
                       toolId={currentTool.id}
-                      onSuccess={() => {
-                        setScheduleSuccess(true);
-                      }}
                     />
                   </motion.div>
                 )}
@@ -459,17 +465,6 @@ await client.executeWorkflow({
             )}
           </Tabs>
 
-          {/* Action buttons */}
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={() => {
-                onClose();
-              }}
-            >
-              Close
-            </Button>
-          </div>
         </div>
       </DialogContent>
     </Dialog>

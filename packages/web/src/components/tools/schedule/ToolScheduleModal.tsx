@@ -1,5 +1,4 @@
 import { useConfig } from '@/src/app/config-context';
-import { Switch } from "@/src/components/ui/switch";
 import { useToast } from '@/src/hooks/use-toast';
 import { createSuperglueClient } from '@/src/lib/client-utils';
 import { cn, getGroupedTimezones } from '@/src/lib/general-utils';
@@ -10,7 +9,6 @@ import { Check, ChevronRight, ChevronsUpDown, Loader2 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
 import { Button } from '../../ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../ui/card';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../../ui/command';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
@@ -241,27 +239,12 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
 
   return (
     isOpen && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-        <div className="bg-background rounded-xl max-w-2xl w-full max-h-full flex flex-col overflow-hidden">
-          <Card className="flex flex-col h-full overflow-hidden">
-            <CardHeader className="flex-shrink-0">
-              <CardTitle className="text-lg">
-                Add Schedule for: {toolId}
-              </CardTitle>
-            </CardHeader>
-            <div className="flex-1 overflow-y-auto">
-              <CardContent className="flex flex-col gap-6">
-                {/* enabled switch */}
-                <div className="flex items-center gap-3">
-                  <Label htmlFor="enabled">Enable schedule</Label>
-                  <Switch
-                    id="enabled"
-                    checked={enabled}
-                    onCheckedChange={handleEnabledChange}
-                    className="custom-switch"
-                  />
-                </div>
-
+      <div className="flex flex-col h-full overflow-hidden">
+        <div className="flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-6 pb-6">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">Schedule tool</h2>
+            </div>
                 {/* frequency select */}
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="frequency">Frequency</Label>
@@ -559,9 +542,9 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                     </div>
                   )}
                 </div>
-              </CardContent>
+              </div>
             </div>
-            <CardFooter className="flex-shrink-0">
+            <div className="flex-shrink-0">
               <div className="flex justify-end gap-2 w-full">
                 <Button variant="outline" onClick={onClose}>
                   Cancel
@@ -571,9 +554,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                   {schedule ? "Save Changes" : "Add Schedule"}
                 </Button>
               </div>
-            </CardFooter>
-          </Card>
-        </div>
+            </div>
       </div>
     )
   );
