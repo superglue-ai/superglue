@@ -122,6 +122,7 @@ Individual step within a workflow.
 ```graphql
 type ExecutionStep {
   id: String!
+  modify: Boolean                   # Whether this step modifies data (writes, updates, deletes)
   apiConfig: ApiConfig!             # API configuration for this step
   integrationId: ID                 # Integration to use for this step
   executionMode: String             # DIRECT | LOOP
@@ -456,6 +457,7 @@ Configuration for a single step within a workflow.
 ```graphql
 type ExecutionStep {
   id: String!
+  modify: Boolean           # Whether this step modifies data (writes, updates, deletes)
   apiConfig: ApiConfig!
   integrationId: ID
   executionMode: String     # DIRECT | LOOP
@@ -466,6 +468,7 @@ type ExecutionStep {
 }
 ```
 
+- `modify`: Indicates whether this operation modifies data on the system it operates on (creates, updates, or deletes). Read-only operations should be `false`. Default is `false`.
 - `executionMode`: How to execute the step (DIRECT for single execution, LOOP for batch processing)
 - `loopSelector`: JSONata expression to select items for looping
 - `loopMaxIters`: Maximum iterations for loop mode (default: 1000)

@@ -136,7 +136,7 @@ When present, these user instructions should take priority and be carefully foll
 </INTEGRATION_INSTRUCTIONS>
 
 <STEP_CREATION>
-1. [Important] Fetch ALL prerequisites like available projects you can query, available entities / object types you can access, available categories you can filter on, etc. 
+1. [Important] Fetch ALL prerequisites like available projects you can query, available entities / object types you can access, available categories you can filter on, etc.
 2. [Important] Plan the actual steps to fulfill the instruction. Critical: If the workflow is not a pure transformation task, you MUST add steps.
 
 Further:
@@ -151,6 +151,7 @@ Further:
 - For pure data transformation tasks with no API calls, the workflow may have no steps with a final transformation only
 - Step instructions should DESCRIBE in detail (2-3 sentences) what this steps goal is (ex. retrieve certain data, trigger an action, etc.), and how the response should be structured, without prescribing a rigid response structure.
 - The API's actual response structure will be discovered during execution - don't prescribe it
+- MODIFY FLAG: Identify if the operation can meaningfully change or delete live data and label it as modify only when the action carries clear potential for harm. Do not rely on HTTP verbs alone and judge based on the actual effect of the call. Default to false
 
 CRITICAL: Never use any integration IDs in a step that were not explicitly provided as an available integration in the <available_integration_ids> context.
 </STEP_CREATION>

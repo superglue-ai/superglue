@@ -300,6 +300,7 @@ type TenantInfo {
 
 type ExecutionStep {
   id: String!
+  modify: Boolean
   apiConfig: ApiConfig!
   integrationId: ID
   executionMode: String # DIRECT | LOOP
@@ -311,6 +312,7 @@ type ExecutionStep {
 
 input ExecutionStepInput {
   id: String!
+  modify: Boolean
   apiConfig: ApiInput!
   integrationId: ID
   executionMode: String # DIRECT | LOOP
