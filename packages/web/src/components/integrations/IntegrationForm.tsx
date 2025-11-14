@@ -1186,13 +1186,23 @@ export function IntegrationForm({
                                         </div>
                                     )}
 
-                                    {isOAuthConfigured && (oauthFields.expires_at) && (oauthFields.expires_at < Date.now() + 1000 * 60 * 60 * 24) && (
-                                        <div className="pt-2 text-xs text-muted-foreground">
-                                            OAuth access token expired on``: {
-                                                new Date(oauthFields.expires_at).toLocaleString()
-                                            }
-                                        </div>
-                                    )}
+                                    {isOAuthConfigured && oauthFields.expires_at && (() => {
+                                        const expiryDate = new Date(oauthFields.expires_at);
+                                        const expiryTime = expiryDate.getTime();
+                                        const now = Date.now();
+                                        const isExpired = expiryTime < now;
+                                        
+                                        if (!isExpired) return null;
+                                        
+                                        const dateStr = expiryDate.toLocaleDateString();
+                                        const timeStr = expiryDate.toLocaleTimeString();
+                                        
+                                        return (
+                                            <div className="pt-2 text-xs text-muted-foreground">
+                                                OAuth access token expired: {dateStr} {timeStr}. Execute a tool with this integration to refresh automatically.
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             )}
                         </>
