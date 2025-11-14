@@ -117,7 +117,7 @@ export class ToolBuilder {
               id: z.string().describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails')"),
               integrationId: z.string().describe("REQUIRED: The integration ID for this step (must match one of the available integration IDs)"),
               loopSelector: z.string().describe("JavaScript function that returns OBJECT for direct execution or ARRAY for loop execution. If returns OBJECT (including {}), step executes once with object as currentItem. If returns ARRAY, step executes once per array item. Examples: (sourceData) => ({ userId: sourceData.userId }) OR (sourceData) => sourceData.getContacts.data.filter(c => c.active)"),
-              modify: z.boolean().describe("Marks whether this operation modifies data on the system it operates on (writes, updates, deletes). Read-only operations should be false. Default is false."),
+              modify: z.boolean().optional().describe("Marks whether this operation modifies data on the system it operates on (writes, updates, deletes). Read-only operations should be false. Default is false."),
               apiConfig: z.object({
                   id: z.string().describe("Same as the step ID"),
                   instruction: z.string().describe("A concise instruction describing WHAT data this API call should retrieve or what action it should perform."),
