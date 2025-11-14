@@ -103,6 +103,8 @@ export const truncateValue = (value: any, depth: number = 0): any => {
     return '...';
   }
 
+  if (typeof value === 'function') return '[FUNCTION]';
+
   if (typeof value === 'string') {
     if (value.length > MAX_STRING_PREVIEW_LENGTH) {
       return value.substring(0, MAX_STRING_PREVIEW_LENGTH) + `... [${value.length.toLocaleString()} chars total]`;
@@ -136,6 +138,9 @@ export const truncateValue = (value: any, depth: number = 0): any => {
 export const truncateForDisplay = (data: any): { value: string, truncated: boolean } => {
   if (data === null || data === undefined) {
     return { value: '{}', truncated: false };
+  }
+  if (typeof data === 'function') {
+    return { value: JSON.stringify('[FUNCTION]'), truncated: false };
   }
   if (typeof data === 'string') {
     if (data.length > MAX_STRING_PREVIEW_LENGTH) {
