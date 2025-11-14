@@ -188,11 +188,6 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
         options
       });
 
-      toast({
-        title: "Schedule saved",
-        description: schedule ? "Schedule updated successfully." : "Schedule created successfully."
-      });
-
       onClose();
       onSave?.();
     } catch (error) {
