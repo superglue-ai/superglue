@@ -2,7 +2,7 @@ import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglu
 import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { WorkflowBuilder } from "../../build/workflow-builder.js";
+import { ToolBuilder } from "../../build/tool-builder.js";
 import { ToolSelector } from "../../execute/tool-selector.js";
 import { WorkflowExecutor } from "../../execute/workflow-executor.js";
 import { parseJSON } from "../../files/index.js";
@@ -138,8 +138,16 @@ export const executeWorkflowResolver = async (
     });
 
     // Notify webhook if configured (fire-and-forget)
-    if (args.options?.webhookUrl) {
+    if (args.options?.webhookUrl?.startsWith('http')) {
       notifyWebhook(args.options.webhookUrl, runId, result.success, result.data, result.error);
+    }
+    else if(args.options?.webhookUrl?.startsWith('tool:')) {
+      const toolId = args.options.webhookUrl.split(':')[1];
+      if(toolId == args.input.id) {
+        logMessage('warn', "Tool cannot trigger itself", metadata);
+        return;
+      }
+      executeWorkflowResolver(_, { input: { id: toolId }, payload: result.data, credentials: args.credentials, options: { ...args.options, webhookUrl: undefined } }, context, info);
     }
 
     return result;
@@ -156,13 +164,8 @@ export const executeWorkflowResolver = async (
       completedAt: new Date(),
     };
     // Save run to datastore
+    // do not trigger webhook on failure
     context.datastore.createRun({ result, orgId: context.orgId });
-
-    // Notify webhook if configured (for failure, fire-and-forget)
-    if (args.options?.webhookUrl) {
-      notifyWebhook(args.options.webhookUrl, runId, false, undefined, String(error));
-    }
-
     return { ...result, data: {}, stepResults: [] } as WorkflowResult;
   }
 };
@@ -307,14 +310,14 @@ export const buildWorkflowResolver = async (
       resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds);
     }
 
-    const builder = new WorkflowBuilder(
+    const builder = new ToolBuilder(
       instruction,
       resolvedIntegrations,
       payload,
       responseSchema,
       metadata
     );
-    const workflow = await builder.buildWorkflow();
+    const workflow = await builder.buildTool();
 
     workflow.id = await generateUniqueId({
       baseId: workflow.id,

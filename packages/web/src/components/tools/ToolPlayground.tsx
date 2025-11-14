@@ -24,7 +24,6 @@ import {
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
-import { ToolDeployModal } from "./deploy/ToolDeployModal";
 import { ToolStepGallery } from "./ToolStepGallery";
 
 export interface ToolPlaygroundProps {

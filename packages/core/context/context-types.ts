@@ -47,7 +47,7 @@ export type LoopSelectorContextOptions = {
 
 export type EvaluateStepResponseContextInput = {
     data: any;
-    endpoint: ApiConfig;
+    config: ApiConfig;
     docSearchResultsForStepInstruction: string;
 };
 
@@ -77,14 +77,18 @@ export type EvaluateTransformContextOptions = {
     characterBudget: number;
 };
 
-export type GenerateApiConfigContextInput = {
+export type GenerateStepConfigContextInput = {
     instruction: string;
-    previousStepConfig: Partial<ApiConfig>;
-    stepInput: any;
-    credentials: Record<string, string>;
-    integrationManager?: IntegrationManager;
+    previousStepConfig?: Partial<ApiConfig>;
+    stepInput?: any;
+    credentials?: Record<string, string>;
+    integrationDocumentation: string;
+    integrationSpecificInstructions: string;
+    errorMessage?: string;
+    editInstruction?: string;
 };
 
-export type GenerateApiConfigContextOptions = {
+export type GenerateStepConfigContextOptions = {
     characterBudget: number;
+    mode: 'create' | 'edit' | 'self-healing';
 };

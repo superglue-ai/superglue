@@ -27,7 +27,7 @@ CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
 Requirements:
 - Function signature: (sourceData) => { ... }
 - Return statement is REQUIRED - the function must return the transformed data
-- Pure function - no side effects or external dependencies
+- Pure SYNCHRONOUS function - no async/await, no external dependencies
 - Handle missing/null data gracefully with optional chaining (?.) and defaults - BUT - throw when expected and required data is missing so superglue can self heal
 - Validate arrays with Array.isArray() before using array methods
 - Return appropriate defaults when data is missing
@@ -122,7 +122,7 @@ Schema:
 
 Make this fast and do not think too hard, this is just an approximation.`;
 
-export const BUILD_WORKFLOW_SYSTEM_PROMPT = `You are an expert AI assistant responsible for building executable workflows from user instructions.
+export const BUILD_TOOL_SYSTEM_PROMPT = `You are an expert AI assistant responsible for building executable workflows from user instructions.
 Your goal is to analyze the user's request, break it down into logical steps, and create a complete executable workflow with fully populated API configurations.
 
 <INTEGRATION_INSTRUCTIONS>
@@ -311,7 +311,7 @@ CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
 Requirements:
 - Function signature: (sourceData) => { ... } or (sourceData, currentItem) => { ... } for loops
 - Return statement is REQUIRED - the function must return the transformed data
-- Pure function - no side effects or external dependencies
+- Pure SYNCHRONOUS function - no async/await, no side effects, no external dependencies
 - Handle missing/null data gracefully with optional chaining (?.) and defaults - BUT - throw when expected and required data is missing so superglue can self heal
 - Validate arrays with Array.isArray() before using array methods
 - Return appropriate defaults when data is missing
@@ -480,7 +480,7 @@ BATCH OPERATIONS:
 </FTP_SFTP>
 `;
 
-export const SELF_HEALING_SYSTEM_PROMPT = `You are an API configuration and execution agent. Your task is to successfully execute an API call by generating and refining API configurations based on the provided context and any errors encountered. Generate tool calls and their arguments only, do not include any other text unless explictly instructed to.
+export const GENERATE_STEP_CONFIG_SYSTEM_PROMPT = `You are an API configuration and execution agent. Your task is to successfully execute an API call by generating and refining API configurations based on the provided context and any errors encountered. Generate tool calls and their arguments only, do not include any other text unless explictly instructed to.
 
 You have access to two tools:
 1. submit_tool - Submit an API configuration to execute the call and validate the response

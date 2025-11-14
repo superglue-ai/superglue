@@ -1,4 +1,4 @@
-import type { AssistantModelMessage, SystemModelMessage, ToolModelMessage, UserModelMessage } from "ai";
+import type { AssistantModelMessage, SystemModelMessage, Tool, ToolModelMessage, UserModelMessage } from "ai";
 import { ToolCall, ToolCallResult, ToolDefinition } from "../execute/tools.js";
 import { AiSdkModel } from "./ai-sdk-model.js";
 
@@ -7,7 +7,7 @@ export type LLMMessage = SystemModelMessage | UserModelMessage | AssistantModelM
 export interface LLM {
     contextLength: number;
     generateText(messages: LLMMessage[], temperature?: number): Promise<LLMResponse>;
-    generateObject(messages: LLMMessage[], schema: any, temperature?: number, customTools?: ToolDefinition[], context?: any): Promise<LLMObjectResponse>;
+    generateObject<T>(input: LLMObjectGeneratorInput): Promise<LLMObjectResponse<T>>;
 }
 
 export interface LLMToolResponse {
@@ -41,10 +41,17 @@ export interface LLMResponse {
     messages: LLMMessage[];
 }
 
-export interface LLMObjectResponse {
-    response: any | null;
-    error?: string;
+export type LLMObjectResponse<T> = 
+    | { success: true; response: T; messages: LLMMessage[] }
+    | { success: false; response: string; messages: LLMMessage[] };
+
+export interface LLMObjectGeneratorInput {
     messages: LLMMessage[];
+    schema: any;
+    temperature?: number;
+    tools?: (ToolDefinition | Record<string, Tool>)[];
+    toolContext?: any;
+    toolChoice?: 'auto' | 'required' | 'none' | { type: 'tool'; toolName: string };
 }
 
 // Lazy initialization to ensure environment variables are loaded
@@ -59,8 +66,8 @@ export const LanguageModel = {
         return this._getInstance().generateText(messages, temperature);
     },
 
-    generateObject(messages: LLMMessage[], schema: any, temperature?: number, customTools?: ToolDefinition[], toolContext?: any): Promise<LLMObjectResponse> {
-        return this._getInstance().generateObject(messages, schema, temperature, customTools, toolContext);
+    generateObject<T>(input: LLMObjectGeneratorInput): Promise<LLMObjectResponse<T>> {
+        return this._getInstance().generateObject(input) as Promise<LLMObjectResponse<T>>;
     },
 
     _getInstance(): LLM {

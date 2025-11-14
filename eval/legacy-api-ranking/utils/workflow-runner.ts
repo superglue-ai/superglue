@@ -1,4 +1,4 @@
-import { WorkflowBuilder } from '@core/build/workflow-builder.js';
+import { ToolBuilder } from '@core/build/tool-builder.js';
 import { DataStore } from '@core/datastore/types.js';
 import { WorkflowExecutor } from '@core/execute/workflow-executor.js';
 import { IntegrationManager } from '@core/integrations/integration-manager.js';
@@ -221,7 +221,7 @@ export class WorkflowRunner {
         try {
             logMessage('info', `📝 Building workflow ${workflowConfig.name}...`, this.metadata);
 
-            const builder = new WorkflowBuilder(
+            const builder = new ToolBuilder(
                 workflowConfig.instruction,
                 integrations,
                 workflowConfig.payload || {},
@@ -229,7 +229,7 @@ export class WorkflowRunner {
                 this.metadata
             );
 
-            workflow = await builder.buildWorkflow();
+            workflow = await builder.buildTool();
             workflow.id = await generateUniqueId({
                 baseId: workflow.id,
                 exists: async (id) => !!(await this.datastore.getWorkflow({ id, orgId: this.metadata.orgId }))
