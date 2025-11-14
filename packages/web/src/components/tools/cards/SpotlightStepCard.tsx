@@ -318,7 +318,7 @@ export const SpotlightStepCard = React.memo(({
                                     return (
                                         <>
                                             <p className="text-xs text-muted-foreground mb-2">
-                                            The step data is created by taking the aggregated step input and passing it as <code className="text-xs">sourceData</code> to the step data selector. The JavaScript function then picks the fields needed for this step.
+                                            The step data is created by taking the aggregated step input and passing it as <code className="text-xs">sourceData</code> to the step data selector. The JavaScript function then selects the data needed for this step.
                                             </p>
                                             <div className="flex gap-3">
                                                 <div className="flex-1">
@@ -367,7 +367,7 @@ export const SpotlightStepCard = React.memo(({
                                                     <div className="flex-1">
                                                         <Label className="text-xs flex items-center gap-1 mb-1">
                                                             Step Data Selector (JavaScript)
-                                                            <HelpTooltip text="JavaScript anonymized arrow function selecting specific step inputs. If the output is an array, the step runs once per item; within each iteration sourceData.currentItem is set to that item." />
+                                                            <HelpTooltip text="JavaScript arrow function that receives the step input as sourceData. It should return the part of the data this step needs. If it returns an object, the step runs once. If it returns an array, the step runs once for each item and sourceData.currentItem is set for every iteration." />
                                                         </Label>
                                                         <JavaScriptCodeEditor
                                                             value={step.loopSelector || '(sourceData) => { }'}
