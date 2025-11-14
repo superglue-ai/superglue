@@ -57,7 +57,7 @@ export interface ToolPlaygroundProps {
 
 export interface ToolPlaygroundHandle {
   executeTool: () => Promise<void>;
-  saveTool: () => Promise<void>;
+  saveTool: () => Promise<boolean>;
   getCurrentTool: () => Tool;
   closeRebuild: () => void;
 }
@@ -593,7 +593,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   }, [id, embedded, initialTool]);
 
 
-  const saveTool = async () => {
+  const saveTool = async (): Promise<boolean> => {
     try {
       try {
         JSON.parse(responseSchema || '{}');
@@ -648,6 +648,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 3000);
+      return true;
     } catch (error: any) {
       console.error("Error saving tool:", error);
       toast({
@@ -655,6 +656,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         description: error.message,
         variant: "destructive",
       });
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1056,8 +1058,12 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       )}
       <Button
           variant="outline"
-          onClick={() => setShowDeployModal(true)}
+          onClick={async () => {
+            await saveTool();
+            setShowDeployModal(true);
+          }}
         className="h-9 px-5"
+        disabled={saving || loading}
       >
         <CloudUpload className="h-4 w-4" />
         Deploy
@@ -1066,7 +1072,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         variant="default"
         onClick={saveTool}
         disabled={saving || loading}
-        className="h-9 px-5 shadow-md border border-primary/40"
+        className="h-9 px-5 w-[108px] shadow-md border border-primary/40"
       >
         {saving ? "Saving..." : justSaved ? (
           <>

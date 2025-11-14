@@ -198,11 +198,11 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
           <Table className="w-full">
           <TableHeader>
             <TableRow className="!border-b">
-              <TableHead className="pl-0">Enabled</TableHead>
+              <TableHead className="pl-0 w-[60px]">Active</TableHead>
               <TableHead>Schedule</TableHead>
               <TableHead>Cron</TableHead>
               <TableHead>Timezone</TableHead>
-              <TableHead>Webhook</TableHead>
+              <TableHead>On Success</TableHead>
               <TableHead>
                 Last Run
                 <div className="text-xs text-muted-foreground font-normal">
@@ -261,7 +261,7 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
                               variant="ghost" 
                               size="icon" 
                               onClick={(e) => handleRunNow(e, schedule.id)}
-                              disabled={!schedule.enabled || !!executingSchedules[schedule.id]}
+                              disabled={!!executingSchedules[schedule.id]}
                             >
                               {executingSchedules[schedule.id] === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
                               {executingSchedules[schedule.id] === 'success' && <Check className="h-4 w-4 text-green-500" />}
