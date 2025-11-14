@@ -318,12 +318,12 @@ export const SpotlightStepCard = React.memo(({
                                     return (
                                         <>
                                             <p className="text-xs text-muted-foreground mb-2">
-                                            The step input is created by taking the aggregated step data and passing it as sourceData to the data selector. The JavaScript function then picks the fields needed for this step. If the selector returns an object, the step runs once. If it returns an array, the step runs once per item and the current item is available as sourceData.currentItem inside the step configuration.
+                                            The step data is created by taking the aggregated step input and passing it as <code className="text-xs">sourceData</code> to the step data selector. The JavaScript function then picks the fields needed for this step.
                                             </p>
                                             <div className="flex gap-3">
                                                 <div className="flex-1">
                                                     <Label className="text-xs flex items-center gap-1 mb-1">
-                                                        Aggregated Step Data
+                                                        Aggregated Step Input
                                                         <HelpTooltip text="This is an object combined from the tool payload and the previous step results." />
                                                     </Label>
                                                     <JsonCodeEditor
@@ -366,7 +366,7 @@ export const SpotlightStepCard = React.memo(({
                                                 <div className="flex-1 flex flex-col gap-3">
                                                     <div className="flex-1">
                                                         <Label className="text-xs flex items-center gap-1 mb-1">
-                                                            Data Selector (JavaScript)
+                                                            Step Data Selector (JavaScript)
                                                             <HelpTooltip text="JavaScript anonymized arrow function selecting specific step inputs. If the output is an array, the step runs once per item; within each iteration sourceData.currentItem is set to that item." />
                                                         </Label>
                                                         <JavaScriptCodeEditor
@@ -387,8 +387,8 @@ export const SpotlightStepCard = React.memo(({
 
                                                     <div className="flex-1">
                                                         <Label className="text-xs flex items-center gap-1 mb-1">
-                                                            Step Input Data
-                                                            <HelpTooltip text="Preview of the step input data. Evaluates the Data Selector against the aggregated step data." />
+                                                            Step Data
+                                                            <HelpTooltip text="Preview of the step data. Evaluates the step data selector against the aggregated step input." />
                                                             {isLoopItemsEvaluating && (
                                                                 <div className="ml-1 h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/70 border-t-transparent" />
                                                             )}
@@ -413,11 +413,13 @@ export const SpotlightStepCard = React.memo(({
                                                                         )}
                                                                     </div>
                                                                 }
-                                                                bottomRightOverlay={(!loopItemsError && Array.isArray(loopItems)) ? (
+                                                                bottomRightOverlay={(!loopItemsError) ?  ((Array.isArray(loopItems)) ? (
                                                                     <div className="px-2 py-1 rounded-md bg-secondary text-muted-foreground text-[11px] font-medium shadow-md">
-                                                                        {loopItems.length} items
+                                                                        Step will loop over {loopItems.length} items. The current item is available as sourceData.currentItem inside the step configuration.
                                                                     </div>
-                                                                ) : undefined}
+                                                                ) : <div className="px-2 py-1 rounded-md bg-secondary text-muted-foreground text-[11px] font-medium shadow-md">
+                                                                Step will run once with the step data available as sourceData.currentItem.
+                                                            </div>) : undefined}
                                                             />
                                                             {loopItemsError && (
                                                                 <div className="absolute bottom-0 left-0 right-0 p-2 bg-destructive/10 text-destructive text-xs max-h-32 overflow-y-auto overflow-x-hidden">
@@ -439,15 +441,19 @@ export const SpotlightStepCard = React.memo(({
                                             <div className="mt-4">
                                                 <div>
                                                     <Label className="text-xs flex items-center gap-1">
-                                                        Maximum Number of Iterations
-                                                        <HelpTooltip text="Maximum number of requests sent per step. Only applicable if the data selector returns an array. Default is 1000." />
+                                                        Limit Loop Executions
+                                                        <HelpTooltip text="Maximum number of iterations the step will run. Only applicable if the step data selector returns an array. Default is 1000." />
                                                     </Label>
                                                     <Input 
                                                         type="number" 
+                                                        min="0"
+                                                        max="10000"
                                                         value={step.loopMaxIters || ''} 
                                                         onChange={(e) => {
                                                             if (onEdit && !readOnly) {
-                                                                onEdit(step.id, { ...step, loopMaxIters: parseInt(e.target.value) || undefined }, true);
+                                                                const value = parseInt(e.target.value);
+                                                                if (value < 0 || value > 10000) return;
+                                                                onEdit(step.id, { ...step, loopMaxIters: value || undefined }, true);
                                                             }
                                                         }} 
                                                         className="text-xs mt-1 w-32" 
