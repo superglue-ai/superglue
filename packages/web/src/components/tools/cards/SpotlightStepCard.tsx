@@ -318,7 +318,7 @@ export const SpotlightStepCard = React.memo(({
                                     return (
                                         <>
                                             <p className="text-xs text-muted-foreground mb-2">
-                                            The step data is created by taking the aggregated step input and passing it as <code className="text-xs">sourceData</code> to the step data selector. The JavaScript function then selects the data needed for this step.
+                                                Step data selector extracts step data from the aggregated step input.
                                             </p>
                                             <div className="flex gap-3">
                                                 <div className="flex-1">
@@ -367,7 +367,7 @@ export const SpotlightStepCard = React.memo(({
                                                     <div className="flex-1">
                                                         <Label className="text-xs flex items-center gap-1 mb-1">
                                                             Step Data Selector (JavaScript)
-                                                            <HelpTooltip text="JavaScript arrow function that receives the step input as sourceData. It should return the part of the data this step needs. If it returns an object, the step runs once. If it returns an array, the step runs once for each item and sourceData.currentItem is set for every iteration." />
+                                                            <HelpTooltip text="JavaScript arrow function that receives the aggregatedstep input as sourceData. It should return the part of the data this step needs. If it returns an object, the step runs once. If it returns an array, the step runs once for each item and sourceData.currentItem is set for every iteration." />
                                                         </Label>
                                                         <JavaScriptCodeEditor
                                                             value={step.loopSelector || '(sourceData) => { }'}
@@ -413,12 +413,12 @@ export const SpotlightStepCard = React.memo(({
                                                                         )}
                                                                     </div>
                                                                 }
-                                                                bottomRightOverlay={(!loopItemsError) ?  ((Array.isArray(loopItems)) ? (
+                                                                bottomRightOverlay={(!loopItemsError && loopItems) ?  ((Array.isArray(loopItems)) ? (
                                                                     <div className="px-2 py-1 rounded-md bg-secondary text-muted-foreground text-[11px] font-medium shadow-md">
-                                                                        Step will loop over {loopItems.length} items. The current item is available as sourceData.currentItem inside the step configuration.
+                                                                        Step config will run {loopItems.length} times. Loop items can be accessed in config as sourceData.currentItem.
                                                                     </div>
                                                                 ) : <div className="px-2 py-1 rounded-md bg-secondary text-muted-foreground text-[11px] font-medium shadow-md">
-                                                                Step will run once with the step data available as sourceData.currentItem.
+                                                                Step data is available in config as sourceData.currentItem.
                                                             </div>) : undefined}
                                                             />
                                                             {loopItemsError && (
@@ -441,7 +441,7 @@ export const SpotlightStepCard = React.memo(({
                                             <div className="mt-4">
                                                 <div>
                                                     <Label className="text-xs flex items-center gap-1">
-                                                        Limit Loop Executions
+                                                        Loop Execution Limit
                                                         <HelpTooltip text="Maximum number of iterations the step will run. Only applicable if the step data selector returns an array. Default is 1000." />
                                                     </Label>
                                                     <Input 
