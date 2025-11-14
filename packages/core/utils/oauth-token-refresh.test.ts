@@ -7,13 +7,17 @@ import {
     refreshOAuthToken,
 } from './oauth-token-refresh.js';
 
-// Mock the logs module
 vi.mock('./logs.js', () => ({
     logMessage: vi.fn(),
 }));
 
-// Mock fetch globally
-global.fetch = vi.fn();
+vi.mock('axios', () => ({
+    default: {
+        post: vi.fn(),
+    }
+}));
+
+import axios from 'axios';
 
 describe('OAuth Utilities', () => {
     beforeEach(() => {
@@ -123,7 +127,7 @@ describe('OAuth Utilities', () => {
                 urlHost: 'https://api.test.com',
                 credentials: {
                     client_id: 'test-id',
-                    // missing client_secret and refresh_token
+                    grant_type: 'authorization_code',
                 },
             };
 
@@ -131,8 +135,12 @@ describe('OAuth Utilities', () => {
             expect(result.success).toBe(false);
             expect(logs.logMessage).toHaveBeenCalledWith(
                 'error',
-                'Missing required credentials for token refresh',
-                expect.any(Object)
+                'Missing required credentials for authorization_code token refresh',
+                expect.objectContaining({
+                    integrationId: 'test',
+                    hasClientSecret: false,
+                    hasRefreshToken: false
+                })
             );
         });
 
@@ -144,6 +152,7 @@ describe('OAuth Utilities', () => {
                     client_id: 'test-id',
                     client_secret: 'test-secret',
                     refresh_token: 'old-refresh-token',
+                    grant_type: 'authorization_code',
                 },
             };
 
@@ -154,9 +163,9 @@ describe('OAuth Utilities', () => {
                 expires_in: 3600,
             };
 
-            (global.fetch as any).mockResolvedValueOnce({
-                ok: true,
-                json: async () => mockTokenResponse,
+            (axios.post as any).mockResolvedValueOnce({
+                status: 200,
+                data: mockTokenResponse,
             });
 
             const result = await refreshOAuthToken(integration);
@@ -176,13 +185,13 @@ describe('OAuth Utilities', () => {
                     client_id: 'test-id',
                     client_secret: 'test-secret',
                     refresh_token: 'old-refresh-token',
+                    grant_type: 'authorization_code',
                 },
             };
 
-            (global.fetch as any).mockResolvedValueOnce({
-                ok: false,
+            (axios.post as any).mockResolvedValueOnce({
                 status: 401,
-                text: async () => 'Unauthorized',
+                data: 'Unauthorized',
             });
 
             const result = await refreshOAuthToken(integration);
