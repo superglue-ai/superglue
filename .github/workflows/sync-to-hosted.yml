@@ -34,17 +34,13 @@ jobs:
           BRANCH_NAME="sync-from-main-$(date +%s)"
           git checkout -b "${BRANCH_NAME}"
 
-          rsync -av --exclude='.git' --exclude='hosted-repo' --exclude='node_modules' ../ ./
+          git cherry-pick ${{ github.event.pull_request.merge_commit_sha }}
 
-          git add .
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-            exit 0
+          if [ $? -ne 0 ]; then
+            echo "Cherry-pick had conflicts, aborting"
+            git cherry-pick --abort
+            exit 1
           fi
-
-          git commit -m "Sync from main: ${{ github.event.pull_request.title }}" \
-                     -m "Original PR: ${{ github.event.pull_request.html_url }}" \
-                     -m "Merged by: @${{ github.event.pull_request.merged_by.login }}"
 
           git push origin "${BRANCH_NAME}"
 
