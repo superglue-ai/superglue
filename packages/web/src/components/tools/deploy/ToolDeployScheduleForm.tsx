@@ -35,9 +35,10 @@ export function ToolDeployScheduleForm({ toolId, onSuccess }: ToolDeploySchedule
   const [customCronExpression, setCustomCronExpression] = useState<string>('');
   const [isCustomCronValid, setIsCustomCronValid] = useState(true);
   const [timezoneOpen, setTimezoneOpen] = useState(false);
+  const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
   const [selectedTimezone, setTimezone] = useState<{ value: string, label: string }>({
-    value: 'Europe/Berlin',
-    label: 'Europe/Berlin'
+    value: browserTimezone,
+    label: browserTimezone
   });
   const [schedulePayload, setPayload] = useState<string>('{}');
   const [isJsonValid, setIsJsonValid] = useState(true);

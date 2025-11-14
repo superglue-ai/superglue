@@ -201,7 +201,6 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
               <TableHead className="pl-0 w-[60px]">Active</TableHead>
               <TableHead>Schedule</TableHead>
               <TableHead>Cron</TableHead>
-              <TableHead>Timezone</TableHead>
               <TableHead>On Success</TableHead>
               <TableHead>
                 Last Run
@@ -229,7 +228,6 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
                 </TableCell>
                 <TableCell className="w-[200px]">{cronstrue.toString(schedule.cronExpression)}</TableCell>
                 <TableCell className="w-[200px]">{schedule.cronExpression}</TableCell>
-                <TableCell className="w-[200px]">{schedule.timezone}</TableCell>
                 <TableCell className="max-w-[300px]">
                   {schedule.options?.webhookUrl ? (
                     schedule.options.webhookUrl.startsWith('tool:') ? (

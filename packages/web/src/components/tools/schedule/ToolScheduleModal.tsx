@@ -41,9 +41,10 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
   const [customCronExpression, setCustomCronExpression] = React.useState<string>('');
   const [isCustomCronValid, setIsCustomCronValid] = React.useState(true);
   const [timezoneOpen, setTimezoneOpen] = useState(false);
+  const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
   const [selectedTimezone, setTimezone] = useState<{ value: string, label: string }>({
-    value: 'Europe/Berlin',
-    label: 'Europe/Berlin'
+    value: browserTimezone,
+    label: browserTimezone
   });
   const [schedulePayload, setPayload] = useState<string>('{}');
   const [isJsonValid, setIsJsonValid] = useState(true);

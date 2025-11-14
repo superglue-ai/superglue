@@ -1056,18 +1056,20 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           Rebuild
         </Button>
       )}
-      <Button
+      {!embedded && (
+        <Button
           variant="outline"
           onClick={async () => {
             await saveTool();
             setShowDeployModal(true);
           }}
-        className="h-9 px-5"
-        disabled={saving || loading}
-      >
-        <CloudUpload className="h-4 w-4" />
-        Deploy
-      </Button>
+          className="h-9 px-5"
+          disabled={saving || loading}
+        >
+          <CloudUpload className="h-4 w-4" />
+          Deploy
+        </Button>
+      )}
       <Button
         variant="default"
         onClick={saveTool}
