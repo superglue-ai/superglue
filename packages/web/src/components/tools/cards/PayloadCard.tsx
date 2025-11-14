@@ -128,7 +128,7 @@ export const PayloadSpotlight = ({
             <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="h-9 p-1 rounded-md mb-3">
                     <TabsTrigger value="payload" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
-                        <FileJson className="h-4 w-4" /> Payload JSON
+                        <FileJson className="h-4 w-4" /> Payload
                     </TabsTrigger>
                     {isPayloadValid && (
                         <TabsTrigger value="schema" className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm">
