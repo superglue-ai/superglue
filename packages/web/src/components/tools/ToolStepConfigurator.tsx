@@ -2,12 +2,11 @@ import { useConfig } from '@/src/app/config-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
 import { useToast } from '@/src/hooks/use-toast';
 import { splitUrl } from '@/src/lib/client-utils';
-import { composeUrl, ensureSourceDataArrowFunction, formatJavaScriptCode, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, truncateForDisplay } from '@/src/lib/general-utils';
+import { composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/general-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
 import { Integration, SuperglueClient } from "@superglue/client";
-import { ArrowDown, Check, Copy, Download, Edit, Globe } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { downloadJson } from '../../lib/download-utils';
+import { ArrowDown, Check, Copy, Edit, Globe } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { JavaScriptCodeEditor } from '../editors/JavaScriptCodeEditor';
 import { JsonCodeEditor } from '../editors/JsonCodeEditor';
 import { Badge } from "../ui/badge";
@@ -17,7 +16,6 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { HelpTooltip } from '../utils/HelpTooltip';
-import { CopyButton } from './shared/CopyButton';
 
 interface ToolStepConfiguratorProps {
     step: any;
@@ -32,7 +30,6 @@ interface ToolStepConfiguratorProps {
 }
 
 export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput }: ToolStepConfiguratorProps) {
-    const [didFormatLoopSelector, setDidFormatLoopSelector] = useState(false);
     const [localIntegrations, setLocalIntegrations] = useState<Integration[]>([]);
     const [headersText, setHeadersText] = useState('');
     const [queryParamsText, setQueryParamsText] = useState('');
@@ -133,20 +130,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [step.apiConfig?.queryParams]);
 
-    // Format loop selector on first load
-    useEffect(() => {
-        if (!didFormatLoopSelector && step.loopSelector) {
-            formatJavaScriptCode(step.loopSelector).then(formatted => {
-                if (formatted !== step.loopSelector) {
-                    const updated = { ...step, loopSelector: formatted } as any;
-                    // Programmatic normalization; do NOT mark as user-initiated
-                    onEdit(step.id, updated, false);
-                }
-                setDidFormatLoopSelector(true);
-            });
-        }
-    }, [step.loopSelector]);
-
     const handleImmediateEdit = (updater: (s: any) => any) => {
         if (disabled) return;
         const updated = updater(step);
@@ -155,57 +138,9 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         if (onEditingChange) setTimeout(() => onEditingChange(false), 100);
     };
 
-    const linkedIntegration = integrations?.find(integration => {
-        if (step.integrationId && integration.id === step.integrationId) return true;
-        return step.apiConfig?.urlHost && integration.urlHost && step.apiConfig.urlHost.includes(integration.urlHost.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, ''));
-    });
-
-    const DATA_SELECTOR_DEBOUNCE_MS = 400;
-    const [loopItems, setLoopItems] = useState<any | null>(null);
-    const [loopItemsError, setLoopItemsError] = useState<string | null>(null);
-    const [isLoopItemsEvaluating, setIsLoopItemsEvaluating] = useState<boolean>(false);
-    const lastEvalTimerRef = useRef<number | null>(null);
-
-    const loopItemsDisplayValue = useMemo(() => {
-        if (loopItemsError) return '{}';
-        const displayData = truncateForDisplay(loopItems);
-        return displayData.value;
-    }, [loopItems, loopItemsError]);
-
-    const loopItemsCopyValue = useMemo(() => {
-        return JSON.stringify(loopItems, null, 2);
-    }, [loopItems]);
-
-    useEffect(() => {
-
-        if (lastEvalTimerRef.current) {
-            window.clearTimeout(lastEvalTimerRef.current);
-            lastEvalTimerRef.current = null;
-        }
-        setLoopItemsError(null);
-        const t = window.setTimeout(() => {
-            setIsLoopItemsEvaluating(true);
-            try {
-                let sel = step?.loopSelector || "(sourceData) => { }";
-                const raw = ensureSourceDataArrowFunction(sel).trim();
-                const stripped = raw.replace(/;\s*$/, '');
-                const body = `const __selector = (${stripped});\nreturn __selector(sourceData);`;
-                // eslint-disable-next-line no-new-func
-                const fn = new Function('sourceData', body);
-                const out = fn(stepInput || {});
-                setLoopItems(out);
-                setLoopItemsError(null);
-            } catch (err: any) {
-                setLoopItems(null);
-                setLoopItemsError(err?.message ? String(err.message) : 'Error evaluating loop selector');
-            } finally {
-                setIsLoopItemsEvaluating(false);
-            }
-        }, DATA_SELECTOR_DEBOUNCE_MS);
-        lastEvalTimerRef.current = t as unknown as number;
-        return () => { if (lastEvalTimerRef.current) { window.clearTimeout(lastEvalTimerRef.current); lastEvalTimerRef.current = null; } };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [step.executionMode, step.loopSelector, step.loopMaxIters, stepInput]);
+    const linkedIntegration = step.integrationId 
+        ? integrations?.find(integration => integration.id === step.integrationId)
+        : undefined;
 
     return (
         <div className="flex flex-col items-center">
@@ -420,67 +355,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             />
                                         </div>
                                     )}
-                                                                            <div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                <div>
-                                                    <Label className="text-xs flex items-center gap-1 mb-1">
-                                                        Data Selector (JavaScript)
-                                                        <HelpTooltip text="JavaScript arrow function selecting an array from step input. The step runs once per item; within each iteration sourceData.currentItem is set to that item." />
-                                                    </Label>
-                                                    <JavaScriptCodeEditor
-                                                        value={step.loopSelector || '(sourceData) => { }'}
-                                                        onChange={(val) => handleImmediateEdit((s) => ({ ...s, loopSelector: val }))}
-                                                        readOnly={disabled}
-                                                        minHeight="150px"
-                                                        maxHeight="300px"
-                                                        resizable={true}
-                                                        isTransformEditor={false}
-                                                        autoFormatOnMount={false}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label className="text-xs flex items-center gap-1 mb-1">
-                                                        Selected Data (JSON)
-                                                        <HelpTooltip text="Evaluates the data selector against the step input. The resulting array drives execution (one run per item). During execution, sourceData.currentItem equals the current item." />
-                                                        {isLoopItemsEvaluating && (
-                                                            <div className="ml-1 h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/70 border-t-transparent" />
-                                                        )}
-                                                    </Label>
-                                                    <div className="relative">
-                                                    <JsonCodeEditor
-                                                            value={loopItemsDisplayValue}
-                                                            readOnly={true}
-                                                            minHeight="176px"
-                                                            maxHeight="300px"
-                                                            resizable={true}
-                                                            placeholder=""
-                                                            overlay={
-                                                                <div className="flex items-center gap-2">
-                                                                    {!loopItemsError && (
-                                                                        <CopyButton text={loopItemsCopyValue} />
-                                                                    )}
-                                                                    {!loopItemsError && (
-                                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => downloadJson(loopItems, `step_${step.id}_loop_items.json`)} title="Download loop items as JSON">
-                                                                            <Download className="h-3 w-3" />
-                                                                        </Button>
-                                                                    )}
-                                                                </div>
-                                                            }
-                                                            bottomRightOverlay={(!loopItemsError && Array.isArray(loopItems)) ? (
-                                                                <div className="px-2 py-1 rounded-md bg-secondary text-muted-foreground text-[11px] font-medium shadow-md">
-                                                                    {loopItems.length} items
-                                                                </div>
-                                                            ) : undefined}
-                                                        />
-                                                        {loopItemsError && (
-                                                            <div className="absolute bottom-0 left-0 right-0 p-2 bg-destructive/10 text-destructive text-xs max-h-32 overflow-y-auto overflow-x-hidden">
-                                                                Error: {loopItemsError}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
                                     <div>
                                         <Label className="text-xs flex items-center gap-1">
                                             Pagination
@@ -540,13 +414,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             )}
                                         </div>
                                     </div>
-                                        <div>
-                                            <Label className="text-xs flex items-center gap-1">
-                                                # of max requests
-                                                <HelpTooltip text="Maximum number of requests sent per step to prevent infinite loops. Default is 1000." />
-                                            </Label>
-                                            <Input type="number" value={step.loopMaxIters || ''} onChange={(e) => handleImmediateEdit((s) => ({ ...s, loopMaxIters: parseInt(e.target.value) || undefined }))} className="text-xs mt-1 w-32" placeholder="1000" disabled={disabled} />
-                                        </div>
                     </div>
                 </CardContent>
             </Card>

@@ -195,8 +195,8 @@ Every step MUST have a loopSelector that determines how it executes:
    - Step executes once with the object as currentItem
    - Result: sourceData.stepId = { currentItem: <object>, data: <API response> }
    - Use for: Single operations, fetching one resource, operations without iteration
-   - Example: (sourceData) => ({ userId: sourceData.userId, action: 'create' })
-   - Example: (sourceData) => ({}) // Empty object for steps with no specific input
+   - Example: (sourceData) => {return { userId: sourceData.userId, action: 'create' }}
+   - Example: (sourceData) => {return {}} // Empty object for steps with no specific input
 
 2. Return an ARRAY for LOOP execution (multiple API calls):
    - Step executes once per array item, each with its own currentItem
@@ -258,7 +258,7 @@ IMPORTANT: Modern APIs (HubSpot, Stripe, etc.) mostly expect authentication in h
 Every step has a loopSelector that determines execution mode:
 1. loopSelector returns OBJECT (including empty {}): Executes once with object as currentItem
    - Result: sourceData.stepId = { currentItem: <object>, data: <API response> }
-   - Example: (sourceData) => ({ userId: sourceData.userId, action: 'update' })
+   - Example: (sourceData) => {return { userId: sourceData.userId, action: 'update' }}
    
 2. loopSelector returns ARRAY: Executes once per array item
    - Result: sourceData.stepId = [{ currentItem: <item1>, data: <response1> }, ...]
