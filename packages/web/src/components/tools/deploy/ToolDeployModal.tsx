@@ -17,7 +17,7 @@ import { CodeSnippet } from "../../editors/ReadonlyCodeEditor";
 import { Button } from "../../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
-import ToolSchedulesList from "../schedule/ToolSchedulesList";
+import ToolSchedulesList from "./ToolSchedulesList";
 
 interface ToolDeployModalProps {
   currentTool: Workflow;

@@ -31,13 +31,13 @@ import {
 } from "@/src/components/ui/table";
 import { tokenRegistry } from '@/src/lib/token-registry';
 
-import ToolSchedulesList from '@/src/components/tools/schedule/ToolSchedulesList';
 import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
+import { ToolDeployModal } from '@/src/components/tools/deploy/ToolDeployModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { loadFromCache, saveToCache } from '@/src/lib/cache-utils';
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
 import { ApiConfig, Integration, SuperglueClient, Workflow as Tool } from '@superglue/client';
-import { Calendar, Check, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2 } from "lucide-react";
+import { Check, CloudUpload, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React from 'react';
 import type { SimpleIcon } from 'simple-icons';
@@ -63,11 +63,10 @@ const ConfigTable = () => {
   const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | Tool | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
-  const [expandedToolId, setExpandedToolId] = React.useState<string | null>(null);
+  const [deployToolId, setDeployToolId] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedIntegration, setSelectedIntegration] = React.useState<string>("all");
   const [showToolStepper, setShowToolStepper] = React.useState(false);
-  const [scheduleRefreshTrigger, setScheduleRefreshTrigger] = React.useState(0);
 
 
   const refreshConfigs = React.useCallback(async () => {
@@ -100,11 +99,6 @@ const ConfigTable = () => {
         configs: combinedConfigs,
         timestamp: Date.now()
       });
-      
-      // Trigger schedule refresh if a schedule section is open
-      if (expandedToolId) {
-        setScheduleRefreshTrigger(prev => prev + 1);
-      }
     } catch (error) {
       console.error('Error fetching configs:', error);
     } finally {
@@ -252,11 +246,9 @@ const ConfigTable = () => {
     setTimeout(() => setCopiedDetails(null), 2000);
   };
 
-  const handleScheduleClick = async (e: React.MouseEvent, toolId: string) => {
+  const handleDeployClick = (e: React.MouseEvent, toolId: string) => {
     e.stopPropagation();
-
-    const newExpandedToolId = toolId === expandedToolId ? null : toolId;
-    setExpandedToolId(newExpandedToolId);
+    setDeployToolId(toolId);
   };
 
   const getSimpleIcon = (name: string): SimpleIcon | null => {
@@ -523,11 +515,11 @@ const ConfigTable = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={(e) => handleScheduleClick(e, config.id)}
+                              onClick={(e) => handleDeployClick(e, config.id)}
                               className="gap-2"
                             >
-                              <Calendar className="h-4 w-4" />
-                              Schedules
+                              <CloudUpload className="h-4 w-4" />
+                              Deploy
                             </Button>
                           )}
                           <TooltipProvider>
@@ -588,15 +580,6 @@ const ConfigTable = () => {
                         </div>
                       </TableCell>
                     </TableRow>
-
-                    {/* Expanded Details Row */}
-                    {expandedToolId === config.id && (
-                      <TableRow>
-                        <TableCell colSpan={5} className="p-4">
-                          <ToolSchedulesList toolId={config.id} refreshTrigger={scheduleRefreshTrigger} />
-                        </TableCell>
-                      </TableRow>
-                    )}
                   </React.Fragment>
                 );
               })
@@ -638,6 +621,15 @@ const ConfigTable = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {deployToolId && (
+        <ToolDeployModal
+          currentTool={allConfigs.find(c => c.id === deployToolId) as Tool}
+          payload={{}}
+          isOpen={!!deployToolId}
+          onClose={() => setDeployToolId(null)}
+        />
+      )}
     </div>
   );
 };
