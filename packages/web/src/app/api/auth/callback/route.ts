@@ -1,6 +1,8 @@
 import { ExtendedSuperglueClient } from '@/src/lib/extended-superglue-client';
 import { OAuthState } from '@/src/lib/oauth-utils';
+import { resolveOAuthCertAndKey } from '@superglue/shared';
 import axios from 'axios';
+import https from 'https';
 import { NextRequest, NextResponse } from 'next/server';
 
 const OAUTH_STATE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
@@ -59,22 +61,35 @@ async function exchangeCodeForToken(
 async function exchangeClientCredentialsForToken(
     tokenUrl: string,
     clientId: string,
-    clientSecret: string
+    clientSecret?: string,
+    oauth_cert?: string,
+    oauth_key?: string,
+    scopes?: string
 ): Promise<OAuthTokenResponse> {
-    if (!clientId || !clientSecret) {
+    if (!clientId || (!clientSecret && !oauth_cert && !oauth_key)) {
         throw new Error('[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth client credentials not configured for client credentials flow');
     }
 
+    const httpsAgent = (oauth_cert && oauth_key) ? new https.Agent({
+        cert: oauth_cert,
+        key: oauth_key,
+        rejectUnauthorized: false
+    }) : undefined;
+
+    const params: Record<string, string> = {
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        ...(clientSecret && { client_secret: clientSecret }),
+        ...(scopes && { scope: scopes })
+    };
+
     try {
-        const response = await axios.post(tokenUrl, new URLSearchParams({
-            grant_type: 'client_credentials',
-            client_id: clientId,
-            client_secret: clientSecret,
-        }), {
+        const response = await axios.post(tokenUrl, new URLSearchParams(params), {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json',
-            }
+            },
+            httpsAgent
         });
 
         return response.data;
@@ -224,7 +239,7 @@ export async function GET(request: NextRequest) {
 
     try {
         const stateData = JSON.parse(atob(state)) as OAuthState & { token_url?: string };
-        const { integrationId, timestamp, client_credentials_uid, templateId, token_url, suppressErrorUI } = stateData;
+        const { integrationId, timestamp, clientId, client_credentials_uid, templateId, token_url, suppressErrorUI, oauth_cert, oauth_key, scopes } = stateData;
 
         if (Date.now() - timestamp >= OAUTH_STATE_EXPIRY_MS) {
             throw new Error('[OAUTH_STAGE:VALIDATION] OAuth state expired (older than 5 minutes). Please start the OAuth flow again.');
@@ -234,19 +249,45 @@ export async function GET(request: NextRequest) {
         
         // Get API key from cookie (set during OAuth init)
         const apiKey = request.cookies.get('api_key')?.value;
+        
         if (!apiKey) {
             throw new Error('[OAUTH_STAGE:AUTHENTICATION] No API key found. OAuth session may have expired or was not properly initialized.');
         }
-        
-        const client = new ExtendedSuperglueClient({ endpoint, apiKey: apiKey });
-        const resolved = await client.getOAuthClientCredentials({ templateId, clientCredentialsUid: client_credentials_uid });
-        if (!resolved?.client_secret || !resolved?.client_id) {
-            throw new Error('[OAUTH_STAGE:CREDENTIAL_RESOLUTION] OAuth client credentials could not be resolved from backend. The client_id or client_secret may not have been properly stored.');
+
+        // skip backend resolution if its key/cert oauth
+        let resolved: { client_id: string; client_secret: string } | undefined;
+        if (oauth_cert && oauth_key) {
+            resolved = {
+                client_id: clientId,
+                client_secret: '',
+            }
+        } else {
+            const client = new ExtendedSuperglueClient({ endpoint, apiKey: apiKey });
+            resolved = await client.getOAuthClientCredentials({ templateId, clientCredentialsUid: client_credentials_uid });
+            if (!resolved?.client_secret || !resolved?.client_id) {
+                throw new Error('[OAUTH_STAGE:CREDENTIAL_RESOLUTION] OAuth client credentials could not be resolved from backend. The client_id or client_secret may not have been properly stored.');
+            }
         }
 
         let tokenData: OAuthTokenResponse;
         if (grantTypeParam === 'client_credentials') {
-            tokenData = await exchangeClientCredentialsForToken(String(token_url), resolved.client_id, resolved.client_secret);
+            let certContent: string | null = null;
+            let keyContent: string | null = null;
+
+            if (oauth_cert && oauth_key) {
+                const { cert, key } = resolveOAuthCertAndKey(oauth_cert, oauth_key);
+                certContent = cert?.content;
+                keyContent = key?.content;
+            }
+            
+            tokenData = await exchangeClientCredentialsForToken(
+                String(token_url), 
+                resolved.client_id, 
+                resolved.client_secret,
+                certContent,
+                keyContent,
+                scopes
+            );
         } else {
             const redirectUri = stateData.redirectUri || `${origin}/api/auth/callback`;
             tokenData = await exchangeCodeForToken(code as string, String(token_url), resolved.client_id, resolved.client_secret, redirectUri, state);

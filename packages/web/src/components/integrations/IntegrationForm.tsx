@@ -12,6 +12,7 @@ import { Switch } from '@/src/components/ui/switch';
 import { Textarea } from '@/src/components/ui/textarea';
 import { CredentialsManager } from '@/src/components/utils/CredentialManager';
 import { DocumentationField } from '@/src/components/utils/DocumentationField';
+import { FileChip } from '@/src/components/ui/FileChip';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { URLField } from '@/src/components/utils/URLField';
 import { useToast } from '@/src/hooks/use-toast';
@@ -19,8 +20,8 @@ import { cn, composeUrl, inputErrorStyles } from '@/src/lib/general-utils';
 import type { Integration } from '@superglue/client';
 
 import { createOAuthErrorHandler, getOAuthCallbackUrl, triggerOAuthFlow } from '@/src/lib/oauth-utils';
-import { integrations } from '@superglue/shared';
-import { Check, ChevronRight, ChevronsUpDown, Copy, Eye, EyeOff, Globe } from 'lucide-react';
+import { integrations, resolveOAuthCertAndKey } from '@superglue/shared';
+import { Check, ChevronRight, ChevronsUpDown, Copy, Eye, EyeOff, Globe, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 export interface IntegrationFormProps {
@@ -112,8 +113,11 @@ export function IntegrationForm({
             refresh_token: creds.refresh_token || '',
             scopes: creds.scopes || '',
             expires_at: creds.expires_at || '',
+            expires_in: creds.expires_in || '',
             token_type: creds.token_type || 'Bearer',
-            grant_type: 'authorization_code'
+            grant_type: creds.grant_type || 'authorization_code',
+            oauth_cert: creds.oauth_cert || '',
+            oauth_key: creds.oauth_key || ''
         };
     });
 
@@ -134,7 +138,7 @@ export function IntegrationForm({
     const [initialApiCredentials, setInitialApiCredentials] = useState(() => {
         const creds = integration?.credentials || {};
         if (initialAuthType === 'oauth' && integration) {
-            const { client_id, client_secret, auth_url, token_url, access_token, refresh_token, scopes, expires_at, token_type, grant_type, ...additionalCreds } = creds;
+            const { client_id, client_secret, auth_url, token_url, access_token, refresh_token, scopes, expires_at, expires_in, token_type, grant_type, oauth_cert, oauth_key, ...additionalCreds } = creds;
             return Object.keys(additionalCreds).length > 0 ? JSON.stringify(additionalCreds, null, 2) : '{}';
         }
         return Object.keys(creds).length > 0 ? JSON.stringify(creds, null, 2) : '{}';
@@ -145,7 +149,7 @@ export function IntegrationForm({
         const creds = integration?.credentials || {};
         // For OAuth integrations, only include non-OAuth fields in the additional credentials
         if (initialAuthType === 'oauth' && integration) {
-            const { client_id, client_secret, auth_url, token_url, access_token, refresh_token, scopes, expires_at, token_type, grant_type, ...additionalCreds } = creds;
+            const { client_id, client_secret, auth_url, token_url, access_token, refresh_token, scopes, expires_at, expires_in, token_type, grant_type, oauth_cert, oauth_key, ...additionalCreds } = creds;
             return Object.keys(additionalCreds).length > 0 ? JSON.stringify(additionalCreds, null, 2) : '{}';
         }
         return Object.keys(creds).length > 0 ? JSON.stringify(creds, null, 2) : '{}';
@@ -161,8 +165,18 @@ export function IntegrationForm({
         // Check if existing integration has file upload
         integration?.documentationUrl?.startsWith('file://') || false
     );
+    const [certFileName, setCertFileName] = useState<string>('');
+    const [keyFileName, setKeyFileName] = useState<string>('');
 
     const { toast } = useToast();
+
+    useEffect(() => {
+        if (integration?.credentials?.oauth_cert && integration?.credentials?.oauth_key) {
+            const { cert, key } = resolveOAuthCertAndKey(integration.credentials.oauth_cert, integration.credentials.oauth_key);
+            setCertFileName(cert?.filename || 'Certificate loaded');
+            setKeyFileName(key?.filename || 'Private key loaded');
+        }
+    }, [integration]);
 
     useEffect(() => {
         const handleOAuthMessage = (event: MessageEvent) => {
@@ -242,6 +256,46 @@ export function IntegrationForm({
         setDocumentationUrl('');
         setHasUploadedFile(false);
     };
+
+    const handleOAuthFileUpload = (field: 'oauth_cert' | 'oauth_key', setFileName: (name: string) => void, displayName: string) => 
+        async (e: React.ChangeEvent<HTMLInputElement>) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+
+            try {
+                const content = await file.text();
+                const fileData = JSON.stringify({
+                    filename: file.name,
+                    content
+                });
+                setOauthFields(prev => ({ ...prev, [field]: fileData }));
+                setFileName(file.name);
+                toast({
+                    title: `${displayName} uploaded`,
+                    description: `${file.name} loaded successfully`,
+                });
+            } catch (error) {
+                toast({
+                    title: `Failed to read ${displayName.toLowerCase()}`,
+                    description: error instanceof Error ? error.message : 'Unknown error',
+                    variant: 'destructive'
+                });
+            }
+        };
+
+    const handleRemoveOAuthFile = (field: 'oauth_cert' | 'oauth_key', setFileName: (name: string) => void, inputId: string) => () => {
+        setOauthFields(prev => ({ ...prev, [field]: '' }));
+        setFileName('');
+        const fileInput = document.getElementById(inputId) as HTMLInputElement;
+        if (fileInput) {
+            fileInput.value = '';
+        }
+    };
+
+    const handleCertFileUpload = handleOAuthFileUpload('oauth_cert', setCertFileName, 'Certificate');
+    const handleKeyFileUpload = handleOAuthFileUpload('oauth_key', setKeyFileName, 'Private key');
+    const handleRemoveCert = handleRemoveOAuthFile('oauth_cert', setCertFileName, 'cert-file-upload');
+    const handleRemoveKey = handleRemoveOAuthFile('oauth_key', setKeyFileName, 'key-file-upload');
 
     const handleIntegrationSelect = (value: string) => {
         setSelectedIntegration(value);
@@ -349,7 +403,7 @@ export function IntegrationForm({
         return (integrations[selectedIntegration]?.oauth as any) || null;
     };
 
-    const buildEffectiveOAuthFields = (): typeof oauthFields => {
+    const getResolvedOAuthFields = (): typeof oauthFields => {
         const templateOAuth = getTemplateOAuth();
         if (useSuperglueOAuth && templateOAuth) {
             return {
@@ -358,7 +412,9 @@ export function IntegrationForm({
                 auth_url: templateOAuth.authUrl || oauthFields.auth_url,
                 token_url: templateOAuth.tokenUrl || oauthFields.token_url,
                 scopes: templateOAuth.scopes || oauthFields.scopes,
-                grant_type: (templateOAuth.grant_type as 'authorization_code' | 'client_credentials') || oauthFields.grant_type || 'authorization_code'
+                grant_type: templateOAuth.grant_type || oauthFields.grant_type,
+                oauth_cert: oauthFields.oauth_cert,
+                oauth_key: oauthFields.oauth_key
             };
         }
         return oauthFields;
@@ -374,28 +430,38 @@ export function IntegrationForm({
     const isConnectDisabled = () => {
         if (authType !== 'oauth') return true;
         if (useSuperglueOAuth) return false;
-        const ef = buildEffectiveOAuthFields();
-        const isClientCreds = ef.grant_type === 'client_credentials';
+        const resolvedFields = getResolvedOAuthFields();
+        const isClientCreds = resolvedFields.grant_type === 'client_credentials';
         if (isClientCreds) {
-            return !(ef.client_id && ef.client_secret && ef.token_url);
+            const hasClientSecret = !!resolvedFields.client_secret;
+            const hasCertAndKey = !!(resolvedFields.oauth_cert && resolvedFields.oauth_key);
+            return !(resolvedFields.client_id && (hasClientSecret || hasCertAndKey) && resolvedFields.token_url);
         }
-        return !(ef.client_id && ef.client_secret && ef.token_url && ef.auth_url && ef.scopes);
+        return !(resolvedFields.client_id && resolvedFields.client_secret && resolvedFields.token_url && resolvedFields.auth_url && resolvedFields.scopes);
     };
 
     const handleConnect = async () => {
         if (authType !== 'oauth') return;
         setConnectLoading(true);
-        const ef = buildEffectiveOAuthFields();
+        const resolvedFields = getResolvedOAuthFields();
         const errors: Record<string, boolean> = {};
         if (!useSuperglueOAuth) {
-            const isClientCreds = ef.grant_type === 'client_credentials';
-            if (!ef.client_id) errors.client_id = true;
-            if (!ef.client_secret) errors.client_secret = true;
-            if (!ef.token_url) errors.token_url = true;
-            if (!isClientCreds) {
-                if (!ef.auth_url) errors.auth_url = true;
-                if (!ef.scopes) errors.scopes = true;
+            const isClientCreds = resolvedFields.grant_type === 'client_credentials';
+            if (!resolvedFields.client_id) errors.client_id = true;
+            if (!resolvedFields.token_url) errors.token_url = true;
+            
+            if (isClientCreds) {
+                const hasClientSecret = !!resolvedFields.client_secret;
+                const hasCertAndKey = !!(resolvedFields.oauth_cert && resolvedFields.oauth_key);
+                if (!hasClientSecret && !hasCertAndKey) {
+                    errors.client_secret = true;
+                }
+            } else {
+                if (!resolvedFields.client_secret) errors.client_secret = true;
+                if (!resolvedFields.auth_url) errors.auth_url = true;
+                if (!resolvedFields.scopes) errors.scopes = true;
             }
+            
             setValidationErrors(prev => ({ ...prev, ...errors }));
             if (Object.keys(errors).length > 0) {
                 setConnectLoading(false);
@@ -406,9 +472,9 @@ export function IntegrationForm({
         let creds: any = {};
         try {
             const additional = JSON.parse(apiKeyCredentials || '{}');
-            creds = { ...ef, ...additional };
+            creds = { ...resolvedFields, ...additional };
         } catch {
-            creds = { ...ef };
+            creds = { ...resolvedFields };
         }
 
         const integrationData = {
@@ -424,7 +490,7 @@ export function IntegrationForm({
         try {
             const templateInfo = useSuperglueOAuth ? {
                 templateId: selectedIntegration,
-                clientId: ef.client_id
+                clientId: resolvedFields.client_id
             } : undefined;
 
             const handleOAuthError = (error: string) => {
@@ -453,7 +519,7 @@ export function IntegrationForm({
 
             triggerOAuthFlow(
                 integrationData.id,
-                ef,
+                resolvedFields,
                 selectedIntegration,
                 tokenRegistry.getToken(),
                 authType,
@@ -480,12 +546,13 @@ export function IntegrationForm({
 
         // Build credentials based on auth type
         if (authType === 'oauth') {
-            const ef = buildEffectiveOAuthFields();
-            const { grant_type: _omitGrantType, ...efWithoutGrant } = ef as any;
+            const resolvedFields = getResolvedOAuthFields();
+            const { grant_type, ...fieldsWithoutGrantType } = resolvedFields as any;
             const oauthCredsRaw = Object.fromEntries(
                 Object.entries({
-                    ...efWithoutGrant,
-                    scopes: efWithoutGrant.scopes || integrations[selectedIntegration]?.oauth?.scopes || ''
+                    ...fieldsWithoutGrantType,
+                    grant_type,
+                    scopes: fieldsWithoutGrantType.scopes || integrations[selectedIntegration]?.oauth?.scopes || ''
                 }).filter(([_, value]) => value !== '')
             ) as Record<string, any>;
 
@@ -935,6 +1002,116 @@ export function IntegrationForm({
                                             </div>
 
                                             {oauthFields.grant_type === 'authorization_code' && (
+                                                <div>
+                                                    <Label htmlFor="scopes" className="text-xs">OAuth Scopes*</Label>
+                                                    <HelpTooltip text="Space-separated scopes. Leave empty to use defaults." />
+                                                    <Input
+                                                        id="scopes"
+                                                        value={oauthFields.scopes}
+                                                        onChange={e => setOauthFields(prev => ({ ...prev, scopes: e.target.value }))}
+                                                        placeholder="e.g., read write"
+                                                        className={cn("h-9", validationErrors.scopes && inputErrorStyles)}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {oauthFields.grant_type === 'client_credentials' && (
+                                                <div className="space-y-3">
+                                                    <div>
+                                                        <Label htmlFor="scopes-cc" className="text-xs flex items-center gap-1">
+                                                            OAuth Scopes
+                                                            <HelpTooltip text="Space-separated scopes (optional). Some providers require scopes for client credentials flow." />
+                                                        </Label>
+                                                        <Input
+                                                            id="scopes-cc"
+                                                            value={oauthFields.scopes}
+                                                            onChange={e => setOauthFields(prev => ({ ...prev, scopes: e.target.value }))}
+                                                            placeholder="e.g., read write"
+                                                            className="h-9"
+                                                        />
+                                                    </div>
+                                                    <div className="flex justify-evenly">
+                                                        <div className="flex flex-col items-center">
+                                                            <Label className="text-xs flex items-center gap-1 mb-2">
+                                                                Client Certificate
+                                                                <HelpTooltip text="Required for mTLS/mutual TLS authentication (e.g., ABN AMRO). Upload .crt, .pem, or .cer file." />
+                                                            </Label>
+                                                            {oauthFields.oauth_cert ? (
+                                                                <FileChip
+                                                                    file={{
+                                                                        name: certFileName || 'Certificate',
+                                                                        key: 'oauth_cert',
+                                                                        size: 0,
+                                                                        status: 'ready'
+                                                                    }}
+                                                                    onRemove={handleRemoveCert}
+                                                                    size="large"
+                                                                    rounded="sm"
+                                                                    showOriginalName={true}
+                                                                    showSize={false}
+                                                                />
+                                                            ) : (
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => document.getElementById('cert-file-upload')?.click()}
+                                                                >
+                                                                    <Upload className="h-4 w-4 mr-2" />
+                                                                    Upload
+                                                                </Button>
+                                                            )}
+                                                            <input
+                                                                type="file"
+                                                                id="cert-file-upload"
+                                                                hidden
+                                                                accept=".crt,.pem,.cer"
+                                                                onChange={handleCertFileUpload}
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col items-center">
+                                                            <Label className="text-xs flex items-center gap-1 mb-2">
+                                                                Private Key
+                                                                <HelpTooltip text="Required for mTLS/mutual TLS authentication. Upload .key or .pem file." />
+                                                            </Label>
+                                                            {oauthFields.oauth_key ? (
+                                                                <FileChip
+                                                                    file={{
+                                                                        name: keyFileName || 'Private Key',
+                                                                        key: 'oauth_key',
+                                                                        size: 0,
+                                                                        status: 'ready'
+                                                                    }}
+                                                                    onRemove={handleRemoveKey}
+                                                                    size="large"
+                                                                    rounded="sm"
+                                                                    showOriginalName={true}
+                                                                    showSize={false}
+                                                                />
+                                                            ) : (
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => document.getElementById('key-file-upload')?.click()}
+                                                                >
+                                                                    <Upload className="h-4 w-4 mr-2" />
+                                                                    Upload
+                                                                </Button>
+                                                            )}
+                                                            <input
+                                                                type="file"
+                                                                id="key-file-upload"
+                                                                hidden
+                                                                accept=".key,.pem"
+                                                                onChange={handleKeyFileUpload}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {oauthFields.grant_type === 'authorization_code' && (
                                                 <div className="border-t pt-3">
                                                     <Label className="text-xs flex items-center gap-1">
                                                         Redirect URI
@@ -959,7 +1136,7 @@ export function IntegrationForm({
 
                                             <div className="text-xs text-muted-foreground">
                                                 {oauthFields.grant_type === 'client_credentials' ? (
-                                                    <span>Required: client ID, client secret, token URL.</span>
+                                                    <span>Required: client ID, token URL, and either client secret OR (certificate + key).</span>
                                                 ) : (
                                                     <span>Required: client ID, client secret, token URL, auth URL, scopes.</span>
                                                 )}
@@ -1006,6 +1183,14 @@ export function IntegrationForm({
                                                     )}
                                                 </span>
                                             </Button>
+                                        </div>
+                                    )}
+
+                                    {isOAuthConfigured && (oauthFields.expires_at) && (oauthFields.expires_at < Date.now() + 1000 * 60 * 60 * 24) && (
+                                        <div className="pt-2 text-xs text-muted-foreground">
+                                            OAuth access token expired on``: {
+                                                new Date(oauthFields.expires_at).toLocaleString()
+                                            }
                                         </div>
                                     )}
                                 </div>
@@ -1056,10 +1241,11 @@ export function IntegrationForm({
                 {showAdvanced && (
                     <>
                         {authType === 'oauth' && (
-                            <div className="space-y-2">
-                                <Label htmlFor="additionalCredentials" className="flex items-center gap-2 text-xs">
-                                    Additional API Credentials
-                                    <HelpTooltip text="Some APIs require additional credentials alongside OAuth. Common examples: developer_token (Google Ads), account_id, workspace_id. Add any extra key-value pairs needed." />
+                            <div className="space-y-3">
+                                <div>
+                                    <Label htmlFor="additionalCredentials" className="flex items-center gap-2 text-xs">
+                                        Additional API Credentials
+                                        <HelpTooltip text="Some APIs require additional credentials alongside OAuth. Common examples: developer_token (Google Ads), account_id, workspace_id. Add any extra key-value pairs needed." />
                                 </Label>
                                 <div className="w-full">
                                     <CredentialsManager
@@ -1069,6 +1255,7 @@ export function IntegrationForm({
                                     />
                                 </div>
                                 {validationErrors.credentials && <p className="text-sm text-destructive">Credentials must be valid JSON.</p>}
+                                </div>
                             </div>
                         )}
 
