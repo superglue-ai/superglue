@@ -1,6 +1,6 @@
 "use client"
 
-import { Edit, Loader2, Play, Plus, Trash2 } from "lucide-react";
+import { Check, Edit, Loader2, Play, Plus, Trash2, X } from "lucide-react";
 import React from 'react';
 
 import { useConfig } from '@/src/app/config-context';
@@ -15,6 +15,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/src/components/ui/tooltip";
 import { useToast } from '@/src/hooks/use-toast';
 import { tokenRegistry } from '@/src/lib/token-registry';
 import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/client';
@@ -29,6 +35,8 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
   const [loadingSchedules, setLoadingSchedules] = React.useState(false);
   const [modalOpen, setModalOpen] = React.useState(false);
   const [modalSchedule, setModalSchedule] = React.useState<ToolSchedule | null>(null);
+  const [executingSchedules, setExecutingSchedules] = React.useState<Record<string, 'loading' | 'success' | 'error'>>({});
+  const [scheduleErrors, setScheduleErrors] = React.useState<Record<string, string>>({});
 
   React.useEffect(() => {
     loadSchedules();
@@ -102,38 +110,57 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
   const handleRunNow = async (e: React.MouseEvent, scheduleId: string) => {
     e.stopPropagation();
 
+    const schedule = toolSchedules.find(s => s.id === scheduleId);
+    if (!schedule) return;
+
+    setExecutingSchedules(prev => ({ ...prev, [scheduleId]: 'loading' }));
+
     try {
-      const query = `
-        mutation TriggerScheduleNow($id: ID!) {
-          triggerScheduleNow(id: $id)
-        }
-      `;
-
-      await fetch(config.superglueEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenRegistry.getToken()}`
-        },
-        body: JSON.stringify({
-          query,
-          variables: { id: scheduleId }
-        })
+      const superglueClient = new SuperglueClient({
+        endpoint: config.superglueEndpoint,
+        apiKey: tokenRegistry.getToken()
       });
 
-      toast({
-        title: 'Schedule triggered',
-        description: 'The tool will run within the next minute'
+      const workflow = await superglueClient.getWorkflow(schedule.workflowId);
+      if (!workflow) {
+        throw new Error('Workflow not found');
+      }
+
+      const result = await superglueClient.executeWorkflow({
+        workflow,
+        payload: schedule.payload || {},
+        options: schedule.options || {}
       });
 
-      // refresh schedules to show updated nextRunAt
+      if (result.success) {
+        setExecutingSchedules(prev => ({ ...prev, [scheduleId]: 'success' }));
+        
+        setTimeout(() => {
+          setExecutingSchedules(prev => {
+            const { [scheduleId]: _, ...rest } = prev;
+            return rest;
+          });
+        }, 3000);
+      } else {
+        throw new Error(result.error || 'Execution failed');
+      }
+
       loadSchedules(false);
     } catch (error: any) {
-      toast({
-        title: 'Error triggering schedule',
-        description: error.message || 'Unknown error',
-        variant: 'destructive'
-      });
+      const errorMessage = error.message || 'Unknown error';
+      setExecutingSchedules(prev => ({ ...prev, [scheduleId]: 'error' }));
+      setScheduleErrors(prev => ({ ...prev, [scheduleId]: errorMessage }));
+      
+      setTimeout(() => {
+        setExecutingSchedules(prev => {
+          const { [scheduleId]: _, ...rest } = prev;
+          return rest;
+        });
+        setScheduleErrors(prev => {
+          const { [scheduleId]: _, ...rest } = prev;
+          return rest;
+        });
+      }, 10000);
     }
   };
 
@@ -226,15 +253,29 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={(e) => handleRunNow(e, schedule.id)}
-                      title="Run Now"
-                      disabled={!schedule.enabled}
-                    >
-                      <Play className="h-4 w-4" />
-                    </Button>
+                    <TooltipProvider delayDuration={0}>
+                      <Tooltip open={executingSchedules[schedule.id] === 'success' || executingSchedules[schedule.id] === 'error'}>
+                        <TooltipTrigger asChild>
+                          <span className="inline-block">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={(e) => handleRunNow(e, schedule.id)}
+                              disabled={!schedule.enabled || !!executingSchedules[schedule.id]}
+                            >
+                              {executingSchedules[schedule.id] === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
+                              {executingSchedules[schedule.id] === 'success' && <Check className="h-4 w-4 text-green-500" />}
+                              {executingSchedules[schedule.id] === 'error' && <X className="h-4 w-4 text-red-500" />}
+                              {!executingSchedules[schedule.id] && <Play className="h-4 w-4" />}
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          {executingSchedules[schedule.id] === 'success' && 'Executed successfully'}
+                          {executingSchedules[schedule.id] === 'error' && scheduleErrors[schedule.id]}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <Button variant="ghost" size="icon" onClick={() => handleModalOpen(schedule)}>
                       <Edit className="h-4 w-4" />
                     </Button>

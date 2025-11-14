@@ -437,7 +437,6 @@ type Mutation {
 
   upsertWorkflowSchedule(schedule: WorkflowScheduleInput!): WorkflowSchedule!
   deleteWorkflowSchedule(id: ID!): Boolean!
-  triggerScheduleNow(id: ID!): Boolean!
 
   upsertApi(id: ID!, input: JSON!): ApiConfig!
   deleteApi(id: ID!): Boolean!
@@ -450,8 +449,15 @@ type Mutation {
   ): Integration!
   deleteIntegration(id: ID!): Boolean!
 
-  cacheOauthClientCredentials(clientCredentialsUid: String!, clientId: String!, clientSecret: String!): Boolean!
-  getOAuthClientCredentials(templateId: ID, clientCredentialsUid: String): OAuthClientCredentials!
+  cacheOauthClientCredentials(
+    clientCredentialsUid: String!
+    clientId: String!
+    clientSecret: String!
+  ): Boolean!
+  getOAuthClientCredentials(
+    templateId: ID
+    clientCredentialsUid: String
+  ): OAuthClientCredentials!
 }
 
 type Subscription {

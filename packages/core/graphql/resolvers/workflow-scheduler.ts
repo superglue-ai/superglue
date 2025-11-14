@@ -91,33 +91,3 @@ export const deleteWorkflowScheduleResolver = async (
         throw error;
     }
 };
-
-export const triggerScheduleNowResolver = async (
-    _: unknown, 
-    { id }: { id: string },
-    context: Context,
-    info: GraphQLResolveInfo
-) => {
-    try {
-        const schedule = await context.datastore.getWorkflowSchedule({ id, orgId: context.orgId });
-        if (!schedule) {
-            throw new Error("Schedule not found");
-        }
-
-        if (!schedule.enabled) {
-            throw new Error("Cannot trigger a disabled schedule");
-        }
-
-        const now = new Date();
-        await context.datastore.updateScheduleNextRun({ 
-            id, 
-            nextRunAt: now, 
-            lastRunAt: schedule.lastRunAt || now 
-        });
-
-        return true;
-    } catch (error) {
-        logMessage('error', "Error triggering schedule: " + String(error), { orgId: context.orgId });
-        throw error;
-    }
-};

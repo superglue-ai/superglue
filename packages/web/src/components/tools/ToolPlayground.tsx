@@ -8,7 +8,7 @@ import { ExecutionStep, Integration, Workflow as Tool, WorkflowResult as ToolRes
 import { generateDefaultFromSchema } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import isEqual from "lodash.isequal";
-import { Check, Hammer, Loader2, Play, X } from "lucide-react";
+import { Check, CloudUpload, Hammer, Loader2, Play, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -39,7 +39,6 @@ export interface ToolPlaygroundProps {
   onInstructionEdit?: () => void;
   headerActions?: React.ReactNode;
   hideHeader?: boolean;
-  readOnly?: boolean;
   shouldStopExecution?: boolean;
   onStopExecution?: () => void;
   uploadedFiles?: UploadedFileInfo[];
@@ -75,7 +74,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   onInstructionEdit,
   headerActions,
   hideHeader = false,
-  readOnly = false,
   shouldStopExecution: externalShouldStop,
   onStopExecution,
   uploadedFiles: parentUploadedFiles,
@@ -1039,11 +1037,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           disabled={loading || saving || (isExecutingStep !== undefined) || (isFixingStep !== undefined) || isExecutingTransform}
           className="h-9 px-4"
         >
-          <Play className="h-4 w-4 fill-current" strokeWidth="3px" strokeLinejoin="round" strokeLinecap="round" />
+          <Play className="h-4 w-4" />
           Run All Steps
           </Button>
       )}
-      {!readOnly && !hideRebuildButton && (
+      {!hideRebuildButton && (
         <Button
           variant="outline"
           onClick={() => {
@@ -1052,10 +1050,18 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           }}
           className="h-9 px-5"
         >
-          <Hammer fill="currentColor" className="h-4 w-4" />
+          <Hammer className="h-4 w-4" />
           Rebuild
         </Button>
       )}
+      <Button
+          variant="outline"
+          onClick={() => setShowDeployModal(true)}
+        className="h-9 px-5"
+      >
+        <CloudUpload className="h-4 w-4" />
+        Deploy
+      </Button>
       <Button
         variant="default"
         onClick={saveTool}
@@ -1069,15 +1075,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           </>
         ) : saveButtonText}
       </Button>
-      {!readOnly && (
-        <Button
-          variant="default"
-          onClick={() => setShowDeployModal(true)}
-          className="h-9 px-5"
-        >
-          Deploy
-        </Button>
-      )}
     </div>
   );
 
@@ -1178,12 +1175,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   currentExecutingStepIndex={currentExecutingStepIndex}
                   completedSteps={completedSteps}
                   failedSteps={failedSteps}
-                  readOnly={readOnly}
                   inputSchema={inputSchema}
                   onInputSchemaChange={(v) => setInputSchema(v)}
                   payloadText={manualPayloadText}
                   computedPayload={computedPayload}
-                  headerActions={headerActions !== undefined ? headerActions : (!readOnly ? defaultHeaderActions : undefined)}
+                  headerActions={headerActions !== undefined ? headerActions : defaultHeaderActions}
                   navigateToFinalSignal={navigateToFinalSignal}
                   showStepOutputSignal={showStepOutputSignal}
                   focusStepId={focusStepId}
