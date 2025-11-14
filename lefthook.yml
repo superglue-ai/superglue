@@ -1,9 +1,0 @@
-pre-commit:
-  parallel: true
-  commands:
-    prettier:
-      glob: "packages/**/*.{ts,tsx,js,jsx,json,md}"
-      exclude: "(node_modules|.next|.turbo)"
-      run: npx prettier --write {staged_files}
-    secrets:
-      run: npx secretlint "**/*.{ts,tsx,js,jsx,json,md}" --maskSecrets {staged_files}
