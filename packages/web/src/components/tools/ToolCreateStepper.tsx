@@ -71,11 +71,6 @@ export function ToolCreateStepper({
       const saved = await client.upsertWorkflow(toolToSave.id, toolToSave as any);
       if (!saved) throw new Error('Failed to save tool');
 
-      toast({
-        title: 'Tool saved',
-        description: `"${saved.id}" saved successfully`
-      });
-
       setCurrentTool(saved);
       setToolPayload(payload);
 

@@ -8,7 +8,7 @@ import { ExecutionStep, Integration, Workflow as Tool, WorkflowResult as ToolRes
 import { generateDefaultFromSchema } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import isEqual from "lodash.isequal";
-import { Check, Hammer, Loader2, Play, X } from "lucide-react";
+import { Check, CloudUpload, Hammer, Loader2, Play, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -25,6 +25,7 @@ import {
 import { Button } from "../ui/button";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 import { ToolStepGallery } from "./ToolStepGallery";
+import { ToolDeployModal } from "./deploy/ToolDeployModal";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -38,7 +39,6 @@ export interface ToolPlaygroundProps {
   onInstructionEdit?: () => void;
   headerActions?: React.ReactNode;
   hideHeader?: boolean;
-  readOnly?: boolean;
   shouldStopExecution?: boolean;
   onStopExecution?: () => void;
   uploadedFiles?: UploadedFileInfo[];
@@ -57,7 +57,7 @@ export interface ToolPlaygroundProps {
 
 export interface ToolPlaygroundHandle {
   executeTool: () => Promise<void>;
-  saveTool: () => Promise<void>;
+  saveTool: () => Promise<boolean>;
   getCurrentTool: () => Tool;
   closeRebuild: () => void;
 }
@@ -74,7 +74,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   onInstructionEdit,
   headerActions,
   hideHeader = false,
-  readOnly = false,
   shouldStopExecution: externalShouldStop,
   onStopExecution,
   uploadedFiles: parentUploadedFiles,
@@ -176,6 +175,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const hasGeneratedDefaultPayloadRef = useRef<boolean>(false);
   const [showToolBuilder, setShowToolBuilder] = useState(false);
   const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
+  const [showDeployModal, setShowDeployModal] = useState(false);
 
   // Generate default payload once when schema is available if payload is empty
   useEffect(() => {
@@ -593,7 +593,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   }, [id, embedded, initialTool]);
 
 
-  const saveTool = async () => {
+  const saveTool = async (): Promise<boolean> => {
     try {
       try {
         JSON.parse(responseSchema || '{}');
@@ -648,6 +648,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 3000);
+      return true;
     } catch (error: any) {
       console.error("Error saving tool:", error);
       toast({
@@ -655,6 +656,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         description: error.message,
         variant: "destructive",
       });
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1037,11 +1039,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           disabled={loading || saving || (isExecutingStep !== undefined) || (isFixingStep !== undefined) || isExecutingTransform}
           className="h-9 px-4"
         >
-          <Play className="h-4 w-4 fill-current" strokeWidth="3px" strokeLinejoin="round" strokeLinecap="round" />
+          <Play className="h-4 w-4" />
           Run All Steps
           </Button>
       )}
-      {!readOnly && !hideRebuildButton && (
+      {!hideRebuildButton && (
         <Button
           variant="outline"
           onClick={() => {
@@ -1050,15 +1052,29 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           }}
           className="h-9 px-5"
         >
-          <Hammer fill="currentColor" className="h-4 w-4" />
+          <Hammer className="h-4 w-4" />
           Rebuild
+        </Button>
+      )}
+      {!embedded && (
+        <Button
+          variant="outline"
+          onClick={async () => {
+            await saveTool();
+            setShowDeployModal(true);
+          }}
+          className="h-9 px-5"
+          disabled={saving || loading}
+        >
+          <CloudUpload className="h-4 w-4" />
+          Deploy
         </Button>
       )}
       <Button
         variant="default"
         onClick={saveTool}
         disabled={saving || loading}
-        className="h-9 px-5 shadow-md border border-primary/40"
+        className="h-9 px-5 w-[108px] shadow-md border border-primary/40"
       >
         {saving ? "Saving..." : justSaved ? (
           <>
@@ -1167,12 +1183,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   currentExecutingStepIndex={currentExecutingStepIndex}
                   completedSteps={completedSteps}
                   failedSteps={failedSteps}
-                  readOnly={readOnly}
                   inputSchema={inputSchema}
                   onInputSchemaChange={(v) => setInputSchema(v)}
                   payloadText={manualPayloadText}
                   computedPayload={computedPayload}
-                  headerActions={headerActions !== undefined ? headerActions : (!readOnly ? defaultHeaderActions : undefined)}
+                  headerActions={headerActions !== undefined ? headerActions : defaultHeaderActions}
                   navigateToFinalSignal={navigateToFinalSignal}
                   showStepOutputSignal={showStepOutputSignal}
                   focusStepId={focusStepId}
@@ -1212,6 +1227,27 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ToolDeployModal
+        currentTool={{
+          id: toolId,
+          steps: steps.map((step: ExecutionStep) => ({
+            ...step,
+            apiConfig: {
+              id: step.apiConfig.id || step.id,
+              ...step.apiConfig,
+              pagination: step.apiConfig.pagination || null
+            }
+          })),
+          responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
+          inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
+          finalTransform,
+          instruction: instructions
+        }}
+        payload={computedPayload}
+        isOpen={showDeployModal}
+        onClose={() => setShowDeployModal(false)}
+      />
     </div>
   );
 });

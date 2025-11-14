@@ -47,7 +47,7 @@ export class WorkflowSchedulerWorker {
 
         for (const schedule of schedules) {
             try {
-                logMessage('debug', `WORKFLOW SCHEDULER: Running scheduled workflow ${schedule.workflowId}`);
+                logMessage('info', `WORKFLOW SCHEDULER: Running scheduled workflow ${schedule.workflowId}`);
 
                 const now = new Date(Date.now());
                 const nextRun = calculateNextRun(schedule.cronExpression, schedule.timezone, now);
