@@ -10,20 +10,25 @@ import {
 } from '@/src/components/ui/alert-dialog';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/src/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { downloadJson } from '@/src/lib/download-utils';
 import { ensureSourceDataArrowFunction, formatJavaScriptCode, isEmptyData, truncateForDisplay } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
-import { Download, FileBraces, FileInput, FileOutput, FilePlay, Loader2, Play, Route, Trash2, Wand2 } from 'lucide-react';
+import { ChevronDown, Download, FileBraces, FileInput, FileOutput, Loader2, Play, Route, Trash2, Wand2 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { JavaScriptCodeEditor } from '../../editors/JavaScriptCodeEditor';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
-import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { ToolStepConfigurator } from '../ToolStepConfigurator';
 import { useDataProcessor } from '../hooks/use-data-processor';
 import { CopyButton } from '../shared/CopyButton';
-import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 
 export const SpotlightStepCard = React.memo(({
     step,
@@ -53,7 +58,7 @@ export const SpotlightStepCard = React.memo(({
     stepResult?: any;
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onRemove?: (stepId: string) => void;
-    onExecuteStep?: () => Promise<void>;
+    onExecuteStep?: (stepOverride?: any) => Promise<void>;
     onFixStep?: () => Promise<void>;
     canExecute?: boolean;
     isExecuting?: boolean;
@@ -208,6 +213,15 @@ export const SpotlightStepCard = React.memo(({
         }
     };
 
+    const handleRunFirstClick = async () => {
+        if (isFirstStep && !isPayloadValid) {
+            setShowInvalidPayloadDialog(true);
+        } else if (onExecuteStep) {
+            const modifiedStep = { ...step, loopMaxIters: 1 };
+            await onExecuteStep(modifiedStep);
+        }
+    };
+
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50 overflow-hidden">
             <div className="p-3">
@@ -223,13 +237,13 @@ export const SpotlightStepCard = React.memo(({
                     </div>
                     <div className="flex items-center gap-2">
                         {!readOnly && onExecuteStep && (
-                            <>
+                            <div className="flex items-center">
                                 <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Run this single step"}>
                                     <Button
                                         variant="ghost"
                                         onClick={handleRunStepClick}
                                         disabled={!canExecute || isExecuting || isFixingStep}
-                                        className="h-8 px-3 gap-2"
+                                        className={`h-8 px-3 gap-2 ${Array.isArray(loopItems) && loopItems.length > 0 ? 'rounded-r-none border-r border-border/50' : ''}`}
                                     >
                                         {isExecuting ? (
                                             <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -239,7 +253,25 @@ export const SpotlightStepCard = React.memo(({
                                         <span className="font-medium text-[13px]">Run Step</span>
                                     </Button>
                                 </span>
-                            </>
+                                {Array.isArray(loopItems) && loopItems.length > 1 && (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                disabled={!canExecute || isExecuting || isFixingStep}
+                                                className="h-8 px-1 rounded-l-none"
+                                            >
+                                                <ChevronDown className="h-3 w-3" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={handleRunFirstClick}>
+                                                Run with first item
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                )}
+                            </div>
                         )}
                         {!readOnly && onFixStep && (
                             <>
@@ -318,7 +350,7 @@ export const SpotlightStepCard = React.memo(({
                                     return (
                                         <>
                                             <p className="text-xs text-muted-foreground mb-2">
-                                                Step data selector extracts step data from the aggregated step input.
+                                                Step data selector extracts step data from the aggregated step input and exposes it as sourceData.currentItem.
                                             </p>
                                             <div className="flex gap-3">
                                                 <div className="flex-1">
@@ -367,7 +399,7 @@ export const SpotlightStepCard = React.memo(({
                                                     <div className="flex-1">
                                                         <Label className="text-xs flex items-center gap-1 mb-1">
                                                             Step Data Selector (JavaScript)
-                                                            <HelpTooltip text="JavaScript arrow function that receives the aggregatedstep input as sourceData. It should return the part of the data this step needs. If it returns an object, the step runs once. If it returns an array, the step runs once for each item and sourceData.currentItem is set for every iteration." />
+                                                            <HelpTooltip text="JavaScript arrow function that receives the aggregated step input as sourceData. It should return the part of the data this step needs. If it returns an object, the step runs once. If it returns an array, the step runs once for each item and sourceData.currentItem is set for every iteration." />
                                                         </Label>
                                                         <JavaScriptCodeEditor
                                                             value={step.loopSelector || '(sourceData) => { }'}
@@ -427,39 +459,7 @@ export const SpotlightStepCard = React.memo(({
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        {!loopItemsError && Array.isArray(loopItems) && step.loopMaxIters && loopItems.length > step.loopMaxIters && (
-                                                            <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
-                                                                <p className="text-xs text-amber-800 dark:text-amber-200">
-                                                                    Warning: The Data Selector returned {loopItems.length} items, but only the first {step.loopMaxIters === 1 ? 'one' : step.loopMaxIters} will be executed due to the max requests limit setting below.
-                                                                </p>
-                                                            </div>
-                                                        )}
                                                     </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="mt-4">
-                                                <div>
-                                                    <Label className="text-xs flex items-center gap-1">
-                                                        Loop Execution Limit
-                                                        <HelpTooltip text="Maximum number of iterations the step will run. Only applicable if the step data selector returns an array. Default is 1000." />
-                                                    </Label>
-                                                    <Input 
-                                                        type="number" 
-                                                        min="0"
-                                                        max="10000"
-                                                        value={step.loopMaxIters || ''} 
-                                                        onChange={(e) => {
-                                                            if (onEdit && !readOnly) {
-                                                                const value = parseInt(e.target.value);
-                                                                if (value < 0 || value > 10000) return;
-                                                                onEdit(step.id, { ...step, loopMaxIters: value || undefined }, true);
-                                                            }
-                                                        }} 
-                                                        className="text-xs mt-1 w-32" 
-                                                        placeholder="1000" 
-                                                        disabled={readOnly} 
-                                                    />
                                                 </div>
                                             </div>
                                         </>
