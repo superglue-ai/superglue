@@ -1,4 +1,6 @@
+import type { Integration } from '@superglue/client';
 import { ExtendedSuperglueClient } from './extended-superglue-client';
+import { resolveOAuthCertAndKey } from '@superglue/shared';
 
 type OAuthFields = {
     client_id: string;
@@ -20,6 +22,9 @@ export type OAuthState = {
     clientId?: string;
     client_credentials_uid?: string;
     suppressErrorUI?: boolean;
+    oauth_cert?: string;
+    oauth_key?: string;
+    scopes?: string;
 };
 
 type OAuthCallbacks = {
@@ -32,6 +37,33 @@ export const getOAuthCallbackUrl = (): string => {
     return `${baseUrl}/api/auth/callback`;
 };
 
+export const buildOAuthFieldsFromIntegration = (integration: Integration) => {
+    const hasRefreshToken = !!integration.credentials?.refresh_token;
+    const derivedGrantType = integration.credentials?.grant_type || (hasRefreshToken ? 'authorization_code' : 'client_credentials');
+    
+    let oauth_cert = integration.credentials?.oauth_cert;
+    let oauth_key = integration.credentials?.oauth_key;
+    
+    if (oauth_cert && oauth_key) {
+        const { cert, key } = resolveOAuthCertAndKey(oauth_cert, oauth_key);
+        oauth_cert = cert?.content;
+        oauth_key = key?.content;
+    }
+    
+    return {
+        access_token: integration.credentials?.access_token,
+        refresh_token: integration.credentials?.refresh_token,
+        client_id: integration.credentials?.client_id,
+        client_secret: integration.credentials?.client_secret,
+        scopes: integration.credentials?.scopes,
+        auth_url: integration.credentials?.auth_url,
+        token_url: integration.credentials?.token_url,
+        grant_type: derivedGrantType,
+        oauth_cert,
+        oauth_key,
+    };
+};
+
 
 const buildOAuthState = (params: {
     integrationId: string;
@@ -41,6 +73,9 @@ const buildOAuthState = (params: {
     clientId?: string;
     clientCredentialsUid?: string;
     suppressErrorUI?: boolean;
+    oauth_cert?: string;
+    oauth_key?: string;
+    scopes?: string;
 }): OAuthState => {
     return {
         integrationId: params.integrationId,
@@ -51,6 +86,9 @@ const buildOAuthState = (params: {
         ...(params.clientId && { clientId: params.clientId }),
         ...(params.clientCredentialsUid && { client_credentials_uid: params.clientCredentialsUid }),
         ...(params.suppressErrorUI && { suppressErrorUI: params.suppressErrorUI }),
+        ...(params.oauth_cert && { oauth_cert: params.oauth_cert }),
+        ...(params.oauth_key && { oauth_key: params.oauth_key }),
+        ...(params.scopes && { scopes: params.scopes }),
     };
 };
 
@@ -94,14 +132,22 @@ const executeClientCredentialsFlow = async (params: {
     state: OAuthState;
     cachePromise: Promise<any> | null;
     callbacks: OAuthCallbacks;
+    apiKey: string;
 }) => {
-    const { state, cachePromise, callbacks } = params;
+    const { state, cachePromise, callbacks, apiKey } = params;
     const { onSuccess, onError } = callbacks;
 
     const callbackUrl = `${window.location.origin}/api/auth/callback?grant_type=client_credentials&state=${encodeURIComponent(btoa(JSON.stringify(state)))}`;
 
     const makeRequest = async () => {
         try {
+            await fetch('/api/auth/init-oauth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ apiKey }),
+                credentials: 'same-origin'
+            });
+
             const response = await fetch(callbackUrl);
 
             if (response.ok) {
@@ -232,6 +278,8 @@ export const triggerOAuthFlow = (
         token_url?: string;
         grant_type?: string;
         client_secret?: string;
+        oauth_cert?: string;
+        oauth_key?: string;
     },
     selectedIntegration?: string,
     apiKey?: string,
@@ -274,10 +322,13 @@ export const triggerOAuthFlow = (
         clientId: templateInfo?.clientId || oauthFields.client_id,
         clientCredentialsUid,
         suppressErrorUI,
+        oauth_cert: oauthFields.oauth_cert,
+        oauth_key: oauthFields.oauth_key,
+        scopes: oauthFields.scopes,
     });
 
     if (grantType === 'client_credentials') {
-        executeClientCredentialsFlow({ state, cachePromise, callbacks });
+        executeClientCredentialsFlow({ state, cachePromise, callbacks, apiKey: apiKey! });
         return null;
     }
 

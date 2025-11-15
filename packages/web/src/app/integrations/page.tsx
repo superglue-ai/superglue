@@ -20,7 +20,7 @@ import { DocStatus } from '@/src/components/utils/DocStatusSpinner';
 import { useToast } from '@/src/hooks/use-toast';
 import { createSuperglueClient, needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
 import { composeUrl, getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
-import { createOAuthErrorHandler, triggerOAuthFlow } from '@/src/lib/oauth-utils';
+import { buildOAuthFieldsFromIntegration, createOAuthErrorHandler, triggerOAuthFlow } from '@/src/lib/oauth-utils';
 import type { Integration } from '@superglue/client';
 import { UpsertMode } from '@superglue/client';
 import { integrationOptions } from '@superglue/shared';
@@ -180,18 +180,7 @@ export default function IntegrationsPage() {
     };
 
     const handleCompleteOAuth = (integration: Integration) => {
-        const hasRefreshToken = !!integration.credentials?.refresh_token;
-        const derivedGrantType = hasRefreshToken ? 'authorization_code' : 'client_credentials';
-        const oauthFields = {
-            access_token: integration.credentials?.access_token,
-            refresh_token: integration.credentials?.refresh_token,
-            client_id: integration.credentials?.client_id,
-            client_secret: integration.credentials?.client_secret,
-            scopes: integration.credentials?.scopes,
-            auth_url: integration.credentials?.auth_url,
-            token_url: integration.credentials?.token_url,
-            grant_type: derivedGrantType,
-        };
+        const oauthFields = buildOAuthFieldsFromIntegration(integration);
 
         // Determine auth type dynamically
         const authType = detectAuthType(integration.credentials || {});
