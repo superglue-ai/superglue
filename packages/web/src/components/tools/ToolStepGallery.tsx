@@ -28,7 +28,7 @@ export interface ToolStepGalleryProps {
     onPayloadChange?: (payload: string) => void;
     onToolIdChange?: (id: string) => void;
     onInstructionEdit?: () => void;
-    onExecuteStep?: (stepIndex: number) => Promise<void>;
+    onExecuteStep?: (stepIndex: number, stepConfig?: any) => Promise<void>;
     onFixStep?: (stepIndex: number) => Promise<void>;
     onExecuteAllSteps?: () => Promise<void>;
     onExecuteTransform?: (schema: string, transform: string) => Promise<void>;
@@ -739,7 +739,7 @@ export function ToolStepGallery({
                                     stepResult={currentItem.stepResult}
                                     onEdit={!readOnly ? onStepEdit : undefined}
                                     onRemove={!readOnly && currentItem.type === 'step' ? handleRemoveStep : undefined}
-                                    onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
+                                    onExecuteStep={onExecuteStep ? (stepConfig?: any) => onExecuteStep(activeIndex - 1, stepConfig) : undefined}
                                     onFixStep={onFixStep ? () => onFixStep(activeIndex - 1) : undefined}
                                     canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
                                     isExecuting={isExecutingStep === activeIndex - 1}

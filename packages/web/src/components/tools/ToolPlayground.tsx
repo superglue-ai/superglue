@@ -93,7 +93,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const { toast } = useToast();
   const config = useConfig();
   const [toolId, setToolId] = useState(initialTool?.id || "");
-  const [steps, setSteps] = useState<any[]>(initialTool?.steps || []);
+  const [steps, setSteps] = useState<ExecutionStep[]>(initialTool?.steps || []);
   const [finalTransform, setFinalTransform] = useState(initialTool?.finalTransform || `(sourceData) => {
   return {
     result: sourceData
@@ -138,8 +138,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
-  const [result, setResult] = useState<ToolResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [failedSteps, setFailedSteps] = useState<string[]>([]);
   const [navigateToFinalSignal, setNavigateToFinalSignal] = useState<number>(0);
@@ -278,7 +276,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
     
     // Clear execution state since tool changed
-    setResult(null);
     setCompletedSteps([]);
     setFailedSteps([]);
     setStepResultsMap({});
@@ -506,7 +503,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     try {
       if (!idToLoad) return;
       setLoading(true);
-      setResult(null);
       const client = createSuperglueClient(config.superglueEndpoint);
       const tool = await client.getWorkflow(idToLoad);
       if (!tool) {
@@ -587,7 +583,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setResponseSchema('');
       setInputSchema(null);
       setManualPayloadText('{}');
-      setResult(null);
       setFinalPreviewResult(null);
     }
   }, [id, embedded, initialTool]);
@@ -677,10 +672,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     setIsStopping(false);
     setCompletedSteps([]);
     setFailedSteps([]);
-    setResult(null);
     setFinalPreviewResult(null);
     setStepResultsMap({});
-    setError(null);
     setFocusStepId(null);
 
     try {
@@ -779,7 +772,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           finalTransform: state.currentTool.finalTransform || finalTransform,
         } as any
       };
-      setResult(wr);
 
       // Update finalTransform with the self-healed version if it was modified
       if (state.currentTool.finalTransform && effectiveSelfHealing) {
@@ -891,7 +883,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           return next;
         });
         setFinalPreviewResult(null);
-        setResult(null);
       }
       // Clear marker regardless to avoid stale cascades
       lastUserEditedStepIdRef.current = null;
@@ -901,7 +892,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     prevStepHashesRef.current = currentHashes;
   }, [steps]);
 
-  const executeStepByIdx = async (idx: number, selfHealing: boolean = false) => {
+  const executeStepByIdx = async (idx: number, selfHealing: boolean = false, stepConfig?: ExecutionStep) => {
     try {
       if (selfHealing) {
         setIsFixingStep(idx);
@@ -909,18 +900,17 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         setIsExecutingStep(idx);
       }
       const client = createSuperglueClient(config.superglueEndpoint);
+      const stepToExecute = stepConfig || steps[idx];
+      
       const single = await executeSingleStep(
         client,
-        {
-          id: toolId,
-          steps
-        } as any,
-        idx,
+        toolId,
+        stepToExecute,
         computedPayload,
         stepResultsMap,
         selfHealing,
       );
-      const sid = steps[idx].id;
+      const sid = stepToExecute.id;
       const normalized = computeStepOutput(single);
       const isFailure = !single.success;
 
@@ -947,8 +937,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
   };
 
-  const handleExecuteStep = async (idx: number) => {
-    await executeStepByIdx(idx, false);
+  const handleExecuteStep = async (idx: number, stepConfig?: ExecutionStep) => {
+    await executeStepByIdx(idx, false, stepConfig);
   };
 
   const handleFixStep = async (idx: number) => {

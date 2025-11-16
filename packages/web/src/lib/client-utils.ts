@@ -28,38 +28,20 @@ export interface ToolExecutionState {
   interrupted?: boolean;
 }
 
-export function createSingleStepTool(
-  tool: Tool,
-  stepIndex: number,
-  previousResults: Record<string, any> = {}
-): Tool {
-  if (stepIndex < 0 || stepIndex >= tool.steps.length) {
-    throw new Error(`Invalid step index: ${stepIndex}`);
-  }
-
-  const step = tool.steps[stepIndex];
-
-  const singleStepTool: any = {
-    id: `${tool.id}_step_${stepIndex}`,
-    steps: [step],
-    finalTransform: ''
-  };
-
-  return singleStepTool;
-}
-
 export async function executeSingleStep(
   client: SuperglueClient,
-  tool: Tool,
-  stepIndex: number,
+  toolId: string,
+  step: any,
   payload: any,
   previousResults: Record<string, any> = {},
   selfHealing: boolean = false
 ): Promise<StepExecutionResult> {
-  const step = tool.steps[stepIndex];
-
   try {
-    const singleStepTool = createSingleStepTool(tool, stepIndex, previousResults);
+    const singleStepTool: any = {
+      id: `${toolId}_step_${step.id}`,
+      steps: [step],
+      finalTransform: ''
+    };
 
     const executionPayload = {
       ...payload,
@@ -129,8 +111,8 @@ export async function executeToolStepByStep(
 
     const result = await executeSingleStep(
       client,
-      state.currentTool,
-      i,
+      state.currentTool.id,
+      step,
       payload,
       previousResults,
       selfHealing
