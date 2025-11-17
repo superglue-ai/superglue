@@ -33,10 +33,9 @@ export const SpotlightStepCard = React.memo(({
     onEdit,
     onRemove,
     onExecuteStep,
-    onFixStep,
+    onOpenFixStepDialog,
     canExecute,
     isExecuting,
-    isFixingStep,
     isGlobalExecuting,
     currentExecutingStepIndex,
     integrations,
@@ -54,10 +53,9 @@ export const SpotlightStepCard = React.memo(({
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onRemove?: (stepId: string) => void;
     onExecuteStep?: () => Promise<void>;
-    onFixStep?: () => Promise<void>;
+    onOpenFixStepDialog?: () => void;
     canExecute?: boolean;
     isExecuting?: boolean;
-    isFixingStep?: boolean;
     isGlobalExecuting?: boolean;
     currentExecutingStepIndex?: number;
     integrations?: Integration[];
@@ -227,7 +225,7 @@ export const SpotlightStepCard = React.memo(({
                                         <Button
                                             variant="default"
                                             onClick={handleRunStepClick}
-                                            disabled={!canExecute || isExecuting || isFixingStep}
+                                            disabled={!canExecute || isExecuting || isGlobalExecuting}
                                             className="h-8 px-3 gap-2 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90"
                                         >
                                             <PlayCircle className="h-3 w-3" />
@@ -239,7 +237,7 @@ export const SpotlightStepCard = React.memo(({
                                     <Button
                                         variant="default"
                                         onClick={handleRunStepClick}
-                                        disabled={!canExecute || isExecuting || isFixingStep}
+                                        disabled={!canExecute || isExecuting || isGlobalExecuting}
                                         className="h-8 px-3 gap-2 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90"
                                     >
                                         {isExecuting ? (
@@ -252,20 +250,16 @@ export const SpotlightStepCard = React.memo(({
                                 </span>
                             </>
                         )}
-                        {!readOnly && onFixStep && (
+                        {!readOnly && onOpenFixStepDialog && (
                             <>
-                                <span title={!canExecute ? "Execute previous steps first" : isFixingStep ? "Step is self-healing..." : "Run and fix this step with AI"}>
+                                <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Fix this step with AI"}>
                                     <Button
                                         variant="ghost"
-                                        onClick={onFixStep}
-                                        disabled={!canExecute || isExecuting || isFixingStep}
+                                        onClick={onOpenFixStepDialog}
+                                        disabled={!canExecute || isExecuting || isGlobalExecuting}
                                         className="h-8 px-3 gap-2"
                                     >
-                                        {isFixingStep ? (
-                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                        ) : (
-                                            <Wand2 className="h-3 w-3" />
-                                        )}
+                                        <Wand2 className="h-3 w-3" />
                                         <span className="font-medium text-[13px]">Fix Step</span>
                                     </Button>
                                 </span>

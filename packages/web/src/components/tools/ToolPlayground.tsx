@@ -3,7 +3,7 @@
 import { useConfig } from "@/src/app/config-context";
 import { createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { computeStepOutput, computeToolPayload, removeFileKeysFromPayload } from "@/src/lib/general-utils";
+import { buildEvolvingPayload, computeStepOutput, computeToolPayload, removeFileKeysFromPayload } from "@/src/lib/general-utils";
 import { ExecutionStep, Integration, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
 import { generateDefaultFromSchema } from "@superglue/shared";
 import { Validator } from "jsonschema";
@@ -26,6 +26,7 @@ import { Button } from "../ui/button";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 import { ToolStepGallery } from "./ToolStepGallery";
 import { ToolDeployModal } from "./deploy/ToolDeployModal";
+import { FixStepDialog } from "./FixStepDialog";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -160,8 +161,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
   }, [embedded, initialInstruction]);
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
-  const [isFixingStep, setIsFixingStep] = useState<number | undefined>(undefined);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndex] = useState<number | undefined>(undefined);
+  const [showFixStepDialog, setShowFixStepDialog] = useState(false);
+  const [fixStepIndex, setFixStepIndex] = useState<number | null>(null);
   const [isStopping, setIsStopping] = useState(false);
   const [isRunningTransform, setIsRunningTransform] = useState(false);
   const [isFixingTransform, setIsFixingTransform] = useState(false);
@@ -901,13 +903,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     prevStepHashesRef.current = currentHashes;
   }, [steps]);
 
-  const executeStepByIdx = async (idx: number, selfHealing: boolean = false) => {
+  const executeStepByIdx = async (idx: number) => {
     try {
-      if (selfHealing) {
-        setIsFixingStep(idx);
-      } else {
-        setIsExecutingStep(idx);
-      }
+      setIsExecutingStep(idx);
       const client = createSuperglueClient(config.superglueEndpoint);
       const single = await executeSingleStep(
         client,
@@ -918,7 +916,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         idx,
         computedPayload,
         stepResultsMap,
-        selfHealing,
+        false, // selfHealing removed
       );
       const sid = steps[idx].id;
       const normalized = computeStepOutput(single);
@@ -943,16 +941,36 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setShowStepOutputSignal(Date.now());
     } finally {
       setIsExecutingStep(undefined);
-      setIsFixingStep(undefined);
     }
   };
 
   const handleExecuteStep = async (idx: number) => {
-    await executeStepByIdx(idx, false);
+    await executeStepByIdx(idx);
   };
 
-  const handleFixStep = async (idx: number) => {
-    await executeStepByIdx(idx, true);
+  const handleOpenFixStepDialog = (idx: number) => {
+    setFixStepIndex(idx);
+    setShowFixStepDialog(true);
+  };
+
+  const handleCloseFixStepDialog = () => {
+    setShowFixStepDialog(false);
+    setFixStepIndex(null);
+  };
+
+  const handleFixStepSuccess = (newConfig: any) => {
+    if (fixStepIndex === null) return;
+
+    const step = steps[fixStepIndex];
+    const updatedStep = {
+      ...step,
+      apiConfig: {
+        ...step.apiConfig,
+        ...newConfig,
+      },
+    };
+
+    handleStepEdit(step.id, updatedStep, true);
   };
 
   const handleExecuteTransform = async (schemaStr: string, transformStr: string, selfHealing: boolean = false) => {
@@ -1027,7 +1045,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         <Button
           variant="destructive"
           onClick={handleStopExecution}
-          disabled={saving || (isExecutingStep !== undefined) || (isFixingStep !== undefined) || isExecutingTransform || isStopping}
+          disabled={saving || (isExecutingStep !== undefined) || isExecutingTransform || isStopping}
           className="h-9 px-4"
         >
           {isStopping ? "Stopping..." : "Stop Execution"}
@@ -1036,7 +1054,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         <Button
           variant="outline"
           onClick={handleRunAllSteps}
-          disabled={loading || saving || (isExecutingStep !== undefined) || (isFixingStep !== undefined) || isExecutingTransform}
+          disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
           className="h-9 px-4"
         >
           <Play className="h-4 w-4" />
@@ -1166,7 +1184,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   onStepsChange={handleStepsChange}
                   onStepEdit={handleStepEdit}
                   onExecuteStep={handleExecuteStep}
-                  onFixStep={handleFixStep}
+                  onOpenFixStepDialog={handleOpenFixStepDialog}
                   onExecuteTransform={handleExecuteTransform}
                   onFixTransform={handleFixTransform}
                   onFinalTransformChange={setFinalTransform}
@@ -1177,7 +1195,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   integrations={integrations}
                   isExecuting={loading}
                   isExecutingStep={isExecutingStep}
-                  isFixingStep={isFixingStep}
                   isRunningTransform={isRunningTransform}
                   isFixingTransform={isFixingTransform}
                   currentExecutingStepIndex={currentExecutingStepIndex}
@@ -1227,6 +1244,18 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {fixStepIndex !== null && (
+        <FixStepDialog
+          open={showFixStepDialog}
+          onClose={handleCloseFixStepDialog}
+          step={steps[fixStepIndex]}
+          stepInput={buildEvolvingPayload(computedPayload || {}, steps, stepResultsMap, fixStepIndex - 1)}
+          integrationId={steps[fixStepIndex]?.integrationId}
+          errorMessage={stepResultsMap[steps[fixStepIndex]?.id]?.error}
+          onSuccess={handleFixStepSuccess}
+        />
+      )}
 
       <ToolDeployModal
         currentTool={{
