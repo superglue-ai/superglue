@@ -2,7 +2,7 @@ import { Workflow } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { logMessage } from "../utils/logs.js";
 
-export interface SuggestedTool {
+export interface FoundTool {
     id: string;
     instruction?: string;
     inputSchema?: any;
@@ -14,14 +14,14 @@ export interface SuggestedTool {
     reason: string;
 }
 
-export class ToolSelector {
+export class ToolFinder {
     private metadata: Metadata;
 
     constructor(metadata: Metadata) {
         this.metadata = metadata;
     }
 
-    private enrichTool(tool: Workflow, reason: string): SuggestedTool {
+    private enrichTool(tool: Workflow, reason: string): FoundTool {
         return {
             id: tool.id,
             instruction: tool.instruction,
@@ -35,7 +35,7 @@ export class ToolSelector {
         };
     }
 
-    private keywordSearch(query: string, tools: Workflow[]): SuggestedTool[] {
+    private keywordSearch(query: string, tools: Workflow[]): FoundTool[] {
         const keywords = query.toLowerCase().split(/\s+/).filter(k => k.length > 0);
 
         const scored = tools.map(tool => {
@@ -69,10 +69,10 @@ export class ToolSelector {
         );
     }
 
-    public async select(
+    public async findTools(
         query: string | undefined,
         tools: Workflow[]
-    ): Promise<SuggestedTool[]> {
+    ): Promise<FoundTool[]> {
         if (!tools || tools.length === 0) {
             logMessage('info', 'No tools available for selection.', this.metadata);
             return [];

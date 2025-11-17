@@ -6,9 +6,9 @@
 
 import { ApiConfig } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
-import { callPostgres } from '../../execute/postgres/postgres.js';
+import { callPostgres } from '../../tools/strategies/postgres/postgres.js';
 import { logMessage } from "../../utils/logs.js";
-import { composeUrl } from "../../utils/tools.js";
+import { composeUrl } from "../../utils/helpers.js";
 import { DocumentationProcessingStrategy } from '../types.js';
 
 export class PostgreSqlStrategy implements DocumentationProcessingStrategy {

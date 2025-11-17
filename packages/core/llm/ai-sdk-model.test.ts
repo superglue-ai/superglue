@@ -5,7 +5,7 @@ import { getModelContextLength, initializeAIModel } from '@superglue/shared/util
 import { generateText, jsonSchema, tool } from 'ai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AiSdkModel } from './ai-sdk-model.js';
-import { LLMMessage } from './language-model.js';
+import { LLMMessage } from './llm-base-model.js';
 
 vi.mock('ai');
 vi.mock('@ai-sdk/openai');
@@ -233,9 +233,9 @@ describe('AiSdkModel', () => {
       );
     });
 
-    it('should handle custom tools', async () => {
+    it('should handle custom tools with context', async () => {
       const model = new AiSdkModel();
-      const customToolExecute = vi.fn().mockResolvedValue({ result: 'custom tool result' });
+      const customToolExecute = vi.fn().mockResolvedValue({ success: true, data: 'custom tool result' });
       
       mockGenerateText.mockResolvedValue({
         text: '',
@@ -248,24 +248,92 @@ describe('AiSdkModel', () => {
       } as any);
 
       const customTools = [{
-        name: 'custom_tool',
-        description: 'A custom tool',
-        arguments: {
-          type: 'object' as const,
-          properties: {
-            param: { type: 'string' }
-          }
+        toolDefinition: {
+          name: 'custom_tool',
+          description: 'A custom tool',
+          arguments: {
+            type: 'object' as const,
+            properties: {
+              param: { type: 'string' }
+            }
+          },
+          execute: customToolExecute
         },
-        execute: customToolExecute
+        toolContext: { contextData: 'test' }
       }];
 
       await model.generateObject(
-        { messages: [{ role: 'user', content: 'test' }], schema: { type: 'object', properties: {} }, tools: customTools, toolContext: { contextData: 'test' } }
+        { messages: [{ role: 'user', content: 'test' }], schema: { type: 'object', properties: {} }, tools: customTools }
       );
 
       expect(mockGenerateText).toHaveBeenCalled();
       const lastCall = mockGenerateText.mock.calls[mockGenerateText.mock.calls.length - 1][0];
       expect(lastCall.tools).toHaveProperty('custom_tool');
+    });
+
+    it('should handle custom tools without context', async () => {
+      const model = new AiSdkModel();
+      const customToolExecute = vi.fn().mockResolvedValue({ success: true, data: 'custom tool result' });
+      
+      mockGenerateText.mockResolvedValue({
+        text: '',
+        toolCalls: [{
+          toolCallId: 'call_123',
+          toolName: 'submit',
+          input: { key: 'value' }
+        }],
+        toolResults: []
+      } as any);
+
+      const customTools = [{
+        toolDefinition: {
+          name: 'custom_tool',
+          description: 'A custom tool',
+          arguments: {
+            type: 'object' as const,
+            properties: {
+              param: { type: 'string' }
+            }
+          },
+          execute: customToolExecute
+        },
+        toolContext: undefined
+      }];
+
+      await model.generateObject(
+        { messages: [{ role: 'user', content: 'test' }], schema: { type: 'object', properties: {} }, tools: customTools }
+      );
+
+      expect(mockGenerateText).toHaveBeenCalled();
+      const lastCall = mockGenerateText.mock.calls[mockGenerateText.mock.calls.length - 1][0];
+      expect(lastCall.tools).toHaveProperty('custom_tool');
+    });
+
+    it('should handle web search tool as Record<string, Tool>', async () => {
+      const model = new AiSdkModel();
+      
+      mockGenerateText.mockResolvedValue({
+        text: '',
+        toolCalls: [{
+          toolCallId: 'call_123',
+          toolName: 'submit',
+          input: { key: 'value' }
+        }],
+        toolResults: []
+      } as any);
+
+      const webSearchTools = [{
+        toolDefinition: { web_search: { type: 'web_search_openai' } as any },
+        toolContext: {}
+      }];
+
+      await model.generateObject(
+        { messages: [{ role: 'user', content: 'test' }], schema: { type: 'object', properties: {} }, tools: webSearchTools }
+      );
+
+      expect(mockGenerateText).toHaveBeenCalled();
+      const lastCall = mockGenerateText.mock.calls[mockGenerateText.mock.calls.length - 1][0];
+      expect(lastCall.tools).toHaveProperty('web_search');
     });
 
     it('should handle multi-turn conversation with tool results', async () => {

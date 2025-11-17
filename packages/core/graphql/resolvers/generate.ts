@@ -1,15 +1,15 @@
 import { ApiConfig, Integration } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
-import { executeTool, ToolCall } from "../../execute/tools.js";
-import { InstructionGenerationContext } from "../../utils/workflow-tools.js";
+import { executeLLMTool, LLMToolCall } from "../../llm/llm-tool-utils.js";
+import { InstructionGenerationContext } from "../../llm/llm-tools.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { Context, Metadata } from '../types.js';
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { getGenerateStepConfigContext } from "../../context/context-builders.js";
-import { LLMMessage } from "../../llm/language-model.js";
+import { LLMMessage } from "../../llm/llm-base-model.js";
 import { GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../../context/context-prompts.js";
 import { logMessage } from "../../utils/logs.js";
-import { generateStepConfig } from "../../build/tool-step-builder.js";
+import { generateStepConfig } from "../../tools/tool-step-builder.js";
 
 interface GenerateStepConfigArgs {
   integrationId?: string;
@@ -28,7 +28,7 @@ export const generateInstructionsResolver = async (
   info: GraphQLResolveInfo
 ) => {
   try {
-    const toolCall: ToolCall = {
+    const toolCall: LLMToolCall = {
       id: crypto.randomUUID(),
       name: "generate_instructions",
       arguments: {}
@@ -40,7 +40,7 @@ export const generateInstructionsResolver = async (
       integrations: integrations
     };
 
-    const callResult = await executeTool(toolCall, toolContext);
+    const callResult = await executeLLMTool(toolCall, toolContext);
 
     if (callResult.error) {
       throw new Error(callResult.error);
@@ -120,7 +120,11 @@ export const generateStepConfigResolver = async (
       }
     ];
 
-    const generateStepConfigResult = await generateStepConfig(0, messages);
+    const generateStepConfigResult = await generateStepConfig({
+      retryCount: 0,
+      messages,
+      integration
+    });
           
     if (!generateStepConfigResult.success || !generateStepConfigResult.config) {
       throw new Error(generateStepConfigResult.error || "No step config generated");

@@ -5,14 +5,15 @@ import { getEvaluateStepResponseContext, getGenerateStepConfigContext, getLoopSe
 import { EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT, GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
-import { LanguageModel, LLMMessage } from "../llm/language-model.js";
+import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
-import { applyJsonata, isSelfHealingEnabled, maskCredentials, transformAndValidateSchema } from "../utils/tools.js";
-import { evaluateTransform, generateTransformCode } from "../utils/transform.js";
-import { AbortError, ApiCallError } from "./api/api.js";
-import { runStepConfig } from "./api/api.legacy.js";
-import { generateStepConfig } from "../build/tool-step-builder.js";
+import { isSelfHealingEnabled, maskCredentials, transformAndValidateSchema } from "../utils/helpers.js";
+import { applyJsonata } from "../utils/helpers.legacy.js";
+import { evaluateTransform, generateTransformCode } from "./tool-transform.js";
+import { AbortError, ApiCallError } from "./strategies/http/http.js";
+import { runStepConfig } from "./strategies/http/http.js";
+import { generateStepConfig } from "./tool-step-builder.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
@@ -474,7 +475,11 @@ export class WorkflowExecutor implements Workflow {
             });
           }
 
-          const generateStepConfigResult = await generateStepConfig(retryCount, messages);
+          const generateStepConfigResult = await generateStepConfig({
+            retryCount,
+            messages,
+            integration
+          });
           messages = generateStepConfigResult.messages;
           
           if (!generateStepConfigResult.success) {

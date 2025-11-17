@@ -1,13 +1,38 @@
 import { ApiConfig, RequestOptions } from '@superglue/client';
 import { Pool } from 'pg';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { server_defaults } from '../../default.js';
+import { server_defaults } from '../../../default.js';
 import { callPostgres, closeAllPools } from './postgres.js';
 
 // Create mock functions that we can reference
 const mockPoolQuery = vi.fn();
 const mockPoolEnd = vi.fn();
 const mockPoolOn = vi.fn();
+
+let shouldSkip = true;
+
+describe('callPostgres', () => {
+  const testConfig: ApiConfig = {
+    id: '1',
+    instruction: 'test',
+    urlHost: 'postgres://user:password@localhost:5432',
+    urlPath: '/testdb',
+    body: JSON.stringify({
+      query: 'SELECT NOW()'
+    })
+  };
+
+  it.skipIf(shouldSkip)('should connect and execute a simple query', async () => {
+    const result = await callPostgres({
+      endpoint: testConfig,
+      payload: {},
+      credentials: {},
+      options: { timeout: 5000, retries: 1 }
+    });
+
+    expect(result).toBeDefined();
+  });
+});
 
 // Mock pg Pool
 vi.mock('pg', () => ({

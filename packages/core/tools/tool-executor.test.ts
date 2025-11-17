@@ -1,6 +1,6 @@
 import { SelfHealingMode } from '@superglue/client';
 import { describe, expect, it, vi } from 'vitest';
-import { isSelfHealingEnabled } from '../utils/tools.js';
+import { isSelfHealingEnabled } from '../utils/helpers.js';
 
 // Mock the tools module but keep isSelfHealingEnabled real
 vi.mock('../utils/tools.js', async () => {
