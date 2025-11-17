@@ -6,7 +6,7 @@ import { EVALUATE_TRANSFORM_SYSTEM_PROMPT, GENERATE_TRANSFORM_SYSTEM_PROMPT } fr
 import { server_defaults } from "../default.js";
 import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { logMessage } from "./logs.js";
-import { isSelfHealingEnabled, transformAndValidateSchema } from "./tools.js";
+import { isSelfHealingEnabled, transformAndValidateSchema } from "./helpers.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
