@@ -33,6 +33,7 @@ export const SpotlightStepCard = React.memo(({
     onEdit,
     onRemove,
     onExecuteStep,
+    onExecuteStepWithLimit,
     onOpenFixStepDialog,
     canExecute,
     isExecuting,
@@ -53,6 +54,7 @@ export const SpotlightStepCard = React.memo(({
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onRemove?: (stepId: string) => void;
     onExecuteStep?: () => Promise<void>;
+    onExecuteStepWithLimit?: (limit: number) => Promise<void>;
     onOpenFixStepDialog?: () => void;
     canExecute?: boolean;
     isExecuting?: boolean;
@@ -114,10 +116,11 @@ export const SpotlightStepCard = React.memo(({
     };
 
     useEffect(() => {
-        if (showOutputSignal) {
+        // Only switch to output tab if there's actual output data to show
+        if (showOutputSignal && stepResult) {
             setActivePanel('output');
         }
-    }, [showOutputSignal]);
+    }, [showOutputSignal, stepResult]);
 
     // Re-trigger schema computation when data changes and we're viewing schema
     useEffect(() => {
@@ -204,6 +207,14 @@ export const SpotlightStepCard = React.memo(({
         }
     };
 
+    const handleTryWithOneIterationClick = () => {
+        if (isFirstStep && !isPayloadValid) {
+            setShowInvalidPayloadDialog(true);
+        } else if (onExecuteStepWithLimit) {
+            onExecuteStepWithLimit(1);
+        }
+    };
+
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50 overflow-hidden">
             <div className="p-3">
@@ -224,7 +235,7 @@ export const SpotlightStepCard = React.memo(({
                                     <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Try running this step with only 1 iteration"}>
                                         <Button
                                             variant="default"
-                                            onClick={handleRunStepClick}
+                                            onClick={handleTryWithOneIterationClick}
                                             disabled={!canExecute || isExecuting || isGlobalExecuting}
                                             className="h-8 px-3 gap-2 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90"
                                         >

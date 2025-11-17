@@ -3,7 +3,7 @@
 import { useConfig } from "@/src/app/config-context";
 import { createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { buildEvolvingPayload, computeStepOutput, computeToolPayload, removeFileKeysFromPayload } from "@/src/lib/general-utils";
+import { buildEvolvingPayload, computeStepOutput, computeToolPayload, removeFileKeysFromPayload, wrapLoopSelectorWithLimit } from "@/src/lib/general-utils";
 import { ExecutionStep, Integration, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
 import { generateDefaultFromSchema } from "@superglue/shared";
 import { Validator } from "jsonschema";
@@ -862,7 +862,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         id: s.id,
         executionMode: s.executionMode,
         loopSelector: s.loopSelector,
-        loopMaxIters: s.loopMaxIters,
         integrationId: s.integrationId,
         apiConfig: s.apiConfig,
       };
@@ -903,29 +902,42 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     prevStepHashesRef.current = currentHashes;
   }, [steps]);
 
-  const executeStepByIdx = async (idx: number) => {
+  const executeStepByIdx = async (idx: number, limitIterations?: number) => {
     try {
       setIsExecutingStep(idx);
       const client = createSuperglueClient(config.superglueEndpoint);
+      
+      // Store original loop selector to restore it after execution
+      const originalLoopSelector = steps[idx]?.loopSelector;
+      
+      // Wrap loop selector if limit is specified (ephemeral, not saved to state)
+      const executionSteps = limitIterations && originalLoopSelector
+        ? steps.map((s, i) => i === idx ? { ...s, loopSelector: wrapLoopSelectorWithLimit(s.loopSelector, limitIterations) } : s)
+        : steps;
+
       const single = await executeSingleStep(
         client,
-        {
-          id: toolId,
-          steps
-        } as any,
+        { id: toolId, steps: executionSteps } as any,
         idx,
         computedPayload,
         stepResultsMap,
-        false, // selfHealing removed
+        false,
       );
+      
       const sid = steps[idx].id;
       const normalized = computeStepOutput(single);
       const isFailure = !single.success;
 
-      // Update step configuration if API returned changes
       if (single.updatedStep) {
         setSteps(prevSteps =>
-          prevSteps.map((step, i) => i === idx ? single.updatedStep : step)
+          prevSteps.map((step, i) => {
+            if (i !== idx) return step;
+            // If we used a limit, restore the original loop selector
+            const updated = single.updatedStep;
+            return limitIterations && originalLoopSelector
+              ? { ...updated, loopSelector: originalLoopSelector }
+              : updated;
+          })
         );
       }
 
@@ -946,6 +958,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
   const handleExecuteStep = async (idx: number) => {
     await executeStepByIdx(idx);
+  };
+
+  const handleExecuteStepWithLimit = async (idx: number, limit: number) => {
+    await executeStepByIdx(idx, limit);
   };
 
   const handleOpenFixStepDialog = (idx: number) => {
@@ -1184,6 +1200,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   onStepsChange={handleStepsChange}
                   onStepEdit={handleStepEdit}
                   onExecuteStep={handleExecuteStep}
+                  onExecuteStepWithLimit={handleExecuteStepWithLimit}
                   onOpenFixStepDialog={handleOpenFixStepDialog}
                   onExecuteTransform={handleExecuteTransform}
                   onFixTransform={handleFixTransform}
