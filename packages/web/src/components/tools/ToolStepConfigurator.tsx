@@ -5,7 +5,7 @@ import { splitUrl } from '@/src/lib/client-utils';
 import { composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/general-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
 import { Integration, SuperglueClient } from "@superglue/client";
-import { ArrowDown, Check, Copy, Edit, Globe } from 'lucide-react';
+import { ArrowDown, Check, Copy, Edit, Globe, IterationCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { JavaScriptCodeEditor } from '../editors/JavaScriptCodeEditor';
 import { JsonCodeEditor } from '../editors/JsonCodeEditor';
@@ -28,9 +28,10 @@ interface ToolStepConfiguratorProps {
     onEditingChange?: (editing: boolean) => void;
     disabled?: boolean;
     stepInput?: any;
+    loopItems?: any;
 }
 
-export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput }: ToolStepConfiguratorProps) {
+export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, loopItems }: ToolStepConfiguratorProps) {
     const [localIntegrations, setLocalIntegrations] = useState<Integration[]>([]);
     const [headersText, setHeadersText] = useState('');
     const [queryParamsText, setQueryParamsText] = useState('');
@@ -168,6 +169,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                         </Badge>
                                     );
                                 })()}
+                                
                             </CardTitle>
                         </div>
                         {(step.modify === true) && (

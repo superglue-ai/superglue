@@ -1034,13 +1034,13 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         </Button>
       ) : (
         <Button
-          variant="success"
+          variant="outline"
           onClick={handleRunAllSteps}
           disabled={loading || saving || (isExecutingStep !== undefined) || (isFixingStep !== undefined) || isExecutingTransform}
           className="h-9 px-4"
         >
           <Play className="h-4 w-4" />
-          Run All Steps
+          Safely Run all Steps
           </Button>
       )}
       {!hideRebuildButton && (
