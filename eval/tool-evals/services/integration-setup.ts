@@ -3,6 +3,7 @@ import { Integration } from "@superglue/client";
 import { DataStore } from "../../../packages/core/datastore/types.js";
 import { DocumentationFetcher } from "../../../packages/core/documentation/index.js";
 import { logMessage } from "../../../packages/core/utils/logs.js";
+import { replaceVariables } from "../../../packages/core/utils/tools.js";
 import type { AgentEvalConfig, IntegrationConfig } from "../types.js";
 
 export class IntegrationSetupService {
@@ -50,27 +51,23 @@ export class IntegrationSetupService {
         credentials: integrationConfig.credentials,
       };
     }
-
-    if (integrationConfig.id === "postgres-lego") {
-      // replace the username, password, host, port, and database in the urlHost with the values from the credentials
-      integrationConfig.urlHost = integrationConfig.urlHost.replace("<<username>>", integrationConfig.credentials.username).replace("<<password>>", integrationConfig.credentials.password).replace("<<host>>", integrationConfig.credentials.host).replace("<<port>>", integrationConfig.credentials.port);
-      integrationConfig.urlPath = integrationConfig.credentials.database;
-    }
-    if (integrationConfig.id === "eval-postgres") {
-      // replace the username, password, host, port, and database in the urlHost with the values from the credentials
-      integrationConfig.urlHost = integrationConfig.urlHost.replace("<<username>>", integrationConfig.credentials.username).replace("<<password>>", integrationConfig.credentials.password).replace("<<host>>", integrationConfig.credentials.host).replace("<<port>>", integrationConfig.credentials.port);
-      integrationConfig.urlPath = integrationConfig.credentials.database;
-    }
+    const scopedCredentials = Object.entries(integrationConfig.credentials).reduce(
+      (acc, [key, value]) => {
+        acc[`${integrationConfig.id}_${key}`] = value;
+        return acc;
+      },
+      {} as Record<string, string>
+    );
 
     const docFetcher = new DocumentationFetcher(
       {
-        urlHost: integrationConfig.urlHost,
-        urlPath: integrationConfig.urlPath,
-        documentationUrl: integrationConfig.documentationUrl,
-        openApiUrl: integrationConfig.openApiUrl,
+        urlHost: await replaceVariables(integrationConfig.urlHost, scopedCredentials),
+        urlPath: await replaceVariables(integrationConfig.urlPath, scopedCredentials),
+        documentationUrl: await replaceVariables(integrationConfig.documentationUrl, scopedCredentials),
+        openApiUrl: await replaceVariables(integrationConfig.openApiUrl, scopedCredentials),
         keywords: integrationConfig.keywords,
       },
-      integrationConfig.credentials || {},
+      scopedCredentials,
       this.metadata
     );
 

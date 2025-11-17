@@ -212,7 +212,7 @@
     {
       "id": "jira",
       "name": "JIRA",
-      "urlHost": "https://<<organization>>.atlassian.net",
+      "urlHost": "https://<<jira_organization>>.atlassian.net",
       "urlPath": "rest/api/3",
       "documentationUrl": "https://developer.atlassian.com/cloud/jira/platform/rest/v3",
       "openApiUrl": "https://developer.atlassian.com/cloud/jira/platform/swagger-v3.json",
@@ -358,8 +358,8 @@
     {
       "id": "postgres-lego",
       "name": "LEGO Database",
-      "urlHost": "postgres://<<username>>:<<password>>@<<host>>:<<port>>",
-      "urlPath": "<<database>>",
+      "urlHost": "postgres://<<postgres-lego_username>>:<<postgres-lego_password>>@<<postgres-lego_host>>:<<postgres-lego_port>>",
+      "urlPath": "<<postgres-lego_database>>",
       "documentationUrl": "",
       "credentials": {
         "username": "",
@@ -381,8 +381,8 @@
     {
       "id": "eval-postgres",
       "name": "Eval PostgreSQL Test Database",
-      "urlHost": "postgres://<<username>>:<<password>>@<<host>>:<<port>>",
-      "urlPath": "<<database>>",
+      "urlHost": "postgres://<<eval-postgres_username>>:<<eval-postgres_password>>@<<eval-postgres_host>>:<<eval-postgres_port>>",
+      "urlPath": "<<eval-postgres_database>>",
       "documentationUrl": "",
       "credentials": {
         "username": "",
@@ -1340,7 +1340,7 @@
   "settings": {
     "runOneShotMode": true,
     "runSelfHealingMode": true,
-    "attemptsEachMode": 3,
+    "attemptsEachMode": 5,
     "maxConcurrentWorkers": 5,
     "toolAttemptTimeoutMs": 300000
   },
