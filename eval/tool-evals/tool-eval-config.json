@@ -212,13 +212,14 @@
     {
       "id": "jira",
       "name": "JIRA",
-      "urlHost": "https://superglue-team-test.atlassian.net",
+      "urlHost": "https://<<organization>>.atlassian.net",
       "urlPath": "rest/api/3",
       "documentationUrl": "https://developer.atlassian.com/cloud/jira/platform/rest/v3",
       "openApiUrl": "https://developer.atlassian.com/cloud/jira/platform/swagger-v3.json",
       "credentials": {
         "email": "",
-        "api_token": ""
+        "api_token": "",
+        "organization": ""
       },
       "description": "JIRA project management API",
       "keywords": [
@@ -357,8 +358,8 @@
     {
       "id": "postgres-lego",
       "name": "LEGO Database",
-      "urlHost": "postgres://<<username>>:<<password>>@<<host>>:<<port>>/<<database>>/",
-      "urlPath": "",
+      "urlHost": "postgres://<<username>>:<<password>>@<<host>>:<<port>>",
+      "urlPath": "<<database>>",
       "documentationUrl": "",
       "credentials": {
         "username": "",
@@ -375,6 +376,52 @@
         "postgresql",
         "api key",
         "tables"
+      ]
+    },
+    {
+      "id": "eval-postgres",
+      "name": "Eval PostgreSQL Test Database",
+      "urlHost": "postgres://<<username>>:<<password>>@<<host>>:<<port>>",
+      "urlPath": "<<database>>",
+      "documentationUrl": "",
+      "credentials": {
+        "username": "",
+        "password": "",
+        "host": "",
+        "port": "",
+        "database": ""
+      },
+      "description": "PostgreSQL test database for evaluations",
+      "keywords": [
+        "database",
+        "sql",
+        "postgres",
+        "postgresql",
+        "test"
+      ]
+    },
+    {
+      "id": "eval-sftp",
+      "name": "Eval SFTP Test Server",
+      "urlHost": "sftp://<<username>>:<<password>>@<<host>>:<<port>>",
+      "urlPath": "/",
+      "documentationUrl": "",
+      "credentials": {
+        "username": "",
+        "password": "",
+        "host": "",
+        "port": "",
+        "home": "",
+        "uploads_dir": ""
+      },
+      "description": "SFTP test server for file operations evaluations",
+      "keywords": [
+        "sftp",
+        "ftp",
+        "file",
+        "upload",
+        "download",
+        "test"
       ]
     },
     {
@@ -992,32 +1039,6 @@
       "expectedResultDescription": "Should count all breweries in California state. Expected total of 919 breweries."
     },
     {
-      "id": "038-openalex-fetch-1000-works-2025",
-      "name": "OpenAlex - Fetch 1000 Works from 2025",
-      "description": "Fetch exactly 1000 scholarly works published in 2025 using pagination",
-      "type": "retrieval",
-      "instruction": "Fetch exactly 1000 works published in 2025 from the OpenAlex API. Filter by publication_year:2025. Return a JSON object with this structure: { total_fetched: number, publication_year: number}> }",
-      "integrationIds": [
-        "openalex"
-      ],
-      "payload": {},
-      "validationFunction": "validators/038-openalex-fetch-1000-works-2025.ts",
-      "expectedResultDescription": "Should fetch exactly 1000 scholarly works from 2025 using OpenAlex pagination. Expected count 1000 with publication_year 2025."
-    },
-    {
-      "id": "039-openalex-pagination-1000-works-2025",
-      "name": "OpenAlex - Pagination 1000 Works from 2025",
-      "description": "Fetch exactly 1000 scholarly works published in 2025 using pagination with a reminder to use pagination",
-      "type": "retrieval",
-      "instruction": "Fetch exactly 1000 works published in 2025 from the OpenAlex API. Remember to use pagination and configure it correctly. Return a JSON object with this structure: { total_fetched: number, publication_year: number}> }",
-      "integrationIds": [
-        "openalex"
-      ],
-      "payload": {},
-      "validationFunction": "validators/039-openalex-pagination-1000-works-2025.ts",
-      "expectedResultDescription": "Should fetch exactly 1000 scholarly works from 2025 with explicit pagination reminder. Expected count 1000 with publication_year 2025."
-    },
-    {
       "id": "040-punkapi-fetch-all-beers",
       "name": "PunkAPI - Fetch All Beers",
       "description": "Fetch all BrewDog beers from the catalogue",
@@ -1203,18 +1224,128 @@
       },
       "validationFunction": "validators/053-multifile-all-summary.ts",
       "expectedResultDescription": "Should generate accurate summary statistics from all three files. CSV: 50 rows, ~$44k revenue, 35 unique products. JSON: 10 users, 9 with orders, 14 total orders, ~$5619.59 total value. Fixed-width: 20 customers, ~$161.5k total balance, avg age ~38.5, 20 unique cities."
+    },
+    {
+      "id": "054-postgres-list-tables",
+      "name": "PostgreSQL List All Eval Tables",
+      "description": "Simple test: Query database to list all eval tables",
+      "type": "retrieval",
+      "instruction": "Query the PostgreSQL database to retrieve all table names from the public schema that start with 'eval_'. Return a JSON object with this structure: { tables: string[] }",
+      "integrationIds": ["eval-postgres"],
+      "payload": {},
+      "validationFunction": "validators/054-postgres-list-tables.ts",
+      "expectedResultDescription": "Should return all eval table names from the public schema. Expected tables: eval_customers, eval_employees, eval_orders, eval_products."
+    },
+    {
+      "id": "055-postgres-aggregate-products",
+      "name": "PostgreSQL Aggregate Products by Category",
+      "description": "Medium test: Aggregate product data with filtering",
+      "type": "retrieval",
+      "instruction": "Query the PostgreSQL eval_products table to aggregate data by category. Calculate the total number of products, average price, and total stock for each category. Return JSON: { categories: Array<{ category: string, product_count: number, avg_price: number, total_stock: number }> }. Sort by product_count descending.",
+      "integrationIds": ["eval-postgres"],
+      "payload": {},
+      "validationFunction": "validators/055-postgres-aggregate-products.ts",
+      "expectedResultDescription": "Should aggregate products by category. Expected 2 categories: Electronics (5 products, 865 total stock) and Furniture (3 products, 145 total stock) with accurate price and stock calculations."
+    },
+    {
+      "id": "056-postgres-customer-order-analysis",
+      "name": "PostgreSQL Customer Order Analysis",
+      "description": "Complex test: Join multiple tables and aggregate order statistics",
+      "type": "retrieval",
+      "instruction": "Query the PostgreSQL database to analyze customer orders. Join the eval_orders, eval_customers, and eval_products tables. Calculate: total number of orders, completed orders (status='completed'), failed/pending orders, total revenue from completed orders. Also provide per-customer analysis including customer name, order count, total spent, and most purchased category. Return JSON: { summary: { total_orders: number, completed_orders: number, pending_orders: number, failed_orders: number, total_revenue: number }, by_customer: Array<{ customer_name: string, order_count: number, total_spent: number, most_purchased_category: string }> }. Sort by_customer by total_spent descending.",
+      "integrationIds": ["eval-postgres"],
+      "payload": {},
+      "validationFunction": "validators/056-postgres-customer-order-analysis.ts",
+      "expectedResultDescription": "Should perform complex joins and aggregations on customer order data. Expected 9 total orders, 7 completed, 1 pending, 1 failed. Total revenue ~$2554.87. John Smith should be the top customer by spending with ~$1959.96."
+    },
+    {
+      "id": "057-sftp-list-directory",
+      "name": "SFTP List Directory Contents",
+      "description": "Simple test: List files and directories in home directory",
+      "type": "retrieval",
+      "instruction": "Connect to the SFTP server and list all files and directories in the home directory. Return JSON: { files: Array<{ name: string, type: 'file' | 'directory', size?: number }> }",
+      "integrationIds": ["eval-sftp"],
+      "payload": {},
+      "validationFunction": "validators/057-sftp-list-directory.ts",
+      "expectedResultDescription": "Should list all files and directories in SFTP home directory. Expected to find 'uploads' directory and various configuration files."
+    },
+    {
+      "id": "058-sftp-upload-download-verify",
+      "name": "SFTP Upload Download and Verify",
+      "description": "Medium test: Upload a file, download it, and verify content matches",
+      "type": "action",
+      "instruction": "Create a test file with the content 'SFTP Eval Test - {timestamp}' where {timestamp} is the current Unix timestamp. Upload this file to the SFTP server in the uploads directory with filename 'eval_test_{timestamp}.txt'. Then download the same file and verify the content matches what was uploaded. Return JSON: { status: 'success' | 'failure', uploaded_filename: string, content_matches: boolean, original_content: string, downloaded_content: string }",
+      "integrationIds": ["eval-sftp"],
+      "payload": {},
+      "validationFunction": "validators/058-sftp-upload-download-verify.ts",
+      "expectedResultDescription": "Should successfully upload file to SFTP server, download it back, and verify content matches. Expected status 'success' with content_matches: true."
+    },
+    {
+      "id": "059-sftp-batch-operations",
+      "name": "SFTP Batch File Operations with Cleanup",
+      "description": "Complex test: Upload multiple files, list, download, and cleanup",
+      "type": "action",
+      "instruction": "Perform a series of SFTP operations: 1) Create 3 test files with different content (file1.txt='First test', file2.txt='Second test', file3.txt='Third test'). 2) Upload all 3 files to the uploads directory. 3) List the uploads directory and confirm all 3 files exist. 4) Download all 3 files and verify their contents. 5) Delete all 3 files from the server. 6) List the directory again to confirm deletion. Return JSON: { operations: { upload_count: number, upload_success: number, download_count: number, download_success: number, content_verification: boolean, cleanup_success: boolean }, files_remaining: number, details: Array<{ filename: string, uploaded: boolean, downloaded: boolean, content_verified: boolean, deleted: boolean }> }",
+      "integrationIds": ["eval-sftp"],
+      "payload": {},
+      "validationFunction": "validators/059-sftp-batch-operations.ts",
+      "expectedResultDescription": "Should perform complete SFTP workflow with multiple files including upload, verification, download, and cleanup. Expected all operations to succeed with 3 files processed, all content verified, and cleanup successful (files_remaining should not include test files)."
+    },
+    {
+      "id": "060-sftp-postgres-bulk-insert",
+      "name": "SFTP to PostgreSQL Bulk Insert",
+      "description": "Very complex test: Download CSV from SFTP and bulk insert into PostgreSQL",
+      "type": "action",
+      "instruction": "Perform a complex multi-system operation: 1) Connect to the SFTP server and download the file 'employees.csv' from the uploads directory. 2) Parse the CSV file which contains employee data with columns: employee_id, first_name, last_name, email, department, salary, hire_date, is_active. 3) Clear the eval_employees table (TRUNCATE or DELETE all records), then insert all records from the CSV. Use proper data type conversions (salary as decimal, hire_date as date, is_active as boolean). 4) After inserting, query the database to verify: total number of inserted records, count by department, average salary by department, and list of inactive employees. Return JSON: { insert_summary: { total_records_inserted: number, source_file: string, insert_successful: boolean }, verification: { total_count: number, by_department: Array<{ department: string, employee_count: number, avg_salary: number }>, inactive_employees: Array<{ employee_id: string, name: string }> } }. Sort by_department by employee_count descending.",
+      "integrationIds": ["eval-sftp", "eval-postgres"],
+      "payload": {},
+      "validationFunction": "validators/060-sftp-postgres-bulk-insert.ts",
+      "expectedResultDescription": "Should download CSV from SFTP (employees.csv with 15 records), parse it, and bulk insert into PostgreSQL eval_employees table. Expected 15 total records inserted, with Engineering having most employees (6), followed by Sales (3), Marketing (2), Finance (2), HR (2). One inactive employee (Robert Lee, EMP009). Engineering avg salary should be highest (~101,666.67)."
+    },
+    {
+      "id": "061-jira-list-projects",
+      "name": "JIRA List All Projects",
+      "description": "Simple test: Retrieve all accessible Jira projects",
+      "type": "retrieval",
+      "instruction": "Query the JIRA API to retrieve all projects that the authenticated user has access to. For each project, get the project key, name, and project type. Return JSON: { project_count: number, projects: Array<{ key: string, name: string, projectTypeKey: string }> }",
+      "integrationIds": ["jira"],
+      "payload": {},
+      "validationFunction": "validators/061-jira-list-projects.ts",
+      "expectedResultDescription": "Should return all accessible Jira projects. Expected 3 projects: 'GTMS' (Go to market sample, business), 'LEARNJIRA' (Learn Jira in 10 minutes, software), and 'KAN' (My Kanban Project, software)."
+    },
+    {
+      "id": "062-jira-search-issues-by-status",
+      "name": "JIRA Search Issues by Status",
+      "description": "Medium test: Search for issues using JQL and aggregate by status",
+      "type": "retrieval",
+      "instruction": "Use the JIRA search API (POST /rest/api/3/search/jql) to find all issues in the GTMS project. Use JQL (Jira Query Language) with the query 'project=GTMS'. Then aggregate the results by status and calculate: total issues found, count per status, and list of issue keys and summaries for 'In Progress' status. Return JSON: { summary: { total_issues: number, total_statuses: number }, by_status: Array<{ status: string, count: number }>, in_progress_issues: Array<{ key: string, summary: string, assignee: string | null }> }. Sort by_status by count descending.",
+      "integrationIds": ["jira"],
+      "payload": {},
+      "validationFunction": "validators/062-jira-search-issues-by-status.ts",
+      "expectedResultDescription": "Should search all GTMS project issues and aggregate by status. Expected 22 total issues with 4 statuses: 'To Do' (10), 'In Progress' (5), 'Ready for Launch' (4), 'Launched' (3). In Progress issues should include GTMS-20, GTMS-9, GTMS-7, GTMS-3, GTMS-1."
+    },
+    {
+      "id": "063-jira-workflow-anomaly-analysis",
+      "name": "JIRA Workflow Anomaly Analysis",
+      "description": "Complex test: Multi-dimensional analysis with JQL filtering and aggregation",
+      "type": "retrieval",
+      "instruction": "Perform a comprehensive workflow analysis on the GTMS project: 1) Search for all issues using JQL 'project=GTMS'. 2) Calculate workload metrics: total issues, assigned vs unassigned count, issues by assignee with their status distribution. 3) Identify workflow anomalies: unassigned issues that are 'In Progress' (should typically have an assignee). 4) Calculate backlog metrics: count of 'To Do' issues, percentage of total. 5) Aggregate by issue type (Task vs Sub-task) and show distribution. Return JSON: { metrics: { total_issues: number, assigned_count: number, unassigned_count: number, backlog_count: number, backlog_percentage: number }, by_assignee: Array<{ assignee: string, issue_count: number, statuses: Array<{ status: string, count: number }> }>, anomalies: { unassigned_in_progress: Array<{ key: string, summary: string }>, count: number }, by_issue_type: Array<{ type: string, count: number }> }. Sort by_assignee by issue_count descending.",
+      "integrationIds": ["jira"],
+      "payload": {},
+      "validationFunction": "validators/063-jira-workflow-anomaly-analysis.ts",
+      "expectedResultDescription": "Should perform complex multi-dimensional analysis on GTMS issues. Expected: 22 total issues, 3 assigned to Stefan Faistenauer, 19 unassigned. Anomalies: 3 unassigned 'In Progress' issues (GTMS-20, GTMS-3, GTMS-1). Backlog: 10 'To Do' issues (45.45%). Issue types: 15 Tasks, 7 Sub-tasks. Stefan's issues: In Progress (2 issues: GTMS-9, GTMS-7), Launched (1 issue: GTMS-4)."
     }
   ],
   "enabledTools": "all",
   "settings": {
     "runOneShotMode": true,
     "runSelfHealingMode": true,
-    "attemptsEachMode": 5,
+    "attemptsEachMode": 3,
     "maxConcurrentWorkers": 5,
     "toolAttemptTimeoutMs": 300000
   },
   "validationLlmConfig": {
     "provider": "openai",
-    "model": "gpt-4o"
+    "model": "gpt-5.1"
   }
 }

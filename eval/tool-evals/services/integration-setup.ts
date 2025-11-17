@@ -1,9 +1,9 @@
+import { Metadata } from "@playwright/test";
+import { Integration } from "@superglue/client";
 import { DataStore } from "../../../packages/core/datastore/types.js";
+import { DocumentationFetcher } from "../../../packages/core/documentation/index.js";
 import { logMessage } from "../../../packages/core/utils/logs.js";
 import type { AgentEvalConfig, IntegrationConfig } from "../types.js";
-import { Integration } from "@superglue/client";
-import { DocumentationFetcher } from "../../../packages/core/documentation/index.js";
-import { Metadata } from "@playwright/test";
 
 export class IntegrationSetupService {
   constructor(
@@ -53,7 +53,13 @@ export class IntegrationSetupService {
 
     if (integrationConfig.id === "postgres-lego") {
       // replace the username, password, host, port, and database in the urlHost with the values from the credentials
-      integrationConfig.urlHost = integrationConfig.urlHost.replace("<<username>>", integrationConfig.credentials.username).replace("<<password>>", integrationConfig.credentials.password).replace("<<host>>", integrationConfig.credentials.host).replace("<<port>>", integrationConfig.credentials.port).replace("<<database>>", integrationConfig.credentials.database);
+      integrationConfig.urlHost = integrationConfig.urlHost.replace("<<username>>", integrationConfig.credentials.username).replace("<<password>>", integrationConfig.credentials.password).replace("<<host>>", integrationConfig.credentials.host).replace("<<port>>", integrationConfig.credentials.port);
+      integrationConfig.urlPath = integrationConfig.credentials.database;
+    }
+    if (integrationConfig.id === "eval-postgres") {
+      // replace the username, password, host, port, and database in the urlHost with the values from the credentials
+      integrationConfig.urlHost = integrationConfig.urlHost.replace("<<username>>", integrationConfig.credentials.username).replace("<<password>>", integrationConfig.credentials.password).replace("<<host>>", integrationConfig.credentials.host).replace("<<port>>", integrationConfig.credentials.port);
+      integrationConfig.urlPath = integrationConfig.credentials.database;
     }
 
     const docFetcher = new DocumentationFetcher(
