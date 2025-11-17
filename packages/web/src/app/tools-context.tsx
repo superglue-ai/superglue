@@ -16,7 +16,7 @@ export type CachedTools = {
     timestamp: number
 }
 
-const CACHE_PREFIX = 'superglue-tools-cache';
+const CACHE_PREFIX = 'superglue-tools';
 const ToolsContext = createContext<ToolsContext | null>(null);
 
 export function ToolsProvider({ children }: { children: ReactNode }) {
