@@ -8,7 +8,7 @@ import { WorkflowExecutor } from "../../tools/tool-executor.js";
 import { parseJSON } from "../../files/index.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { logMessage } from "../../utils/logs.js";
-import { replaceVariables } from "../../utils/tools.js";
+import { replaceVariables } from "../../utils/helpers.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { Context, Metadata } from '../types.js';
 

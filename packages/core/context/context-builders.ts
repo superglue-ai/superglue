@@ -2,7 +2,7 @@ import { Integration } from '@superglue/client';
 import { server_defaults } from '../default.js';
 import { DocumentationSearch } from '../documentation/documentation-search.js';
 import { logMessage } from '../utils/logs.js';
-import { composeUrl } from '../utils/tools.js';
+import { composeUrl } from '../utils/helpers.js';
 import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
 import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, ToolBuilderContextInput, ToolBuilderContextOptions, GenerateStepConfigContextInput, GenerateStepConfigContextOptions } from './context-types.js';
 

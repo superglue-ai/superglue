@@ -1,6 +1,6 @@
 import { parseJSON } from '@core/files/parsers/json.js';
 import { logMessage } from '@core/utils/logs.js';
-import { sample } from '@core/utils/tools.js';
+import { sample } from '@/packages/core/utils/helpers.js';
 import { LLMMessage } from '@core/llm/llm-base-model.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';

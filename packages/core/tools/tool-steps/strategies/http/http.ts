@@ -7,12 +7,12 @@ import { JSONPath } from "jsonpath-plus";
 import { server_defaults } from "../../../../default.js";
 import { parseJSON } from "../../../../files/index.js";
 import { logMessage } from "../../../../utils/logs.js";
-import { convertBasicAuthToBase64, maskCredentials, replaceVariables } from "../../../../utils/tools.js";
+import { convertBasicAuthToBase64, maskCredentials, replaceVariables } from "../../../../utils/helpers.js";
 import { callPostgres } from "../postgres/postgres.js";
 import { callFTP } from "../ftp/ftp.js";
-import { composeUrl } from "../../../../utils/tools.js";
+import { composeUrl } from "../../../../utils/helpers.js";
 import { parseFile } from "../../../../files/index.js";
-import { smartMergeResponses } from "../../../../utils/tools.js";
+import { smartMergeResponses } from "../../../../utils/helpers.js";
 
 export interface CallAxiosResult {
   response: AxiosResponse;

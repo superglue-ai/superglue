@@ -3,7 +3,7 @@ import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { BaseLLMToolContext, LLMToolDefinition, LLMToolImplementation } from "./llm-tool-utils.js";
-import { sanitizeInstructionSuggestions } from "../utils/tools.js";
+import { sanitizeInstructionSuggestions } from "../utils/helpers.js";
 import { LanguageModel, LLMMessage } from "./llm-base-model.js";
 import { GENERATE_INSTRUCTIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { Integration } from "@superglue/client";

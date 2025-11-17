@@ -1,7 +1,7 @@
 import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../tools/tool-executor.js";
-import { maskCredentials } from "../../utils/tools.js";
+import { maskCredentials } from "../../utils/helpers.js";
 import { executeTransform, TransformConfig } from "../../utils/transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { Context, Metadata } from '../types.js';

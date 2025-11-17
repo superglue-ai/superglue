@@ -7,7 +7,7 @@ import { server_defaults } from '../../default.js';
 import { DocumentationFetcher } from '../../documentation/documentation-fetching.js';
 import { IntegrationFinder } from '../../integrations/integration-finder.js';
 import { logMessage } from '../../utils/logs.js';
-import { composeUrl } from '../../utils/tools.js';
+import { composeUrl } from '../../utils/helpers.js';
 import { DocumentationSearch } from '../../documentation/documentation-search.js';
 
 export const listIntegrationsResolver = async (

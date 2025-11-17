@@ -4,8 +4,8 @@ import { server_defaults } from "../../../../default.js";
 import { callAxios, runStepConfig } from "./http.js";
 import * as api from './http.js';
 import { ApiConfig, HttpMethod, PaginationType } from '@superglue/client';
-import { convertBasicAuthToBase64 } from '../../../../utils/tools.js';
-import { isSelfHealingEnabled } from '../../../../utils/tools.js';
+import { convertBasicAuthToBase64 } from '../../../../utils/helpers.js';
+import { isSelfHealingEnabled } from '../../../../utils/helpers.js';
 import { SelfHealingMode } from '@superglue/client';
 
 vi.mock('axios');
