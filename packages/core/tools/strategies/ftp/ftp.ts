@@ -304,9 +304,7 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
 
 export async function callFTP({ endpoint, credentials, options }: { endpoint: ApiConfig, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
   let connectionString = composeUrl(endpoint.urlHost, endpoint.urlPath);
-  console.log("connectionString", connectionString);
   const connectionInfo = parseConnectionUrl(connectionString);
-  console.log("connectionInfo", connectionInfo);
   let operations: FTPOperation[] = [];
   try {
     const body = parseJSON(endpoint.body);
