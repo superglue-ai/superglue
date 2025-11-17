@@ -64,6 +64,7 @@ const ConfigTable = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIntegration, setSelectedIntegration] = useState<string>("all");
   const [showToolStepper, setShowToolStepper] = useState(false);
+  const [hasCheckedInitialState, setHasCheckedInitialState] = useState(false);
 
   useEffect(() => {
     const combinedConfigs = [
@@ -247,9 +248,12 @@ const ConfigTable = () => {
   const totalPages = Math.ceil(total / pageSize);
 
   useEffect(() => {
-    const hasNoConfigsFinally = allConfigs.length === 0 && !isInitiallyLoading && !isRefreshing;
-    setShowToolStepper(hasNoConfigsFinally);
-  }, [allConfigs, isInitiallyLoading, isRefreshing]);
+    if (!hasCheckedInitialState && !isInitiallyLoading) {
+      const hasNoConfigs = allConfigs.length === 0 && !isRefreshing;
+      setShowToolStepper(hasNoConfigs);
+      setHasCheckedInitialState(true);
+    }
+  }, [allConfigs, isInitiallyLoading, isRefreshing, hasCheckedInitialState]);
 
   if (showToolStepper) {
     return (
