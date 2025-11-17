@@ -10,6 +10,7 @@ export default function validate(result: any, payload: any): void {
 
   assert(result.status === 'success', 'Upload/download operation failed');
   assert(result.content_matches, 'Uploaded and downloaded content do not match');
+  assert(result.original_content === result.downloaded_content, 'Original and downloaded content must match');
   assert(result.uploaded_filename.startsWith('eval_test_'), 'Uploaded filename should start with "eval_test_"');
   assert(result.original_content.startsWith('SFTP Eval Test -'), 'Original content should start with "SFTP Eval Test -"');
 }
