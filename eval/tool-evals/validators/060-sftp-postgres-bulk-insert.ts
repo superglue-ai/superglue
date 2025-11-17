@@ -36,9 +36,8 @@ export default function validate(result: any, payload: any): void {
     assert(typeof dept.avg_salary === 'number', 'Each department must have an "avg_salary" number');
 
     const expected = expectedDepartments[dept.department as keyof typeof expectedDepartments];
-    if (expected) {
-      assert(dept.employee_count === expected, `${dept.department} should have ${expected} employees, got ${dept.employee_count}`);
-    }
+    assert(expected !== undefined, `Unexpected department "${dept.department}" - must be one of: ${Object.keys(expectedDepartments).join(', ')}`);
+    assert(dept.employee_count === expected, `${dept.department} should have ${expected} employees, got ${dept.employee_count}`);
   }
 
   assert(verification.inactive_employees.length === 1, `Expected 1 inactive employee, got ${verification.inactive_employees.length}`);
