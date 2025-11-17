@@ -21,8 +21,12 @@ export class MetricsCalculator {
         const toolMetricsWithOneShotAttempts = toolMetrics.filter(t => t.hasOneShotAttempts);
         const toolMetricsWithSelfHealingAttempts = toolMetrics.filter(t => t.hasSelfHealingAttempts);
         
-        const toolOneShotAverageSuccessRate = toolMetricsWithOneShotAttempts.reduce((acc, currentTool) => acc + (currentTool.oneShotAverageSuccessRate), 0) / toolMetricsWithOneShotAttempts.length;
-        const toolSelfHealingAverageSuccessRate = toolMetricsWithSelfHealingAttempts.reduce((acc, currentTool) => acc + (currentTool.selfHealingAverageSuccessRate), 0) / toolMetricsWithSelfHealingAttempts.length;
+        const toolOneShotAverageSuccessRate = toolMetricsWithOneShotAttempts.length > 0
+            ? toolMetricsWithOneShotAttempts.reduce((acc, currentTool) => acc + (currentTool.oneShotAverageSuccessRate), 0) / toolMetricsWithOneShotAttempts.length
+            : null;
+        const toolSelfHealingAverageSuccessRate = toolMetricsWithSelfHealingAttempts.length > 0
+            ? toolMetricsWithSelfHealingAttempts.reduce((acc, currentTool) => acc + (currentTool.selfHealingAverageSuccessRate), 0) / toolMetricsWithSelfHealingAttempts.length
+            : null;
 
         return {
             toolCount,
