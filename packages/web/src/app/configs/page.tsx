@@ -248,7 +248,6 @@ const ConfigTable = () => {
 
   const shouldShowStepper = manuallyOpenedStepper || (
     !isInitiallyLoading && 
-    !isRefreshing && 
     allConfigs.length === 0
   );
 
