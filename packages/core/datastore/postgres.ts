@@ -18,7 +18,7 @@ export class PostgresService implements DataStore {
             ssl: config.ssl === false || config.host.includes('localhost') || config.host.includes('127.0.0.1') ? false : { rejectUnauthorized: false }
         });
         this.pool.on('error', (err) => {
-            logMessage('error', 'postgres pool error: ' + JSON.stringify(err));
+            logMessage('error', 'postgres pool error:\n' + JSON.stringify(err, null, 2));
         });
 
         this.pool.on('connect', () => {
@@ -26,7 +26,7 @@ export class PostgresService implements DataStore {
         });
 
         this.pool.connect().catch((err) => {
-            logMessage('error', '[CRITICAL] Postgres connection failed: ' + JSON.stringify(err));
+            logMessage('error', '[CRITICAL] Postgres connection failed:\n' + JSON.stringify(err, null, 2));
             process.exit(1);
         }).then((client) => {
             client.release();
