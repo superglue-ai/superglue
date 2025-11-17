@@ -50,19 +50,20 @@ const ConfigTable = () => {
   const {tools, isInitiallyLoading, isRefreshing, refreshTools} = useTools();
   const { integrations } = useIntegrations();
 
-  const [allConfigs, setAllConfigs] = React.useState<(ApiConfig | Tool)[]>([]);
+  const [allConfigs, setAllConfigs] = useState<(ApiConfig | Tool)[]>([]);
   const [legacyApiConfigs, setLegacyApiConfigs] = useState<ApiConfig[]>([]);
-  const [currentConfigs, setCurrentConfigs] = React.useState<(ApiConfig | Tool)[]>([]);
-  const [total, setTotal] = React.useState(0);
-  const [page, setPage] = React.useState(0);
-  const [pageSize] = React.useState(20);
+  const [currentConfigs, setCurrentConfigs] = useState<(ApiConfig | Tool)[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [pageSize] = useState(20);
 
-  const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | Tool | null>(null);
-  const [copiedId, setCopiedId] = React.useState<string | null>(null);
-  const [deployToolId, setDeployToolId] = React.useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = React.useState("");
-  const [selectedIntegration, setSelectedIntegration] = React.useState<string>("all");
-  const [showToolStepper, setShowToolStepper] = React.useState(false);
+  const [configToDelete, setConfigToDelete] = useState<ApiConfig | Tool | null>(null);
+  const [copiedDetails, setCopiedDetails] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deployToolId, setDeployToolId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedIntegration, setSelectedIntegration] = useState<string>("all");
+  const [showToolStepper, setShowToolStepper] = useState(false);
 
   const mergeToolsAndApiConfigs = () => {
     const combinedConfigs = [
@@ -94,9 +95,9 @@ const ConfigTable = () => {
       ]);
 
       setLegacyApiConfigs(apiConfigs.items);
-  }, [config.superglueEndpoint]);
+  }, [config.superglueEndpoint, refreshTools]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const filtered = allConfigs.filter(config => {
       if (!config) return false;
 
@@ -142,7 +143,7 @@ const ConfigTable = () => {
     setCurrentConfigs(filtered.slice(start, end));
   }, [page, allConfigs, searchTerm, selectedIntegration, pageSize]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (searchTerm || selectedIntegration !== "all") {
       setPage(0);
     }
@@ -215,7 +216,6 @@ const ConfigTable = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const [copiedDetails, setCopiedDetails] = React.useState<string | null>(null);
 
   const handleCopyDetails = (e: React.MouseEvent, text: string) => {
     e.stopPropagation();
