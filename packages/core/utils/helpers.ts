@@ -1,4 +1,4 @@
-import { HttpMethod, RequestOptions, SelfHealingMode } from "@superglue/client";
+import { RequestOptions, SelfHealingMode } from "@superglue/client";
 import ivm from 'isolated-vm';
 import { applyJsonataWithValidation, oldReplaceVariables } from "./helpers.legacy.js";
 import { Validator } from "jsonschema";

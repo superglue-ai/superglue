@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as httpModule from '../tools/tool-steps/strategies/http/http.js';
+import * as httpModule from '../tools/strategies/http/http.js';
 import { notifyWebhook } from './webhook.js';
 
 vi.mock('../tools/tool-steps/strategies/http/http.js');

@@ -2,7 +2,7 @@ import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions } from "@superglu
 import { GraphQLResolveInfo } from "graphql";
 import { WorkflowExecutor } from "../../tools/tool-executor.js";
 import { maskCredentials } from "../../utils/helpers.js";
-import { executeTransform, TransformConfig } from "../../utils/transform.js";
+import { executeTransform, TransformConfig } from "../../tools/tool-transform.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { Context, Metadata } from '../types.js';
 

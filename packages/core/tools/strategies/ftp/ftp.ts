@@ -4,9 +4,9 @@ import { Client as FTPClient } from "basic-ftp";
 import * as path from "path";
 import SFTPClient from "ssh2-sftp-client";
 import { URL } from "url";
-import { server_defaults } from "../../../../default.js";
-import { parseFile, parseJSON } from "../../../../files/index.js";
-import { composeUrl } from "../../../../utils/helpers.js";
+import { server_defaults } from "../../../default.js";
+import { parseFile, parseJSON } from "../../../files/index.js";
+import { composeUrl } from "../../../utils/helpers.js";
 
 const SUPPORTED_OPERATIONS = ['list', 'get', 'put', 'delete', 'rename', 'mkdir', 'rmdir', 'exists', 'stat'];
 

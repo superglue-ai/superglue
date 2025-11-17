@@ -5,8 +5,8 @@ import { getEvaluateTransformContext, getTransformContext } from "../context/con
 import { EVALUATE_TRANSFORM_SYSTEM_PROMPT, GENERATE_TRANSFORM_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
 import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
-import { logMessage } from "./logs.js";
-import { isSelfHealingEnabled, transformAndValidateSchema } from "./helpers.js";
+import { logMessage } from "../utils/logs.js";
+import { isSelfHealingEnabled, transformAndValidateSchema } from "../utils/helpers.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 

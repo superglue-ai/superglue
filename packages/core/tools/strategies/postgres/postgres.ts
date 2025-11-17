@@ -1,8 +1,8 @@
 import { ApiConfig, RequestOptions } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
-import { server_defaults } from "../../../../default.js";
-import { parseJSON } from "../../../../files/index.js";
-import { composeUrl, replaceVariables } from "../../../../utils/helpers.js";
+import { server_defaults } from "../../../default.js";
+import { parseJSON } from "../../../files/index.js";
+import { composeUrl, replaceVariables } from "../../../utils/helpers.js";
 
 
 interface PoolCacheEntry {

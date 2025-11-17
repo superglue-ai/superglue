@@ -9,7 +9,7 @@ import { getGenerateStepConfigContext } from "../../context/context-builders.js"
 import { LLMMessage } from "../../llm/llm-base-model.js";
 import { GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../../context/context-prompts.js";
 import { logMessage } from "../../utils/logs.js";
-import { generateStepConfig } from "../../tools/tool-steps/tool-step-builder.js";
+import { generateStepConfig } from "../../tools/tool-step-builder.js";
 
 interface GenerateStepConfigArgs {
   integrationId?: string;

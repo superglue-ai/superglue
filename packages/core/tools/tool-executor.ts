@@ -10,10 +10,10 @@ import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
 import { isSelfHealingEnabled, maskCredentials, transformAndValidateSchema } from "../utils/helpers.js";
 import { applyJsonata } from "../utils/helpers.legacy.js";
-import { evaluateTransform, generateTransformCode } from "../utils/transform.js";
-import { AbortError, ApiCallError } from "./tool-steps/strategies/http/http.js";
-import { runStepConfig } from "./tool-steps/strategies/http/http.js";
-import { generateStepConfig } from "./tool-steps/tool-step-builder.js";
+import { evaluateTransform, generateTransformCode } from "./tool-transform.js";
+import { AbortError, ApiCallError } from "./strategies/http/http.js";
+import { runStepConfig } from "./strategies/http/http.js";
+import { generateStepConfig } from "./tool-step-builder.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 

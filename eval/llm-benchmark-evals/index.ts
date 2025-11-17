@@ -5,7 +5,7 @@ import type { Metadata } from "@superglue/shared";
 import { initializeAIModel } from "@superglue/shared/utils";
 import { config } from "dotenv";
 import { PlaywrightFetchingStrategy } from "../../packages/core/documentation/strategies/fetching-playwright.js";
-import { closeAllPools } from "../../packages/core/tools/tool-steps/strategies/postgres/postgres.js";
+import { closeAllPools } from "../../packages/core/tools/strategies/postgres/postgres.js";
 import { shutdownSharedHtmlMarkdownPool } from "../../packages/core/utils/html-markdown-pool.js";
 import { logMessage } from "../../packages/core/utils/logs.js";
 import { loadConfig } from "../tool-evals/config/config-loader.js";
