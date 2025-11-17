@@ -135,7 +135,10 @@ function renderMetrics(data) {
         return attempts.some(a => !a.selfHealingEnabled && a.overallValidationPassed === true);
     }).length;
     const oneShotRate = totalTools > 0 ? (oneShotSuccessfulTools / totalTools * 100) : null;
-    
+
+    const oneShotAverageSuccessRate = calculateAverageOneShotSuccess(toolsById);
+    const selfHealingAverageSuccessRate = calculateAverageSelfHealingSuccess(toolsById);
+
     // Self-healing success: tools that succeeded in either one-shot OR self-healing
     const selfHealingSuccessfulTools = Object.values(toolsById).filter(attempts => {
         const oneShotSuccess = attempts.some(a => !a.selfHealingEnabled && a.overallValidationPassed === true);
@@ -164,14 +167,54 @@ function renderMetrics(data) {
         benchmarkMetrics = calculateBenchmarkMetrics(filteredBenchmark);
     }
     
-    // Display with deltas
-    displayMetricWithDelta('oneShotSuccessRate', oneShotRate, benchmarkMetrics?.oneShotRate, '%', 
-        `${oneShotSuccessfulTools}/${totalTools}`, true);
-    displayMetricWithDelta('selfHealingSuccessRate', selfHealingRate, benchmarkMetrics?.selfHealingRate, '%',
-        `${selfHealingSuccessfulTools}/${totalTools}`, true);
+    // Display with deltas - showing average as primary, "at least one" as secondary
+    displaySuccessMetricWithAverage('oneShotSuccessRate', oneShotAverageSuccessRate, oneShotRate, 
+        benchmarkMetrics?.oneShotRate, `${oneShotSuccessfulTools}/${totalTools}`, true);
+    displaySuccessMetricWithAverage('selfHealingSuccessRate', selfHealingAverageSuccessRate, selfHealingRate,
+        benchmarkMetrics?.selfHealingRate, `${selfHealingSuccessfulTools}/${totalTools}`, true);
     displayMetricWithDelta('avgBuildTime', avgBuild, benchmarkMetrics?.avgBuild, 's', null, false, true);
     displayMetricWithDelta('avgExecOneShot', avgOneShotExec, benchmarkMetrics?.avgOneShotExec, 's', null, false, true);
     displayMetricWithDelta('avgExecSelfHealing', avgSelfHealingExec, benchmarkMetrics?.avgSelfHealingExec, 's', null, false, true);
+}
+
+function calculateAverageOneShotSuccess(toolsById) {
+    const allTools = Object.values(toolsById);
+    if (allTools.length === 0) return null;
+    
+    const successRates = allTools
+        .map(attempts => {
+            const oneShotAttempts = attempts.filter(a => !a.selfHealingEnabled);
+            if (oneShotAttempts.length === 0) return null;
+            
+            const successCount = oneShotAttempts.filter(a => a.overallValidationPassed).length;
+            return successCount / oneShotAttempts.length;
+        })
+        .filter(rate => rate !== null);
+
+    if (successRates.length === 0) return null;
+    
+    const sum = successRates.reduce((acc, rate) => acc + rate, 0);
+    return sum / successRates.length;
+}
+
+function calculateAverageSelfHealingSuccess(toolsById) {
+    const allTools = Object.values(toolsById);
+    if (allTools.length === 0) return null;
+    
+    const successRates = allTools
+        .map(attempts => {
+            const selfHealingAttempts = attempts.filter(a => a.selfHealingEnabled);
+            if (selfHealingAttempts.length === 0) return null;
+            
+            const successCount = selfHealingAttempts.filter(a => a.overallValidationPassed).length;
+            return successCount / selfHealingAttempts.length;
+        })
+        .filter(rate => rate !== null);
+
+    if (successRates.length === 0) return null;
+    
+    const sum = successRates.reduce((acc, rate) => acc + rate, 0);
+    return sum / successRates.length;
 }
 
 function calculateBenchmarkMetrics(filteredBenchmark) {
@@ -215,6 +258,39 @@ function calculateBenchmarkMetrics(filteredBenchmark) {
         avgOneShotExec,
         avgSelfHealingExec
     };
+}
+
+function displaySuccessMetricWithAverage(elementId, averageRate, atLeastOneRate, benchmark, suffix, higherIsBetter) {
+    const element = document.getElementById(elementId);
+    
+    if (averageRate === null && atLeastOneRate === null) {
+        element.innerHTML = 'N/A';
+        return;
+    }
+    
+    const avgDisplay = averageRate !== null ? (averageRate * 100).toFixed(1) : 'N/A';
+    const atLeastOneDisplay = atLeastOneRate !== null ? atLeastOneRate.toFixed(1) : 'N/A';
+    const suffixText = suffix ? ` (${suffix})` : '';
+    
+    let html = `
+        <div style="font-weight: bold;">${avgDisplay}%</div>
+        <div style="font-size: 0.65em; color: #333; margin-top: 2px; font-weight: normal;">At least one: ${atLeastOneDisplay}%${suffixText}</div>
+    `;
+    
+    if (benchmark !== null && benchmark !== undefined && atLeastOneRate !== null) {
+        const absoluteDiff = atLeastOneRate - benchmark;
+        const percentChange = ((atLeastOneRate - benchmark) / benchmark) * 100;
+        
+        const diffSign = absoluteDiff > 0 ? '+' : '';
+        const deltaClass = getDeltaClass(absoluteDiff, higherIsBetter, false);
+        const benchmarkDisplay = benchmark.toFixed(1);
+        
+        const deltaText = `${diffSign}${absoluteDiff.toFixed(1)} points vs ${benchmarkDisplay}% (${diffSign}${percentChange.toFixed(1)}% change)`;
+        
+        html += `<span class="metric-delta ${deltaClass}" style="margin-top: 4px; display: block;">${deltaText}</span>`;
+    }
+    
+    element.innerHTML = html;
 }
 
 function displayMetricWithDelta(elementId, current, benchmark, unit, suffix, higherIsBetter, lowerIsBetter = false) {
@@ -482,28 +558,25 @@ function createModeStatusHTML(modeName, attempts) {
         `;
     }
     
-    // Find the furthest attempt (one that progressed most)
-    const furthestAttempt = getFurthestAttempt(attempts);
-    const succeeded = attempts.some(a => a.overallValidationPassed === true);
+    // Count successful attempts
+    const successCount = attempts.filter(a => a.overallValidationPassed === true).length;
+    const totalCount = attempts.length;
     
-    if (succeeded) {
-        return `
-            <div class="mode-status">
-                <div class="mode-label">${modeName}</div>
-                <div class="status-badges">
-                    <span class="badge badge-success">✓ Succeeded</span>
-                </div>
-            </div>
-        `;
+    // Determine badge class based on success ratio
+    let badgeClass;
+    if (successCount === totalCount) {
+        badgeClass = 'badge-success';
+    } else if (successCount === 0) {
+        badgeClass = 'badge-failure';
+    } else {
+        badgeClass = 'badge-partial';
     }
     
-    // Failed - show where it failed
-    const failureStage = getFailureStage(furthestAttempt);
     return `
         <div class="mode-status">
             <div class="mode-label">${modeName}</div>
             <div class="status-badges">
-                <span class="badge ${failureStage.badgeClass}">${failureStage.label}</span>
+                <span class="badge ${badgeClass}">${successCount}/${totalCount}</span>
             </div>
         </div>
     `;

@@ -18,10 +18,18 @@ export class MetricsCalculator {
             ? null 
             : hasSuccessfulToolsWithSelfHealing / toolCount;
 
+        const toolMetricsWithOneShotAttempts = toolMetrics.filter(t => t.hasOneShotAttempts);
+        const toolMetricsWithSelfHealingAttempts = toolMetrics.filter(t => t.hasSelfHealingAttempts);
+        
+        const toolOneShotAverageSuccessRate = toolMetricsWithOneShotAttempts.reduce((acc, currentTool) => acc + (currentTool.oneShotAverageSuccessRate), 0) / toolMetricsWithOneShotAttempts.length;
+        const toolSelfHealingAverageSuccessRate = toolMetricsWithSelfHealingAttempts.reduce((acc, currentTool) => acc + (currentTool.selfHealingAverageSuccessRate), 0) / toolMetricsWithSelfHealingAttempts.length;
+
         return {
             toolCount,
             toolSelfHealingSuccessRate,
+            toolSelfHealingAverageSuccessRate,
             toolOneShotSuccessRate,
+            toolOneShotAverageSuccessRate,
             overallAverageBuildTimeMs: this.calculateAverageBuildTime(toolAttempts),
             overallAverageExecutionTimeMs: this.calculateAverageExecutionTime(toolAttempts),
             oneShotAverageExecutionTimeMs: this.calculateOneShotAverageExecutionTime(toolAttempts),
@@ -96,6 +104,14 @@ export class MetricsCalculator {
             const oneShotAttempts = toolAttempts.filter(a => !a.selfHealingEnabled);
             const selfHealingAttempts = toolAttempts.filter(a => a.selfHealingEnabled);
 
+            const oneShotAverageSuccessRate = oneShotAttempts.length > 0
+                ? oneShotAttempts.filter(a => this.isAttemptSuccessful(a)).length / oneShotAttempts.length
+                : null;
+    
+            const selfHealingAverageSuccessRate = selfHealingAttempts.length > 0
+                ? selfHealingAttempts.filter(a => this.isAttemptSuccessful(a)).length / selfHealingAttempts.length
+                : null;
+
             const validBuildTimes = toolAttempts
                 .map(a => a.buildTime)
                 .filter((t): t is number => t !== null);
@@ -127,6 +143,8 @@ export class MetricsCalculator {
                 hasSelfHealingAttempts,
                 hadOneShotSuccess,
                 hadSelfHealingSuccess,
+                oneShotAverageSuccessRate,
+                selfHealingAverageSuccessRate,
                 oneShotFailuresByReason,
                 selfHealingFailuresByReason,
                 averageBuildTimeMs,
