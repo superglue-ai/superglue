@@ -97,7 +97,9 @@ export interface ToolAttempt {
 
 export interface Metrics {
     toolCount: number;
+    toolSelfHealingAverageSuccessRate: number | null;
     toolSelfHealingSuccessRate: number | null;
+    toolOneShotAverageSuccessRate: number | null;
     toolOneShotSuccessRate: number | null;
     overallAverageBuildTimeMs: number;
     overallAverageExecutionTimeMs: number;
@@ -116,6 +118,8 @@ export interface ToolMetrics {
     hasSelfHealingAttempts: boolean;
     hadOneShotSuccess: boolean;
     hadSelfHealingSuccess: boolean;
+    selfHealingAverageSuccessRate: number | null;
+    oneShotAverageSuccessRate: number | null;
     oneShotFailuresByReason: FailureCountsByReason;
     selfHealingFailuresByReason: FailureCountsByReason;
     averageBuildTimeMs: number | null;
