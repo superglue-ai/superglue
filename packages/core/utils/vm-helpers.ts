@@ -11,6 +11,12 @@ export async function injectVMHelpersIndividually(context: ivm.Context): Promise
     // String.prototype.matchAll polyfill
     if (!String.prototype.matchAll) {
       String.prototype.matchAll = function(regexp) {
+        if (typeof regexp === 'string') {
+          regexp = new RegExp(regexp, 'g');
+        }
+        if (!(regexp instanceof RegExp)) {
+          regexp = new RegExp(regexp, 'g');
+        }
         if (!regexp.global) {
           throw new TypeError('matchAll requires a global RegExp');
         }
@@ -37,6 +43,14 @@ export async function injectVMHelpersIndividually(context: ivm.Context): Promise
             throw new TypeError('replaceAll requires a global RegExp');
           }
           return this.replace(search, replace);
+        }
+        if (typeof replace === 'function') {
+          const parts = this.split(search);
+          let result = parts[0];
+          for (let i = 1; i < parts.length; i++) {
+            result += replace(search, result.length, this) + parts[i];
+          }
+          return result;
         }
         return this.split(search).join(replace);
       };
@@ -92,12 +106,13 @@ export async function injectVMHelpersIndividually(context: ivm.Context): Promise
       String.prototype.padStart = function(targetLength, padString) {
         targetLength = targetLength >> 0;
         padString = String(typeof padString !== 'undefined' ? padString : ' ');
-        if (this.length >= targetLength) {
+        if (this.length >= targetLength || padString.length === 0) {
           return String(this);
         }
         targetLength = targetLength - this.length;
         if (targetLength > padString.length) {
-          padString += padString.repeat(targetLength / padString.length);
+          const repeatCount = Math.ceil(targetLength / padString.length);
+          padString = padString.repeat(repeatCount);
         }
         return padString.slice(0, targetLength) + String(this);
       };
@@ -106,12 +121,13 @@ export async function injectVMHelpersIndividually(context: ivm.Context): Promise
       String.prototype.padEnd = function(targetLength, padString) {
         targetLength = targetLength >> 0;
         padString = String(typeof padString !== 'undefined' ? padString : ' ');
-        if (this.length >= targetLength) {
+        if (this.length >= targetLength || padString.length === 0) {
           return String(this);
         }
         targetLength = targetLength - this.length;
         if (targetLength > padString.length) {
-          padString += padString.repeat(targetLength / padString.length);
+          const repeatCount = Math.ceil(targetLength / padString.length);
+          padString = padString.repeat(repeatCount);
         }
         return String(this) + padString.slice(0, targetLength);
       };
@@ -120,6 +136,7 @@ export async function injectVMHelpersIndividually(context: ivm.Context): Promise
     // Array.prototype.at polyfill
     if (!Array.prototype.at) {
       Array.prototype.at = function(index) {
+        index = Math.trunc(index) || 0;
         const len = this.length;
         const relativeIndex = index >= 0 ? index : len + index;
         if (relativeIndex < 0 || relativeIndex >= len) {

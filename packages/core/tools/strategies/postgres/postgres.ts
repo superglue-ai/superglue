@@ -82,7 +82,7 @@ export async function closeAllPools(): Promise<void> {
 export async function callPostgres({ endpoint, payload, credentials, options }: { endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
   const requestVars = { ...payload, ...credentials };
   let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
-  connectionString = connectionString.replace(/\/+\?/, '?').replace(/\/+$/, '');
+  connectionString = connectionString.replace(/\/+(\?)/, '$1').replace(/\/+$/, '');
 
   let bodyParsed: any;
   try {
