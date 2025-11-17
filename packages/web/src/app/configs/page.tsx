@@ -86,16 +86,16 @@ const ConfigTable = () => {
     mergeToolsAndApiConfigs();
   }, [tools, legacyApiConfigs]);
 
-  const refreshConfigs = useCallback(async () => {
-      const client = createSuperglueClient(config.superglueEndpoint);
+  const refreshLegacyApiConfigs = useCallback(async () => {
+    const client = createSuperglueClient(config.superglueEndpoint);
+    const apiConfigs = await client.listApis(1000, 0);
+    setLegacyApiConfigs(apiConfigs.items);
+  }, [config.superglueEndpoint]);
 
-      const [apiConfigs, _] = await Promise.all([
-        client.listApis(1000, 0),
-        refreshTools()
-      ]);
-
-      setLegacyApiConfigs(apiConfigs.items);
-  }, [config.superglueEndpoint, refreshTools]);
+  const refreshConfigs = useCallback(async () => {      
+      await refreshLegacyApiConfigs();
+      await refreshTools();
+  }, [config.superglueEndpoint, refreshLegacyApiConfigs, refreshTools]);
 
   useEffect(() => {
     const filtered = allConfigs.filter(config => {
