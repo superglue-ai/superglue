@@ -250,5 +250,296 @@ describe('VM Helpers', () => {
             const parsed = JSON.parse(result);
             expect(parsed.allUnique).toBe(true);
         });
+
+        it('should inject String.prototype.matchAll', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            const result = await context.eval(`
+                const str = 'test1test2test3';
+                const matches = [...str.matchAll(/test(\\d)/g)];
+                JSON.stringify({
+                    count: matches.length,
+                    first: matches[0][1],
+                    second: matches[1][1],
+                    third: matches[2][1]
+                })
+            `);
+            
+            const parsed = JSON.parse(result);
+            expect(parsed.count).toBe(3);
+            expect(parsed.first).toBe('1');
+            expect(parsed.second).toBe('2');
+            expect(parsed.third).toBe('3');
+        });
+
+        it('should throw error for non-global regex in matchAll', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            await expect(context.eval(`
+                'test'.matchAll(/test/)
+            `)).rejects.toThrow();
+        });
+
+        it('should inject String.prototype.replaceAll', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            const result = await context.eval(`
+                'foo bar foo baz foo'.replaceAll('foo', 'qux')
+            `);
+            
+            expect(result).toBe('qux bar qux baz qux');
+        });
+
+        it('should handle replaceAll with regex', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            const result = await context.eval(`
+                'test1 test2 test3'.replaceAll(/test\\d/g, 'replaced')
+            `);
+            
+            expect(result).toBe('replaced replaced replaced');
+        });
+
+        it('should inject String.prototype.trimStart and trimEnd', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            const result = await context.eval(`
+                const str = '  hello world  ';
+                JSON.stringify({
+                    trimStart: str.trimStart(),
+                    trimEnd: str.trimEnd(),
+                    trimLeft: str.trimLeft(),
+                    trimRight: str.trimRight()
+                })
+            `);
+            
+            const parsed = JSON.parse(result);
+            expect(parsed.trimStart).toBe('hello world  ');
+            expect(parsed.trimEnd).toBe('  hello world');
+            expect(parsed.trimLeft).toBe('hello world  ');
+            expect(parsed.trimRight).toBe('  hello world');
+        });
+
+        it('should inject String.prototype.padStart and padEnd', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            const result = await context.eval(`
+                const str = '5';
+                JSON.stringify({
+                    padStart: str.padStart(3, '0'),
+                    padEnd: str.padEnd(3, '0'),
+                    padStartCustom: 'abc'.padStart(10, '123'),
+                    padEndCustom: 'abc'.padEnd(10, '123')
+                })
+            `);
+            
+            const parsed = JSON.parse(result);
+            expect(parsed.padStart).toBe('005');
+            expect(parsed.padEnd).toBe('500');
+            expect(parsed.padStartCustom).toBe('1231231abc');
+            expect(parsed.padEndCustom).toBe('abc1231231');
+        });
+
+        it('should inject String.prototype.at for negative indexing', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            const result = await context.eval(`
+                const str = 'hello';
+                JSON.stringify({
+                    last: str.at(-1),
+                    secondLast: str.at(-2),
+                    first: str.at(0),
+                    outOfBounds: str.at(10)
+                })
+            `);
+            
+            const parsed = JSON.parse(result);
+            expect(parsed.last).toBe('o');
+            expect(parsed.secondLast).toBe('l');
+            expect(parsed.first).toBe('h');
+            expect(parsed.outOfBounds).toBeUndefined();
+        });
+
+        it('should inject Array.prototype.flat', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            const result = await context.eval(`
+                const nested = [1, [2, 3], [4, [5, 6]]];
+                JSON.stringify({
+                    flat1: nested.flat(),
+                    flat2: nested.flat(2),
+                    flatInfinity: nested.flat(Infinity)
+                })
+            `);
+            
+            const parsed = JSON.parse(result);
+            expect(parsed.flat1).toEqual([1, 2, 3, 4, [5, 6]]);
+            expect(parsed.flat2).toEqual([1, 2, 3, 4, 5, 6]);
+            expect(parsed.flatInfinity).toEqual([1, 2, 3, 4, 5, 6]);
+        });
+
+        it('should inject Array.prototype.flatMap', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            const result = await context.eval(`
+                const arr = [1, 2, 3];
+                JSON.stringify(arr.flatMap(x => [x, x * 2]))
+            `);
+            
+            expect(JSON.parse(result)).toEqual([1, 2, 2, 4, 3, 6]);
+        });
+
+        it('should inject Array.prototype.at for negative indexing', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            const result = await context.eval(`
+                const arr = ['a', 'b', 'c', 'd'];
+                JSON.stringify({
+                    last: arr.at(-1),
+                    secondLast: arr.at(-2),
+                    first: arr.at(0),
+                    outOfBounds: arr.at(10)
+                })
+            `);
+            
+            const parsed = JSON.parse(result);
+            expect(parsed.last).toBe('d');
+            expect(parsed.secondLast).toBe('c');
+            expect(parsed.first).toBe('a');
+            expect(parsed.outOfBounds).toBeUndefined();
+        });
+
+        it('should inject Array.prototype.findLast and findLastIndex', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            const result = await context.eval(`
+                const arr = [1, 2, 3, 4, 5, 4, 3, 2, 1];
+                JSON.stringify({
+                    findLast: arr.findLast(x => x > 3),
+                    findLastIndex: arr.findLastIndex(x => x > 3),
+                    findLastNotFound: arr.findLast(x => x > 10),
+                    findLastIndexNotFound: arr.findLastIndex(x => x > 10)
+                })
+            `);
+            
+            const parsed = JSON.parse(result);
+            expect(parsed.findLast).toBe(4);
+            expect(parsed.findLastIndex).toBe(5);
+            expect(parsed.findLastNotFound).toBeUndefined();
+            expect(parsed.findLastIndexNotFound).toBe(-1);
+        });
+
+        it('should inject Object.fromEntries', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            const result = await context.eval(`
+                const entries = [['a', 1], ['b', 2], ['c', 3]];
+                JSON.stringify(Object.fromEntries(entries))
+            `);
+            
+            expect(JSON.parse(result)).toEqual({ a: 1, b: 2, c: 3 });
+        });
+
+        it('should inject Object.hasOwn', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            const result = await context.eval(`
+                const obj = { a: 1, b: 2 };
+                JSON.stringify({
+                    hasA: Object.hasOwn(obj, 'a'),
+                    hasC: Object.hasOwn(obj, 'c'),
+                    hasToString: Object.hasOwn(obj, 'toString')
+                })
+            `);
+            
+            const parsed = JSON.parse(result);
+            expect(parsed.hasA).toBe(true);
+            expect(parsed.hasC).toBe(false);
+            expect(parsed.hasToString).toBe(false);
+        });
+
+        it('should handle complex real-world scenario with multiple polyfills', async () => {
+            const isolate = new ivm.Isolate({ memoryLimit: 128 });
+            const context = await isolate.createContext();
+            
+            await injectVMHelpersIndividually(context);
+            
+            const result = await context.eval(`
+                const data = [
+                    { id: 1, tags: ['foo', 'bar'] },
+                    { id: 2, tags: ['baz', 'foo'] },
+                    { id: 3, tags: ['qux'] }
+                ];
+                
+                // Use flatMap to get all tags
+                const allTags = data.flatMap(item => item.tags);
+                
+                // Use matchAll to find 'foo' occurrences
+                const fooMatches = [...allTags.join(',').matchAll(/foo/g)];
+                
+                // Use findLast to get last item with 'foo'
+                const lastWithFoo = data.findLast(item => item.tags.includes('foo'));
+                
+                // Use Object.fromEntries to create a map
+                const tagMap = Object.fromEntries(allTags.map((tag, i) => [tag, i]));
+                
+                // Use at for negative indexing
+                const lastTag = allTags.at(-1);
+                
+                JSON.stringify({
+                    allTags,
+                    fooCount: fooMatches.length,
+                    lastWithFooId: lastWithFoo.id,
+                    hasQux: Object.hasOwn(tagMap, 'qux'),
+                    lastTag
+                })
+            `);
+            
+            const parsed = JSON.parse(result);
+            expect(parsed.allTags).toEqual(['foo', 'bar', 'baz', 'foo', 'qux']);
+            expect(parsed.fooCount).toBe(2);
+            expect(parsed.lastWithFooId).toBe(2);
+            expect(parsed.hasQux).toBe(true);
+            expect(parsed.lastTag).toBe('qux');
+        });
     });
 }); 
