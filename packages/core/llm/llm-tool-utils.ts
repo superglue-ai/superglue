@@ -87,11 +87,16 @@ export function getLLMToolDefinitions(toolNames?: string[]): LLMToolDefinition[]
 
 export function logToolExecution(toolName: string, input: any, output: any): void {
     switch (toolName) {
-      case 'search_documentation': {
-        const query = input?.query || 'unknown';
-        const outputStr = typeof output === 'string' ? output : JSON.stringify(output);
-        logMessage('info', `search_documentation tool executed with keywords: ${query}" returned ${outputStr.length} chars`);
-        break;
-      }
+        case 'search_documentation': {
+            const query = input?.query || 'no query';
+            let outputStr: string;
+            try {
+            outputStr = typeof output === 'string' ? output : JSON.stringify(output);
+            } catch {
+            outputStr = '[unstringifiable]';
+            }
+            logMessage('info', `search_documentation: query="${query}" → ${outputStr.length} chars`);
+            break;
+        }
     }
   }
