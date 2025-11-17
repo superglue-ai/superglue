@@ -522,3 +522,18 @@ export function sanitizeInstructionSuggestions(raw: unknown): string[] {
 
   return filtered;
 }
+
+export function convertBasicAuthToBase64(headerValue: string) {
+  if (!headerValue) return headerValue;
+  // Get the part of the 'Basic '
+  const credentials = headerValue.substring('Basic '.length).trim();
+  // checking if it is already Base64 decoded
+  const seemsEncoded = /^[A-Za-z0-9+/=]+$/.test(credentials);
+
+  if (!seemsEncoded) {
+    // if not encoded, convert to username:password to Base64
+    const base64Credentials = Buffer.from(credentials).toString('base64');
+    return `Basic ${base64Credentials}`;
+  }
+  return headerValue;
+}

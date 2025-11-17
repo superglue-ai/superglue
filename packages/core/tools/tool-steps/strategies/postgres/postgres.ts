@@ -5,7 +5,6 @@ import { parseJSON } from "../../../../files/index.js";
 import { composeUrl, replaceVariables } from "../../../../utils/tools.js";
 
 
-// Pool cache management
 interface PoolCacheEntry {
   pool: Pool;
   lastUsed: number;
@@ -14,7 +13,6 @@ interface PoolCacheEntry {
 
 const poolCache = new Map<string, PoolCacheEntry>();
 
-// Start cleanup interval
 let cleanupInterval: NodeJS.Timeout | null = null;
 
 function startCleanupInterval() {
@@ -29,7 +27,6 @@ function startCleanupInterval() {
       }
     }, server_defaults.POSTGRES.POOL_CLEANUP_INTERVAL);
 
-    // Prevent the interval from keeping the process alive
     if (cleanupInterval.unref) {
       cleanupInterval.unref();
     }
@@ -52,10 +49,8 @@ function getOrCreatePool(connectionString: string, poolConfig: PoolConfig): Pool
     connectionTimeoutMillis: 5000, // How long to wait for a connection
   });
 
-  // Add error handler to prevent unhandled errors
   pool.on('error', (err) => {
     console.error('Unexpected pool error:', err);
-    // Remove from cache if pool has an error
     poolCache.delete(cacheKey);
   });
 
@@ -65,13 +60,11 @@ function getOrCreatePool(connectionString: string, poolConfig: PoolConfig): Pool
     connectionString
   });
 
-  // Start cleanup interval if not already running
   startCleanupInterval();
 
   return pool;
 }
 
-// Graceful shutdown function
 export async function closeAllPools(): Promise<void> {
   if (cleanupInterval) {
     clearInterval(cleanupInterval);
@@ -127,15 +120,12 @@ export async function callPostgres({ endpoint, payload, credentials, options }: 
       : false
   };
 
-  // Get or create pool from cache
   const pool = getOrCreatePool(connectionString, poolConfig);
   let attempts = 0;
   const maxRetries = options?.retries || server_defaults.POSTGRES.DEFAULT_RETRIES;
 
   do {
     try {
-
-      // Use parameterized query if params are provided, otherwise fall back to simple query
       const result = queryParams
         ? await pool.query(queryText, queryParams)
         : await pool.query(queryText);

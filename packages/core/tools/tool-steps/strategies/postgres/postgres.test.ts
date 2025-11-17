@@ -9,6 +9,31 @@ const mockPoolQuery = vi.fn();
 const mockPoolEnd = vi.fn();
 const mockPoolOn = vi.fn();
 
+let shouldSkip = true;
+
+describe('callPostgres', () => {
+  const testConfig: ApiConfig = {
+    id: '1',
+    instruction: 'test',
+    urlHost: 'postgres://user:password@localhost:5432',
+    urlPath: '/testdb',
+    body: JSON.stringify({
+      query: 'SELECT NOW()'
+    })
+  };
+
+  it.skipIf(shouldSkip)('should connect and execute a simple query', async () => {
+    const result = await callPostgres({
+      endpoint: testConfig,
+      payload: {},
+      credentials: {},
+      options: { timeout: 5000, retries: 1 }
+    });
+
+    expect(result).toBeDefined();
+  });
+});
+
 // Mock pg Pool
 vi.mock('pg', () => ({
   Pool: vi.fn().mockImplementation(() => ({

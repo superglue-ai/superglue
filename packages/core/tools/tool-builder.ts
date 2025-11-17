@@ -3,11 +3,11 @@ import { convertRequiredToArray, Metadata, toJsonSchema } from "@superglue/share
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { getToolBuilderContext } from "../context/context-builders.js";
 import { BUILD_TOOL_SYSTEM_PROMPT } from "../context/context-prompts.js";
-import { LanguageModel, LLMMessage } from "../llm/language-model.js";
+import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { logMessage } from "../utils/logs.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import z from "zod";
-import { getWebSearchTool, searchDocumentationToolDefinition } from "../utils/llm-tools.js";
+import { getWebSearchTool, searchDocumentationToolDefinition } from "../llm/llm-tools.js";
 
 export class ToolBuilder {
   private integrations: Record<string, Integration>;

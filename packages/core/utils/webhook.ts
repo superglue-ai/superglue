@@ -1,5 +1,5 @@
 import { AxiosRequestConfig } from "axios";
-import { callAxios } from "../tools/tool-steps/tool-step-strategies/api/api.js";
+import { callAxios } from "../tools/tool-steps/strategies/http/http.js";
 
 
 // Handle webhook notification
