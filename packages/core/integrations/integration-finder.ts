@@ -2,19 +2,19 @@ import { Integration } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { logMessage } from "../utils/logs.js";
 
-export interface SuggestedIntegration {
+export interface FoundIntegration {
     integration: Integration;
     reason: string;
 }
 
-export class IntegrationSelector {
+export class IntegrationFinder {
     private metadata: Metadata;
 
     constructor(metadata: Metadata) {
         this.metadata = metadata;
     }
 
-    private keywordSearch(searchTerms: string, integrations: Integration[]): SuggestedIntegration[] {
+    private keywordSearch(searchTerms: string, integrations: Integration[]): FoundIntegration[] {
         const keywords = searchTerms.toLowerCase().split(/\s+/).filter(k => k.length > 0);
 
         const scored = integrations.map(integration => {
@@ -52,10 +52,10 @@ export class IntegrationSelector {
         }));
     }
 
-    public async select(
+    public async findIntegrations(
         instruction: string | undefined,
         integrations: Integration[]
-    ): Promise<SuggestedIntegration[]> {
+    ): Promise<FoundIntegration[]> {
 
         if (!integrations || integrations.length === 0) {
             logMessage('info', 'No integrations available for selection.', this.metadata);

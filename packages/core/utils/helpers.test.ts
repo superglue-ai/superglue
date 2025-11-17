@@ -1,6 +1,7 @@
 import { SelfHealingMode } from '@superglue/client';
 import { describe, expect, it, vi } from 'vitest';
-import { applyAuthFormat, applyJsonata, applyJsonataWithValidation, composeUrl, isSelfHealingEnabled, maskCredentials, replaceVariables, safeHttpMethod, sample } from './tools.js';
+import { applyAuthFormat, composeUrl, isSelfHealingEnabled, maskCredentials, replaceVariables, sample } from './helpers.js';
+import { applyJsonata, applyJsonataWithValidation } from './helpers.legacy.js';
 
 vi.mock('axios');
 
@@ -301,40 +302,6 @@ describe('tools utility functions', () => {
       // All represent same day, but different times
       expect(new Date(earliestDate).getUTCHours()).toBe(15); // 10:00 EST = 15:00 UTC
       expect(new Date(latestDate).getUTCHours()).toBe(20);   // 20:00 UTC
-    });
-  });
-
-  describe('safeHttpMethod', () => {
-    it('returns the method if it is a valid HttpMethod (case sensitive)', () => {
-      expect(safeHttpMethod('GET')).toBe('GET');
-      expect(safeHttpMethod('POST')).toBe('POST');
-      expect(safeHttpMethod('DELETE')).toBe('DELETE');
-    });
-
-    it('returns the uppercased method if it is a valid HttpMethod (case insensitive)', () => {
-      expect(safeHttpMethod('get')).toBe('GET');
-      expect(safeHttpMethod('post')).toBe('POST');
-      expect(safeHttpMethod('delete')).toBe('DELETE');
-    });
-
-    it('returns "GET" if the method is invalid', () => {
-      expect(safeHttpMethod('FOO')).toBe('GET');
-      expect(safeHttpMethod(undefined)).toBe('GET');
-      expect(safeHttpMethod(null)).toBe('GET');
-      expect(safeHttpMethod(123)).toBe('GET');
-    });
-
-    it('accepts HttpMethodEnum additions', () => {
-      // If you add "HEAD" or "OPTIONS" to HttpMethodEnum, this will pass
-      expect(['HEAD', 'OPTIONS']).toContain(safeHttpMethod('head'));
-      expect(['HEAD', 'OPTIONS']).toContain(safeHttpMethod('OPTIONS'));
-    });
-
-    it('does not throw if method is undefined or null', () => {
-      expect(() => safeHttpMethod(undefined)).not.toThrow();
-      expect(() => safeHttpMethod(null)).not.toThrow();
-      expect(safeHttpMethod(undefined)).toBe('GET');
-      expect(safeHttpMethod(null)).toBe('GET');
     });
   });
 
