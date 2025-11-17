@@ -20,7 +20,21 @@ export default function validate(result: any, payload: any): void {
   assert(electronics.product_count === 5, `Electronics should have 5 products, got ${electronics.product_count}`);
   assert(electronics.total_stock === 865, `Electronics total stock should be 865, got ${electronics.total_stock}`);
 
+  // Validate average price for Electronics
+  const expectedElectronicsAvgPrice = 449.99;
+  assert(
+    Math.abs(electronics.avg_price - expectedElectronicsAvgPrice) <= 1,
+    `Electronics avg_price should be ~${expectedElectronicsAvgPrice}, got ${electronics.avg_price}`
+  );
+
   assert(furniture, 'Missing Furniture category');
   assert(furniture.product_count === 3, `Furniture should have 3 products, got ${furniture.product_count}`);
   assert(furniture.total_stock === 145, `Furniture total stock should be 145, got ${furniture.total_stock}`);
+
+  // Validate average price for Furniture
+  const expectedFurnitureAvgPrice = 324.99;
+  assert(
+    Math.abs(furniture.avg_price - expectedFurnitureAvgPrice) <= 1,
+    `Furniture avg_price should be ~${expectedFurnitureAvgPrice}, got ${furniture.avg_price}`
+  );
 }
