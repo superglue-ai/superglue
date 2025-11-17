@@ -7,10 +7,9 @@ import { LogSidebar } from '../components/utils/LogSidebar';
 import { ServerMonitor } from '../components/utils/ServerMonitor';
 import { ConfigProvider } from './config-context';
 import { jetbrainsMono, jetbrainsSans } from './fonts';
-import { IntegrationsProvider } from './integrations-context';
 import { CSPostHogProvider } from './providers';
 import { useToken } from '../hooks/use-token';
-import { ToolsProvider } from './tools-context';
+import { ConditionalDataProvider } from './conditional-data-provider';
 
 interface Props {
   children: React.ReactNode
@@ -19,45 +18,43 @@ interface Props {
 
 export function ClientWrapper({ children, config }: Props) {
   const pathname = usePathname()
-  const isAuthPage = pathname?.startsWith('/auth') || pathname?.startsWith('/login');
+  const isAuthPage = pathname?.startsWith('/auth');
   const token = useToken();
 
   return (
     <ConfigProvider config={config}>
       <CSPostHogProvider>
-        <div
-          className={`${jetbrainsSans.variable} ${jetbrainsMono.variable} antialiased`}
-        >
-          {isAuthPage ? (
-            children
-          ) : (
-            <IntegrationsProvider>
-              <ToolsProvider>
-                <div className="flex h-screen overflow-hidden">
-                  {token && <Sidebar />}
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={pathname}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="w-full h-full overflow-y-scroll"
-                    >
-                      {children}
-                    </motion.div>
-                  </AnimatePresence>
-                  {token && (
-                    <div className="hidden lg:block">
-                      <LogSidebar />
-                    </div>
-                  )}
-                </div>
-              </ToolsProvider>
-            </IntegrationsProvider>
-          )}
-          <Toaster />
-          {token && <ServerMonitor />}
-        </div>
+        <ConditionalDataProvider>
+          <div
+            className={`${jetbrainsSans.variable} ${jetbrainsMono.variable} antialiased`}
+          >
+            {isAuthPage ? (
+              children
+            ) : (
+              <div className="flex h-screen overflow-hidden">
+                {token && <Sidebar />}
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={pathname}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="w-full h-full overflow-y-scroll"
+                  >
+                    {children}
+                  </motion.div>
+                </AnimatePresence>
+                {token && (
+                  <div className="hidden lg:block">
+                    <LogSidebar />
+                  </div>
+                )}
+              </div>
+            )}
+            <Toaster />
+            {token && <ServerMonitor />}
+          </div>
+        </ConditionalDataProvider>
       </CSPostHogProvider>
     </ConfigProvider>
   );
