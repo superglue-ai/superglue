@@ -26,10 +26,42 @@ function parseConnectionUrl(urlString: string): {
   password?: string;
   basePath?: string;
 } {
-  const url = new URL(urlString);
+  let url: URL;
+  
+  try {
+    url = new URL(urlString);
+  } catch (error) {
+    const protocolMatch = urlString.match(/^(sftp|ftps?):\/\//);
+    if (!protocolMatch) {
+      throw new Error('Invalid URL: protocol must be ftp, ftps, or sftp');
+    }
+    
+    const afterProtocol = urlString.slice(protocolMatch[0].length);
+    const lastAtIndex = afterProtocol.lastIndexOf('@');
+    
+    if (lastAtIndex === -1) {
+      throw new Error(`Invalid URL format: ${error.message}`);
+    }
+    
+    const credentials = afterProtocol.slice(0, lastAtIndex);
+    const hostAndPath = afterProtocol.slice(lastAtIndex + 1);
+    const colonIndex = credentials.indexOf(':');
+    
+    const username = colonIndex !== -1 
+      ? encodeURIComponent(credentials.slice(0, colonIndex))
+      : encodeURIComponent(credentials);
+    const password = colonIndex !== -1 
+      ? encodeURIComponent(credentials.slice(colonIndex + 1))
+      : undefined;
+    
+    const encodedUrl = password 
+      ? `${protocolMatch[0]}${username}:${password}@${hostAndPath}`
+      : `${protocolMatch[0]}${username}@${hostAndPath}`;
+    
+    url = new URL(encodedUrl);
+  }
+  
   const protocol = url.protocol.replace(':', '') as 'ftp' | 'ftps' | 'sftp';
-
-
   const defaultPorts = {
     ftp: 21,
     ftps: 21,
@@ -40,8 +72,8 @@ function parseConnectionUrl(urlString: string): {
     protocol,
     host: url.hostname,
     port: url.port ? parseInt(url.port) : defaultPorts[protocol],
-    username: url.username || undefined,
-    password: url.password || undefined,
+    username: url.username ? decodeURIComponent(url.username) : undefined,
+    password: url.password ? decodeURIComponent(url.password) : undefined,
     basePath: url.pathname && url.pathname !== '/' ? url.pathname : undefined
   };
 }
@@ -272,8 +304,9 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
 
 export async function callFTP({ endpoint, credentials, options }: { endpoint: ApiConfig, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
   let connectionString = composeUrl(endpoint.urlHost, endpoint.urlPath);
+  console.log("connectionString", connectionString);
   const connectionInfo = parseConnectionUrl(connectionString);
-
+  console.log("connectionInfo", connectionInfo);
   let operations: FTPOperation[] = [];
   try {
     const body = parseJSON(endpoint.body);
