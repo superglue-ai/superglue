@@ -45,12 +45,16 @@ export type LLMObjectResponse<T> =
     | { success: true; response: T; messages: LLMMessage[] }
     | { success: false; response: string; messages: LLMMessage[] };
 
+export interface LLMToolWithContext<TContext = any> {
+    toolDefinition: LLMToolDefinition | Record<string, Tool>;
+    toolContext: TContext;
+}
+
 export interface LLMObjectGeneratorInput {
     messages: LLMMessage[];
     schema: any;
     temperature?: number;
-    tools?: (LLMToolDefinition | Record<string, Tool>)[];
-    toolContext?: any;
+    tools?: LLMToolWithContext[];
     toolChoice?: 'auto' | 'required' | 'none' | { type: 'tool'; toolName: string };
 }
 

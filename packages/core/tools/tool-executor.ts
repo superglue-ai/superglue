@@ -474,7 +474,11 @@ export class WorkflowExecutor implements Workflow {
             });
           }
 
-          const generateStepConfigResult = await generateStepConfig(retryCount, messages);
+          const generateStepConfigResult = await generateStepConfig({
+            retryCount,
+            messages,
+            integration
+          });
           messages = generateStepConfigResult.messages;
           
           if (!generateStepConfigResult.success) {

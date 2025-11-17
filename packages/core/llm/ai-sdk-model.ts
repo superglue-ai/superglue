@@ -1,9 +1,9 @@
 import { getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
 import { AssistantModelMessage, TextPart, ToolCallPart, ToolResultPart, Tool, generateText, jsonSchema, tool } from "ai";
 import { server_defaults } from "../default.js";
-import { LLMToolDefinition } from "./llm-tool-utils.js";
+import { LLMToolDefinition, logToolExecution } from "./llm-tool-utils.js";
 import { logMessage } from "../utils/logs.js";
-import { LLM, LLMMessage, LLMObjectGeneratorInput, LLMObjectResponse, LLMResponse } from "./llm-base-model.js";
+import { LLM, LLMMessage, LLMObjectGeneratorInput, LLMObjectResponse, LLMResponse, LLMToolWithContext } from "./llm-base-model.js";
 
 export class AiSdkModel implements LLM {
   public contextLength: number;
@@ -28,8 +28,7 @@ export class AiSdkModel implements LLM {
 
   private buildTools(
     schemaObj: any,
-    tools?: (LLMToolDefinition | Record<string, Tool>)[],
-    toolContext?: any
+    tools?: LLMToolWithContext[]
   ): Record<string, Tool> {
     const defaultTools: Record<string, Tool> = {
       submit: tool({
@@ -50,11 +49,12 @@ export class AiSdkModel implements LLM {
 
     if (tools && tools.length > 0) {
       for (const item of tools) {
+        const { toolDefinition: toolDef, toolContext: toolContext } = item;
         
-        const isCustomTool = item.name && item.arguments && item.description;
+        const isCustomTool = 'name' in toolDef && 'arguments' in toolDef && 'description' in toolDef;
         
         if (isCustomTool) {
-          const toolDef = item as LLMToolDefinition;
+          const toolDef = item.toolDefinition as LLMToolDefinition;
           defaultTools[toolDef.name] = tool({
             description: toolDef.description,
             inputSchema: jsonSchema(toolDef.arguments),
@@ -63,7 +63,7 @@ export class AiSdkModel implements LLM {
             } : undefined,
           });
         } else {
-          Object.assign(defaultTools, item);
+          Object.assign(defaultTools, toolDef);
         }
       }
     }
@@ -158,7 +158,7 @@ export class AiSdkModel implements LLM {
     }
 
     const schemaObj = jsonSchema(schema);
-    const availableTools = this.buildTools(schemaObj, input.tools, input.toolContext);
+    const availableTools = this.buildTools(schemaObj, input.tools);
 
     let conversationMessages: LLMMessage[] = String(input.messages[0]?.content)?.startsWith("The current date and time is")
       ? input.messages
@@ -210,7 +210,6 @@ export class AiSdkModel implements LLM {
         }
 
         for (const toolCall of result.toolCalls) {
-          // if we can find the tool id in the toolResults
           conversationMessages.push({
             role: 'assistant', content: [{
               type: 'tool-call',
@@ -219,8 +218,12 @@ export class AiSdkModel implements LLM {
               input: toolCall.input ?? {}
             } as ToolCallPart]
           } as AssistantModelMessage);
+          
           const toolResult = result.toolResults.find(tr => tr.toolCallId === toolCall.toolCallId);
+          
           if (toolResult) {
+            logToolExecution(toolCall.toolName, toolCall.input, toolResult.output);
+            
             conversationMessages.push({
               role: 'tool', content: [{
                 type: 'tool-result',
@@ -257,7 +260,7 @@ export class AiSdkModel implements LLM {
         messages: updatedMessages
       };
     } catch (error) {
-      logMessage('error', `Error generating LLM response: ${error}`, { orgId: 'ai-sdk' });
+      logMessage('error', `Error generating LLM response: ${error}`);
       const updatedMessages = [...input.messages, {
         role: "assistant" as const,
         content: "Error: Vercel AI API Error: " + (error as any)?.message

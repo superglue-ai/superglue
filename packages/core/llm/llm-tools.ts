@@ -49,7 +49,6 @@ export const searchDocumentationToolImplementation: LLMToolImplementation<search
             };
         }
 
-        // Use DocumentationSearch for targeted search
         const documentationSearch = new DocumentationSearch({ orgId: context.orgId });
         const searchResults = documentationSearch.extractRelevantSections(
             integration.documentation,
@@ -59,7 +58,6 @@ export const searchDocumentationToolImplementation: LLMToolImplementation<search
             integration.openApiSchema
         );
 
-        // Return the full search results
         return {
             success: true,
             data: {

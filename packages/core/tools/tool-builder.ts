@@ -151,8 +151,8 @@ export class ToolBuilder {
 
       const webSearchTool = getWebSearchTool();
       const tools = webSearchTool 
-        ? [searchDocumentationToolDefinition, { web_search: webSearchTool }]
-        : [searchDocumentationToolDefinition];
+        ? [{ toolDefinition: { web_search: webSearchTool }, toolContext: {} }]
+        : [];
       
       const generateToolResult = await LanguageModel.generateObject<Tool>({
         messages: messages,

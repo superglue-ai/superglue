@@ -120,7 +120,11 @@ export const generateStepConfigResolver = async (
       }
     ];
 
-    const generateStepConfigResult = await generateStepConfig(0, messages);
+    const generateStepConfigResult = await generateStepConfig({
+      retryCount: 0,
+      messages,
+      integration
+    });
           
     if (!generateStepConfigResult.success || !generateStepConfigResult.config) {
       throw new Error(generateStepConfigResult.error || "No step config generated");

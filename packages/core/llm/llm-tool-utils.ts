@@ -1,3 +1,4 @@
+import { logMessage } from "../utils/logs.js";
 import { generateInstructionsDefinition, generateInstructionsImplementation } from "./llm-tools.js";
 import { searchDocumentationToolDefinition, searchDocumentationToolImplementation } from "./llm-tools.js";
 
@@ -83,3 +84,14 @@ export function getLLMToolDefinitions(toolNames?: string[]): LLMToolDefinition[]
 
     return allLLMToolDefinitions.filter(def => toolNames.includes(def.name));
 } 
+
+export function logToolExecution(toolName: string, input: any, output: any): void {
+    switch (toolName) {
+      case 'search_documentation': {
+        const query = input?.query || 'unknown';
+        const outputStr = typeof output === 'string' ? output : JSON.stringify(output);
+        logMessage('info', `search_documentation tool executed with keywords: ${query}" returned ${outputStr.length} chars`);
+        break;
+      }
+    }
+  }
