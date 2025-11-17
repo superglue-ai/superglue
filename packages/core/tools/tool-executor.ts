@@ -5,14 +5,14 @@ import { getEvaluateStepResponseContext, getGenerateStepConfigContext, getLoopSe
 import { EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT, GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
-import { LanguageModel, LLMMessage } from "../llm/language-model.js";
+import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
 import { applyJsonata, isSelfHealingEnabled, maskCredentials, transformAndValidateSchema } from "../utils/tools.js";
 import { evaluateTransform, generateTransformCode } from "../utils/transform.js";
-import { AbortError, ApiCallError } from "./api/api.js";
-import { runStepConfig } from "./api/api.legacy.js";
-import { generateStepConfig } from "../build/tool-step-builder.js";
+import { AbortError, ApiCallError } from "./tool-steps/tool-step-strategies/api/api.js";
+import { runStepConfig } from "./tool-steps/tool-step-strategies/api/api.legacy.js";
+import { generateStepConfig } from "./tool-steps/tool-step-builder.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 

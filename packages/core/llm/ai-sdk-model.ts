@@ -1,9 +1,9 @@
 import { getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
 import { AssistantModelMessage, TextPart, ToolCallPart, ToolResultPart, Tool, generateText, jsonSchema, tool } from "ai";
 import { server_defaults } from "../default.js";
-import { ToolDefinition } from "../execute/tools.js";
+import { LLMToolDefinition } from "./llm-tool-utils.js";
 import { logMessage } from "../utils/logs.js";
-import { LLM, LLMMessage, LLMObjectGeneratorInput, LLMObjectResponse, LLMResponse } from "./language-model.js";
+import { LLM, LLMMessage, LLMObjectGeneratorInput, LLMObjectResponse, LLMResponse } from "./llm-base-model.js";
 
 export class AiSdkModel implements LLM {
   public contextLength: number;
@@ -28,7 +28,7 @@ export class AiSdkModel implements LLM {
 
   private buildTools(
     schemaObj: any,
-    tools?: (ToolDefinition | Record<string, Tool>)[],
+    tools?: (LLMToolDefinition | Record<string, Tool>)[],
     toolContext?: any
   ): Record<string, Tool> {
     const defaultTools: Record<string, Tool> = {
@@ -54,7 +54,7 @@ export class AiSdkModel implements LLM {
         const isCustomTool = item.name && item.arguments && item.description;
         
         if (isCustomTool) {
-          const toolDef = item as ToolDefinition;
+          const toolDef = item as LLMToolDefinition;
           defaultTools[toolDef.name] = tool({
             description: toolDef.description,
             inputSchema: jsonSchema(toolDef.arguments),

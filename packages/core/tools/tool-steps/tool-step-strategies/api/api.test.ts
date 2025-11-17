@@ -1,6 +1,6 @@
 import axios from "axios";
 import { describe, expect, it, vi } from "vitest";
-import { server_defaults } from "../../default.js";
+import { server_defaults } from "../../../../default.js";
 import { callAxios } from "./api.js";
 
 vi.mock('axios');

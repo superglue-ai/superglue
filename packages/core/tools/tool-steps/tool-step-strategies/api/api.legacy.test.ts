@@ -1,6 +1,6 @@
 import { ApiConfig, HttpMethod, PaginationType, SelfHealingMode } from '@superglue/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
-import { isSelfHealingEnabled } from '../../utils/tools.js';
+import { isSelfHealingEnabled } from '../../../../utils/tools.js';
 import * as api from './api.js';
 import { runStepConfig, convertBasicAuthToBase64 } from './api.legacy.js';
 

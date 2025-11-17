@@ -7,7 +7,7 @@ import { LanguageModel, LLMMessage } from "../llm/language-model.js";
 import { logMessage } from "../utils/logs.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import z from "zod";
-import { getWebSearchTool, searchDocumentationToolDefinition } from "../utils/workflow-tools.js";
+import { getWebSearchTool, searchDocumentationToolDefinition } from "../utils/llm-tools.js";
 
 export class ToolBuilder {
   private integrations: Record<string, Integration>;

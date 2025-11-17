@@ -1,10 +1,10 @@
 import { RequestOptions } from "@superglue/client";
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import https from 'https';
-import { server_defaults } from "../../default.js";
-import { parseJSON } from "../../files/index.js";
-import { logMessage } from "../../utils/logs.js";
-import { maskCredentials } from "../../utils/tools.js";
+import { server_defaults } from "../../../../default.js";
+import { parseJSON } from "../../../../files/index.js";
+import { logMessage } from "../../../../utils/logs.js";
+import { maskCredentials } from "../../../../utils/tools.js";
 
 export interface CallAxiosResult {
   response: AxiosResponse;

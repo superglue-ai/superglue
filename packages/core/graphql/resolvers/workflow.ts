@@ -2,9 +2,9 @@ import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglu
 import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { ToolBuilder } from "../../build/tool-builder.js";
-import { ToolSelector } from "../../execute/tool-selector.js";
-import { WorkflowExecutor } from "../../execute/workflow-executor.js";
+import { ToolBuilder } from "../../tools/tool-builder.js";
+import { ToolFinder } from "../../tools/tool-finder.js";
+import { WorkflowExecutor } from "../../tools/tool-executor.js";
 import { parseJSON } from "../../files/index.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { logMessage } from "../../utils/logs.js";
@@ -277,8 +277,8 @@ export const findRelevantToolsResolver = async (
       return tool;
     });
 
-    const selector = new ToolSelector(metadata);
-    return await selector.select(searchTerms, tools);
+    const selector = new ToolFinder(metadata);
+    return await selector.findTools(searchTerms, tools);
   } catch (error) {
     logMessage('error', `Error finding relevant tools: ${String(error)}`, { orgId: context.orgId });
     return [];

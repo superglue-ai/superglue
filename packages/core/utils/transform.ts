@@ -4,7 +4,7 @@ import prettier from "prettier";
 import { getEvaluateTransformContext, getTransformContext } from "../context/context-builders.js";
 import { EVALUATE_TRANSFORM_SYSTEM_PROMPT, GENERATE_TRANSFORM_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
-import { LanguageModel, LLMMessage } from "../llm/language-model.js";
+import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { logMessage } from "./logs.js";
 import { isSelfHealingEnabled, transformAndValidateSchema } from "./tools.js";
 import { z } from "zod";

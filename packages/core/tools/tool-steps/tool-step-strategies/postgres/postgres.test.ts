@@ -1,7 +1,7 @@
 import { ApiConfig, RequestOptions } from '@superglue/client';
 import { Pool } from 'pg';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { server_defaults } from '../../default.js';
+import { server_defaults } from '../../../../default.js';
 import { callPostgres, closeAllPools } from './postgres.js';
 
 // Create mock functions that we can reference

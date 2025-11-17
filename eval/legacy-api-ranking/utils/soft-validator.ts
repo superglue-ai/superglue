@@ -1,7 +1,7 @@
 import { parseJSON } from '@core/files/parsers/json.js';
 import { logMessage } from '@core/utils/logs.js';
 import { sample } from '@core/utils/tools.js';
-import { LLMMessage } from '@core/llm/language-model.js';
+import { LLMMessage } from '@core/llm/llm-base-model.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
@@ -18,7 +18,7 @@ export async function validateWorkflowResult(
     workflowInstruction: string,
     metadata: { orgId: string; userId: string }
 ): Promise<z.infer<typeof softValidationSchema>> {
-    const { LanguageModel } = await import('@core/llm/language-model.js');
+    const { LanguageModel } = await import('@core/llm/llm-base-model.js');
 
         let actualContent = JSON.stringify(actualResult, null, 2);
         if (actualContent.length > 10000) {

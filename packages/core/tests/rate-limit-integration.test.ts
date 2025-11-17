@@ -1,6 +1,6 @@
 import { type ApiConfig, HttpMethod } from "@superglue/client";
 import { describe, expect, it } from "vitest";
-import { runStepConfig } from "../execute/api/api.legacy.js";
+import { runStepConfig } from "../tools/tool-steps/tool-step-strategies/api/api.legacy.js";
 import { MockServerFactory } from "./test-utils.js";
 
 describe("Rate Limit Integration Test with real server", () => {

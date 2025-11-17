@@ -11,7 +11,7 @@ import { config } from "dotenv";
 import { MetricsCalculator } from "./services/metrics-calculator.js";
 import { CsvReporter } from "./reporters/csv-reporter.js";
 import { ConsoleReporter } from "./reporters/console-reporter.js";
-import { closeAllPools } from "../../packages/core/execute/postgres/postgres.js";
+import { closeAllPools } from "../../packages/core/tools/tool-steps/tool-step-strategies/postgres/postgres.js";
 import { JsonReporter } from "./reporters/json-reporter.js";
 import { shutdownSharedHtmlMarkdownPool } from "../../packages/core/utils/html-markdown-pool.js";
 import { PlaywrightFetchingStrategy } from "../../packages/core/documentation/strategies/fetching-playwright.js";

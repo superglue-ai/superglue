@@ -5,7 +5,7 @@ import { getModelContextLength, initializeAIModel } from '@superglue/shared/util
 import { generateText, jsonSchema, tool } from 'ai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AiSdkModel } from './ai-sdk-model.js';
-import { LLMMessage } from './language-model.js';
+import { LLMMessage } from './llm-base-model.js';
 
 vi.mock('ai');
 vi.mock('@ai-sdk/openai');

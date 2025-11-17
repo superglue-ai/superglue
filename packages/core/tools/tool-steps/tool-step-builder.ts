@@ -1,7 +1,7 @@
 import { ApiConfig, HttpMethod, Pagination } from "@superglue/client";
-import { LLMMessage } from "../llm/language-model.js";
-import { LanguageModel } from "../llm/language-model.js";
-import { getWebSearchTool, searchDocumentationToolDefinition } from "../utils/workflow-tools.js";
+import { LLMMessage } from "../../llm/llm-base-model.js";
+import { LanguageModel } from "../../llm/llm-base-model.js";
+import { getWebSearchTool, searchDocumentationToolDefinition } from "../../llm/llm-tools.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 

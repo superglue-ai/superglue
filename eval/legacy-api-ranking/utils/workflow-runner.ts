@@ -1,6 +1,6 @@
-import { ToolBuilder } from '@core/build/tool-builder.js';
+import { ToolBuilder } from '@/packages/core/tools/tool-builder.js';
 import { DataStore } from '@core/datastore/types.js';
-import { WorkflowExecutor } from '@core/execute/workflow-executor.js';
+import { WorkflowExecutor } from '@/packages/core/tools/tool-executor.js';
 import { IntegrationManager } from '@core/integrations/integration-manager.js';
 import { logEmitter, logMessage } from '@core/utils/logs.js';
 import { Integration, Workflow, WorkflowResult } from '@superglue/client';
