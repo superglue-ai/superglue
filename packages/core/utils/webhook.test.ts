@@ -1,20 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { callAxios } from '../tools/tool-steps/strategies/http/http.js';
+import * as httpModule from '../tools/tool-steps/strategies/http/http.js';
 import { notifyWebhook } from './webhook.js';
 
-// Mock the callAxios function
-vi.mock('../execute/api/api.js', () => ({
-  callAxios: vi.fn()
-}));
+vi.mock('../tools/tool-steps/strategies/http/http.js');
 
 describe('notifyWebhook', () => {
+  let callAxiosSpy: any;
+
   beforeEach(() => {
-    // Clear mock before each test
     vi.clearAllMocks();
+    callAxiosSpy = vi.spyOn(httpModule, 'callAxios').mockResolvedValue({ 
+      response: { status: 200, data: {}, headers: {}, statusText: 'OK', config: {} },
+      retriesAttempted: 0
+    } as any);
   });
 
   afterEach(() => {
-    vi.resetAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('should call webhook with success data', async () => {
@@ -24,7 +26,7 @@ describe('notifyWebhook', () => {
 
     await notifyWebhook(webhookUrl, callId, true, data);
 
-    expect(callAxios).toHaveBeenCalledWith(
+    expect(callAxiosSpy).toHaveBeenCalledWith(
       {
         method: 'POST',
         url: webhookUrl,
@@ -48,7 +50,7 @@ describe('notifyWebhook', () => {
 
     await notifyWebhook(webhookUrl, callId, false, undefined, error);
 
-    expect(callAxios).toHaveBeenCalledWith(
+    expect(callAxiosSpy).toHaveBeenCalledWith(
       {
         method: 'POST',
         url: webhookUrl,
@@ -69,11 +71,9 @@ describe('notifyWebhook', () => {
     const webhookUrl = 'https://example.com/webhook';
     const callId = '123';
 
-    // Mock console.error to avoid cluttering test output
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
-    // Make callAxios throw an error
-    (callAxios as any).mockRejectedValueOnce(new Error('Network error'));
+    callAxiosSpy.mockRejectedValueOnce(new Error('Network error'));
 
     // Should not throw
     await expect(notifyWebhook(webhookUrl, callId, true)).resolves.not.toThrow();

@@ -1,27 +1,16 @@
 import axios from "axios";
-import { afterEach, beforeEach, describe, expect, it, Mocked, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server_defaults } from "../../../../default.js";
-import { callAxios, runStepConfig } from "./http.js";
-import * as api from './http.js';
+import * as httpModule from "./http.js";
 import { ApiConfig, HttpMethod, PaginationType } from '@superglue/client';
 import { convertBasicAuthToBase64 } from '../../../../utils/helpers.js';
 import { isSelfHealingEnabled } from '../../../../utils/helpers.js';
 import { SelfHealingMode } from '@superglue/client';
 
 vi.mock('axios');
-vi.mock('axios');
 vi.mock('openai');
-vi.mock('../integrations/integration-manager.js');
-vi.mock('../llm/language-model.js');
-vi.mock('./logs.js');
-vi.mock('./api.js', async () => {
-  const actual = await vi.importActual('./api.js');
-  return {
-    ...(actual as Object),
-    callAxios: vi.fn()
-  };
-});
-const mockedTools = api as Mocked<typeof api>;
+
+const { callAxios, runStepConfig } = httpModule;
 
 describe('api utility functions', () => {
 
@@ -61,7 +50,7 @@ describe('API Utilities', () => {
   });
 
   afterEach(() => {
-    vi.resetAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('runStepConfig', () => {
@@ -79,12 +68,12 @@ describe('API Utilities', () => {
     it('should make successful API call', async () => {
       const mockResponse = {
         status: 200,
-        data: { result: 'success' },
+        data: Buffer.from(JSON.stringify({ result: 'success' })),
         statusText: 'OK',
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
+      (axios as any).mockResolvedValueOnce(mockResponse);
 
       const result = await runStepConfig({ config: testEndpoint, payload: testPayload, credentials: testCredentials, options: testOptions });
 
@@ -101,27 +90,27 @@ describe('API Utilities', () => {
       } as ApiConfig;
 
       const mockResponses = [
-        { status: 200, data: [{ id: 1 }, { id: 2 }], statusText: 'OK', headers: {}, config: {} as any },
-        { status: 200, data: [{ id: 3 }], statusText: 'OK', headers: {}, config: {} as any }
+        { status: 200, data: Buffer.from(JSON.stringify([{ id: 1 }, { id: 2 }])), statusText: 'OK', headers: {}, config: {} as any },
+        { status: 200, data: Buffer.from(JSON.stringify([{ id: 3 }])), statusText: 'OK', headers: {}, config: {} as any }
       ];
 
-      mockedTools.callAxios
-        .mockResolvedValueOnce({ response: mockResponses[0], retriesAttempted: 0, lastFailureStatus: undefined })
-        .mockResolvedValueOnce({ response: mockResponses[1], retriesAttempted: 0, lastFailureStatus: undefined });
+      (axios as any)
+        .mockResolvedValueOnce(mockResponses[0])
+        .mockResolvedValueOnce(mockResponses[1]);
 
       const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {} });
 
       expect(result.data).toHaveLength(3);
       expect(result.data).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
-      expect(mockedTools.callAxios).toHaveBeenCalledTimes(2);
+      expect(axios).toHaveBeenCalledTimes(2);
     });
 
     it('should handle offset-based pagination', async () => {
       const config = {
         ...testEndpoint,
         queryParams: {
-          offset: "{offset}",
-          limit: "{limit}"
+          offset: "<<offset>>",
+          limit: "<<limit>>"
         },
         pagination: {
           type: PaginationType.OFFSET_BASED,
@@ -130,30 +119,28 @@ describe('API Utilities', () => {
       } as ApiConfig;
 
       const mockResponses = [
-        { status: 200, data: [{ id: 1 }, { id: 2 }], statusText: 'OK', headers: {}, config: {} as any },
-        { status: 200, data: [{ id: 3 }], statusText: 'OK', headers: {}, config: {} as any }
+        { status: 200, data: Buffer.from(JSON.stringify([{ id: 1 }, { id: 2 }])), statusText: 'OK', headers: {}, config: {} as any },
+        { status: 200, data: Buffer.from(JSON.stringify([{ id: 3 }])), statusText: 'OK', headers: {}, config: {} as any }
       ];
 
-      mockedTools.callAxios
-        .mockResolvedValueOnce({ response: mockResponses[0], retriesAttempted: 0, lastFailureStatus: undefined })
-        .mockResolvedValueOnce({ response: mockResponses[1], retriesAttempted: 0, lastFailureStatus: undefined });
+      (axios as any)
+        .mockResolvedValueOnce(mockResponses[0])
+        .mockResolvedValueOnce(mockResponses[1]);
 
       const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {} });
 
       expect(result.data).toHaveLength(3);
-      expect(mockedTools.callAxios).toHaveBeenNthCalledWith(
+      expect(axios).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({
           params: { offset: "0", limit: "2" }
-        }),
-        expect.any(Object)
+        })
       );
-      expect(mockedTools.callAxios).toHaveBeenNthCalledWith(
+      expect(axios).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({
           params: { offset: "2", limit: "2" }
-        }),
-        expect.any(Object)
+        })
       );
     });
 
@@ -171,33 +158,32 @@ describe('API Utilities', () => {
       const mockResponses = [
         {
           status: 200,
-          data: {
+          data: Buffer.from(JSON.stringify({
             data: [{ id: 1 }, { id: 2 }],
             meta: { next_cursor: 'cursor123' }
-          },
+          })),
           statusText: 'OK',
           headers: {},
           config: {} as any
         },
         {
           status: 200,
-          data: {
+          data: Buffer.from(JSON.stringify({
             data: [{ id: 3 }],
             meta: { next_cursor: null }
-          },
+          })),
           statusText: 'OK',
           headers: {},
           config: {} as any
         }
       ];
 
-      mockedTools.callAxios
-        .mockResolvedValueOnce({ response: mockResponses[0], retriesAttempted: 0, lastFailureStatus: undefined })
-        .mockResolvedValueOnce({ response: mockResponses[1], retriesAttempted: 0, lastFailureStatus: undefined });
+      (axios as any)
+        .mockResolvedValueOnce(mockResponses[0])
+        .mockResolvedValueOnce(mockResponses[1]);
 
       const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {} });
 
-      // Without dataPath, responses are merged via smartMergeResponses
       expect(result.data).toEqual({
         data: [{ id: 1 }, { id: 2 }, { id: 3 }],
         meta: { next_cursor: null }
@@ -215,20 +201,20 @@ describe('API Utilities', () => {
 
       const sameResponse = {
         status: 200,
-        data: [{ id: 1 }, { id: 2 }],
+        data: Buffer.from(JSON.stringify([{ id: 1 }, { id: 2 }])),
         statusText: 'OK',
         headers: {},
         config: {} as any
       };
 
-      mockedTools.callAxios
-        .mockResolvedValueOnce({ response: sameResponse, retriesAttempted: 0, lastFailureStatus: undefined })
-        .mockResolvedValueOnce({ response: sameResponse, retriesAttempted: 0, lastFailureStatus: undefined }); // Same data returned
+      (axios as any)
+        .mockResolvedValueOnce(sameResponse)
+        .mockResolvedValueOnce(sameResponse);
 
       const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {} });
 
-      expect(result.data).toHaveLength(2); // Should only include unique data
-      expect(mockedTools.callAxios).toHaveBeenCalledTimes(2);
+      expect(result.data).toHaveLength(2);
+      expect(axios).toHaveBeenCalledTimes(2);
     });
 
     it('should stop after 500 iterations', async () => {
@@ -243,19 +229,17 @@ describe('API Utilities', () => {
         }
       } as ApiConfig;
 
-      // Mock 501 responses to test the loop limit
-      const mockResponse = {
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: {} as any
-      };
       for (let i = 0; i < 505; i++) {
-        mockedTools.callAxios.mockResolvedValueOnce({ response: { ...mockResponse, data: [{ id: i }] }, retriesAttempted: 0, lastFailureStatus: undefined });
+        (axios as any).mockResolvedValueOnce({ 
+          status: 200, 
+          data: Buffer.from(JSON.stringify([{ id: i }])), 
+          statusText: 'OK', 
+          headers: {}, 
+          config: {} as any 
+        });
       }
       const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {} });
-      // Should stop at 500 iterations (as defined in the code)
-      expect(mockedTools.callAxios).toHaveBeenCalledTimes(500);
+      expect(axios).toHaveBeenCalledTimes(500);
     });
 
     it('if 2 responses are the same, stop pagination', async () => {
@@ -270,47 +254,44 @@ describe('API Utilities', () => {
         }
       } as ApiConfig;
 
-      // Mock 501 responses to test the loop limit
       const mockResponse = {
         status: 200,
-        data: [{ id: 1 }],
+        data: Buffer.from(JSON.stringify([{ id: 1 }])),
         statusText: 'OK',
         headers: {},
         config: {} as any
       };
 
-      mockedTools.callAxios.mockResolvedValue({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
+      (axios as any).mockResolvedValue(mockResponse);
 
       const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {} });
 
-      // Should stop at 500 iterations (as defined in the code)
-      expect(mockedTools.callAxios).toHaveBeenCalledTimes(2);
+      expect(axios).toHaveBeenCalledTimes(2);
     });
 
     it('should handle error responses', async () => {
       const errorResponse = {
         status: 400,
-        data: null,
-        error: 'Bad Request',
+        data: Buffer.from('Bad Request'),
         statusText: 'Bad Request',
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce({ response: errorResponse, retriesAttempted: 0, lastFailureStatus: undefined });
+      (axios as any).mockResolvedValue(errorResponse);
 
-      await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {} }))
+      await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: { retries: 0 } }))
         .rejects.toThrow(/API call failed/);
     });
 
     it('should handle HTML error responses', async () => {
       const htmlResponse = {
         status: 200,
-        data: '<!DOCTYPE html><html><body>Error page</body></html>',
+        data: Buffer.from('<!DOCTYPE html><html><body>Error page</body></html>'),
         statusText: 'OK',
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce({ response: htmlResponse, retriesAttempted: 0, lastFailureStatus: undefined } );
+      (axios as any).mockResolvedValueOnce(htmlResponse);
 
       await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/Received HTML response/);
@@ -324,8 +305,8 @@ describe('API Utilities', () => {
       } as ApiConfig;
 
       const graphqlErrorResponse = {
-        status: 200,  // GraphQL often returns 200 even with errors
-        data: {
+        status: 200,
+        data: Buffer.from(JSON.stringify({
           errors: [
             {
               message: 'Field "test" not found',
@@ -334,50 +315,51 @@ describe('API Utilities', () => {
             }
           ],
           data: null
-        },
+        })),
         statusText: 'OK',
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce({ response: graphqlErrorResponse, retriesAttempted: 0, lastFailureStatus: undefined });
+      (axios as any).mockResolvedValueOnce(graphqlErrorResponse);
 
       await expect(runStepConfig({ config: config, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/appears to be an error/i);
     });
 
     it('should not flag benign 2xx responses with similar-sounding keys', async () => {
+      const mockData = {
+        profile: 'ok',
+        errorCount: 0,
+        stats: { failureProbability: 0 },
+        items: [],
+        failedItems: []
+      };
       const mockResponse = {
         status: 200,
-        data: {
-          profile: 'ok',
-          errorCount: 0,
-          stats: { failureProbability: 0 },
-          items: [],
-          failedItems: []
-        },
+        data: Buffer.from(JSON.stringify(mockData)),
         statusText: 'OK',
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
+      (axios as any).mockResolvedValueOnce(mockResponse);
 
       const result = await runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {} });
       expect(result.statusCode).toBe(200);
-      expect(result.data).toEqual(mockResponse.data);
+      expect(result.data).toEqual(mockData);
     });
 
     it('should flag 2xx responses with nested error_message keys', async () => {
       const mockResponse = {
         status: 200,
-        data: {
+        data: Buffer.from(JSON.stringify({
           data: { id: 1 },
           details: { error_message: 'boom' }
-        },
+        })),
         statusText: 'OK',
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
+      (axios as any).mockResolvedValueOnce(mockResponse);
 
       await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/appears to be an error/i);
@@ -386,15 +368,15 @@ describe('API Utilities', () => {
     it('should flag 2xx responses with top-level failure key', async () => {
       const mockResponse = {
         status: 200,
-        data: {
+        data: Buffer.from(JSON.stringify({
           failure: true,
           result: null
-        },
+        })),
         statusText: 'OK',
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
+      (axios as any).mockResolvedValueOnce(mockResponse);
 
       await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/appears to be an error/i);
@@ -403,36 +385,37 @@ describe('API Utilities', () => {
     it('should flag 2xx responses if any nested errors key exists (non-empty)', async () => {
       const mockResponse = {
         status: 200,
-        data: {
+        data: Buffer.from(JSON.stringify({
           data: { id: 1 },
           meta: { errors: [{ message: 'boom' }] }
-        },
+        })),
         statusText: 'OK',
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
+      (axios as any).mockResolvedValueOnce(mockResponse);
 
       await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {} }))
         .rejects.toThrow(/appears to be an error/i);
     });
 
     it('should NOT flag 2xx responses when nested errors key is an empty array', async () => {
+      const mockData = {
+        data: { id: 1 },
+        meta: { errors: [] }
+      };
       const mockResponse = {
         status: 200,
-        data: {
-          data: { id: 1 },
-          meta: { errors: [] }
-        },
+        data: Buffer.from(JSON.stringify(mockData)),
         statusText: 'OK',
         headers: {},
         config: {} as any
       };
-      mockedTools.callAxios.mockResolvedValueOnce({ response: mockResponse, retriesAttempted: 0, lastFailureStatus: undefined });
+      (axios as any).mockResolvedValueOnce(mockResponse);
 
       const result = await runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {} });
       expect(result.statusCode).toBe(200);
-      expect(result.data).toEqual(mockResponse.data);
+      expect(result.data).toEqual(mockData);
     });
   });
 
