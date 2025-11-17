@@ -26,7 +26,7 @@
 
 ## Quick Start
 ### Option 1: Sign up to [superglue](https://app.superglue.cloud) and start building immediately
-### Option 2: [Self-host](https://docs.superglue.cloud/guides/self-hosting) for maximum control and customization
+### Option 2: [Self-host](https://docs.superglue.cloud/getting-started/setup#self-hosted) for maximum control and customization
 
 ## Interfaces
 
@@ -40,7 +40,7 @@ You can interact with superglue via three interfaces, regardless of whether you 
 **superglue SDK**
 
   - The superglue SDK offers CRUD functionality for all superglue data types and lets you execute tools programmatically
-  - For more detailed information on SDK functionality, check our [SDK guide](https://docs.superglue.cloud/agent-builders/sdk-integration)
+  - For more detailed information on SDK functionality, check our [SDK guide](https://docs.superglue.cloud/sdk/overview)
 
     Install via npm:
     ```bash
@@ -59,7 +59,7 @@ You can interact with superglue via three interfaces, regardless of whether you 
     ```
 
 **MCP Server**
-  - Look at our [MCP Guide](https://docs.superglue.cloud/agent-builders/quickstart#mcp-recommended-for-agents) for full installation instructions
+  - Look at our [MCP Guide](https://docs.superglue.cloud/mcp/using-the-mcp) for full installation instructions
   - The MCP interface gives you discoverability tools and execution capabilities for your pre-built superglue tools
   - The MCP does not support ad-hoc integration creation or tool building
   - Use MCP in production for agentic use cases and internal GPTs to access and execute pre-built tools with full control
