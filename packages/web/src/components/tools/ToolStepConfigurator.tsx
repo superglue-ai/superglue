@@ -35,7 +35,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
     const [localIntegrations, setLocalIntegrations] = useState<Integration[]>([]);
     const [headersText, setHeadersText] = useState('');
     const [queryParamsText, setQueryParamsText] = useState('');
-    const [isEditingInstruction, setIsEditingInstruction] = useState(false);
     const [instructionCopied, setInstructionCopied] = useState(false);
 
     const config = useConfig();
@@ -188,63 +187,33 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 Step Instruction
                                                 <HelpTooltip text="AI-generated instruction for this step. This describes what the step does and how it should behave." />
                                             </Label>
-                                            {!isEditingInstruction && (
-                                                <div className="flex items-center gap-1">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6"
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(step.apiConfig.instruction || '');
-                                                            setInstructionCopied(true);
-                                                            setTimeout(() => setInstructionCopied(false), 1500);
-                                                        }}
-                                                        disabled={disabled || !step.apiConfig.instruction}
-                                                        title="Copy instruction"
-                                                    >
-                                                        {instructionCopied ? (
-                                                            <Check className="h-3 w-3 text-green-600" />
-                                                        ) : (
-                                                            <Copy className="h-3 w-3" />
-                                                        )}
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6"
-                                                        onClick={() => setIsEditingInstruction(true)}
-                                                        disabled={disabled}
-                                                        title="Edit instruction"
-                                                    >
-                                                        <Edit className="h-3 w-3" />
-                                                    </Button>
-                                                </div>
-                                            )}
+                                            <div className="flex items-center gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(step.apiConfig.instruction || '');
+                                                        setInstructionCopied(true);
+                                                        setTimeout(() => setInstructionCopied(false), 1500);
+                                                    }}
+                                                    disabled={disabled || !step.apiConfig.instruction}
+                                                    title="Copy instruction"
+                                                >
+                                                    {instructionCopied ? (
+                                                        <Check className="h-3 w-3 text-green-600" />
+                                                    ) : (
+                                                        <Copy className="h-3 w-3" />
+                                                    )}
+                                                </Button>
+                                            </div>
                                         </div>
                                         
-                                        {isEditingInstruction ? (
-                                            <Textarea
-                                                value={step.apiConfig.instruction || ''}
-                                                onChange={(e) => handleImmediateEdit((s) => ({
-                                                    ...s,
-                                                    apiConfig: {
-                                                        ...s.apiConfig,
-                                                        instruction: e.target.value
-                                                    }
-                                                }))}
-                                                onBlur={() => setIsEditingInstruction(false)}
-                                                className="text-xs h-20 mt-1 focus:ring-0 focus:ring-offset-0"
-                                                placeholder="Describe what this step should do..."
-                                                disabled={disabled}
-                                                autoFocus
-                                            />
-                                        ) : (
-                                            <div className="text-xs mt-1 p-3 rounded-md border bg-muted/30 min-h-[5rem] whitespace-pre-wrap">
-                                                {step.apiConfig.instruction || (
-                                                    <span className="text-muted-foreground italic">Describe what this step should do...</span>
-                                                )}
-                                            </div>
-                                        )}
+                                        <div className="text-xs mt-1 p-3 rounded-md border bg-muted/30 min-h-[5rem] whitespace-pre-wrap">
+                                            {step.apiConfig.instruction || (
+                                                <span className="text-muted-foreground italic">Describe what this step should do...</span>
+                                            )}
+                                        </div>
                                         
                                     </div>
                                     <div className="flex gap-2">
