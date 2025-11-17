@@ -64,6 +64,7 @@ const ConfigTable = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIntegration, setSelectedIntegration] = useState<string>("all");
   const [manuallyOpenedStepper, setManuallyOpenedStepper] = useState(false);
+  const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
 
   useEffect(() => {
     const combinedConfigs = [
@@ -246,8 +247,14 @@ const ConfigTable = () => {
 
   const totalPages = Math.ceil(total / pageSize);
 
+  useEffect(() => {
+    if (!isInitiallyLoading && !hasCompletedInitialLoad) {
+      setHasCompletedInitialLoad(true);
+    }
+  }, [isInitiallyLoading, hasCompletedInitialLoad]);
+
   const shouldShowStepper = manuallyOpenedStepper || (
-    !isInitiallyLoading && 
+    hasCompletedInitialLoad && 
     allConfigs.length === 0
   );
 
