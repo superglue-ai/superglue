@@ -78,6 +78,7 @@ export const SpotlightStepCard = React.memo(({
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
     const [outputViewMode, setOutputViewMode] = useState<'preview' | 'schema'>('preview');
     const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
+    const [pendingStepOverride, setPendingStepOverride] = useState<any>(undefined);
     const [didFormatLoopSelector, setDidFormatLoopSelector] = useState(false);
     
     const DATA_SELECTOR_DEBOUNCE_MS = 400;
@@ -207,6 +208,7 @@ export const SpotlightStepCard = React.memo(({
 
     const handleRunStepClick = () => {
         if (isFirstStep && !isPayloadValid) {
+            setPendingStepOverride(undefined);
             setShowInvalidPayloadDialog(true);
         } else if (onExecuteStep) {
             onExecuteStep();
@@ -214,10 +216,11 @@ export const SpotlightStepCard = React.memo(({
     };
 
     const handleRunFirstClick = async () => {
+        const modifiedStep = { ...step, loopMaxIters: 1 };
         if (isFirstStep && !isPayloadValid) {
+            setPendingStepOverride(modifiedStep);
             setShowInvalidPayloadDialog(true);
         } else if (onExecuteStep) {
-            const modifiedStep = { ...step, loopMaxIters: 1 };
             await onExecuteStep(modifiedStep);
         }
     };
@@ -613,8 +616,9 @@ export const SpotlightStepCard = React.memo(({
                         <AlertDialogAction onClick={() => {
                             setShowInvalidPayloadDialog(false);
                             if (onExecuteStep) {
-                                onExecuteStep();
+                                onExecuteStep(pendingStepOverride);
                             }
+                            setPendingStepOverride(undefined);
                         }}>
                             Run Anyway
                         </AlertDialogAction>
