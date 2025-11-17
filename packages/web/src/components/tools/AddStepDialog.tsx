@@ -40,7 +40,11 @@ export function AddStepDialog({
     const [activeTab, setActiveTab] = useState<'scratch' | 'tool'>('scratch');
     const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const { tools, isInitiallyLoading, isRefreshing } = useTools();
+    const { tools, isInitiallyLoading, isRefreshing, refreshTools } = useTools();
+
+    useEffect(() => {
+        refreshTools();
+    }, []);
 
     useEffect(() => {
         if (open && defaultId) {
