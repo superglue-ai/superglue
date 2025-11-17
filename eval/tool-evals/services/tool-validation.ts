@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import { join } from "node:path";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { LanguageModel } from "@core/llm/language-model.js";
+import { LanguageModel } from "@core/llm/llm-base-model.js";
 
 const MAX_OUTPUT_FOR_LLM = 3000;
 

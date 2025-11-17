@@ -1,5 +1,5 @@
 import type { AssistantModelMessage, SystemModelMessage, Tool, ToolModelMessage, UserModelMessage } from "ai";
-import { ToolCall, ToolCallResult, ToolDefinition } from "../execute/tools.js";
+import { LLMToolCall, LLMToolCallResult, LLMToolDefinition } from "./llm-tool-utils.js";
 import { AiSdkModel } from "./ai-sdk-model.js";
 
 export type LLMMessage = SystemModelMessage | UserModelMessage | AssistantModelMessage | ToolModelMessage;
@@ -11,7 +11,7 @@ export interface LLM {
 }
 
 export interface LLMToolResponse {
-    toolCall: ToolCall | null;
+    toolCall: LLMToolCall | null;
     textResponse?: string;
     messages: LLMMessage[];
     responseId?: string;
@@ -19,16 +19,16 @@ export interface LLMToolResponse {
 
 export interface LLMAgentResponse {
     finalResult: any;
-    toolCalls: ToolCall[];
+    toolCalls: LLMToolCall[];
     executionTrace: Array<{
-        toolCall: ToolCall;
-        result: ToolCallResult;
+        toolCall: LLMToolCall;
+        result: LLMToolCallResult;
     }>;
     messages: LLMMessage[];
     responseId?: string;
     success: boolean;
     lastSuccessfulToolCall?: {
-        toolCall: ToolCall;
+        toolCall: LLMToolCall;
         result: any;
         additionalData?: any;
     };
@@ -45,12 +45,16 @@ export type LLMObjectResponse<T> =
     | { success: true; response: T; messages: LLMMessage[] }
     | { success: false; response: string; messages: LLMMessage[] };
 
+export interface LLMToolWithContext<TContext = any> {
+    toolDefinition: LLMToolDefinition | Record<string, Tool>;
+    toolContext: TContext;
+}
+
 export interface LLMObjectGeneratorInput {
     messages: LLMMessage[];
     schema: any;
     temperature?: number;
-    tools?: (ToolDefinition | Record<string, Tool>)[];
-    toolContext?: any;
+    tools?: LLMToolWithContext[];
     toolChoice?: 'auto' | 'required' | 'none' | { type: 'tool'; toolName: string };
 }
 

@@ -2,9 +2,9 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
-import { BaseToolContext, ToolDefinition, ToolImplementation, WorkflowExecutionContext } from "../execute/tools.js";
-import { sanitizeInstructionSuggestions } from "./tools.js";
-import { LanguageModel, LLMMessage } from "../llm/language-model.js";
+import { BaseLLMToolContext, LLMToolDefinition, LLMToolImplementation } from "./llm-tool-utils.js";
+import { sanitizeInstructionSuggestions } from "../utils/helpers.js";
+import { LanguageModel, LLMMessage } from "./llm-base-model.js";
 import { GENERATE_INSTRUCTIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { Integration } from "@superglue/client";
 
@@ -22,7 +22,11 @@ export function getWebSearchTool(): any {
     }
 }
 
-export const searchDocumentationToolImplementation: ToolImplementation<WorkflowExecutionContext> = async (args, context) => {
+export interface searchDocumentationToolContext extends BaseLLMToolContext {
+  integration: Integration;
+}
+
+export const searchDocumentationToolImplementation: LLMToolImplementation<searchDocumentationToolContext> = async (args, context) => {
     const { query } = args;
     const { integration } = context;
 
@@ -45,7 +49,6 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
             };
         }
 
-        // Use DocumentationSearch for targeted search
         const documentationSearch = new DocumentationSearch({ orgId: context.orgId });
         const searchResults = documentationSearch.extractRelevantSections(
             integration.documentation,
@@ -55,7 +58,6 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
             integration.openApiSchema
         );
 
-        // Return the full search results
         return {
             success: true,
             data: {
@@ -73,7 +75,7 @@ export const searchDocumentationToolImplementation: ToolImplementation<WorkflowE
     }
 };
 
-export const searchDocumentationToolDefinition: ToolDefinition = {
+export const searchDocumentationToolDefinition: LLMToolDefinition = {
     name: "search_documentation",
     description: "Search documentation for specific information about API structure, endpoints, authentication patterns, etc. Use this when you need to understand how an API works, what endpoints are available, or how to authenticate. Returns relevant documentation excerpts matching your search query.",
     arguments: {
@@ -89,11 +91,11 @@ export const searchDocumentationToolDefinition: ToolDefinition = {
     execute: searchDocumentationToolImplementation
 };
 
-export interface InstructionGenerationContext extends BaseToolContext {
+export interface InstructionGenerationContext extends BaseLLMToolContext {
     integrations: Integration[];
 }
   
-export const generateInstructionsImplementation: ToolImplementation<InstructionGenerationContext> = async (args, context) => {
+export const generateInstructionsImplementation: LLMToolImplementation<InstructionGenerationContext> = async (args, context) => {
     const { integrations } = context;
   
     if (!integrations || integrations.length === 0) {
@@ -155,7 +157,7 @@ export const generateInstructionsImplementation: ToolImplementation<InstructionG
     };
 };
 
-export const generateInstructionsDefinition: ToolDefinition = {
+export const generateInstructionsDefinition: LLMToolDefinition = {
     name: "generate_instructions",
     description: "Generate specific, implementable workflow instructions for the available integrations.",
     arguments: {
