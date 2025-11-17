@@ -1,3 +1,5 @@
+'use client';
+
 import { usePathname } from "next/navigation";
 import { IntegrationsProvider } from "./integrations-context";
 import { ToolsProvider } from "./tools-context";

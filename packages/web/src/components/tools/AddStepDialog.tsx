@@ -1,5 +1,3 @@
-import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
 import { Button } from '@/src/components/ui/button';
 import {
     Dialog,
@@ -234,7 +232,7 @@ export function AddStepDialog({
                     </Button>
                     <Button
                         onClick={activeTab === 'scratch' ? handleConfirmScratch : handleConfirmTool}
-                        disabled={isInitiallyLoading || isRefreshing}
+                        disabled={isInitiallyLoading}
                     >
                         {activeTab === 'scratch' ? 'Add Step' : 'Import Steps'}
                     </Button>
