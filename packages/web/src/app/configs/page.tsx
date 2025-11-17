@@ -65,7 +65,7 @@ const ConfigTable = () => {
   const [selectedIntegration, setSelectedIntegration] = useState<string>("all");
   const [showToolStepper, setShowToolStepper] = useState(false);
 
-  const mergeToolsAndApiConfigs = () => {
+  useEffect(() => {
     const combinedConfigs = [
       ...legacyApiConfigs.map(item => ({ ...item, type: 'api' as const })),
       ...tools.map((item: any) => ({ ...item, type: 'tool' as const }))
@@ -80,22 +80,19 @@ const ConfigTable = () => {
     setAllConfigs(sortedConfigs);
     setTotal(sortedConfigs.length);
     setPage(0);
-  };
-
-  useEffect(() => {
-    mergeToolsAndApiConfigs();
   }, [tools, legacyApiConfigs]);
 
-  const refreshLegacyApiConfigs = useCallback(async () => {
-    const client = createSuperglueClient(config.superglueEndpoint);
-    const apiConfigs = await client.listApis(1000, 0);
-    setLegacyApiConfigs(apiConfigs.items);
-  }, [config.superglueEndpoint]);
+  const refreshConfigs = useCallback(async () => { 
+      refreshTools();
+    
+      const client = createSuperglueClient(config.superglueEndpoint);
+      const apiConfigs = await client.listApis(1000, 0);
+      setLegacyApiConfigs(apiConfigs.items);
+  }, [config.superglueEndpoint, refreshTools]);
 
-  const refreshConfigs = useCallback(async () => {      
-      await refreshLegacyApiConfigs();
-      await refreshTools();
-  }, [config.superglueEndpoint, refreshLegacyApiConfigs, refreshTools]);
+  useEffect(() => {
+    refreshConfigs();
+  }, [config.superglueEndpoint]);
 
   useEffect(() => {
     const filtered = allConfigs.filter(config => {
