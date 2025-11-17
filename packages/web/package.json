@@ -47,7 +47,6 @@
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "react-virtualized": "^9.22.6",
-        "rehackt": "^0.1.0",
         "shadcn-ui": "^0.9.5",
         "simple-icons": "^14.12.3",
         "tailwind-merge": "^2.6.0",
