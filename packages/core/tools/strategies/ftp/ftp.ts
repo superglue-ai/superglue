@@ -18,6 +18,14 @@ interface FTPOperation {
   recursive?: boolean;
 }
 
+function safeDecodeURIComponent(str: string): string {
+  try {
+    return decodeURIComponent(str);
+  } catch {
+    return str;
+  }
+}
+
 export function parseConnectionUrl(urlString: string): {
   protocol: 'ftp' | 'ftps' | 'sftp';
   host: string;
@@ -72,8 +80,8 @@ export function parseConnectionUrl(urlString: string): {
     protocol,
     host: url.hostname,
     port: url.port ? parseInt(url.port) : defaultPorts[protocol],
-    username: url.username || undefined,
-    password: url.password || undefined,
+    username: url.username ? safeDecodeURIComponent(url.username) : undefined,
+    password: url.password ? safeDecodeURIComponent(url.password) : undefined,
     basePath: url.pathname && url.pathname !== '/' ? url.pathname : undefined
   };
 }
