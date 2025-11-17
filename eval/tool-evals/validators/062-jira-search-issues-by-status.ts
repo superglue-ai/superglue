@@ -27,9 +27,8 @@ export default function validate(result: any, payload: any): void {
     assert(typeof status.count === 'number', 'Each status must have a "count" number');
 
     const expected = expectedStatuses[status.status as keyof typeof expectedStatuses];
-    if (expected) {
-      assert(status.count === expected, `Status "${status.status}" should have ${expected} issues, got ${status.count}`);
-    }
+    assert(expected !== undefined, `Unexpected status: "${status.status}". Expected one of: ${Object.keys(expectedStatuses).join(', ')}`);
+    assert(status.count === expected, `Status "${status.status}" should have ${expected} issues, got ${status.count}`);
   }
 
   assert(result.in_progress_issues.length === 5, `Expected 5 'In Progress' issues, got ${result.in_progress_issues.length}`);
