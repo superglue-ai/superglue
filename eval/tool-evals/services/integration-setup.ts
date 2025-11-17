@@ -51,7 +51,7 @@ export class IntegrationSetupService {
         credentials: integrationConfig.credentials,
       };
     }
-    const scopedCredentials = Object.entries(integrationConfig.credentials).reduce(
+    const scopedCredentials = Object.entries(integrationConfig.credentials ?? {}).reduce(
       (acc, [key, value]) => {
         acc[`${integrationConfig.id}_${key}`] = value;
         return acc;
