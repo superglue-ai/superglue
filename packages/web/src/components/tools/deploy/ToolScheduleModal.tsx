@@ -409,7 +409,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                               <>
                                 <CommandEmpty>No tools found.</CommandEmpty>
                                 <CommandGroup>
-                                  {tools.filter(tool => tool.id !== toolId).map((tool) => (
+                                  {tools.filter(tool => tool.id !== toolId && tool.steps?.length > 0).map((tool) => (
                                     <CommandItem
                                       key={tool.id}
                                       value={tool.id}
