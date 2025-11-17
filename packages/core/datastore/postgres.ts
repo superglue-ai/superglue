@@ -17,13 +17,19 @@ export class PostgresService implements DataStore {
             min: 2,
             ssl: config.ssl === false || config.host.includes('localhost') || config.host.includes('127.0.0.1') ? false : { rejectUnauthorized: false }
         });
-
         this.pool.on('error', (err) => {
-            console.error('postgres pool error:', err);
+            logMessage('error', 'postgres pool error: ' + JSON.stringify(err));
         });
 
         this.pool.on('connect', () => {
             logMessage('debug', '🐘 postgres connected');
+        });
+
+        this.pool.connect().catch((err) => {
+            logMessage('error', '[CRITICAL] Postgres connection failed: ' + JSON.stringify(err));
+            process.exit(1);
+        }).then((client) => {
+            client.release();
         });
 
         this.initializeTables();
