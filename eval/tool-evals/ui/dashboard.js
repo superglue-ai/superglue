@@ -27,17 +27,15 @@ document.getElementById('benchmarkFile').addEventListener('change', (event) => {
     const reader = new FileReader();
     reader.onload = (e) => {
         try {
-            const csvText = e.target.result;
-            benchmarkData = parseBenchmarkCsv(csvText);
-            console.log('Benchmark loaded:', benchmarkData.length, 'rows');
+            benchmarkData = JSON.parse(e.target.result);
+            console.log('Benchmark loaded:', benchmarkData.results.length, 'attempts');
             
-            // Re-render if we have current data
             if (currentData) {
                 renderDashboard(currentData);
             }
             hideError();
         } catch (error) {
-            showError('Failed to parse benchmark CSV: ' + error.message);
+            showError('Failed to parse benchmark JSON: ' + error.message);
         }
     };
     reader.readAsText(file);
@@ -80,7 +78,7 @@ function checkForNewTools(data) {
     }
     
     const currentToolIds = [...new Set(data.results.map(r => r.tool))];
-    const benchmarkToolIds = new Set(benchmarkData.map(b => b.tool_id));
+    const benchmarkToolIds = new Set(benchmarkData.results.map(r => r.tool));
     
     const newTools = currentToolIds.filter(id => !benchmarkToolIds.has(id));
     
@@ -101,10 +99,10 @@ function renderBenchmarkSummary(data) {
     }
     
     const currentToolIds = [...new Set(data.results.map(r => r.tool))];
-    const benchmarkToolIds = new Set(benchmarkData.map(b => b.tool_id));
+    const benchmarkToolIds = new Set(benchmarkData.results.map(r => r.tool));
     const commonToolIds = currentToolIds.filter(id => benchmarkToolIds.has(id));
     
-    const totalBenchmarkTools = new Set(benchmarkData.map(b => b.tool_id)).size;
+    const totalBenchmarkTools = benchmarkToolIds.size;
     
     summaryEl.innerHTML = `
         <strong>Benchmark Comparison:</strong> Comparing your metrics against the same <strong>${commonToolIds.length}</strong> tools 
@@ -113,24 +111,14 @@ function renderBenchmarkSummary(data) {
     summaryEl.style.display = 'block';
 }
 
-// Calculate and render metrics
-function renderMetrics(data) {
-    const { config, results } = data;
-    
-    // Config info
-    document.getElementById('llm').textContent = `${config.llmProvider} / ${config.backendModel}`;
-    document.getElementById('validationLlm').textContent = `${config.validationLlmProvider} / ${config.validationLlmModel}`;
-    document.getElementById('attemptsPerMode').textContent = config.attemptsPerMode;
-    
-    // Calculate metrics
+// Calculate metrics from results
+function calculateMetrics(results) {
     const oneShotAttempts = results.filter(r => !r.selfHealingEnabled);
     const selfHealingAttempts = results.filter(r => r.selfHealingEnabled);
     
-    // Group by tool to calculate per-tool success
     const toolsById = groupByTool(results);
     const totalTools = Object.keys(toolsById).length;
     
-    // One-shot success: tools that succeeded in one-shot mode
     const oneShotSuccessfulTools = Object.values(toolsById).filter(attempts => {
         return attempts.some(a => !a.selfHealingEnabled && a.overallValidationPassed === true);
     }).length;
@@ -139,7 +127,6 @@ function renderMetrics(data) {
     const oneShotAverageSuccessRate = calculateAverageOneShotSuccess(toolsById);
     const selfHealingAverageSuccessRate = calculateAverageSelfHealingSuccess(toolsById);
 
-    // Self-healing success: tools that succeeded in either one-shot OR self-healing
     const selfHealingSuccessfulTools = Object.values(toolsById).filter(attempts => {
         const oneShotSuccess = attempts.some(a => !a.selfHealingEnabled && a.overallValidationPassed === true);
         const selfHealingSuccess = attempts.some(a => a.selfHealingEnabled && a.overallValidationPassed === true);
@@ -147,34 +134,27 @@ function renderMetrics(data) {
     }).length;
     const selfHealingRate = totalTools > 0 ? (selfHealingSuccessfulTools / totalTools * 100) : null;
     
-    // Build times (convert to seconds)
     const buildTimes = results.filter(r => r.buildTime !== null).map(r => r.buildTime);
     const avgBuild = buildTimes.length > 0 ? (buildTimes.reduce((a, b) => a + b, 0) / buildTimes.length) : null;
     
-    // Execution times - one-shot
     const oneShotExecTimes = oneShotAttempts.filter(r => r.executionTime !== null).map(r => r.executionTime);
     const avgOneShotExec = oneShotExecTimes.length > 0 ? (oneShotExecTimes.reduce((a, b) => a + b, 0) / oneShotExecTimes.length) : null;
     
-    // Execution times - self-healing
     const selfHealingExecTimes = selfHealingAttempts.filter(r => r.executionTime !== null).map(r => r.executionTime);
     const avgSelfHealingExec = selfHealingExecTimes.length > 0 ? (selfHealingExecTimes.reduce((a, b) => a + b, 0) / selfHealingExecTimes.length) : null;
     
-    // Calculate benchmark metrics if available
-    let benchmarkMetrics = null;
-    if (benchmarkData) {
-        const currentToolIds = [...new Set(results.map(r => r.tool))];
-        const filteredBenchmark = benchmarkData.filter(b => currentToolIds.includes(b.tool_id));
-        benchmarkMetrics = calculateBenchmarkMetrics(filteredBenchmark);
-    }
-    
-    // Display with deltas - showing average as primary, "at least one" as secondary
-    displaySuccessMetricWithAverage('oneShotSuccessRate', oneShotAverageSuccessRate, oneShotRate, 
-        benchmarkMetrics?.oneShotRate, `${oneShotSuccessfulTools}/${totalTools}`, true);
-    displaySuccessMetricWithAverage('selfHealingSuccessRate', selfHealingAverageSuccessRate, selfHealingRate,
-        benchmarkMetrics?.selfHealingRate, `${selfHealingSuccessfulTools}/${totalTools}`, true);
-    displayMetricWithDelta('avgBuildTime', avgBuild, benchmarkMetrics?.avgBuild, 's', null, false, true);
-    displayMetricWithDelta('avgExecOneShot', avgOneShotExec, benchmarkMetrics?.avgOneShotExec, 's', null, false, true);
-    displayMetricWithDelta('avgExecSelfHealing', avgSelfHealingExec, benchmarkMetrics?.avgSelfHealingExec, 's', null, false, true);
+    return {
+        oneShotRate,
+        oneShotAverageSuccessRate,
+        oneShotSuccessfulTools,
+        selfHealingRate,
+        selfHealingAverageSuccessRate,
+        selfHealingSuccessfulTools,
+        totalTools,
+        avgBuild,
+        avgOneShotExec,
+        avgSelfHealingExec
+    };
 }
 
 function calculateAverageOneShotSuccess(toolsById) {
@@ -217,47 +197,34 @@ function calculateAverageSelfHealingSuccess(toolsById) {
     return sum / successRates.length;
 }
 
-function calculateBenchmarkMetrics(filteredBenchmark) {
-    const toolIds = [...new Set(filteredBenchmark.map(b => b.tool_id))];
+// Calculate and render metrics
+function renderMetrics(data) {
+    const { config, results } = data;
     
-    // One-shot success rate
-    const oneShotSuccessCount = toolIds.filter(toolId => {
-        const oneShotRow = filteredBenchmark.find(b => b.tool_id === toolId && b.mode === 'one-shot');
-        return oneShotRow && oneShotRow.success === true;
-    }).length;
-    const oneShotRate = toolIds.length > 0 ? (oneShotSuccessCount / toolIds.length * 100) : null;
+    // Config info
+    document.getElementById('llm').textContent = `${config.llmProvider} / ${config.backendModel}`;
+    document.getElementById('validationLlm').textContent = `${config.validationLlmProvider} / ${config.validationLlmModel}`;
+    document.getElementById('attemptsPerMode').textContent = config.attemptsPerMode;
     
-    // Self-healing success rate (succeeded in any mode)
-    const selfHealingSuccessCount = toolIds.filter(toolId => {
-        const toolRows = filteredBenchmark.filter(b => b.tool_id === toolId);
-        return toolRows.some(row => row.success === true);
-    }).length;
-    const selfHealingRate = toolIds.length > 0 ? (selfHealingSuccessCount / toolIds.length * 100) : null;
+    // Calculate current metrics
+    const metrics = calculateMetrics(results);
     
-    // Average build time
-    const buildTimes = filteredBenchmark.filter(b => b.avg_build_time_ms !== null).map(b => b.avg_build_time_ms);
-    const avgBuild = buildTimes.length > 0 ? (buildTimes.reduce((a, b) => a + b, 0) / buildTimes.length) : null;
+    // Calculate benchmark metrics if available
+    let benchmarkMetrics = null;
+    if (benchmarkData) {
+        const currentToolIds = [...new Set(results.map(r => r.tool))];
+        const filteredBenchmarkResults = benchmarkData.results.filter(r => currentToolIds.includes(r.tool));
+        benchmarkMetrics = calculateMetrics(filteredBenchmarkResults);
+    }
     
-    // Average execution times
-    const oneShotExecTimes = filteredBenchmark
-        .filter(b => b.mode === 'one-shot' && b.avg_exec_time_ms !== null)
-        .map(b => b.avg_exec_time_ms);
-    const avgOneShotExec = oneShotExecTimes.length > 0 ? 
-        (oneShotExecTimes.reduce((a, b) => a + b, 0) / oneShotExecTimes.length) : null;
-    
-    const selfHealingExecTimes = filteredBenchmark
-        .filter(b => b.mode === 'self-healing' && b.avg_exec_time_ms !== null)
-        .map(b => b.avg_exec_time_ms);
-    const avgSelfHealingExec = selfHealingExecTimes.length > 0 ?
-        (selfHealingExecTimes.reduce((a, b) => a + b, 0) / selfHealingExecTimes.length) : null;
-    
-    return {
-        oneShotRate,
-        selfHealingRate,
-        avgBuild,
-        avgOneShotExec,
-        avgSelfHealingExec
-    };
+    // Display with deltas - showing average as primary, "at least one" as secondary
+    displaySuccessMetricWithAverage('oneShotSuccessRate', metrics.oneShotAverageSuccessRate, metrics.oneShotRate, 
+        benchmarkMetrics?.oneShotRate, `${metrics.oneShotSuccessfulTools}/${metrics.totalTools}`, true);
+    displaySuccessMetricWithAverage('selfHealingSuccessRate', metrics.selfHealingAverageSuccessRate, metrics.selfHealingRate,
+        benchmarkMetrics?.selfHealingRate, `${metrics.selfHealingSuccessfulTools}/${metrics.totalTools}`, true);
+    displayMetricWithDelta('avgBuildTime', metrics.avgBuild, benchmarkMetrics?.avgBuild, 's', null, false, true);
+    displayMetricWithDelta('avgExecOneShot', metrics.avgOneShotExec, benchmarkMetrics?.avgOneShotExec, 's', null, false, true);
+    displayMetricWithDelta('avgExecSelfHealing', metrics.avgSelfHealingExec, benchmarkMetrics?.avgSelfHealingExec, 's', null, false, true);
 }
 
 function displaySuccessMetricWithAverage(elementId, averageRate, atLeastOneRate, benchmark, suffix, higherIsBetter) {
@@ -369,17 +336,17 @@ function groupByTool(results) {
 function getToolStatusChange(toolId, oneShotAttempts, selfHealingAttempts) {
     if (!benchmarkData) return null;
     
-    const benchmarkRows = benchmarkData.filter(b => b.tool_id === toolId);
-    if (benchmarkRows.length === 0) return null;
+    const benchmarkAttempts = benchmarkData.results.filter(r => r.tool === toolId);
+    if (benchmarkAttempts.length === 0) return null;
     
     const changes = [];
     
     // Check one-shot mode
     if (oneShotAttempts.length > 0) {
-        const benchmarkOneShot = benchmarkRows.find(b => b.mode === 'one-shot');
-        if (benchmarkOneShot) {
+        const benchmarkOneShot = benchmarkAttempts.filter(a => !a.selfHealingEnabled);
+        if (benchmarkOneShot.length > 0) {
             const currentSuccess = oneShotAttempts.some(a => a.overallValidationPassed === true);
-            const benchmarkSuccess = benchmarkOneShot.success === true;
+            const benchmarkSuccess = benchmarkOneShot.some(a => a.overallValidationPassed === true);
             
             if (benchmarkSuccess && !currentSuccess) {
                 const currentFailure = getFailureStage(getFurthestAttempt(oneShotAttempts));
@@ -400,10 +367,10 @@ function getToolStatusChange(toolId, oneShotAttempts, selfHealingAttempts) {
     
     // Check self-healing mode
     if (selfHealingAttempts.length > 0) {
-        const benchmarkSelfHealing = benchmarkRows.find(b => b.mode === 'self-healing');
-        if (benchmarkSelfHealing) {
+        const benchmarkSelfHealing = benchmarkAttempts.filter(a => a.selfHealingEnabled);
+        if (benchmarkSelfHealing.length > 0) {
             const currentSuccess = selfHealingAttempts.some(a => a.overallValidationPassed === true);
-            const benchmarkSuccess = benchmarkSelfHealing.success === true;
+            const benchmarkSuccess = benchmarkSelfHealing.some(a => a.overallValidationPassed === true);
             
             if (benchmarkSuccess && !currentSuccess) {
                 const currentFailure = getFailureStage(getFurthestAttempt(selfHealingAttempts));
@@ -424,7 +391,6 @@ function getToolStatusChange(toolId, oneShotAttempts, selfHealingAttempts) {
     
     if (changes.length === 0) return null;
     
-    // Return the most severe change with all details
     const hasRegression = changes.some(c => c.type === 'regression');
     return {
         type: hasRegression ? 'regression' : 'improvement',
@@ -845,79 +811,20 @@ function copyToClipboard(elementId) {
     });
 }
 
-// Load benchmark CSV (only works when served via HTTP, not file://)
-async function loadBenchmarkCsv() {
+// Load benchmark JSON (only works when served via HTTP, not file://)
+async function loadBenchmarkJson() {
     try {
-        const response = await fetch('../data/benchmark/tool-eval-benchmark.csv');
+        const response = await fetch('../data/benchmark/tool-eval-benchmark.json');
         if (!response.ok) {
             console.log('No benchmark file available - use file input to load manually');
             return;
         }
         
-        const csvText = await response.text();
-        benchmarkData = parseBenchmarkCsv(csvText);
-        console.log('Benchmark auto-loaded:', benchmarkData.length, 'rows');
+        benchmarkData = await response.json();
+        console.log('Benchmark auto-loaded:', benchmarkData.results.length, 'attempts');
     } catch (error) {
         console.log('Benchmark auto-load failed (expected with file:// protocol) - use file input to load manually');
     }
-}
-
-function parseBenchmarkCsv(csvText) {
-    const lines = csvText.trim().split('\n');
-    if (lines.length < 2) return [];
-    
-    const headers = lines[0].split(',');
-    const rows = [];
-    
-    for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        
-        const values = parseCsvLine(line);
-        if (values.length < 6) continue;
-        
-        const row = {
-            tool_id: unquote(values[0]),
-            tool_name: unquote(values[1]),
-            mode: values[2],
-            success: values[3] === 'true',
-            avg_build_time_ms: parseFloat(values[4]) || null,
-            avg_exec_time_ms: parseFloat(values[5]) || null
-        };
-        
-        rows.push(row);
-    }
-    
-    return rows;
-}
-
-function parseCsvLine(line) {
-    const values = [];
-    let current = '';
-    let inQuotes = false;
-    
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        
-        if (char === '"') {
-            inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-            values.push(current);
-            current = '';
-        } else {
-            current += char;
-        }
-    }
-    
-    values.push(current);
-    return values;
-}
-
-function unquote(str) {
-    if (str.startsWith('"') && str.endsWith('"')) {
-        return str.slice(1, -1).replace(/""/g, '"');
-    }
-    return str;
 }
 
 // Auto-load latest result if available (optional)
@@ -937,6 +844,6 @@ async function tryLoadLatestResult() {
 }
 
 // Load benchmark and try to auto-load on page load
-loadBenchmarkCsv();
+loadBenchmarkJson();
 tryLoadLatestResult();
 
