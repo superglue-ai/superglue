@@ -63,8 +63,7 @@ const ConfigTable = () => {
   const [deployToolId, setDeployToolId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIntegration, setSelectedIntegration] = useState<string>("all");
-  const [showToolStepper, setShowToolStepper] = useState(false);
-  const [hasCheckedInitialState, setHasCheckedInitialState] = useState(false);
+  const [manuallyOpenedStepper, setManuallyOpenedStepper] = useState(false);
 
   useEffect(() => {
     const combinedConfigs = [
@@ -148,7 +147,7 @@ const ConfigTable = () => {
   }, [searchTerm, selectedIntegration]);
 
   const handleTool = () => {
-    setShowToolStepper(true);
+    setManuallyOpenedStepper(true);
   };
 
   const handleEdit = (e: React.MouseEvent, id: string) => {
@@ -247,19 +246,17 @@ const ConfigTable = () => {
 
   const totalPages = Math.ceil(total / pageSize);
 
-  useEffect(() => {
-    if (!hasCheckedInitialState && !isInitiallyLoading) {
-      const hasNoConfigs = allConfigs.length === 0 && !isRefreshing;
-      setShowToolStepper(hasNoConfigs);
-      setHasCheckedInitialState(true);
-    }
-  }, [allConfigs, isInitiallyLoading, isRefreshing, hasCheckedInitialState]);
+  const shouldShowStepper = manuallyOpenedStepper || (
+    !isInitiallyLoading && 
+    !isRefreshing && 
+    allConfigs.length === 0
+  );
 
-  if (showToolStepper) {
+  if (shouldShowStepper) {
     return (
       <div className="max-w-none w-full min-h-full">
         <ToolCreateStepper onComplete={() => {
-          setShowToolStepper(false);
+          setManuallyOpenedStepper(false);
           refreshConfigs();
         }} />
       </div>
