@@ -15,6 +15,7 @@ import { Label } from '../../ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { HelpTooltip } from '../../utils/HelpTooltip';
+import { useTools } from '@/src/app/tools-context';
 
 const DEFAULT_SCHEDULES = [
   { value: '*/5 * * * *', label: 'Every 5 minutes' },
@@ -55,9 +56,8 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
   const [webhookUrl, setWebhookUrl] = useState<string>('');
   const [webhookType, setWebhookType] = useState<'url' | 'tool'>('url');
   const [selectedWebhookTool, setSelectedWebhookTool] = useState<string>('');
-  const [tools, setTools] = useState<Tool[]>([]);
-  const [loadingTools, setLoadingTools] = useState(false);
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
+  const { tools, isInitiallyLoading, isRefreshing, refreshTools } = useTools();
 
   const config = useConfig();
   const { toast } = useToast();
@@ -112,20 +112,6 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
       setIsCustomCronValid(true);
     }
   }, [scheduleSelectedItem, customCronExpression]);
-
-  const loadTools = async () => {
-    if (tools.length > 0) return;
-    setLoadingTools(true);
-    try {
-      const client = createSuperglueClient(config.superglueEndpoint);
-      const result = await client.listWorkflows(1000, 0);
-      setTools(result.items?.filter(tool => tool.steps?.length > 0) || []);
-    } catch (error) {
-      console.error('Error loading tools:', error);
-    } finally {
-      setLoadingTools(false);
-    }
-  };
 
   const validateJson = (jsonString: string) => {
     try {
@@ -230,7 +216,6 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
       setIsRetriesValid(!isNaN(numValue) && numValue >= 0 && numValue <= 10);
     }
   };
-
 
   return (
     isOpen && (
@@ -406,7 +391,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                           role="combobox"
                           aria-expanded={toolDropdownOpen}
                           className="w-full justify-between font-normal"
-                          onClick={() => !toolDropdownOpen && loadTools()}
+                          onClick={() => !toolDropdownOpen && refreshTools()}
                         >
                           {selectedWebhookTool || "Select tool..."}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -416,7 +401,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                         <Command>
                           <CommandInput placeholder="Search tools..." />
                           <CommandList>
-                            {loadingTools ? (
+                            {isInitiallyLoading || isRefreshing ? (
                               <div className="flex items-center justify-center py-6">
                                 <Loader2 className="h-5 w-5 animate-spin" />
                               </div>
@@ -424,7 +409,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                               <>
                                 <CommandEmpty>No tools found.</CommandEmpty>
                                 <CommandGroup>
-                                  {tools.filter(tool => tool.id !== toolId).map((tool) => (
+                                  {tools.filter(tool => tool.id !== toolId && tool.steps?.length > 0).map((tool) => (
                                     <CommandItem
                                       key={tool.id}
                                       value={tool.id}

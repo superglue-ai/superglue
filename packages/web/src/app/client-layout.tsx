@@ -7,9 +7,9 @@ import { LogSidebar } from '../components/utils/LogSidebar';
 import { ServerMonitor } from '../components/utils/ServerMonitor';
 import { ConfigProvider } from './config-context';
 import { jetbrainsMono, jetbrainsSans } from './fonts';
-import { IntegrationsProvider } from './integrations-context';
 import { CSPostHogProvider } from './providers';
 import { useToken } from '../hooks/use-token';
+import { ConditionalDataProvider } from './conditional-data-provider';
 
 interface Props {
   children: React.ReactNode
@@ -18,14 +18,16 @@ interface Props {
 
 export function ClientWrapper({ children, config }: Props) {
   const pathname = usePathname()
-  const isAuthPage = pathname?.startsWith('/auth')
+  const isAuthPage = pathname?.startsWith('/auth');
   const token = useToken();
 
   return (
     <ConfigProvider config={config}>
-      <IntegrationsProvider>
-        <CSPostHogProvider>
-          <div className={`${jetbrainsSans.variable} ${jetbrainsMono.variable} antialiased`}>
+      <CSPostHogProvider>
+        <ConditionalDataProvider>
+          <div
+            className={`${jetbrainsSans.variable} ${jetbrainsMono.variable} antialiased`}
+          >
             {isAuthPage ? (
               children
             ) : (
@@ -52,8 +54,8 @@ export function ClientWrapper({ children, config }: Props) {
             <Toaster />
             {token && <ServerMonitor />}
           </div>
-        </CSPostHogProvider>
-      </IntegrationsProvider>
+        </ConditionalDataProvider>
+      </CSPostHogProvider>
     </ConfigProvider>
-  )
+  );
 }
