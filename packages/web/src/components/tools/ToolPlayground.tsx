@@ -1165,7 +1165,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           className="h-9 px-4"
         >
           <Play className="h-4 w-4" />
-          Safely Run all Steps
+          Run all Steps
           </Button>
       )}
       {!hideRebuildButton && (
