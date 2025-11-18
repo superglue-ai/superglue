@@ -34,90 +34,68 @@ import { tokenRegistry } from '@/src/lib/token-registry';
 import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
 import { ToolDeployModal } from '@/src/components/tools/deploy/ToolDeployModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
-import { loadFromCache, saveToCache } from '@/src/lib/cache-utils';
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
 import { ApiConfig, Integration, SuperglueClient, Workflow as Tool } from '@superglue/client';
 import { Check, CloudUpload, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
-
-const CACHE_PREFIX = 'superglue-tools-cache';
-
-interface CachedTools {
-  configs: (ApiConfig | Tool)[];
-  timestamp: number;
-}
+import { useTools } from '../tools-context';
+import { createSuperglueClient } from '@/src/lib/client-utils';
 
 const ConfigTable = () => {
   const router = useRouter();
-  const [allConfigs, setAllConfigs] = React.useState<(ApiConfig | Tool)[]>([]);
-  const [configs, setConfigs] = React.useState<(ApiConfig | Tool)[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [total, setTotal] = React.useState(0);
-  const [page, setPage] = React.useState(0);
-  const [pageSize] = React.useState(20);
   const config = useConfig();
+  const {tools, isInitiallyLoading, isRefreshing, refreshTools} = useTools();
   const { integrations } = useIntegrations();
-  const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | Tool | null>(null);
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
-  const [copiedId, setCopiedId] = React.useState<string | null>(null);
-  const [deployToolId, setDeployToolId] = React.useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = React.useState("");
-  const [selectedIntegration, setSelectedIntegration] = React.useState<string>("all");
-  const [showToolStepper, setShowToolStepper] = React.useState(false);
 
+  const [allConfigs, setAllConfigs] = useState<(ApiConfig | Tool)[]>([]);
+  const [legacyApiConfigs, setLegacyApiConfigs] = useState<ApiConfig[]>([]);
+  const [currentConfigs, setCurrentConfigs] = useState<(ApiConfig | Tool)[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [pageSize] = useState(20);
 
-  const refreshConfigs = React.useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      const superglueClient = new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: tokenRegistry.getToken()
-      });
+  const [configToDelete, setConfigToDelete] = useState<ApiConfig | Tool | null>(null);
+  const [copiedDetails, setCopiedDetails] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deployToolId, setDeployToolId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedIntegration, setSelectedIntegration] = useState<string>("all");
+  const [manuallyOpenedStepper, setManuallyOpenedStepper] = useState(false);
+  const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
 
-      const [apiConfigs, toolConfigs] = await Promise.all([
-        superglueClient.listApis(1000, 0),
-        superglueClient.listWorkflows(1000, 0),
-      ]);
+  useEffect(() => {
+    const combinedConfigs = [
+      ...legacyApiConfigs.map(item => ({ ...item, type: 'api' as const })),
+      ...tools.map((item: any) => ({ ...item, type: 'tool' as const }))
+    ];
 
-      const combinedConfigs = [
-        ...apiConfigs.items.map(item => ({ ...item, type: 'api' as const })),
-        ...toolConfigs.items.map((item: any) => ({ ...item, type: 'tool' as const }))
-      ].sort((a, b) => {
-        const dateA = new Date(a.updatedAt || a.createdAt).getTime();
-        const dateB = new Date(b.updatedAt || b.createdAt).getTime();
-        return dateB - dateA;
-      });
+    const sortedConfigs = combinedConfigs.sort((a, b) => {
+      const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+      const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+      return dateB - dateA;
+    });
 
-      setAllConfigs(combinedConfigs);
-      setTotal(combinedConfigs.length);
-      setPage(0);
+    setAllConfigs(sortedConfigs);
+    setTotal(sortedConfigs.length);
+    setPage(0);
+  }, [tools, legacyApiConfigs]);
 
-      saveToCache(CACHE_PREFIX, {
-        configs: combinedConfigs,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      console.error('Error fetching configs:', error);
-    } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-    }
+  const refreshConfigs = useCallback(async () => { 
+      refreshTools();
+    
+      const client = createSuperglueClient(config.superglueEndpoint);
+      const apiConfigs = await client.listApis(1000, 0);
+      setLegacyApiConfigs(apiConfigs.items);
+  }, [config.superglueEndpoint, refreshTools]);
+
+  useEffect(() => {
+    refreshConfigs();
   }, [config.superglueEndpoint]);
 
-  React.useEffect(() => {
-    const cachedData = loadFromCache<CachedTools>(CACHE_PREFIX);
-    if (cachedData?.configs) {
-      setAllConfigs(cachedData.configs);
-      setTotal(cachedData.configs.length);
-      setLoading(false);
-    }
-    refreshConfigs();
-  }, [refreshConfigs]);
-
-  React.useEffect(() => {
+  useEffect(() => {
     const filtered = allConfigs.filter(config => {
       if (!config) return false;
 
@@ -160,19 +138,18 @@ const ConfigTable = () => {
 
     const start = page * pageSize;
     const end = start + pageSize;
-    setConfigs(filtered.slice(start, end));
+    setCurrentConfigs(filtered.slice(start, end));
   }, [page, allConfigs, searchTerm, selectedIntegration, pageSize]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (searchTerm || selectedIntegration !== "all") {
       setPage(0);
     }
   }, [searchTerm, selectedIntegration]);
 
   const handleTool = () => {
-    setShowToolStepper(true);
+    setManuallyOpenedStepper(true);
   };
-
 
   const handleEdit = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -237,7 +214,6 @@ const ConfigTable = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const [copiedDetails, setCopiedDetails] = React.useState<string | null>(null);
 
   const handleCopyDetails = (e: React.MouseEvent, text: string) => {
     e.stopPropagation();
@@ -271,19 +247,26 @@ const ConfigTable = () => {
 
   const totalPages = Math.ceil(total / pageSize);
 
-  if (showToolStepper) {
+  useEffect(() => {
+    if (!isInitiallyLoading && !hasCompletedInitialLoad) {
+      setHasCompletedInitialLoad(true);
+    }
+  }, [isInitiallyLoading, hasCompletedInitialLoad]);
+
+  const shouldShowStepper = manuallyOpenedStepper || (
+    hasCompletedInitialLoad && 
+    allConfigs.length === 0
+  );
+
+  if (shouldShowStepper) {
     return (
       <div className="max-w-none w-full min-h-full">
         <ToolCreateStepper onComplete={() => {
-          setShowToolStepper(false);
+          setManuallyOpenedStepper(false);
           refreshConfigs();
         }} />
       </div>
     )
-  }
-
-  if (allConfigs.length === 0 && !loading && !isRefreshing) {
-    setShowToolStepper(true);
   }
 
   return (
@@ -354,20 +337,20 @@ const ConfigTable = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading && allConfigs.length === 0 ? (
+            {isInitiallyLoading && allConfigs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-24 text-center">
                   <Loader2 className="h-6 w-6 animate-spin text-foreground inline-block" />
                 </TableCell>
               </TableRow>
-            ) : configs.length === 0 ? (
+            ) : currentConfigs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                   No results found
                 </TableCell>
               </TableRow>
             ) : (
-              configs.map((config) => {
+              currentConfigs.map((config) => {
                 const configType = (config as any).type;
                 const isApi = configType === 'api';
                 const isTool = configType === 'tool';

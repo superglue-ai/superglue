@@ -1,5 +1,3 @@
-import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
 import { Button } from '@/src/components/ui/button';
 import {
     Dialog,
@@ -12,10 +10,10 @@ import {
 import { Input } from '@/src/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { cn } from '@/src/lib/general-utils';
-import { ExecutionStep, SuperglueClient, Workflow as Tool } from '@superglue/client';
+import { ExecutionStep } from '@superglue/client';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { createSuperglueClient } from '@/src/lib/client-utils';
+import { useTools } from '@/src/app/tools-context';
 
 interface AddStepDialogProps {
     open: boolean;
@@ -38,11 +36,13 @@ export function AddStepDialog({
     const [instruction, setInstruction] = useState('');
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState<'scratch' | 'tool'>('scratch');
-    const [tools, setTools] = useState<Tool[]>([]);
-    const [loadingTools, setLoadingTools] = useState(false);
     const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const config = useConfig();
+    const { tools, isInitiallyLoading, isRefreshing, refreshTools } = useTools();
+
+    useEffect(() => {
+        refreshTools();
+    }, []);
 
     useEffect(() => {
         if (open && defaultId) {
@@ -51,26 +51,6 @@ export function AddStepDialog({
             setError('');
         }
     }, [open, defaultId]);
-
-    useEffect(() => {
-        if (open && activeTab === 'tool' && tools.length === 0) {
-            loadTools();
-        }
-    }, [open, activeTab]);
-
-    const loadTools = async () => {
-        setLoadingTools(true);
-        try {
-            const client = createSuperglueClient(config.superglueEndpoint);
-            const result = await client.listWorkflows(1000, 0);
-            setTools(result.items?.filter(tool => tool.steps?.length > 0) || []);
-        } catch (error) {
-            console.error('Error loading tools:', error);
-            setError('Failed to load tools');
-        } finally {
-            setLoadingTools(false);
-        }
-    };
 
     const handleOpenChange = (newOpen: boolean) => {
         if (!newOpen) {
@@ -186,7 +166,7 @@ export function AddStepDialog({
                     </TabsContent>
 
                     <TabsContent value="tool" className="space-y-4 py-4">
-                        {loadingTools ? (
+                        {isInitiallyLoading || isRefreshing ? (
                             <div className="flex items-center justify-center py-8">
                                 <Loader2 className="h-6 w-6 animate-spin" />
                             </div>
@@ -252,7 +232,7 @@ export function AddStepDialog({
                     </Button>
                     <Button
                         onClick={activeTab === 'scratch' ? handleConfirmScratch : handleConfirmTool}
-                        disabled={loadingTools}
+                        disabled={isInitiallyLoading}
                     >
                         {activeTab === 'scratch' ? 'Add Step' : 'Import Steps'}
                     </Button>
