@@ -989,6 +989,53 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     handleStepEdit(step.id, updatedStep, true);
   };
 
+  const handleAutoHealStep = async () => {
+    if (fixStepIndex === null) return;
+    
+    try {
+      setIsExecutingStep(fixStepIndex);
+      const client = createSuperglueClient(config.superglueEndpoint);
+
+      const single = await executeSingleStep(
+        client,
+        { id: toolId, steps } as any,
+        fixStepIndex,
+        computedPayload,
+        stepResultsMap,
+        true, // Enable self-healing
+      );
+
+      const sid = steps[fixStepIndex].id;
+      const normalized = computeStepOutput(single);
+      const isFailure = !single.success;
+
+      if (single.updatedStep) {
+        setSteps(prevSteps =>
+          prevSteps.map((step, i) => i === fixStepIndex ? single.updatedStep : step)
+        );
+        
+        toast({
+          title: "Step auto-healed successfully",
+          description: "The step configuration has been updated and executed successfully.",
+        });
+      }
+
+      if (isFailure) {
+        setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+        setCompletedSteps(prev => prev.filter(id => id !== sid));
+        throw new Error(single.error || 'Auto-heal failed');
+      } else {
+        setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+        setFailedSteps(prev => prev.filter(id => id !== sid));
+      }
+      setStepResultsMap(prev => ({ ...prev, [sid]: normalized.output }));
+      setFocusStepId(sid);
+      setShowStepOutputSignal(Date.now());
+    } finally {
+      setIsExecutingStep(undefined);
+    }
+  };
+
   const handleExecuteTransform = async (schemaStr: string, transformStr: string, selfHealing: boolean = false) => {
     try {
       if (selfHealing) {
@@ -1271,6 +1318,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           integrationId={steps[fixStepIndex]?.integrationId}
           errorMessage={stepResultsMap[steps[fixStepIndex]?.id]?.error}
           onSuccess={handleFixStepSuccess}
+          onAutoHeal={handleAutoHealStep}
         />
       )}
 

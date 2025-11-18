@@ -10,7 +10,7 @@ import {
 } from '@/src/components/ui/dialog';
 import { Label } from '@/src/components/ui/label';
 import { Textarea } from '@/src/components/ui/textarea';
-import { Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, Sparkles } from 'lucide-react';
 import { useGenerateStepConfig } from './hooks/use-generate-step-config';
 import { useToast } from '@/src/hooks/use-toast';
 
@@ -22,6 +22,7 @@ interface FixStepDialogProps {
     integrationId?: string;
     errorMessage?: string;
     onSuccess: (newConfig: any) => void;
+    onAutoHeal?: () => Promise<void>;
 }
 
 export function FixStepDialog({
@@ -32,8 +33,11 @@ export function FixStepDialog({
     integrationId,
     errorMessage,
     onSuccess,
+    onAutoHeal,
 }: FixStepDialogProps) {
     const [instruction, setInstruction] = useState(step?.apiConfig?.instruction || '');
+    const [isAutoHealing, setIsAutoHealing] = useState(false);
+    const [showExperimental, setShowExperimental] = useState(false);
     const { generateConfig, isGenerating, error } = useGenerateStepConfig();
     const { toast } = useToast();
 
@@ -48,7 +52,6 @@ export function FixStepDialog({
         }
 
         try {
-            // Update the step config with the new instruction before sending to SDK
             const updatedStepConfig = {
                 ...step?.apiConfig,
                 instruction: instruction.trim(),
@@ -77,22 +80,57 @@ export function FixStepDialog({
         }
     };
 
+    const handleAutoHeal = async () => {
+        if (!onAutoHeal) return;
+        
+        try {
+            setIsAutoHealing(true);
+            await onAutoHeal();
+            handleClose();
+        } catch (err: any) {
+            toast({
+                title: 'Auto-heal failed',
+                description: err.message || 'Failed to automatically fix the step.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsAutoHealing(false);
+        }
+    };
+
     const handleClose = () => {
         setInstruction(step?.apiConfig?.instruction || '');
+        setIsAutoHealing(false);
+        setShowExperimental(false);
         onClose();
     };
+
+    const isProcessing = isGenerating || isAutoHealing;
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Fix Step</DialogTitle>
+                    <DialogTitle>Fix Step Configuration</DialogTitle>
                     <DialogDescription>
-                        Update the step instruction. The AI will regenerate the step configuration based on your updated instruction.
+                        Update the instruction and regenerate the step configuration.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">
+                    {errorMessage && (
+                        <div className="space-y-2">
+                            <Label className="text-sm font-medium text-destructive">
+                                Error Details
+                            </Label>
+                            <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3">
+                                <p className="text-sm font-mono break-words">
+                                    {errorMessage}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="space-y-2">
                         <Label htmlFor="instruction" className="text-sm font-medium">
                             Step Instruction
@@ -102,45 +140,76 @@ export function FixStepDialog({
                             value={instruction}
                             onChange={(e) => setInstruction(e.target.value)}
                             placeholder="Describe what this step should do..."
-                            className="min-h-[200px] text-sm"
+                            className="min-h-[150px] text-sm"
+                            disabled={isProcessing}
                             autoFocus
                         />
                         <p className="text-xs text-muted-foreground">
-                            Edit the instruction to describe what changes you want to make to this step.
+                            Edit the instruction to describe what changes you want to make.
                         </p>
                     </div>
 
-                    {errorMessage && (
-                        <div className="space-y-2">
-                            <Label className="text-sm font-medium text-destructive">
-                                Previous Error
-                            </Label>
-                            <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3">
-                                <p className="text-xs text-muted-foreground mb-1">
-                                    This error will be sent to the AI to help fix the step:
-                                </p>
-                                <p className="text-sm font-mono break-words">
-                                    {errorMessage}
-                                </p>
-                            </div>
+                    <Button
+                        onClick={handleRebuild}
+                        disabled={isProcessing || !instruction.trim()}
+                        className="w-full"
+                    >
+                        {isGenerating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isGenerating ? 'Rebuilding...' : 'Rebuild Configuration'}
+                    </Button>
+
+                    {onAutoHeal && (
+                        <div>
+                            <button
+                                type="button"
+                                onClick={() => setShowExperimental(!showExperimental)}
+                                className="w-full flex items-center gap-1.5 py-2 hover:bg-muted/50 transition-colors rounded text-left"
+                                disabled={isProcessing}
+                            >
+                                {showExperimental ? (
+                                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                ) : (
+                                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                                <span className="text-sm text-muted-foreground">Try Iterative Execution and Healing</span>
+                            </button>
+                            
+                            {showExperimental && (
+                                <div className="pt-2 pb-3 space-y-3">
+                                    <p className="text-xs text-muted-foreground">
+                                        AI will execute the step repeatedly, analyzing errors and adjusting the configuration until it succeeds or reaches the retry limit.
+                                    </p>
+                                    
+                                    <div className="space-y-1.5">
+                                        <p className="text-xs font-medium">Risks:</p>
+                                        <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                                            <li>Makes multiple API calls with potentially incorrect configurations</li>
+                                        </ul>
+                                    </div>
+
+                                    <Button
+                                        onClick={handleAutoHeal}
+                                        disabled={isProcessing}
+                                        variant="outline"
+                                        className="w-full"
+                                        size="sm"
+                                    >
+                                        {isAutoHealing && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                                        {isAutoHealing ? 'Healing...' : 'Start Iterative Healing'}
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
 
                 <DialogFooter>
                     <Button
-                        variant="outline"
+                        variant="ghost"
                         onClick={handleClose}
-                        disabled={isGenerating}
+                        disabled={isProcessing}
                     >
                         Cancel
-                    </Button>
-                    <Button
-                        onClick={handleRebuild}
-                        disabled={isGenerating || !instruction.trim()}
-                    >
-                        {isGenerating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Rebuild Step
                     </Button>
                 </DialogFooter>
             </DialogContent>
