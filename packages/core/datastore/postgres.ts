@@ -29,7 +29,7 @@ export class PostgresService implements DataStore {
             logMessage('error', '[CRITICAL] Postgres connection failed', { error: err });
             process.exit(1);
         }).then((client) => {
-            client.release();
+            client?.release();
         });
 
         this.initializeTables();
