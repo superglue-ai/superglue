@@ -85,7 +85,6 @@ export type GenerateStepConfigContextInput = {
     integrationDocumentation: string;
     integrationSpecificInstructions: string;
     errorMessage?: string;
-    editInstruction?: string;
 };
 
 export type GenerateStepConfigContextOptions = {

@@ -102,7 +102,8 @@ export async function executeToolStepByStep(
   payload: any,
   onStepComplete?: (stepIndex: number, result: StepExecutionResult) => void,
   selfHealing: boolean = false,
-  shouldStop?: () => boolean
+  shouldStop?: () => boolean,
+  onBeforeStep?: (stepIndex: number, step: any) => Promise<boolean>
 ): Promise<ToolExecutionState> {
   const state: ToolExecutionState = {
     originalTool: tool,
@@ -126,6 +127,16 @@ export async function executeToolStepByStep(
 
     state.currentStepIndex = i;
     const step = tool.steps[i];
+
+    // Check if we should pause before executing this step
+    if (onBeforeStep) {
+      const shouldContinue = await onBeforeStep(i, step);
+      if (!shouldContinue) {
+        state.isExecuting = false;
+        state.interrupted = true;
+        return state;
+      }
+    }
 
     const result = await executeSingleStep(
       client,

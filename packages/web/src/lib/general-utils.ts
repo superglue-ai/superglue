@@ -305,3 +305,28 @@ export function ensureSourceDataArrowFunction(code: string | undefined | null): 
   if (isValidSourceDataArrowFunction(text)) return text;
   return `(sourceData) => {\n${text}\n}`;
 }
+
+/**
+ * Wraps a loop selector function to limit the number of iterations
+ * @param loopSelectorCode The original loop selector code
+ * @param limit Maximum number of items to return (defaults to 1)
+ * @returns Wrapped code that limits the array to specified number of items
+ *
+ * @example
+ * const original = "(sourceData) => { return [1,2,3] }";
+ * const wrapped = wrapLoopSelectorWithLimit(original, 1);
+ * // Result: "(sourceData) => { const originalFunction = (sourceData) => { return [1,2,3] }; const out = originalFunction(sourceData); return Array.isArray(out) ? out.slice(0, 1) : out; }"
+ */
+export function wrapLoopSelectorWithLimit(loopSelectorCode: string | undefined | null, limit: number = 1): string {
+  if (!loopSelectorCode || !loopSelectorCode.trim()) {
+    return loopSelectorCode || '';
+  }
+
+  const trimmedCode = loopSelectorCode.trim();
+
+  return `(sourceData) => {
+  const originalFunction = ${trimmedCode};
+  const out = originalFunction(sourceData);
+  return Array.isArray(out) ? out.slice(0, ${limit}) : out;
+}`;
+}

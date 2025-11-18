@@ -13,12 +13,10 @@ import { generateStepConfig } from "../../tools/tool-step-builder.js";
 
 interface GenerateStepConfigArgs {
   integrationId?: string;
-  instruction: string;
   currentStepConfig?: Partial<ApiConfig>;
   stepInput?: Record<string, any>;
   credentials?: Record<string, string>;
   errorMessage?: string;
-  editInstruction?: string;
 }
 
 export const generateInstructionsResolver = async (
@@ -61,25 +59,27 @@ export const generateInstructionsResolver = async (
 
 export const generateStepConfigResolver = async (
   _: any,
-  { integrationId, instruction, currentStepConfig, stepInput, credentials, errorMessage, editInstruction }: GenerateStepConfigArgs,
+  { integrationId, currentStepConfig, stepInput, credentials, errorMessage }: GenerateStepConfigArgs,
   context: Context,
   info: GraphQLResolveInfo
-) => {
+): Promise<ApiConfig> => {
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    
+
+    // Extract instruction from currentStepConfig
+    const instruction = currentStepConfig?.instruction;
+    if (!instruction) {
+      throw new Error('Instruction is required in currentStepConfig');
+    }
+
     let integration: Integration | undefined;
     let integrationDocs = '';
     let integrationSpecificInstructions = '';
 
-    if (editInstruction && editInstruction.length < 100) {
-      logMessage('error', `Edit instruction must be at least 100 characters long`, metadata);
-      throw new Error('Edit instruction must be at least 100 characters long');
-    }
     if (errorMessage && errorMessage.length < 100) {
       throw new Error('Error message must be at least 100 characters long');
     }
-    
+
     if (integrationId) {
       try {
         logMessage('info', `Generating step config for integration ${integrationId}`, metadata);
@@ -93,11 +93,10 @@ export const generateStepConfigResolver = async (
         });
       }
     }
-    
-    const mode = errorMessage ? 'self-healing' 
-      : editInstruction ? 'edit' 
-      : 'create';
-    
+
+    // Mode is either 'self-healing' if there's an error, or 'edit' (since we're always editing based on updated instruction)
+    const mode = errorMessage ? 'self-healing' : 'edit';
+
     const userPrompt = getGenerateStepConfigContext({
       instruction,
       previousStepConfig: currentStepConfig,
@@ -105,8 +104,7 @@ export const generateStepConfigResolver = async (
       credentials,
       integrationDocumentation: integrationDocs,
       integrationSpecificInstructions: integrationSpecificInstructions,
-      errorMessage,
-      editInstruction
+      errorMessage
     }, { characterBudget: 50000, mode });
 
     const messages: LLMMessage[] = [
@@ -129,8 +127,15 @@ export const generateStepConfigResolver = async (
     if (!generateStepConfigResult.success || !generateStepConfigResult.config) {
       throw new Error(generateStepConfigResult.error || "No step config generated");
     }
-          
-    return generateStepConfigResult.config;
+
+    // Merge the generated config with the current config to ensure all required fields are present
+    const mergedConfig = {
+      ...currentStepConfig,
+      ...generateStepConfigResult.config,
+      id: currentStepConfig?.id || crypto.randomUUID(),
+    } as ApiConfig;
+
+    return mergedConfig;
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
       integrationId

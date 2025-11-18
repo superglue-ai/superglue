@@ -3,7 +3,7 @@
 import { useConfig } from "@/src/app/config-context";
 import { createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { computeStepOutput, computeToolPayload, removeFileKeysFromPayload } from "@/src/lib/general-utils";
+import { buildEvolvingPayload, computeStepOutput, computeToolPayload, removeFileKeysFromPayload, wrapLoopSelectorWithLimit } from "@/src/lib/general-utils";
 import { ExecutionStep, Integration, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
 import { generateDefaultFromSchema } from "@superglue/shared";
 import { Validator } from "jsonschema";
@@ -26,6 +26,8 @@ import { Button } from "../ui/button";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 import { ToolStepGallery } from "./ToolStepGallery";
 import { ToolDeployModal } from "./deploy/ToolDeployModal";
+import { FixStepDialog } from "./FixStepDialog";
+import { ModifyStepConfirmDialog } from "./ModifyStepConfirmDialog";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -160,8 +162,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
   }, [embedded, initialInstruction]);
   const [isExecutingStep, setIsExecutingStep] = useState<number | undefined>(undefined);
-  const [isFixingStep, setIsFixingStep] = useState<number | undefined>(undefined);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndex] = useState<number | undefined>(undefined);
+  const [showFixStepDialog, setShowFixStepDialog] = useState(false);
+  const [fixStepIndex, setFixStepIndex] = useState<number | null>(null);
   const [isStopping, setIsStopping] = useState(false);
   const [isRunningTransform, setIsRunningTransform] = useState(false);
   const [isFixingTransform, setIsFixingTransform] = useState(false);
@@ -176,6 +179,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [showToolBuilder, setShowToolBuilder] = useState(false);
   const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
   const [showDeployModal, setShowDeployModal] = useState(false);
+  const [showModifyStepConfirm, setShowModifyStepConfirm] = useState(false);
+  const [pendingModifyStepIndex, setPendingModifyStepIndex] = useState<number | null>(null);
+  const modifyStepResolveRef = useRef<((shouldContinue: boolean) => void) | null>(null);
 
   // Generate default payload once when schema is available if payload is empty
   useEffect(() => {
@@ -670,6 +676,45 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
   };
 
+  const handleBeforeStepExecution = async (stepIndex: number, step: any): Promise<boolean> => {
+    // Check if this step has the modify flag
+    if (step.modify === true) {
+      // Show confirmation dialog and wait for user response
+      return new Promise((resolve) => {
+        modifyStepResolveRef.current = resolve;
+        setPendingModifyStepIndex(stepIndex);
+        setShowModifyStepConfirm(true);
+      });
+    }
+    return true;
+  };
+
+  const handleModifyStepConfirm = () => {
+    setShowModifyStepConfirm(false);
+    setPendingModifyStepIndex(null);
+    if (modifyStepResolveRef.current) {
+      modifyStepResolveRef.current(true);
+      modifyStepResolveRef.current = null;
+    }
+  };
+
+  const handleModifyStepCancel = () => {
+    setShowModifyStepConfirm(false);
+    if (modifyStepResolveRef.current) {
+      modifyStepResolveRef.current(false);
+      modifyStepResolveRef.current = null;
+    }
+    // Focus on the step that was about to be executed
+    if (pendingModifyStepIndex !== null) {
+      const stepId = steps[pendingModifyStepIndex]?.id;
+      if (stepId) {
+        setFocusStepId(stepId);
+        setShowStepOutputSignal(Date.now());
+      }
+    }
+    setPendingModifyStepIndex(null);
+  };
+
   const executeTool = async () => {
     setLoading(true);
     // Fully clear any stale stop signals from a previous run (both modes)
@@ -730,7 +775,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           } catch { }
         },
         effectiveSelfHealing,
-        () => stopSignalRef.current
+        () => stopSignalRef.current,
+        handleBeforeStepExecution
       );
 
       // Always update steps with returned configuration (API may normalize/update even without self-healing)
@@ -860,7 +906,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         id: s.id,
         executionMode: s.executionMode,
         loopSelector: s.loopSelector,
-        loopMaxIters: s.loopMaxIters,
         integrationId: s.integrationId,
         apiConfig: s.apiConfig,
       };
@@ -901,33 +946,42 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     prevStepHashesRef.current = currentHashes;
   }, [steps]);
 
-  const executeStepByIdx = async (idx: number, selfHealing: boolean = false) => {
+  const executeStepByIdx = async (idx: number, limitIterations?: number) => {
     try {
-      if (selfHealing) {
-        setIsFixingStep(idx);
-      } else {
-        setIsExecutingStep(idx);
-      }
+      setIsExecutingStep(idx);
       const client = createSuperglueClient(config.superglueEndpoint);
+      
+      // Store original loop selector to restore it after execution
+      const originalLoopSelector = steps[idx]?.loopSelector;
+      
+      // Wrap loop selector if limit is specified (ephemeral, not saved to state)
+      const executionSteps = limitIterations && originalLoopSelector
+        ? steps.map((s, i) => i === idx ? { ...s, loopSelector: wrapLoopSelectorWithLimit(s.loopSelector, limitIterations) } : s)
+        : steps;
+
       const single = await executeSingleStep(
         client,
-        {
-          id: toolId,
-          steps
-        } as any,
+        { id: toolId, steps: executionSteps } as any,
         idx,
         computedPayload,
         stepResultsMap,
-        selfHealing,
+        false,
       );
+      
       const sid = steps[idx].id;
       const normalized = computeStepOutput(single);
       const isFailure = !single.success;
 
-      // Update step configuration if API returned changes
       if (single.updatedStep) {
         setSteps(prevSteps =>
-          prevSteps.map((step, i) => i === idx ? single.updatedStep : step)
+          prevSteps.map((step, i) => {
+            if (i !== idx) return step;
+            // If we used a limit, restore the original loop selector
+            const updated = single.updatedStep;
+            return limitIterations && originalLoopSelector
+              ? { ...updated, loopSelector: originalLoopSelector }
+              : updated;
+          })
         );
       }
 
@@ -943,16 +997,95 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setShowStepOutputSignal(Date.now());
     } finally {
       setIsExecutingStep(undefined);
-      setIsFixingStep(undefined);
     }
   };
 
   const handleExecuteStep = async (idx: number) => {
-    await executeStepByIdx(idx, false);
+    await executeStepByIdx(idx);
   };
 
-  const handleFixStep = async (idx: number) => {
-    await executeStepByIdx(idx, true);
+  const handleExecuteStepWithLimit = async (idx: number, limit: number) => {
+    await executeStepByIdx(idx, limit);
+  };
+
+  const handleOpenFixStepDialog = (idx: number) => {
+    setFixStepIndex(idx);
+    setShowFixStepDialog(true);
+  };
+
+  const handleCloseFixStepDialog = () => {
+    setShowFixStepDialog(false);
+    setFixStepIndex(null);
+  };
+
+  const handleFixStepSuccess = (newConfig: any) => {
+    if (fixStepIndex === null) return;
+
+    const step = steps[fixStepIndex];
+    const updatedStep = {
+      ...step,
+      apiConfig: {
+        ...step.apiConfig,
+        ...newConfig,
+      },
+    };
+
+    handleStepEdit(step.id, updatedStep, true);
+  };
+
+  const handleAutoHealStep = async (updatedInstruction: string) => {
+    if (fixStepIndex === null) return;
+    
+    try {
+      setIsExecutingStep(fixStepIndex);
+      const client = createSuperglueClient(config.superglueEndpoint);
+
+      const updatedSteps = updatedInstruction
+        ? steps.map((step, i) => 
+            i === fixStepIndex 
+              ? { ...step, apiConfig: { ...step.apiConfig, instruction: updatedInstruction } }
+              : step
+          )
+        : steps;
+
+      const single = await executeSingleStep(
+        client,
+        { id: toolId, steps: updatedSteps } as any,
+        fixStepIndex,
+        computedPayload,
+        stepResultsMap,
+        true, // Enable self-healing
+      );
+
+      const sid = steps[fixStepIndex].id;
+      const normalized = computeStepOutput(single);
+      const isFailure = !single.success;
+
+      if (single.updatedStep) {
+        setSteps(prevSteps =>
+          prevSteps.map((step, i) => i === fixStepIndex ? single.updatedStep : step)
+        );
+        
+        toast({
+          title: "Step fixed",
+          description: "The step configuration has been updated and executed successfully.",
+        });
+      }
+
+      if (isFailure) {
+        setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+        setCompletedSteps(prev => prev.filter(id => id !== sid));
+        throw new Error(single.error || 'Failed to fix step');
+      } else {
+        setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+        setFailedSteps(prev => prev.filter(id => id !== sid));
+      }
+      setStepResultsMap(prev => ({ ...prev, [sid]: normalized.output }));
+      setFocusStepId(sid);
+      setShowStepOutputSignal(Date.now());
+    } finally {
+      setIsExecutingStep(undefined);
+    }
   };
 
   const handleExecuteTransform = async (schemaStr: string, transformStr: string, selfHealing: boolean = false) => {
@@ -1027,20 +1160,20 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         <Button
           variant="destructive"
           onClick={handleStopExecution}
-          disabled={saving || (isExecutingStep !== undefined) || (isFixingStep !== undefined) || isExecutingTransform || isStopping}
+          disabled={saving || (isExecutingStep !== undefined) || isExecutingTransform || isStopping}
           className="h-9 px-4"
         >
           {isStopping ? "Stopping..." : "Stop Execution"}
         </Button>
       ) : (
         <Button
-          variant="success"
+          variant="outline"
           onClick={handleRunAllSteps}
-          disabled={loading || saving || (isExecutingStep !== undefined) || (isFixingStep !== undefined) || isExecutingTransform}
+          disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
           className="h-9 px-4"
         >
           <Play className="h-4 w-4" />
-          Run All Steps
+          Run all Steps
           </Button>
       )}
       {!hideRebuildButton && (
@@ -1166,7 +1299,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   onStepsChange={handleStepsChange}
                   onStepEdit={handleStepEdit}
                   onExecuteStep={handleExecuteStep}
-                  onFixStep={handleFixStep}
+                  onExecuteStepWithLimit={handleExecuteStepWithLimit}
+                  onOpenFixStepDialog={handleOpenFixStepDialog}
                   onExecuteTransform={handleExecuteTransform}
                   onFixTransform={handleFixTransform}
                   onFinalTransformChange={setFinalTransform}
@@ -1177,7 +1311,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   integrations={integrations}
                   isExecuting={loading}
                   isExecutingStep={isExecutingStep}
-                  isFixingStep={isFixingStep}
                   isRunningTransform={isRunningTransform}
                   isFixingTransform={isFixingTransform}
                   currentExecutingStepIndex={currentExecutingStepIndex}
@@ -1227,6 +1360,33 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {fixStepIndex !== null && (
+        <FixStepDialog
+          open={showFixStepDialog}
+          onClose={handleCloseFixStepDialog}
+          step={steps[fixStepIndex]}
+          stepInput={buildEvolvingPayload(computedPayload || {}, steps, stepResultsMap, fixStepIndex - 1)}
+          integrationId={steps[fixStepIndex]?.integrationId}
+          errorMessage={
+            typeof stepResultsMap[steps[fixStepIndex]?.id] === 'string'
+              ? stepResultsMap[steps[fixStepIndex]?.id]
+              : stepResultsMap[steps[fixStepIndex]?.id]?.error
+          }
+          onSuccess={handleFixStepSuccess}
+          onAutoHeal={handleAutoHealStep}
+        />
+      )}
+
+      {pendingModifyStepIndex !== null && (
+        <ModifyStepConfirmDialog
+          open={showModifyStepConfirm}
+          stepId={steps[pendingModifyStepIndex]?.id}
+          stepName={steps[pendingModifyStepIndex]?.name}
+          onConfirm={handleModifyStepConfirm}
+          onCancel={handleModifyStepCancel}
+        />
+      )}
 
       <ToolDeployModal
         currentTool={{

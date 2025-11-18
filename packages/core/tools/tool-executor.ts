@@ -304,7 +304,7 @@ export class WorkflowExecutor implements Workflow {
         }
       }
   
-      loopItems = loopItems.slice(0, step.loopMaxIters || server_defaults.DEFAULT_LOOP_MAX_ITERS);
+      loopItems = loopItems.slice(0, server_defaults.DEFAULT_LOOP_MAX_ITERS);
   
       const stepResults: WorkflowStepResult[] = [];
       let successfulConfig: ApiConfig | null = null;

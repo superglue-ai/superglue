@@ -288,13 +288,12 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
     const promptStart = options.mode === 'create'
         ? `Generate a new API config to execute this step instruction:`
         : options.mode === 'self-healing'
-        ? `The previous step config failed. Generate a corrected config that executes the step instruction:`
-        : `Edit the step config according to the edit instructions:`;
+        ? `The previous step config failed. Generate a corrected config that executes the updated step instruction provided by the user:`
+        : `Generate an updated API config based on the updated step instruction provided by the user:`;
 
     const instructionContext = `<step_instruction>${input.instruction}</step_instruction>`;
     const previousStepConfigContext = input.previousStepConfig ? `<previous_step_config>${JSON.stringify(input.previousStepConfig)}</previous_step_config>` : '';
     const errorContext = input.errorMessage ? `<error_message>${input.errorMessage}</error_message>` : '';
-    const editInstructionsContext = input.editInstruction ? `<edit_instructions>${input.editInstruction}</edit_instructions>` : '';
 
     const documentationWrapperLength = '<documentation>'.length + '</documentation>'.length;
     const stepInputWrapperLength = '<step_input>'.length + '</step_input>'.length;
@@ -305,14 +304,12 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
     let newlineCount = 6;
     if (previousStepConfigContext) newlineCount += 1;
     if (errorContext) newlineCount += 1;
-    if (editInstructionsContext) newlineCount += 1;
 
-    const essentialLength = promptStart.length + instructionContext.length + previousStepConfigContext.length + errorContext.length + editInstructionsContext.length + newlineCount + totalWrapperLength;
+    const essentialLength = promptStart.length + instructionContext.length + previousStepConfigContext.length + errorContext.length + newlineCount + totalWrapperLength;
 
     if (budget <= essentialLength) {
         logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getGenerateStepConfigContext`, {});
         let minimalContext = promptStart + '\n' + instructionContext;
-        if (editInstructionsContext) minimalContext += '\n' + editInstructionsContext;
         if (previousStepConfigContext) minimalContext += '\n' + previousStepConfigContext;
         if (errorContext) minimalContext += '\n' + errorContext;
         return minimalContext;
@@ -334,7 +331,6 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
     const credentialsContext = `<available_credentials>${credentialsContent}</available_credentials>`;
 
     let contextParts = [promptStart, instructionContext];
-    if (editInstructionsContext) contextParts.push(editInstructionsContext);
     if (previousStepConfigContext) contextParts.push(previousStepConfigContext);
     if (errorContext) contextParts.push(errorContext);
     contextParts.push(documentationContext, stepInputContext, integrationInstructionsContext, credentialsContext);
