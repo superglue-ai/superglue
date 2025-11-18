@@ -22,7 +22,7 @@ interface FixStepDialogProps {
     integrationId?: string;
     errorMessage?: string;
     onSuccess: (newConfig: any) => void;
-    onAutoHeal?: () => Promise<void>;
+    onAutoHeal?: (updatedInstruction: string) => Promise<void>;
 }
 
 export function FixStepDialog({
@@ -84,7 +84,7 @@ export function FixStepDialog({
         
         try {
             setIsAutoHealing(true);
-            await onAutoHeal();
+            await onAutoHeal(instruction.trim());
             handleClose();
         } catch (err: any) {
             toast({

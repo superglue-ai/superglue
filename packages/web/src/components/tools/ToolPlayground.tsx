@@ -1033,16 +1033,24 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     handleStepEdit(step.id, updatedStep, true);
   };
 
-  const handleAutoHealStep = async () => {
+  const handleAutoHealStep = async (updatedInstruction: string) => {
     if (fixStepIndex === null) return;
     
     try {
       setIsExecutingStep(fixStepIndex);
       const client = createSuperglueClient(config.superglueEndpoint);
 
+      const updatedSteps = updatedInstruction
+        ? steps.map((step, i) => 
+            i === fixStepIndex 
+              ? { ...step, apiConfig: { ...step.apiConfig, instruction: updatedInstruction } }
+              : step
+          )
+        : steps;
+
       const single = await executeSingleStep(
         client,
-        { id: toolId, steps } as any,
+        { id: toolId, steps: updatedSteps } as any,
         fixStepIndex,
         computedPayload,
         stepResultsMap,
