@@ -123,7 +123,7 @@ export const SpotlightStepCard = React.memo(({
 
     useEffect(() => {
         // Only switch to output tab if there's actual output data to show
-        if (showOutputSignal && stepResult) {
+        if (showOutputSignal && stepResult != null) {
             setActivePanel('output');
         }
     }, [showOutputSignal, stepResult]);
