@@ -10,7 +10,7 @@ import {
 } from '@/src/components/ui/dialog';
 import { Label } from '@/src/components/ui/label';
 import { Textarea } from '@/src/components/ui/textarea';
-import { ChevronDown, ChevronRight, Loader2, Sparkles } from 'lucide-react';
+import { Loader2, RefreshCw, WandSparkles } from 'lucide-react';
 import { useGenerateStepConfig } from './hooks/use-generate-step-config';
 import { useToast } from '@/src/hooks/use-toast';
 
@@ -37,7 +37,6 @@ export function FixStepDialog({
 }: FixStepDialogProps) {
     const [instruction, setInstruction] = useState(step?.apiConfig?.instruction || '');
     const [isAutoHealing, setIsAutoHealing] = useState(false);
-    const [showExperimental, setShowExperimental] = useState(false);
     const { generateConfig, isGenerating, error } = useGenerateStepConfig();
     const { toast } = useToast();
 
@@ -101,7 +100,6 @@ export function FixStepDialog({
     const handleClose = () => {
         setInstruction(step?.apiConfig?.instruction || '');
         setIsAutoHealing(false);
-        setShowExperimental(false);
         onClose();
     };
 
@@ -145,61 +143,29 @@ export function FixStepDialog({
                         </div>
                     )}
 
-                    <Button
-                        onClick={handleRebuild}
-                        disabled={isProcessing || !instruction.trim()}
-                        className="w-full"
-                    >
-                        {isGenerating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {isGenerating ? 'Fixing...' : 'Fix Step'}
-                    </Button>
+                    <div className="space-y-2 text-xs text-muted-foreground">
+                        <p>Choose how to fix this step:</p>
+                        
+                        <p>
+                            <strong>Fix Step:</strong> Generates new configuration without executing the step.
+                        </p>
+                        
+                        {onAutoHeal && (
+                            <>
+                                <p>
+                                    <strong>Fix Step & Execute:</strong> Runs the step, analyzes errors, and regenerates the config in a loop until it succeeds or reaches 10 iterations.
+                                </p>
+                                
+                                <p className="italic">
+                                    Warning: The Fix Step & Execute makes multiple API calls with potentially incorrect configurations.
+                                </p>
+                            </>
+                        )}
+                    </div>
 
-                    {onAutoHeal && (
-                        <div>
-                            <button
-                                type="button"
-                                onClick={() => setShowExperimental(!showExperimental)}
-                                className="w-full flex items-center gap-1.5 py-2 hover:bg-muted/50 transition-colors rounded text-left"
-                                disabled={isProcessing}
-                            >
-                                {showExperimental ? (
-                                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                                ) : (
-                                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                                )}
-                                <span className="text-sm text-muted-foreground">Try Iterative Execution and Healing</span>
-                            </button>
-                            
-                            {showExperimental && (
-                                <div className="pt-2 pb-3 space-y-3">
-                                    <p className="text-xs text-muted-foreground">
-                                        AI will execute the step repeatedly, analyzing errors and adjusting the configuration until it succeeds or reaches the retry limit.
-                                    </p>
-                                    
-                                    <div className="space-y-1.5">
-                                        <p className="text-xs font-medium">Risks:</p>
-                                        <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
-                                            <li>Makes multiple API calls with potentially incorrect configurations</li>
-                                        </ul>
-                                    </div>
-
-                                    <Button
-                                        onClick={handleAutoHeal}
-                                        disabled={isProcessing}
-                                        variant="outline"
-                                        className="w-full"
-                                        size="sm"
-                                    >
-                                        {isAutoHealing && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-                                        {isAutoHealing ? 'Healing...' : 'Start Iterative Healing'}
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                    )}
                 </div>
 
-                <DialogFooter>
+                <DialogFooter className="flex items-center justify-between">
                     <Button
                         variant="ghost"
                         onClick={handleClose}
@@ -207,6 +173,35 @@ export function FixStepDialog({
                     >
                         Cancel
                     </Button>
+                    
+                    <div className="flex items-center gap-2">
+                        {onAutoHeal && (
+                            <Button
+                                onClick={handleAutoHeal}
+                                disabled={isProcessing || !instruction.trim()}
+                                variant="outline"
+                            >
+                                {isAutoHealing ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <RefreshCw className="mr-2 h-4 w-4" />
+                                )}
+                                {isAutoHealing ? 'Fixing...' : 'Fix Step & Execute'}
+                            </Button>
+                        )}
+                        
+                        <Button
+                            onClick={handleRebuild}
+                            disabled={isProcessing || !instruction.trim()}
+                        >
+                            {isGenerating ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <WandSparkles className="mr-2 h-4 w-4" />
+                            )}
+                            {isGenerating ? 'Fixing...' : 'Fix Step'}
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
