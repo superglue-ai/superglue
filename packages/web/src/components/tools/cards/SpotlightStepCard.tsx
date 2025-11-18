@@ -240,7 +240,7 @@ export const SpotlightStepCard = React.memo(({
                                             className="h-8 px-3 gap-2 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90"
                                         >
                                             <PlayCircle className="h-3 w-3" />
-                                            <span className="font-medium text-[13px]">Try Step with 1 iteration</span>
+                                            <span className="font-medium text-[13px]">Try step with single iteration</span>
                                         </Button>
                                     </span>
                                 )}
