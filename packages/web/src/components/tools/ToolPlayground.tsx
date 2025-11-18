@@ -27,6 +27,7 @@ import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 import { ToolStepGallery } from "./ToolStepGallery";
 import { ToolDeployModal } from "./deploy/ToolDeployModal";
 import { FixStepDialog } from "./FixStepDialog";
+import { ModifyStepConfirmDialog } from "./ModifyStepConfirmDialog";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -178,6 +179,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [showToolBuilder, setShowToolBuilder] = useState(false);
   const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
   const [showDeployModal, setShowDeployModal] = useState(false);
+  const [showModifyStepConfirm, setShowModifyStepConfirm] = useState(false);
+  const [pendingModifyStepIndex, setPendingModifyStepIndex] = useState<number | null>(null);
+  const modifyStepResolveRef = useRef<((shouldContinue: boolean) => void) | null>(null);
 
   // Generate default payload once when schema is available if payload is empty
   useEffect(() => {
@@ -672,6 +676,45 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
   };
 
+  const handleBeforeStepExecution = async (stepIndex: number, step: any): Promise<boolean> => {
+    // Check if this step has the modify flag
+    if (step.modify === true) {
+      // Show confirmation dialog and wait for user response
+      return new Promise((resolve) => {
+        modifyStepResolveRef.current = resolve;
+        setPendingModifyStepIndex(stepIndex);
+        setShowModifyStepConfirm(true);
+      });
+    }
+    return true;
+  };
+
+  const handleModifyStepConfirm = () => {
+    setShowModifyStepConfirm(false);
+    setPendingModifyStepIndex(null);
+    if (modifyStepResolveRef.current) {
+      modifyStepResolveRef.current(true);
+      modifyStepResolveRef.current = null;
+    }
+  };
+
+  const handleModifyStepCancel = () => {
+    setShowModifyStepConfirm(false);
+    if (modifyStepResolveRef.current) {
+      modifyStepResolveRef.current(false);
+      modifyStepResolveRef.current = null;
+    }
+    // Focus on the step that was about to be executed
+    if (pendingModifyStepIndex !== null) {
+      const stepId = steps[pendingModifyStepIndex]?.id;
+      if (stepId) {
+        setFocusStepId(stepId);
+        setShowStepOutputSignal(Date.now());
+      }
+    }
+    setPendingModifyStepIndex(null);
+  };
+
   const executeTool = async () => {
     setLoading(true);
     // Fully clear any stale stop signals from a previous run (both modes)
@@ -732,7 +775,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           } catch { }
         },
         effectiveSelfHealing,
-        () => stopSignalRef.current
+        () => stopSignalRef.current,
+        handleBeforeStepExecution
       );
 
       // Always update steps with returned configuration (API may normalize/update even without self-healing)
@@ -1319,6 +1363,16 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           errorMessage={stepResultsMap[steps[fixStepIndex]?.id]?.error}
           onSuccess={handleFixStepSuccess}
           onAutoHeal={handleAutoHealStep}
+        />
+      )}
+
+      {pendingModifyStepIndex !== null && (
+        <ModifyStepConfirmDialog
+          open={showModifyStepConfirm}
+          stepId={steps[pendingModifyStepIndex]?.id}
+          stepName={steps[pendingModifyStepIndex]?.name}
+          onConfirm={handleModifyStepConfirm}
+          onCancel={handleModifyStepCancel}
         />
       )}
 
