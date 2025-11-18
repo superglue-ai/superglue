@@ -319,8 +319,12 @@ export function ToolStepGallery({
         setIsAddStepDialogOpen(true);
     };
 
-    const handleConfirmInsertStep = (stepId: string, instruction: string) => {
+    const handleConfirmInsertStep = (stepId: string, instruction: string, integrationId?: string) => {
         if (pendingInsertIndex === null || !onStepsChange) return;
+
+        const selectedIntegration = integrationId 
+            ? integrations?.find(i => i.id === integrationId)
+            : undefined;
 
         const newStep = {
             id: stepId,
@@ -328,8 +332,9 @@ export function ToolStepGallery({
             apiConfig: {
                 id: stepId,
                 instruction: instruction,
-                urlHost: '',
-                urlPath: '',
+                integrationId: integrationId || '',
+                urlHost: selectedIntegration?.urlHost || '',
+                urlPath: selectedIntegration?.urlPath || '',
                 method: 'GET',
                 headers: {},
                 queryParams: {},

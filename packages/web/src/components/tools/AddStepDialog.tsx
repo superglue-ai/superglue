@@ -1,3 +1,6 @@
+'use client';
+
+import { useTools } from '@/src/app/tools-context';
 import { Button } from '@/src/components/ui/button';
 import {
     Dialog,
@@ -13,12 +16,12 @@ import { cn } from '@/src/lib/general-utils';
 import { ExecutionStep } from '@superglue/client';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useTools } from '@/src/app/tools-context';
+import { IntegrationSelector } from './shared/IntegrationSelector';
 
 interface AddStepDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onConfirm: (stepId: string, instruction: string) => void;
+    onConfirm: (stepId: string, instruction: string, integrationId?: string) => void;
     onConfirmTool?: (steps: ExecutionStep[]) => void;
     existingStepIds: string[];
     defaultId?: string;
@@ -34,6 +37,7 @@ export function AddStepDialog({
 }: AddStepDialogProps) {
     const [stepId, setStepId] = useState(defaultId || '');
     const [instruction, setInstruction] = useState('');
+    const [selectedIntegrationId, setSelectedIntegrationId] = useState<string>('');
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState<'scratch' | 'tool'>('scratch');
     const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
@@ -56,6 +60,7 @@ export function AddStepDialog({
         if (!newOpen) {
             setError('');
             setInstruction('');
+            setSelectedIntegrationId('');
             setSelectedToolId(null);
             setActiveTab('scratch');
             setSearchQuery('');
@@ -80,12 +85,17 @@ export function AddStepDialog({
             return;
         }
 
+        if (!selectedIntegrationId) {
+            setError('Please select an integration');
+            return;
+        }
+
         if (existingStepIds.includes(trimmedId)) {
             setError(`Step with ID "${trimmedId}" already exists`);
             return;
         }
 
-        onConfirm(trimmedId, instruction.trim());
+        onConfirm(trimmedId, instruction.trim(), selectedIntegrationId);
         setError('');
     };
 
@@ -126,6 +136,19 @@ export function AddStepDialog({
 
                     <TabsContent value="scratch" className="space-y-4 py-4 overflow-hidden">
                         <div className="space-y-2">
+                            <label htmlFor="integration-select" className="text-sm font-medium">
+                                Integration
+                            </label>
+                            <IntegrationSelector
+                                value={selectedIntegrationId}
+                                onValueChange={(value) => {
+                                    setSelectedIntegrationId(value);
+                                    setError('');
+                                }}
+                                triggerClassName={cn(error && !selectedIntegrationId && "border-destructive")}
+                            />
+                        </div>
+                        <div className="space-y-2">
                             <label htmlFor="step-id" className="text-sm font-medium">
                                 Step ID
                             </label>
@@ -137,12 +160,8 @@ export function AddStepDialog({
                                     setError('');
                                 }}
                                 placeholder="e.g., fetch_users"
-                                className={cn(error && "border-destructive")}
-                                autoFocus
+                                className={cn(error && !stepId && "border-destructive")}
                             />
-                            {error && (
-                                <p className="text-sm text-destructive">{error}</p>
-                            )}
                         </div>
                         <div className="space-y-2">
                             <label htmlFor="step-instruction" className="text-sm font-medium">
@@ -163,6 +182,9 @@ export function AddStepDialog({
                                 placeholder="e.g., Fetch all users from the API"
                             />
                         </div>
+                        {error && (
+                            <p className="text-sm text-destructive">{error}</p>
+                        )}
                     </TabsContent>
 
                     <TabsContent value="tool" className="space-y-4 py-4">
@@ -241,4 +263,3 @@ export function AddStepDialog({
         </Dialog>
     );
 }
-
