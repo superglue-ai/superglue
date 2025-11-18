@@ -8,6 +8,174 @@ export async function injectVMHelpersIndividually(context: ivm.Context): Promise
   // Use evalSync to inject all helpers at once
   // The code will run in the context and create global functions
   context.evalSync(`
+    // String.prototype.matchAll polyfill
+    if (!String.prototype.matchAll) {
+      String.prototype.matchAll = function(regexp) {
+        if (typeof regexp === 'string') {
+          regexp = new RegExp(regexp, 'g');
+        }
+        if (!(regexp instanceof RegExp)) {
+          regexp = new RegExp(regexp, 'g');
+        }
+        if (!regexp.global) {
+          throw new TypeError('matchAll requires a global RegExp');
+        }
+        const matches = [];
+        const str = this;
+        const regex = new RegExp(regexp.source, regexp.flags);
+        let match;
+        while ((match = regex.exec(str)) !== null) {
+          matches.push(match);
+        }
+        return matches[Symbol.iterator] ? matches[Symbol.iterator]() : (function* () {
+          for (let i = 0; i < matches.length; i++) {
+            yield matches[i];
+          }
+        })();
+      };
+    }
+    
+    // String.prototype.replaceAll polyfill
+    if (!String.prototype.replaceAll) {
+      String.prototype.replaceAll = function(search, replace) {
+        if (search instanceof RegExp) {
+          if (!search.global) {
+            throw new TypeError('replaceAll requires a global RegExp');
+          }
+          return this.replace(search, replace);
+        }
+        if (typeof replace === 'function') {
+          const parts = this.split(search);
+          let result = parts[0];
+          for (let i = 1; i < parts.length; i++) {
+            result += replace(search, result.length, this) + parts[i];
+          }
+          return result;
+        }
+        return this.split(search).join(replace);
+      };
+    }
+    
+    // Array.prototype.flat polyfill
+    if (!Array.prototype.flat) {
+      Array.prototype.flat = function(depth) {
+        depth = depth === undefined ? 1 : Math.floor(depth);
+        if (depth < 1) return Array.prototype.slice.call(this);
+        return (function flatten(arr, d) {
+          return arr.reduce(function(acc, val) {
+            return acc.concat(d > 1 && Array.isArray(val) ? flatten(val, d - 1) : val);
+          }, []);
+        })(this, depth);
+      };
+    }
+    
+    // Array.prototype.flatMap polyfill
+    if (!Array.prototype.flatMap) {
+      Array.prototype.flatMap = function(callback, thisArg) {
+        return this.map(callback, thisArg).flat(1);
+      };
+    }
+    
+    // Object.fromEntries polyfill
+    if (!Object.fromEntries) {
+      Object.fromEntries = function(entries) {
+        const obj = {};
+        for (const [key, value] of entries) {
+          obj[key] = value;
+        }
+        return obj;
+      };
+    }
+    
+    // String.prototype.trimStart/trimEnd polyfills
+    if (!String.prototype.trimStart) {
+      String.prototype.trimStart = function() {
+        return this.replace(/^\\s+/, '');
+      };
+      String.prototype.trimLeft = String.prototype.trimStart;
+    }
+    if (!String.prototype.trimEnd) {
+      String.prototype.trimEnd = function() {
+        return this.replace(/\\s+$/, '');
+      };
+      String.prototype.trimRight = String.prototype.trimEnd;
+    }
+    
+    // String.prototype.padStart/padEnd polyfills
+    if (!String.prototype.padStart) {
+      String.prototype.padStart = function(targetLength, padString) {
+        targetLength = targetLength >> 0;
+        padString = String(typeof padString !== 'undefined' ? padString : ' ');
+        if (this.length >= targetLength || padString.length === 0) {
+          return String(this);
+        }
+        targetLength = targetLength - this.length;
+        if (targetLength > padString.length) {
+          const repeatCount = Math.ceil(targetLength / padString.length);
+          padString = padString.repeat(repeatCount);
+        }
+        return padString.slice(0, targetLength) + String(this);
+      };
+    }
+    if (!String.prototype.padEnd) {
+      String.prototype.padEnd = function(targetLength, padString) {
+        targetLength = targetLength >> 0;
+        padString = String(typeof padString !== 'undefined' ? padString : ' ');
+        if (this.length >= targetLength || padString.length === 0) {
+          return String(this);
+        }
+        targetLength = targetLength - this.length;
+        if (targetLength > padString.length) {
+          const repeatCount = Math.ceil(targetLength / padString.length);
+          padString = padString.repeat(repeatCount);
+        }
+        return String(this) + padString.slice(0, targetLength);
+      };
+    }
+    
+    // Array.prototype.at polyfill
+    if (!Array.prototype.at) {
+      Array.prototype.at = function(index) {
+        index = Math.trunc(index) || 0;
+        const len = this.length;
+        const relativeIndex = index >= 0 ? index : len + index;
+        if (relativeIndex < 0 || relativeIndex >= len) {
+          return undefined;
+        }
+        return this[relativeIndex];
+      };
+      String.prototype.at = Array.prototype.at;
+    }
+    
+    // Array.prototype.findLast/findLastIndex polyfills
+    if (!Array.prototype.findLast) {
+      Array.prototype.findLast = function(callback, thisArg) {
+        for (let i = this.length - 1; i >= 0; i--) {
+          if (callback.call(thisArg, this[i], i, this)) {
+            return this[i];
+          }
+        }
+        return undefined;
+      };
+    }
+    if (!Array.prototype.findLastIndex) {
+      Array.prototype.findLastIndex = function(callback, thisArg) {
+        for (let i = this.length - 1; i >= 0; i--) {
+          if (callback.call(thisArg, this[i], i, this)) {
+            return i;
+          }
+        }
+        return -1;
+      };
+    }
+    
+    // Object.hasOwn polyfill
+    if (!Object.hasOwn) {
+      Object.hasOwn = function(obj, prop) {
+        return Object.prototype.hasOwnProperty.call(obj, prop);
+      };
+    }
+    
     // Base64 encoding
     btoa = function(str) {
       if (!str) return '';

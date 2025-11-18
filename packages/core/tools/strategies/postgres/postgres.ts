@@ -79,29 +79,10 @@ export async function closeAllPools(): Promise<void> {
   poolCache.clear();
 }
 
-function sanitizeDatabaseName(connectionString: string): string {
-  // First remove any trailing slashes
-  let cleanUrl = connectionString.replace(/\/+$/, '');
-
-  // Now find the last '/' to get the database name
-  const lastSlashIndex = cleanUrl.lastIndexOf('/');
-  if (lastSlashIndex === -1) return cleanUrl;
-
-  const baseUrl = cleanUrl.substring(0, lastSlashIndex + 1);
-  const dbName = cleanUrl.substring(lastSlashIndex + 1);
-
-  // Clean the database name of invalid characters
-  const cleanDbName = dbName
-    .replace(/[^a-zA-Z0-9_$-]/g, '') // Keep only valid chars
-    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
-
-  return baseUrl + cleanDbName;
-}
-
 export async function callPostgres({ endpoint, payload, credentials, options }: { endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
   const requestVars = { ...payload, ...credentials };
   let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
-  connectionString = sanitizeDatabaseName(connectionString);
+  connectionString = connectionString.replace(/\/+(\?)/, '$1').replace(/\/+$/, '');
 
   let bodyParsed: any;
   try {

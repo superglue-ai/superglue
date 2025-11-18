@@ -275,23 +275,62 @@ describe('PostgreSQL Utilities', () => {
       expect(mockPoolQuery).toHaveBeenCalledTimes(2);
     });
 
-    it('should sanitize database names with invalid characters', async () => {
-      const endpointWithDirtyDb: ApiConfig = {
+    it('should preserve special characters in database names', async () => {
+      const endpointWithSpecialChars: ApiConfig = {
         id: '1',
         instruction: 'test',
-        urlHost: 'postgres://{user}:{password}@{host}:{port}/my-test_db$123///',
+        urlHost: 'postgres://{user}:{password}@{host}:{port}/my-test_db$123',
         urlPath: '',
         body: JSON.stringify({ query: 'SELECT 1' })
       };
 
       mockPoolQuery.mockResolvedValueOnce({ rows: [{ result: 1 }] });
 
-      await callPostgres({ endpoint: endpointWithDirtyDb, payload: {}, credentials: mockCredentials, options: {} });
+      await callPostgres({ endpoint: endpointWithSpecialChars, payload: {}, credentials: mockCredentials, options: {} });
 
-      // The connection string should have the database name sanitized (trailing slashes removed, $ and - are allowed)
       expect(vi.mocked(Pool)).toHaveBeenCalledWith(
         expect.objectContaining({
-          connectionString: expect.stringMatching(/\/my-test_db\$123$/), // Only trailing slashes removed, $ is kept
+          connectionString: 'postgres://testuser:testpass@localhost:5432/my-test_db$123',
+        })
+      );
+    });
+
+    it('should remove trailing slashes from connection strings', async () => {
+      const endpointWithTrailingSlash: ApiConfig = {
+        id: '1',
+        instruction: 'test',
+        urlHost: 'postgres://{user}:{password}@{host}:{port}/testdb///',
+        urlPath: '',
+        body: JSON.stringify({ query: 'SELECT 1' })
+      };
+
+      mockPoolQuery.mockResolvedValueOnce({ rows: [{ result: 1 }] });
+
+      await callPostgres({ endpoint: endpointWithTrailingSlash, payload: {}, credentials: mockCredentials, options: {} });
+
+      expect(vi.mocked(Pool)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          connectionString: 'postgres://testuser:testpass@localhost:5432/testdb',
+        })
+      );
+    });
+
+    it('should preserve query parameters while removing trailing slashes', async () => {
+      const endpointWithQueryParams: ApiConfig = {
+        id: '1',
+        instruction: 'test',
+        urlHost: 'postgres://{user}:{password}@{host}:{port}/testdb///?sslmode=disable&connect_timeout=10',
+        urlPath: '',
+        body: JSON.stringify({ query: 'SELECT 1' })
+      };
+
+      mockPoolQuery.mockResolvedValueOnce({ rows: [{ result: 1 }] });
+
+      await callPostgres({ endpoint: endpointWithQueryParams, payload: {}, credentials: mockCredentials, options: {} });
+
+      expect(vi.mocked(Pool)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          connectionString: 'postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable&connect_timeout=10',
         })
       );
     });
