@@ -1,6 +1,10 @@
 import jsonata from "jsonata";
 import { Validator } from "jsonschema";
-import { TransformResult, addNullableToOptional } from "./helpers.js";
+import { TransformResult, addNullableToOptional, validateSchema } from "./helpers.js";
+import { generateWorkingTransform } from "../tools/tool-transform.js";
+import { isSelfHealingEnabled, transformData } from "./helpers.js";
+import { BaseConfig, JSONata, JSONSchema, RequestOptions } from "@superglue/client";
+import type { DataStore, Metadata } from "@superglue/shared";
 
 export function superglueJsonata(expr: string) {
     const expression = jsonata(expr, {
@@ -102,7 +106,7 @@ export async function applyJsonata(data: any, expr: string): Promise<any> {
     const errorPositions = (error as any).position ? expr.substring(error.position - 10, error.position + 10) : "";
     throw new Error(`Transformation failed: ${error.message} at ${errorPositions}.`);
   }
-}
+} 
 
 export async function applyJsonataWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
   try {
@@ -173,4 +177,100 @@ export function flattenObject(obj: any, parentKey = '', res: Record<string, any>
     }
   }
   return res;
+}
+
+export interface TransformConfig extends BaseConfig {
+  instruction: string;
+  responseSchema: JSONSchema;
+  responseMapping?: JSONata;
+}
+
+export type TransformInputRequest = {
+  id?: string;
+  endpoint?: TransformConfig;
+};
+
+export async function executeTransformLegacy(args: {
+  datastore: DataStore,
+  fromCache: boolean,
+  input: TransformInputRequest,
+  data: any,
+  options?: RequestOptions,
+  metadata: Metadata
+}): Promise<{ data?: any; config?: TransformConfig }> {
+  const { datastore, fromCache, input, data, metadata, options } = args;
+  let currentConfig = input.endpoint;
+  if (fromCache && datastore) {
+    const cached = await datastore.getTransformConfig(input.id || input.endpoint.id, metadata.orgId);
+    if (cached) {
+      currentConfig = { ...cached, ...input.endpoint };
+    }
+  }
+  if (!currentConfig) {
+    throw new Error("No transform config found");
+  }
+
+  try {
+    if (!currentConfig?.responseMapping) {
+      throw new Error("No response mapping found");
+    }
+
+    const transformResult = await transformData(
+      data,
+      currentConfig.responseMapping
+    );
+
+    if (currentConfig.responseSchema) {
+      const validatedResult = await validateSchema(transformResult.data, currentConfig.responseSchema);
+      if (!validatedResult.success) {
+        throw new Error(`Schema validation failed: ${validatedResult.error}`);
+      }
+    }
+
+    if (!transformResult.success) {
+      throw new Error(transformResult.error);
+    }
+
+    return {
+      data: transformResult.data,
+      config: currentConfig
+    };
+  } catch (error) {
+    const rawErrorString = error?.message || JSON.stringify(error || {});
+    const transformError = rawErrorString.slice(0, 200);
+    let instruction = currentConfig.instruction;
+    if (transformError && currentConfig.responseMapping) {
+      instruction = `${instruction}\n\nThe previous error was: ${transformError} for the following mapping: ${currentConfig.responseMapping}`;
+    }
+
+    // if the transform is not self healing and there is an existing mapping, throw an error
+    // if there is no mapping that means that the config is being generated for the first time and should generate regardless
+    if (currentConfig.responseMapping && !isSelfHealingEnabled(options, "transform")) {
+      throw new Error(transformError);
+    }
+
+    const result = await generateWorkingTransform({
+      targetSchema: currentConfig.responseSchema,
+      inputData: data,
+      instruction: instruction,
+      metadata: metadata
+    });
+
+    if (!result || !result?.transformCode) {
+      throw new Error("Failed to generate transformation code.");
+    }
+
+    currentConfig = {
+      id: crypto.randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...currentConfig,
+      responseMapping: result.transformCode
+    };
+
+    return {
+      data: data,
+      config: currentConfig
+    };
+  }
 }

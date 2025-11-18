@@ -1,9 +1,26 @@
-import { ApiConfig, RequestOptions } from "@superglue/client";
+import { ApiConfig as StepConfig, RequestOptions, HttpMethod } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
 import { server_defaults } from "../../../default.js";
 import { parseJSON } from "../../../files/index.js";
 import { composeUrl, replaceVariables } from "../../../utils/helpers.js";
+import { StepExecutionInput, StepExecutionResult, StepExecutionStrategy } from "../strategy.js";
 
+export class PostgresStepExecutionStrategy implements StepExecutionStrategy {
+  readonly version = '1.0.0';
+
+  async shouldExecute(stepConfig: StepConfig): Promise<boolean> {
+    return stepConfig.method === HttpMethod.POST && stepConfig.urlHost?.startsWith("postgres://") || stepConfig.urlHost?.startsWith("postgresql://");
+  }
+
+  async executeStep(input: StepExecutionInput): Promise<StepExecutionResult> {
+    const { stepConfig, stepInputData, credentials, requestOptions } = input;
+    const result = await callPostgres({ endpoint: stepConfig, payload: stepInputData, credentials, options: requestOptions });
+    return {
+      success: true,
+      data: result,
+    };
+  }
+}
 
 interface PoolCacheEntry {
   pool: Pool;
@@ -79,7 +96,26 @@ export async function closeAllPools(): Promise<void> {
   poolCache.clear();
 }
 
-export async function callPostgres({ endpoint, payload, credentials, options }: { endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
+function sanitizeDatabaseName(connectionString: string): string {
+  // First remove any trailing slashes
+  let cleanUrl = connectionString.replace(/\/+$/, '');
+
+  // Now find the last '/' to get the database name
+  const lastSlashIndex = cleanUrl.lastIndexOf('/');
+  if (lastSlashIndex === -1) return cleanUrl;
+
+  const baseUrl = cleanUrl.substring(0, lastSlashIndex + 1);
+  const dbName = cleanUrl.substring(lastSlashIndex + 1);
+
+  // Clean the database name of invalid characters
+  const cleanDbName = dbName
+    .replace(/[^a-zA-Z0-9_$-]/g, '') // Keep only valid chars
+    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+
+  return baseUrl + cleanDbName;
+}
+
+export async function callPostgres({ endpoint, payload, credentials, options }: { endpoint: StepConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
   const requestVars = { ...payload, ...credentials };
   let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
   connectionString = connectionString.replace(/\/+(\?)/, '$1').replace(/\/+$/, '');
