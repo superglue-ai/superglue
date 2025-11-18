@@ -264,16 +264,16 @@ export const SpotlightStepCard = React.memo(({
                                                     <ChevronDown className="h-3 w-3" />
                                                 </Button>
                                             </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="w-56">
-                                                <DropdownMenuItem
-                                                    onClick={handleTryWithOneIterationClick}
-                                                    disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                                    className="cursor-pointer"
-                                                >
-                                                    <PlayCircle className="h-4 w-4 mr-2" />
-                                                    <span>Run with single iteration</span>
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
+                                        <DropdownMenuContent align="end" className="w-fit">
+                                            <DropdownMenuItem
+                                                onClick={handleTryWithOneIterationClick}
+                                                disabled={!canExecute || isExecuting || isGlobalExecuting}
+                                                className="cursor-pointer"
+                                            >
+                                                <PlayCircle className="h-4 w-4 mr-1" />
+                                                <span>Run single iteration</span>
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
                                         </DropdownMenu>
                                     </div>
                                 ) : (
