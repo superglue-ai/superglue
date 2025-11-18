@@ -1,5 +1,7 @@
 import type { Integration } from '@superglue/client';
-import { getOAuthTokenUrl } from '@superglue/shared';
+import { getOAuthTokenUrl, resolveOAuthCertAndKey } from '@superglue/shared';
+import axios from 'axios';
+import https from 'https';
 import { logMessage } from './logs.js';
 
 export interface OAuthTokens {
@@ -10,14 +12,10 @@ export interface OAuthTokens {
     expires_in?: number;
 }
 
-/**
- * Check if OAuth token is expired or about to expire
- */
 export function isTokenExpired(integration: Integration): boolean {
     const { expires_at } = integration.credentials || {};
     if (!expires_at) return false;
 
-    // Consider token expired if it expires in less than 5 minutes
     const expiryTime = new Date(expires_at).getTime();
     const now = Date.now();
     const fiveMinutes = 5 * 60 * 1000;
@@ -25,22 +23,38 @@ export function isTokenExpired(integration: Integration): boolean {
     return expiryTime < (now + fiveMinutes);
 }
 
-/**
- * Refresh OAuth tokens for an integration
- */
 export async function refreshOAuthToken(
     integration: Integration,
 ): Promise<{ success: boolean, newCredentials: Record<string, any> }> {
-    const { client_id, client_secret, refresh_token, access_token } = integration.credentials || {};
+    const { client_id, client_secret, refresh_token, access_token, grant_type, oauth_cert, oauth_key, scopes } = integration.credentials || {};
+    const isClientCredentials = grant_type === 'client_credentials';
 
-    if (!client_id || !client_secret || !refresh_token) {
-        logMessage('error', 'Missing required credentials for token refresh', {
-            integrationId: integration.id,
-            hasClientId: !!client_id,
-            hasClientSecret: !!client_secret,
-            hasRefreshToken: !!refresh_token
+    if (!client_id) {
+        logMessage('error', 'Missing client_id for token refresh', {
+            integrationId: integration.id
         });
         return { success: false, newCredentials: {} };
+    }
+
+    if (isClientCredentials) {
+        const hasCertAndKey = !!(oauth_cert && oauth_key);
+        if (!hasCertAndKey && !client_secret) {
+            logMessage('error', 'Missing credentials for client_credentials token refresh', {
+                integrationId: integration.id,
+                hasClientSecret: !!client_secret,
+                hasCertAndKey
+            });
+            return { success: false, newCredentials: {} };
+        }
+    } else {
+        if (!client_secret || !refresh_token) {
+            logMessage('error', 'Missing required credentials for authorization_code token refresh', {
+                integrationId: integration.id,
+                hasClientSecret: !!client_secret,
+                hasRefreshToken: !!refresh_token
+            });
+            return { success: false, newCredentials: {} };
+        }
     }
 
     try {
@@ -49,32 +63,54 @@ export async function refreshOAuthToken(
             throw new Error('Could not determine token URL for integration');
         }
 
-        const response = await fetch(tokenUrl, {
-            method: 'POST',
+        let certContent: string | undefined;
+        let keyContent: string | undefined;
+        
+        if (oauth_cert && oauth_key) {
+            const { cert, key } = resolveOAuthCertAndKey(oauth_cert, oauth_key);
+            certContent = cert?.content;
+            keyContent = key?.content;
+        }
+
+        const httpsAgent = (certContent && keyContent) ? new https.Agent({
+            cert: certContent,
+            key: keyContent,
+            rejectUnauthorized: false
+        }) : undefined;
+
+        const params: Record<string, string> = isClientCredentials ? {
+            grant_type: 'client_credentials',
+            client_id,
+            ...(client_secret && { client_secret }),
+            ...(scopes && { scope: scopes })
+        } : {
+            grant_type: 'refresh_token',
+            refresh_token: refresh_token!,
+            client_id,
+            client_secret: client_secret!,
+        };
+
+        const response = await axios.post(tokenUrl, new URLSearchParams(params), {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json',
             },
-            body: new URLSearchParams({
-                grant_type: 'refresh_token',
-                refresh_token,
-                client_id,
-                client_secret,
-            }),
+            httpsAgent,
+            validateStatus: null
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            // Check if this is a long-lived access token scenario (access_token === refresh_token)
+        if (response.status < 200 || response.status >= 300) {
+            const errorText = typeof response.data === 'string' 
+                ? response.data 
+                : JSON.stringify(response.data);
             if (access_token === refresh_token) {
                 throw new Error(`OAuth access token was unable to refresh. This integration likely uses a long-lived access token in its OAuth flow. Please reauthenticate with the OAuth provider to refresh the access token manually.`);
             }
             throw new Error(`Token refresh failed: ${response.status} - ${errorText}`);
         }
 
-        const tokenData: OAuthTokens = await response.json();
+        const tokenData: OAuthTokens = response.data;
 
-        // Update integration credentials in place
         integration.credentials = {
             ...integration.credentials,
             access_token: tokenData.access_token,
@@ -85,7 +121,7 @@ export async function refreshOAuthToken(
                 : undefined),
         };
 
-        logMessage('info', 'Successfully refreshed OAuth token', {
+        logMessage('info', `Successfully ${isClientCredentials ? 'renewed' : 'refreshed'} OAuth token`, {
             integrationId: integration.id
         });
 

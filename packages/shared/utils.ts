@@ -250,3 +250,18 @@ export function mapUserRole(role: string): UserRole {
             return UserRole.MEMBER;
     }
 }
+
+export function resolveOAuthCertAndKey(oauthCert: string, oauthKey: string) {
+    let parsedCert: { content: string; filename: string } | null = null;
+    let parsedKey: { content: string; filename: string } | null = null;
+    
+    try {
+        if (oauthCert && oauthKey) {
+            parsedCert = JSON.parse(oauthCert);
+            parsedKey = JSON.parse(oauthKey);
+        }
+    } catch {
+        return { cert: { content: undefined, filename: undefined }, key: { content: undefined, filename: undefined } };
+    }
+    return { cert: parsedCert, key: parsedKey };
+}
