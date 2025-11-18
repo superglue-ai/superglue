@@ -850,7 +850,7 @@ export function IntegrationForm({
                                                     <span>Connected — Reauthenticate</span>
                                                 </>
                                             ) : (
-                                                <span>Connect to {integrationOptions.find(option => option.value === selectedIntegration)?.label}</span>
+                                                <span>Connect to {integrationOptions.find(option => option.value === selectedIntegration)?.label || id || 'system'}</span>
                                             )}
                                         </span>
                                     </Button>
@@ -1001,20 +1001,6 @@ export function IntegrationForm({
                                                 </div>
                                             </div>
 
-                                            {oauthFields.grant_type === 'authorization_code' && (
-                                                <div>
-                                                    <Label htmlFor="scopes" className="text-xs">OAuth Scopes*</Label>
-                                                    <HelpTooltip text="Space-separated scopes. Leave empty to use defaults." />
-                                                    <Input
-                                                        id="scopes"
-                                                        value={oauthFields.scopes}
-                                                        onChange={e => setOauthFields(prev => ({ ...prev, scopes: e.target.value }))}
-                                                        placeholder="e.g., read write"
-                                                        className={cn("h-9", validationErrors.scopes && inputErrorStyles)}
-                                                    />
-                                                </div>
-                                            )}
-
                                             {oauthFields.grant_type === 'client_credentials' && (
                                                 <div className="space-y-3">
                                                     <div>
@@ -1160,7 +1146,7 @@ export function IntegrationForm({
                                                         </>
                                                     ) : (
                                                         <>
-                                                            Connect to {integrationOptions.find(option => option.value === selectedIntegration)?.label}
+                                                            Connect to {integrationOptions.find(option => option.value === selectedIntegration)?.label || id || 'system'}
                                                             {(() => {
                                                                 const icon = getSimpleIcon(
                                                                     integrationOptions.find(opt => opt.value === selectedIntegration)?.icon || ''
