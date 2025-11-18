@@ -20,11 +20,10 @@ import {
 import { downloadJson } from '@/src/lib/download-utils';
 import { ensureSourceDataArrowFunction, formatJavaScriptCode, isEmptyData, truncateForDisplay } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
-import { ChevronDown, Download, FileBraces, FileInput, FileOutput, FilePlay, Loader2, Play, PlayCircle, Route, Trash2, Wand2 } from 'lucide-react';
+import { ChevronDown, Download, FileBraces, FileInput, FileOutput, Loader2, Play, BugPlay, Route, Trash2, Wand2 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { JavaScriptCodeEditor } from '../../editors/JavaScriptCodeEditor';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
-import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { ToolStepConfigurator } from '../ToolStepConfigurator';
 import { useDataProcessor } from '../hooks/use-data-processor';
@@ -270,7 +269,7 @@ export const SpotlightStepCard = React.memo(({
                                                 disabled={!canExecute || isExecuting || isGlobalExecuting}
                                                 className="cursor-pointer"
                                             >
-                                                <PlayCircle className="h-4 w-4 mr-1" />
+                                                <BugPlay className="h-4 w-4 mr-1" />
                                                 <span>Run single iteration</span>
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
