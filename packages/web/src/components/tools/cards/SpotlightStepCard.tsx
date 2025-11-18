@@ -78,6 +78,7 @@ export const SpotlightStepCard = React.memo(({
     const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
     const [outputViewMode, setOutputViewMode] = useState<'preview' | 'schema'>('preview');
     const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
+    const [pendingAction, setPendingAction] = useState<'execute' | 'executeWithLimit' | null>(null);
     const [didFormatLoopSelector, setDidFormatLoopSelector] = useState(false);
     
     const DATA_SELECTOR_DEBOUNCE_MS = 400;
@@ -206,6 +207,7 @@ export const SpotlightStepCard = React.memo(({
 
     const handleRunStepClick = () => {
         if (isFirstStep && !isPayloadValid) {
+            setPendingAction('execute');
             setShowInvalidPayloadDialog(true);
         } else if (onExecuteStep) {
             onExecuteStep();
@@ -214,6 +216,7 @@ export const SpotlightStepCard = React.memo(({
 
     const handleTryWithOneIterationClick = () => {
         if (isFirstStep && !isPayloadValid) {
+            setPendingAction('executeWithLimit');
             setShowInvalidPayloadDialog(true);
         } else if (onExecuteStepWithLimit) {
             onExecuteStepWithLimit(1);
@@ -626,7 +629,12 @@ export const SpotlightStepCard = React.memo(({
                 </div>
             </div>
 
-            <AlertDialog open={showInvalidPayloadDialog} onOpenChange={setShowInvalidPayloadDialog}>
+            <AlertDialog open={showInvalidPayloadDialog} onOpenChange={(open) => {
+                setShowInvalidPayloadDialog(open);
+                if (!open) {
+                    setPendingAction(null);
+                }
+            }}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Tool Input Does Not Match Input Schema</AlertDialogTitle>
@@ -639,9 +647,12 @@ export const SpotlightStepCard = React.memo(({
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={() => {
                             setShowInvalidPayloadDialog(false);
-                            if (onExecuteStep) {
+                            if (pendingAction === 'executeWithLimit' && onExecuteStepWithLimit) {
+                                onExecuteStepWithLimit(1);
+                            } else if (pendingAction === 'execute' && onExecuteStep) {
                                 onExecuteStep();
                             }
+                            setPendingAction(null);
                         }}>
                             Run Anyway
                         </AlertDialogAction>
