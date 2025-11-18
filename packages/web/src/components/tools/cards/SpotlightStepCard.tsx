@@ -11,10 +11,16 @@ import {
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/src/components/ui/dropdown-menu';
 import { downloadJson } from '@/src/lib/download-utils';
 import { ensureSourceDataArrowFunction, formatJavaScriptCode, isEmptyData, truncateForDisplay } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
-import { Download, FileBraces, FileInput, FileOutput, FilePlay, Loader2, Play, PlayCircle, Route, Trash2, Wand2 } from 'lucide-react';
+import { ChevronDown, Download, FileBraces, FileInput, FileOutput, FilePlay, Loader2, Play, PlayCircle, Route, Trash2, Wand2 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { JavaScriptCodeEditor } from '../../editors/JavaScriptCodeEditor';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
@@ -231,34 +237,63 @@ export const SpotlightStepCard = React.memo(({
                     <div className="flex items-center gap-2">
                         {!readOnly && onExecuteStep && (
                             <>
-                                {loopItems && Array.isArray(loopItems) && loopItems.length > 0 && (
-                                    <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Try running this step with only 1 iteration"}>
+                                {loopItems && Array.isArray(loopItems) && loopItems.length > 0 ? (
+                                    <div className="flex items-center">
+                                        <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Run this single step"}>
+                                            <Button
+                                                variant="default"
+                                                onClick={handleRunStepClick}
+                                                disabled={!canExecute || isExecuting || isGlobalExecuting}
+                                                className="h-8 pl-3 pr-2 gap-2 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90 rounded-r-none border-r border-white/20 dark:border-black/20"
+                                            >
+                                                {isExecuting ? (
+                                                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                                ) : (
+                                                    <Play className="h-3 w-3" />
+                                                )}
+                                                <span className="font-medium text-[13px]">Run Step</span>
+                                            </Button>
+                                        </span>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="default"
+                                                    disabled={!canExecute || isExecuting || isGlobalExecuting}
+                                                    className="h-8 px-2 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90 rounded-l-none"
+                                                >
+                                                    <ChevronDown className="h-3 w-3" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-56">
+                                                <DropdownMenuItem
+                                                    onClick={handleTryWithOneIterationClick}
+                                                    disabled={!canExecute || isExecuting || isGlobalExecuting}
+                                                    className="cursor-pointer"
+                                                >
+                                                    <PlayCircle className="h-4 w-4 mr-2" />
+                                                    <span>Run with single iteration</span>
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                ) : (
+                                    <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Run this single step"}>
                                         <Button
                                             variant="default"
-                                            onClick={handleTryWithOneIterationClick}
+                                            onClick={handleRunStepClick}
                                             disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                            className="h-8 px-3 gap-2 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90"
+                                            className="h-8 pl-3 pr-4 gap-2 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90"
                                         >
-                                            <PlayCircle className="h-3 w-3" />
-                                            <span className="font-medium text-[13px]">Try step with single iteration</span>
+                                            {isExecuting ? (
+                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                            ) : (
+                                                <Play className="h-3 w-3" />
+                                            )}
+                                            <span className="font-medium text-[13px]">Run Step</span>
+                                            <div className="w-4" />
                                         </Button>
                                     </span>
                                 )}
-                                <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Run this single step"}>
-                                    <Button
-                                        variant="default"
-                                        onClick={handleRunStepClick}
-                                        disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                        className="h-8 px-3 gap-2 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90"
-                                    >
-                                        {isExecuting ? (
-                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                        ) : (
-                                            <Play className="h-3 w-3" />
-                                        )}
-                                        <span className="font-medium text-[13px]">Run Step</span>
-                                    </Button>
-                                </span>
                             </>
                         )}
                         {!readOnly && onOpenFixStepDialog && (
