@@ -1059,7 +1059,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         );
         
         toast({
-          title: "Step auto-healed successfully",
+          title: "Step fixed",
           description: "The step configuration has been updated and executed successfully.",
         });
       }
@@ -1067,7 +1067,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       if (isFailure) {
         setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
         setCompletedSteps(prev => prev.filter(id => id !== sid));
-        throw new Error(single.error || 'Auto-heal failed');
+        throw new Error(single.error || 'Failed to fix step');
       } else {
         setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
         setFailedSteps(prev => prev.filter(id => id !== sid));

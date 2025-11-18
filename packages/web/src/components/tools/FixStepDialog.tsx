@@ -88,7 +88,7 @@ export function FixStepDialog({
             handleClose();
         } catch (err: any) {
             toast({
-                title: 'Auto-heal failed',
+                title: 'Failed to fix step',
                 description: err.message || 'Failed to automatically fix the step.',
                 variant: 'destructive',
             });
