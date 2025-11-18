@@ -118,23 +118,7 @@ export function FixStepDialog({
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">
-                    {errorMessage && (
-                        <div className="space-y-2">
-                            <Label className="text-sm font-medium text-destructive">
-                                Error Details
-                            </Label>
-                            <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3">
-                                <p className="text-sm font-mono break-words">
-                                    {errorMessage}
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="space-y-2">
-                        <Label htmlFor="instruction" className="text-sm font-medium">
-                            Step Instruction
-                        </Label>
+                    <div>
                         <Textarea
                             id="instruction"
                             value={instruction}
@@ -144,10 +128,22 @@ export function FixStepDialog({
                             disabled={isProcessing}
                             autoFocus
                         />
-                        <p className="text-xs text-muted-foreground">
-                            Edit the instruction to describe what changes you want to make.
-                        </p>
                     </div>
+
+                    {errorMessage && (
+                        <div className="space-y-1">
+                            <Label className="text-xs font-medium text-destructive">
+                                Step Error Details passed along
+                            </Label>
+                            <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2">
+                                <p className="text-xs font-mono break-words text-muted-foreground">
+                                    {errorMessage.length > 200 
+                                        ? `${errorMessage.substring(0, 200)}...` 
+                                        : errorMessage}
+                                </p>
+                            </div>
+                        </div>
+                    )}
 
                     <Button
                         onClick={handleRebuild}
@@ -155,7 +151,7 @@ export function FixStepDialog({
                         className="w-full"
                     >
                         {isGenerating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {isGenerating ? 'Rebuilding...' : 'Rebuild Configuration'}
+                        {isGenerating ? 'Fixing...' : 'Fix Step'}
                     </Button>
 
                     {onAutoHeal && (

@@ -8,7 +8,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/src/components/ui/alert-dialog';
-import { OctagonAlert } from 'lucide-react';
+import { OctagonAlert, X } from 'lucide-react';
+import { Button } from '@/src/components/ui/button';
 
 interface ModifyStepConfirmDialogProps {
   open: boolean;
@@ -28,6 +29,14 @@ export function ModifyStepConfirmDialog({
   return (
     <AlertDialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
       <AlertDialogContent>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute right-4 top-4 h-6 w-6"
+          onClick={onCancel}
+        >
+          <X className="h-4 w-4" />
+        </Button>
         <AlertDialogHeader>
           <div className="flex items-center gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/20">
@@ -42,7 +51,7 @@ export function ModifyStepConfirmDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel onClick={onCancel}>Inspect Step</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm}>
             Continue Execution
           </AlertDialogAction>

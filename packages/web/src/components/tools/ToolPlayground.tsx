@@ -1360,7 +1360,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           step={steps[fixStepIndex]}
           stepInput={buildEvolvingPayload(computedPayload || {}, steps, stepResultsMap, fixStepIndex - 1)}
           integrationId={steps[fixStepIndex]?.integrationId}
-          errorMessage={stepResultsMap[steps[fixStepIndex]?.id]?.error}
+          errorMessage={
+            typeof stepResultsMap[steps[fixStepIndex]?.id] === 'string'
+              ? stepResultsMap[steps[fixStepIndex]?.id]
+              : stepResultsMap[steps[fixStepIndex]?.id]?.error
+          }
           onSuccess={handleFixStepSuccess}
           onAutoHeal={handleAutoHealStep}
         />
