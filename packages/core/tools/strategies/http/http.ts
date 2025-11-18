@@ -1,4 +1,4 @@
-import { ApiConfig, PaginationType, RequestOptions } from "@superglue/client";
+import { ApiConfig as StepConfig, HttpMethod, PaginationType, RequestOptions } from "@superglue/client";
 import { SupportedFileType } from "@superglue/shared";
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import https from 'https';
@@ -13,6 +13,25 @@ import { callFTP } from "../ftp/ftp.js";
 import { composeUrl } from "../../../utils/helpers.js";
 import { parseFile } from "../../../files/index.js";
 import { smartMergeResponses } from "../../../utils/helpers.js";
+import { StepExecutionInput, StepExecutionResult, StepExecutionStrategy } from "../strategy.js";
+
+export class HttpStepExecutionStrategy implements StepExecutionStrategy {
+  readonly version = '1.0.0';
+
+  async shouldExecute(stepConfig: StepConfig): Promise<boolean> {
+    return (stepConfig.method in HttpMethod && stepConfig.urlHost?.startsWith("http"));
+  }
+
+  async executeStep(input: StepExecutionInput): Promise<StepExecutionResult> {
+    const { stepConfig, stepInputData, credentials, requestOptions } = input;
+    const result = await callHttp({ config: stepConfig, payload: stepInputData, credentials, options: requestOptions });
+    return {
+      success: true,
+      data: result,
+    };
+  }
+}
+
 
 export interface CallAxiosResult {
   response: AxiosResponse;
@@ -304,7 +323,7 @@ export function handleErrorStatus(
   return { shouldFail: true, message: full };
 }
 
-export async function runStepConfig({ config, payload, credentials, options }: { config: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<{ data: any; statusCode: number; headers: Record<string, any>; }> {
+export async function callHttp({ config, payload, credentials, options }: { config: StepConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<{ data: any; statusCode: number; headers: Record<string, any>; }> {
   const allVariables = { ...payload, ...credentials };
 
   let allResults = [];

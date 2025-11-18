@@ -1,4 +1,4 @@
-import { ApiConfig, RequestOptions } from "@superglue/client";
+import { ApiConfig as StepConfig, HttpMethod, RequestOptions } from "@superglue/client";
 import { SupportedFileType } from "@superglue/shared";
 import { Client as FTPClient } from "basic-ftp";
 import * as path from "path";
@@ -7,6 +7,24 @@ import { URL } from "url";
 import { server_defaults } from "../../../default.js";
 import { parseFile, parseJSON } from "../../../files/index.js";
 import { composeUrl } from "../../../utils/helpers.js";
+import { StepExecutionInput, StepExecutionResult, StepExecutionStrategy } from "../strategy.js";
+
+export class FTPStepExecutionStrategy implements StepExecutionStrategy {
+  readonly version = '1.0.0';
+
+  async shouldExecute(stepConfig: StepConfig): Promise<boolean> {
+    return stepConfig.method === HttpMethod.POST && stepConfig.urlHost?.startsWith("ftp://") || stepConfig.urlHost?.startsWith("ftps://") || stepConfig.urlHost?.startsWith("sftp://");
+  }
+
+  async executeStep(input: StepExecutionInput): Promise<StepExecutionResult> {
+    const { stepConfig, stepInputData, credentials, requestOptions } = input;
+    const result = await callFTP({ endpoint: stepConfig, credentials, options: requestOptions });
+    return {
+      success: true,
+      data: result,
+    };
+  }
+}
 
 const SUPPORTED_OPERATIONS = ['list', 'get', 'put', 'delete', 'rename', 'mkdir', 'rmdir', 'exists', 'stat'];
 
@@ -310,7 +328,7 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
   }
 }
 
-export async function callFTP({ endpoint, credentials, options }: { endpoint: ApiConfig, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
+export async function callFTP({ endpoint, credentials, options }: { endpoint: StepConfig, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
   let connectionString = composeUrl(endpoint.urlHost, endpoint.urlPath);
   const connectionInfo = parseConnectionUrl(connectionString);
   let operations: FTPOperation[] = [];

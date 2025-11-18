@@ -2,11 +2,11 @@ import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglu
 import { generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { ToolBuilder } from "../../tools/tool-builder.js";
+import { ToolFinder } from "../../tools/tool-finder.js";
+import { ToolExecutor } from "../../tools/tool-executor.js";
 import { parseJSON } from "../../files/index.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
-import { ToolBuilder } from "../../tools/tool-builder.js";
-import { WorkflowExecutor } from "../../tools/tool-executor.js";
-import { ToolFinder } from "../../tools/tool-finder.js";
 import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { Context, Metadata } from '../types.js';
@@ -97,8 +97,8 @@ export const executeWorkflowResolver = async (
       });
     }
 
-    const executor = new WorkflowExecutor({ workflow, metadata, integrations: integrationManagers });
-    const result = await executor.execute({ payload: args.payload, credentials: args.credentials, options: args.options });
+    const executor = new ToolExecutor({ workflow, metadata, integrations: integrationManagers });
+    const result = await executor.execute({ payload: args.payload, credentials: mergedCredentials, options: args.options });
 
     // Save run to datastore
     context.datastore.createRun({

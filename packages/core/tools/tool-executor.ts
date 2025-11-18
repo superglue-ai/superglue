@@ -1,53 +1,53 @@
-import { ApiConfig, ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
+import { ApiConfig, ExecutionStep, Integration, RequestOptions, Workflow as Tool, WorkflowResult as ToolResult, WorkflowStepResult as ToolStepResult } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
-import { flattenAndNamespaceWorkflowCredentials } from '@superglue/shared/utils';
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
-import { getEvaluateStepResponseContext, getGenerateStepConfigContext, getLoopSelectorContext } from "../context/context-builders.js";
+import { getEvaluateStepResponseContext, getGenerateStepConfigContext, getLoopSelectorContext as getDataSelectorContext } from "../context/context-builders.js";
 import { EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT, GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
-import { isSelfHealingEnabled, maskCredentials, transformAndValidateSchema } from "../utils/helpers.js";
-import { applyJsonata } from "../utils/helpers.legacy.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
-import { AbortError, ApiCallError, runStepConfig } from "./strategies/http/http.js";
+import { isSelfHealingEnabled, maskCredentials, transformData } from "../utils/helpers.js";
+import { executeAndEvaluateFinalTransform, generateWorkingTransform } from "./tool-transform.js";
+import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
 import { generateStepConfig } from "./tool-step-builder.js";
-import { evaluateTransform, generateTransformCode } from "./tool-transform.js";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { StepExecutionStrategy, StepExecutionStrategyRegistry } from "./strategies/strategy.js";
 
-export interface WorkflowExecutorOptions {
-  workflow: Workflow;
+export interface ToolExecutorOptions {
+  tool: Tool;
   metadata: Metadata;
   integrations: IntegrationManager[];
 }
 
-export class WorkflowExecutor implements Workflow {
+export class ToolExecutor implements Tool {
   public id: string;
   public steps: ExecutionStep[];
   public finalTransform?: string;
-  public result: WorkflowResult;
+  public result: ToolResult;
   public responseSchema?: JSONSchema;
   public metadata: Metadata;
   public instruction?: string;
   public inputSchema?: JSONSchema;
   private integrations: Record<string, IntegrationManager>;
-
-  constructor(
-    { workflow, metadata, integrations }: WorkflowExecutorOptions,
-  ) {
-    this.id = workflow.id;
-    this.steps = workflow.steps;
-    this.finalTransform = workflow.finalTransform;
-    this.responseSchema = workflow.responseSchema;
-    this.instruction = workflow.instruction;
+  private stepExecutionStrategies: StepExecutionStrategy[];
+  
+  constructor({ tool, metadata, integrations }: ToolExecutorOptions) {
+    this.id = tool.id;
+    this.steps = tool.steps;
+    this.finalTransform = tool.finalTransform;
+    this.responseSchema = tool.responseSchema;
+    this.instruction = tool.instruction;
     this.metadata = metadata;
-    this.inputSchema = workflow.inputSchema;
+    this.inputSchema = tool.inputSchema;
+
     this.integrations = integrations.reduce((acc, int) => {
       acc[int.id] = int;
       return acc;
     }, {} as Record<string, IntegrationManager>);
+
     this.result = {
       id: crypto.randomUUID(),
       success: false,
@@ -55,148 +55,351 @@ export class WorkflowExecutor implements Workflow {
       stepResults: [],
       startedAt: new Date(),
       completedAt: undefined,
-      config: workflow,
-    } as WorkflowResult;
+      config: tool,
+    } as ToolResult;
+
+    const registry = new StepExecutionStrategyRegistry();
+    registry.register(new HttpStepExecutionStrategy());
+    this.stepExecutionStrategies = registry.getStrategies();
   }
+
   
-  public async execute(
-    { payload, credentials, options }: { payload: Record<string, any>, credentials: Record<string, string>, options?: RequestOptions },
-  ): Promise<WorkflowResult> {
-    this.result = {
-      ...this.result,
-      id: crypto.randomUUID(),
-      success: false,
-      data: {} as Record<string, unknown>,
-      stepResults: [] as WorkflowStepResult[],
-      startedAt: new Date(),
-      completedAt: undefined
-    } as WorkflowResult;
+  public async execute({ payload = {}, credentials = {}, options = {} }: { payload?: Record<string, any>, credentials?: Record<string, string>, options?: RequestOptions }): Promise<ToolResult> {
     try {
-      if (!payload) payload = {};
-      if (!credentials) credentials = {};
       this.validate({ payload, credentials });
-      logMessage("debug", `Executing workflow ${this.id}`, this.metadata);
+      logMessage("debug", `Executing tool ${this.id}`, this.metadata);
 
-      // Execute each step in order
       for (const step of this.steps) {
-        let stepResult: WorkflowStepResult;
-        try {
-          const stepInputPayload = await this.prepareStepInput(step, payload);
-          stepResult = await this.executeStep({ step, payload: stepInputPayload, credentials, options });
-          step.apiConfig = stepResult.config;
-        } catch (stepError) {
-          stepResult = {
-            stepId: step.id,
-            success: false,
-            error: stepError,
-            config: step.apiConfig
-          };
-        }
+        const aggregatedStepData = this.buildAggregatedStepData(payload);
+        const stepResult = await this.executeStep({ step, stepInput: aggregatedStepData, credentials, options });
         this.result.stepResults.push(stepResult);
+        
+        step.apiConfig = stepResult.config;
 
-        // abort if failure occurs
         if (!stepResult.success) {
-          this.result.completedAt = new Date();
-          this.result.success = false;
-          this.result.error = stepResult.error;
-          return this.result;
+          return this.completeWithFailure(stepResult.error);
         }
       }
 
-      // Apply final transformation if specified
       if (this.finalTransform || this.responseSchema) {
-        const rawStepData = {
-          ...payload,
-          ...this.result.stepResults.reduce(
-            (acc, stepResult) => {
-              if (stepResult?.stepId && stepResult?.transformedData !== undefined) {
-                acc[stepResult.stepId] = stepResult.transformedData;
-              }
-              return acc;
-            },
-            {} as Record<string, unknown>,
-          ),
-        };
-        try {
-          // Apply the final transform using the original data
-          let currentFinalTransform = this.finalTransform;
-          const finalResult = await transformAndValidateSchema(rawStepData, currentFinalTransform, this.responseSchema);
-          if (!finalResult.success) {
-            throw new Error(finalResult.error);
-          }
+        const finalAggregatedStepData = this.buildAggregatedStepData(payload);
+        
+        const finalTransformResult = await executeAndEvaluateFinalTransform({
+          aggregatedStepData: finalAggregatedStepData,
+          finalTransform: this.finalTransform,
+          responseSchema: this.responseSchema,
+          instruction: this.instruction,
+          options: options,
+          metadata: this.metadata
+        });
 
-          if (options?.testMode) {
-            const testResult = await evaluateTransform(
-              finalResult.data,
-              currentFinalTransform,
-              rawStepData,
-              this.responseSchema,
-              this.instruction,
-              this.metadata
-            );
-            if (!testResult.success) {
-              throw new Error(testResult.reason);
-            }
-          }
-
-          this.result.data = finalResult.data || {};
-          this.result.config = {
-            id: this.id,
-            steps: this.steps,
-            finalTransform: currentFinalTransform,
-            inputSchema: this.inputSchema,
-            responseSchema: this.responseSchema,
-            instruction: this.instruction
-          } as Workflow; // Store the successful transform
-        } catch (transformError) {
-          // Check if self-healing is enabled before regenerating
-          if (!isSelfHealingEnabled(options, "transform")) {
-            // If self-healing is disabled, fail with the original error
-            this.result.success = false;
-            this.result.error = transformError?.message || transformError;
-            this.result.completedAt = new Date();
-            return this.result;
-          }
-
-          logMessage("info", `Preparing new final transform`, this.metadata);
-          const instruction = "Generate the final transformation code." +
-            (this.instruction ? " with the following instruction: " + this.instruction : "") +
-            (this.finalTransform ? "\nOriginally, we used the following transformation, fix it without messing up future transformations with the original data: " + this.finalTransform : "");
-
-          const newTransformConfig = await generateTransformCode(this.responseSchema, rawStepData, instruction, this.metadata);
-          if (!newTransformConfig) {
-            throw new Error("Failed to generate new final transform");
-          }
-          this.result.data = newTransformConfig.data || {};
-          this.result.config = {
-            id: this.id,
-            steps: this.steps,
-            finalTransform: newTransformConfig.mappingCode,
-            inputSchema: this.inputSchema,
-            responseSchema: this.responseSchema,
-            instruction: this.instruction
-          } as Workflow; // Store the successful transform
+        if (!finalTransformResult.success) {
+          return this.completeWithFailure(finalTransformResult.error);
         }
+
+        this.result.data = finalTransformResult.transformedData || {};
+        this.result.config = {
+          id: this.id,
+          steps: this.steps,
+          finalTransform: finalTransformResult.successfulTransformCode,
+          inputSchema: this.inputSchema,
+          responseSchema: this.responseSchema,
+          instruction: this.instruction
+        } as Tool;
       }
-      this.result.error = undefined;
-      this.result.success = true;
-      this.result.completedAt = new Date();
-      return this.result;
+      return this.completeWithSuccess();
     } catch (error) {
-      this.result.success = false;
-      this.result.error = error?.message || error;
-      this.result.completedAt = new Date();
-      return this.result;
+      return this.completeWithFailure(error?.message || error);
     }
   }
 
+
+  private async executeStep({
+    step,
+    stepInput,
+    credentials,
+    options
+  }: {
+    step: ExecutionStep,
+    stepInput: Record<string, any>,
+    credentials: Record<string, string>,
+    options: RequestOptions
+  }): Promise<ToolStepResult> {
+    try {
+      const { dataSelectorItems, successfulDataSelector, isArray } = await this.getDataSelectorOutput({ step, stepInput, options });
+      step.loopSelector = successfulDataSelector;
+
+      const stepResults = [];
+      const integrationManager = this.integrations[step.integrationId];
+      const isSelfHealing = isSelfHealingEnabled(options, "api");
+      const maxRetries = isSelfHealing 
+        ? (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES) 
+        : 1;
+
+      for (let i = 0; i < dataSelectorItems.length; i++) {
+        const currentItem = dataSelectorItems[i] || "";
+        
+        if (dataSelectorItems.length > 1) {
+          logMessage("debug", `Executing loop iteration ${i + 1}/${dataSelectorItems.length} with item: ${JSON.stringify(currentItem).slice(0, 100)}...`, this.metadata);
+        } else if (dataSelectorItems.length === 1 && currentItem && Object.keys(currentItem).length > 0) {
+          logMessage("debug", `Executing step ${step.id} with item: ${JSON.stringify(currentItem).slice(0, 200)}...`, this.metadata);
+        }
+
+        const loopPayload = { currentItem, ...stepInput };
+        let retryCount = 0;
+        let lastError: string | null = null;
+        let messages: LLMMessage[] = [];
+        let currentConfig = step.apiConfig;
+        let iterationResult: any = null;
+        let cachedIntegration: Integration | undefined;
+
+        while (retryCount < maxRetries) {
+          try {
+            if (retryCount > 0 && isSelfHealing) {
+              logMessage('info', `Self healing step config (retry ${retryCount})`, this.metadata);
+
+              if (messages.length === 0) {
+                cachedIntegration = await integrationManager.getIntegration();
+                messages = await this.initializeSelfHealingContext(
+                  integrationManager,
+                  currentConfig,
+                  loopPayload,
+                  credentials,
+                  cachedIntegration
+                );
+              }
+
+              const generateResult = await generateStepConfig({
+                retryCount,
+                messages,
+                integration: cachedIntegration
+              });
+              
+              if (!generateResult.success) {
+                throw new Error(generateResult.error);
+              }
+
+              currentConfig = { ...currentConfig, ...generateResult.config } as ApiConfig;
+            }
+
+            const stepExecutionStrategy = this.stepExecutionStrategies.find(s => s.shouldExecute(currentConfig));
+            
+            if (!stepExecutionStrategy) {
+              throw new Error("No execution strategy found for this step configuration");
+            }
+
+            const stepExecutionResult = await stepExecutionStrategy.executeStep({
+              stepConfig: currentConfig,
+              stepInputData: loopPayload,
+              credentials,
+              requestOptions: { ...options, testMode: false }
+            });
+
+            if (!stepExecutionResult.success || !stepExecutionResult.data?.data) {
+              throw new Error(stepExecutionResult.error || "No data returned from step");
+            }
+
+            if ((retryCount > 0 && isSelfHealing) || options.testMode) {
+              await this.validateStepResponse(
+                stepExecutionResult.data.data,
+                currentConfig,
+                integrationManager
+              );
+            }
+
+            iterationResult = stepExecutionResult.data;
+            
+            if (currentConfig !== step.apiConfig) {
+              logMessage("debug", `Loop iteration ${i + 1} updated configuration`, this.metadata);
+              step.apiConfig = currentConfig;
+            }
+            break;
+
+          } catch (error) {
+            lastError = maskCredentials(error?.message || String(error), credentials).slice(0, 10000);
+            
+            if (retryCount > 0) {
+              messages.push({ role: "user", content: `Error: ${lastError}` });
+              logMessage('info', `API call failed: ${lastError}`, this.metadata);
+            }
+
+            if (error instanceof AbortError) throw error;
+
+            retryCount++;
+            
+            if (retryCount >= maxRetries) {
+              this.handleMaxRetriesExceeded(currentConfig, retryCount, lastError, i, dataSelectorItems.length);
+            }
+          }
+        }
+
+        const stepResponseData = { 
+          currentItem, 
+          data: iterationResult.data, 
+          ...(typeof iterationResult.data === 'object' && !Array.isArray(iterationResult.data) ? iterationResult.data : {}) 
+        };
+        
+        stepResults.push({
+          stepId: step.id,
+          success: true,
+          stepResponseData,
+          config: currentConfig
+        });
+      }
+
+      logMessage("info", `'${step.id}' Complete`, this.metadata);
+      
+      return {
+        stepId: step.id,
+        success: true,
+        rawData: isArray ? stepResults.map(r => r.stepResponseData) : stepResults[0]?.stepResponseData || null,
+        transformedData: isArray ? stepResults.map(r => r.stepResponseData) : stepResults[0]?.stepResponseData || null,
+        config: step.apiConfig,
+        error: undefined
+      };
+    } catch (error) {
+      logMessage("info", `'${step.id}' Failed`, this.metadata);
+      
+      return {
+        stepId: step.id,
+        success: false,
+        rawData: null,
+        transformedData: null,
+        config: step.apiConfig,
+        error: error.message || error
+      };
+    }
+  }
+
+  private async getDataSelectorOutput({ 
+    step, 
+    stepInput, 
+    options 
+  }: { 
+    step: ExecutionStep, 
+    stepInput: Record<string, any>, 
+    options: RequestOptions 
+  }): Promise<{ dataSelectorItems: any[], successfulDataSelector: string, isArray: boolean }> {
+    const dataSelectorResult = await transformData(stepInput, step.loopSelector);
+    
+    const isArray = Array.isArray(dataSelectorResult.data);
+    let dataSelectorItems: any[] = [];
+    
+    if (isArray) {
+      dataSelectorItems = dataSelectorResult.data;
+    } else if (dataSelectorResult.data) {
+      dataSelectorItems = [dataSelectorResult.data];
+    } else {
+      dataSelectorItems = [{}];
+    }
+
+    if (!dataSelectorResult.success) {
+      if (!isSelfHealingEnabled(options, "api")) {
+        logMessage("error", `Loop selector for '${step.id}' failed. ${dataSelectorResult.error}\nCode: ${step.loopSelector}\nPayload: ${JSON.stringify(stepInput).slice(0, 1000)}...`, this.metadata);
+        throw new Error(`Loop selector for '${step.id}' failed. Check the loop selector code or enable self-healing and re-execute to regenerate automatically.`);
+      }
+
+      const dataSelectorPrompt = getDataSelectorContext({ 
+        step, 
+        payload: stepInput, 
+        instruction: step.apiConfig.instruction 
+      }, { characterBudget: 20000 });
+      
+      const transformResult = await generateWorkingTransform({
+        targetSchema: {},
+        inputData: stepInput,
+        instruction: dataSelectorPrompt,
+        metadata: this.metadata
+      });
+
+      if (!transformResult) {
+        throw new Error("Failed to generate loop selector");
+      }
+
+      step.loopSelector = transformResult.transformCode;
+      const retryResult = await transformData(stepInput, step.loopSelector);
+      dataSelectorItems = retryResult.data;
+
+      if (!retryResult.success || !Array.isArray(dataSelectorItems)) {
+        throw new Error("Failed to generate loop selector");
+      }
+    }
+
+    dataSelectorItems = dataSelectorItems.slice(0, step.loopMaxIters || server_defaults.DEFAULT_LOOP_MAX_ITERS);
+    return { dataSelectorItems, successfulDataSelector: step.loopSelector, isArray };
+  }
+  
+
+  private async initializeSelfHealingContext(
+    integrationManager: IntegrationManager,
+    config: ApiConfig,
+    payload: any,
+    credentials: Record<string, string>,
+    integration: Integration
+  ): Promise<LLMMessage[]> {
+    const docs = await integrationManager.getDocumentation();
+    
+    const userPrompt = getGenerateStepConfigContext({
+      instruction: config.instruction,
+      previousStepConfig: config,
+      stepInput: payload,
+      credentials,
+      integrationDocumentation: docs?.content || '',
+      integrationSpecificInstructions: integration.specificInstructions || ''
+    }, { characterBudget: 50000, mode: 'self-healing' });
+
+    return [
+      { role: "system", content: GENERATE_STEP_CONFIG_SYSTEM_PROMPT },
+      { role: "user", content: userPrompt }
+    ];
+  }
+
+  private async validateStepResponse(
+    data: any,
+    config: ApiConfig,
+    integrationManager: IntegrationManager
+  ): Promise<void> {
+    const evaluation = await this.evaluateStepResponse({
+      data,
+      config,
+      docSearchResultsForStepInstruction: await integrationManager?.searchDocumentation(config.instruction)
+    });
+    
+    if (!evaluation.success) {
+      throw new Error(evaluation.shortReason + " " + JSON.stringify(data).slice(0, 10000));
+    }
+  }
+
+  private handleMaxRetriesExceeded(
+    config: ApiConfig,
+    retryCount: number,
+    lastError: string,
+    iterationIndex: number,
+    totalIterations: number
+  ): never {
+    telemetryClient?.captureException(
+      new Error(`API call failed after ${retryCount} attempts: ${lastError}`), 
+      this.metadata?.orgId,
+      { config, retryCount }
+    );
+    throw new ApiCallError(
+      `Error processing item ${iterationIndex + 1}/${totalIterations}: ${lastError}`, 
+      500
+    );
+  }
+
   private validate(payload: Record<string, unknown>): void {
+
     if (!this.id) {
-      throw new Error("Workflow must have a valid ID");
+      throw new Error("Tool must have a valid ID");
     }
 
     if (!this.steps || !Array.isArray(this.steps)) {
       throw new Error("Execution steps must be an array");
+    }
+
+    if (!this.stepExecutionStrategies || !Array.isArray(this.stepExecutionStrategies)) {
+      throw new Error("Step execution strategies must be an array");
     }
 
     for (const step of this.steps) {
@@ -210,177 +413,36 @@ export class WorkflowExecutor implements Workflow {
     }
   }
 
-  private async prepareStepInput(
-    step: ExecutionStep,
-    originalPayload: Record<string, unknown>,
-  ): Promise<Record<string, unknown>> {
-    try {
-      // if explicit mapping exists, use it first
-      const mappingContext = {
-        ...originalPayload,
-        // Include step results at root level for easier access
-        ...Object.entries(this.result?.stepResults).reduce(
-          (acc, [stepIndex, stepResult]) => {
-            if (stepResult?.transformedData) {
-              acc[this.result.stepResults[stepIndex].stepId] = stepResult.transformedData;
-            }
-            return acc;
-          },
-          {} as Record<string, unknown>,
-        ),
-      };
-      // DEPRECATED: Remove this once we have a proper migration path
-      if (step.inputMapping) {
-        // Use JS transform for input mapping
-        try {
-          const transformResult = await transformAndValidateSchema(
-            mappingContext,
-            step.inputMapping,
-            null // No schema validation for input mappings
-          );
-
-          if (!transformResult.success) {
-            throw new Error(`Input mapping failed: ${transformResult.error}`);
-          }
-
-          return transformResult.data as Record<string, unknown>;
-        } catch (err) {
-          console.warn(`[Step ${step.id}] Input mapping failed, falling back to auto-detection`, err);
-        }
+  private buildAggregatedStepData(originalPayload: Record<string, unknown>): Record<string, unknown> {
+    const stepResults: Record<string, unknown> = {};
+    
+    for (const result of this.result.stepResults) {
+      if (result?.transformedData) {
+        stepResults[result.stepId] = result.transformedData;
       }
-      return mappingContext;
-    } catch (error) {
-      console.error(`[Step ${step.id}] Error preparing input:`, error);
-      return { ...originalPayload };
     }
-  }
-  private async executeStep({
-    step,
-    payload,
-    credentials,
-    options
-  }: {
-    step: ExecutionStep,
-    payload: Record<string, any>,
-    credentials: Record<string, string>,
-    options: RequestOptions
-  }): Promise<WorkflowStepResult> {
-    const result: WorkflowStepResult = {
-      stepId: step.id,
-      success: false,
-      config: step.apiConfig
-    }
-  
-    try {
-      let loopItems: any[] = [];
-  
-      const integrationManager = step.integrationId ? this.integrations[step.integrationId] : undefined;
-      const loopSelectorResult = await transformAndValidateSchema(payload, step.loopSelector || "$", null);
-      const isLoopSelectorArray = Array.isArray(loopSelectorResult.data);
-      if(isLoopSelectorArray) {
-        loopItems = loopSelectorResult.data;
-      }
-      else if(loopSelectorResult.data) {
-        loopItems = [loopSelectorResult.data];
-      }
-      else {
-        loopItems = [{}];
-      }
-  
-      if (!loopSelectorResult.success) {
-        if (!isSelfHealingEnabled(options, "api")) {
-          logMessage("error", `Loop selector for '${step.id}' failed. ${loopSelectorResult.error}\nCode: ${step.loopSelector}\nPayload: ${JSON.stringify(payload).slice(0, 1000)}...`, this.metadata);
-          throw new Error(`Data selector for '${step.id}' failed. Verify the data selector code.`);
-        }
-  
-        const loopPrompt = getLoopSelectorContext( { step: step, payload: payload, instruction: step.apiConfig.instruction }, { characterBudget: 20000 });
-        const arraySchema = { type: "array", description: "Array of items to iterate over" };
-        const transformResult = await generateTransformCode(arraySchema, payload, loopPrompt, this.metadata);
-  
-        step.loopSelector = transformResult.mappingCode;
-        const retryResult = await transformAndValidateSchema(payload, step.loopSelector, null);
-        loopItems = retryResult.data;
-  
-        if (!retryResult.success || !Array.isArray(loopItems)) {
-          throw new Error("Failed to generate loop selector");
-        }
-      }
-  
-      loopItems = loopItems.slice(0, server_defaults.DEFAULT_LOOP_MAX_ITERS);
-  
-      const stepResults: WorkflowStepResult[] = [];
-      let successfulConfig: ApiConfig | null = null;
-  
-      for (let i = 0; i < loopItems.length; i++) {
-        const currentItem = loopItems[i] || "";
-        if(loopItems.length > 1) {
-          logMessage("debug", `Executing loop iteration ${i + 1}/${loopItems.length} with item: ${JSON.stringify(currentItem).slice(0, 100)}...`, this.metadata);
-        }
-        else if(loopItems.length == 1 && currentItem && Object.keys(currentItem).length > 0) {
-          logMessage("debug", `Executing step ${step.id} with item: ${JSON.stringify(currentItem).slice(0, 100)}...`, this.metadata);
-        }
-  
-        const loopPayload: Record<string, any> = {
-          currentItem: currentItem,
-          ...payload
-        };
-  
-        try {
-          const apiResponse = await this.executeConfig({
-            config: successfulConfig || step.apiConfig,
-            integrationManager,
-            payload: loopPayload,
-            credentials,
-            options: {
-              ...options,
-              testMode: false
-            }
-          });
-  
-          if (apiResponse.config) {
-            successfulConfig = apiResponse.config;
-            if (successfulConfig !== step.apiConfig) {
-              logMessage("debug", `Loop iteration ${i + 1} updated configuration`, this.metadata);
-            }
-          } 
-          const rawData = { currentItem: currentItem, data: apiResponse.data, ...(typeof apiResponse.data === 'object' && !Array.isArray(apiResponse.data) ? apiResponse.data : {}) };
-          const transformedData = await applyJsonata(rawData, step.responseMapping); //LEGACY: New workflow strategy will not use response mappings, default to $
-          stepResults.push({
-            stepId: step.id,
-            success: true,
-            rawData: null,
-            transformedData: transformedData,
-            config: apiResponse.config
-          });
-  
-          // update the apiConfig with the new config
-          step.apiConfig = apiResponse.config;
-  
-        } catch (callError) {
-          const errorMessage = `Error processing item ${i + 1}/${loopItems.length} '${JSON.stringify(currentItem).slice(0, 50)}...': ${String(callError)}`;
-          logMessage("error", errorMessage, this.metadata);
-          throw new Error(errorMessage);
-        }
-      }
-  
-      result.config = step.apiConfig;
-      result.rawData = isLoopSelectorArray ? stepResults.map(r => r.rawData) : stepResults[0]?.rawData || null;
-      result.transformedData = isLoopSelectorArray ? stepResults.map(r => r.transformedData) : stepResults[0]?.transformedData || null;
-      result.success = stepResults.every(r => r.success);
-      result.error = stepResults.filter(s => s.error).join("\n");
-    } catch (error) {
-      result.config = step.apiConfig;
-      result.success = false;
-      result.error = error.message || error;
-      result.rawData = null;
-      result.transformedData = null;
-    }
-    logMessage("info", `'${step.id}' ${result.success ? "Complete" : "Failed"}`, this.metadata);
-    return result;
+    
+    return {
+      ...originalPayload,
+      ...stepResults,
+    };
   }
 
+  private completeWithSuccess(): ToolResult {
+    this.result.success = true;
+    this.result.error = undefined;
+    this.result.completedAt = new Date();
+    return this.result;
+  }
 
-  public async evaluateConfigResponse({
+  private completeWithFailure(error: any): ToolResult {
+    this.result.success = false;
+    this.result.error = error;
+    this.result.completedAt = new Date();
+    return this.result;
+  }
+
+  private async evaluateStepResponse({
     data,
     config,
     docSearchResultsForStepInstruction
@@ -418,141 +480,4 @@ export class WorkflowExecutor implements Workflow {
     return evaluationResult.response;
   }
 
-  
-  private async executeConfig({
-    config,
-    integrationManager,
-    payload,
-    credentials,
-    options
-  }: {
-    config: ApiConfig,
-    integrationManager: IntegrationManager | undefined,
-    payload: any,
-    credentials: Record<string, string>,
-    options: RequestOptions
-  }): Promise<{
-    data: any;
-    config: ApiConfig;
-    statusCode: number;
-    headers: Record<string, any>;
-  }> {
-    let response: any = null;
-    let retryCount = 0;
-    let lastError: string | null = null;
-    let messages: LLMMessage[] = [];
-    let success = false;
-    let isSelfHealing = isSelfHealingEnabled(options, "api");
-    let integration: Integration | undefined;
-    let stepCredentials: Record<string, string> = credentials;
-    // If self healing is enabled, use the retries from the options or the default max of 10 if not specified, otherwise use 1 (no self-healing case)
-    const effectiveMaxRetries = isSelfHealing ? (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES) : 1;
-  
-    do {
-      try {
-
-        // compute credentials for the step
-        await integrationManager?.refreshTokenIfNeeded();
-        const currentIntegration = await integrationManager?.getIntegration();
-        if (currentIntegration) {
-          stepCredentials = {
-            ...credentials,
-            ...flattenAndNamespaceWorkflowCredentials([currentIntegration])
-          } as Record<string, string>;
-        }
-
-        // self healing logic
-        if (retryCount > 0 && isSelfHealing) {
-          logMessage('info', `Self healing the step configuration for ${config?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, this.metadata);
-          if (messages.length === 0) {
-            integration = await integrationManager?.getIntegration();
-            const docs = await integrationManager?.getDocumentation();
-            const integrationSpecificInstructions = integration?.specificInstructions || '';
-            
-            const userPrompt = getGenerateStepConfigContext({
-              instruction: config.instruction,
-              previousStepConfig: config,
-              stepInput: payload,
-              credentials: stepCredentials,
-              integrationDocumentation: docs?.content || '',
-              integrationSpecificInstructions: integrationSpecificInstructions
-            }, { characterBudget: 50000, mode: 'self-healing' });
-        
-            messages.push({
-              role: "system",
-              content: GENERATE_STEP_CONFIG_SYSTEM_PROMPT
-            });
-            messages.push({
-              role: "user",
-              content: userPrompt
-            });
-          }
-
-          const generateStepConfigResult = await generateStepConfig({
-            retryCount,
-            messages,
-            integration
-          });
-          messages = generateStepConfigResult.messages;
-          
-          if (!generateStepConfigResult.success) {
-            throw new Error(generateStepConfigResult.error);
-          }
-          
-          config = {
-            ...config,
-            ...generateStepConfigResult.config
-          } as ApiConfig;
-        }
-  
-        // execute the step config
-        response = await runStepConfig({ config, payload, credentials: stepCredentials, options });
-  
-        if (!response.data) {
-          throw new Error("No data returned from step. This could be due to a configuration error.");
-        }
-  
-        if (retryCount > 0 && isSelfHealing || options.testMode) {
-          const result = await this.evaluateConfigResponse({
-            data: response.data,
-            config: config,
-            docSearchResultsForStepInstruction: await integrationManager?.searchDocumentation(config.instruction)
-          });
-          success = result.success;
-          if (!result.success) throw new Error(result.shortReason + " " + JSON.stringify(response.data).slice(0, 10000));
-        }
-        else {
-          success = true;
-        }
-        break;
-      }
-      catch (error) {
-        const rawErrorString = error?.message || JSON.stringify(error || {});
-        lastError = maskCredentials(rawErrorString, stepCredentials).slice(0, 10000);
-        if (retryCount > 0) {
-          messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${lastError}` });
-          logMessage('info', `API call failed. Last error: ${lastError}`, this.metadata);
-        }
-  
-        // hack to get the status code from the error
-        if (!response?.statusCode) {
-          response = response || {};
-          response.statusCode = error instanceof ApiCallError ? error.statusCode : 500;
-        }
-        if (error instanceof AbortError) {
-          break;
-        }
-      }
-      retryCount++;
-    } while (retryCount < effectiveMaxRetries);
-    if (!success) {
-      telemetryClient?.captureException(new Error(`API call failed. Last error: ${lastError}`), this.metadata?.orgId || undefined, {
-        config: config,
-        retryCount: retryCount,
-      });
-      throw new ApiCallError(`API call failed. Last error: ${lastError}`, response?.statusCode);
-    }
-  
-    return { data: response?.data, config: config, statusCode: response?.statusCode, headers: response?.headers };
-  }  
 }
