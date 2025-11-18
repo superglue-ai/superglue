@@ -193,6 +193,64 @@ deleteWorkflow(id: string): Promise<boolean>
 await superglue.deleteWorkflow("old-tool");
 ```
 
+### generateStepConfig
+
+Generate or refine an API configuration for a workflow step using AI. Supports creating configurations from scratch, editing existing ones, or fixing failed configurations.
+
+**Use Cases:**
+- **Create**: Generate a new API config from an instruction
+- **Edit**: Modify an existing config with new requirements
+- **Fix**: Automatically repair a failed config when errors occur
+
+```typescript
+generateStepConfig({
+  integrationId?: string;
+  currentStepConfig: Record<string, any>;
+  stepInput?: Record<string, any>;
+  credentials?: Record<string, string>;
+  errorMessage?: string;
+}): Promise<ApiConfig>
+```
+
+**Parameters:**
+- `integrationId` - Integration ID for context/documentation (optional)
+- `currentStepConfig` - API config to edit (must include `instruction` field)
+- `stepInput` - Sample input data for the step (optional)
+- `credentials` - Available credentials for context (optional)
+- `errorMessage` - Error from failed execution (triggers fix mode, min 100 chars)
+
+**Returns:** `ApiConfig` - Generated or updated configuration
+
+**Example:**
+```typescript
+// Create: Generate new config from instruction
+const newConfig = await superglue.generateStepConfig({
+  integrationId: "postgres-db",
+  currentStepConfig: {
+    instruction: "Get all active users from the database"
+  },
+  stepInput: { limit: 100 }
+});
+
+// Edit: Modify existing config
+const updatedConfig = await superglue.generateStepConfig({
+  integrationId: "postgres-db",
+  currentStepConfig: {
+    ...existingStep.apiConfig,
+    instruction: "Get users with status = 'active' and last_login > 30 days ago"
+  },
+  stepInput: { limit: 100 }
+});
+
+// Fix: Repair failed config with error context
+const fixedConfig = await superglue.generateStepConfig({
+  integrationId: "stripe-api",
+  currentStepConfig: failedStep.apiConfig,
+  stepInput: { customerId: "cus_123" },
+  errorMessage: "Request failed with 401: Invalid API key format. Expected 'Bearer sk_live_...' in Authorization header."
+});
+```
+
 ## Workflow scheduling
 
 ### listWorkflowSchedules
