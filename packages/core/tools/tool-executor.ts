@@ -14,7 +14,7 @@ import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategie
 import { generateStepConfig } from "./tool-step-builder.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { StepExecutionStrategy, StepExecutionStrategyRegistry } from "./strategies/strategy.js";
+import { StepExecutionStrategyRegistry } from "./strategies/strategy.js";
 import { PostgresStepExecutionStrategy } from "./strategies/postgres/postgres.js";
 import { FTPStepExecutionStrategy } from "./strategies/ftp/ftp.js";
 
@@ -248,8 +248,8 @@ export class ToolExecutor implements Tool {
 
         const stepResponseData = { 
           currentItem, 
-          data: iterationResult.data, 
-          ...(typeof iterationResult.data === 'object' && !Array.isArray(iterationResult.data) ? iterationResult.data : {}) 
+          data: iterationResult, 
+          ...(typeof iterationResult === 'object' && !Array.isArray(iterationResult) ? iterationResult : {}) 
         };
         
         stepResults.push({

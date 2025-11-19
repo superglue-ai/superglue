@@ -24,10 +24,10 @@ export class HttpStepExecutionStrategy implements StepExecutionStrategy {
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
     const { stepConfig, stepInputData, credentials, requestOptions } = input;
-    const result = await callHttp({ config: stepConfig, payload: stepInputData, credentials, options: requestOptions });
+    const httpResult = await callHttp({ config: stepConfig, payload: stepInputData, credentials, options: requestOptions });
     return {
       success: true,
-      strategyExecutionData: result,
+      strategyExecutionData: httpResult.data,
     };
   }
 }
