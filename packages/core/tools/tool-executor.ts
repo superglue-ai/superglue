@@ -288,7 +288,7 @@ export class WorkflowExecutor implements Workflow {
       if (!loopSelectorResult.success) {
         if (!isSelfHealingEnabled(options, "api")) {
           logMessage("error", `Loop selector for '${step.id}' failed. ${loopSelectorResult.error}\nCode: ${step.loopSelector}\nPayload: ${JSON.stringify(payload).slice(0, 1000)}...`, this.metadata);
-          throw new Error(`Loop selector for '${step.id}' failed. Check the loop selector code or enable self-healing and re-execute to regenerate automatically.`);
+          throw new Error(`Data selector for '${step.id}' failed. Verify the data selector code.`);
         }
   
         const loopPrompt = getLoopSelectorContext( { step: step, payload: payload, instruction: step.apiConfig.instruction }, { characterBudget: 20000 });

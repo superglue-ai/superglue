@@ -130,12 +130,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     computeToolPayload(manualPayloadText, filePayloads),
     [manualPayloadText, filePayloads]
   );
-
-  useEffect(() => {
-    if (initialPayload !== undefined) {
-      setManualPayloadText(initialPayload);
-    }
-  }, [initialPayload]);
   
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
