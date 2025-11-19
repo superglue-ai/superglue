@@ -3,7 +3,7 @@ import { Integration } from "@superglue/client";
 import { DataStore } from "../../../packages/core/datastore/types.js";
 import { DocumentationFetcher } from "../../../packages/core/documentation/index.js";
 import { logMessage } from "../../../packages/core/utils/logs.js";
-import { replaceVariables } from "../../../packages/core/utils/tools.js";
+import { replaceVariables } from "../../../packages/core/utils/helpers.js";
 import type { AgentEvalConfig, IntegrationConfig } from "../types.js";
 
 export class IntegrationSetupService {
@@ -59,6 +59,12 @@ export class IntegrationSetupService {
       {} as Record<string, string>
     );
 
+    logMessage('info', 'scopedCredentials', this.metadata);
+    logMessage('info', 'integrationConfig.urlHost', this.metadata);
+    logMessage('info', 'integrationConfig.urlPath', this.metadata);
+    logMessage('info', 'integrationConfig.documentationUrl', this.metadata);
+    logMessage('info', 'integrationConfig.openApiUrl', this.metadata);
+    logMessage('info', 'integrationConfig.keywords', this.metadata);
     const docFetcher = new DocumentationFetcher(
       {
         urlHost: await replaceVariables(integrationConfig.urlHost, scopedCredentials),

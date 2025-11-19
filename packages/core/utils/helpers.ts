@@ -96,15 +96,22 @@ export async function replaceVariables(template: string, payload: Record<string,
   for (const match of matches) {
     const path = match[1].trim();
     let value: any;
-    if (payload[path]) {
+    if (path in payload && payload[path] !== undefined) {
       value = payload[path];
     }
     else {
-      const result = await transformData(payload, path);
-      if (result.success) {
+      const isArrowFunction = /^\s*\([^)]*\)\s*=>/.test(path);
+      
+      if (isArrowFunction) {
+        const result = await transformData(payload, path);
+        if (!result.success) {
+          throw new Error(`Failed to run JS expression: ${path} - ${result.error}`);
+        }
         value = result.data;
       } else {
-        throw new Error(`Failed to run JS expression: ${path} - ${result.error}`);
+        const availableKeys = Object.keys(payload).slice(0, 10).join(', ');
+        const keyPreview = Object.keys(payload).length > 10 ? `${availableKeys}... (${Object.keys(payload).length} total)` : availableKeys;
+        throw new Error(`Direct variable reference '${path}' failed to resolve. Available top level keys: ${keyPreview}`);
       }
     }
 
