@@ -14,10 +14,10 @@ export class PostgresStepExecutionStrategy implements StepExecutionStrategy {
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
     const { stepConfig, stepInputData, credentials, requestOptions } = input;
-    const result = await callPostgres({ endpoint: stepConfig, payload: stepInputData, credentials, options: requestOptions });
+    const rows = await callPostgres({ endpoint: stepConfig, payload: stepInputData, credentials, options: requestOptions });
     return {
       success: true,
-      strategyExecutionData: result,
+      strategyExecutionData: rows,
     };
   }
 }

@@ -18,10 +18,10 @@ export class FTPStepExecutionStrategy implements StepExecutionStrategy {
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
     const { stepConfig, stepInputData, credentials, requestOptions } = input;
-    const result = await callFTP({ endpoint: stepConfig, credentials, options: requestOptions });
+    const ftpResult = await callFTP({ endpoint: stepConfig, credentials, options: requestOptions });
     return {
       success: true,
-      strategyExecutionData: result,
+      strategyExecutionData: ftpResult,
     };
   }
 }
