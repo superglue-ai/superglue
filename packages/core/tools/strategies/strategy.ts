@@ -1,9 +1,9 @@
 import { ApiConfig as StepConfig, RequestOptions } from "@superglue/client";
 
 
-export interface StepExecutionResult {
+export interface StepStrategyExecutionResult {
     success: boolean;
-    data: any;
+    strategyExecutionData: any;
     error?: string;
 }
 
@@ -32,7 +32,7 @@ export interface StepExecutionStrategy {
      * @param stepConfig The step config to execute
      * @returns the execution result
      */
-    executeStep(input: StepExecutionInput): Promise<StepExecutionResult> | StepExecutionResult;
+    executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> | StepStrategyExecutionResult;
 }
 
 export class StepExecutionStrategyRegistry {
@@ -46,16 +46,24 @@ export class StepExecutionStrategyRegistry {
         return [...this.strategies];
     }
 
-    async routeAndExecute(input: StepExecutionInput): Promise<StepExecutionResult> {
+    async routeAndExecute(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
         for (const strategy of this.strategies) {
             if (await strategy.shouldExecute(input.stepConfig)) {
-                return await strategy.executeStep(input);
+                try {
+                    return await strategy.executeStep(input);
+                } catch (error) {
+                    return {
+                        success: false,
+                        strategyExecutionData: {},
+                        error: error.message
+                    };
+                }
             }
         }
         return {
             success: false,
-            data: {},
-            error: 'No strategy found to execute the step'
+            strategyExecutionData: {},
+            error: 'No strategy found to execute the step.'
         };
     }
 }

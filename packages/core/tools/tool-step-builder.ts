@@ -71,6 +71,14 @@ export async function generateStepConfig({ retryCount, messages, integration }: 
 
     const generatedConfig = generateStepConfigResult.response.stepConfig;
     
+    if (!generatedConfig) {
+        return {
+            success: false,
+            error: "LLM returned invalid response: stepConfig is missing",
+            messages: generateStepConfigResult.messages
+        };
+    }
+    
     const config: Partial<ApiConfig> = {
         urlHost: generatedConfig.urlHost,
         urlPath: generatedConfig.urlPath,

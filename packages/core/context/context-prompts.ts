@@ -31,6 +31,7 @@ Requirements:
 - Handle missing/null data gracefully with optional chaining (?.) and defaults - BUT - throw when expected and required data is missing so superglue can self heal
 - Validate arrays with Array.isArray() before using array methods
 - Return appropriate defaults when data is missing
+- Do not throw errors in generated transform code and do not include overly defensive fallbacks
 
 COMMON WORKFLOW TRANSFORMATIONS:
 
@@ -39,7 +40,6 @@ COMMON WORKFLOW TRANSFORMATIONS:
 (sourceData) => {
   // fetchItems returned object, so .data contains the result
   const items = sourceData.fetchItems.data;
-  if (!Array.isArray(items)) throw new Error("Expected array of items to iterate over");
   
   // excludeIds returned object, so .data contains the array
   const excludeIds = sourceData.excludeIds.data || [];

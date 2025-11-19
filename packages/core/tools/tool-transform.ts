@@ -160,15 +160,17 @@ export async function generateWorkingTransform({
 
     const evaluation = await evaluateTransform(transformedData, transformCode, inputData, targetSchema, instruction, metadata);
     if (!evaluation.success) {
-      throw new Error(`Mapping evaluation failed: ${evaluation.reason}`);
+      throw new Error(`Transform evaluation failed: ${evaluation.reason}`);
     }
-    logMessage('info', `Mapping generated successfully`, metadata);
+    logMessage('info', `Transform generated successfully`, metadata);
     return { transformCode: transformCode, data: transformedData };
   } catch (error) {
     if (retry < server_defaults.MAX_TRANSFORMATION_RETRIES) {
       const errorMessage = String(error.message);
       logMessage('warn', "Error generating JS transform: " + errorMessage.slice(0, 1000), metadata);
+      
       messages?.push({ role: "user", content: errorMessage });
+      
       return generateWorkingTransform({
         targetSchema: targetSchema,
         inputData: inputData,
