@@ -3,7 +3,7 @@ import { Pool, PoolConfig } from 'pg';
 import { server_defaults } from "../../../default.js";
 import { parseJSON } from "../../../files/index.js";
 import { composeUrl, replaceVariables } from "../../../utils/helpers.js";
-import { StepExecutionInput, StepExecutionResult, StepExecutionStrategy } from "../strategy.js";
+import { StepExecutionInput, StepStrategyExecutionResult, StepExecutionStrategy } from "../strategy.js";
 
 export class PostgresStepExecutionStrategy implements StepExecutionStrategy {
   readonly version = '1.0.0';
@@ -12,12 +12,12 @@ export class PostgresStepExecutionStrategy implements StepExecutionStrategy {
     return stepConfig.method === HttpMethod.POST && stepConfig.urlHost?.startsWith("postgres://") || stepConfig.urlHost?.startsWith("postgresql://");
   }
 
-  async executeStep(input: StepExecutionInput): Promise<StepExecutionResult> {
+  async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
     const { stepConfig, stepInputData, credentials, requestOptions } = input;
     const result = await callPostgres({ endpoint: stepConfig, payload: stepInputData, credentials, options: requestOptions });
     return {
       success: true,
-      data: result,
+      strategyExecutionData: result,
     };
   }
 }

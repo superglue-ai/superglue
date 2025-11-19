@@ -129,23 +129,35 @@ export class ToolExecutor implements Tool {
     options: RequestOptions
   }): Promise<ToolStepResult> {
     try {
-      const { dataSelectorItems, successfulDataSelector, isArray } = await this.getDataSelectorOutput({ step, stepInput, options });
+      const { dataSelectorOutput, successfulDataSelector } = await this.getDataSelectorOutput({ step, stepInput, options });
       step.loopSelector = successfulDataSelector;
+
+      const isLoopStep = Array.isArray(dataSelectorOutput);
+      let itemsToExecuteStepOn = isLoopStep 
+        ? dataSelectorOutput 
+        : [dataSelectorOutput || {}];
+      
+      itemsToExecuteStepOn = itemsToExecuteStepOn.slice(0, step.loopMaxIters || server_defaults.DEFAULT_LOOP_MAX_ITERS);
 
       const stepResults = [];
       const integrationManager = this.integrations[step.integrationId];
+      
+      if (!integrationManager) {
+        throw new Error(`Integration '${step.integrationId}' not found. Available integrations: ${Object.keys(this.integrations).join(', ')}`);
+      }
+      
       const isSelfHealing = isSelfHealingEnabled(options, "api");
       const maxRetries = isSelfHealing 
         ? (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES) 
         : 1;
 
-      for (let i = 0; i < dataSelectorItems.length; i++) {
-        const currentItem = dataSelectorItems[i] || "";
+      let configWasValidated = false;
+
+      for (let i = 0; i < itemsToExecuteStepOn.length; i++) {
+        const currentItem = itemsToExecuteStepOn[i];
         
-        if (dataSelectorItems.length > 1) {
-          logMessage("debug", `Executing loop iteration ${i + 1}/${dataSelectorItems.length} with item: ${JSON.stringify(currentItem).slice(0, 100)}...`, this.metadata);
-        } else if (dataSelectorItems.length === 1 && currentItem && Object.keys(currentItem).length > 0) {
-          logMessage("debug", `Executing step ${step.id} with item: ${JSON.stringify(currentItem).slice(0, 200)}...`, this.metadata);
+        if (itemsToExecuteStepOn.length > 1) {
+          logMessage("debug", `Executing loop iteration ${i + 1}/${itemsToExecuteStepOn.length} with item: ${JSON.stringify(currentItem).slice(0, 100)}...`, this.metadata);
         }
 
         const loopPayload = { currentItem, ...stepInput };
@@ -183,28 +195,32 @@ export class ToolExecutor implements Tool {
               }
 
               currentConfig = { ...currentConfig, ...generateResult.config } as ApiConfig;
+              configWasValidated = false;
             }
 
-            const stepExecutionResult = await this.strategyRegistry.routeAndExecute({
+            const itemExecutionResult = await this.strategyRegistry.routeAndExecute({
               stepConfig: currentConfig,
               stepInputData: loopPayload,
               credentials,
               requestOptions: { ...options, testMode: false }
             });
 
-            if (!stepExecutionResult.success || !stepExecutionResult.data) {
-              throw new Error(stepExecutionResult.error || "No data returned from step");
+            if (!itemExecutionResult.success || itemExecutionResult.strategyExecutionData === undefined) {
+              throw new Error(itemExecutionResult.error || `No data returned from iteration: ${i + 1} in step: ${step.id}`);
             }
 
-            if ((retryCount > 0 && isSelfHealing) || options.testMode) {
+            const needsValidation = options.testMode || (retryCount > 0 && isSelfHealing && !configWasValidated);
+            
+            if (needsValidation) {
               await this.validateStepResponse(
-                stepExecutionResult.data.data,
+                itemExecutionResult.strategyExecutionData,
                 currentConfig,
                 integrationManager
               );
+              configWasValidated = true;
             }
 
-            iterationResult = stepExecutionResult.data;
+            iterationResult = itemExecutionResult.strategyExecutionData;
             
             if (currentConfig !== step.apiConfig) {
               logMessage("debug", `Loop iteration ${i + 1} updated configuration`, this.metadata);
@@ -217,7 +233,7 @@ export class ToolExecutor implements Tool {
             
             if (retryCount > 0) {
               messages.push({ role: "user", content: `Error: ${lastError}` });
-              logMessage('info', `API call failed: ${lastError}`, this.metadata);
+              logMessage('info', `Step execution failed: ${lastError}`, this.metadata);
             }
 
             if (error instanceof AbortError) throw error;
@@ -225,7 +241,7 @@ export class ToolExecutor implements Tool {
             retryCount++;
             
             if (retryCount >= maxRetries) {
-              this.handleMaxRetriesExceeded(currentConfig, retryCount, lastError, i, dataSelectorItems.length);
+              this.handleMaxRetriesExceeded(currentConfig, retryCount, lastError, i, Array.isArray(itemsToExecuteStepOn) ? itemsToExecuteStepOn.length : null);
             }
           }
         }
@@ -249,8 +265,9 @@ export class ToolExecutor implements Tool {
       return {
         stepId: step.id,
         success: true,
-        rawData: isArray ? stepResults.map(r => r.stepResponseData) : stepResults[0]?.stepResponseData || null,
-        transformedData: isArray ? stepResults.map(r => r.stepResponseData) : stepResults[0]?.stepResponseData || null,
+        transformedData: isLoopStep 
+          ? stepResults.map(r => r.stepResponseData)
+          : stepResults[0]?.stepResponseData || null,
         config: step.apiConfig,
         error: undefined
       };
@@ -260,7 +277,6 @@ export class ToolExecutor implements Tool {
       return {
         stepId: step.id,
         success: false,
-        rawData: null,
         transformedData: null,
         config: step.apiConfig,
         error: error.message || error
@@ -276,23 +292,13 @@ export class ToolExecutor implements Tool {
     step: ExecutionStep, 
     stepInput: Record<string, any>, 
     options: RequestOptions 
-  }): Promise<{ dataSelectorItems: any[], successfulDataSelector: string, isArray: boolean }> {
-    const dataSelectorResult = await transformData(stepInput, step.loopSelector);
+  }): Promise<{ dataSelectorOutput: any, successfulDataSelector: string }> {
     
-    const isArray = Array.isArray(dataSelectorResult.data);
-    let dataSelectorItems: any[] = [];
-    
-    if (isArray) {
-      dataSelectorItems = dataSelectorResult.data;
-    } else if (dataSelectorResult.data) {
-      dataSelectorItems = [dataSelectorResult.data];
-    } else {
-      dataSelectorItems = [{}];
-    }
+    let dataSelectorTransformResult = await transformData(stepInput, step.loopSelector);
 
-    if (!dataSelectorResult.success) {
+    if (!dataSelectorTransformResult.success) {
       if (!isSelfHealingEnabled(options, "api")) {
-        logMessage("error", `Loop selector for '${step.id}' failed. ${dataSelectorResult.error}\nCode: ${step.loopSelector}\nPayload: ${JSON.stringify(stepInput).slice(0, 1000)}...`, this.metadata);
+        logMessage("error", `Loop selector for '${step.id}' failed. ${dataSelectorTransformResult.error}\nCode: ${step.loopSelector}\nPayload: ${JSON.stringify(stepInput).slice(0, 1000)}...`, this.metadata);
         throw new Error(`Loop selector for '${step.id}' failed. Check the loop selector code or enable self-healing and re-execute to regenerate automatically.`);
       }
 
@@ -314,16 +320,15 @@ export class ToolExecutor implements Tool {
       }
 
       step.loopSelector = transformResult.transformCode;
-      const retryResult = await transformData(stepInput, step.loopSelector);
-      dataSelectorItems = retryResult.data;
-
-      if (!retryResult.success || !Array.isArray(dataSelectorItems)) {
-        throw new Error("Failed to generate loop selector");
+      dataSelectorTransformResult = {
+        success: true,
+        data: transformResult.data
       }
     }
 
-    dataSelectorItems = dataSelectorItems.slice(0, step.loopMaxIters || server_defaults.DEFAULT_LOOP_MAX_ITERS);
-    return { dataSelectorItems, successfulDataSelector: step.loopSelector, isArray };
+    const dataSelectorOutput = dataSelectorTransformResult.data || {};
+    
+    return { dataSelectorOutput, successfulDataSelector: step.loopSelector };
   }
   
 
@@ -380,7 +385,7 @@ export class ToolExecutor implements Tool {
       { config, retryCount }
     );
     throw new ApiCallError(
-      `Error processing item ${iterationIndex + 1}/${totalIterations}: ${lastError}`, 
+      `Error processing item ${iterationIndex + 1}/${totalIterations ? totalIterations : 'N/A'}: ${lastError}`, 
       500
     );
   }

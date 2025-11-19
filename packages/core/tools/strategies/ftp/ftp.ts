@@ -7,7 +7,7 @@ import { URL } from "url";
 import { server_defaults } from "../../../default.js";
 import { parseFile, parseJSON } from "../../../files/index.js";
 import { composeUrl } from "../../../utils/helpers.js";
-import { StepExecutionInput, StepExecutionResult, StepExecutionStrategy } from "../strategy.js";
+import { StepExecutionInput, StepStrategyExecutionResult, StepExecutionStrategy } from "../strategy.js";
 
 export class FTPStepExecutionStrategy implements StepExecutionStrategy {
   readonly version = '1.0.0';
@@ -16,12 +16,12 @@ export class FTPStepExecutionStrategy implements StepExecutionStrategy {
     return stepConfig.method === HttpMethod.POST && stepConfig.urlHost?.startsWith("ftp://") || stepConfig.urlHost?.startsWith("ftps://") || stepConfig.urlHost?.startsWith("sftp://");
   }
 
-  async executeStep(input: StepExecutionInput): Promise<StepExecutionResult> {
+  async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
     const { stepConfig, stepInputData, credentials, requestOptions } = input;
     const result = await callFTP({ endpoint: stepConfig, credentials, options: requestOptions });
     return {
       success: true,
-      data: result,
+      strategyExecutionData: result,
     };
   }
 }

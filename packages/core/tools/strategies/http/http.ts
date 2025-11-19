@@ -13,7 +13,7 @@ import { callFTP } from "../ftp/ftp.js";
 import { composeUrl } from "../../../utils/helpers.js";
 import { parseFile } from "../../../files/index.js";
 import { smartMergeResponses } from "../../../utils/helpers.js";
-import { StepExecutionInput, StepExecutionResult, StepExecutionStrategy } from "../strategy.js";
+import { StepExecutionInput, StepStrategyExecutionResult, StepExecutionStrategy } from "../strategy.js";
 
 export class HttpStepExecutionStrategy implements StepExecutionStrategy {
   readonly version = '1.0.0';
@@ -22,12 +22,12 @@ export class HttpStepExecutionStrategy implements StepExecutionStrategy {
     return (stepConfig.method in HttpMethod && stepConfig.urlHost?.startsWith("http"));
   }
 
-  async executeStep(input: StepExecutionInput): Promise<StepExecutionResult> {
+  async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
     const { stepConfig, stepInputData, credentials, requestOptions } = input;
     const result = await callHttp({ config: stepConfig, payload: stepInputData, credentials, options: requestOptions });
     return {
       success: true,
-      data: result,
+      strategyExecutionData: result,
     };
   }
 }
