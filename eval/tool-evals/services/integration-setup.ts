@@ -59,12 +59,6 @@ export class IntegrationSetupService {
       {} as Record<string, string>
     );
 
-    logMessage('info', 'scopedCredentials', this.metadata);
-    logMessage('info', 'integrationConfig.urlHost', this.metadata);
-    logMessage('info', 'integrationConfig.urlPath', this.metadata);
-    logMessage('info', 'integrationConfig.documentationUrl', this.metadata);
-    logMessage('info', 'integrationConfig.openApiUrl', this.metadata);
-    logMessage('info', 'integrationConfig.keywords', this.metadata);
     const docFetcher = new DocumentationFetcher(
       {
         urlHost: await replaceVariables(integrationConfig.urlHost, scopedCredentials),

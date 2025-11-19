@@ -15,6 +15,8 @@ import { generateStepConfig } from "./tool-step-builder.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { StepExecutionStrategy, StepExecutionStrategyRegistry } from "./strategies/strategy.js";
+import { PostgresStepExecutionStrategy } from "./strategies/postgres/postgres.js";
+import { FTPStepExecutionStrategy } from "./strategies/ftp/ftp.js";
 
 export interface ToolExecutorOptions {
   tool: Tool;
@@ -32,7 +34,7 @@ export class ToolExecutor implements Tool {
   public instruction?: string;
   public inputSchema?: JSONSchema;
   private integrations: Record<string, IntegrationManager>;
-  private stepExecutionStrategies: StepExecutionStrategy[];
+  private strategyRegistry: StepExecutionStrategyRegistry;
   
   constructor({ tool, metadata, integrations }: ToolExecutorOptions) {
     this.id = tool.id;
@@ -58,9 +60,10 @@ export class ToolExecutor implements Tool {
       config: tool,
     } as ToolResult;
 
-    const registry = new StepExecutionStrategyRegistry();
-    registry.register(new HttpStepExecutionStrategy());
-    this.stepExecutionStrategies = registry.getStrategies();
+    this.strategyRegistry = new StepExecutionStrategyRegistry();
+    this.strategyRegistry.register(new HttpStepExecutionStrategy());
+    this.strategyRegistry.register(new PostgresStepExecutionStrategy());
+    this.strategyRegistry.register(new FTPStepExecutionStrategy());
   }
 
   
@@ -182,20 +185,14 @@ export class ToolExecutor implements Tool {
               currentConfig = { ...currentConfig, ...generateResult.config } as ApiConfig;
             }
 
-            const stepExecutionStrategy = this.stepExecutionStrategies.find(s => s.shouldExecute(currentConfig));
-            
-            if (!stepExecutionStrategy) {
-              throw new Error("No execution strategy found for this step configuration");
-            }
-
-            const stepExecutionResult = await stepExecutionStrategy.executeStep({
+            const stepExecutionResult = await this.strategyRegistry.routeAndExecute({
               stepConfig: currentConfig,
               stepInputData: loopPayload,
               credentials,
               requestOptions: { ...options, testMode: false }
             });
 
-            if (!stepExecutionResult.success || !stepExecutionResult.data?.data) {
+            if (!stepExecutionResult.success || !stepExecutionResult.data) {
               throw new Error(stepExecutionResult.error || "No data returned from step");
             }
 
@@ -389,7 +386,6 @@ export class ToolExecutor implements Tool {
   }
 
   private validate(payload: Record<string, unknown>): void {
-
     if (!this.id) {
       throw new Error("Tool must have a valid ID");
     }
@@ -398,8 +394,8 @@ export class ToolExecutor implements Tool {
       throw new Error("Execution steps must be an array");
     }
 
-    if (!this.stepExecutionStrategies || !Array.isArray(this.stepExecutionStrategies)) {
-      throw new Error("Step execution strategies must be an array");
+    if (!this.strategyRegistry) {
+      throw new Error("Step execution strategy registry is required");
     }
 
     for (const step of this.steps) {
