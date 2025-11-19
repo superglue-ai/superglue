@@ -3,7 +3,7 @@ import { Integration, SelfHealingMode, Workflow, WorkflowResult } from "@supergl
 import { generateUniqueId } from "@superglue/shared/utils";
 import { ToolBuilder } from "../../../packages/core/tools/tool-builder.js";
 import { DataStore } from "../../../packages/core/datastore/types.js";
-import { WorkflowExecutor } from "../../../packages/core/tools/tool-executor.js";
+import { ToolExecutor } from "../../../packages/core/tools/tool-executor.js";
 import { IntegrationManager } from "../../../packages/core/integrations/integration-manager.js";
 import { AttemptStatus, ToolAttempt, ToolConfig, ToolFailureReason, ValidationLLMConfig } from "../types.js";
 import { ToolValidationService } from "./tool-validation.js";
@@ -122,8 +122,8 @@ export class SuperglueToolAttemptService {
         integrations: Integration[],
         selfHealingEnabled: boolean
     ): Promise<WorkflowResult> {
-        const executor = new WorkflowExecutor(
-            { workflow, metadata: this.metadata, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId) }
+        const executor = new ToolExecutor(
+            { tool: workflow, metadata: this.metadata, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId) }
         );
 
         const allCredentials = integrations.reduce(

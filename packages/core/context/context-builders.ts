@@ -252,7 +252,9 @@ export function getEvaluateTransformContext(input: EvaluateTransformContextInput
     const budget = Math.max(0, options.characterBudget | 0);
     if (budget === 0) return '';
 
-    const promptStart = input.instruction ? `<instruction>${input.instruction}</instruction>` : 'No specific instruction provided; focus on mapping the source data to the target schema as closely as possible.';
+    const promptStart = input.instruction 
+        ? `<workflow_instruction>${input.instruction}</workflow_instruction>\n\nNote: This instruction describes the overall workflow goal. The transform's job is ONLY to reshape the transform data retrieved in previous completed workflow steps into the target schema format. If no target schema is provided, reshape the transform data into a concise and appropriate output based on the instruction.` 
+        : 'No specific instruction provided; focus on transforming the transform input into a concise and appropriate output based on the instruction.';
     const transformCodeContext = `<transform_code>${input.transformCode}</transform_code>`;
     const promptEnd = `Please evaluate the transformation based on the criteria in the system prompt, considering that samples may not show all data values present in the full dataset.`;
 

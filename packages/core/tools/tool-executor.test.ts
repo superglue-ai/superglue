@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { isSelfHealingEnabled } from '../utils/helpers.js';
 
 // Mock the tools module but keep isSelfHealingEnabled real
-vi.mock('../utils/tools.js', async () => {
-  const actual = await vi.importActual('../utils/tools.js');
+vi.mock('../utils/helpers.js', async () => {
+  const actual = await vi.importActual('../utils/helpers.js');
   return {
     ...actual,
     // Keep the real isSelfHealingEnabled function for testing
