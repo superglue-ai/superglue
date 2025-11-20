@@ -28,9 +28,7 @@ Requirements:
 - Function signature: (sourceData) => { ... }
 - Return statement is REQUIRED - the function must return the transformed data
 - Pure SYNCHRONOUS function - no async/await, no external dependencies
-- Handle missing/null data gracefully with optional chaining (?.) and defaults - BUT - throw when expected and required data is missing so superglue can self heal
 - Validate arrays with Array.isArray() before using array methods
-- Return appropriate defaults when data is missing
 - Do not throw errors in generated transform code and do not include overly defensive fallbacks
 
 COMMON WORKFLOW TRANSFORMATIONS:
@@ -42,7 +40,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
   const items = sourceData.fetchItems.data;
   
   // excludeIds returned object, so .data contains the array
-  const excludeIds = sourceData.excludeIds.data || [];
+  const excludeIds = sourceData.excludeIds.data;
   return items.filter(item => !excludeIds.includes(item.id));
 }
 \`\`\`
