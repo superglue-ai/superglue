@@ -11,7 +11,7 @@ interface IntegrationSelectorProps {
     onValueChange: (value: string, integration?: Integration) => void;
     disabled?: boolean;
     placeholder?: string;
-    className?: string;
+    contentClassName?: string;
     triggerClassName?: string;
     showCreateNew?: boolean;
     onCreateNew?: () => void;
@@ -23,7 +23,7 @@ export function IntegrationSelector({
     onValueChange,
     disabled = false,
     placeholder = "Select integration",
-    className,
+    contentClassName,
     triggerClassName = "h-9",
     showCreateNew = false,
     onCreateNew,
@@ -51,7 +51,7 @@ export function IntegrationSelector({
             <SelectTrigger className={`${triggerClassName} shadow-none ring-offset-0 focus:ring-0`} disabled={disabled}>
                 <SelectValue placeholder={placeholder} />
             </SelectTrigger>
-            <SelectContent className="shadow-none">
+            <SelectContent className={`${contentClassName} shadow-none`}>
                 {integrations?.map(integration => {
                     const icon = getIntegrationIcon(integration);
                     return (

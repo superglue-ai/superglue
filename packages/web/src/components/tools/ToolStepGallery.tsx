@@ -329,10 +329,10 @@ export function ToolStepGallery({
         const newStep = {
             id: stepId,
             name: '',
+            integrationId: integrationId || '',
             apiConfig: {
                 id: stepId,
                 instruction: instruction,
-                integrationId: integrationId || '',
                 urlHost: selectedIntegration?.urlHost || '',
                 urlPath: selectedIntegration?.urlPath || '',
                 method: 'GET',
