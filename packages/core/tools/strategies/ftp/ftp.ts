@@ -6,14 +6,14 @@ import SFTPClient from "ssh2-sftp-client";
 import { URL } from "url";
 import { server_defaults } from "../../../default.js";
 import { parseFile, parseJSON } from "../../../files/index.js";
-import { composeUrl } from "../../../utils/helpers.js";
+import { composeUrl, replaceVariables } from "../../../utils/helpers.js";
 import { StepExecutionInput, StepStrategyExecutionResult, StepExecutionStrategy } from "../strategy.js";
 
 export class FTPStepExecutionStrategy implements StepExecutionStrategy {
   readonly version = '1.0.0';
 
   async shouldExecute(stepConfig: StepConfig): Promise<boolean> {
-    return stepConfig.method === HttpMethod.POST && stepConfig.urlHost?.startsWith("ftp://") || stepConfig.urlHost?.startsWith("ftps://") || stepConfig.urlHost?.startsWith("sftp://");
+    return stepConfig.method === HttpMethod.POST && (stepConfig.urlHost?.startsWith("ftp://") || stepConfig.urlHost?.startsWith("ftps://") || stepConfig.urlHost?.startsWith("sftp://"));
   }
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
@@ -329,11 +329,17 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
 }
 
 export async function callFTP({ endpoint, credentials, options }: { endpoint: StepConfig, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
-  let connectionString = composeUrl(endpoint.urlHost, endpoint.urlPath);
+  const allVars = { ...credentials };
+  
+  const resolvedUrlHost = await replaceVariables(endpoint.urlHost, allVars);
+  const resolvedUrlPath = await replaceVariables(endpoint.urlPath, allVars);
+  let connectionString = composeUrl(resolvedUrlHost, resolvedUrlPath);
   const connectionInfo = parseConnectionUrl(connectionString);
+  
   let operations: FTPOperation[] = [];
   try {
-    const body = parseJSON(endpoint.body);
+    const resolvedBody = await replaceVariables(endpoint.body, allVars);
+    const body = parseJSON(resolvedBody);
     if(!Array.isArray(body)) {
       operations.push(body);
     } else {
