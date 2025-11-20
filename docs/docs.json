@@ -29,6 +29,7 @@
               "guides/creating-a-tool",
               "guides/debugging-a-tool",
               "guides/deploying-a-tool",
+              "guides/using-template-expressions",
               "guides/using-the-agent",
               "mcp/using-the-mcp"
             ]

@@ -1,0 +1,169 @@
+---
+title: "Using Template Expressions"
+description: "Understand how template expressions work across integrations, tools, and steps."
+---
+
+Most of the time you don't have to write template expressions yourself—the agent generates them for you. Still, understanding how they work helps when you're debugging or tweaking a tool.
+
+At their core, template expressions use the `<<expression>>` pattern, where `expression` is evaluated at runtime.
+
+## Where template expressions are used
+
+The same template engine is used across superglue:
+
+- **Integrations** – connection strings and URL templates
+- **Step configuration** – `urlHost`, `urlPath`, `headers`, `queryParams`, `body`
+- **Transforms** – final transforms and data selectors
+
+## Template expression modes
+
+There are two kinds of template expressions: **simple expressions** and **arrow function expressions**.
+
+### Simple expressions (legacy)
+
+Simple expressions resolve values directly from the context (payload, credentials, previous step results) without any JavaScript.
+
+Syntax:
+
+- `<<variable>>`
+- `<<variable.key>>` for nested fields
+
+**Examples:**
+
+In the context of a tool step:
+
+```typescript
+headers: {
+  "Authorization": "Bearer <<stripe_apiKey>>"
+},
+queryParams: {
+  user_id: "<<userId>>"
+}
+```
+
+or in an integration:
+
+```text
+postgres://<<username>>:<<password>>@<<host>>:<<port>>/<<database>>
+```
+
+### Arrow function expressions (recommended)
+
+Arrow function expressions use JavaScript arrow functions that receive the context as a single parameter (typically named `sourceData`) and return the value to insert. superglue runs these functions in a sandboxed JavaScript VM.
+
+```js
+<<(sourceData) => {
+  // read from sourceData and return the value to insert
+}>>
+```
+
+<Note>
+  Arrow function expressions are also used in places that are pure code (for example, the
+  `finalTransform` field), where you don’t wrap them in `<< >>`. They still receive the same
+  `sourceData` context object and behave the same way.
+</Note>
+
+**Examples:**
+
+```typescript
+headers: {
+  "Authorization": "<<(sourceData) => `Bearer ${sourceData.credentials.apiKey}`>>"
+}
+```
+
+```typescript
+body: {
+  posts: "<<(sourceData) => {
+    const fromJsonPlaceholder =
+      (sourceData.fetchJsonPlaceholderPosts ?? []).map(p => ({
+        id: p.id,
+        title: p.title,
+        source: 'jsonplaceholder'
+      }));
+
+    const fromDummyJson =
+      (sourceData.fetchDummyJsonPosts?.posts ?? []).map(p => ({
+        id: p.id,
+        title: p.title,
+        source: 'dummyjson'
+      }));
+
+    return [...fromJsonPlaceholder, ...fromDummyJson];
+  }>>"
+}
+```
+
+## Template context
+
+Template expressions evaluate against a **context object** that depends on where they're used (step config, integration, or transform).
+
+- **Arrow function expressions** – context is passed as the function parameter (typically `sourceData`)
+- **Simple expressions** – the string inside `<< >>` is resolved against the same context object
+
+The context looks different depending on where the expression is used:
+
+### Integration context
+
+The context is built from the integration credentials (for example, `username`, `password`, `access_token`).
+
+The `sourceData` might look like this:
+
+```json
+{
+  "username": "db_user",
+  "password": "secret123",
+  "host": "db.example.com",
+  "port": "5432",
+  "database": "production"
+}
+```
+
+<Note>
+  Integration templates are only resolved at tool execution time and get merged with tool-specific credentials.
+</Note>
+
+### Tool step context
+
+The context is the **aggregated step input**, which includes:
+
+- `payload` – workflow input payload
+- `credentials` – resolved credentials for the integration
+- Previous step results keyed by step ID (for example, `getCustomers`)
+- `currentItem` – current iteration data when the step runs in a loop
+
+The `sourceData` object might look like this:
+
+```json
+{
+  "payload": { "userId": "12345", "startDate": "2024-01-01" },
+  "credentials": { "apiKey": "sk_test_..." },
+  "getCustomers": {
+    "data": [
+      { "id": "cus_123", "email": "user@example.com" }
+    ]
+  }
+}
+```
+
+### Final transform context
+
+The context is a combined view of the entire workflow execution:
+
+- All step results keyed by step ID
+- The original `payload`
+
+The `sourceData` object might look like this:
+
+```json
+{
+  "payload": { "userId": "12345" },
+  "getCustomers": {
+    "data": [
+      { "id": "cus_123", "email": "user@example.com" }
+    ]
+  },
+  "createPaymentIntent": {
+    "data": { "id": "pi_456", "status": "succeeded" }
+  }
+}
+```
