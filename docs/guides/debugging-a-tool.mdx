@@ -116,6 +116,8 @@ Executes just this one step using the current configuration and previous step re
 - Debug a specific failure in isolation
 - Verify your instruction changes work
 
+If the **Step Data Selector** returns an array, the step becomes iterational—it runs once for each item in the array. In this case, you can choose to run a single iteration using the dropdown on the **Run Step** button.   
+
 ### Fix Step
 
 Opens a modal where you can refine the **step-specific instruction** and trigger an LLM-powered repair for this step. The modal provides two actions:
