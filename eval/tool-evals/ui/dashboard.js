@@ -345,21 +345,22 @@ function getToolStatusChange(toolId, oneShotAttempts, selfHealingAttempts) {
     if (oneShotAttempts.length > 0) {
         const benchmarkOneShot = benchmarkAttempts.filter(a => !a.selfHealingEnabled);
         if (benchmarkOneShot.length > 0) {
-            const currentSuccess = oneShotAttempts.some(a => a.overallValidationPassed === true);
-            const benchmarkSuccess = benchmarkOneShot.some(a => a.overallValidationPassed === true);
+            const currentSuccessCount = oneShotAttempts.filter(a => a.overallValidationPassed === true).length;
+            const currentTotal = oneShotAttempts.length;
+            const benchmarkSuccessCount = benchmarkOneShot.filter(a => a.overallValidationPassed === true).length;
+            const benchmarkTotal = benchmarkOneShot.length;
             
-            if (benchmarkSuccess && !currentSuccess) {
-                const currentFailure = getFailureStage(getFurthestAttempt(oneShotAttempts));
+            if (currentSuccessCount < benchmarkSuccessCount) {
                 changes.push({
                     type: 'regression',
                     mode: 'one-shot',
-                    detail: `was ✓, now ${currentFailure.label}`
+                    detail: `was ${benchmarkSuccessCount}/${benchmarkTotal}, now ${currentSuccessCount}/${currentTotal}`
                 });
-            } else if (!benchmarkSuccess && currentSuccess) {
+            } else if (currentSuccessCount > benchmarkSuccessCount) {
                 changes.push({
                     type: 'improvement',
                     mode: 'one-shot',
-                    detail: 'was ✗, now ✓'
+                    detail: `was ${benchmarkSuccessCount}/${benchmarkTotal}, now ${currentSuccessCount}/${currentTotal}`
                 });
             }
         }
@@ -369,21 +370,22 @@ function getToolStatusChange(toolId, oneShotAttempts, selfHealingAttempts) {
     if (selfHealingAttempts.length > 0) {
         const benchmarkSelfHealing = benchmarkAttempts.filter(a => a.selfHealingEnabled);
         if (benchmarkSelfHealing.length > 0) {
-            const currentSuccess = selfHealingAttempts.some(a => a.overallValidationPassed === true);
-            const benchmarkSuccess = benchmarkSelfHealing.some(a => a.overallValidationPassed === true);
+            const currentSuccessCount = selfHealingAttempts.filter(a => a.overallValidationPassed === true).length;
+            const currentTotal = selfHealingAttempts.length;
+            const benchmarkSuccessCount = benchmarkSelfHealing.filter(a => a.overallValidationPassed === true).length;
+            const benchmarkTotal = benchmarkSelfHealing.length;
             
-            if (benchmarkSuccess && !currentSuccess) {
-                const currentFailure = getFailureStage(getFurthestAttempt(selfHealingAttempts));
+            if (currentSuccessCount < benchmarkSuccessCount) {
                 changes.push({
                     type: 'regression',
                     mode: 'self-healing',
-                    detail: `was ✓, now ${currentFailure.label}`
+                    detail: `was ${benchmarkSuccessCount}/${benchmarkTotal}, now ${currentSuccessCount}/${currentTotal}`
                 });
-            } else if (!benchmarkSuccess && currentSuccess) {
+            } else if (currentSuccessCount > benchmarkSuccessCount) {
                 changes.push({
                     type: 'improvement',
                     mode: 'self-healing',
-                    detail: 'was ✗, now ✓'
+                    detail: `was ${benchmarkSuccessCount}/${benchmarkTotal}, now ${currentSuccessCount}/${currentTotal}`
                 });
             }
         }
@@ -530,12 +532,10 @@ function createModeStatusHTML(modeName, attempts) {
     
     // Determine badge class based on success ratio
     let badgeClass;
-    if (successCount === totalCount) {
+    if (successCount > 0) {
         badgeClass = 'badge-success';
-    } else if (successCount === 0) {
-        badgeClass = 'badge-failure';
     } else {
-        badgeClass = 'badge-partial';
+        badgeClass = 'badge-failure';
     }
     
     return `
