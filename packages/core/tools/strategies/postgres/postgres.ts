@@ -9,7 +9,7 @@ export class PostgresStepExecutionStrategy implements StepExecutionStrategy {
   readonly version = '1.0.0';
 
   async shouldExecute(stepConfig: StepConfig): Promise<boolean> {
-    return stepConfig.method === HttpMethod.POST && stepConfig.urlHost?.startsWith("postgres://") || stepConfig.urlHost?.startsWith("postgresql://");
+    return stepConfig.method === HttpMethod.POST && (stepConfig.urlHost?.startsWith("postgres://") || stepConfig.urlHost?.startsWith("postgresql://"));
   }
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {

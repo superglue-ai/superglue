@@ -16,18 +16,17 @@ export const HttpMethodEnum = z.enum(["GET", "POST", "PUT", "DELETE", "PATCH", "
 
 export async function transformData(data: any, code: string): Promise<TransformResult> {
   try {
-    let result: TransformResult;
     if (!code) {
-      result = { success: true, data: data };
+      return { success: true, data: data };
     }
+    
     const ARROW_FUNCTION_PATTERN = /^\s*\([^)]+\)\s*=>/;
 
     if (ARROW_FUNCTION_PATTERN.test(code)) {
-      result = await runCodeUsingIVM(data, code);
+      return await runCodeUsingIVM(data, code);
     } else {
       throw new Error("Invalid expression");
     }
-    return result;
   } catch (error) {
     return { success: false, error: error.message };
   }
