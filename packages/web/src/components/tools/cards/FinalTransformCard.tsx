@@ -88,7 +88,7 @@ export const FinalTransformMiniStepCard = ({
       if (onResponseSchemaChange && localSchema !== responseSchema) {
         onResponseSchemaChange(localSchema);
       }
-    }, [activeTab]);
+    }, [localTransform, localSchema, transform, responseSchema, onTransformChange, onResponseSchemaChange]);
 
     useEffect(() => {
       if (hasTransformCompleted) {
