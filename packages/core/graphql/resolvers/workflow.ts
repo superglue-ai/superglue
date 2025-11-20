@@ -97,7 +97,7 @@ export const executeWorkflowResolver = async (
       });
     }
 
-    const executor = new ToolExecutor({ workflow, metadata, integrations: integrationManagers });
+    const executor = new ToolExecutor({ tool: workflow, metadata, integrations: integrationManagers });
     const result = await executor.execute({ payload: args.payload, credentials: mergedCredentials, options: args.options });
 
     // Save run to datastore

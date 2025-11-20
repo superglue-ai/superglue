@@ -23,7 +23,7 @@ export async function transformData(data: any, code: string): Promise<TransformR
     const ARROW_FUNCTION_PATTERN = /^\s*\([^)]+\)\s*=>/;
 
     if (ARROW_FUNCTION_PATTERN.test(code)) {
-      return await runCodeUsingIVM(data, code);
+      return await runCodeInIVM(data, code);
     } else {
       throw new Error("Invalid expression");
     }
@@ -32,7 +32,7 @@ export async function transformData(data: any, code: string): Promise<TransformR
   }
 }
 
-export async function runCodeUsingIVM(input: any, mappingCode: string): Promise<TransformResult> {
+export async function runCodeInIVM(input: any, mappingCode: string): Promise<TransformResult> {
   const isolate = new ivm.Isolate({ memoryLimit: 4096 }); // 32 MB
   const context = await isolate.createContext();
   await injectVMHelpersIndividually(context);
