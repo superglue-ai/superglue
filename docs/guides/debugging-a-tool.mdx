@@ -81,11 +81,12 @@ The **Step Input** section shows exactly what data flows into the step and how i
 The **Step Config** tab shows how this step calls the external system:
 
 - **Step Instruction** – natural‑language description of what the step does and what the response should contain
-- **Integration** – which integration is used to make the call (for example, `stripe`)
+- **Integration** – which integration is used to make the call
 - **Safety badge** – a `Step modifies data on system` pill when the step performs write operations, so you can quickly spot calls that change external state
 - **API Config** – HTTP method and URL for the request
 - **Headers (JSON)** – JSON object with the request headers sent to the server (for example, the `Authorization` header)
 - **Query Parameters** – JSON object with the query parameters appended to the request URL
+- **Body** – Request body content, which can be JSON, form data, plain text, or any format
 - **Pagination** – controls how the step fetches multiple pages (strategy, page size, cursor/offset paths) or shows *No pagination* when pagination is disabled
 - **Stop Condition (JavaScript)** – optional JavaScript function that inspects each `response` and pagination state to decide when to stop fetching more pages
 
