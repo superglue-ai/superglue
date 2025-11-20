@@ -31,6 +31,9 @@ jobs:
       - name: Create branch and sync changes
         working-directory: hosted-repo
         run: |
+          git remote add source ..
+          git fetch source
+
           BRANCH_NAME="sync-from-main-$(date +%s)"
           git checkout -b "${BRANCH_NAME}"
 
