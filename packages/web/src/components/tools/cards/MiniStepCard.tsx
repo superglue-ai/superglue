@@ -1,7 +1,7 @@
 import { Card } from '@/src/components/ui/card';
 import { cn, getIntegrationIcon, getSimpleIcon } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
-import { FileJson, FilePlay, Globe, RotateCw, OctagonAlert } from 'lucide-react';
+import { FileJson, FilePlay, Globe, OctagonAlert, RotateCw } from 'lucide-react';
 import React from 'react';
 
 const ACTIVE_CARD_STYLE = "ring-1 shadow-lg" as const;

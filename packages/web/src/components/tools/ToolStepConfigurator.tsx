@@ -3,9 +3,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from '@/src/hooks/use-toast';
 import { splitUrl } from '@/src/lib/client-utils';
 import { composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/general-utils';
-import { tokenRegistry } from '@/src/lib/token-registry';
-import { Integration, SuperglueClient } from "@superglue/client";
-import { ArrowDown, Check, Copy, Edit, Globe, IterationCw } from 'lucide-react';
+import { Integration } from "@superglue/client";
+import { ArrowDown, Check, Copy, Globe, OctagonAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { JavaScriptCodeEditor } from '../editors/JavaScriptCodeEditor';
 import { JsonCodeEditor } from '../editors/JsonCodeEditor';
@@ -14,9 +13,8 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
 import { HelpTooltip } from '../utils/HelpTooltip';
-import { OctagonAlert } from 'lucide-react';
+import { IntegrationSelector } from './shared/IntegrationSelector';
 
 interface ToolStepConfiguratorProps {
     step: any;
@@ -32,39 +30,12 @@ interface ToolStepConfiguratorProps {
 }
 
 export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, loopItems }: ToolStepConfiguratorProps) {
-    const [localIntegrations, setLocalIntegrations] = useState<Integration[]>([]);
     const [headersText, setHeadersText] = useState('');
     const [queryParamsText, setQueryParamsText] = useState('');
     const [instructionCopied, setInstructionCopied] = useState(false);
 
     const config = useConfig();
     const { toast } = useToast();
-
-    const loadIntegrations = async () => {
-        if (localIntegrations.length > 0) return;
-        try {
-            
-            const client = new SuperglueClient({
-                endpoint: config.superglueEndpoint,
-                apiKey: tokenRegistry.getToken(),
-            });
-            
-            const result = await client.listIntegrations(100, 0);
-            setLocalIntegrations(result.items);
-        } catch (error: any) {
-            console.error("Error loading integrations:", error);
-            toast({ title: "Error loading integrations", description: error.message, variant: "destructive" });
-        } finally {
-        }
-    };
-
-    useEffect(() => {
-        if (!propIntegrations) {
-            loadIntegrations();
-        }
-    }, []);
-
-    const integrations = propIntegrations || localIntegrations;
 
     const getIntegrationIcon = (integration: Integration) => {
         const iconName = getIntegrationIconName(integration);
@@ -139,8 +110,21 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         if (onEditingChange) setTimeout(() => onEditingChange(false), 100);
     };
 
-    const linkedIntegration = step.integrationId 
-        ? integrations?.find(integration => integration.id === step.integrationId)
+    const handleIntegrationChange = (value: string, selectedIntegration?: Integration) => {
+        if (disabled) return;
+        handleImmediateEdit((s) => ({
+            ...s,
+            integrationId: value,
+            apiConfig: {
+                ...s.apiConfig,
+                urlHost: selectedIntegration?.urlHost || s.apiConfig.urlHost,
+                urlPath: selectedIntegration?.urlPath || s.apiConfig.urlPath,
+            }
+        }));
+    };
+
+    const linkedIntegration = step.integrationId && propIntegrations
+        ? propIntegrations.find(integration => integration.id === step.integrationId)
         : undefined;
 
     return (
@@ -222,32 +206,15 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 Integration
                                                 <HelpTooltip text="Select an integration to link this step to. This will pre-fill the API configuration with the integration's base URL and credentials." />
                                             </Label>
-                                            <Select value={step.integrationId || ''} onValueChange={(value) => { if (disabled) return; if (value === "CREATE_NEW") { onCreateIntegration?.(); } else { const selectedIntegration = integrations?.find(integration => integration.id === value); handleImmediateEdit((s) => ({ ...s, integrationId: value, apiConfig: { ...s.apiConfig, urlHost: selectedIntegration?.urlHost || s.apiConfig.urlHost, urlPath: selectedIntegration?.urlPath || s.apiConfig.urlPath, headers: selectedIntegration?.credentials ? Object.entries(selectedIntegration.credentials).reduce((acc, [key, val]) => ({ ...acc, [key]: val }), {}) : s.apiConfig.headers } })); } }}>
-                                                <SelectTrigger className="h-9 mt-1" disabled={disabled}>
-                                                    <SelectValue placeholder="Select integration" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {integrations?.map(integration => {
-                                                        const icon = getIntegrationIcon(integration);
-                                                        return (
-                                                            <SelectItem key={integration.id} value={integration.id}>
-                                                                <div className="flex items-center gap-2 w-full">
-                                                                    {icon ? (
-                                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill={`#${icon.hex}`} className="flex-shrink-0">
-                                                                            <path d={icon.path || ''} />
-                                                                        </svg>
-                                                                    ) : (
-                                                                        <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                                                    )}
-                                                                    <span className="flex-grow">{integration.id}</span>
-                                                                    {integration.urlHost && (<span className="text-muted-foreground text-xs ml-auto">({integration.urlHost})</span>)}
-                                                                </div>
-                                                            </SelectItem>
-                                                        );
-                                                    })}
-                                                    {onCreateIntegration && (<SelectItem value="CREATE_NEW" className="text-primary">+ Add New Integration</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
+                                            <IntegrationSelector
+                                                value={step.integrationId || ''}
+                                                onValueChange={handleIntegrationChange}
+                                                disabled={disabled}
+                                                triggerClassName="h-9 mt-1"
+                                                showCreateNew={!!onCreateIntegration}
+                                                onCreateNew={onCreateIntegration}
+                                                integrations={propIntegrations}
+                                            />
                                         </div>
                                     </div>
                                     <div>

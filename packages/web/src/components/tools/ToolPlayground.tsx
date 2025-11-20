@@ -1,6 +1,7 @@
 "use client";
 
 import { useConfig } from "@/src/app/config-context";
+import { useIntegrations } from "@/src/app/integrations-context";
 import { createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, computeStepOutput, computeToolPayload, removeFileKeysFromPayload, wrapLoopSelectorWithLimit } from "@/src/lib/general-utils";
@@ -94,6 +95,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const router = useRouter();
   const { toast } = useToast();
   const config = useConfig();
+  const { integrations: contextIntegrations } = useIntegrations();
   const [toolId, setToolId] = useState(initialTool?.id || "");
   const [steps, setSteps] = useState<any[]>(initialTool?.steps || []);
   const [finalTransform, setFinalTransform] = useState(initialTool?.finalTransform || `(sourceData) => {
@@ -147,7 +149,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const lastUserEditedStepIdRef = useRef<string | null>(null);
   const prevStepHashesRef = useRef<string[]>([]);
 
-  const [integrations, setIntegrations] = useState<Integration[]>(providedIntegrations || []);
+  const integrations = providedIntegrations || contextIntegrations;
   const [instructions, setInstructions] = useState<string>(initialInstruction || '');
 
   useEffect(() => {
@@ -480,28 +482,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     // Don't modify manual payload text - leave user's JSON as-is
   };
 
-  const loadIntegrations = async () => {
-    if (providedIntegrations) return;
-
-    try {
-      setLoading(true);
-
-      const client = createSuperglueClient(config.superglueEndpoint);
-      const result = await client.listIntegrations(100, 0);
-      setIntegrations(result.items);
-      return result.items;
-    } catch (error: any) {
-      console.error("Error loading integrations:", error);
-      toast({
-        title: "Error loading integrations",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const loadTool = async (idToLoad: string) => {
     try {
       if (!idToLoad) return;
@@ -536,19 +516,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setLoading(false);
     }
   };
-
-
-  useEffect(() => {
-    if (!embedded && !providedIntegrations) {
-      loadIntegrations();
-    }
-  }, [embedded, providedIntegrations]);
-
-  useEffect(() => {
-    if (providedIntegrations) {
-      setIntegrations(providedIntegrations);
-    }
-  }, [providedIntegrations]);
 
   const [lastToolId, setLastToolId] = useState<string | undefined>(initialTool?.id);
 

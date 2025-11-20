@@ -34,6 +34,7 @@ import { tokenRegistry } from '@/src/lib/token-registry';
 import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
 import { ToolDeployModal } from '@/src/components/tools/deploy/ToolDeployModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
+import { createSuperglueClient } from '@/src/lib/client-utils';
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
 import { ApiConfig, Integration, SuperglueClient, Workflow as Tool } from '@superglue/client';
 import { Check, CloudUpload, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2 } from "lucide-react";
@@ -42,7 +43,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 import { useTools } from '../tools-context';
-import { createSuperglueClient } from '@/src/lib/client-utils';
 
 const ConfigTable = () => {
   const router = useRouter();
