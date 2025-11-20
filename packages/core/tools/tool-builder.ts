@@ -211,7 +211,7 @@ const toolSchema = z.object({
           instruction: z.string().describe("A concise instruction describing WHAT data this API call should retrieve or what action it should perform."),
           urlHost: z.string().describe("The base URL host (e.g., https://api.example.com). Must not be empty."),
           urlPath: z.string().describe("The API endpoint path (e.g., /v1/users)."),
-          method: z.enum(Object.values(HttpMethod) as [string, ...string[]]).describe("HTTP method: GET, POST, PUT, DELETE, or PATCH"),
+          method: z.enum(Object.values(HttpMethod) as [string, ...string[]]).describe("HTTP method (MUST be a literal value, not a variable or expression): GET, POST, PUT, DELETE, or PATCH"),
           queryParams: z.array(z.object({
               key: z.string(),
               value: z.string()
