@@ -136,7 +136,7 @@ export function AddStepDialog({
 
                     <TabsContent value="scratch" className="space-y-4 py-4 overflow-hidden">
                         <div className="space-y-2">
-                            <label htmlFor="integration-select" className="text-sm font-medium">
+                            <label className="text-sm font-medium">
                                 Integration
                             </label>
                             <IntegrationSelector
