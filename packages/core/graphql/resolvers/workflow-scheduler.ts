@@ -3,7 +3,7 @@ import { GraphQLResolveInfo } from "graphql";
 import { WorkflowScheduleInternal } from "../../datastore/types.js";
 import { WorkflowScheduler } from "../../scheduler/scheduler-service.js";
 import { logMessage } from "../../utils/logs.js";
-import { Context } from "../types.js";
+import { GraphQLRequestContext } from "../types.js";
 
 function toPublicSchedule(internal: WorkflowScheduleInternal): WorkflowSchedule {
     return {
@@ -24,7 +24,7 @@ function toPublicSchedule(internal: WorkflowScheduleInternal): WorkflowSchedule 
 export const listWorkflowSchedulesResolver = async (
   _: unknown,
   { workflowId }: { workflowId: string },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
     try {
@@ -53,7 +53,7 @@ type UpsertWorkflowScheduleArgs = {
 export const upsertWorkflowScheduleResolver = async (
   _: unknown,
   { schedule }: UpsertWorkflowScheduleArgs,
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ): Promise<WorkflowSchedule> => {
     try {
@@ -80,7 +80,7 @@ export const upsertWorkflowScheduleResolver = async (
 export const deleteWorkflowScheduleResolver = async (
     _: unknown, 
     { id }: { id: string },
-    context: Context,
+    context: GraphQLRequestContext,
     info: GraphQLResolveInfo
 ) => {
     try {

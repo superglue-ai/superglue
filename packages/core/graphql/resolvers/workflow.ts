@@ -9,7 +9,7 @@ import { parseJSON } from "../../files/index.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { Context, Metadata } from '../types.js';
+import { GraphQLRequestContext, Metadata } from '../types.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -35,14 +35,14 @@ interface BuildWorkflowArgs {
 export const executeWorkflowResolver = async (
   _: unknown,
   args: ExecuteWorkflowArgs,
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ): Promise<WorkflowResult> => {
-  let runId = crypto.randomUUID();
-  let startedAt = new Date();
-  let metadata: Metadata = { orgId: context.orgId, runId };
-  let workflow: Workflow | undefined;
+  const runId = crypto.randomUUID();
+  const startedAt = new Date();
+  const metadata: Metadata = { orgId: context.orgId, runId };
 
+  let workflow: Workflow | undefined;
   try {
     if (args.input.id) {
       workflow = await context.datastore.getWorkflow({ id: args.input.id, orgId: context.orgId });
@@ -238,7 +238,7 @@ export const listWorkflowsResolver = async (
 export const findRelevantToolsResolver = async (
   _: unknown,
   { searchTerms }: { searchTerms?: string },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ) => {
   try {
@@ -265,12 +265,13 @@ export const findRelevantToolsResolver = async (
 export const buildWorkflowResolver = async (
   _: unknown,
   args: BuildWorkflowArgs,
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ): Promise<Workflow> => {
+  const runId = crypto.randomUUID();
 
   try {
-    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
+    const metadata: Metadata = { orgId: context.orgId, runId };
     const { instruction, payload = {}, integrationIds, responseSchema } = args;
 
     if (!instruction || instruction.trim() === "") {

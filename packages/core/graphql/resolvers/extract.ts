@@ -5,7 +5,7 @@ import { parseFile } from "../../files/index.js";
 import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from "../../utils/helpers.js";
-import { Context, Metadata } from '../types.js';
+import { GraphQLRequestContext, Metadata } from '../types.js';
 
 export const extractResolver = async (
   _: any,
@@ -15,7 +15,7 @@ export const extractResolver = async (
     credentials: Record<string, string>;
     options: RequestOptions;
   },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   const callId = crypto.randomUUID();

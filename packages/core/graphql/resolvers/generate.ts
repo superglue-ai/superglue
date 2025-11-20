@@ -3,7 +3,7 @@ import { GraphQLResolveInfo } from "graphql";
 import { executeLLMTool, LLMToolCall } from "../../llm/llm-tool-utils.js";
 import { InstructionGenerationContext } from "../../llm/llm-tools.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { Context, Metadata } from '../types.js';
+import { GraphQLRequestContext, Metadata } from '../types.js';
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { getGenerateStepConfigContext } from "../../context/context-builders.js";
 import { LLMMessage } from "../../llm/llm-base-model.js";
@@ -22,7 +22,7 @@ interface GenerateStepConfigArgs {
 export const generateInstructionsResolver = async (
   _: any,
   { integrations }: { integrations: Integration[] },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   try {
@@ -60,7 +60,7 @@ export const generateInstructionsResolver = async (
 export const generateStepConfigResolver = async (
   _: any,
   { integrationId, currentStepConfig, stepInput, credentials, errorMessage }: GenerateStepConfigArgs,
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ): Promise<ApiConfig> => {
   try {

@@ -5,7 +5,7 @@ import { maskCredentials } from "../../utils/helpers.js";
 import { TransformConfig } from "../../utils/helpers.legacy.js";
 import { executeTransformLegacy } from "../../utils/helpers.legacy.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { Context, Metadata } from '../types.js';
+import { GraphQLRequestContext, Metadata } from '../types.js';
 
 
 export const callResolver = async (
@@ -16,7 +16,7 @@ export const callResolver = async (
     credentials?: Record<string, string>;
     options: RequestOptions;
   },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   const startedAt = new Date();
