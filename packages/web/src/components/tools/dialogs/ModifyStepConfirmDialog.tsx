@@ -8,8 +8,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/src/components/ui/alert-dialog';
-import { OctagonAlert, X } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
+import { OctagonAlert, X } from 'lucide-react';
 
 interface ModifyStepConfirmDialogProps {
   open: boolean;
@@ -28,7 +28,12 @@ export function ModifyStepConfirmDialog({
 }: ModifyStepConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
-      <AlertDialogContent>
+      <AlertDialogContent onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onConfirm();
+        }
+      }}>
         <Button
           variant="ghost"
           size="icon"

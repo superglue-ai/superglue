@@ -16,7 +16,7 @@ import { cn } from '@/src/lib/general-utils';
 import { ExecutionStep } from '@superglue/client';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { IntegrationSelector } from './shared/IntegrationSelector';
+import { IntegrationSelector } from '../shared/IntegrationSelector';
 
 interface AddStepDialogProps {
     open: boolean;
@@ -120,7 +120,16 @@ export function AddStepDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl" onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (activeTab === 'scratch') {
+                        handleConfirmScratch();
+                    } else {
+                        handleConfirmTool();
+                    }
+                }
+            }}>
                 <DialogHeader>
                     <DialogTitle>Add</DialogTitle>
                     <DialogDescription>
@@ -172,12 +181,6 @@ export function AddStepDialog({
                                 value={instruction}
                                 onChange={(e) => {
                                     setInstruction(e.target.value);
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        handleConfirmScratch();
-                                    }
                                 }}
                                 placeholder="e.g., Fetch all users from the API"
                             />
