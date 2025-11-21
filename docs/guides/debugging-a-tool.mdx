@@ -41,23 +41,6 @@ When you upload a file named `customers.csv`, it becomes available in your paylo
 
 The input card shows a red border if your payload doesn't match the input schema. Click "Run Anyway" to proceed despite validation errors, or fix your payload to match the schema requirements.
 
-## Auto-Repair Mode (Self-Healing)
-
-<video autoPlay className="w-full rounded-lg">
-  <source src="/resources/auto-repair-demo.mp4" type="video/mp4" />
-</video>
-
-The **auto-repair** toggle in the header enables self-healing during execution. When enabled:
-
-- The AI automatically fixes step configurations that fail
-- API endpoints are corrected if they return errors
-- Data transformations are adjusted to handle unexpected formats
-- Step instructions are refined to match actual API responses
-
-Auto-repair is slower but dramatically increases success rates for complex tools. Disable it when you want to see raw errors for debugging.
-
-After a successful auto-repair run, the playground updates your step configurations automatically. You'll see a toast notification: "Tool configuration updated - auto-repair has modified the tool configuration to fix issues."
-
 ## Run All Steps
 
 Click **Run All Steps** to execute your entire tool from start to finish. The playground:
@@ -66,13 +49,14 @@ Click **Run All Steps** to execute your entire tool from start to finish. The pl
 - Shows progress with a loading indicator on each step
 - Marks completed steps with a green checkmark
 - Marks failed steps with a red X
+- Pauses before the next **critical** step and waits for your confirmation before continuing (for example, a step that writes data or makes changes in a third-party system)
 - Navigates to the first failure or final output when done
 
 Click **Stop Execution** to halt the run after the current step completes.
 
-## Inspect Step Inputs and Outputs
+## Inspect a Step
 
-### Input Preview
+### Step Input
 
 <img
   src="../resources/step-input.png"
@@ -80,13 +64,33 @@ Click **Stop Execution** to halt the run after the current step completes.
   className="w-full rounded-lg mb-4"
 />
 
-The **Input** section displays the data passed into the step, including:
+The **Step Input** section shows exactly what data flows into the step and how it is shaped:
 
-- Previous step results referenced in the instruction
-- Original payload fields
-- Processed file data
+- **Aggregated Step Input**: A merged JSON containing previous step results, original payload fields, and processed file data
+- **Step Data Selector (JavaScript)**: a selector function that receives the aggregated input as `sourceData` and returns the slice of data this step should operate on.
+- **Step Data**: the result of the selector and the exact data passed into the step (also available in config as `sourceData.currentItem`)
 
-### Output Preview
+### Step Config
+
+<img
+  src="../resources/step-config.png"
+  alt="Step output"
+  className="w-full rounded-lg"
+/>
+
+The **Step Config** tab shows how this step calls the external system:
+
+- **Step Instruction** – natural‑language description of what the step does and what the response should contain
+- **Integration** – which integration is used to make the call
+- **Safety badge** – a `Step modifies data on system` pill when the step performs write operations, so you can quickly spot calls that change external state
+- **API Config** – HTTP method and URL for the request
+- **Headers (JSON)** – JSON object with the request headers sent to the server (for example, the `Authorization` header)
+- **Query Parameters** – JSON object with the query parameters appended to the request URL
+- **Body** – Request body content, which can be JSON, form data, plain text, or any format
+- **Pagination** – controls how the step fetches multiple pages (strategy, page size, cursor/offset paths) or shows *No pagination* when pagination is disabled
+- **Stop Condition (JavaScript)** – optional JavaScript function that inspects each `response` and pagination state to decide when to stop fetching more pages
+
+### Step Result
 
 <img
   src="../resources/step-output.png"
@@ -102,27 +106,7 @@ After execution, the **Output** section shows:
 
 Click on nested objects to expand and inspect their contents. Use this to verify your step is receiving and returning the expected data structure.
 
-## Step Configuration
-
-<img
-  src="../resources/step-config.png"
-  alt="Step output"
-  className="w-full rounded-lg"
-/>
-
-### Step Instruction
-
-Edit the natural language instruction that describes what the step should do. Once edited, rerun the step with "Fix Step" to apply changes. These are auto generated based on the tool-level instruction.
-
-### Integration
-
-Change which integration (API connection) the step uses. The playground validates that the selected integration exists. Note that this will change what credentials can be used.
-
-## Run or Fix Individual Steps
-
-<video autoPlay className="w-full rounded-lg">
-  <source src="/resources/fix-step.mp4" type="video/mp4" />
-</video>
+## Run or Fix a Step
 
 ### Run Step
 
@@ -132,13 +116,23 @@ Executes just this one step using the current configuration and previous step re
 - Debug a specific failure in isolation
 - Verify your instruction changes work
 
+If the **Step Data Selector** returns an array, the step becomes iterational—it runs once for each item in the array. In this case, you can choose to run a single iteration using the dropdown on the **Run Step** button.   
+
 ### Fix Step
 
-Runs the step with auto-repair enabled, even if global auto-repair is off. The AI attempts to fix the step configuration if it fails. Use this when:
+Opens a modal where you can refine the **step-specific instruction** and trigger an LLM-powered repair for this step. The modal provides two actions:
 
-- A step is failing and you want the AI to suggest a fix
-- You've made manual changes but they're not working
-- You have changed the instruction and want to align the API call with it
+- **Fix Step & Execute** – uses the LLM to update the step configuration and immediately runs the step with the fixed version
+- **Fix Step** – uses the LLM to update the step configuration but does not run it yet (you can execute it later with **Run Step**)
+
+<video autoPlay className="w-full rounded-lg">
+  <source src="/resources/fix-step.mp4" type="video/mp4" />
+</video>
+
+Use this when:
+
+- A step is failing and you want the LLM to find and apply a fix
+- You've made manual changes but they're not working as expected
 
 <Note>
   A fixed step will update the step configuration in the view but will not save
