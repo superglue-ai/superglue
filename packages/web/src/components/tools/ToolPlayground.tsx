@@ -2,6 +2,7 @@
 
 import { useConfig } from "@/src/app/config-context";
 import { useIntegrations } from "@/src/app/integrations-context";
+import { useTools } from "@/src/app/tools-context";
 import { createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, computeStepOutput, computeToolPayload, removeFileKeysFromPayload, wrapLoopSelectorWithLimit } from "@/src/lib/general-utils";
@@ -9,7 +10,7 @@ import { ExecutionStep, Integration, Workflow as Tool, WorkflowResult as ToolRes
 import { generateDefaultFromSchema } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import isEqual from "lodash.isequal";
-import { Check, CloudUpload, Hammer, Loader2, Play, X } from "lucide-react";
+import { Check, CloudUpload, CopyPlus, Edit2, Hammer, Loader2, Play, Trash2, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -24,11 +25,15 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+import { ToolDeployModal } from "./deploy/ToolDeployModal";
+import { DeleteConfigDialog } from "./dialogs/DeleteConfigDialog";
+import { DuplicateToolDialog } from "./dialogs/DuplicateToolDialog";
+import { FixStepDialog } from "./dialogs/FixStepDialog";
+import { ModifyStepConfirmDialog } from "./dialogs/ModifyStepConfirmDialog";
+import { RenameToolDialog } from "./dialogs/RenameToolDialog";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 import { ToolStepGallery } from "./ToolStepGallery";
-import { ToolDeployModal } from "./deploy/ToolDeployModal";
-import { FixStepDialog } from "./FixStepDialog";
-import { ModifyStepConfirmDialog } from "./ModifyStepConfirmDialog";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -99,9 +104,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [toolId, setToolId] = useState(initialTool?.id || "");
   const [steps, setSteps] = useState<any[]>(initialTool?.steps || []);
   const [finalTransform, setFinalTransform] = useState(initialTool?.finalTransform || `(sourceData) => {
-  return {
-    result: sourceData
-  }
+  return sourceData;
 }`);
   const [responseSchema, setResponseSchema] = useState<string>(
     initialTool?.responseSchema ? JSON.stringify(initialTool.responseSchema, null, 2) : ''
@@ -136,8 +139,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
-  const [result, setResult] = useState<ToolResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [failedSteps, setFailedSteps] = useState<string[]>([]);
   const [navigateToFinalSignal, setNavigateToFinalSignal] = useState<number>(0);
@@ -178,6 +179,12 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [showModifyStepConfirm, setShowModifyStepConfirm] = useState(false);
   const [pendingModifyStepIndex, setPendingModifyStepIndex] = useState<number | null>(null);
   const modifyStepResolveRef = useRef<((shouldContinue: boolean) => void) | null>(null);
+  
+  // Tool action dialogs (rename, duplicate, delete)
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const { refreshTools } = useTools();
 
   // Generate default payload once when schema is available if payload is empty
   useEffect(() => {
@@ -280,7 +287,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
     
     // Clear execution state since tool changed
-    setResult(null);
     setCompletedSteps([]);
     setFailedSteps([]);
     setStepResultsMap({});
@@ -486,7 +492,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     try {
       if (!idToLoad) return;
       setLoading(true);
-      setResult(null);
       const client = createSuperglueClient(config.superglueEndpoint);
       const tool = await client.getWorkflow(idToLoad);
       if (!tool) {
@@ -554,7 +559,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setResponseSchema('');
       setInputSchema(null);
       setManualPayloadText('{}');
-      setResult(null);
       setFinalPreviewResult(null);
     }
   }, [id, embedded, initialTool]);
@@ -683,10 +687,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     setIsStopping(false);
     setCompletedSteps([]);
     setFailedSteps([]);
-    setResult(null);
     setFinalPreviewResult(null);
     setStepResultsMap({});
-    setError(null);
     setFocusStepId(null);
 
     try {
@@ -786,7 +788,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           finalTransform: state.currentTool.finalTransform || finalTransform,
         } as any
       };
-      setResult(wr);
 
       // Update finalTransform with the self-healed version if it was modified
       if (state.currentTool.finalTransform && effectiveSelfHealing) {
@@ -897,7 +898,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           return next;
         });
         setFinalPreviewResult(null);
-        setResult(null);
       }
       // Clear marker regardless to avoid stale cascades
       lastUserEditedStepIdRef.current = null;
@@ -1118,6 +1118,89 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     await handleExecuteTransform(schemaStr, transformStr, true);
   };
 
+  // Tool action handlers
+  const handleRenamed = (newId: string) => {
+    setToolId(newId);
+    refreshTools();
+    router.push(`/tools/${encodeURIComponent(newId)}`);
+  };
+
+  const handleDuplicated = (newId: string) => {
+    refreshTools();
+    router.push(`/tools/${encodeURIComponent(newId)}`);
+  };
+
+  const handleDeleted = () => {
+    router.push('/configs');
+  };
+
+  const currentTool = useMemo(() => ({
+    id: toolId,
+    steps,
+    instruction: instructions,
+    finalTransform,
+    responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
+    inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
+    createdAt: initialTool?.createdAt,
+    updatedAt: initialTool?.updatedAt
+  } as Tool), [toolId, steps, instructions, finalTransform, responseSchema, inputSchema, initialTool]);
+
+  // Tool action buttons next to the name
+  const toolActionButtons = !embedded ? (
+    <div className="flex items-center gap-1">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setShowRenameDialog(true)}
+              disabled={!toolId.trim()}
+            >
+              <Edit2 className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Rename Tool</p>
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setShowDuplicateDialog(true)}
+              disabled={!toolId.trim()}
+            >
+              <CopyPlus className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Duplicate Tool</p>
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setShowDeleteDialog(true)}
+              disabled={!toolId.trim()}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Delete Tool</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+  ) : null;
+
   // Default header actions for standalone mode
   const defaultHeaderActions = (
     <div className="flex items-center gap-2">
@@ -1271,8 +1354,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   onFinalTransformChange={setFinalTransform}
                   onResponseSchemaChange={setResponseSchema}
                   onPayloadChange={setManualPayloadText}
-                  onToolIdChange={setToolId}
                   onInstructionEdit={embedded ? onInstructionEdit : undefined}
+                  toolActionButtons={toolActionButtons}
                   integrations={integrations}
                   isExecuting={loading}
                   isExecutingStep={isExecutingStep}
@@ -1372,6 +1455,27 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         payload={computedPayload}
         isOpen={showDeployModal}
         onClose={() => setShowDeployModal(false)}
+      />
+
+      <RenameToolDialog
+        tool={currentTool}
+        isOpen={showRenameDialog}
+        onClose={() => setShowRenameDialog(false)}
+        onRenamed={handleRenamed}
+      />
+
+      <DuplicateToolDialog
+        tool={currentTool}
+        isOpen={showDuplicateDialog}
+        onClose={() => setShowDuplicateDialog(false)}
+        onDuplicated={handleDuplicated}
+      />
+
+      <DeleteConfigDialog
+        config={{ ...currentTool, type: 'tool' } as any}
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onDeleted={handleDeleted}
       />
     </div>
   );

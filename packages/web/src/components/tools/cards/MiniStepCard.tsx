@@ -136,10 +136,9 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
     const isRunning = isTesting || (isRunningAll && !!stepId);
     const statusInfo = getStatusInfo(isRunning, isFailed, isCompleted);
 
-    const linkedIntegration = integrations?.find(integration => {
-        if (step.integrationId && integration.id === step.integrationId) return true;
-        return step.apiConfig?.urlHost && integration.urlHost && step.apiConfig.urlHost.includes(integration.urlHost.replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, ''));
-    });
+    const linkedIntegration = step.integrationId && integrations
+        ? integrations.find(integration => integration.id === step.integrationId)
+        : undefined;
 
     const iconName = linkedIntegration ? getIntegrationIcon(linkedIntegration) : null;
     const simpleIcon = iconName ? getSimpleIcon(iconName) : null;

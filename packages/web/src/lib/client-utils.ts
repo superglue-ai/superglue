@@ -1,5 +1,25 @@
-import { Integration, SelfHealingMode, SuperglueClient, Workflow as Tool } from "@superglue/client";
+import { ExecutionStep, Integration, SelfHealingMode, SuperglueClient, Workflow as Tool } from "@superglue/client";
 import { tokenRegistry } from "./token-registry";
+
+const BASE62_REGEX = /^[a-zA-Z0-9_-]*$/;
+
+export function isValidToolName(name: string): boolean {
+  return BASE62_REGEX.test(name);
+}
+
+export function validateToolName(name: string): string | null {  
+  if (!name) {
+    return "Tool name cannot be empty";
+  }
+  if (name.length > 100) {
+    return "Tool name cannot be longer than 100 characters";
+  }
+  if (!isValidToolName(name)) {
+    return "Tool name can only contain letters, numbers, hyphens, and underscores";
+  }
+  
+  return null;
+}
 
 export interface StepExecutionResult {
   stepId: string;
@@ -126,12 +146,14 @@ export async function executeToolStepByStep(
     }
 
     const result = await executeSingleStep(
-      client,
-      state.currentTool,
-      i,
-      payload,
-      previousResults,
-      selfHealing
+      {
+        client,
+        step,
+        toolId: state.currentTool.id,
+        payload,
+        previousResults,
+        selfHealing
+      }
     );
 
     state.stepResults[step.id] = result;

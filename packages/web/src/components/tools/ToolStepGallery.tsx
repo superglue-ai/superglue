@@ -6,11 +6,11 @@ import { buildEvolvingPayload, cn } from '@/src/lib/general-utils';
 import { Integration } from "@superglue/client";
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AddStepDialog } from './AddStepDialog';
 import { FinalTransformMiniStepCard } from './cards/FinalTransformCard';
 import { MiniStepCard } from './cards/MiniStepCard';
 import { PayloadMiniStepCard } from './cards/PayloadCard';
 import { SpotlightStepCard } from './cards/SpotlightStepCard';
+import { AddStepDialog } from './dialogs/AddStepDialog';
 import { InstructionDisplay } from './shared/InstructionDisplay';
 
 export interface ToolStepGalleryProps {
@@ -26,8 +26,8 @@ export interface ToolStepGalleryProps {
     onFinalTransformChange?: (transform: string) => void;
     onResponseSchemaChange?: (schema: string) => void;
     onPayloadChange?: (payload: string) => void;
-    onToolIdChange?: (id: string) => void;
     onInstructionEdit?: () => void;
+    toolActionButtons?: React.ReactNode;
     onExecuteStep?: (stepIndex: number) => Promise<void>;
     onExecuteStepWithLimit?: (stepIndex: number, limit: number) => Promise<void>;
     onOpenFixStepDialog?: (stepIndex: number) => void;
@@ -75,8 +75,8 @@ export function ToolStepGallery({
     onFinalTransformChange,
     onResponseSchemaChange,
     onPayloadChange,
-    onToolIdChange,
     onInstructionEdit,
+    toolActionButtons,
     onExecuteStep,
     onExecuteStepWithLimit,
     onOpenFixStepDialog,
@@ -170,25 +170,6 @@ export function ToolStepGallery({
                 scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
             }
         }, NAV_DELAY_MS);
-    };
-
-    // Local toolId editor state to reduce re-renders
-    const [localToolId, setLocalToolId] = useState<string>(toolId ?? '');
-    const [isEditingToolId, setIsEditingToolId] = useState<boolean>(false);
-    const toolIdInputRef = useRef<HTMLInputElement | null>(null);
-    const liveToolIdRef = useRef<string>(toolId ?? '');
-    useEffect(() => {
-        if (!isEditingToolId) {
-            setLocalToolId(toolId ?? '');
-        }
-    }, [toolId, isEditingToolId]);
-    const commitToolIdIfChanged = () => {
-        const nextVal = liveToolIdRef.current ?? localToolId;
-        if (onToolIdChange && nextVal !== (toolId ?? '')) {
-            onToolIdChange(nextVal);
-            setLocalToolId(nextVal);
-        }
-        setIsEditingToolId(false);
     };
 
     // Hydration effect
@@ -435,45 +416,13 @@ export function ToolStepGallery({
             <div className="flex-shrink-0 space-y-1.5 mb-6">
                 <div className="flex items-center justify-center gap-3 flex-wrap">
                     <div className="flex items-center gap-3 min-w-0 w-full">
-                        {(onToolIdChange || typeof toolId !== 'undefined') && (
+                        {typeof toolId !== 'undefined' && (
                             <div className="flex w-full items-center justify-between gap-3 mb-2">
-                                <div className="flex items-center gap-3 flex-1">
-                                    {isEditingToolId ? (
-                                        <input
-                                            key="editing"
-                                            ref={toolIdInputRef}
-                                            defaultValue={localToolId}
-                                            onChange={(e) => { liveToolIdRef.current = e.target.value; }}
-                                            onBlur={commitToolIdIfChanged}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.preventDefault();
-                                                    commitToolIdIfChanged();
-                                                } else if (e.key === 'Escape') {
-                                                    if (toolIdInputRef.current) {
-                                                        toolIdInputRef.current.value = toolId ?? '';
-                                                    }
-                                                    liveToolIdRef.current = toolId ?? '';
-                                                    setLocalToolId(toolId ?? '');
-                                                    setIsEditingToolId(false);
-                                                }
-                                            }}
-                                            className="text-2xl font-bold border-0 bg-transparent p-0 h-auto focus:ring-0 focus:outline-none min-w-0 flex-1 w-full"
-                                            autoFocus
-                                        />
-                                    ) : (
-                                        <h1
-                                            className="text-2xl font-bold cursor-pointer hover:text-primary/80 transition-colors"
-                                            onClick={() => {
-                                                if (!readOnly && onToolIdChange) {
-                                                    setIsEditingToolId(true);
-                                                    liveToolIdRef.current = localToolId;
-                                                }
-                                            }}
-                                        >
-                                            {localToolId || 'Untitled Tool'}
-                                        </h1>
-                                    )}
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <h1 className="text-2xl font-bold truncate">
+                                        {toolId || 'Untitled Tool'}
+                                    </h1>
+                                    {toolActionButtons}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {headerActions ?? null}
