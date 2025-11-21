@@ -28,45 +28,31 @@ export interface ToolExecutionState {
   interrupted?: boolean;
 }
 
-export function createSingleStepTool(
-  tool: Tool,
-  stepIndex: number,
-  previousResults: Record<string, any> = {}
-): Tool {
-  if (stepIndex < 0 || stepIndex >= tool.steps.length) {
-    throw new Error(`Invalid step index: ${stepIndex}`);
-  }
-
-  const step = tool.steps[stepIndex];
-
-  const singleStepTool: any = {
-    id: `${tool.id}_step_${stepIndex}`,
-    steps: [step],
-    finalTransform: ''
-  };
-
-  return singleStepTool;
-}
-
-export async function executeSingleStep(
-  client: SuperglueClient,
-  tool: Tool,
-  stepIndex: number,
-  payload: any,
-  previousResults: Record<string, any> = {},
-  selfHealing: boolean = false
-): Promise<StepExecutionResult> {
-  const step = tool.steps[stepIndex];
-
+export async function executeSingleStep({
+  client,
+  step,
+  toolId,
+  payload,
+  previousResults,
+  selfHealing
+}: {
+  client: SuperglueClient;
+  step: ExecutionStep;
+  toolId: string;
+  payload: any;
+  previousResults: Record<string, any>;
+  selfHealing: boolean;
+}): Promise<StepExecutionResult> {
   try {
-    const singleStepTool = createSingleStepTool(tool, stepIndex, previousResults);
+    const singleStepTool: Tool = {
+      id: `${toolId}_step_${step.id}`,
+      steps: [step],
+      finalTransform: ''
+    } as any;
 
     const executionPayload = {
       ...payload,
-      ...Object.keys(previousResults).reduce((acc, stepId) => ({
-        ...acc,
-        [`${stepId}`]: previousResults[stepId]
-      }), {})
+      ...previousResults
     };
 
     const result = await client.executeWorkflow({

@@ -921,12 +921,14 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         : steps;
 
       const single = await executeSingleStep(
-        client,
-        { id: toolId, steps: executionSteps } as any,
-        idx,
-        computedPayload,
-        stepResultsMap,
-        false,
+        {
+          client,
+          step: steps[idx],
+          toolId,
+          payload: computedPayload,
+          previousResults: stepResultsMap,
+          selfHealing: false
+        }
       );
       
       const sid = steps[idx].id;
@@ -1010,12 +1012,14 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         : steps;
 
       const single = await executeSingleStep(
-        client,
-        { id: toolId, steps: updatedSteps } as any,
-        fixStepIndex,
-        computedPayload,
-        stepResultsMap,
-        true, // Enable self-healing
+        {
+          client,
+          step: updatedSteps[fixStepIndex],
+          toolId,
+          payload: computedPayload,
+          previousResults: stepResultsMap,
+          selfHealing: true
+        }
       );
 
       const sid = steps[fixStepIndex].id;
