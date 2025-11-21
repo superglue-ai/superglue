@@ -8,6 +8,7 @@ import { getApiResolver, getRunResolver } from "./resolvers/get.js";
 import { cacheOauthClientCredentialsResolver, deleteIntegrationResolver, findRelevantIntegrationsResolver, getIntegrationResolver, getOAuthClientCredentialsResolver, listIntegrationsResolver, searchIntegrationDocumentationResolver, upsertIntegrationResolver } from "./resolvers/integrations.js";
 import { listApisResolver, listRunsResolver } from "./resolvers/list.js";
 import { logsResolver } from "./resolvers/logs.js";
+import { renameWorkflowResolver } from "./resolvers/rename-workflow.js";
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
 import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant.js";
 import { updateApiConfigIdResolver } from "./resolvers/update-id.js";
@@ -48,6 +49,7 @@ export const resolvers = {
     buildWorkflow: buildWorkflowResolver,
     upsertWorkflow: upsertWorkflowResolver,
     deleteWorkflow: deleteWorkflowResolver,
+    renameWorkflow: renameWorkflowResolver,
     upsertApi: upsertApiResolver,
     deleteApi: deleteApiResolver,
     updateApiConfigId: updateApiConfigIdResolver,

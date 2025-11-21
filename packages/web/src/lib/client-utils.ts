@@ -1,5 +1,25 @@
-import { Integration, SelfHealingMode, SuperglueClient, Workflow as Tool } from "@superglue/client";
+import { ExecutionStep, Integration, SelfHealingMode, SuperglueClient, Workflow as Tool } from "@superglue/client";
 import { tokenRegistry } from "./token-registry";
+
+const BASE62_REGEX = /^[a-zA-Z0-9_-]*$/;
+
+export function isValidToolName(name: string): boolean {
+  return BASE62_REGEX.test(name);
+}
+
+export function validateToolName(name: string): string | null {  
+  if (!name) {
+    return "Tool name cannot be empty";
+  }
+  if (name.length > 100) {
+    return "Tool name cannot be longer than 100 characters";
+  }
+  if (!isValidToolName(name)) {
+    return "Tool name can only contain letters, numbers, hyphens, and underscores";
+  }
+  
+  return null;
+}
 
 export interface StepExecutionResult {
   stepId: string;
@@ -28,45 +48,31 @@ export interface ToolExecutionState {
   interrupted?: boolean;
 }
 
-export function createSingleStepTool(
-  tool: Tool,
-  stepIndex: number,
-  previousResults: Record<string, any> = {}
-): Tool {
-  if (stepIndex < 0 || stepIndex >= tool.steps.length) {
-    throw new Error(`Invalid step index: ${stepIndex}`);
-  }
-
-  const step = tool.steps[stepIndex];
-
-  const singleStepTool: any = {
-    id: `${tool.id}_step_${stepIndex}`,
-    steps: [step],
-    finalTransform: ''
-  };
-
-  return singleStepTool;
-}
-
-export async function executeSingleStep(
-  client: SuperglueClient,
-  tool: Tool,
-  stepIndex: number,
-  payload: any,
-  previousResults: Record<string, any> = {},
-  selfHealing: boolean = false
-): Promise<StepExecutionResult> {
-  const step = tool.steps[stepIndex];
-
+export async function executeSingleStep({
+  client,
+  step,
+  toolId,
+  payload,
+  previousResults,
+  selfHealing
+}: {
+  client: SuperglueClient;
+  step: ExecutionStep;
+  toolId: string;
+  payload: any;
+  previousResults: Record<string, any>;
+  selfHealing: boolean;
+}): Promise<StepExecutionResult> {
   try {
-    const singleStepTool = createSingleStepTool(tool, stepIndex, previousResults);
+    const singleStepTool: Tool = {
+      id: `${toolId}_step_${step.id}`,
+      steps: [step],
+      finalTransform: ''
+    } as any;
 
     const executionPayload = {
       ...payload,
-      ...Object.keys(previousResults).reduce((acc, stepId) => ({
-        ...acc,
-        [`${stepId}`]: previousResults[stepId]
-      }), {})
+      ...previousResults
     };
 
     const result = await client.executeWorkflow({
@@ -140,12 +146,14 @@ export async function executeToolStepByStep(
     }
 
     const result = await executeSingleStep(
-      client,
-      state.currentTool,
-      i,
-      payload,
-      previousResults,
-      selfHealing
+      {
+        client,
+        step,
+        toolId: state.currentTool.id,
+        payload,
+        previousResults,
+        selfHealing
+      }
     );
 
     state.stepResults[step.id] = result;

@@ -41,7 +41,7 @@
     "@apollo/server": "^4.11.3",
     "@fastify/cors": "^10.0.1",
     "@modelcontextprotocol/sdk": "1.12.1",
-    "@superglue/client": "^2.3.60",
+    "@superglue/client": "^2.3.61",
     "@superglue/shared": "file:../shared",
     "@types/js-yaml": "^4.0.9",
     "ai": "^5.0.65",

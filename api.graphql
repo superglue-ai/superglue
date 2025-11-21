@@ -434,6 +434,7 @@ type Mutation {
 
   upsertWorkflow(id: ID!, input: JSON!): Workflow!
   deleteWorkflow(id: ID!): Boolean!
+  renameWorkflow(oldId: ID!, newId: ID!): Workflow!
 
   upsertWorkflowSchedule(schedule: WorkflowScheduleInput!): WorkflowSchedule!
   deleteWorkflowSchedule(id: ID!): Boolean!

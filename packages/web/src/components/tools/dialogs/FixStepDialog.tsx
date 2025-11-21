@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Button } from '@/src/components/ui/button';
 import {
     Dialog,
@@ -10,9 +9,10 @@ import {
 } from '@/src/components/ui/dialog';
 import { Label } from '@/src/components/ui/label';
 import { Textarea } from '@/src/components/ui/textarea';
-import { Loader2, RefreshCw, WandSparkles } from 'lucide-react';
-import { useGenerateStepConfig } from './hooks/use-generate-step-config';
 import { useToast } from '@/src/hooks/use-toast';
+import { Loader2, RefreshCw, WandSparkles } from 'lucide-react';
+import { useState } from 'react';
+import { useGenerateStepConfig } from '../hooks/use-generate-step-config';
 
 interface FixStepDialogProps {
     open: boolean;

@@ -2,16 +2,6 @@
 
 import { useConfig } from '@/src/app/config-context';
 import { useIntegrations } from '@/src/app/integrations-context';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/src/components/ui/alert-dialog";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import {
@@ -29,14 +19,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import { tokenRegistry } from '@/src/lib/token-registry';
 
-import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
 import { ToolDeployModal } from '@/src/components/tools/deploy/ToolDeployModal';
+import { DeleteConfigDialog } from '@/src/components/tools/dialogs/DeleteConfigDialog';
+import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { createSuperglueClient } from '@/src/lib/client-utils';
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
-import { ApiConfig, Integration, SuperglueClient, Workflow as Tool } from '@superglue/client';
+import { ApiConfig, Integration, Workflow as Tool } from '@superglue/client';
 import { Check, CloudUpload, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -173,38 +163,9 @@ const ConfigTable = () => {
     router.push(`/tools/${encodeURIComponent(id)}`);
   };
 
-  const handleDelete = async () => {
-    if (!configToDelete) return;
-
-    try {
-      const superglueClient = new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: tokenRegistry.getToken()
-      });
-
-      let deletePromise;
-
-      switch ((configToDelete as any)?.type) {
-        case 'api':
-          deletePromise = superglueClient.deleteApi(configToDelete.id);
-          break;
-        case 'tool':
-          deletePromise = superglueClient.deleteWorkflow(configToDelete.id);
-          break;
-        default:
-          console.error('Unknown config type for deletion:', (configToDelete as any)?.type);
-          return;
-      }
-
-      await deletePromise;
-
-      const deletedId = configToDelete.id;
-      setConfigToDelete(null);
-      setAllConfigs(prev => prev.filter(c => c.id !== deletedId));
-      setTotal(prev => prev - 1);
-    } catch (error) {
-      console.error('Error deleting config:', error);
-    }
+  const handleDeleted = (deletedId: string) => {
+    setAllConfigs(prev => prev.filter(c => c.id !== deletedId));
+    setTotal(prev => prev - 1);
   };
 
   const handleCopyId = (e: React.MouseEvent, id: string) => {
@@ -313,7 +274,7 @@ const ConfigTable = () => {
             <TableRow>
               <TableHead className="w-[60px]"></TableHead>
               <TableHead>ID</TableHead>
-              <TableHead>Details</TableHead>
+              <TableHead>Instructions</TableHead>
               <TableHead>Updated At</TableHead>
               <TableHead className="text-right">
                 <TooltipProvider>
@@ -590,20 +551,12 @@ const ConfigTable = () => {
         </Button>
       </div>
 
-      <AlertDialog open={!!configToDelete} onOpenChange={(open) => !open && setConfigToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this configuration. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfigDialog
+        config={configToDelete}
+        isOpen={!!configToDelete}
+        onClose={() => setConfigToDelete(null)}
+        onDeleted={handleDeleted}
+      />
 
       {deployToolId && (
         <ToolDeployModal

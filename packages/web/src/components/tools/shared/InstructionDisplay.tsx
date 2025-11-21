@@ -35,10 +35,6 @@ export const InstructionDisplay = ({ instruction, onEdit, showEditButton = true 
                                 <Eye className="h-2.5 w-2.5" />
                             </Button>
                         )}
-                        <Button variant="ghost" size="icon" className="h-[16px] w-[16px] p-0" onClick={handleCopy} title="Copy instruction">
-                            {copied ? <Check size={9} className="scale-[0.8]" /> : <Copy size={9} className="scale-[0.8]" />}
-                        </Button>
-
                     </div>
                 </div>
                 <p
