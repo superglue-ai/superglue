@@ -1,9 +1,9 @@
 import { useConfig } from '@/src/app/config-context';
+import { useTools } from '@/src/app/tools-context';
 import { useToast } from '@/src/hooks/use-toast';
-import { createSuperglueClient } from '@/src/lib/client-utils';
 import { cn, getGroupedTimezones } from '@/src/lib/general-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
-import { SuperglueClient, Workflow as Tool, WorkflowSchedule as ToolSchedule } from '@superglue/client';
+import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/client';
 import { validateCronExpression } from '@superglue/shared';
 import { Check, ChevronRight, ChevronsUpDown, Loader2 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
@@ -15,7 +15,6 @@ import { Label } from '../../ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { HelpTooltip } from '../../utils/HelpTooltip';
-import { useTools } from '@/src/app/tools-context';
 
 const DEFAULT_SCHEDULES = [
   { value: '*/5 * * * *', label: 'Every 5 minutes' },
@@ -507,13 +506,13 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                         <div className="flex flex-col gap-2">
                           <div className="flex items-center gap-2">
                             <Label htmlFor="timeout">Timeout (ms)</Label>
-                            <HelpTooltip text="Maximum time to wait for API responses in milliseconds. Increase for slow APIs. Default: 60000ms (1 minute)." />
+                            <HelpTooltip text="Maximum time to wait for each API request in milliseconds. Increase for slow APIs. Default: 300000ms (5 minutes)." />
                           </div>
                           <Input
                             id="timeout"
                             type="number"
-                            min="1000"
-                            placeholder="Default: 60000"
+                            min="100"
+                            placeholder="Default: 300000"
                             value={timeout}
                             onChange={(e) => setTimeout(e.target.value)}
                           />
