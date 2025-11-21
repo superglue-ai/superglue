@@ -29,7 +29,7 @@ export function ModifyStepConfirmDialog({
   return (
     <AlertDialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
       <AlertDialogContent onKeyDown={(e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'BUTTON') {
           e.preventDefault();
           onConfirm();
         }

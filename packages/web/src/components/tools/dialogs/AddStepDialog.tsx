@@ -121,7 +121,7 @@ export function AddStepDialog({
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className="max-w-2xl" onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'BUTTON') {
                     e.preventDefault();
                     if (activeTab === 'scratch') {
                         handleConfirmScratch();

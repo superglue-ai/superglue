@@ -85,7 +85,7 @@ export function DuplicateToolDialog({ tool, isOpen, onClose, onDuplicated }: Dup
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent onKeyDown={(e) => {
-        if (e.key === 'Enter' && !isDuplicating) {
+        if (e.key === 'Enter' && !isDuplicating && (e.target as HTMLElement).tagName !== 'BUTTON') {
           e.preventDefault();
           handleDuplicateConfirm();
         }

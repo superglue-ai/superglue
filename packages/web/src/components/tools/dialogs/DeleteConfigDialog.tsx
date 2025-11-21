@@ -63,7 +63,7 @@ export function DeleteConfigDialog({ config, isOpen, onClose, onDeleted }: Delet
   return (
     <AlertDialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <AlertDialogContent onKeyDown={(e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'BUTTON') {
           e.preventDefault();
           handleDelete();
         }

@@ -278,6 +278,18 @@ export class MemoryStore implements DataStore {
     // Save new workflow
     this.storage.workflows.set(newKey, newWorkflow);
 
+    // Update all workflow schedules that reference this workflow
+    for (const [key, schedule] of this.storage.workflowSchedules.entries()) {
+      if (schedule.workflowId === oldId && schedule.orgId === (orgId || '')) {
+        const updatedSchedule = {
+          ...schedule,
+          workflowId: newId,
+          updatedAt: new Date()
+        };
+        this.storage.workflowSchedules.set(key, updatedSchedule);
+      }
+    }
+
     // Delete old workflow
     this.storage.workflows.delete(oldKey);
 

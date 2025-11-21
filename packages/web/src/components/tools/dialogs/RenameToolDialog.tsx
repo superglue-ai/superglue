@@ -81,7 +81,7 @@ export function RenameToolDialog({ tool, isOpen, onClose, onRenamed }: RenameToo
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent onKeyDown={(e) => {
-        if (e.key === 'Enter' && !isRenaming) {
+        if (e.key === 'Enter' && !isRenaming && (e.target as HTMLElement).tagName !== 'BUTTON') {
           e.preventDefault();
           handleRename();
         }
