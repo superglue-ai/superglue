@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/ta
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE_TOOLS, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { ALLOWED_FILE_EXTENSIONS } from '@superglue/shared';
-import { Code2, FileJson, Upload, FileBraces, FileBracesCorner } from 'lucide-react';
+import { FileBraces, FileBracesCorner, FileJson, Upload } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
 
@@ -165,9 +165,9 @@ export const PayloadSpotlight = ({
                             value={localPayload}
                             onChange={(val) => handlePayloadChange(val || '')}
                             readOnly={!!readOnly}
-                            minHeight="300px"
                             maxHeight="300px"
                             resizable={true}
+                            showValidation={true}
                         />
                     </div>
                     {!readOnly && onFilesUpload && (

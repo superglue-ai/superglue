@@ -74,7 +74,8 @@ export async function executeSingleStep(
       payload: executionPayload,
       options: {
         testMode: selfHealing,
-        selfHealing: selfHealing ? SelfHealingMode.REQUEST_ONLY : SelfHealingMode.DISABLED
+        selfHealing: selfHealing ? SelfHealingMode.REQUEST_ONLY : SelfHealingMode.DISABLED,
+        timeout: 3_600_000 // 1 hour
       }
     });
 
@@ -252,7 +253,8 @@ export async function executeFinalTransform(
       payload: finalPayload,
       options: {
         testMode: selfHealing,
-        selfHealing: selfHealing ? SelfHealingMode.TRANSFORM_ONLY : SelfHealingMode.DISABLED
+        selfHealing: selfHealing ? SelfHealingMode.TRANSFORM_ONLY : SelfHealingMode.DISABLED,
+        timeout: 600_000 // 10 minutes
       }
     });
     return {

@@ -6,7 +6,32 @@ import { CopyButton } from '../tools/shared/CopyButton';
 
 const HIGHLIGHTING_THRESHOLD = 100 * 1024; // 100KB
 
-export const JsonCodeEditor = ({ value, onChange, readOnly = false, minHeight = '150px', maxHeight = '300px', placeholder = '{}', overlay, bottomRightOverlay, resizable = false, showValidation = false }: { value: string; onChange?: (value: string) => void; readOnly?: boolean; minHeight?: string; maxHeight?: string; placeholder?: string; overlay?: React.ReactNode; bottomRightOverlay?: React.ReactNode; resizable?: boolean; showValidation?: boolean; }) => {
+type JsonCodeEditorProps = {
+    value: string;
+    onChange?: (value: string) => void;
+    readOnly?: boolean;
+    minHeight?: string;
+    maxHeight?: string;
+    placeholder?: string;
+    overlay?: React.ReactNode;
+    bottomRightOverlay?: React.ReactNode;
+    resizable?: boolean;
+    showValidation?: boolean;
+}
+
+export const JsonCodeEditor = (
+    { 
+        value,
+        onChange,
+        readOnly = false,
+        minHeight = '150px',
+        maxHeight = '300px',
+        placeholder = '{}',
+        overlay,
+        bottomRightOverlay,
+        resizable = false,
+        showValidation = false }: 
+    JsonCodeEditorProps) => {
     const { theme, onMount } = useMonacoTheme();
     const [currentHeight, setCurrentHeight] = useState(maxHeight);
     const [jsonError, setJsonError] = useState<string | null>(null);
