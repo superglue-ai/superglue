@@ -525,6 +525,40 @@ export class FileStore implements DataStore {
     return deleted;
   }
 
+  async renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Workflow> {
+    await this.ensureInitialized();
+    const { oldId, newId, orgId } = params;
+    
+    // Check if newId already exists
+    const newKey = this.getKey('workflow', newId, orgId);
+    if (this.storage.workflows.has(newKey)) {
+      throw new Error(`Workflow with ID '${newId}' already exists`);
+    }
+
+    // Get old workflow
+    const oldKey = this.getKey('workflow', oldId, orgId);
+    const oldWorkflow = this.storage.workflows.get(oldKey);
+    if (!oldWorkflow) {
+      throw new Error(`Workflow with ID '${oldId}' not found`);
+    }
+
+    // Create new workflow with newId
+    const newWorkflow: Workflow = {
+      ...oldWorkflow,
+      id: newId,
+      updatedAt: new Date()
+    };
+
+    // Save new workflow
+    this.storage.workflows.set(newKey, newWorkflow);
+
+    // Delete old workflow
+    this.storage.workflows.delete(oldKey);
+
+    await this.persist();
+    return newWorkflow;
+  }
+
   // Integration Methods
   async getIntegration(params: { id: string; includeDocs?: boolean; orgId?: string }): Promise<Integration | null> {
     await this.ensureInitialized();

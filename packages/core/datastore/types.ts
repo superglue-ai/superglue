@@ -19,6 +19,7 @@ export interface DataStore {
   listWorkflows(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: Workflow[], total: number }>;
   upsertWorkflow(params: { id: string; workflow: Workflow; orgId?: string }): Promise<Workflow>;
   deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean>;
+  renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Workflow>;
   getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Workflow[]>;
 
   // Tenant Information Methods

@@ -486,6 +486,83 @@ export class PostgresService implements DataStore {
         return this.deleteConfig(id, 'workflow', orgId);
     }
 
+    async renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Workflow> {
+        const { oldId, newId, orgId = '' } = params;
+        const client = await this.pool.connect();
+        
+        try {
+            await client.query('BEGIN');
+
+            // 1. Check if newId already exists
+            const existingCheck = await client.query(
+                'SELECT id FROM configurations WHERE id = $1 AND type = $2 AND org_id = $3',
+                [newId, 'workflow', orgId]
+            );
+            
+            if (existingCheck.rows.length > 0) {
+                throw new Error(`Workflow with ID '${newId}' already exists`);
+            }
+
+            // 2. Get old workflow
+            const oldWorkflowResult = await client.query(
+                'SELECT data FROM configurations WHERE id = $1 AND type = $2 AND org_id = $3',
+                [oldId, 'workflow', orgId]
+            );
+            
+            if (oldWorkflowResult.rows.length === 0) {
+                throw new Error(`Workflow with ID '${oldId}' not found`);
+            }
+
+            const oldWorkflow = oldWorkflowResult.rows[0].data as Workflow;
+            const now = new Date();
+
+            // 3. Create new workflow with newId
+            const newWorkflow: Workflow = {
+                ...oldWorkflow,
+                id: newId,
+                updatedAt: now
+            };
+
+            const integrationIds: string[] = [];
+            await client.query(
+                `INSERT INTO configurations (id, org_id, type, version, data, integration_ids, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                [
+                    newId,
+                    orgId,
+                    'workflow',
+                    newWorkflow.version || null,
+                    newWorkflow,
+                    integrationIds,
+                    newWorkflow.createdAt || now,
+                    now
+                ]
+            );
+
+            // 4. CRITICAL: Update workflow_schedules BEFORE deleting old workflow (to avoid CASCADE delete)
+            await client.query(
+                `UPDATE workflow_schedules 
+                 SET workflow_id = $1, updated_at = CURRENT_TIMESTAMP 
+                 WHERE workflow_id = $2 AND workflow_type = 'workflow' AND org_id = $3`,
+                [newId, oldId, orgId]
+            );
+
+            // 5. Delete old workflow
+            await client.query(
+                'DELETE FROM configurations WHERE id = $1 AND type = $2 AND org_id = $3',
+                [oldId, 'workflow', orgId]
+            );
+
+            await client.query('COMMIT');
+            return newWorkflow;
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     // Workflow Schedule Methods
     async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]> {
         const client = await this.pool.connect();
