@@ -92,7 +92,5 @@ if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScop
       self.postMessage(response);
     }
   };
-} else {
-  console.warn('[compute-worker] Script loaded in window context, not setting up message handler');
 }
 
