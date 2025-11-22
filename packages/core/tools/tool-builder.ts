@@ -7,7 +7,7 @@ import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { logMessage } from "../utils/logs.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import z from "zod";
-import { getWebSearchTool, searchDocumentationToolDefinition } from "../llm/llm-tools.js";
+import { getWebSearchTool } from "../llm/llm-tools.js";
 
 export class ToolBuilder {
   private integrations: Record<string, Integration>;
@@ -16,6 +16,7 @@ export class ToolBuilder {
   private metadata: Metadata;
   private responseSchema: JSONSchema;
   private inputSchema: JSONSchema;
+  private toolSchema: any;
 
   constructor(
     instruction: string,
@@ -32,6 +33,7 @@ export class ToolBuilder {
     this.initialPayload = initialPayload || {};
     this.metadata = metadata;
     this.responseSchema = responseSchema;
+    this.toolSchema = zodToJsonSchema(toolSchema);
     try {
       const credentials = Object.values(integrations).reduce((acc, int) => {
         return { ...acc, ...Object.entries(int.credentials || {}).reduce((obj, [name, value]) => ({ ...obj, [`${int.id}_${name}`]: value }), {}) };
@@ -101,89 +103,60 @@ export class ToolBuilder {
   }
 
   public async buildTool(): Promise<Tool> {
-    let builtTool: Tool | null = null;
-    let messages = this.prepareBuildingContext();
-    let retryCount = 0;
     const maxRetries = 3;
+    let messages = this.prepareBuildingContext();
     let lastError: string | null = null;
 
-    while (retryCount < maxRetries) {
+    const webSearchTool = getWebSearchTool();
+    const tools = webSearchTool 
+      ? [{ toolDefinition: { web_search: webSearchTool }, toolContext: {} }]
+      : [];
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        logMessage('info', `Building tool${retryCount > 0 ? ` (attempt ${retryCount + 1}/${maxRetries})` : ''}`, this.metadata);
+        logMessage('info', `Building tool${attempt > 0 ? ` (attempt ${attempt + 1}/${maxRetries})` : ''}`, this.metadata);
 
-        const builtToolSchema = z.object({
-          id: z.string().describe("The tool ID (e.g., 'stripe-create-order')"),
-          steps: z.array(z.object({
-              id: z.string().describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails')"),
-              integrationId: z.string().describe("REQUIRED: The integration ID for this step (must match one of the available integration IDs)"),
-              loopSelector: z.string().describe("JavaScript function that returns OBJECT for direct execution or ARRAY for loop execution. If returns OBJECT (including {}), step executes once with object as currentItem. If returns ARRAY, step executes once per array item. Examples: (sourceData) => ({ userId: sourceData.userId }) OR (sourceData) => sourceData.getContacts.data.filter(c => c.active)"),
-              modify: z.boolean().optional().describe("Marks whether this operation modifies data on the system it operates on (writes, updates, deletes). Read-only operations should be false. Default is false."),
-              apiConfig: z.object({
-                  id: z.string().describe("Same as the step ID"),
-                  instruction: z.string().describe("A concise instruction describing WHAT data this API call should retrieve or what action it should perform."),
-                  urlHost: z.string().describe("The base URL host (e.g., https://api.example.com). Must not be empty."),
-                  urlPath: z.string().describe("The API endpoint path (e.g., /v1/users)."),
-                  method: z.enum(Object.values(HttpMethod) as [string, ...string[]]).describe("HTTP method: GET, POST, PUT, DELETE, or PATCH"),
-                  queryParams: z.array(z.object({
-                      key: z.string(),
-                      value: z.string()
-                  })).optional().describe("Query parameters as key-value pairs. If pagination is configured, ensure you have included the right pagination parameters here or in the body."),
-                  headers: z.array(z.object({
-                      key: z.string(),
-                      value: z.string()
-                  })).optional().describe("HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions"),
-                  body: z.string().optional().describe("Request body. Use <<variable>> syntax for dynamic values. If pagination is configured, ensure you have included the right pagination parameters here or in the queryParams."),
-                  pagination: z.object({
-                      type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"]),
-                      pageSize: z.string().describe("Number of items per page (e.g., '50', '100'). Once set, this becomes available as <<limit>> (same as pageSize)."),
-                      cursorPath: z.string().describe("If cursor_based: The JSONPath to the cursor in the response. If not, set this to \"\""),
-                      stopCondition: z.string().describe("REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number). response is the axios response object, access response data via response.data. Return true to STOP. E.g. (response, pageInfo) => !response.data.pagination.has_more")
-                  }).optional().describe("OPTIONAL: Only configure if you are using pagination variables in the URL, headers, or body. For OFFSET_BASED, ALWAYS use <<offset>>. If PAGE_BASED, ALWAYS use <<page>>. If CURSOR_BASED, ALWAYS use <<cursor>>.")
-              }).describe("Complete API configuration for this step")
-          })).describe("Array of workflow steps. Can be empty ([]) for transform-only workflows that just process the input payload without API calls"),
-          finalTransform: z.string().describe("JavaScript function to transform the final workflow output to match responseSchema. Check if result is object or array: if object use sourceData.stepId.data, if array use sourceData.stepId.map(item => item.data). Example: (sourceData) => {return { result: Array.isArray(sourceData.stepId) ? sourceData.stepId.map(item => item.data) : sourceData.stepId.data }}"),
-      });
-
-      messages.push({
-        role: "user",
-        content: `The previous attempt failed with: "${lastError}". Please fix this issue in your new attempt.`
-      } as LLMMessage);
-
-      const webSearchTool = getWebSearchTool();
-      const tools = webSearchTool 
-        ? [{ toolDefinition: { web_search: webSearchTool }, toolContext: {} }]
-        : [];
-      
-      const generateToolResult = await LanguageModel.generateObject<Tool>({
-        messages: messages,
-        schema: zodToJsonSchema(builtToolSchema),
-        temperature: 0.0,
-        tools
-      });
-
-      messages = generateToolResult.messages;
-
-      if (!generateToolResult.success) {
-        throw new Error(`Error generating tool: ${generateToolResult.response}`);
-      }
-
-      const generatedTool = generateToolResult.response;
-
-      generatedTool.steps = generatedTool.steps.map(step => ({
-        ...step,
-        modify: step.modify || false,
-        apiConfig: {
-          ...step.apiConfig,
-          queryParams: step.apiConfig.queryParams
-            ? Object.fromEntries(step.apiConfig.queryParams.map((p: any) => [p.key, p.value]))
-            : undefined,
-          headers: step.apiConfig.headers
-            ? Object.fromEntries(step.apiConfig.headers.map((h: any) => [h.key, h.value]))
-            : undefined,
+        if (attempt > 0 && lastError) {
+          messages.push({
+            role: "user",
+            content: `The previous attempt failed with: "${lastError}". Please fix this issue in your new attempt.`
+          } as LLMMessage);
         }
-      }));
 
-      const validation = this.validateTool(generatedTool);
+        const generateToolResult = await LanguageModel.generateObject<Tool>({
+          messages,
+          schema: this.toolSchema,
+          temperature: 0.0,
+          tools
+        });
+
+        messages = generateToolResult.messages;
+
+        if (!generateToolResult.success) {
+          throw new Error(`Error generating tool: ${generateToolResult.response}`);
+        }
+
+        const generatedTool = generateToolResult.response;
+
+        if (!Array.isArray(generatedTool.steps)) {
+          throw new Error(`LLM returned invalid tool structure: steps must be an array, got ${typeof generatedTool.steps}: ${typeof generatedTool.steps === 'object' ? JSON.stringify(generatedTool.steps, null, 2) : generatedTool.steps}`);
+        }
+
+        generatedTool.steps = generatedTool.steps.map(step => ({
+          ...step,
+          modify: step.modify || false,
+          apiConfig: {
+            ...step.apiConfig,
+            queryParams: step.apiConfig.queryParams
+              ? Object.fromEntries(step.apiConfig.queryParams.map((p: any) => [p.key, p.value]))
+              : undefined,
+            headers: step.apiConfig.headers
+              ? Object.fromEntries(step.apiConfig.headers.map((h: any) => [h.key, h.value]))
+              : undefined,
+          }
+        }));
+
+        const validation = this.validateTool(generatedTool);
         if (!validation.valid) {
           const errorDetails = validation.errors.join('\n');
           const toolSummary = JSON.stringify({
@@ -198,34 +171,63 @@ export class ToolBuilder {
 
           throw new Error(`Tool validation failed:\n${errorDetails}\n\nGenerated tool:\n${toolSummary}`);
         }
-        builtTool = generatedTool;
+
         generatedTool.instruction = this.instruction;
-        builtTool.responseSchema = this.responseSchema;
-        break;
+        generatedTool.responseSchema = this.responseSchema;
+
+        return {
+          id: generatedTool.id,
+          steps: generatedTool.steps,
+          integrationIds: Object.keys(this.integrations),
+          instruction: this.instruction,
+          finalTransform: generatedTool.finalTransform,
+          responseSchema: this.responseSchema,
+          inputSchema: this.inputSchema,
+          createdAt: generatedTool.createdAt || new Date(),
+          updatedAt: generatedTool.updatedAt || new Date(),
+        };
 
       } catch (error: any) {
         lastError = error.message;
-        logMessage('error', `Error during tool build attempt ${retryCount + 1}: ${error.message}`, this.metadata);
-        retryCount++;
+        logMessage('error', `Error during tool build attempt ${attempt + 1}: ${error.message}`, this.metadata);
       }
     }
 
-    if (!builtTool) {
-      const finalErrorMsg = `Tool build failed after ${maxRetries} attempts. Last error: ${lastError}`;
-      logMessage('error', finalErrorMsg, this.metadata);
-      throw new Error(finalErrorMsg);
-    }
-
-    return {
-      id: builtTool.id,
-      steps: builtTool.steps,
-      integrationIds: Object.keys(this.integrations),
-      instruction: this.instruction,
-      finalTransform: builtTool.finalTransform,
-      responseSchema: this.responseSchema,
-      inputSchema: this.inputSchema,
-      createdAt: builtTool.createdAt || new Date(),
-      updatedAt: builtTool.updatedAt || new Date(),
-    };
+    const finalErrorMsg = `Tool build failed after ${maxRetries} attempts. Last error: ${lastError}`;
+    logMessage('error', finalErrorMsg, this.metadata);
+    throw new Error(finalErrorMsg);
   }
 }
+
+const toolSchema = z.object({
+  id: z.string().describe("The tool ID (e.g., 'stripe-create-order')"),
+  steps: z.array(z.object({
+      id: z.string().describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails')"),
+      integrationId: z.string().describe("REQUIRED: The integration ID for this step (must match one of the available integration IDs)"),
+      loopSelector: z.string().describe("JavaScript function that returns OBJECT for direct execution or ARRAY for loop execution. If returns OBJECT (including {}), step executes once with object as currentItem. If returns ARRAY, step executes once per array item. Examples: (sourceData) => ({ userId: sourceData.userId }) OR (sourceData) => sourceData.getContacts.data.filter(c => c.active)"),
+      modify: z.boolean().optional().describe("Marks whether this operation modifies data on the system it operates on (writes, updates, deletes). Read-only operations should be false. Default is false."),
+      apiConfig: z.object({
+          id: z.string().describe("Same as the step ID"),
+          instruction: z.string().describe("A concise instruction describing WHAT data this API call should retrieve or what action it should perform."),
+          urlHost: z.string().describe("The base URL host (e.g., https://api.example.com). Must not be empty."),
+          urlPath: z.string().describe("The API endpoint path (e.g., /v1/users)."),
+          method: z.enum(Object.values(HttpMethod) as [string, ...string[]]).describe("HTTP method (MUST be a literal value, not a variable or expression): GET, POST, PUT, DELETE, or PATCH"),
+          queryParams: z.array(z.object({
+              key: z.string(),
+              value: z.string()
+          })).optional().describe("Query parameters as key-value pairs. If pagination is configured, ensure you have included the right pagination parameters here or in the body."),
+          headers: z.array(z.object({
+              key: z.string(),
+              value: z.string()
+          })).optional().describe("HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions"),
+          body: z.string().optional().describe("Request body. Use <<variable>> syntax for dynamic values. If pagination is configured, ensure you have included the right pagination parameters here or in the queryParams."),
+          pagination: z.object({
+              type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"]),
+              pageSize: z.string().describe("Number of items per page (e.g., '50', '100'). Once set, this becomes available as <<limit>> (same as pageSize)."),
+              cursorPath: z.string().describe("If cursor_based: The JSONPath to the cursor in the response. If not, set this to \"\""),
+              stopCondition: z.string().describe("REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number). response is the axios response object, access response data via response.data. Return true to STOP. E.g. (response, pageInfo) => !response.data.pagination.has_more")
+          }).optional().describe("OPTIONAL: Only configure if you are using pagination variables in the URL, headers, or body. For OFFSET_BASED, ALWAYS use <<offset>>. If PAGE_BASED, ALWAYS use <<page>>. If CURSOR_BASED, ALWAYS use <<cursor>>.")
+      }).describe("Complete API configuration for this step")
+  })).describe("Array of workflow steps. Can be empty ([]) for transform-only workflows that just process the input payload without API calls"),
+  finalTransform: z.string().describe("JavaScript function to transform the final workflow output to match responseSchema. Check if result is object or array: if object use sourceData.stepId.data, if array use sourceData.stepId.map(item => item.data). Example: (sourceData) => {return { result: Array.isArray(sourceData.stepId) ? sourceData.stepId.map(item => item.data) : sourceData.stepId.data }}"),
+});

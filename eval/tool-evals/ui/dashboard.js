@@ -107,7 +107,7 @@ function renderBenchmarkSummary(data) {
     const totalBenchmarkTools = new Set(benchmarkData.map(b => b.tool_id)).size;
     
     summaryEl.innerHTML = `
-        <strong>Benchmark Comparison:</strong> Comparing your metrics agains the same <strong>${commonToolIds.length}</strong> tools 
+        <strong>Benchmark Comparison:</strong> Comparing your metrics against the same <strong>${commonToolIds.length}</strong> tools 
         (There are ${totalBenchmarkTools} possible total in benchmark)
     `;
     summaryEl.style.display = 'block';

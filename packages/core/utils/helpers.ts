@@ -1,10 +1,10 @@
 import { RequestOptions, SelfHealingMode } from "@superglue/client";
 import ivm from 'isolated-vm';
-import { applyJsonataWithValidation, oldReplaceVariables } from "./helpers.legacy.js";
-import { Validator } from "jsonschema";
+import { oldReplaceVariables } from "./helpers.legacy.js";
 import { z } from "zod";
 import { parseJSON } from "../files/index.js";
 import { injectVMHelpersIndividually } from "./vm-helpers.js";
+import { Validator } from "jsonschema";
 
 export interface TransformResult {
   success: boolean;
@@ -14,57 +14,40 @@ export interface TransformResult {
 
 export const HttpMethodEnum = z.enum(["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]);
 
-export async function transformAndValidateSchema(data: any, expr: string, schema: any): Promise<TransformResult> {
+export async function transformData(data: any, code: string): Promise<TransformResult> {
   try {
-    let result: TransformResult;
-    if (!expr) {
-      result = { success: true, data: data };
+    if (!code) {
+      return { success: true, data: data };
     }
+    
     const ARROW_FUNCTION_PATTERN = /^\s*\([^)]+\)\s*=>/;
 
-    if (ARROW_FUNCTION_PATTERN.test(expr)) {
-      result = await executeAndValidateMappingCode(data, expr, schema);
+    if (ARROW_FUNCTION_PATTERN.test(code)) {
+      return await runCodeInIVM(data, code);
     } else {
-      result = await applyJsonataWithValidation(data, expr, schema);
+      throw new Error("Invalid expression");
     }
-    return result;
   } catch (error) {
     return { success: false, error: error.message };
   }
 }
 
-export async function executeAndValidateMappingCode(input: any, mappingCode: string, schema: any): Promise<TransformResult> {
+export async function runCodeInIVM(input: any, mappingCode: string): Promise<TransformResult> {
   const isolate = new ivm.Isolate({ memoryLimit: 4096 }); // 32 MB
   const context = await isolate.createContext();
-
-  // Inject helper functions into the context
   await injectVMHelpersIndividually(context);
 
   await context.global.set('input', JSON.stringify(input));
-
   let result: any;
+
   try {
     const scriptSource = `const fn = ${mappingCode}; const result = fn(JSON.parse(input)); return result === undefined ? null : JSON.stringify(result);`;
     result = parseJSON(await context.evalClosure(scriptSource, null, { timeout: 10000 }));
-    // if no schema is given, skip validation
-    if (!schema) {
-      return { success: true, data: result };
-    }
-    const validatorInstance = new Validator();
-    const optionalSchema = addNullableToOptional(schema);
-    const validation = validatorInstance.validate(result, optionalSchema);
-    if (!validation.valid) {
-      return {
-        success: false,
-        data: result,
-        error: validation.errors.map(e =>
-          `${e.stack}. Computed result: ${e.instance ? JSON.stringify(e.instance) : "undefined"}. Expected schema: ${JSON.stringify(e.schema || {})}`)
-          .join('\n').slice(0, 2000)
-      };
-    }
     return { success: true, data: result };
   } catch (error) {
-    return { success: false, error: error.message };
+    return { 
+      success: false, error: error.message
+    };
   } finally {
     try {
       isolate.dispose();
@@ -112,16 +95,22 @@ export async function replaceVariables(template: string, payload: Record<string,
   for (const match of matches) {
     const path = match[1].trim();
     let value: any;
-    if (payload[path]) {
+    if (path in payload && payload[path] !== undefined) {
       value = payload[path];
     }
     else {
-      // Use transformAndValidateSchema to handle both JS and JSONata
-      const result = await transformAndValidateSchema(payload, path, null);
-      if (result.success) {
+      const isArrowFunction = /^\s*\([^)]*\)\s*=>/.test(path);
+      
+      if (isArrowFunction) {
+        const result = await transformData(payload, path);
+        if (!result.success) {
+          throw new Error(`Failed to run JS expression: ${path} - ${result.error}`);
+        }
         value = result.data;
       } else {
-        throw new Error(`Failed to run JS expression: ${path} - ${result.error}`);
+        const availableKeys = Object.keys(payload).slice(0, 10).join(', ');
+        const keyPreview = Object.keys(payload).length > 10 ? `${availableKeys}... (${Object.keys(payload).length} total)` : availableKeys;
+        throw new Error(`Direct variable reference '${path}' failed to resolve. Available top level keys: ${keyPreview}`);
       }
     }
 
@@ -348,4 +337,14 @@ export function convertBasicAuthToBase64(headerValue: string) {
     return `Basic ${base64Credentials}`;
   }
   return headerValue;
+}
+
+export async function validateSchema(data: any, schema: any): Promise<TransformResult> {
+  const validator = new Validator();
+  const optionalSchema = addNullableToOptional(schema);
+  const validation = validator.validate(data, optionalSchema);
+  if (!validation.valid) {
+    return { success: false, error: validation.errors.map(e => `${e.stack}. Computed result: ${e.instance ? JSON.stringify(e.instance) : "undefined"}.`).join('\n').slice(0, 1000) + `\n\nExpected schema: ${JSON.stringify(optionalSchema)}` };
+  }
+  return { success: true, data: data };
 }

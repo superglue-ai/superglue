@@ -1,9 +1,26 @@
-import { ApiConfig, RequestOptions } from "@superglue/client";
+import { ApiConfig as StepConfig, RequestOptions, HttpMethod } from "@superglue/client";
 import { Pool, PoolConfig } from 'pg';
 import { server_defaults } from "../../../default.js";
 import { parseJSON } from "../../../files/index.js";
 import { composeUrl, replaceVariables } from "../../../utils/helpers.js";
+import { StepExecutionInput, StepStrategyExecutionResult, StepExecutionStrategy } from "../strategy.js";
 
+export class PostgresStepExecutionStrategy implements StepExecutionStrategy {
+  readonly version = '1.0.0';
+
+  async shouldExecute(stepConfig: StepConfig): Promise<boolean> {
+    return stepConfig.method === HttpMethod.POST && (stepConfig.urlHost?.startsWith("postgres://") || stepConfig.urlHost?.startsWith("postgresql://"));
+  }
+
+  async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
+    const { stepConfig, stepInputData, credentials, requestOptions } = input;
+    const rows = await callPostgres({ endpoint: stepConfig, payload: stepInputData, credentials, options: requestOptions });
+    return {
+      success: true,
+      strategyExecutionData: rows,
+    };
+  }
+}
 
 interface PoolCacheEntry {
   pool: Pool;
@@ -79,7 +96,7 @@ export async function closeAllPools(): Promise<void> {
   poolCache.clear();
 }
 
-export async function callPostgres({ endpoint, payload, credentials, options }: { endpoint: ApiConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
+export async function callPostgres({ endpoint, payload, credentials, options }: { endpoint: StepConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
   const requestVars = { ...payload, ...credentials };
   let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
   connectionString = connectionString.replace(/\/+(\?)/, '$1').replace(/\/+$/, '');

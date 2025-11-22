@@ -28,9 +28,8 @@ Requirements:
 - Function signature: (sourceData) => { ... }
 - Return statement is REQUIRED - the function must return the transformed data
 - Pure SYNCHRONOUS function - no async/await, no external dependencies
-- Handle missing/null data gracefully with optional chaining (?.) and defaults - BUT - throw when expected and required data is missing so superglue can self heal
 - Validate arrays with Array.isArray() before using array methods
-- Return appropriate defaults when data is missing
+- Do not throw errors in generated transform code and do not include overly defensive fallbacks
 
 COMMON WORKFLOW TRANSFORMATIONS:
 
@@ -39,10 +38,9 @@ COMMON WORKFLOW TRANSFORMATIONS:
 (sourceData) => {
   // fetchItems returned object, so .data contains the result
   const items = sourceData.fetchItems.data;
-  if (!Array.isArray(items)) throw new Error("Expected array of items to iterate over");
   
   // excludeIds returned object, so .data contains the array
-  const excludeIds = sourceData.excludeIds.data || [];
+  const excludeIds = sourceData.excludeIds.data;
   return items.filter(item => !excludeIds.includes(item.id));
 }
 \`\`\`
@@ -78,7 +76,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
 
 Return your answer in the following JSON format:
 {
-  "mappingCode": "(sourceData) => { return { id: sourceData.getId.data.id }; }"
+  "transformCode": "(sourceData) => { return { id: sourceData.getId.data.id }; }"
 }
 
 THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
@@ -351,12 +349,6 @@ COMMON WORKFLOW TRANSFORMATIONS:
   };
 }
 \`\`\`
-
-Return your answer in the following JSON format:
-{
-  "mappingCode": "(sourceData) => { return { id: sourceData.fetchId.data.id }; }"
-}
-
 THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
 </FINAL_TRANSFORMATION>
 
@@ -663,7 +655,7 @@ Cross-integration: "Sync new Stripe customers to CRM and send welcome email via 
 
 Important: Always generate suggestions based on common patterns for the type of service provided. Use your knowledge of typical API structures and common use cases. Never abort - be creative and helpful.`
 
-export const EVALUATE_TRANSFORM_SYSTEM_PROMPT = `You are a data transformation evaluator assessing if the mapping code correctly implements the transformation logic.
+export const EVALUATE_TRANSFORM_SYSTEM_PROMPT = `You are a data transformation evaluator assessing if the transform code correctly implements the transformation logic.
 
 ONLY fail the evaluation if you find:
 1. Syntax errors or code that would crash
@@ -676,11 +668,11 @@ DO NOT fail for:
 - Missing values in output samples - they may come from records not in your sample
 - Filter conditions that seem incorrect based on samples - trust the instruction over sample inference
 - Empty arrays or filtered results - the sample may not contain matching records
-- Field mappings you cannot verify from the limited sample
+- Field transforms you cannot verify from the limited sample
 - Using a field mentioned in the instruction even if it's not visible in your 5-record sample
 
 When the instruction specifies exact field names or conditions, trust the instruction even if you don't see those values in the sample. The instruction was written with knowledge of the full dataset.
 
-Focus on data accuracy and completeness of the mapping logic, and adherence to the instruction if provided.
+Focus on data accuracy and completeness of the transform logic, and adherence to the instruction if provided.
 Be particularly lenient with arrays and filtered data since the samples may not contain all relevant records.
 Return { success: true, reason: "Mapping follows instruction and appears logically sound" } unless you find definitive errors in the code logic itself.`

@@ -403,7 +403,7 @@
     {
       "id": "eval-sftp",
       "name": "Eval SFTP Test Server",
-      "urlHost": "sftp://<<username>>:<<password>>@<<host>>:<<port>>",
+      "urlHost": "sftp://<<eval-sftp_username>>:<<eval-sftp_password>>@<<eval-sftp_host>>:<<eval-sftp_port>>",
       "urlPath": "/",
       "documentationUrl": "",
       "credentials": {
@@ -1270,40 +1270,7 @@
       "expectedResultDescription": "Should list all files and directories in SFTP home directory. Expected to find 'uploads' directory and various configuration files."
     },
     {
-      "id": "058-sftp-upload-download-verify",
-      "name": "SFTP Upload Download and Verify",
-      "description": "Medium test: Upload a file, download it, and verify content matches",
-      "type": "action",
-      "instruction": "Create a test file with the content 'SFTP Eval Test - {timestamp}' where {timestamp} is the current Unix timestamp. Upload this file to the SFTP server in the uploads directory with filename 'eval_test_{timestamp}.txt'. Then download the same file and verify the content matches what was uploaded. Return JSON: { status: 'success' | 'failure', uploaded_filename: string, content_matches: boolean, original_content: string, downloaded_content: string }",
-      "integrationIds": ["eval-sftp"],
-      "payload": {},
-      "validationFunction": "validators/058-sftp-upload-download-verify.ts",
-      "expectedResultDescription": "Should successfully upload file to SFTP server, download it back, and verify content matches. Expected status 'success' with content_matches: true."
-    },
-    {
-      "id": "059-sftp-batch-operations",
-      "name": "SFTP Batch File Operations with Cleanup",
-      "description": "Complex test: Upload multiple files, list, download, and cleanup",
-      "type": "action",
-      "instruction": "Perform a series of SFTP operations: 1) Create 3 test files with different content (file1.txt='First test', file2.txt='Second test', file3.txt='Third test'). 2) Upload all 3 files to the uploads directory. 3) List the uploads directory and confirm all 3 files exist. 4) Download all 3 files and verify their contents. 5) Delete all 3 files from the server. 6) List the directory again to confirm deletion. Return JSON: { operations: { upload_count: number, upload_success: number, download_count: number, download_success: number, content_verification: boolean, cleanup_success: boolean }, files_remaining: number, details: Array<{ filename: string, uploaded: boolean, downloaded: boolean, content_verified: boolean, deleted: boolean }> }",
-      "integrationIds": ["eval-sftp"],
-      "payload": {},
-      "validationFunction": "validators/059-sftp-batch-operations.ts",
-      "expectedResultDescription": "Should perform complete SFTP workflow with multiple files including upload, verification, download, and cleanup. Expected all operations to succeed with 3 files processed, all content verified, and cleanup successful (files_remaining should not include test files)."
-    },
-    {
-      "id": "060-sftp-postgres-bulk-insert",
-      "name": "SFTP to PostgreSQL Bulk Insert",
-      "description": "Very complex test: Download CSV from SFTP and bulk insert into PostgreSQL",
-      "type": "action",
-      "instruction": "Perform a complex multi-system operation: 1) Connect to the SFTP server and download the file 'employees.csv' from the uploads directory. 2) Parse the CSV file which contains employee data with columns: employee_id, first_name, last_name, email, department, salary, hire_date, is_active. 3) Clear the eval_employees table (TRUNCATE or DELETE all records), then insert all records from the CSV. Use proper data type conversions (salary as decimal, hire_date as date, is_active as boolean). 4) After inserting, query the database to verify: total number of inserted records, count by department, average salary by department, and list of inactive employees. Return JSON: { insert_summary: { total_records_inserted: number, source_file: string, insert_successful: boolean }, verification: { total_count: number, by_department: Array<{ department: string, employee_count: number, avg_salary: number }>, inactive_employees: Array<{ employee_id: string, name: string }> } }. Sort by_department by employee_count descending.",
-      "integrationIds": ["eval-sftp", "eval-postgres"],
-      "payload": {},
-      "validationFunction": "validators/060-sftp-postgres-bulk-insert.ts",
-      "expectedResultDescription": "Should download CSV from SFTP (employees.csv with 15 records), parse it, and bulk insert into PostgreSQL eval_employees table. Expected 15 total records inserted, with Engineering having most employees (6), followed by Sales (3), Marketing (2), Finance (2), HR (2). One inactive employee (Robert Lee, EMP009). Engineering avg salary should be highest (~101,666.67)."
-    },
-    {
-      "id": "061-jira-list-projects",
+      "id": "058-jira-list-projects",
       "name": "JIRA List All Projects",
       "description": "Simple test: Retrieve all accessible Jira projects",
       "type": "retrieval",
@@ -1314,7 +1281,7 @@
       "expectedResultDescription": "Should return all accessible Jira projects. Expected 3 projects: 'GTMS' (Go to market sample, business), 'LEARNJIRA' (Learn Jira in 10 minutes, software), and 'KAN' (My Kanban Project, software)."
     },
     {
-      "id": "062-jira-search-issues-by-status",
+      "id": "059-jira-search-issues-by-status",
       "name": "JIRA Search Issues by Status",
       "description": "Medium test: Search for issues using JQL and aggregate by status",
       "type": "retrieval",
@@ -1325,7 +1292,7 @@
       "expectedResultDescription": "Should search all GTMS project issues and aggregate by status. Expected 22 total issues with 4 statuses: 'To Do' (10), 'In Progress' (5), 'Ready for Launch' (4), 'Launched' (3). In Progress issues should include GTMS-20, GTMS-9, GTMS-7, GTMS-3, GTMS-1."
     },
     {
-      "id": "063-jira-workflow-anomaly-analysis",
+      "id": "060-jira-workflow-anomaly-analysis",
       "name": "JIRA Workflow Anomaly Analysis",
       "description": "Complex test: Multi-dimensional analysis with JQL filtering and aggregation",
       "type": "retrieval",

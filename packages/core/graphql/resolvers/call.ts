@@ -1,8 +1,9 @@
 import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
-import { WorkflowExecutor } from "../../tools/tool-executor.js";
+import { ToolExecutor } from "../../tools/tool-executor.js";
 import { maskCredentials } from "../../utils/helpers.js";
-import { executeTransform, TransformConfig } from "../../tools/tool-transform.js";
+import { TransformConfig } from "../../utils/helpers.legacy.js";
+import { executeTransformLegacy } from "../../utils/helpers.legacy.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { Context, Metadata } from '../types.js';
 
@@ -48,8 +49,8 @@ export const callResolver = async (
     if ((endpoint?.responseSchema as any)?._def?.typeName === "ZodObject") {
       throw new Error("zod is not supported for response schema. Please use json schema instead. you can use the zod-to-json-schema package to convert zod to json schema.");
     }
-    const workflowExecutor = new WorkflowExecutor({
-      workflow: {
+    const workflowExecutor = new ToolExecutor({
+      tool: {
         id: callId,
         steps: [
           {
@@ -69,7 +70,7 @@ export const callResolver = async (
     const data = callResult.data;
 
     // Transform response with built-in retry logic
-    const transformResult = await executeTransform(
+    const transformResult = await executeTransformLegacy(
       {
         datastore: context.datastore,
         fromCache: readCache,
