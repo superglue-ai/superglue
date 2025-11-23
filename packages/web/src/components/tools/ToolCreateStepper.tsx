@@ -1,7 +1,6 @@
 import { useConfig } from '@/src/app/config-context';
 import { useIntegrations } from '@/src/app/integrations-context';
 import { useToast } from '@/src/hooks/use-toast';
-import { createSuperglueClient } from '@/src/lib/client-utils';
 import { Workflow as Tool } from '@superglue/client';
 import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -9,7 +8,7 @@ import { useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { ToolBuilder, type BuildContext } from './ToolBuilder';
 import ToolPlayground, { ToolPlaygroundHandle } from './ToolPlayground';
-import { ToolDeployModal } from './deploy/ToolDeployModal';
+import { SaveToolDialog } from './dialogs/SaveToolDialog';
 
 type ToolCreateStep = 'build' | 'run';
 type ToolBuilderView = 'integrations' | 'instructions';
@@ -42,9 +41,7 @@ export function ToolCreateStepper({
   const [buildContext, setBuildContext] = useState<BuildContext | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
   const [filePayloads, setFilePayloads] = useState<Record<string, any>>({});
-  const [toolPayload, setToolPayload] = useState<Record<string, any>>({});
-  const [showDeployModal, setShowDeployModal] = useState(false);
-  const [hasDeployModalBeenShown, setHasDeployModalBeenShown] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [userSelectedIntegrations, setUserSelectedIntegrations] = useState<string[]>(initialIntegrationIds);
 
   const handleToolBuilt = (tool: Tool, context: BuildContext) => {
@@ -62,32 +59,9 @@ export function ToolCreateStepper({
   };
 
   const handleSaveTool = async (tool: Tool, payload: Record<string, any>) => {
-    try {
-      setIsSaving(true);
-      const currentToolState = playgroundRef.current?.getCurrentTool();
-      const toolToSave = currentToolState || tool;
-
-      const client = createSuperglueClient(superglueConfig.superglueEndpoint);
-      const saved = await client.upsertWorkflow(toolToSave.id, toolToSave as any);
-      if (!saved) throw new Error('Failed to save tool');
-
-      setCurrentTool(saved);
-      setToolPayload(payload);
-
-      if(!hasDeployModalBeenShown) {
-        setHasDeployModalBeenShown(true);
-        setShowDeployModal(true);
-      }
-    } catch (e: any) {
-      toast({
-        title: 'Error saving tool',
-        description: e.message || 'Unknown error',
-        variant: 'destructive'
-      });
-      throw e;
-    } finally {
-      setIsSaving(false);
-    }
+    const currentToolState = playgroundRef.current?.getCurrentTool();
+    setCurrentTool(currentToolState || tool);
+    setShowSaveDialog(true);
   };
 
   const handleStopExecution = () => {
@@ -97,6 +71,10 @@ export function ToolCreateStepper({
       title: "Stopping tool",
       description: "Tool will stop after the current step completes",
     });
+  };
+
+  const handleToolSaved = (savedTool: Tool) => {
+    router.push(`/tools/${savedTool.id}`);
   };
 
   const handleClose = () => {
@@ -176,11 +154,11 @@ export function ToolCreateStepper({
                 onRebuildStart={() => setIsRebuildingFromPlayground(true)}
                 onRebuildEnd={() => setIsRebuildingFromPlayground(false)}
               />
-              <ToolDeployModal
-                currentTool={currentTool}
-                payload={toolPayload}
-                isOpen={showDeployModal}
-                onClose={() => setShowDeployModal(false)}
+              <SaveToolDialog
+                tool={currentTool}
+                isOpen={showSaveDialog}
+                onClose={() => setShowSaveDialog(false)}
+                onSaved={handleToolSaved}
               />
             </div>
           )}

@@ -1,21 +1,20 @@
 import { ApiConfig, ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import { getEvaluateStepResponseContext, getGenerateStepConfigContext, getLoopSelectorContext } from "../context/context-builders.js";
 import { EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT, GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
-import { logMessage } from "../utils/logs.js";
-import { telemetryClient } from "../utils/telemetry.js";
 import { isSelfHealingEnabled, maskCredentials, transformAndValidateSchema } from "../utils/helpers.js";
 import { applyJsonata } from "../utils/helpers.legacy.js";
-import { evaluateTransform, generateTransformCode } from "./tool-transform.js";
-import { AbortError, ApiCallError } from "./strategies/http/http.js";
-import { runStepConfig } from "./strategies/http/http.js";
+import { logMessage } from "../utils/logs.js";
+import { telemetryClient } from "../utils/telemetry.js";
+import { AbortError, ApiCallError, runStepConfig } from "./strategies/http/http.js";
 import { generateStepConfig } from "./tool-step-builder.js";
-import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { evaluateTransform, generateTransformCode } from "./tool-transform.js";
 
 export interface WorkflowExecutorOptions {
   workflow: Workflow;
@@ -532,7 +531,7 @@ export class WorkflowExecutor implements Workflow {
       retryCount++;
     } while (retryCount < effectiveMaxRetries);
     if (!success) {
-      telemetryClient?.captureException(new Error(`API call failed. Last error: ${lastError}`), this.metadata?.orgId, {
+      telemetryClient?.captureException(new Error(`API call failed. Last error: ${lastError}`), this.metadata?.orgId || undefined, {
         config: config,
         retryCount: retryCount,
       });
