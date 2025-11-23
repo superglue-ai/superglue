@@ -40,9 +40,12 @@ jobs:
           git cherry-pick ${{ github.event.pull_request.merge_commit_sha }}
 
           if [ $? -ne 0 ]; then
-            echo "Cherry-pick had conflicts, aborting"
-            git cherry-pick --abort
-            exit 1
+            echo "Cherry-pick had conflicts, committing them for manual resolution"
+            git add -A
+            git -c core.editor=true cherry-pick --continue || true
+            if [ $? -ne 0 ]; then
+              git commit -m "Sync from main (with conflicts to resolve)"
+            fi
           fi
 
           git push origin "${BRANCH_NAME}"
