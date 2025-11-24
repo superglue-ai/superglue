@@ -327,6 +327,7 @@ describe('WorkflowExecutor API Self-Healing', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
 
     mockIntegration = {
       id: 'test-integration',
@@ -352,7 +353,7 @@ describe('WorkflowExecutor API Self-Healing', () => {
     const getDocumentationSpy = vi.spyOn(integrationManager, 'getDocumentation');
     
     let callCount = 0;
-    vi.spyOn(httpStrategies, 'runStepConfig').mockImplementation(async () => {
+    const runStepConfigSpy = vi.spyOn(httpStrategies, 'runStepConfig').mockImplementation(async () => {
       callCount++;
       if (callCount === 1) {
         throw new Error('API call failed: 404 Not Found');
@@ -397,7 +398,7 @@ describe('WorkflowExecutor API Self-Healing', () => {
       integrations: [integrationManager],
     });
 
-    vi.spyOn(executor as any, 'evaluateConfigResponse').mockResolvedValue({
+    const evaluateSpy = vi.spyOn(executor as any, 'evaluateConfigResponse').mockResolvedValue({
       success: true,
       refactorNeeded: false,
       shortReason: 'Response looks good',
@@ -406,16 +407,17 @@ describe('WorkflowExecutor API Self-Healing', () => {
     const result = await executor.execute({
       payload: {},
       credentials: {},
-      options: { selfHealing: SelfHealingMode.ENABLED },
+      options: { selfHealing: SelfHealingMode.ENABLED, retries: 2 },
     });
 
     expect(result.success).toBe(true);
     expect(result.stepResults[0].success).toBe(true);
-    expect(callCount).toBe(2);
+    expect(runStepConfigSpy).toHaveBeenCalledTimes(2);
     
     expect(getIntegrationSpy).toHaveBeenCalled();
     expect(getDocumentationSpy).toHaveBeenCalled();
     expect(generateStepConfigSpy).toHaveBeenCalled();
+    expect(evaluateSpy).toHaveBeenCalled();
     
     const generateCall = generateStepConfigSpy.mock.calls[0][0];
     expect(generateCall.integration).toBeDefined();
