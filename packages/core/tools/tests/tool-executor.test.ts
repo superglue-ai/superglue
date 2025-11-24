@@ -487,7 +487,7 @@ describe('WorkflowExecutor API Self-Healing', () => {
       credentials: {},
       options: { selfHealing: SelfHealingMode.ENABLED, retries: 2 },
     });
-
+    console.log(result);
     expect(result.success).toBe(true);
     expect(result.stepResults[0].success).toBe(true);
     expect(runStepConfigSpy).toHaveBeenCalledTimes(2);
