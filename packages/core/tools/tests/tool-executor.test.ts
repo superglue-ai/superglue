@@ -352,6 +352,12 @@ describe('WorkflowExecutor API Self-Healing', () => {
     const getIntegrationSpy = vi.spyOn(integrationManager, 'getIntegration');
     const getDocumentationSpy = vi.spyOn(integrationManager, 'getDocumentation');
     
+    const evaluateConfigResponseSpy = vi.spyOn(WorkflowExecutor.prototype as any, 'evaluateConfigResponse').mockResolvedValue({
+      success: true,
+      refactorNeeded: false,
+      shortReason: 'Response looks good',
+    });
+    
     let callCount = 0;
     const runStepConfigSpy = vi.spyOn(httpStrategies, 'runStepConfig').mockImplementation(async () => {
       callCount++;
@@ -398,12 +404,6 @@ describe('WorkflowExecutor API Self-Healing', () => {
       integrations: [integrationManager],
     });
 
-    const evaluateSpy = vi.spyOn(executor as any, 'evaluateConfigResponse').mockResolvedValue({
-      success: true,
-      refactorNeeded: false,
-      shortReason: 'Response looks good',
-    });
-
     const result = await executor.execute({
       payload: {},
       credentials: {},
@@ -417,7 +417,7 @@ describe('WorkflowExecutor API Self-Healing', () => {
     expect(getIntegrationSpy).toHaveBeenCalled();
     expect(getDocumentationSpy).toHaveBeenCalled();
     expect(generateStepConfigSpy).toHaveBeenCalled();
-    expect(evaluateSpy).toHaveBeenCalled();
+    expect(evaluateConfigResponseSpy).toHaveBeenCalled();
     
     const generateCall = generateStepConfigSpy.mock.calls[0][0];
     expect(generateCall.integration).toBeDefined();
@@ -425,6 +425,12 @@ describe('WorkflowExecutor API Self-Healing', () => {
   });
 
   it('should self-heal API call without integration', async () => {
+    const evaluateConfigResponseSpy = vi.spyOn(WorkflowExecutor.prototype as any, 'evaluateConfigResponse').mockResolvedValue({
+      success: true,
+      refactorNeeded: false,
+      shortReason: 'Response looks good',
+    });
+    
     let callCount = 0;
     const runStepConfigSpy = vi.spyOn(httpStrategies, 'runStepConfig').mockImplementation(async (args) => {
       callCount++;
@@ -470,12 +476,6 @@ describe('WorkflowExecutor API Self-Healing', () => {
       integrations: [],
     });
 
-    vi.spyOn(executor as any, 'evaluateConfigResponse').mockResolvedValue({
-      success: true,
-      refactorNeeded: false,
-      shortReason: 'Response looks good',
-    });
-
     const result = await executor.execute({
       payload: {},
       credentials: {},
@@ -485,6 +485,7 @@ describe('WorkflowExecutor API Self-Healing', () => {
     expect(result.success).toBe(true);
     expect(result.stepResults[0].success).toBe(true);
     expect(runStepConfigSpy).toHaveBeenCalledTimes(2);
+    expect(evaluateConfigResponseSpy).toHaveBeenCalled();
     
     expect(generateStepConfigSpy).toHaveBeenCalled();
     

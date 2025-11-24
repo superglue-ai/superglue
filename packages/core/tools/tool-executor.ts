@@ -377,7 +377,7 @@ export class WorkflowExecutor implements Workflow {
   }
 
 
-  private async evaluateConfigResponse({
+  public async evaluateConfigResponse({
     data,
     config,
     docSearchResultsForStepInstruction
