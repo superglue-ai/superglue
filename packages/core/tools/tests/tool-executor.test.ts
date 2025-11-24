@@ -333,7 +333,16 @@ describe('WorkflowExecutor API Self-Healing', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.restoreAllMocks();
+
+    // Setup default mock for generateStepConfig
+    vi.mocked(generateStepConfig).mockResolvedValue({
+      success: true,
+      config: {
+        urlPath: '/default-path',
+        method: HttpMethod.GET,
+      },
+      messages: [],
+    });
 
     mockIntegration = {
       id: 'test-integration',
