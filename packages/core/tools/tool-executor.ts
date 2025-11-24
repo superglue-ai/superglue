@@ -377,7 +377,7 @@ export class WorkflowExecutor implements Workflow {
   }
 
 
-  private async evaluateConfigResponse({
+  public async evaluateConfigResponse({
     data,
     config,
     docSearchResultsForStepInstruction
@@ -424,7 +424,7 @@ export class WorkflowExecutor implements Workflow {
     options
   }: {
     config: ApiConfig,
-    integrationManager: IntegrationManager,
+    integrationManager: IntegrationManager | undefined,
     payload: any,
     credentials: Record<string, string>,
     options: RequestOptions
@@ -447,13 +447,17 @@ export class WorkflowExecutor implements Workflow {
   
     do {
       try {
+
+        // refresh the token if needed
+        await integrationManager?.refreshTokenIfNeeded();
+
+        // self healing logic
         if (retryCount > 0 && isSelfHealing) {
           logMessage('info', `Self healing the step configuration for ${config?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, this.metadata);
-  
           if (messages.length === 0) {
-            integration = await integrationManager.getIntegration();
-            const docs = await integrationManager.getDocumentation();
-            const integrationSpecificInstructions = integration.specificInstructions || '';
+            integration = await integrationManager?.getIntegration();
+            const docs = await integrationManager?.getDocumentation();
+            const integrationSpecificInstructions = integration?.specificInstructions || '';
             
             const userPrompt = getGenerateStepConfigContext({
               instruction: config.instruction,
@@ -491,6 +495,7 @@ export class WorkflowExecutor implements Workflow {
           } as ApiConfig;
         }
   
+        // execute the step config
         response = await runStepConfig({ config, payload, credentials, options });
   
         if (!response.data) {
