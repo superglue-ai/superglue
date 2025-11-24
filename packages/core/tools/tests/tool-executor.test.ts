@@ -1,10 +1,11 @@
-import { Integration, SelfHealingMode, Workflow } from '@superglue/client';
+import { HttpMethod, Integration, SelfHealingMode, Workflow } from '@superglue/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataStore } from '../../datastore/types.js';
 import { IntegrationManager } from '../../integrations/integration-manager.js';
 import { isSelfHealingEnabled } from '../../utils/helpers.js';
 import * as httpStrategies from '../strategies/http/http.js';
 import { WorkflowExecutor } from '../tool-executor.js';
+import * as toolStepBuilder from '../tool-step-builder.js';
 
 // Mock the tools module but keep isSelfHealingEnabled real
 vi.mock('../utils/tools.js', async () => {
@@ -192,5 +193,392 @@ describe('WorkflowExecutor OAuth Token Refresh', () => {
 
     expect(refreshSpy).toHaveBeenCalledTimes(1);
     expect(mockDataStore.upsertIntegration).not.toHaveBeenCalled();
+  });
+
+  it('should only refresh token once when multiple steps use same integration', async () => {
+    const integrationManager = new IntegrationManager(mockIntegration, mockDataStore, 'test-org');
+    const refreshSpy = vi.spyOn(integrationManager, 'refreshTokenIfNeeded');
+    
+    let refreshCallCount = 0;
+    refreshSpy.mockImplementation(async () => {
+      refreshCallCount++;
+      
+      if (refreshCallCount === 1) {
+        mockIntegration.credentials.access_token = 'new-access-token';
+        mockIntegration.credentials.expires_at = new Date(Date.now() + 3600 * 1000).toISOString();
+        
+        await mockDataStore.upsertIntegration({
+          id: 'test-integration',
+          integration: mockIntegration,
+          orgId: 'test-org',
+        });
+        
+        return true;
+      }
+      
+      return false;
+    });
+    
+    vi.spyOn(httpStrategies, 'runStepConfig').mockResolvedValue({
+      data: { result: 'success' },
+      statusCode: 200,
+      headers: {},
+    });
+    
+    const workflow = {
+      id: 'test-workflow',
+      steps: [
+        {
+          id: 'step-1',
+          integrationId: 'test-integration',
+          apiConfig: {
+            id: 'step-1',
+            method: 'GET',
+            urlHost: 'https://api.example.com',
+            urlPath: '/endpoint-1',
+            headers: {
+              'Authorization': 'Bearer <<test-integration_access_token>>',
+            },
+            instruction: 'First API call',
+          },
+          responseMapping: '$',
+        },
+        {
+          id: 'step-2',
+          integrationId: 'test-integration',
+          apiConfig: {
+            id: 'step-2',
+            method: 'GET',
+            urlHost: 'https://api.example.com',
+            urlPath: '/endpoint-2',
+            headers: {
+              'Authorization': 'Bearer <<test-integration_access_token>>',
+            },
+            instruction: 'Second API call',
+          },
+          responseMapping: '$',
+        },
+      ],
+    };
+
+    const executor = new WorkflowExecutor({
+      workflow: workflow as Workflow,
+      metadata: { orgId: 'test-org', runId: 'test-run' },
+      integrations: [integrationManager],
+    });
+
+    await executor.execute({
+      payload: {},
+      credentials: {},
+      options: { selfHealing: SelfHealingMode.DISABLED },
+    });
+
+    expect(refreshSpy).toHaveBeenCalledTimes(2);
+    expect(refreshCallCount).toBe(2);
+    expect(mockDataStore.upsertIntegration).toHaveBeenCalledTimes(1);
+  });
+
+  it('should handle steps without integrationId gracefully', async () => {
+    vi.spyOn(httpStrategies, 'runStepConfig').mockResolvedValue({
+      data: { result: 'success' },
+      statusCode: 200,
+      headers: {},
+    });
+    
+    const workflow = {
+      id: 'test-workflow',
+      steps: [
+        {
+          id: 'step-1',
+          apiConfig: {
+            id: 'step-1',
+            method: 'GET',
+            urlHost: 'https://api.example.com',
+            urlPath: '/endpoint',
+            instruction: 'Simple API call without integration',
+          },
+          responseMapping: '$',
+        },
+      ],
+    };
+
+    const executor = new WorkflowExecutor({
+      workflow: workflow as Workflow,
+      metadata: { orgId: 'test-org', runId: 'test-run' },
+      integrations: [],
+    });
+
+    const result = await executor.execute({
+      payload: {},
+      credentials: {},
+      options: { selfHealing: SelfHealingMode.DISABLED },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.stepResults).toHaveLength(1);
+    expect(result.stepResults[0].success).toBe(true);
+    expect(mockDataStore.upsertIntegration).not.toHaveBeenCalled();
+  });
+});
+
+describe('WorkflowExecutor API Self-Healing', () => {
+  let mockDataStore: DataStore;
+  let mockIntegration: Integration;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockIntegration = {
+      id: 'test-integration',
+      urlHost: 'https://api.example.com',
+      credentials: {
+        access_token: 'test-token',
+      },
+      documentation: 'API documentation content',
+      openApiSchema: '{"openapi": "3.0.0"}',
+      specificInstructions: 'Follow API guidelines',
+    };
+
+    mockDataStore = {
+      getIntegration: vi.fn().mockResolvedValue(mockIntegration),
+      upsertIntegration: vi.fn().mockResolvedValue(mockIntegration),
+    } as unknown as DataStore;
+  });
+
+  it('should self-heal API call with integration documentation', async () => {
+    const integrationManager = new IntegrationManager(mockIntegration, mockDataStore, 'test-org');
+    
+    const getIntegrationSpy = vi.spyOn(integrationManager, 'getIntegration');
+    const getDocumentationSpy = vi.spyOn(integrationManager, 'getDocumentation');
+    
+    let callCount = 0;
+    vi.spyOn(httpStrategies, 'runStepConfig').mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error('API call failed: 404 Not Found');
+      }
+      return {
+        data: { result: 'success after self-healing' },
+        statusCode: 200,
+        headers: {},
+      };
+    });
+
+    const generateStepConfigSpy = vi.spyOn(toolStepBuilder, 'generateStepConfig').mockResolvedValue({
+      success: true,
+      config: {
+        urlPath: '/v2/endpoint',
+        method: HttpMethod.GET,
+      },
+      messages: [],
+    });
+
+    const workflow = {
+      id: 'test-workflow',
+      steps: [
+        {
+          id: 'step-1',
+          integrationId: 'test-integration',
+          apiConfig: {
+            id: 'step-1',
+            method: 'GET',
+            urlHost: 'https://api.example.com',
+            urlPath: '/v1/endpoint',
+            instruction: 'Call API endpoint',
+          },
+          responseMapping: '$',
+        },
+      ],
+    };
+
+    const executor = new WorkflowExecutor({
+      workflow: workflow as Workflow,
+      metadata: { orgId: 'test-org', runId: 'test-run' },
+      integrations: [integrationManager],
+    });
+
+    vi.spyOn(executor as any, 'evaluateConfigResponse').mockResolvedValue({
+      success: true,
+      refactorNeeded: false,
+      shortReason: 'Response looks good',
+    });
+
+    const result = await executor.execute({
+      payload: {},
+      credentials: {},
+      options: { selfHealing: SelfHealingMode.ENABLED },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.stepResults[0].success).toBe(true);
+    expect(callCount).toBe(2);
+    
+    expect(getIntegrationSpy).toHaveBeenCalled();
+    expect(getDocumentationSpy).toHaveBeenCalled();
+    expect(generateStepConfigSpy).toHaveBeenCalled();
+    
+    const generateCall = generateStepConfigSpy.mock.calls[0][0];
+    expect(generateCall.integration).toBeDefined();
+    expect(generateCall.integration.id).toBe('test-integration');
+  });
+
+  it('should self-heal API call without integration', async () => {
+    let callCount = 0;
+    const runStepConfigSpy = vi.spyOn(httpStrategies, 'runStepConfig').mockImplementation(async (args) => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error('API call failed: Invalid request');
+      }
+      return {
+        data: { result: 'success after self-healing' },
+        statusCode: 200,
+        headers: {},
+      };
+    });
+
+    const generateStepConfigSpy = vi.spyOn(toolStepBuilder, 'generateStepConfig').mockResolvedValue({
+      success: true,
+      config: {
+        urlPath: '/fixed-endpoint',
+        method: HttpMethod.POST,
+      },
+      messages: [],
+    });
+
+    const workflow = {
+      id: 'test-workflow',
+      steps: [
+        {
+          id: 'step-1',
+          apiConfig: {
+            id: 'step-1',
+            method: 'GET',
+            urlHost: 'https://api.example.com',
+            urlPath: '/broken-endpoint',
+            instruction: 'Call API without integration',
+          },
+          responseMapping: '$',
+        },
+      ],
+    };
+
+    const executor = new WorkflowExecutor({
+      workflow: workflow as Workflow,
+      metadata: { orgId: 'test-org', runId: 'test-run' },
+      integrations: [],
+    });
+
+    vi.spyOn(executor as any, 'evaluateConfigResponse').mockResolvedValue({
+      success: true,
+      refactorNeeded: false,
+      shortReason: 'Response looks good',
+    });
+
+    const result = await executor.execute({
+      payload: {},
+      credentials: {},
+      options: { selfHealing: SelfHealingMode.ENABLED, retries: 2 },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.stepResults[0].success).toBe(true);
+    expect(runStepConfigSpy).toHaveBeenCalledTimes(2);
+    
+    expect(generateStepConfigSpy).toHaveBeenCalled();
+    
+    const generateCall = generateStepConfigSpy.mock.calls[0][0];
+    expect(generateCall.integration).toBeUndefined();
+  });
+
+  it('should not self-heal when disabled', async () => {
+    let callCount = 0;
+    vi.spyOn(httpStrategies, 'runStepConfig').mockImplementation(async () => {
+      callCount++;
+      throw new Error('API call failed');
+    });
+
+    const generateStepConfigSpy = vi.spyOn(toolStepBuilder, 'generateStepConfig');
+
+    const workflow = {
+      id: 'test-workflow',
+      steps: [
+        {
+          id: 'step-1',
+          apiConfig: {
+            id: 'step-1',
+            method: 'GET',
+            urlHost: 'https://api.example.com',
+            urlPath: '/endpoint',
+            instruction: 'Call API',
+          },
+          responseMapping: '$',
+        },
+      ],
+    };
+
+    const executor = new WorkflowExecutor({
+      workflow: workflow as Workflow,
+      metadata: { orgId: 'test-org', runId: 'test-run' },
+      integrations: [],
+    });
+
+    const result = await executor.execute({
+      payload: {},
+      credentials: {},
+      options: { selfHealing: SelfHealingMode.DISABLED },
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.stepResults[0].success).toBe(false);
+    expect(callCount).toBe(1);
+    expect(generateStepConfigSpy).not.toHaveBeenCalled();
+  });
+
+  it('should fail after exhausting retries', async () => {
+    vi.spyOn(httpStrategies, 'runStepConfig').mockRejectedValue(
+      new Error('Persistent API failure')
+    );
+
+    vi.spyOn(toolStepBuilder, 'generateStepConfig').mockResolvedValue({
+      success: true,
+      config: {
+        urlPath: '/attempt',
+        method: HttpMethod.GET,
+      },
+      messages: [],
+    });
+
+    const workflow = {
+      id: 'test-workflow',
+      steps: [
+        {
+          id: 'step-1',
+          apiConfig: {
+            id: 'step-1',
+            method: 'GET',
+            urlHost: 'https://api.example.com',
+            urlPath: '/endpoint',
+            instruction: 'Call API',
+          },
+          responseMapping: '$',
+        },
+      ],
+    };
+
+    const executor = new WorkflowExecutor({
+      workflow: workflow as Workflow,
+      metadata: { orgId: 'test-org', runId: 'test-run' },
+      integrations: [],
+    });
+
+    const result = await executor.execute({
+      payload: {},
+      credentials: {},
+      options: { selfHealing: SelfHealingMode.ENABLED, retries: 3 },
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.stepResults[0].success).toBe(false);
+    expect(result.stepResults[0].error).toContain('Persistent API failure');
   });
 });

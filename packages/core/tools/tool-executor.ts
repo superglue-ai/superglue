@@ -424,7 +424,7 @@ export class WorkflowExecutor implements Workflow {
     options
   }: {
     config: ApiConfig,
-    integrationManager: IntegrationManager,
+    integrationManager: IntegrationManager | undefined,
     payload: any,
     credentials: Record<string, string>,
     options: RequestOptions
@@ -449,15 +449,15 @@ export class WorkflowExecutor implements Workflow {
       try {
 
         // refresh the token if needed
-        await integrationManager.refreshTokenIfNeeded();
+        await integrationManager?.refreshTokenIfNeeded();
 
         // self healing logic
         if (retryCount > 0 && isSelfHealing) {
           logMessage('info', `Self healing the step configuration for ${config?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, this.metadata);
           if (messages.length === 0) {
-            integration = await integrationManager.getIntegration();
-            const docs = await integrationManager.getDocumentation();
-            const integrationSpecificInstructions = integration.specificInstructions || '';
+            integration = await integrationManager?.getIntegration();
+            const docs = await integrationManager?.getDocumentation();
+            const integrationSpecificInstructions = integration?.specificInstructions || '';
             
             const userPrompt = getGenerateStepConfigContext({
               instruction: config.instruction,
