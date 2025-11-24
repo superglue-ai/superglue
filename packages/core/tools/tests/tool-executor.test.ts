@@ -424,7 +424,6 @@ describe('WorkflowExecutor API Self-Healing', () => {
       credentials: {},
       options: { selfHealing: SelfHealingMode.ENABLED, retries: 2 },
     });
-    console.log(result);
 
     expect(result.success).toBe(true);
     expect(result.stepResults[0].success).toBe(true);
@@ -440,7 +439,7 @@ describe('WorkflowExecutor API Self-Healing', () => {
     expect(generateCall.integration.id).toBe('test-integration');
   });
 
-  it.skip('should self-heal API call without integration', async () => {
+  it('should self-heal API call without integration', async () => {
     const evaluateConfigResponseSpy = vi.spyOn(WorkflowExecutor.prototype as any, 'evaluateConfigResponse').mockResolvedValue({
       success: true,
       refactorNeeded: false,
