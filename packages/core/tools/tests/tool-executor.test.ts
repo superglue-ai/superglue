@@ -361,7 +361,7 @@ describe('WorkflowExecutor API Self-Healing', () => {
     } as unknown as DataStore;
   });
 
-  it.skip('should self-heal API call with integration documentation', async () => {
+  it('should self-heal API call with integration documentation', async () => {
     const integrationManager = new IntegrationManager(mockIntegration, mockDataStore, 'test-org');
     
     const getIntegrationSpy = vi.spyOn(integrationManager, 'getIntegration');

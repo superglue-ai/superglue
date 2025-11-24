@@ -1,5 +1,6 @@
 import { ApiConfig, ExecutionStep, Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
+import { flattenAndNamespaceWorkflowCredentials } from '@superglue/shared/utils';
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -441,15 +442,22 @@ export class WorkflowExecutor implements Workflow {
     let success = false;
     let isSelfHealing = isSelfHealingEnabled(options, "api");
     let integration: Integration | undefined;
-  
+    let stepCredentials: Record<string, string> = credentials;
     // If self healing is enabled, use the retries from the options or the default max of 10 if not specified, otherwise use 1 (no self-healing case)
     const effectiveMaxRetries = isSelfHealing ? (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES) : 1;
   
     do {
       try {
 
-        // refresh the token if needed
+        // compute credentials for the step
         await integrationManager?.refreshTokenIfNeeded();
+        const currentIntegration = await integrationManager?.getIntegration();
+        if (currentIntegration) {
+          stepCredentials = {
+            ...credentials,
+            ...flattenAndNamespaceWorkflowCredentials([currentIntegration])
+          } as Record<string, string>;
+        }
 
         // self healing logic
         if (retryCount > 0 && isSelfHealing) {
@@ -463,7 +471,7 @@ export class WorkflowExecutor implements Workflow {
               instruction: config.instruction,
               previousStepConfig: config,
               stepInput: payload,
-              credentials,
+              credentials: stepCredentials,
               integrationDocumentation: docs?.content || '',
               integrationSpecificInstructions: integrationSpecificInstructions
             }, { characterBudget: 50000, mode: 'self-healing' });
@@ -496,7 +504,7 @@ export class WorkflowExecutor implements Workflow {
         }
   
         // execute the step config
-        response = await runStepConfig({ config, payload, credentials, options });
+        response = await runStepConfig({ config, payload, credentials: stepCredentials, options });
   
         if (!response.data) {
           throw new Error("No data returned from step. This could be due to a configuration error.");
@@ -518,7 +526,7 @@ export class WorkflowExecutor implements Workflow {
       }
       catch (error) {
         const rawErrorString = error?.message || JSON.stringify(error || {});
-        lastError = maskCredentials(rawErrorString, credentials).slice(0, 10000);
+        lastError = maskCredentials(rawErrorString, stepCredentials).slice(0, 10000);
         if (retryCount > 0) {
           messages.push({ role: "user", content: `There was an error with the configuration, please fix: ${lastError}` });
           logMessage('info', `API call failed. Last error: ${lastError}`, this.metadata);
