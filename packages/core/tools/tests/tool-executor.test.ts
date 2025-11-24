@@ -5,7 +5,11 @@ import { IntegrationManager } from '../../integrations/integration-manager.js';
 import { isSelfHealingEnabled } from '../../utils/helpers.js';
 import * as httpStrategies from '../strategies/http/http.js';
 import { WorkflowExecutor } from '../tool-executor.js';
-import * as toolStepBuilder from '../tool-step-builder.js';
+
+// Mock the tool-step-builder module
+vi.mock('../tool-step-builder.js', () => ({
+  generateStepConfig: vi.fn(),
+}));
 
 // Mock the tools module but keep isSelfHealingEnabled real
 vi.mock('../utils/tools.js', async () => {
@@ -14,6 +18,8 @@ vi.mock('../utils/tools.js', async () => {
     ...actual,
   };
 });
+
+import { generateStepConfig } from '../tool-step-builder.js';
 
 describe('WorkflowExecutor Self-Healing Logic', () => {
   it('should correctly determine self-healing for transform operations', () => {
@@ -371,7 +377,7 @@ describe('WorkflowExecutor API Self-Healing', () => {
       };
     });
 
-    const generateStepConfigSpy = vi.spyOn(toolStepBuilder, 'generateStepConfig').mockResolvedValue({
+    vi.mocked(generateStepConfig).mockResolvedValue({
       success: true,
       config: {
         urlPath: '/v2/endpoint',
@@ -409,17 +415,17 @@ describe('WorkflowExecutor API Self-Healing', () => {
       credentials: {},
       options: { selfHealing: SelfHealingMode.ENABLED, retries: 2 },
     });
-    console.log(result);
+
     expect(result.success).toBe(true);
     expect(result.stepResults[0].success).toBe(true);
     expect(runStepConfigSpy).toHaveBeenCalledTimes(2);
     
     expect(getIntegrationSpy).toHaveBeenCalled();
     expect(getDocumentationSpy).toHaveBeenCalled();
-    expect(generateStepConfigSpy).toHaveBeenCalled();
+    expect(generateStepConfig).toHaveBeenCalled();
     expect(evaluateConfigResponseSpy).toHaveBeenCalled();
     
-    const generateCall = generateStepConfigSpy.mock.calls[0][0];
+    const generateCall = vi.mocked(generateStepConfig).mock.calls[0][0];
     expect(generateCall.integration).toBeDefined();
     expect(generateCall.integration.id).toBe('test-integration');
   });
@@ -444,7 +450,7 @@ describe('WorkflowExecutor API Self-Healing', () => {
       };
     });
 
-    const generateStepConfigSpy = vi.spyOn(toolStepBuilder, 'generateStepConfig').mockResolvedValue({
+    vi.mocked(generateStepConfig).mockResolvedValue({
       success: true,
       config: {
         urlPath: '/fixed-endpoint',
@@ -487,9 +493,9 @@ describe('WorkflowExecutor API Self-Healing', () => {
     expect(runStepConfigSpy).toHaveBeenCalledTimes(2);
     expect(evaluateConfigResponseSpy).toHaveBeenCalled();
     
-    expect(generateStepConfigSpy).toHaveBeenCalled();
+    expect(generateStepConfig).toHaveBeenCalled();
     
-    const generateCall = generateStepConfigSpy.mock.calls[0][0];
+    const generateCall = vi.mocked(generateStepConfig).mock.calls[0][0];
     expect(generateCall.integration).toBeUndefined();
   });
 
@@ -499,8 +505,6 @@ describe('WorkflowExecutor API Self-Healing', () => {
       callCount++;
       throw new Error('API call failed');
     });
-
-    const generateStepConfigSpy = vi.spyOn(toolStepBuilder, 'generateStepConfig');
 
     const workflow = {
       id: 'test-workflow',
@@ -534,7 +538,7 @@ describe('WorkflowExecutor API Self-Healing', () => {
     expect(result.success).toBe(false);
     expect(result.stepResults[0].success).toBe(false);
     expect(callCount).toBe(1);
-    expect(generateStepConfigSpy).not.toHaveBeenCalled();
+    expect(generateStepConfig).not.toHaveBeenCalled();
   });
 
   it('should fail after exhausting retries', async () => {
@@ -542,7 +546,7 @@ describe('WorkflowExecutor API Self-Healing', () => {
       new Error('Persistent API failure')
     );
 
-    vi.spyOn(toolStepBuilder, 'generateStepConfig').mockResolvedValue({
+    vi.mocked(generateStepConfig).mockResolvedValue({
       success: true,
       config: {
         urlPath: '/attempt',
