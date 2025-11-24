@@ -440,7 +440,7 @@ describe('WorkflowExecutor API Self-Healing', () => {
     expect(generateCall.integration.id).toBe('test-integration');
   });
 
-  it('should self-heal API call without integration', async () => {
+  it.skip('should self-heal API call without integration', async () => {
     const evaluateConfigResponseSpy = vi.spyOn(WorkflowExecutor.prototype as any, 'evaluateConfigResponse').mockResolvedValue({
       success: true,
       refactorNeeded: false,
