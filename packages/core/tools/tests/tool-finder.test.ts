@@ -1,4 +1,4 @@
-import { HttpMethod, Workflow } from '@superglue/client';
+import { ApiConfig, HttpMethod, Workflow } from '@superglue/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as logs from '../../utils/logs.js';
 import { ToolFinder } from '../tool-finder.js';
@@ -423,19 +423,16 @@ describe('ToolFinder', () => {
             id: 'step-1',
             integrationId: 'test',
             apiConfig: {
-              instruction: 'Do something',
               id: 'step-1',
               method: HttpMethod.GET,
               urlHost: 'https://api.example.com',
               urlPath: '/test',
-            },
-            responseMapping: '$',
+            } as unknown as ApiConfig,
           },
         ],
-      };
+      } as Workflow;
 
       const results = await toolFinder.findTools('test', [toolWithUndefinedInstruction]);
-
       expect(results).toHaveLength(1);
       expect(results[0].steps[0].instruction).toBeUndefined();
     });
