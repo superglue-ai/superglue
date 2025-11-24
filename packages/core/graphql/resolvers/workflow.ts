@@ -1,5 +1,5 @@
 import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
-import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
+import { generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { parseJSON } from "../../files/index.js";
@@ -7,7 +7,6 @@ import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { ToolBuilder } from "../../tools/tool-builder.js";
 import { WorkflowExecutor } from "../../tools/tool-executor.js";
 import { ToolFinder } from "../../tools/tool-finder.js";
-import { replaceVariables } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { Context, Metadata } from '../types.js';
@@ -67,7 +66,6 @@ export const executeWorkflowResolver = async (
       workflow.responseSchema = parseJSON(workflow.responseSchema);
     }
 
-    let mergedCredentials = args.credentials || {};
     let integrationManagers: IntegrationManager[] = [];
 
     // Collect integration IDs from workflow level and steps
@@ -97,29 +95,10 @@ export const executeWorkflowResolver = async (
           logMessage('warn', `Integration with id "${id}" not found, skipping.`, metadata);
         }
       });
-
-      const integrations = await Promise.all(integrationManagers.map(i => i.getIntegration()));
-      const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrations);
-
-      // Process args.credentials with variable replacement
-      const processedCredentials = await Promise.all(
-        Object.entries(args.credentials || {}).map(async ([key, value]) => {
-          return {
-            [key]: await replaceVariables(String(value), integrationCreds)
-          };
-        })
-      );
-
-      // Merge all credential objects
-      mergedCredentials = Object.assign(
-        {},
-        integrationCreds,
-        ...processedCredentials
-      );
     }
 
     const executor = new WorkflowExecutor({ workflow, metadata, integrations: integrationManagers });
-    const result = await executor.execute({ payload: args.payload, credentials: mergedCredentials, options: args.options });
+    const result = await executor.execute({ payload: args.payload, credentials: args.credentials, options: args.options });
 
     // Save run to datastore
     context.datastore.createRun({
