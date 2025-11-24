@@ -107,9 +107,11 @@ export class WorkflowExecutor implements Workflow {
       if (this.finalTransform || this.responseSchema) {
         const rawStepData = {
           ...payload,
-          ...Object.entries(this.result.stepResults).reduce(
-            (acc, [stepIndex, stepResult]) => {
-              acc[this.result.stepResults[stepIndex].stepId] = stepResult.transformedData;
+          ...this.result.stepResults.reduce(
+            (acc, stepResult) => {
+              if (stepResult?.stepId && stepResult?.transformedData !== undefined) {
+                acc[stepResult.stepId] = stepResult.transformedData;
+              }
               return acc;
             },
             {} as Record<string, unknown>,
