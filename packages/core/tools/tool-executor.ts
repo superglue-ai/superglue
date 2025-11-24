@@ -447,9 +447,13 @@ export class WorkflowExecutor implements Workflow {
   
     do {
       try {
+
+        // refresh the token if needed
+        await integrationManager.refreshTokenIfNeeded();
+
+        // self healing logic
         if (retryCount > 0 && isSelfHealing) {
           logMessage('info', `Self healing the step configuration for ${config?.urlHost}${retryCount > 0 ? ` (${retryCount})` : ""}`, this.metadata);
-  
           if (messages.length === 0) {
             integration = await integrationManager.getIntegration();
             const docs = await integrationManager.getDocumentation();
@@ -491,6 +495,7 @@ export class WorkflowExecutor implements Workflow {
           } as ApiConfig;
         }
   
+        // execute the step config
         response = await runStepConfig({ config, payload, credentials, options });
   
         if (!response.data) {

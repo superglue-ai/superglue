@@ -2,13 +2,13 @@ import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglu
 import { flattenAndNamespaceWorkflowCredentials, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { ToolBuilder } from "../../tools/tool-builder.js";
-import { ToolFinder } from "../../tools/tool-finder.js";
-import { WorkflowExecutor } from "../../tools/tool-executor.js";
 import { parseJSON } from "../../files/index.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
-import { logMessage } from "../../utils/logs.js";
+import { ToolBuilder } from "../../tools/tool-builder.js";
+import { WorkflowExecutor } from "../../tools/tool-executor.js";
+import { ToolFinder } from "../../tools/tool-finder.js";
 import { replaceVariables } from "../../utils/helpers.js";
+import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { Context, Metadata } from '../types.js';
 
@@ -98,8 +98,6 @@ export const executeWorkflowResolver = async (
         }
       });
 
-      // refresh oauth tokens if needed
-      await Promise.all(integrationManagers.map(i => i.refreshTokenIfNeeded()));
       const integrations = await Promise.all(integrationManagers.map(i => i.getIntegration()));
       const integrationCreds = flattenAndNamespaceWorkflowCredentials(integrations);
 
