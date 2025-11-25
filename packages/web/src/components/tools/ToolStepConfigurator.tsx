@@ -4,7 +4,7 @@ import { useToast } from '@/src/hooks/use-toast';
 import { splitUrl } from '@/src/lib/client-utils';
 import { composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/general-utils';
 import { Integration } from "@superglue/client";
-import { ArrowDown, Globe, OctagonAlert } from 'lucide-react';
+import { ArrowDown, Globe, OctagonAlert, Pencil } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { JavaScriptCodeEditor } from '../editors/JavaScriptCodeEditor';
 import { JsonCodeEditor } from '../editors/JsonCodeEditor';
@@ -27,9 +27,10 @@ interface ToolStepConfiguratorProps {
     disabled?: boolean;
     stepInput?: any;
     loopItems?: any;
+    onOpenFixStepDialog?: () => void;
 }
 
-export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, loopItems }: ToolStepConfiguratorProps) {
+export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, loopItems, onOpenFixStepDialog }: ToolStepConfiguratorProps) {
     const [headersText, setHeadersText] = useState('');
     const [queryParamsText, setQueryParamsText] = useState('');
 
@@ -165,20 +166,23 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                 <CardContent className="space-y-3 text-sm">
                     <div className="space-y-2">
                                     <div>
-                                        <div className="flex items-center justify-between">
-                                            <Label className="text-xs flex items-center gap-1">
-                                                Step Instruction
-                                                <HelpTooltip text="AI-generated instruction for this step. This describes what the step does and how it should behave." />
-                                            </Label>
-                                            <div className="flex items-center gap-1">
+                                        <Label className="text-xs flex items-center gap-1">
+                                            Step Instruction
+                                            <HelpTooltip text="Instruction for this step. This describes what the step does and how it should behave." />
+                                        </Label>
+                                        
+                                        <div className="relative my-2">
+                                            <div className="absolute top-0 right-0 z-10 flex items-center gap-1">
+                                                {onOpenFixStepDialog && (
+                                                    <Pencil className="h-6 w-6 text-muted-foreground cursor-pointer hover:bg-muted-foreground/20 rounded p-1.5" onClick={onOpenFixStepDialog} />
+                                                    )}
                                                 <CopyButton text={step.apiConfig.instruction || ''} />
                                             </div>
-                                        </div>
-                                        
-                                        <div className="text-xs mt-1 p-3 rounded-md border bg-muted/30 min-h-[5rem] whitespace-pre-wrap">
-                                            {step.apiConfig.instruction || (
-                                                <span className="text-muted-foreground italic">Describe what this step should do...</span>
-                                            )}
+                                            <div className="text-xs text-muted-foreground min-h-[5rem] whitespace-pre-wrap">
+                                                {step.apiConfig.instruction || (
+                                                    <span className="text-muted-foreground italic">Describe what this step should do...</span>
+                                                )}
+                                            </div>
                                         </div>
                                         
                                     </div>

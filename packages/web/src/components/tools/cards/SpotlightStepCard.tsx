@@ -10,17 +10,18 @@ import {
 } from '@/src/components/ui/alert-dialog';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/src/components/ui/dropdown-menu';
+import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { downloadJson } from '@/src/lib/download-utils';
 import { ensureSourceDataArrowFunction, formatJavaScriptCode, isEmptyData, truncateForDisplay } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
-import { ChevronDown, Download, FileBraces, FileInput, FileOutput, Loader2, Play, BugPlay, Route, Trash2, Wand2 } from 'lucide-react';
+import { BugPlay, ChevronDown, Download, FileBraces, FileInput, FileOutput, Loader2, Play, Route, Trash2, Wand2 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { JavaScriptCodeEditor } from '../../editors/JavaScriptCodeEditor';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
@@ -28,7 +29,6 @@ import { Label } from '../../ui/label';
 import { ToolStepConfigurator } from '../ToolStepConfigurator';
 import { useDataProcessor } from '../hooks/use-data-processor';
 import { CopyButton } from '../shared/CopyButton';
-import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 
 export const SpotlightStepCard = React.memo(({
     step,
@@ -493,6 +493,7 @@ export const SpotlightStepCard = React.memo(({
                                     onEditingChange={onConfigEditingChange}
                                     stepInput={evolvingPayload}
                                     loopItems={loopItems}
+                                    onOpenFixStepDialog={onOpenFixStepDialog}
                                 />
                             </div>
                         )}
