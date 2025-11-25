@@ -93,32 +93,33 @@ export async function replaceVariables(template: string, payload: Record<string,
   const matches = [...template.matchAll(pattern)];
 
   for (const match of matches) {
-    const path = match[1].trim();
-    let value: any;
-    if (path in payload && payload[path] !== undefined) {
-      value = payload[path];
+    const expression = match[1].trim();
+    let resolvedValue: any;
+    
+    if (expression in payload && payload[expression] !== undefined) {
+      resolvedValue = payload[expression];
     }
     else {
-      const isArrowFunction = /^\s*\([^)]*\)\s*=>/.test(path);
+      const isArrowFunction = /^\s*\([^)]*\)\s*=>/.test(expression);
       
       if (isArrowFunction) {
-        const result = await transformData(payload, path);
-        if (!result.success) {
-          throw new Error(`Failed to run JS expression: ${path} - ${result.error}`);
+        const transformResult = await transformData(payload, expression);
+        if (!transformResult.success) {
+          throw new Error(`Failed to run JS expression: ${expression} - ${transformResult.error}`);
         }
-        value = result.data;
+        resolvedValue = transformResult.data;
       } else {
         const availableKeys = Object.keys(payload).slice(0, 10).join(', ');
         const keyPreview = Object.keys(payload).length > 10 ? `${availableKeys}... (${Object.keys(payload).length} total)` : availableKeys;
-        throw new Error(`Direct variable reference '${path}' failed to resolve. Available top level keys: ${keyPreview}`);
+        throw new Error(`Direct variable reference '${expression}' failed to resolve. Available top level keys: ${keyPreview}`);
       }
     }
 
-    if (Array.isArray(value) || typeof value === 'object') {
-      value = JSON.stringify(value);
+    if (Array.isArray(resolvedValue) || typeof resolvedValue === 'object') {
+      resolvedValue = JSON.stringify(resolvedValue);
     }
 
-    result = result.replace(match[0], String(value));
+    result = result.replace(match[0], String(resolvedValue));
   }
 
   return oldReplaceVariables(result, payload);
