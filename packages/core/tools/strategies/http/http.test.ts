@@ -10,7 +10,7 @@ import { SelfHealingMode } from '@superglue/client';
 vi.mock('axios');
 vi.mock('openai');
 
-const { callAxios, runStepConfig } = httpModule;
+const { callAxios, callHttp: runStepConfig } = httpModule;
 
 describe('api utility functions', () => {
 
