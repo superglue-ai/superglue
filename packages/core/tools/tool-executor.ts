@@ -248,8 +248,7 @@ export class ToolExecutor implements Tool {
 
         const stepResponseData = { 
           currentItem, 
-          data: iterationResult, 
-          ...(typeof iterationResult === 'object' && !Array.isArray(iterationResult) ? iterationResult : {}) 
+          data: iterationResult 
         };
         
         stepResults.push({
