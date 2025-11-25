@@ -7,11 +7,11 @@ import { Integration } from "@superglue/client";
 import { ArrowDown, Globe, OctagonAlert, Pencil } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { JavaScriptCodeEditor } from '../editors/JavaScriptCodeEditor';
-import { JsonCodeEditor } from '../editors/JsonCodeEditor';
 import { Badge } from "../ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { TemplateAwareTextInput, TemplateAwareJsonEditor } from './templates/tiptap';
 import { HelpTooltip } from '../utils/HelpTooltip';
 import { CopyButton } from './shared/CopyButton';
 import { IntegrationSelector } from './shared/IntegrationSelector';
@@ -226,13 +226,15 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                         {['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map(method => (<SelectItem key={method} value={method}>{method}</SelectItem>))}
                                                     </SelectContent>
                                                 </Select>
-                                                <Input 
+                                                <TemplateAwareTextInput 
                                                     value={composeUrl(step.apiConfig.urlHost || '', step.apiConfig.urlPath || '')} 
-                                                    onChange={(e) => {
-                                                        const { urlHost, urlPath } = splitUrl(e.target.value);
+                                                    onChange={(newValue) => {
+                                                        const { urlHost, urlPath } = splitUrl(newValue);
                                                         handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, urlHost, urlPath } }));
-                                                    }} 
-                                                    className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" 
+                                                    }}
+                                                    stepData={stepInput}
+                                                    loopData={loopItems}
+                                                    className="flex-1" 
                                                     placeholder="https://api.example.com/endpoint" 
                                                     disabled={disabled} 
                                                 />
@@ -244,13 +246,15 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             Headers (JSON)
                                             <HelpTooltip text="HTTP headers to include with the request. Use JSON format. Common headers include Content-Type, Authorization, etc." />
                                         </Label>
-                                        <JsonCodeEditor
+                                        <TemplateAwareJsonEditor
                                             value={headersText}
                                             onChange={(val) => {
                                                 if (disabled) return;
                                                 setHeadersText(val || '');
                                                 handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, headers: val || '' } }));
                                             }}
+                                            stepData={stepInput}
+                                            loopData={loopItems}
                                             readOnly={disabled}
                                             minHeight="100px"
                                             maxHeight="150px"
@@ -264,13 +268,15 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             Query Parameters
                                             <HelpTooltip text='URL query parameters to append to the request. Can be JSON object or any text format like "param1=value1&param2=value2"' />
                                         </Label>
-                                        <JsonCodeEditor
+                                        <TemplateAwareJsonEditor
                                             value={queryParamsText}
                                             onChange={(val) => {
                                                 if (disabled) return;
                                                 setQueryParamsText(val || '');
                                                 handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, queryParams: val || '' } }));
                                             }}
+                                            stepData={stepInput}
+                                            loopData={loopItems}
                                             readOnly={disabled}
                                             minHeight="100px"
                                             maxHeight="150px"
@@ -285,9 +291,11 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 Body
                                                 <HelpTooltip text="Request body content. Can be JSON, form data, plain text, or any format. Use JavaScript expressions to transform data from previous steps." />
                                             </Label>
-                                            <JsonCodeEditor
+                                            <TemplateAwareJsonEditor
                                                 value={step.apiConfig.body || ''}
                                                 onChange={(val) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, body: val || '' } }))}
+                                                stepData={stepInput}
+                                                loopData={loopItems}
                                                 readOnly={disabled}
                                                 minHeight="100px"
                                                 maxHeight="150px"
