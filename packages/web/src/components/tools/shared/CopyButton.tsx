@@ -11,8 +11,8 @@ const copyToClipboard = async (text: string): Promise<boolean> => {
         }
     }
     
+    const textArea = document.createElement('textarea');
     try {
-        const textArea = document.createElement('textarea');
         textArea.value = text;
         textArea.style.position = 'fixed';
         textArea.style.left = '-999999px';
@@ -21,11 +21,12 @@ const copyToClipboard = async (text: string): Promise<boolean> => {
         textArea.focus();
         textArea.select();
         const successful = document.execCommand('copy');
-        textArea.remove();
         return successful;
     } catch (err) {
         console.error('Fallback copy failed:', err);
         return false;
+    } finally {
+        textArea.remove();
     }
 };
 

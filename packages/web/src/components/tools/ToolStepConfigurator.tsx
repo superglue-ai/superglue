@@ -174,8 +174,16 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                         <div className="relative my-2">
                                             <div className="absolute top-0 right-0 z-10 flex items-center gap-1">
                                                 {onOpenFixStepDialog && (
-                                                    <Pencil className="h-6 w-6 text-muted-foreground cursor-pointer hover:bg-muted-foreground/20 rounded p-1.5" onClick={onOpenFixStepDialog} />
-                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={onOpenFixStepDialog}
+                                                        className="h-6 w-6 flex items-center justify-center rounded transition-colors"
+                                                        title="Fix this step with AI"
+                                                        aria-label="Fix this step with AI"
+                                                    >
+                                                        <Pencil className="h-3 w-3 text-muted-foreground" />
+                                                    </button>
+                                                )}
                                                 <CopyButton text={step.apiConfig.instruction || ''} />
                                             </div>
                                             <div className="text-xs text-muted-foreground min-h-[5rem] whitespace-pre-wrap">

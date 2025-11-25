@@ -115,6 +115,7 @@ export function FixStepDialog({
                     className="absolute right-4 top-4 h-6 w-6"
                     onClick={handleClose}
                     disabled={isProcessing}
+                    aria-label="Close dialog"
                 >
                     <X className="h-4 w-4" />
                 </Button>
@@ -124,7 +125,13 @@ export function FixStepDialog({
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <HelpCircle className="h-4 w-4 text-muted-foreground cursor-pointer" />
+                                    <button
+                                        type="button"
+                                        className="inline-flex items-center justify-center"
+                                        aria-label="Help information about fixing steps"
+                                    >
+                                        <HelpCircle className="h-4 w-4 text-muted-foreground cursor-pointer" />
+                                    </button>
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-xs" side="right">
                                     <div className="space-y-2">
