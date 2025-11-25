@@ -1,9 +1,9 @@
 import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
 import { detectAuthType } from '@/src/app/integrations/page';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/src/components/ui/command';
+import { FileChip } from '@/src/components/ui/FileChip';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
@@ -12,17 +12,18 @@ import { Switch } from '@/src/components/ui/switch';
 import { Textarea } from '@/src/components/ui/textarea';
 import { CredentialsManager } from '@/src/components/utils/CredentialManager';
 import { DocumentationField } from '@/src/components/utils/DocumentationField';
-import { FileChip } from '@/src/components/ui/FileChip';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { URLField } from '@/src/components/utils/URLField';
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl, inputErrorStyles } from '@/src/lib/general-utils';
+import { tokenRegistry } from '@/src/lib/token-registry';
 import type { Integration } from '@superglue/client';
 
 import { createOAuthErrorHandler, getOAuthCallbackUrl, triggerOAuthFlow } from '@/src/lib/oauth-utils';
 import { integrations, resolveOAuthCertAndKey } from '@superglue/shared';
-import { Check, ChevronRight, ChevronsUpDown, Copy, Eye, EyeOff, Globe, Upload } from 'lucide-react';
+import { Check, ChevronRight, ChevronsUpDown, Eye, EyeOff, Globe, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { CopyButton } from '../tools/shared/CopyButton';
 
 export interface IntegrationFormProps {
     integration?: Integration;
@@ -603,27 +604,6 @@ export function IntegrationForm({
     };
 
 
-
-
-
-    // Helper to copy text to clipboard
-    const copyToClipboard = async (text: string) => {
-        try {
-            await navigator.clipboard.writeText(text);
-            toast({
-                title: 'Copied',
-                description: 'Callback URL copied to clipboard',
-            });
-        } catch (err) {
-            toast({
-                title: 'Failed to copy',
-                description: 'Please copy the URL manually',
-                variant: 'destructive',
-            });
-        }
-    };
-
-
     return (
         <Card className={cn(
             modal ? "border-0 shadow-none bg-background" : "mt-4 border-primary/50",
@@ -1107,15 +1087,7 @@ export function IntegrationForm({
                                                         <code className="text-xs bg-background px-2 py-1 rounded flex-1 overflow-x-auto">
                                                             {getOAuthCallbackUrl()}
                                                         </code>
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8"
-                                                            onClick={() => copyToClipboard(getOAuthCallbackUrl())}
-                                                        >
-                                                            <Copy className="h-4 w-4" />
-                                                        </Button>
+                                                        <CopyButton text={getOAuthCallbackUrl()} />
                                                     </div>
                                                 </div>
                                             )}

@@ -12,9 +12,10 @@ import { Label } from '@radix-ui/react-label';
 import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/client';
 import { integrations } from '@superglue/shared';
 import { createClient } from 'graphql-ws';
-import { Copy, Loader2, Terminal, Upload, X } from 'lucide-react';
+import { Loader2, Terminal, Upload, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { CopyButton } from '../tools/shared/CopyButton';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -722,16 +723,7 @@ const result = await superglue.call({
                 <div className="space-y-1 w-full">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium">Try the endpoint locally with curl: </p>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 flex-none"
-                      onClick={() => {
-                        navigator.clipboard.writeText(getCurlCommand());
-                      }}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
+                    <CopyButton text={getCurlCommand()} />
                   </div>
                   <div className="relative">
                     <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto whitespace-pre-wrap break-all">
@@ -748,16 +740,7 @@ const result = await superglue.call({
                 <div className="space-y-1 w-full">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium">Or use the TypeScript SDK in your application: </p>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 flex-none"
-                      onClick={() => {
-                        navigator.clipboard.writeText(getSdkCode());
-                      }}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
+                    <CopyButton text={getSdkCode()} />
                   </div>
                   <div className="relative">
                     <pre className="rounded-lg bg-secondary p-4 text-sm overflow-x-auto whitespace-pre-wrap break-all">

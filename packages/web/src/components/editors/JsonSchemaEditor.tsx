@@ -17,9 +17,10 @@ import {
 } from "@/src/components/ui/tooltip";
 import { cn, MAX_DISPLAY_LINES, MAX_DISPLAY_SIZE } from "@/src/lib/general-utils";
 import Editor from '@monaco-editor/react';
-import { Check, Copy, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import React from 'react';
 import { useMonacoTheme } from "../../hooks/useMonacoTheme";
+import { CopyButton } from "../tools/shared/CopyButton";
 
 interface JsonSchemaEditorProps {
   value: string | null;
@@ -635,7 +636,7 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
           {isCodeMode ? (
             <div className="h-full font-mono relative bg-transparent px-3">
               <div className="absolute top-1 right-1 z-10 mr-5">
-                <IconCopyButton text={value ?? ''} />
+                <CopyButton text={value ?? ''} />
               </div>
               <Editor
                 height="300px"
@@ -731,24 +732,3 @@ const JsonSchemaEditor: React.FC<JsonSchemaEditorProps> = ({
 };
 
 export default JsonSchemaEditor;
-
-const IconCopyButton = ({ text }: { text: string }) => {
-  const [copied, setCopied] = React.useState(false);
-  const handleCopy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    navigator.clipboard.writeText(text || '');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-  return (
-    <button
-      onClick={handleCopy}
-      className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors backdrop-blur"
-      title="Copy"
-      type="button"
-    >
-      {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
-    </button>
-  );
-};
