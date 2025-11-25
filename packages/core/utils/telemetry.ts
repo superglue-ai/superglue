@@ -122,7 +122,7 @@ const handleQuerySuccess = (query: string, orgId: string, requestContext: any) =
 
   logMessage('debug', `${operation} successful`, {
     orgId: orgId,
-    traceId: requestContext?.traceId
+    traceId: requestContext?.contextValue?.traceId
   });
 
   telemetryClient?.capture({
