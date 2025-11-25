@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as httpModule from '../tools/strategies/http/http.js';
+import * as logsModule from './logs.js';
 import { notifyWebhook } from './webhook.js';
 
 vi.mock('../tools/tool-steps/strategies/http/http.js');
@@ -71,14 +72,14 @@ describe('notifyWebhook', () => {
     const webhookUrl = 'https://example.com/webhook';
     const callId = '123';
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const logMessageSpy = vi.spyOn(logsModule, 'logMessage').mockImplementation(() => { });
 
     callAxiosSpy.mockRejectedValueOnce(new Error('Network error'));
 
     // Should not throw
     await expect(notifyWebhook(webhookUrl, callId, true)).resolves.not.toThrow();
 
-    expect(consoleSpy).toHaveBeenCalled();
-    consoleSpy.mockRestore();
+    expect(logMessageSpy).toHaveBeenCalledWith('error', expect.stringContaining('Webhook notification failed'), undefined);
+    logMessageSpy.mockRestore();
   });
 });
