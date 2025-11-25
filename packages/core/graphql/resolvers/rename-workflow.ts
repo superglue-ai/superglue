@@ -1,12 +1,12 @@
 import { Workflow } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
 import { logMessage } from "../../utils/logs.js";
-import { Context } from '../types.js';
+import { GraphQLRequestContext } from '../types.js';
 
 export const renameWorkflowResolver = async (
   _: any,
   { oldId, newId }: { oldId: string; newId: string },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ): Promise<Workflow> => {
   if (!oldId) {
