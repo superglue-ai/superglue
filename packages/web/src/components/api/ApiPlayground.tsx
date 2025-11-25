@@ -1,17 +1,18 @@
 'use client';
 
 import { useConfig } from "@/src/app/config-context";
-import { tokenRegistry } from '@/src/lib/token-registry';
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { useToast } from "@/src/hooks/use-toast";
 import { generateUUID } from "@/src/lib/client-utils";
 import { composeUrl } from "@/src/lib/general-utils";
+import { tokenRegistry } from '@/src/lib/token-registry';
 import { ApiConfig, CacheMode, SuperglueClient } from "@superglue/client";
-import { AlertCircle, Clock, Copy, Play, Plus, X } from "lucide-react";
+import { AlertCircle, Clock, Play, Plus, X } from "lucide-react";
 import { useParams } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
+import { CopyButton } from "../tools/shared/CopyButton";
 
 // Add this new type and state
 type Credential = { id: string; key: string; value: string; isManual?: boolean; };
@@ -393,17 +394,9 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
                   <pre className="bg-secondary p-4 rounded-md overflow-auto text-xs max-h-full">
                     {JSON.stringify(response, null, 2)}
                   </pre>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="absolute top-2 right-2"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigator.clipboard.writeText(JSON.stringify(response, null, 2));
-                    }}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
+                  <div className="absolute top-2 right-2">
+                    <CopyButton text={JSON.stringify(response, null, 2)} />
+                  </div>
                 </div>
                 {error && (
                   <Card className="border-red-200 bg-red-50 mt-4">

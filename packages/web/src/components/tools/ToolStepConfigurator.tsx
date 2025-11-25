@@ -4,16 +4,16 @@ import { useToast } from '@/src/hooks/use-toast';
 import { splitUrl } from '@/src/lib/client-utils';
 import { composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/general-utils';
 import { Integration } from "@superglue/client";
-import { ArrowDown, Check, Copy, Globe, OctagonAlert } from 'lucide-react';
+import { ArrowDown, Globe, OctagonAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { JavaScriptCodeEditor } from '../editors/JavaScriptCodeEditor';
 import { JsonCodeEditor } from '../editors/JsonCodeEditor';
 import { Badge } from "../ui/badge";
-import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { HelpTooltip } from '../utils/HelpTooltip';
+import { CopyButton } from './shared/CopyButton';
 import { IntegrationSelector } from './shared/IntegrationSelector';
 
 interface ToolStepConfiguratorProps {
@@ -32,7 +32,6 @@ interface ToolStepConfiguratorProps {
 export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, loopItems }: ToolStepConfiguratorProps) {
     const [headersText, setHeadersText] = useState('');
     const [queryParamsText, setQueryParamsText] = useState('');
-    const [instructionCopied, setInstructionCopied] = useState(false);
 
     const config = useConfig();
     const { toast } = useToast();
@@ -172,24 +171,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 <HelpTooltip text="AI-generated instruction for this step. This describes what the step does and how it should behave." />
                                             </Label>
                                             <div className="flex items-center gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-6 w-6"
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(step.apiConfig.instruction || '');
-                                                        setInstructionCopied(true);
-                                                        setTimeout(() => setInstructionCopied(false), 1500);
-                                                    }}
-                                                    disabled={disabled || !step.apiConfig.instruction}
-                                                    title="Copy instruction"
-                                                >
-                                                    {instructionCopied ? (
-                                                        <Check className="h-3 w-3 text-green-600" />
-                                                    ) : (
-                                                        <Copy className="h-3 w-3" />
-                                                    )}
-                                                </Button>
+                                                <CopyButton text={step.apiConfig.instruction || ''} />
                                             </div>
                                         </div>
                                         

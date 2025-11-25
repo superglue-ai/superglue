@@ -22,12 +22,13 @@ import {
 
 import { ToolDeployModal } from '@/src/components/tools/deploy/ToolDeployModal';
 import { DeleteConfigDialog } from '@/src/components/tools/dialogs/DeleteConfigDialog';
+import { CopyButton } from '@/src/components/tools/shared/CopyButton';
 import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { createSuperglueClient } from '@/src/lib/client-utils';
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
 import { ApiConfig, Integration, Workflow as Tool } from '@superglue/client';
-import { Check, CloudUpload, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2 } from "lucide-react";
+import { CloudUpload, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
@@ -48,8 +49,6 @@ const ConfigTable = () => {
   const [pageSize] = useState(20);
 
   const [configToDelete, setConfigToDelete] = useState<ApiConfig | Tool | null>(null);
-  const [copiedDetails, setCopiedDetails] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deployToolId, setDeployToolId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIntegration, setSelectedIntegration] = useState<string>("all");
@@ -166,21 +165,6 @@ const ConfigTable = () => {
   const handleDeleted = (deletedId: string) => {
     setAllConfigs(prev => prev.filter(c => c.id !== deletedId));
     setTotal(prev => prev - 1);
-  };
-
-  const handleCopyId = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(id);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-
-  const handleCopyDetails = (e: React.MouseEvent, text: string) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(text);
-    setCopiedDetails(text);
-    setTimeout(() => setCopiedDetails(null), 2000);
   };
 
   const handleDeployClick = (e: React.MouseEvent, toolId: string) => {
@@ -392,53 +376,17 @@ const ConfigTable = () => {
                       <TableCell className="font-medium max-w-[200px] truncate relative group">
                         <div className="flex items-center space-x-1">
                           <span className="truncate">{config.id}</span>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={(e) => handleCopyId(e, config.id)}
-                                >
-                                  {copiedId === config.id ? (
-                                    <Check className="h-3.5 w-3.5 text-green-500" />
-                                  ) : (
-                                    <Copy className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">
-                                <p>{copiedId === config.id ? "Copied!" : "Copy ID"}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <CopyButton text={config.id} />
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="max-w-[300px] truncate relative group">
                         <div className="flex items-center space-x-1">
                           <span className="truncate">{config.instruction}</span>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={(e) => handleCopyDetails(e, config.instruction || '')}
-                                >
-                                  {copiedDetails === config.instruction ? (
-                                    <Check className="h-3.5 w-3.5 text-green-500" />
-                                  ) : (
-                                    <Copy className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">
-                                <p>{copiedDetails === config.instruction ? "Copied!" : "Copy details"}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <CopyButton text={config.instruction || ''} />
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="w-[150px]">

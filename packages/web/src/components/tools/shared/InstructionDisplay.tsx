@@ -1,19 +1,13 @@
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
-import { Check, Copy, Eye, X } from 'lucide-react';
+import { Eye, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { CopyButton } from './CopyButton';
 
 export const InstructionDisplay = ({ instruction, onEdit, showEditButton = true }: { instruction: string; onEdit?: () => void; showEditButton?: boolean; }) => {
     const [showFull, setShowFull] = useState(false);
-    const [copied, setCopied] = useState(false);
     const [isTruncated, setIsTruncated] = useState(false);
     const textRef = useRef<HTMLParagraphElement>(null);
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(instruction);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-    };
 
     const normalizedText = instruction.replace(/\n/g, ' ');
 
@@ -51,9 +45,7 @@ export const InstructionDisplay = ({ instruction, onEdit, showEditButton = true 
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-lg font-semibold">Tool Instruction</h3>
                                 <div className="flex items-center gap-2">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { navigator.clipboard.writeText(instruction); setCopied(true); setTimeout(() => setCopied(false), 1500); }} title="Copy">
-                                        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                    </Button>
+                                    <CopyButton text={instruction} />
                                     <Button variant="ghost" size="icon" onClick={() => setShowFull(false)}>
                                         <X className="h-4 w-4" />
                                     </Button>
