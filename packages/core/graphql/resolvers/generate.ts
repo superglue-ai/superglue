@@ -51,6 +51,7 @@ export const generateInstructionsResolver = async (
     throw new Error("Failed to generate instructions");
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
+      traceId: context.traceId,
       integrations: integrations
     });
     throw error;
@@ -63,9 +64,9 @@ export const generateStepConfigResolver = async (
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ): Promise<ApiConfig> => {
-  try {
-    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
+  const metadata: Metadata = { orgId: context.orgId, traceId: context.traceId };
 
+  try {
     // Extract instruction from currentStepConfig
     const instruction = currentStepConfig?.instruction;
     if (!instruction) {
@@ -138,8 +139,10 @@ export const generateStepConfigResolver = async (
     return mergedConfig;
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
+      traceId: context.traceId,
       integrationId
     });
+
     throw error;
   }
 };

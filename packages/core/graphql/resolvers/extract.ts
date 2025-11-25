@@ -21,7 +21,7 @@ export const extractResolver = async (
   const callId = crypto.randomUUID();
   const startedAt = new Date();
   const metadata: Metadata = {
-    runId: input.id || callId,
+    traceId: context.traceId,
     orgId: context.orgId
   };
 

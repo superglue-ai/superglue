@@ -38,9 +38,8 @@ export const executeWorkflowResolver = async (
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ): Promise<WorkflowResult> => {
-  const runId = crypto.randomUUID();
   const startedAt = new Date();
-  const metadata: Metadata = { orgId: context.orgId, runId };
+  const metadata: Metadata = { orgId: context.orgId, traceId: context.traceId };
 
   let workflow: Workflow | undefined;
   try {
@@ -103,7 +102,7 @@ export const executeWorkflowResolver = async (
     // Save run to datastore
     context.datastore.createRun({
       result: {
-        id: runId,
+        id: crypto.randomUUID(),
         success: result.success,
         error: result.error || undefined,
         config: result.config || workflow,
@@ -116,7 +115,7 @@ export const executeWorkflowResolver = async (
 
     // Notify webhook if configured (fire-and-forget)
     if (args.options?.webhookUrl?.startsWith('http')) {
-      notifyWebhook(args.options.webhookUrl, runId, result.success, result.data, result.error);
+      notifyWebhook(args.options.webhookUrl, context.traceId, result.success, result.data, result.error);
     }
     else if(args.options?.webhookUrl?.startsWith('tool:')) {
       const toolId = args.options.webhookUrl.split(':')[1];
@@ -130,9 +129,9 @@ export const executeWorkflowResolver = async (
     return result;
 
   } catch (error) {
-    logMessage('error', "Workflow execution error: " + String(error), metadata || { orgId: context.orgId, runId });
+    logMessage('error', "Workflow execution error: " + String(error), metadata);
     const result = {
-      id: runId,
+      id: crypto.randomUUID(),
       success: false,
       config: workflow || { id: args.input.id, steps: [] },
       error: String(error),
@@ -242,7 +241,7 @@ export const findRelevantToolsResolver = async (
   info: GraphQLResolveInfo,
 ) => {
   try {
-    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
+    const metadata: Metadata = { orgId: context.orgId, traceId: context.traceId };
     const allTools = await context.datastore.listWorkflows({ limit: 1000, offset: 0, orgId: context.orgId });
     const tools = (allTools.items || []).map(tool => {
       if (tool.inputSchema && typeof tool.inputSchema === 'string') {
@@ -268,10 +267,9 @@ export const buildWorkflowResolver = async (
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ): Promise<Workflow> => {
-  const runId = crypto.randomUUID();
+  const metadata: Metadata = { orgId: context.orgId, traceId: context.traceId };
 
   try {
-    const metadata: Metadata = { orgId: context.orgId, runId };
     const { instruction, payload = {}, integrationIds, responseSchema } = args;
 
     if (!instruction || instruction.trim() === "") {
@@ -304,7 +302,7 @@ export const buildWorkflowResolver = async (
 
     return workflow;
   } catch (error) {
-    logMessage('error', `Failed to build workflow: ${error}`, { orgId: context.orgId });
+    logMessage('error', `Failed to build workflow: ${error}`, metadata);
     throw error;
   }
 };

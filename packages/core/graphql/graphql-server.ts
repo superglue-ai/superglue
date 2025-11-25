@@ -15,6 +15,8 @@ import { mcpHandler } from '../mcp/mcp-server.js';
 import { logMessage } from "../utils/logs.js";
 import { createTelemetryPlugin, telemetryMiddleware } from '../utils/telemetry.js';
 import { resolvers, typeDefs } from './graphql.js';
+import { GraphQLRequestContext } from './types.js';
+import { generateTraceId, traceIdMiddleware } from '../utils/trace-id.js';
 
 export const DEFAULT_QUERY = `
 query Query {
@@ -35,9 +37,10 @@ export async function startGraphqlServer(datastore: DataStore) {
   const schema = makeExecutableSchema({ typeDefs, resolvers });
 
   // Context Configuration
-  const getHttpContext = async ({ req }) => {
+  const buildContextFromRequest = async ({ req }: { req: any }): Promise<GraphQLRequestContext> => {
     return {
       datastore: datastore,
+      traceId: req.traceId,
       orgId: req.orgId || '',
       userId: req.authInfo?.userId,
       orgName: req.authInfo?.orgName,
@@ -58,26 +61,33 @@ export async function startGraphqlServer(datastore: DataStore) {
   // Setup graphql-ws server
   const serverCleanup = useServer({
     schema,
-    context: async (ctx: any, msg, args) => {
+    onConnect: async (ctx: any) => {
+      ctx.traceId = generateTraceId();;
+    },
+    context: async (ctx: any, msg, args): Promise<GraphQLRequestContext | boolean> => {
+      const traceId = ctx.traceId;
+
       const token = extractTokenFromExpressRequest(ctx);
       const authResult = await validateToken(token);
 
       if (!authResult.success) {
-        logMessage('warn', `Websocket Subscription authentication failed for token: ${token}`);
+        logMessage('warn', `Websocket Subscription authentication failed for token: ${token}`, { traceId });
         return false;
       }
+      
+      logMessage('debug', `Websocket Subscription connected`, { traceId });
 
-      logMessage('debug', `Websocket Subscription connected`);
       return { 
-        datastore, 
+        datastore,
+        traceId, 
         orgId: authResult.orgId,
         userId: authResult.userId,
         orgName: authResult.orgName,
         orgRole: authResult.orgRole
       };
     },
-    onDisconnect(ctx, code, reason) {
-      logMessage('debug', `Websocket Subscription disconnected. code=${code} reason=${reason}`);
+    onDisconnect(ctx: any, code, reason) {
+      logMessage('debug', `Websocket Subscription disconnected. code=${code} reason=${reason}`, { traceId: ctx.traceId });
     },
   }, wsServer);
 
@@ -111,6 +121,7 @@ export async function startGraphqlServer(datastore: DataStore) {
   // Apply Middleware
   app.use(cors<cors.CorsRequest>());
   app.use(express.json({ limit: '1024mb' }));
+  app.use(traceIdMiddleware);
   app.use(authMiddleware);
   app.use(telemetryMiddleware);
   app.use(graphqlUploadExpress({ 
@@ -121,7 +132,7 @@ export async function startGraphqlServer(datastore: DataStore) {
   app.get('/mcp', mcpHandler);
   app.delete('/mcp', mcpHandler);
 
-  app.use('/', expressMiddleware(server, { context: getHttpContext }));
+  app.use('/', expressMiddleware(server, { context: buildContextFromRequest }));
 
   try {
     await new Promise<void>((resolve) => httpServer.listen({ port: PORT }, resolve));

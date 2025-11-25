@@ -22,7 +22,7 @@ export const callResolver = async (
   const startedAt = new Date();
   const callId = crypto.randomUUID();
   const metadata: Metadata = {
-    runId: callId,
+    traceId: callId,
     orgId: context.orgId
   };
   let endpoint: ApiConfig;

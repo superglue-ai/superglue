@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import { UserRole } from '@superglue/shared';
 
 export interface AuthenticatedFastifyRequest extends FastifyRequest {
+  traceId?: string;
   authInfo: {
     orgId: string;
     userId?: string;

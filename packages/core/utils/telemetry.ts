@@ -38,7 +38,10 @@ export const telemetryMiddleware = (req: any, res: any, next: any) => {
   }
   const operation = extractOperationName(req.body.query);
 
-  logMessage('debug', `Executing ${operation}`, { orgId: req.orgId });
+  logMessage('debug', `Executing ${operation}`, {
+    orgId: req.orgId,
+    traceId: req.traceId
+  });
 
   telemetryClient?.capture({
     distinctId: req.orgId || sessionId,
@@ -85,7 +88,10 @@ export const handleQueryError = (errors: any[], query: string, orgId: string, re
   const properties = createCallProperties(query, requestContext.response?.body, isSelfHosted, operation);
   properties.success = false;
 
-  logMessage('warn', `${operation} failed.\n${errors.map(e => `\n- ${e.message || e}`).join('\n')}`, { orgId: orgId });
+  logMessage('warn', `${operation} failed.\n${errors.map(e => `\n- ${e.message || e}`).join('\n')}`, {
+    orgId: orgId,
+    traceId: requestContext?.contextValue?.traceId
+  });
 
   telemetryClient?.capture({
     distinctId: orgId || sessionId,
@@ -114,7 +120,10 @@ const handleQuerySuccess = (query: string, orgId: string, requestContext: any) =
   const properties = createCallProperties(query, requestContext.response?.body, isSelfHosted, operation);
   properties.success = true;
 
-  logMessage('debug', `${operation} successful`, { orgId: orgId });
+  logMessage('debug', `${operation} successful`, {
+    orgId: orgId,
+    traceId: requestContext?.traceId
+  });
 
   telemetryClient?.capture({
     distinctId: distinctId,

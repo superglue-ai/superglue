@@ -47,13 +47,14 @@ export const authMiddleware = async (req: any, res: any, next: any) => {
 
   // If authentication fails, return 401 error
   if (!authResult.success) {
-    logMessage('warn', `Authentication failed for token: ${token}`);
+    logMessage('warn', `Authentication failed for token: ${token}`, { traceId: req.traceId });
     return res.status(401).send(getAuthErrorHTML(token));
   }
 
   // Add orgId to request object
   req.orgId = authResult.orgId;
   req.headers["orgId"] = authResult.orgId;
+  
   req.authInfo = { 
     token: token, 
     clientId: authResult.orgId,
@@ -61,6 +62,7 @@ export const authMiddleware = async (req: any, res: any, next: any) => {
     orgName: authResult.orgName,
     orgRole: authResult.orgRole
   };
+
   return next();
 };
 
