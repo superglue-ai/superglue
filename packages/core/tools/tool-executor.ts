@@ -194,17 +194,17 @@ export class ToolExecutor implements Tool {
                 );
               }
 
-              const generateResult = await generateStepConfig({
+              const generateStepConfigResult = await generateStepConfig({
                 retryCount,
                 messages,
                 integration: currentIntegration
               });
               
-              if (!generateResult.success) {
-                throw new Error(generateResult.error);
+              if (!generateStepConfigResult.success) {
+                throw new Error(generateStepConfigResult.error);
               }
 
-              currentConfig = { ...currentConfig, ...generateResult.config } as ApiConfig;
+              currentConfig = { ...currentConfig, ...generateStepConfigResult.config } as ApiConfig;
               configWasValidated = false;
             }
 

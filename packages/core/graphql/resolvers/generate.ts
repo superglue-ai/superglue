@@ -14,6 +14,7 @@ import { generateStepConfig } from "../../tools/tool-step-builder.js";
 interface GenerateStepConfigArgs {
   integrationId?: string;
   currentStepConfig?: Partial<ApiConfig>;
+  previousStepLoopSelector?: string;
   stepInput?: Record<string, any>;
   credentials?: Record<string, string>;
   errorMessage?: string;
@@ -59,10 +60,10 @@ export const generateInstructionsResolver = async (
 
 export const generateStepConfigResolver = async (
   _: any,
-  { integrationId, currentStepConfig, stepInput, credentials, errorMessage }: GenerateStepConfigArgs,
+  { integrationId, currentStepConfig, previousStepLoopSelector, stepInput, credentials, errorMessage }: GenerateStepConfigArgs,
   context: Context,
   info: GraphQLResolveInfo
-): Promise<ApiConfig> => {
+): Promise<{config: ApiConfig, dataSelector: string}> => {
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
 
@@ -100,6 +101,7 @@ export const generateStepConfigResolver = async (
     const userPrompt = getGenerateStepConfigContext({
       instruction,
       previousStepConfig: currentStepConfig,
+      previousStepLoopSelector: previousStepLoopSelector,
       stepInput,
       credentials,
       integrationDocumentation: integrationDocs,
@@ -132,6 +134,7 @@ export const generateStepConfigResolver = async (
     const mergedConfig = {
       ...currentStepConfig,
       ...generateStepConfigResult.config,
+      loopSelector: generateStepConfigResult.loopSelector,
       id: currentStepConfig?.id || crypto.randomUUID(),
     } as ApiConfig;
 
