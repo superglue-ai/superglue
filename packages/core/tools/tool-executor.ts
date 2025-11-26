@@ -211,7 +211,7 @@ export class ToolExecutor implements Tool {
             const itemExecutionResult = await this.strategyRegistry.routeAndExecute({
               stepConfig: currentConfig,
               stepInputData: loopPayload,
-              credentials,
+              credentials: stepCredentials,
               requestOptions: { ...options, testMode: false }
             });
 
@@ -239,7 +239,7 @@ export class ToolExecutor implements Tool {
             break;
 
           } catch (error) {
-            lastError = maskCredentials(error?.message || String(error), credentials).slice(0, 10000);
+            lastError = maskCredentials(error?.message || String(error), stepCredentials).slice(0, 10000);
             
             if (retryCount > 0) {
               messages.push({ role: "user", content: `Error: ${lastError}` });
