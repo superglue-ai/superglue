@@ -201,7 +201,7 @@ export async function executeTransformLegacy(args: {
   const { datastore, fromCache, input, data, metadata, options } = args;
   let currentConfig = input.endpoint;
   if (fromCache && datastore) {
-    const cached = await datastore.getTransformConfig(input.id || input.endpoint.id, metadata.orgId);
+    const cached = await datastore.getApiConfig({ id: input.id || input.endpoint.id, orgId: metadata.orgId });;
     if (cached) {
       currentConfig = { ...cached, ...input.endpoint };
     }
