@@ -18,7 +18,7 @@ export class FTPStepExecutionStrategy implements StepExecutionStrategy {
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
     const { stepConfig, stepInputData, credentials, requestOptions } = input;
-    const ftpResult = await callFTP({ endpoint: stepConfig, credentials, options: requestOptions });
+    const ftpResult = await callFTP({ endpoint: stepConfig, stepInputData, credentials, options: requestOptions }); 
     return {
       success: true,
       strategyExecutionData: ftpResult,
@@ -328,8 +328,8 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
   }
 }
 
-export async function callFTP({ endpoint, credentials, options }: { endpoint: StepConfig, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
-  const allVars = { ...credentials };
+export async function callFTP({ endpoint, stepInputData, credentials, options }: { endpoint: StepConfig, stepInputData?: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
+  const allVars = { ...stepInputData, ...credentials };
   
   const resolvedUrlHost = await replaceVariables(endpoint.urlHost, allVars);
   const resolvedUrlPath = await replaceVariables(endpoint.urlPath, allVars);
