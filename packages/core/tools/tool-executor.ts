@@ -162,6 +162,11 @@ export class ToolExecutor implements Tool {
         }
 
         const loopPayload = { currentItem, ...stepInput };
+        let retryCount = 0;
+        let lastError: string | null = null;
+        let messages: LLMMessage[] = [];
+        let currentConfig = step.apiConfig;
+        let iterationResult: any = null;
         const currentIntegration = await integrationManager?.getIntegration();
         
         if (currentIntegration) {
@@ -171,33 +176,25 @@ export class ToolExecutor implements Tool {
           } as Record<string, string>;
         }
 
-        let retryCount = 0;
-        let lastError: string | null = null;
-        let messages: LLMMessage[] = [];
-        let currentConfig = step.apiConfig;
-        let iterationResult: any = null;
-        let cachedIntegration: Integration | undefined;
-
         while (retryCount < maxRetries) {
           try {
             if (retryCount > 0 && isSelfHealing) {
               logMessage('info', `Self healing step config (retry ${retryCount})`, this.metadata);
 
               if (messages.length === 0) {
-                cachedIntegration = await integrationManager.getIntegration();
                 messages = await this.initializeSelfHealingContext(
                   integrationManager,
                   currentConfig,
                   loopPayload,
                   credentials,
-                  cachedIntegration
+                  currentIntegration ? currentIntegration : undefined
                 );
               }
 
               const generateResult = await generateStepConfig({
                 retryCount,
                 messages,
-                integration: cachedIntegration
+                integration: currentIntegration
               });
               
               if (!generateResult.success) {
