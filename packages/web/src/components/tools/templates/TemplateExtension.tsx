@@ -1,32 +1,51 @@
 import { Node, mergeAttributes, InputRule } from '@tiptap/core';
 import { NodeViewWrapper, ReactNodeViewRenderer, NodeViewProps } from '@tiptap/react';
-import { TemplateChip } from '../TemplateChip';
+import { TemplateChip } from './TemplateChip';
 import { useTemplateContext } from './TemplateContext';
 import { evaluateTemplate } from '@/src/lib/template-utils';
-import { useEffect, useState } from 'react';
-
+import { useEffect, useMemo, useRef, useState } from 'react';
+import stableStringify from 'fast-safe-stringify';
 
 function TemplateNodeView(props: NodeViewProps) {
     const { node, deleteNode, updateAttributes, selected } = props;
-    const { stepData, loopData, readOnly } = useTemplateContext();
+    const { stepData, loopData, readOnly, canExecute = true } = useTemplateContext();
     const [evaluation, setEvaluation] = useState<{ value?: any; error?: string }>({});
+    const [isEvaluating, setIsEvaluating] = useState(false);
     const rawTemplate = node.attrs.rawTemplate as string;
     const expression = rawTemplate.startsWith('<<') && rawTemplate.endsWith('>>')
         ? rawTemplate.slice(2, -2).trim()
         : rawTemplate.trim();
 
+    const stepDataRef = useRef(stepData);
+    const loopDataRef = useRef(loopData);
+    stepDataRef.current = stepData;
+    loopDataRef.current = loopData;
+
+    const stepDataKey = useMemo(() => stableStringify(stepData), [stepData]);
+    const loopDataKey = useMemo(() => stableStringify(loopData), [loopData]);
+
     useEffect(() => {
         let cancelled = false;
 
+        if (!canExecute) {
+            setEvaluation({});
+            setIsEvaluating(false);
+            return;
+        }
+
+        setIsEvaluating(true);
+
         const evaluate = async () => {
             try {
-                const result = await evaluateTemplate(expression, stepData, loopData);
+                const result = await evaluateTemplate(expression, stepDataRef.current, loopDataRef.current);
                 if (!cancelled) {
                     setEvaluation(result);
+                    setIsEvaluating(false);
                 }
             } catch (error) {
                 if (!cancelled) {
                     setEvaluation({ error: String(error) });
+                    setIsEvaluating(false);
                 }
             }
         };
@@ -35,8 +54,9 @@ function TemplateNodeView(props: NodeViewProps) {
         return () => {
             cancelled = true;
             clearTimeout(timer);
+            setIsEvaluating(false);
         };
-    }, [expression, stepData, loopData]);
+    }, [expression, stepDataKey, loopDataKey, canExecute]);
 
     const handleUpdate = (newTemplate: string) => {
         updateAttributes({ rawTemplate: newTemplate });
@@ -54,6 +74,8 @@ function TemplateNodeView(props: NodeViewProps) {
                 error={evaluation?.error}
                 stepData={stepData}
                 loopData={loopData}
+                isEvaluating={isEvaluating}
+                canExecute={canExecute}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
                 readOnly={readOnly}
@@ -64,9 +86,9 @@ function TemplateNodeView(props: NodeViewProps) {
     );
 }
 
-// Regex to match <<...>> patterns (including nested parens for arrow functions)
-// This allows <<varName>> and <<(sourceData) => sourceData.field>>
-const TEMPLATE_REGEX = /<<([^<>]+|(?:\([^)]*\)\s*=>[^>]+))>>$/;
+// Regex to match <<...>> patterns when >> is typed
+// Match any content between << and >> (non-greedy)
+const TEMPLATE_REGEX = /<<([^<>]+)>>$/;
 
 // TipTap extension for template nodes
 export const TemplateExtension = Node.create({
@@ -108,16 +130,20 @@ export const TemplateExtension = Node.create({
         return ReactNodeViewRenderer(TemplateNodeView);
     },
 
-    // Convert plain text <<template>> to node using custom InputRule
     addInputRules() {
+        const nodeType = this.type;
         return [
             new InputRule({
                 find: TEMPLATE_REGEX,
-                handler: ({ state, range, match }) => {
+                handler: (props) => {
+                    const { state, range, match } = props;
+                    const fullMatch = match[0];
+                    console.log('[TemplateExtension] InputRule triggered:', fullMatch, 'at range', range.from, '-', range.to);
+                    
+                    const templateNode = nodeType.create({ rawTemplate: fullMatch });
                     const { tr } = state;
-                    const fullMatch = match[0]; // e.g., "<<a>>"
-                    const node = this.type.create({ rawTemplate: fullMatch });
-                    tr.replaceWith(range.from, range.to, node);
+                    
+                    tr.replaceWith(range.from, range.to, templateNode);
                 },
             }),
         ];

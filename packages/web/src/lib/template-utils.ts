@@ -1,3 +1,4 @@
+import { executeWithVMHelpers } from '@superglue/shared';
 export interface TemplatePart {
   type: 'text' | 'template';
   value: string;
@@ -63,8 +64,7 @@ export function isSimpleVariableReference(expr: string): boolean {
 
 export function executeTemplateCode(code: string, data: any): any {
   try {
-    const fn = new Function('sourceData', `return (${code})(sourceData)`);
-    return fn(data);
+    return executeWithVMHelpers(code, data);
   } catch (error) {
     throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -172,5 +172,27 @@ export function formatValueForDisplay(value: any): string {
   } catch {
     return '[Object]';
   }
+}
+
+export function isCredentialVariable(expr: string, stepData: any): boolean {
+  if (!stepData || typeof stepData !== 'object') return false;
+  
+  if (!expr || typeof expr !== 'string') return false;
+  
+  const pattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
+  if (!pattern.test(expr)) return false;
+  
+  if (expr in stepData && stepData[expr] !== undefined) {
+    const value = stepData[expr];
+    return typeof value === 'string' && value.length > 0;
+  }
+  
+  return false;
+}
+
+export function maskCredentialValue(value: string): string {
+  if (!value || typeof value !== 'string') return '••••••••';
+  if (value.length <= 4) return '••••';
+  return '•'.repeat(Math.min(value.length, 20));
 }
 

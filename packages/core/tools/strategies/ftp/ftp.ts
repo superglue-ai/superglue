@@ -346,7 +346,7 @@ export async function callFTP({ endpoint, stepInputData, credentials, options }:
       operations = body;
     }
   } catch (error) {
-    throw new Error(`Invalid JSON in body: ${error.message}. Body must be a JSON object with an 'operation' field. Supported operations: ${SUPPORTED_OPERATIONS.join(', ')}`);
+    throw new Error(`Invalid JSON in body: ${error.message}. Body must be valid JSON. Supported operations: ${SUPPORTED_OPERATIONS.join(', ')}`);
   }
 
   // Validate operation
