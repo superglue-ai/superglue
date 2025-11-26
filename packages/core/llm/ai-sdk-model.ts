@@ -5,10 +5,34 @@ import { LLMToolDefinition, logToolExecution } from "./llm-tool-utils.js";
 import { logMessage } from "../utils/logs.js";
 import { LLM, LLMMessage, LLMObjectGeneratorInput, LLMObjectResponse, LLMResponse, LLMToolWithContext } from "./llm-base-model.js";
 
+function isProviderError(error: any): boolean {
+  const statusCode = error?.statusCode || error?.status;
+  if (statusCode >= 500 || statusCode === 429 || statusCode === 503) return true;
+  
+  const errorMsg = (error?.message || '').toLowerCase();
+  const providerErrorPatterns = [
+    'overloaded',
+    'service unavailable',
+    'timeout',
+    'econnrefused',
+    'etimedout',
+    'rate limit',
+    'temporarily unavailable',
+    'internal server error',
+    '503',
+    '500',
+    '502',
+    '504'
+  ];
+  
+  return providerErrorPatterns.some(pattern => errorMsg.includes(pattern));
+}
+
 export class AiSdkModel implements LLM {
   public contextLength: number;
   private model: any;
   private modelId: string;
+  private fallbackModel: any | null;
 
   constructor(modelId?: string) {
     this.modelId = modelId || 'claude-sonnet-4-5';
@@ -17,6 +41,13 @@ export class AiSdkModel implements LLM {
       defaultModel: this.modelId
     });
     this.contextLength = getModelContextLength(this.modelId);
+    
+    this.fallbackModel = process.env.LLM_FALLBACK_PROVIDER
+      ? initializeAIModel({
+          providerEnvVar: 'LLM_FALLBACK_PROVIDER',
+          defaultModel: this.modelId
+        })
+      : null;
   }
 
   private getDateMessage(): LLMMessage {
@@ -114,15 +145,46 @@ export class AiSdkModel implements LLM {
     return cleaned;
   }
 
+  private async generateTextWithFallback(params: {
+    model: any;
+    messages: LLMMessage[];
+    temperature?: number;
+    tools?: Record<string, Tool>;
+    toolChoice?: 'auto' | 'required' | 'none' | { type: 'tool'; toolName: string };
+  }): Promise<any> {
+    try {
+      return await generateText({
+        model: params.model,
+        messages: params.messages,
+        temperature: params.temperature,
+        tools: params.tools,
+        toolChoice: params.toolChoice,
+        maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
+      });
+    } catch (error) {
+      if (this.fallbackModel && isProviderError(error)) {
+        logMessage('warn', `LLM provider failed with message: (${error.message}), trying fallback provider`);
+        return await generateText({
+          model: this.fallbackModel,
+          messages: params.messages,
+          temperature: params.temperature,
+          tools: params.tools,
+          toolChoice: params.toolChoice,
+          maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
+        });
+      }
+      throw error;
+    }
+  }
+
   async generateText(messages: LLMMessage[], temperature: number = 0): Promise<LLMResponse> {
     const dateMessage = this.getDateMessage();
     messages = [dateMessage, ...messages] as LLMMessage[];
 
-    const result = await generateText({
+    const result = await this.generateTextWithFallback({
       model: this.model,
       messages: messages,
       temperature,
-      maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
     });
 
     const updatedMessages = [...messages, {
@@ -168,13 +230,12 @@ export class AiSdkModel implements LLM {
       let finalResult: any = null;
       while (finalResult === null) {
 
-        const result = await generateText({
+        const result = await this.generateTextWithFallback({
           model: this.model,
           messages: conversationMessages,
           tools: availableTools,
           toolChoice: input.toolChoice || 'required',
           temperature: temperatureToUse,
-          maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
         });
 
         if(result.finishReason === 'error' || result.finishReason === 'content-filter' || result.finishReason === 'other') {
