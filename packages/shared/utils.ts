@@ -130,7 +130,7 @@ function enhanceSchemaWithData(value: any, schema: any): any {
     return schema;
 }
 
-export function flattenAndNamespaceWorkflowCredentials(
+export function flattenAndNamespaceCredentials(
     integrations: Integration[]
 ): Record<string, string> {
     return integrations.reduce((acc, sys) => {

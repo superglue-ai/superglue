@@ -9,6 +9,7 @@ import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
 import { isSelfHealingEnabled, maskCredentials, transformData } from "../utils/helpers.js";
+import { flattenAndNamespaceCredentials } from "@superglue/shared/utils";
 import { executeAndEvaluateFinalTransform, generateWorkingTransform } from "./tool-transform.js";
 import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
 import { generateStepConfig } from "./tool-step-builder.js";
@@ -166,7 +167,14 @@ export class ToolExecutor implements Tool {
         let messages: LLMMessage[] = [];
         let currentConfig = step.apiConfig;
         let iterationResult: any = null;
-        let cachedIntegration: Integration | undefined;
+        const currentIntegration = await integrationManager?.getIntegration();
+        
+        if (currentIntegration) {
+          credentials = {
+            ...credentials,
+            ...flattenAndNamespaceCredentials([currentIntegration])
+          } as Record<string, string>;
+        }
 
         while (retryCount < maxRetries) {
           try {
@@ -174,20 +182,19 @@ export class ToolExecutor implements Tool {
               logMessage('info', `Self healing step config (retry ${retryCount})`, this.metadata);
 
               if (messages.length === 0) {
-                cachedIntegration = await integrationManager.getIntegration();
                 messages = await this.initializeSelfHealingContext(
                   integrationManager,
                   currentConfig,
                   loopPayload,
                   credentials,
-                  cachedIntegration
+                  currentIntegration
                 );
               }
 
               const generateResult = await generateStepConfig({
                 retryCount,
                 messages,
-                integration: cachedIntegration
+                integration: currentIntegration
               });
               
               if (!generateResult.success) {
