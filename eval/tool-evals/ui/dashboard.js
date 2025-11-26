@@ -219,9 +219,9 @@ function renderMetrics(data) {
     
     // Display with deltas - showing average as primary, "at least one" as secondary
     displaySuccessMetricWithAverage('oneShotSuccessRate', metrics.oneShotAverageSuccessRate, metrics.oneShotRate, 
-        benchmarkMetrics?.oneShotRate, `${metrics.oneShotSuccessfulTools}/${metrics.totalTools}`, true);
+        benchmarkMetrics?.oneShotAverageSuccessRate, `${metrics.oneShotSuccessfulTools}/${metrics.totalTools}`, true);
     displaySuccessMetricWithAverage('selfHealingSuccessRate', metrics.selfHealingAverageSuccessRate, metrics.selfHealingRate,
-        benchmarkMetrics?.selfHealingRate, `${metrics.selfHealingSuccessfulTools}/${metrics.totalTools}`, true);
+        benchmarkMetrics?.selfHealingAverageSuccessRate, `${metrics.selfHealingSuccessfulTools}/${metrics.totalTools}`, true);
     displayMetricWithDelta('avgBuildTime', metrics.avgBuild, benchmarkMetrics?.avgBuild, 's', null, false, true);
     displayMetricWithDelta('avgExecOneShot', metrics.avgOneShotExec, benchmarkMetrics?.avgOneShotExec, 's', null, false, true);
     displayMetricWithDelta('avgExecSelfHealing', metrics.avgSelfHealingExec, benchmarkMetrics?.avgSelfHealingExec, 's', null, false, true);
@@ -244,13 +244,15 @@ function displaySuccessMetricWithAverage(elementId, averageRate, atLeastOneRate,
         <div style="font-size: 0.65em; color: #333; margin-top: 2px; font-weight: normal;">At least one: ${atLeastOneDisplay}%${suffixText}</div>
     `;
     
-    if (benchmark !== null && benchmark !== undefined && atLeastOneRate !== null) {
-        const absoluteDiff = atLeastOneRate - benchmark;
-        const percentChange = ((atLeastOneRate - benchmark) / benchmark) * 100;
+    if (benchmark !== null && benchmark !== undefined && averageRate !== null) {
+        const benchmarkPercent = benchmark * 100;
+        const averagePercent = averageRate * 100;
+        const absoluteDiff = averagePercent - benchmarkPercent;
+        const percentChange = ((averagePercent - benchmarkPercent) / benchmarkPercent) * 100;
         
         const diffSign = absoluteDiff > 0 ? '+' : '';
         const deltaClass = getDeltaClass(absoluteDiff, higherIsBetter, false);
-        const benchmarkDisplay = benchmark.toFixed(1);
+        const benchmarkDisplay = benchmarkPercent.toFixed(1);
         
         const deltaText = `${diffSign}${absoluteDiff.toFixed(1)} points vs ${benchmarkDisplay}% (${diffSign}${percentChange.toFixed(1)}% change)`;
         

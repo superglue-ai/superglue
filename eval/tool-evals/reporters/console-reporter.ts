@@ -49,15 +49,15 @@ export class ConsoleReporter {
     const oneShotSuccessCount = metrics.toolMetrics.filter(t => t.hadOneShotSuccess).length;
     const toolCount = metrics.toolCount;
 
-    if (oneShotAvgRate !== null) {
-      console.log(`One-Shot Avg Success: ${oneShotAvgRate.toFixed(1)}%`);
+    if (oneShotAvgRate !== null || oneShotAtLeastOneRate !== null) {
+      console.log(`One-Shot Avg Success: ${oneShotAvgRate !== null ? oneShotAvgRate.toFixed(1) + '%' : 'N/A'}`);
       if (oneShotAtLeastOneRate !== null) {
         console.log(`  At least one:       ${oneShotAtLeastOneRate.toFixed(1)}% (${oneShotSuccessCount}/${toolCount})`);
       }
     }
     
-    if (selfHealingAvgRate !== null) {
-      console.log(`Self-Healing Avg:     ${selfHealingAvgRate.toFixed(1)}%`);
+    if (selfHealingAvgRate !== null || selfHealingAtLeastOneRate !== null) {
+      console.log(`Self-Healing Avg:     ${selfHealingAvgRate !== null ? selfHealingAvgRate.toFixed(1) + '%' : 'N/A'}`);
       if (selfHealingAtLeastOneRate !== null) {
         console.log(`  At least one:       ${selfHealingAtLeastOneRate.toFixed(1)}% (${selfHealingSuccessCount}/${toolCount})`);
       }
