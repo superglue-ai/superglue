@@ -3,7 +3,7 @@ import { Integration } from "@superglue/client";
 import { DataStore } from "../../../packages/core/datastore/types.js";
 import { DocumentationFetcher } from "../../../packages/core/documentation/index.js";
 import { logMessage } from "../../../packages/core/utils/logs.js";
-import { replaceVariables } from "../../../packages/core/utils/tools.js";
+import { replaceVariables } from "../../../packages/core/utils/helpers.js";
 import type { AgentEvalConfig, IntegrationConfig } from "../types.js";
 
 export class IntegrationSetupService {

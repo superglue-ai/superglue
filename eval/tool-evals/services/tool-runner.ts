@@ -18,12 +18,27 @@ export class ToolRunnerService {
         const queue = settings.maxConcurrentWorkers ? new PromiseQueue(settings.maxConcurrentWorkers) : null;
         const timeoutMs = settings.toolAttemptTimeoutMs ?? 300000;
 
-        const runAttempt = (fn: () => Promise<ToolAttempt>): Promise<ToolAttempt> => {
-            const wrappedFn = async () => {
-                const timeout = new Promise<never>((_, reject) => 
-                    setTimeout(() => reject(new Error(`Tool attempt timed out after ${timeoutMs / 1000}s`)), timeoutMs)
-                );
-                return Promise.race([fn(), timeout]);
+        const runAttempt = (fn: () => Promise<ToolAttempt>, toolId: string): Promise<ToolAttempt> => {
+            const wrappedFn = async (): Promise<ToolAttempt> => {
+                try {
+                    const timeout = new Promise<never>((_, reject) => 
+                        setTimeout(() => reject(new Error(`Tool attempt timed out after ${timeoutMs / 1000}s`)), timeoutMs)
+                    );
+                    return await Promise.race([fn(), timeout]);
+                } catch (error) {
+                    return {
+                        toolConfig: { id: toolId } as any,
+                        selfHealingEnabled: false,
+                        buildTime: null,
+                        buildSuccess: false,
+                        executionTime: null,
+                        executionSuccess: false,
+                        status: 'EXECUTION_FAILED' as any,
+                        executionError: error instanceof Error ? error.message : String(error),
+                        failureReason: 'EXECUTION' as any,
+                        createdAt: new Date(),
+                    };
+                }
             };
             return queue ? queue.enqueue(wrappedFn) : wrappedFn();
         };
@@ -38,7 +53,7 @@ export class ToolRunnerService {
                 const toolIntegrations = integrations.filter(i => tool.integrationIds.includes(i.id));
                 for (let i = 0; i < settings.attemptsEachMode; i++) {
                     oneShotPromises.push(
-                        runAttempt(() => toolAttemptService.runToolAttempt(tool, toolIntegrations, false))
+                        runAttempt(() => toolAttemptService.runToolAttempt(tool, toolIntegrations, false), tool.id)
                     );
                 }
             }
@@ -65,7 +80,7 @@ export class ToolRunnerService {
                     const toolIntegrations = integrations.filter(i => tool.integrationIds.includes(i.id));
                     for (let i = 0; i < settings.attemptsEachMode; i++) {
                         selfHealingPromises.push(
-                            runAttempt(() => toolAttemptService.runToolAttempt(tool, toolIntegrations, true))
+                            runAttempt(() => toolAttemptService.runToolAttempt(tool, toolIntegrations, true), tool.id)
                         );
                     }
                 }
@@ -81,7 +96,7 @@ export class ToolRunnerService {
                 const toolIntegrations = integrations.filter(i => tool.integrationIds.includes(i.id));
                 for (let i = 0; i < settings.attemptsEachMode; i++) {
                     selfHealingPromises.push(
-                        runAttempt(() => toolAttemptService.runToolAttempt(tool, toolIntegrations, true))
+                        runAttempt(() => toolAttemptService.runToolAttempt(tool, toolIntegrations, true), tool.id)
                     );
                 }
             }

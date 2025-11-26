@@ -1,9 +1,9 @@
 import { ApiConfig, HttpMethod, Workflow } from '@superglue/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import * as logs from '../../utils/logs.js';
-import { ToolFinder } from '../tool-finder.js';
+import * as logs from '../utils/logs.js';
+import { ToolFinder } from './tool-finder.js';
 
-vi.mock('../../utils/logs.js', () => ({
+vi.mock('../utils/logs.js', () => ({
   logMessage: vi.fn(),
 }));
 

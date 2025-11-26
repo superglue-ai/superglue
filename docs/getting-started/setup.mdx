@@ -45,6 +45,7 @@ Deploy on your infrastructure for complete control and customizability.
 ```env
 AUTH_TOKEN=your-secret-token
 LLM_PROVIDER=OPENAI
+LLM_FALLBACK_PROVIDER=ANTHROPIC
 OPENAI_API_KEY=sk-proj-xxxxx
 DATASTORE_TYPE=postgres
 ```
@@ -103,6 +104,7 @@ For production deployments, add PostgreSQL and enable credential encryption:
 ```env
 AUTH_TOKEN=your-secret-token
 LLM_PROVIDER=OPENAI
+LLM_FALLBACK_PROVIDER=ANTHROPIC
 OPENAI_API_KEY=sk-proj-xxxxx
 
 # PostgreSQL
@@ -141,6 +143,7 @@ docker run -d \
 | `AUTH_TOKEN`             | Yes       | Secret for API authentication                                  |
 | `DATASTORE_TYPE`         | Yes       | `memory` or `postgres` (`postgres` requires additional config) |
 | `LLM_PROVIDER`           | Yes       | `OPENAI`, `ANTHROPIC`, or `GEMINI` (default: `OPENAI`)         |
+| `LLM_FALLBACK_PROVIDER`  | No        | Optional fallback provider (`OPENAI`, `ANTHROPIC`, `GEMINI`)   |
 | `OPENAI_API_KEY`         | If active | OpenAI API key                                                 |
 | `ANTHROPIC_API_KEY`      | If active | Anthropic API key                                              |
 | `GEMINI_API_KEY`         | If active | Gemini API key                                                 |
