@@ -27,7 +27,7 @@ export function templateStringToTiptap(value: string): JSONContent {
         }
     }
 
-    const result = {
+    return {
         type: 'doc',
         content: [
             {
@@ -36,8 +36,6 @@ export function templateStringToTiptap(value: string): JSONContent {
             },
         ],
     };
-    console.log('[templateStringToTiptap] Final result:', JSON.stringify(result, null, 2));
-    return result;
 }
 
 /**
@@ -102,18 +100,16 @@ export function multilineTemplateStringToTiptap(value: string): JSONContent {
         });
     }
 
-    const result = {
+    return {
         type: 'doc',
         content: paragraphs,
     };
-    return result;
 }
 
 
 export function multilineTiptapToTemplateString(json: JSONContent): string {
     if (!json || !json.content) return '';
 
-    console.log('[multilineTiptapToTemplateString] Input JSON:', JSON.stringify(json, null, 2));
     const lines: string[] = [];
 
     for (const paragraph of json.content) {
@@ -132,7 +128,6 @@ export function multilineTiptapToTemplateString(json: JSONContent): string {
         }
     }
 
-    const result = lines.join('\n');
-    return result;
+    return lines.join('\n');
 }
 

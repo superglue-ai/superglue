@@ -19,10 +19,11 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { downloadJson } from '@/src/lib/download-utils';
-import { formatJavaScriptCode, isEmptyData, truncateForDisplay } from '@/src/lib/general-utils';
+import { formatJavaScriptCode, isEmptyData, truncateForDisplay, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
 import { assertValidArrowFunction } from '@superglue/shared';
-import { BugPlay, ChevronDown, Download, FileBraces, FileInput, FileOutput, Loader2, Play, Route, Trash2, Wand2, X } from 'lucide-react';
+import { BugPlay, ChevronDown, Download, FileBraces, FileInput, FileOutput, Loader2, Play, Route, Trash2, Wand2, Globe, X } from 'lucide-react';
+import { Badge } from '@/src/components/ui/badge';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { JavaScriptCodeEditor } from '../../editors/JavaScriptCodeEditor';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
@@ -228,14 +229,34 @@ export const SpotlightStepCard = React.memo(({
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50 overflow-hidden">
             <div className="p-3">
                 <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <Route className="h-4 w-4 text-muted-foreground" />
-                        <h3 className="text-lg font-semibold">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Route className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <h3 className="text-lg font-semibold truncate">
                             {step.id || `Step ${stepIndex + 1}`}
                         </h3>
                         {step.name && step.name !== step.id && (
-                            <span className="text-sm text-muted-foreground">({step.name})</span>
+                            <span className="text-sm text-muted-foreground truncate">({step.name})</span>
                         )}
+                        {integrations && step.integrationId && (() => {
+                            const linkedIntegration = integrations.find(integration => integration.id === step.integrationId);
+                            if (!linkedIntegration) return null;
+                            const iconName = getIntegrationIconName(linkedIntegration);
+                            const icon = iconName ? getSimpleIcon(iconName) : null;
+                            return (
+                                <Badge variant="outline" className="text-xs flex-shrink-0">
+                                    <div className="text-xs flex items-center gap-1">
+                                        {icon ? (
+                                            <svg width="10" height="10" viewBox="0 0 24 24" fill={`#${icon.hex}`} className="flex-shrink-0">
+                                                <path d={icon.path || ''} />
+                                            </svg>
+                                        ) : (
+                                            <Globe className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                                        )}
+                                        <span className="truncate">{linkedIntegration.id}</span>
+                                    </div>
+                                </Badge>
+                            );
+                        })()}
                     </div>
                     <div className="flex items-center gap-2">
                         {!readOnly && onExecuteStep && (
@@ -495,6 +516,7 @@ export const SpotlightStepCard = React.memo(({
                                     stepInput={evolvingPayload}
                                     loopItems={loopItems}
                                     onOpenFixStepDialog={onOpenFixStepDialog}
+                                    canExecute={canExecute}
                                 />
                             </div>
                         )}
