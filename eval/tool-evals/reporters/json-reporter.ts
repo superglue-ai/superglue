@@ -197,6 +197,10 @@ export class JsonReporter {
       return data.length > maxLength ? data.substring(0, maxLength) + `... [truncated]` : data;
     }
 
+    if (Array.isArray(data)) {
+      return data.map(item => this.truncateStringsRecursively(item, maxLength));
+    }
+
     if (typeof data === 'object' && data !== null) {
       return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, this.truncateStringsRecursively(value, maxLength)]));
     }
