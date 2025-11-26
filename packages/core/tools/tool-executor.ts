@@ -9,6 +9,7 @@ import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
 import { isSelfHealingEnabled, maskCredentials, transformData } from "../utils/helpers.js";
+import { flattenAndNamespaceCredentials } from "@superglue/shared/utils";
 import { executeAndEvaluateFinalTransform, generateWorkingTransform } from "./tool-transform.js";
 import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
 import { generateStepConfig } from "./tool-step-builder.js";
@@ -161,6 +162,15 @@ export class ToolExecutor implements Tool {
         }
 
         const loopPayload = { currentItem, ...stepInput };
+        const currentIntegration = await integrationManager?.getIntegration();
+        
+        if (currentIntegration) {
+          credentials = {
+            ...credentials,
+            ...flattenAndNamespaceCredentials([currentIntegration])
+          } as Record<string, string>;
+        }
+
         let retryCount = 0;
         let lastError: string | null = null;
         let messages: LLMMessage[] = [];
