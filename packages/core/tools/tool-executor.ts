@@ -187,7 +187,7 @@ export class ToolExecutor implements Tool {
                   currentConfig,
                   loopPayload,
                   credentials,
-                  currentIntegration ? currentIntegration : undefined
+                  currentIntegration
                 );
               }
 
