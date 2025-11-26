@@ -133,6 +133,6 @@ We use GitHub Actions for CI/CD, the configuration is in [`.github/workflows/nod
 
 ## License
 
-superglue uses a GNU License. See [LICENSE](https://github.com/superglue-ai/superglue/blob/main/LICENSE) and [docs](https://docs.superglue.cloud/introduction) for more details.
+superglue uses a Functional Source License. See [LICENSE](https://github.com/superglue-ai/superglue/blob/main/LICENSE) and [docs](https://docs.superglue.cloud/introduction) for more details.
 
 When contributing to the superglue codebase, you need to agree to the [Contributor License Agreement](https://cla-assistant.io/superglue-ai/superglue). You only need to do this once and the CLA bot will remind you if you haven't signed it yet.

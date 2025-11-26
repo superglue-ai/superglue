@@ -75,7 +75,7 @@ We love contributions! Before making contributions, we ask that all users read t
 
 ## License
 
-superglue is GPL licensed. The superglue client SDKs are MIT licensed. See [LICENSE](LICENSE) for details.
+superglue is FSL licensed. The superglue client SDKs are MIT licensed. See [LICENSE](LICENSE) for details.
 
 ## Next Steps
 
