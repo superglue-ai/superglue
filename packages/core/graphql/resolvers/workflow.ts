@@ -100,9 +100,10 @@ export const executeWorkflowResolver = async (
     const result = await executor.execute({ payload: args.payload, credentials: args.credentials, options: args.options });
 
     // Save run to datastore
+    const runId = crypto.randomUUID();
     context.datastore.createRun({
       result: {
-        id: crypto.randomUUID(),
+        id: runId,
         success: result.success,
         error: result.error || undefined,
         config: result.config || workflow,
@@ -115,9 +116,8 @@ export const executeWorkflowResolver = async (
 
     // Notify webhook if configured (fire-and-forget)
     if (args.options?.webhookUrl?.startsWith('http')) {
-      notifyWebhook(args.options.webhookUrl, context.traceId, result.success, result.data, result.error);
-    }
-    else if(args.options?.webhookUrl?.startsWith('tool:')) {
+      notifyWebhook(args.options.webhookUrl, runId, result.success, result.data, result.error);
+    } else if(args.options?.webhookUrl?.startsWith('tool:')) {
       const toolId = args.options.webhookUrl.split(':')[1];
       if(toolId == args.input.id) {
         logMessage('warn', "Tool cannot trigger itself", metadata);

@@ -20,9 +20,8 @@ export const callResolver = async (
   info: GraphQLResolveInfo
 ) => {
   const startedAt = new Date();
-  const callId = crypto.randomUUID();
   const metadata: Metadata = {
-    traceId: callId,
+    traceId: context.traceId,
     orgId: context.orgId
   };
   let endpoint: ApiConfig;
@@ -51,10 +50,10 @@ export const callResolver = async (
     }
     const workflowExecutor = new ToolExecutor({
       tool: {
-        id: callId,
+        id: context.traceId,
         steps: [
           {
-            id: callId,
+            id: context.traceId,
             apiConfig: endpoint
           }
         ]
@@ -76,7 +75,7 @@ export const callResolver = async (
         fromCache: readCache,
         input: { endpoint: endpoint as TransformConfig },
         data: data,
-        metadata: { runId: callId, orgId: context.orgId },
+        metadata,
         options: options
       }
     );
@@ -88,13 +87,15 @@ export const callResolver = async (
       context.datastore.upsertApiConfig({ id: input.id || endpoint.id, config, orgId: context.orgId });
     }
 
+    const runId = crypto.randomUUID();
+
     // Notify webhook if configured
     if (options?.webhookUrl) {
-      notifyWebhook(options.webhookUrl, callId, true, transformResult.data);
+      notifyWebhook(options.webhookUrl, runId, true, transformResult.data);
     }
 
     const result = {
-      id: callId,
+      id: runId,
       success: true,
       config: config,
       statusCode: callResult?.statusCode,
@@ -106,12 +107,13 @@ export const callResolver = async (
     return { ...result, data: transformResult.data };
   } catch (error) {
     const maskedError = maskCredentials(error.message, credentials);
+    const runId = crypto.randomUUID();
 
     if (options?.webhookUrl) {
-      notifyWebhook(options.webhookUrl, callId, false, undefined, error.message);
+      notifyWebhook(options.webhookUrl, runId, false, undefined, error.message);
     }
     const result = {
-      id: callId,
+      id: runId,
       success: false,
       error: maskedError,
       config: endpoint,
