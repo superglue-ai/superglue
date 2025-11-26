@@ -3,11 +3,20 @@ import { callAxios } from "../tools/strategies/http/http.js";
 import { logMessage } from "./logs.js";
 import { Metadata } from "pdf-parse";
 
+interface WebhookPayload {
+  runId: string;
+  traceId: string;
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
 // Handle webhook notification
-export async function notifyWebhook(webhookUrl: string, callId: string, success: boolean, data?: any, error?: string, metadata?: Metadata) {
+export async function notifyWebhook(webhookUrl: string, runId: string, traceId: string, success: boolean, data?: any, error?: string, metadata?: Metadata) {
   try {
-    const webhookPayload = {
-      callId,
+    const webhookPayload: WebhookPayload = {
+      runId,
+      traceId,
       success,
       ...(data && { data }),
       ...(error && { error })

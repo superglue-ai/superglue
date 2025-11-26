@@ -22,10 +22,11 @@ describe('notifyWebhook', () => {
 
   it('should call webhook with success data', async () => {
     const webhookUrl = 'https://example.com/webhook';
-    const callId = '123';
+    const runId = '123';
+    const traceId = '456';
     const data = { foo: 'bar' };
 
-    await notifyWebhook(webhookUrl, callId, true, data);
+    await notifyWebhook(webhookUrl, runId, traceId, true, data);
 
     expect(callAxiosSpy).toHaveBeenCalledWith(
       {
@@ -35,7 +36,8 @@ describe('notifyWebhook', () => {
           'Content-Type': 'application/json'
         },
         data: JSON.stringify({
-          callId,
+          runId,
+          traceId,
           success: true,
           data
         })
@@ -46,10 +48,11 @@ describe('notifyWebhook', () => {
 
   it('should call webhook with error data', async () => {
     const webhookUrl = 'https://example.com/webhook';
-    const callId = '123';
+    const runId = '123';
+    const traceId = '456';
     const error = 'Something went wrong';
 
-    await notifyWebhook(webhookUrl, callId, false, undefined, error);
+    await notifyWebhook(webhookUrl, runId, traceId, false, undefined, error);
 
     expect(callAxiosSpy).toHaveBeenCalledWith(
       {
@@ -59,7 +62,8 @@ describe('notifyWebhook', () => {
           'Content-Type': 'application/json'
         },
         data: JSON.stringify({
-          callId,
+          runId,
+          traceId,
           success: false,
           error
         })
@@ -70,14 +74,15 @@ describe('notifyWebhook', () => {
 
   it('should not throw if callAxios fails', async () => {
     const webhookUrl = 'https://example.com/webhook';
-    const callId = '123';
+    const runId = '123';
+    const traceId = '456';
 
     const logMessageSpy = vi.spyOn(logsModule, 'logMessage').mockImplementation(() => { });
 
     callAxiosSpy.mockRejectedValueOnce(new Error('Network error'));
 
     // Should not throw
-    await expect(notifyWebhook(webhookUrl, callId, true)).resolves.not.toThrow();
+    await expect(notifyWebhook(webhookUrl, runId, traceId, true)).resolves.not.toThrow();
 
     expect(logMessageSpy).toHaveBeenCalledWith('error', expect.stringContaining('Webhook notification failed'), undefined);
     logMessageSpy.mockRestore();
