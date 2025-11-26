@@ -167,10 +167,13 @@ export class ToolExecutor implements Tool {
         let messages: LLMMessage[] = [];
         let currentConfig = step.apiConfig;
         let iterationResult: any = null;
+        let stepCredentials = credentials;
+
+        await integrationManager?.refreshTokenIfNeeded();
         const currentIntegration = await integrationManager?.getIntegration();
         
         if (currentIntegration) {
-          credentials = {
+          stepCredentials = {
             ...credentials,
             ...flattenAndNamespaceCredentials([currentIntegration])
           } as Record<string, string>;
@@ -186,7 +189,7 @@ export class ToolExecutor implements Tool {
                   integrationManager,
                   currentConfig,
                   loopPayload,
-                  credentials,
+                  stepCredentials,
                   currentIntegration
                 );
               }
