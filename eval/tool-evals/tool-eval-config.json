@@ -1078,30 +1078,28 @@
       "expectedResultDescription": "Should successfully post message 'Hi, this is the superglue bot running some evals' to the evals channel. Expected response ok: true with a channel ID."
     },
     {
-      "id": "043-slack-list-non-sg-channels",
-      "name": "Slack List Non-SG Channels",
-      "description": "List all channels whose name doesn't start with sg-",
+      "id": "043-jira-workflow-anomaly-analysis",
+      "name": "JIRA Workflow Anomaly Analysis",
+      "description": "Complex test: Multi-dimensional analysis with JQL filtering and aggregation",
       "type": "retrieval",
-      "instruction": "List all public and private channels in the workspace whose name does not start with 'sg-'. Return a JSON object with this structure: { channel_count: number, channels: Array<{id: string, name: string, is_private: boolean}> }",
-      "integrationIds": [
-        "slack"
-      ],
+      "instruction": "Perform a comprehensive workflow analysis on the GTMS project: 1) Search for all issues using JQL 'project=GTMS'. 2) Calculate workload metrics: total issues, assigned vs unassigned count, issues by assignee with their status distribution. 3) Identify workflow anomalies: unassigned issues that are 'In Progress' (should typically have an assignee). 4) Calculate backlog metrics: count of 'To Do' issues, percentage of total. 5) Aggregate by issue type (Task vs Sub-task) and show distribution. Return JSON: { metrics: { total_issues: number, assigned_count: number, unassigned_count: number, backlog_count: number, backlog_percentage: number }, by_assignee: Array<{ assignee: string, issue_count: number, statuses: Array<{ status: string, count: number }> }>, anomalies: { unassigned_in_progress: Array<{ key: string, summary: string }>, count: number }, by_issue_type: Array<{ type: string, count: number }> }. Sort by_assignee by issue_count descending.",
+      "integrationIds": ["jira"],
       "payload": {},
-      "skipValidationFunction": true,
-      "expectedResultDescription": "Should return all Slack channels (public and private) whose names do NOT start with 'sg-'. Expected channels to exclude anything starting with 'sg-' prefix. Channel count should match the number of channels in the array."
+      "validationFunction": "validators/063-jira-workflow-anomaly-analysis.ts",
+      "expectedResultDescription": "Should perform complex multi-dimensional analysis on GTMS issues. Expected: 22 total issues, 3 assigned to Stefan Faistenauer, 19 unassigned. Anomalies: 3 unassigned 'In Progress' issues (GTMS-20, GTMS-3, GTMS-1). Backlog: 10 'To Do' issues (45.45%). Issue types: 15 Tasks, 7 Sub-tasks. Stefan's issues: In Progress (2 issues: GTMS-9, GTMS-7), Launched (1 issue: GTMS-4)."
     },
     {
       "id": "044-slack-get-last-20-messages",
       "name": "Slack Get Last 20 Messages",
-      "description": "Retrieve exactly 20 messages from all-superglue channel",
+      "description": "Retrieve exactly 20 messages from evals channel",
       "type": "retrieval",
-      "instruction": "Retrieve the last 20 messages from the all-superglue channel. Return a JSON object with this structure: { message_count: number, messages: Array<{type: string, ts: string, text: string}> }. The message_count must equal the number of messages retrieved.",
+      "instruction": "Retrieve the last 20 messages from the evals channel. Return a JSON object with this structure: { message_count: number, messages: Array<{type: string, ts: string, text: string}> }. The message_count must equal the number of messages retrieved.",
       "integrationIds": [
         "slack"
       ],
       "payload": {},
       "validationFunction": "validators/044-slack-get-last-20-messages.ts",
-      "expectedResultDescription": "Should retrieve exactly 20 most recent messages from the 'all-superglue' Slack channel. Expected message_count to be exactly 20."
+      "expectedResultDescription": "Should retrieve exactly 20 most recent messages from the 'evals' Slack channel. Expected message_count to be exactly 20."
     },
     {
       "id": "045-slack-get-all-messages",
@@ -1290,17 +1288,6 @@
       "payload": {},
       "validationFunction": "validators/062-jira-search-issues-by-status.ts",
       "expectedResultDescription": "Should search all GTMS project issues and aggregate by status. Expected 22 total issues with 4 statuses: 'To Do' (10), 'In Progress' (5), 'Ready for Launch' (4), 'Launched' (3). In Progress issues should include GTMS-20, GTMS-9, GTMS-7, GTMS-3, GTMS-1."
-    },
-    {
-      "id": "060-jira-workflow-anomaly-analysis",
-      "name": "JIRA Workflow Anomaly Analysis",
-      "description": "Complex test: Multi-dimensional analysis with JQL filtering and aggregation",
-      "type": "retrieval",
-      "instruction": "Perform a comprehensive workflow analysis on the GTMS project: 1) Search for all issues using JQL 'project=GTMS'. 2) Calculate workload metrics: total issues, assigned vs unassigned count, issues by assignee with their status distribution. 3) Identify workflow anomalies: unassigned issues that are 'In Progress' (should typically have an assignee). 4) Calculate backlog metrics: count of 'To Do' issues, percentage of total. 5) Aggregate by issue type (Task vs Sub-task) and show distribution. Return JSON: { metrics: { total_issues: number, assigned_count: number, unassigned_count: number, backlog_count: number, backlog_percentage: number }, by_assignee: Array<{ assignee: string, issue_count: number, statuses: Array<{ status: string, count: number }> }>, anomalies: { unassigned_in_progress: Array<{ key: string, summary: string }>, count: number }, by_issue_type: Array<{ type: string, count: number }> }. Sort by_assignee by issue_count descending.",
-      "integrationIds": ["jira"],
-      "payload": {},
-      "validationFunction": "validators/063-jira-workflow-anomaly-analysis.ts",
-      "expectedResultDescription": "Should perform complex multi-dimensional analysis on GTMS issues. Expected: 22 total issues, 3 assigned to Stefan Faistenauer, 19 unassigned. Anomalies: 3 unassigned 'In Progress' issues (GTMS-20, GTMS-3, GTMS-1). Backlog: 10 'To Do' issues (45.45%). Issue types: 15 Tasks, 7 Sub-tasks. Stefan's issues: In Progress (2 issues: GTMS-9, GTMS-7), Launched (1 issue: GTMS-4)."
     }
   ],
   "enabledTools": "all",
