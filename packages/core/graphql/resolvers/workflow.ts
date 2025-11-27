@@ -37,7 +37,7 @@ export const executeWorkflowResolver = async (
   args: ExecuteWorkflowArgs,
   context: Context,
   info: GraphQLResolveInfo,
-): Promise<WorkflowResult> => {
+): Promise<WorkflowResult & { data?: any }> => {
   let runId = crypto.randomUUID();
   let startedAt = new Date();
   let metadata: Metadata = { orgId: context.orgId, runId };
@@ -127,7 +127,7 @@ export const executeWorkflowResolver = async (
       executeWorkflowResolver(_, { input: { id: toolId }, payload: result.data, credentials: args.credentials, options: { ...args.options, webhookUrl: undefined } }, context, info);
     }
 
-    return result;
+    return result as WorkflowResult & { data?: any };
 
   } catch (error) {
     logMessage('error', "Workflow execution error: " + String(error), metadata || { orgId: context.orgId, runId });
@@ -143,7 +143,7 @@ export const executeWorkflowResolver = async (
     // Save run to datastore
     // do not trigger webhook on failure
     context.datastore.createRun({ result, orgId: context.orgId });
-    return { ...result, data: {}, stepResults: [] } as WorkflowResult;
+    return { ...result, data: undefined, stepResults: [] } as WorkflowResult & { data?: any };
   }
 };
 

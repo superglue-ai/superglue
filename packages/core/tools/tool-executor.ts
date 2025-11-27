@@ -34,6 +34,7 @@ export class ToolExecutor implements Tool {
   public metadata: Metadata;
   public instruction?: string;
   public inputSchema?: JSONSchema;
+  public integrationIds: string[];
   private integrations: Record<string, IntegrationManager>;
   private strategyRegistry: StepExecutionStrategyRegistry;
   
@@ -50,6 +51,8 @@ export class ToolExecutor implements Tool {
       acc[int.id] = int;
       return acc;
     }, {} as Record<string, IntegrationManager>);
+
+    this.integrationIds = tool.integrationIds;
 
     this.result = {
       id: crypto.randomUUID(),
@@ -68,7 +71,7 @@ export class ToolExecutor implements Tool {
   }
 
   
-  public async execute({ payload = {}, credentials = {}, options = {} }: { payload?: Record<string, any>, credentials?: Record<string, string>, options?: RequestOptions }): Promise<ToolResult> {
+  public async execute({ payload = {}, credentials = {}, options = {} }: { payload?: Record<string, any>, credentials?: Record<string, string>, options?: RequestOptions }): Promise<ToolResult & { data?: any }> {
     try {
       this.validate({ payload, credentials });
       logMessage("debug", `Executing tool ${this.id}`, this.metadata);
@@ -105,6 +108,7 @@ export class ToolExecutor implements Tool {
         this.result.data = finalTransformResult.transformedData || {};
         this.result.config = {
           id: this.id,
+          integrationIds: this.integrationIds,
           steps: this.steps,
           finalTransform: finalTransformResult.successfulTransformCode,
           inputSchema: this.inputSchema,
