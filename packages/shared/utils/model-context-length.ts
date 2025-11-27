@@ -21,6 +21,9 @@ export function getConfiguredModelContextLength(): number {
     case 'azure':
       modelId = process.env.AZURE_MODEL;
       break;
+    case 'bedrock':
+      modelId = process.env.BEDROCK_MODEL;
+      break;
   }
 
   return modelId ? getModelContextLength(modelId) : DEFAULT_CONTEXT_LENGTH;

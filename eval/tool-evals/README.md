@@ -18,7 +18,7 @@ Two test modes:
 
 From project root:
 ```bash
-npm run test:tool-eval
+npm run test:evals
 ```
 
 ## Required Setup
