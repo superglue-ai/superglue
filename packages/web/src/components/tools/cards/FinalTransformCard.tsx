@@ -10,7 +10,6 @@ import {
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
 import { downloadJson } from "@/src/lib/download-utils";
 import {
-  ensureSourceDataArrowFunction,
   isEmptyData,
 } from "@/src/lib/general-utils";
 import {
@@ -159,22 +158,16 @@ export const FinalTransformMiniStepCard = ({
       }
     }
 
-    function ensureValidTransform(code: string): string {
-      return ensureSourceDataArrowFunction(code);
-    }
-
     function handleExecuteTransform(): void {
-      const validTransform = ensureValidTransform(localTransform);
       if (onExecuteTransform) {
-        onExecuteTransform(localSchema, validTransform);
+        onExecuteTransform(localSchema, localTransform);
         setActiveTab("output");
       }
     }
 
     function handleFixTransform(): void {
-      const validTransform = ensureValidTransform(localTransform);
       if (onFixTransform) {
-        onFixTransform(localSchema, validTransform);
+        onFixTransform(localSchema, localTransform);
         setActiveTab("output");
       }
     }

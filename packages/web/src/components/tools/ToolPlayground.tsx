@@ -615,6 +615,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           throw new Error("Failed to save tool");
         }
         setToolId(savedTool.id);
+        setFinalTransform(savedTool.finalTransform);
+        setSteps(savedTool.steps);
       }
 
       setJustSaved(true);
@@ -789,8 +791,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         } as any
       };
 
-      // Update finalTransform with the self-healed version if it was modified
-      if (state.currentTool.finalTransform && effectiveSelfHealing) {
+      // Update finalTransform if it was wrapped or self-healed by backend
+      if (state.currentTool.finalTransform && state.currentTool.finalTransform !== finalTransform) {
         setFinalTransform(state.currentTool.finalTransform);
       }
       setCompletedSteps(state.completedSteps);
@@ -912,18 +914,16 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setIsExecutingStep(idx);
       const client = createSuperglueClient(config.superglueEndpoint);
       
-      // Store original loop selector to restore it after execution
+      // If limit is specified, wrap loopSelector temporarily for this execution only
       const originalLoopSelector = steps[idx]?.loopSelector;
-      
-      // Wrap loop selector if limit is specified (ephemeral, not saved to state)
-      const executionSteps = limitIterations && originalLoopSelector
-        ? steps.map((s, i) => i === idx ? { ...s, loopSelector: wrapLoopSelectorWithLimit(s.loopSelector, limitIterations) } : s)
-        : steps;
+      const stepToExecute = limitIterations && originalLoopSelector
+        ? { ...steps[idx], loopSelector: wrapLoopSelectorWithLimit(originalLoopSelector, limitIterations) }
+        : steps[idx];
 
       const single = await executeSingleStep(
         {
           client,
-          step: steps[idx],
+          step: stepToExecute,
           toolId,
           payload: computedPayload,
           previousResults: stepResultsMap,
@@ -939,11 +939,14 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         setSteps(prevSteps =>
           prevSteps.map((step, i) => {
             if (i !== idx) return step;
-            // If we used a limit, restore the original loop selector
             const updated = single.updatedStep;
-            return limitIterations && originalLoopSelector
-              ? { ...updated, loopSelector: originalLoopSelector }
-              : updated;
+            // If we used limitIterations, the backend wrapped our temporary limit wrapper
+            // So restore the original loopSelector (backend will wrap it properly on next real execution)
+            if (limitIterations && originalLoopSelector) {
+              return { ...updated, loopSelector: originalLoopSelector };
+            }
+            // Otherwise use the backend's wrapped version (it ensured arrow function format)
+            return updated;
           })
         );
       }
@@ -1088,13 +1091,15 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         setFinalPreviewResult(result.data);
         setNavigateToFinalSignal(Date.now());
 
-        // Update transform if it was self-healed
-        if (result.updatedTransform && selfHealing) {
+        // Update transform if it was wrapped or self-healed by backend
+        if (result.updatedTransform && result.updatedTransform !== (transformStr || finalTransform)) {
           setFinalTransform(result.updatedTransform);
-          toast({
-            title: "Transform code updated",
-            description: "auto-repair has modified the transform code to fix issues.",
-          });
+          if (selfHealing) {
+            toast({
+              title: "Transform code updated",
+              description: "auto-repair has modified the transform code to fix issues.",
+            });
+          }
         }
       } else {
         setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
