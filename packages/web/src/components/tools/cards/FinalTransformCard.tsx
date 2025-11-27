@@ -10,19 +10,17 @@ import {
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
 import { downloadJson } from "@/src/lib/download-utils";
 import {
-  ensureSourceDataArrowFunction,
   isEmptyData,
 } from "@/src/lib/general-utils";
 import {
   Code2,
   Download,
-  FileBraces,
   FileBracesCorner,
   FileInput,
   FilePlay,
   Loader2,
   Play,
-  Wand2,
+  Wand2
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { JavaScriptCodeEditor } from "../../editors/JavaScriptCodeEditor";
@@ -147,6 +145,7 @@ export const FinalTransformMiniStepCard = ({
 
     function handleTransformChange(value: string): void {
       setLocalTransform(value);
+      if (onTransformChange) onTransformChange(value);
     }
 
     function handleSchemaChange(value: string | null): void {
@@ -159,28 +158,16 @@ export const FinalTransformMiniStepCard = ({
       }
     }
 
-    function ensureValidTransform(code: string): string {
-      return ensureSourceDataArrowFunction(code);
-    }
-
     function handleExecuteTransform(): void {
-      const validTransform = ensureValidTransform(localTransform);
-      if (onTransformChange) onTransformChange(localTransform);
-      if (onResponseSchemaChange) onResponseSchemaChange(localSchema);
       if (onExecuteTransform) {
-        onExecuteTransform(localSchema, validTransform);
-        // Auto-navigate to output tab when transform starts
+        onExecuteTransform(localSchema, localTransform);
         setActiveTab("output");
       }
     }
 
     function handleFixTransform(): void {
-      const validTransform = ensureValidTransform(localTransform);
-      if (onTransformChange) onTransformChange(localTransform);
-      if (onResponseSchemaChange) onResponseSchemaChange(localSchema);
       if (onFixTransform) {
-        onFixTransform(localSchema, validTransform);
-        // Auto-navigate to output tab when transform starts
+        onFixTransform(localSchema, localTransform);
         setActiveTab("output");
       }
     }

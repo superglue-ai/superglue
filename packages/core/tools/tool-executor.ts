@@ -1,23 +1,23 @@
 import { ApiConfig, ExecutionStep, Integration, RequestOptions, Workflow as Tool, WorkflowResult as ToolResult, WorkflowStepResult as ToolStepResult } from "@superglue/client";
 import { Metadata } from "@superglue/shared";
+import { flattenAndNamespaceCredentials } from "@superglue/shared/utils";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { getEvaluateStepResponseContext, getGenerateStepConfigContext, getLoopSelectorContext as getDataSelectorContext } from "../context/context-builders.js";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { getLoopSelectorContext as getDataSelectorContext, getEvaluateStepResponseContext, getGenerateStepConfigContext } from "../context/context-builders.js";
 import { EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT, GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
+import { isSelfHealingEnabled, maskCredentials, transformData } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
-import { isSelfHealingEnabled, maskCredentials, transformData } from "../utils/helpers.js";
-import { flattenAndNamespaceCredentials } from "@superglue/shared/utils";
-import { executeAndEvaluateFinalTransform, generateWorkingTransform } from "./tool-transform.js";
-import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
-import { generateStepConfig } from "./tool-step-builder.js";
-import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
-import { StepExecutionStrategyRegistry } from "./strategies/strategy.js";
-import { PostgresStepExecutionStrategy } from "./strategies/postgres/postgres.js";
 import { FTPStepExecutionStrategy } from "./strategies/ftp/ftp.js";
+import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
+import { PostgresStepExecutionStrategy } from "./strategies/postgres/postgres.js";
+import { StepExecutionStrategyRegistry } from "./strategies/strategy.js";
+import { generateStepConfig } from "./tool-step-builder.js";
+import { executeAndEvaluateFinalTransform, generateWorkingTransform } from "./tool-transform.js";
 
 export interface ToolExecutorOptions {
   tool: Tool;
@@ -105,7 +105,17 @@ export class ToolExecutor implements Tool {
         this.result.config = {
           id: this.id,
           steps: this.steps,
-          finalTransform: finalTransformResult.successfulTransformCode,
+          finalTransform: finalTransformResult.finalTransform,
+          inputSchema: this.inputSchema,
+          responseSchema: this.responseSchema,
+          instruction: this.instruction
+        } as Tool;
+      } else {
+        // Always set config to propagate wrapped loopSelectors back to frontend
+        this.result.config = {
+          id: this.id,
+          steps: this.steps,
+          finalTransform: this.finalTransform,
           inputSchema: this.inputSchema,
           responseSchema: this.responseSchema,
           instruction: this.instruction
@@ -130,8 +140,8 @@ export class ToolExecutor implements Tool {
     options: RequestOptions
   }): Promise<ToolStepResult> {
     try {
-      const { dataSelectorOutput, successfulDataSelector } = await this.getDataSelectorOutput({ step, stepInput, options });
-      step.loopSelector = successfulDataSelector;
+      const { dataSelectorOutput, dataSelector } = await this.getDataSelectorOutput({ step, stepInput, options });
+      step.loopSelector = dataSelector;
 
       const isLoopStep = Array.isArray(dataSelectorOutput);
       let itemsToExecuteStepOn = isLoopStep 
@@ -301,7 +311,7 @@ export class ToolExecutor implements Tool {
     step: ExecutionStep, 
     stepInput: Record<string, any>, 
     options: RequestOptions 
-  }): Promise<{ dataSelectorOutput: any, successfulDataSelector: string }> {
+  }): Promise<{ dataSelectorOutput: any, dataSelector: string }> {
     
     let dataSelectorTransformResult = await transformData(stepInput, step.loopSelector);
 
@@ -331,13 +341,14 @@ export class ToolExecutor implements Tool {
       step.loopSelector = transformResult.transformCode;
       dataSelectorTransformResult = {
         success: true,
+        code: transformResult.transformCode,
         data: transformResult.data
       }
     }
 
     const dataSelectorOutput = dataSelectorTransformResult.data || {};
     
-    return { dataSelectorOutput, successfulDataSelector: step.loopSelector };
+    return { dataSelectorOutput, dataSelector: step.loopSelector };
   }
   
 
