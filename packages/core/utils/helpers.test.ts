@@ -228,11 +228,11 @@ describe('tools utility functions', () => {
       expect(result.data).toEqual(testData);
     });
 
-    it('should return null for empty code string (no transformation)', async () => {
+    it('should return {} for empty code string (no transformation)', async () => {
       const testData = { test: 'value' };
       const result = await transformData(testData, '');
       expect(result.success).toBe(true);
-      expect(result.data).toBe(null);
+      expect(result.data).toStrictEqual({});
     });
 
     it('should return empty object when empty code is wrapped with ensureSourceDataArrowFunction', async () => {
