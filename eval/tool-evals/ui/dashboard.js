@@ -140,6 +140,12 @@ function calculateMetrics(results) {
     }).length;
     const selfHealingRate = totalTools > 0 ? (selfHealingSuccessfulTools / totalTools * 100) : null;
     
+    const oneShotSuccessfulAttempts = oneShotAttempts.filter(a => a.overallValidationPassed === true).length;
+    const oneShotTotalAttempts = oneShotAttempts.length;
+    
+    const selfHealingSuccessfulAttempts = selfHealingAttempts.filter(a => a.overallValidationPassed === true).length;
+    const selfHealingTotalAttempts = selfHealingAttempts.length;
+    
     const buildTimes = results.filter(r => r.buildTime !== null).map(r => r.buildTime);
     const avgBuild = buildTimes.length > 0 ? (buildTimes.reduce((a, b) => a + b, 0) / buildTimes.length) : null;
     
@@ -153,9 +159,13 @@ function calculateMetrics(results) {
         oneShotRate,
         oneShotAverageSuccessRate,
         oneShotSuccessfulTools,
+        oneShotSuccessfulAttempts,
+        oneShotTotalAttempts,
         selfHealingRate,
         selfHealingAverageSuccessRate,
         selfHealingSuccessfulTools,
+        selfHealingSuccessfulAttempts,
+        selfHealingTotalAttempts,
         totalTools,
         avgBuild,
         avgOneShotExec,
@@ -225,15 +235,17 @@ function renderMetrics(data) {
     
     // Display with deltas - showing average as primary, "at least one" as secondary
     displaySuccessMetricWithAverage('oneShotSuccessRate', metrics.oneShotAverageSuccessRate, metrics.oneShotRate, 
-        benchmarkMetrics?.oneShotAverageSuccessRate, `${metrics.oneShotSuccessfulTools}/${metrics.totalTools}`, true);
+        benchmarkMetrics?.oneShotAverageSuccessRate, `${metrics.oneShotSuccessfulTools}/${metrics.totalTools}`, 
+        `${metrics.oneShotSuccessfulAttempts}/${metrics.oneShotTotalAttempts}`, true);
     displaySuccessMetricWithAverage('selfHealingSuccessRate', metrics.selfHealingAverageSuccessRate, metrics.selfHealingRate,
-        benchmarkMetrics?.selfHealingAverageSuccessRate, `${metrics.selfHealingSuccessfulTools}/${metrics.totalTools}`, true);
+        benchmarkMetrics?.selfHealingAverageSuccessRate, `${metrics.selfHealingSuccessfulTools}/${metrics.totalTools}`, 
+        `${metrics.selfHealingSuccessfulAttempts}/${metrics.selfHealingTotalAttempts}`, true);
     displayMetricWithDelta('avgBuildTime', metrics.avgBuild, benchmarkMetrics?.avgBuild, 's', null, false, true);
     displayMetricWithDelta('avgExecOneShot', metrics.avgOneShotExec, benchmarkMetrics?.avgOneShotExec, 's', null, false, true);
     displayMetricWithDelta('avgExecSelfHealing', metrics.avgSelfHealingExec, benchmarkMetrics?.avgSelfHealingExec, 's', null, false, true);
 }
 
-function displaySuccessMetricWithAverage(elementId, averageRate, atLeastOneRate, benchmark, suffix, higherIsBetter) {
+function displaySuccessMetricWithAverage(elementId, averageRate, atLeastOneRate, benchmark, suffix, attemptsCount, higherIsBetter) {
     const element = document.getElementById(elementId);
     
     if (averageRate === null && atLeastOneRate === null) {
@@ -244,9 +256,10 @@ function displaySuccessMetricWithAverage(elementId, averageRate, atLeastOneRate,
     const avgDisplay = averageRate !== null ? (averageRate * 100).toFixed(1) : 'N/A';
     const atLeastOneDisplay = atLeastOneRate !== null ? atLeastOneRate.toFixed(1) : 'N/A';
     const suffixText = suffix ? ` (${suffix})` : '';
+    const attemptsText = attemptsCount ? ` <span style="font-weight: normal;">(${attemptsCount})</span>` : '';
     
     let html = `
-        <div style="font-weight: bold;">${avgDisplay}%</div>
+        <div style="font-weight: bold;">${avgDisplay}%${attemptsText}</div>
         <div style="font-size: 0.65em; color: #333; margin-top: 2px; font-weight: normal;">At least one: ${atLeastOneDisplay}%${suffixText}</div>
     `;
     
