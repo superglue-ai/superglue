@@ -15,12 +15,12 @@ export interface GenerateStepConfigResult {
     success: boolean;
     error?: string;
     config?: Partial<ApiConfig>;
-    loopSelector?: string;
+    dataSelector?: string;
     messages?: LLMMessage[];
 }
 
 const stepConfigSchema = z.object({
-    loopSelector: z.string().describe("JavaScript function that returns OBJECT for direct execution or ARRAY for loop execution. If returns OBJECT (including {}), step executes once with object as currentItem. If returns ARRAY, step executes once per array item. Examples: (sourceData) => ({ userId: sourceData.userId }) OR (sourceData) => sourceData.getContacts.data.filter(c => c.active)"),
+    dataSelector: z.string().describe("JavaScript function that returns OBJECT for direct execution or ARRAY for loop execution. If returns OBJECT (including {}), step executes once with object as currentItem. If returns ARRAY, step executes once per array item. Examples: (sourceData) => ({ userId: sourceData.userId }) OR (sourceData) => sourceData.getContacts.data.filter(c => c.active)"),
     apiConfig: z.object({
       urlHost: z.string().describe("The base URL host (e.g., https://api.example.com). Must not be empty."),
       urlPath: z.string().describe("The API endpoint path (e.g., /v1/users)."),
@@ -72,7 +72,7 @@ export async function generateStepConfig({ retryCount, messages, integration }: 
     }
 
     const generatedConfig = generateStepConfigResult.response.apiConfig;
-    const generatedLoopSelector = generateStepConfigResult.response.loopSelector;
+    const generatedDataSelector = generateStepConfigResult.response.dataSelector;
     
     if (!generatedConfig) {
         return {
@@ -99,7 +99,7 @@ export async function generateStepConfig({ retryCount, messages, integration }: 
     return {
         success: true,
         config: config,
-        loopSelector: generatedLoopSelector,
+        dataSelector: generatedDataSelector,
         messages: generateStepConfigResult.messages
     };
 };

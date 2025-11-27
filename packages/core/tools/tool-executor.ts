@@ -150,7 +150,7 @@ export class ToolExecutor implements Tool {
       let lastError: string | null = null;
       let messages: LLMMessage[] = [];
       let currentConfig = step.apiConfig;
-      let currentLoopSelector = step.loopSelector;
+      let currentDataSelector = step.loopSelector;
       let stepCredentials = credentials;
       let isLoopStep = false;
       let stepResults: any[] = [];
@@ -180,10 +180,10 @@ export class ToolExecutor implements Tool {
       // loop through retries to execute the step
       while (retryCount < maxRetries) {
         try {
-          // 1. evaluate data selector (use currentLoopSelector which may have been updated by self-healing)
-          const dataSelectorTransformResult = await transformData(stepInput, currentLoopSelector);
+          // 1. evaluate data selector (use currentDataSelector which may have been updated by self-healing)
+          const dataSelectorTransformResult = await transformData(stepInput, currentDataSelector);
           if (!dataSelectorTransformResult.success) {
-            throw new Error(`Loop selector for '${step.id}' failed. ${dataSelectorTransformResult.error}\nCode: ${currentLoopSelector}\nPayload: ${JSON.stringify(stepInput).slice(0, 1000)}...`);
+            throw new Error(`Loop selector for '${step.id}' failed. ${dataSelectorTransformResult.error}\nCode: ${currentDataSelector}\nPayload: ${JSON.stringify(stepInput).slice(0, 1000)}...`);
           }
           const dataSelectorOutput = dataSelectorTransformResult.data || {};
 
@@ -204,7 +204,6 @@ export class ToolExecutor implements Tool {
             }
     
             const loopPayload = { currentItem, ...stepInput };
-            let iterationResult: any = null;
 
             // Refresh integration token if needed (important for long-running loops)
             await integrationManager?.refreshTokenIfNeeded();
@@ -277,7 +276,7 @@ export class ToolExecutor implements Tool {
               messages = await this.initializeSelfHealingContext(
                 integrationManager,
                 currentConfig,
-                currentLoopSelector,
+                currentDataSelector,
                 loopPayload,
                 stepCredentials,
                 currentIntegration
@@ -295,7 +294,7 @@ export class ToolExecutor implements Tool {
             }
 
             currentConfig = { ...currentConfig, ...generateStepConfigResult.config } as ApiConfig;
-            currentLoopSelector = generateStepConfigResult.loopSelector;
+            currentDataSelector = generateStepConfigResult.dataSelector;
           }
         }
       }
@@ -314,7 +313,7 @@ export class ToolExecutor implements Tool {
       const updatedStep = {
         ...step,
         apiConfig: currentConfig,
-        loopSelector: currentLoopSelector
+        loopSelector: currentDataSelector
       } as ExecutionStep;
 
       return {

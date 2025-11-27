@@ -136,7 +136,7 @@ export const generateStepConfigResolver = async (
       ...generateStepConfigResult.config,
     } as ApiConfig;
 
-    return {config: mergedConfig, dataSelector: generateStepConfigResult.loopSelector};
+    return {config: mergedConfig, dataSelector: generateStepConfigResult.dataSelector};
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
       integrationId

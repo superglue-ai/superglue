@@ -473,9 +473,9 @@ BATCH OPERATIONS:
 </FTP_SFTP>
 `;
 
-export const GENERATE_STEP_CONFIG_SYSTEM_PROMPT = `You are an API configuration and execution agent. Your task is to successfully execute an API call by generating both an API configuration AND a loopSelector based on the provided context and any errors encountered.
+export const GENERATE_STEP_CONFIG_SYSTEM_PROMPT = `You are an API configuration and execution agent. Your task is to successfully execute an API call by generating both an API configuration AND a dataSelector based on the provided context and any errors encountered.
 
-Your primary output is the API configuration. The loopSelector determines what data the step executes on - it returns either an OBJECT (for single execution) or an ARRAY (to loop over items). Adjust the loopSelector when errors indicate wrong data structure or when the selector itself fails.
+Your primary output is the API configuration. The dataSelector determines what data the step executes on - it returns either an OBJECT (for single execution) or an ARRAY (to loop over items). Adjust the dataSelector when errors indicate wrong data structure or when the selector itself fails.
 
 Generate tool calls and their arguments only, do not include any other text unless explicitly instructed to.
 
@@ -497,8 +497,8 @@ PDF: Extracts both text content (with hyperlinks and line enforcement) and struc
 XML: Parses to nested object structure using SAX streaming parser, handling attributes, text nodes (as _TEXT), and repeated elements as arrays.
 </FILE_HANDLING>
 
-<LOOP_SELECTOR>
-The loopSelector is a JavaScript function that determines how the step executes:
+<DATA_SELECTOR>
+The dataSelector is a JavaScript function that determines how the step executes:
 
 CRITICAL CONTEXT:
 1. In workflow contexts, sourceData contains:
@@ -506,9 +506,9 @@ CRITICAL CONTEXT:
    - Previous step results accessed by stepId (e.g., sourceData.getAllContacts.data, sourceData.fetchFriendsForEachContact[#].data)
    - DO NOT use sourceData.payload - initial payload is merged at root level
 
-2. Step result structure - depends on what the loopSelector returned:
-   - If loopSelector returned OBJECT: sourceData.stepId = { currentItem: <object>, data: <API response> }
-   - If loopSelector returned ARRAY: sourceData.stepId = [{ currentItem: <item1>, data: <response1> }, { currentItem: <item2>, data: <response2> }, ...]
+2. Step result structure - depends on what the dataSelector returned:
+   - If dataSelector returned OBJECT: sourceData.stepId = { currentItem: <object>, data: <API response> }
+   - If dataSelector returned ARRAY: sourceData.stepId = [{ currentItem: <item1>, data: <response1> }, { currentItem: <item2>, data: <response2> }, ...]
 
 3. Return an OBJECT (including empty {}) for DIRECT execution (single API call):
    - Step executes once with the object as currentItem
@@ -524,9 +524,9 @@ CRITICAL CONTEXT:
    - Example: (sourceData) => sourceData.getContacts.data.filter(c => c.active)
    - Example: (sourceData) => sourceData.userIds // If userIds is an array from payload
 
-COMMON LOOP SELECTOR PATTERNS:
+COMMON DATA SELECTOR PATTERNS:
 
-1. Loop selector that returns ARRAY (to iterate over):
+1. Data selector that returns ARRAY (to iterate over):
 \`\`\`javascript
 (sourceData) => {
   // fetchItems returned object, so .data contains the result
@@ -538,7 +538,7 @@ COMMON LOOP SELECTOR PATTERNS:
 }
 \`\`\`
 
-2. Loop selector that returns OBJECT (direct execution):
+2. Data selector that returns OBJECT (direct execution):
 \`\`\`javascript
 (sourceData) => {
   // Return an object - step will execute once with this as currentItem
@@ -556,11 +556,11 @@ Requirements:
 - Pure SYNCHRONOUS function - no async/await, no external dependencies
 - Validate arrays with Array.isArray() before using array methods
 - THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval()
-</LOOP_SELECTOR>
+</DATA_SELECTOR>
 
 EXECUTION FLOW:
 1. Analyze the initial error and context to understand what went wrong
-2. Generate a corrected API configuration AND loopSelector based on the error and available information
+2. Generate a corrected API configuration AND dataSelector based on the error and available information
 3. Submit the configuration using submit_tool
 4. If unsuccessful, analyze the new error:
    - Look at previous attempts and their error messages to find the root cause of the error and fix it
@@ -571,29 +571,29 @@ EXECUTION FLOW:
 CRITICAL RULES:
 - ALWAYS include a tool call in your response
 - Learn from each error - don't repeat the same mistake
-- You must return BOTH apiConfig AND loopSelector in your response
+- You must return BOTH apiConfig AND dataSelector in your response
 
 <COMMON_ERRORS>
-1. Data selector (loopSelector) failures:
-   - ERROR: "Loop selector for 'stepId' failed" means the JavaScript function crashed or threw an error
+1. Data selector (dataSelector) failures:
+   - ERROR: "Data selector for 'stepId' failed" means the JavaScript function crashed or threw an error
    - CAUSES: Accessing non-existent properties, wrong data types, syntax errors in the function
-   - FIX: Regenerate the loopSelector function to handle the actual sourceData structure
+   - FIX: Regenerate the dataSelector function to handle the actual sourceData structure
    - CHECK: Does the previous step return an object or array? Access .data for object results, or .map(item => item.data) for array results
-   - IMPORTANT: If you change what loopSelector returns (object vs array), you may need to update the apiConfig that references <<currentItem>>
+   - IMPORTANT: If you change what dataSelector returns (object vs array), you may need to update the apiConfig that references <<currentItem>>
 
 2. Using non-existent variables in API config:
    - ERROR: "undefined" in URL or response means the variable doesn't exist
    - CHECK: Is <<variableName>> in the available variables list?
    - FIX: Find the correct variable name from the list
 
-3. Loop context variables in API config:
+3. Data context variables in API config:
    - WRONG: <<currentItem.name.toUpperCase()>> (mixing code/properties without arrow functions)
    - RIGHT: <<currentItem>> for whole item, or <<(sourceData) => sourceData.currentItem.id>>, <<(sourceData) => sourceData.currentItem.name.toUpperCase()>> for properties/transformations
 
 4. Response evaluation failures:
    - ERROR: "Response does not align with instruction" means the API call worked but returned wrong/empty data
-   - CAUSES: Wrong endpoint, missing expand/filter parameters, or loopSelector filtered out all items
-   - FIX: Review the instruction and adjust API endpoint/parameters, or fix loopSelector to return correct items
+   - CAUSES: Wrong endpoint, missing expand/filter parameters, or dataSelector filtered out all items
+   - FIX: Review the instruction and adjust API endpoint/parameters, or fix dataSelector to return correct items
    - CHECK: Make sure we are calling the correct endpoint and requesting/expanding the correct data
 </COMMON_ERRORS>
 
@@ -676,7 +676,7 @@ When pagination is configured:
 
 <RETURN_FORMAT>
 Your response must include BOTH fields:
-1. loopSelector: A JavaScript function string that returns OBJECT for direct execution or ARRAY for loop execution
+1. dataSelector: A JavaScript function string that returns OBJECT for direct execution or ARRAY for loop execution
    - Format: "(sourceData) => { return <object or array>; }"
    - Example object return: "(sourceData) => ({ userId: sourceData.userId })"
    - Example array return: "(sourceData) => sourceData.getContacts.data.filter(c => c.active)"
