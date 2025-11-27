@@ -105,7 +105,7 @@ export class ToolExecutor implements Tool {
           return this.completeWithFailure(finalTransformResult.error);
         }
 
-        this.result.data = finalTransformResult.data || {};
+        this.result.data = finalTransformResult.transformedData || {};
         this.result.config = {
           id: this.id,
           integrationIds: this.integrationIds,

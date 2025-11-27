@@ -35,16 +35,6 @@ export type ToolBuilderContextInput = {
     responseSchema?: JSONSchema;
 };
 
-export type LoopSelectorContextInput = {
-    step: ExecutionStep;
-    payload: any;
-    instruction: string;
-};
-
-export type LoopSelectorContextOptions = {
-    characterBudget: number;
-};
-
 export type EvaluateStepResponseContextInput = {
     data: any;
     config: ApiConfig;
