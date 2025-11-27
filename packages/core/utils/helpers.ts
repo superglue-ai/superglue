@@ -1,38 +1,58 @@
 import { RequestOptions, SelfHealingMode } from "@superglue/client";
 import ivm from 'isolated-vm';
-import { oldReplaceVariables } from "./helpers.legacy.js";
+import { Validator } from "jsonschema";
 import { z } from "zod";
 import { parseJSON } from "../files/index.js";
+import { oldReplaceVariables } from "./helpers.legacy.js";
 import { injectVMHelpersIndividually } from "./vm-helpers.js";
-import { Validator } from "jsonschema";
 
 export interface TransformResult {
   success: boolean;
+  code: string;
   data?: any;
   error?: string;
 }
 
 export const HttpMethodEnum = z.enum(["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]);
 
+export function ensureSourceDataArrowFunction(code: string | undefined | null): string {
+  const fallback = `(sourceData) => {\n  return sourceData;\n}`;
+  const text = (code ?? '').trim();
+  if (!text) return fallback;
+  
+  const validPatterns = [
+    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*\)?\s*;?\s*$/, // block body
+    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>\s*\([\s\S]*\)\s*\)?\s*;?\s*$/, // parenthesized expr
+    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>[\s\S]*\)?\s*;?\s*$/              // tolerant bare expr
+  ];
+  
+  if (validPatterns.some((re) => re.test(text))) {
+    return text;
+  }
+  
+  return `(sourceData) => {\n${text}\n}`;
+}
+
 export async function transformData(data: any, code: string): Promise<TransformResult> {
   try {
     if (!code) {
-      return { success: true, data: data };
+      return { success: true, code: code, data: null };
+    }
+    else if(code == "$") {
+      return { success: true, code: code, data: data };
     }
     
-    const ARROW_FUNCTION_PATTERN = /^\s*\([^)]+\)\s*=>/;
-
-    if (ARROW_FUNCTION_PATTERN.test(code)) {
-      return await runCodeInIVM(data, code);
-    } else {
-      throw new Error("Invalid expression");
-    }
+    const wrappedCode = ensureSourceDataArrowFunction(code);
+    
+    const result = await runCodeInIVM(data, wrappedCode);
+    
+    return result;
   } catch (error) {
-    return { success: false, error: error.message };
+    return { success: false, code: code, error: error.message };
   }
 }
 
-export async function runCodeInIVM(input: any, mappingCode: string): Promise<TransformResult> {
+export async function runCodeInIVM(input: any, code: string): Promise<TransformResult> {
   const isolate = new ivm.Isolate({ memoryLimit: 4096 }); // 32 MB
   const context = await isolate.createContext();
   await injectVMHelpersIndividually(context);
@@ -41,13 +61,11 @@ export async function runCodeInIVM(input: any, mappingCode: string): Promise<Tra
   let result: any;
 
   try {
-    const scriptSource = `const fn = ${mappingCode}; const result = fn(JSON.parse(input)); return result === undefined ? null : JSON.stringify(result);`;
+    const scriptSource = `const fn = ${code}; const result = fn(JSON.parse(input)); return result === undefined ? null : JSON.stringify(result);`;
     result = parseJSON(await context.evalClosure(scriptSource, null, { timeout: 10000 }));
-    return { success: true, data: result };
+    return { success: true, data: result, code: code };
   } catch (error) {
-    return { 
-      success: false, error: error.message
-    };
+    return { success: false, error: error.message, code: code };
   } finally {
     try {
       isolate.dispose();
@@ -345,7 +363,7 @@ export async function validateSchema(data: any, schema: any): Promise<TransformR
   const optionalSchema = addNullableToOptional(schema);
   const validation = validator.validate(data, optionalSchema);
   if (!validation.valid) {
-    return { success: false, error: validation.errors.map(e => `${e.stack}. Computed result: ${e.instance ? JSON.stringify(e.instance) : "undefined"}.`).join('\n').slice(0, 1000) + `\n\nExpected schema: ${JSON.stringify(optionalSchema)}` };
+    return { success: false, code: "", error: validation.errors.map(e => `${e.stack}. Computed result: ${e.instance ? JSON.stringify(e.instance) : "undefined"}.`).join('\n').slice(0, 1000) + `\n\nExpected schema: ${JSON.stringify(optionalSchema)}` };
   }
-  return { success: true, data: data };
+  return { success: true, data: data, code: "" };
 }
