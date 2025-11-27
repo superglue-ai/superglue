@@ -103,10 +103,16 @@ function renderBenchmarkSummary(data) {
     const commonToolIds = currentToolIds.filter(id => benchmarkToolIds.has(id));
     
     const totalBenchmarkTools = benchmarkToolIds.size;
+    const totalBenchmarkAttempts = benchmarkData.results.length;
+    const benchmarkLlm = `${benchmarkData.config.llmProvider} / ${benchmarkData.config.backendModel}`;
+    const benchmarkAttemptsPerMode = benchmarkData.config.attemptsPerMode;
     
     summaryEl.innerHTML = `
         <strong>Benchmark Comparison:</strong> Comparing your metrics against the same <strong>${commonToolIds.length}</strong> tools 
-        (There are ${totalBenchmarkTools} possible total in benchmark)
+        (There are ${totalBenchmarkTools} possible total in benchmark) | 
+        <strong>${totalBenchmarkAttempts}</strong> total attempts | 
+        <strong>${benchmarkAttemptsPerMode}</strong> attempts per mode | 
+        LLM: <strong>${benchmarkLlm}</strong>
     `;
     summaryEl.style.display = 'block';
 }
