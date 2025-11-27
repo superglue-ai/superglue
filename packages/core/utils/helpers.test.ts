@@ -1,6 +1,6 @@
 import { SelfHealingMode } from '@superglue/client';
 import { describe, expect, it, vi } from 'vitest';
-import { applyAuthFormat, composeUrl, isSelfHealingEnabled, maskCredentials, replaceVariables, sample } from './helpers.js';
+import { applyAuthFormat, composeUrl, ensureSourceDataArrowFunction, isSelfHealingEnabled, maskCredentials, replaceVariables, sample } from './helpers.js';
 
 vi.mock('axios');
 
@@ -167,6 +167,44 @@ describe('tools utility functions', () => {
       it('should default to true when options is undefined', () => {
         expect(isSelfHealingEnabled(undefined, 'api')).toBe(true);
       });
+    });
+  });
+
+  describe('ensureSourceDataArrowFunction', () => {
+    it('should return fallback for empty/null/undefined code', () => {
+      const fallback = `(sourceData) => {\n  return sourceData;\n}`;
+      expect(ensureSourceDataArrowFunction('')).toBe(fallback);
+      expect(ensureSourceDataArrowFunction(null)).toBe(fallback);
+      expect(ensureSourceDataArrowFunction(undefined)).toBe(fallback);
+      expect(ensureSourceDataArrowFunction('   ')).toBe(fallback);
+    });
+
+    it('should accept arrow functions with sourceData parameter', () => {
+      expect(ensureSourceDataArrowFunction('(sourceData) => sourceData.id')).toBe('(sourceData) => sourceData.id');
+      expect(ensureSourceDataArrowFunction('(sourceData) => { return sourceData.id; }')).toBe('(sourceData) => { return sourceData.id; }');
+    });
+
+    it('should accept arrow functions with any valid parameter name', () => {
+      expect(ensureSourceDataArrowFunction('(payload) => payload.id')).toBe('(payload) => payload.id');
+      expect(ensureSourceDataArrowFunction('(data) => data.value')).toBe('(data) => data.value');
+      expect(ensureSourceDataArrowFunction('(x) => x.name')).toBe('(x) => x.name');
+      expect(ensureSourceDataArrowFunction('(_input) => _input.field')).toBe('(_input) => _input.field');
+      expect(ensureSourceDataArrowFunction('($data) => $data.prop')).toBe('($data) => $data.prop');
+    });
+
+    it('should accept arrow functions with block body and any parameter name', () => {
+      expect(ensureSourceDataArrowFunction('(payload) => { return payload.id; }')).toBe('(payload) => { return payload.id; }');
+      expect(ensureSourceDataArrowFunction('(data) => { const x = data.a; return x; }')).toBe('(data) => { const x = data.a; return x; }');
+    });
+
+    it('should accept parenthesized expressions with any parameter name', () => {
+      expect(ensureSourceDataArrowFunction('(payload) => (payload.items)')).toBe('(payload) => (payload.items)');
+      expect(ensureSourceDataArrowFunction('(data) => ({ id: data.id })')).toBe('(data) => ({ id: data.id })');
+    });
+
+    it('should wrap non-arrow-function code', () => {
+      expect(ensureSourceDataArrowFunction('return sourceData.id')).toBe('(sourceData) => {\nreturn sourceData.id\n}');
+      expect(ensureSourceDataArrowFunction('sourceData.id')).toBe('(sourceData) => {\nsourceData.id\n}');
     });
   });
 }) 

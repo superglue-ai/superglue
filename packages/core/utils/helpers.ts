@@ -19,17 +19,19 @@ export function ensureSourceDataArrowFunction(code: string | undefined | null): 
   const fallback = `(sourceData) => {\n  return sourceData;\n}`;
   const text = (code ?? '').trim();
   if (!text) return fallback;
-  
+
+  // Match any valid JavaScript identifier as the parameter name
+  const identifier = '[a-zA-Z_$][a-zA-Z0-9_$]*';
   const validPatterns = [
-    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*\)?\s*;?\s*$/, // block body
-    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>\s*\([\s\S]*\)\s*\)?\s*;?\s*$/, // parenthesized expr
-    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>[\s\S]*\)?\s*;?\s*$/              // tolerant bare expr
+    new RegExp(`^\\s*\\(?\\s*\\(\\s*${identifier}\\s*\\)\\s*=>\\s*\\{[\\s\\S]*\\}\\s*\\)?\\s*;?\\s*$`), // block body
+    new RegExp(`^\\s*\\(?\\s*\\(\\s*${identifier}\\s*\\)\\s*=>\\s*\\([\\s\\S]*\\)\\s*\\)?\\s*;?\\s*$`), // parenthesized expr
+    new RegExp(`^\\s*\\(?\\s*\\(\\s*${identifier}\\s*\\)\\s*=>[\\s\\S]*\\)?\\s*;?\\s*$`)              // tolerant bare expr
   ];
-  
+
   if (validPatterns.some((re) => re.test(text))) {
     return text;
   }
-  
+
   return `(sourceData) => {\n${text}\n}`;
 }
 
