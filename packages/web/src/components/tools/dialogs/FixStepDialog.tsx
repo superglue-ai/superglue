@@ -67,13 +67,9 @@ export function FixStepDialog({
             console.log('[FixStepDialog] generateConfig returned:', result);
 
             // Result now has shape: { config: ApiConfig, dataSelector: string }
-            // We need to update both the apiConfig AND the loopSelector
             const updatedStep = {
                 ...step,
-                apiConfig: {
-                    ...step.apiConfig,
-                    ...result.config,
-                },
+                apiConfig: result.config,
                 loopSelector: result.dataSelector
             };
 

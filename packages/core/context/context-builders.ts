@@ -314,6 +314,7 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
 
     let contextParts = [promptStart, instructionContext];
     if (previousStepConfigContext) contextParts.push(previousStepConfigContext);
+    if (previousStepDataSelectorContext) contextParts.push(previousStepDataSelectorContext);
     if (errorContext) contextParts.push(errorContext);
     contextParts.push(documentationContext, stepInputContext, integrationInstructionsContext, credentialsContext);
 

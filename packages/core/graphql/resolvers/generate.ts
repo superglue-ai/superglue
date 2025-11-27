@@ -130,10 +130,11 @@ export const generateStepConfigResolver = async (
       throw new Error(generateStepConfigResult.error || "No step config generated");
     }
 
-    // Merge the generated config with the current config to ensure all required fields are present
+    // Merge the generated config with the current config
+    // Only preserve instruction which is not part of generated config
     const mergedConfig = {
-      ...currentStepConfig,
       ...generateStepConfigResult.config,
+      instruction: currentStepConfig.instruction,
     } as ApiConfig;
 
     return {config: mergedConfig, dataSelector: generateStepConfigResult.dataSelector};

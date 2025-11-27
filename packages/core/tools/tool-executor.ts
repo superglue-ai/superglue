@@ -202,7 +202,7 @@ export class ToolExecutor implements Tool {
               logMessage("debug", `Executing loop iteration ${i + 1}/${itemsToExecuteStepOn.length} with item: ${JSON.stringify(currentItem).slice(0, 100)}...`, this.metadata);
             }
     
-            const loopPayload = { currentItem, ...stepInput };
+            loopPayload = { currentItem, ...stepInput };
 
             // Refresh integration token if needed (important for long-running loops)
             await integrationManager?.refreshTokenIfNeeded();
