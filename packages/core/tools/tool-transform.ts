@@ -22,7 +22,7 @@ export interface ExecuteAndEvaluateFinalTransformInput {
 
 export interface ExecuteAndEvaluateFinalTransformOutput {
   success: boolean;
-  transformedData?: any;
+  data?: any;
   successfulTransformCode?: string;
   error?: string;
 }
@@ -59,7 +59,7 @@ export async function executeAndEvaluateFinalTransform(input: ExecuteAndEvaluate
 
       return {
         success: true,
-        transformedData: finalResult.data,
+        data: finalResult.data,
         successfulTransformCode: finalTransform
       };
     } catch (transformError) {
@@ -92,7 +92,7 @@ export async function executeAndEvaluateFinalTransform(input: ExecuteAndEvaluate
 
     return {
       success: true,
-      transformedData: transformationResult.data,
+      data: transformationResult.data,
       successfulTransformCode: transformationResult.transformCode
     };
   }

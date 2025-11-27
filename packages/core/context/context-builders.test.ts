@@ -229,7 +229,7 @@ describe('getEvaluateTransformContext budgets and content', () => {
     const base = {
         targetSchema: { type: 'object', properties: { id: { type: 'number' } } },
         sourceData: { users: [{ id: 1 }, { id: 2 }] },
-        transformedData: [{ id: 1 }],
+        data: [{ id: 1 }],
         transformCode: 'return sourceData.users;'
     } as any;
 

@@ -105,7 +105,7 @@ export class ToolExecutor implements Tool {
           return this.completeWithFailure(finalTransformResult.error);
         }
 
-        this.result.data = finalTransformResult.transformedData || {};
+        this.result.data = finalTransformResult.data || {};
         this.result.config = {
           id: this.id,
           integrationIds: this.integrationIds,
@@ -280,7 +280,7 @@ export class ToolExecutor implements Tool {
       const toolStepResult = {
         stepId: step.id,
         success: true,
-        transformedData: isLoopStep 
+        data: isLoopStep 
           ? stepResults.map(r => r.stepResponseData)
           : stepResults[0]?.stepResponseData || null,
         error: undefined
@@ -305,7 +305,7 @@ export class ToolExecutor implements Tool {
         result: {
           stepId: step.id,
           success: false,
-          transformedData: null,
+          data: null,
           error: error.message || error
         },
         updatedStep: step
@@ -417,8 +417,8 @@ export class ToolExecutor implements Tool {
     const stepResults: Record<string, unknown> = {};
     
     for (const result of this.result.stepResults) {
-      if (result?.transformedData) {
-        stepResults[result.stepId] = result.transformedData;
+      if (result?.data) {
+        stepResults[result.stepId] = result.data;
       }
     }
     

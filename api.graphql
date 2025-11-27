@@ -342,8 +342,7 @@ type Workflow implements BaseConfig {
 type WorkflowStepResult {
   stepId: String!
   success: Boolean!
-  rawData: JSON
-  transformedData: JSON
+  data: JSON
   error: String
 }
 
