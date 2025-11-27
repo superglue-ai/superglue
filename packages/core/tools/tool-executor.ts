@@ -153,14 +153,29 @@ export class ToolExecutor implements Tool {
         throw new Error(`Integration '${step.integrationId}' not found. Available integrations: ${Object.keys(this.integrations).join(', ')}`);
       }
 
+      // Get integration early so it's available for self-healing even if data selector fails
+      await integrationManager?.refreshTokenIfNeeded();
+      currentIntegration = await integrationManager?.getIntegration();
+      
+      if (currentIntegration) {
+        stepCredentials = {
+          ...credentials,
+          ...flattenAndNamespaceCredentials([currentIntegration])
+        } as Record<string, string>;
+      }
+
       const maxRetries = isSelfHealing 
         ? (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES) 
         : 1;
       // loop through retries to execute the step
       while (retryCount < maxRetries) {
         try {
-          // 1. evaluate data selector
-          const dataSelectorOutput = await this.getDataSelectorOutput({ step, stepInput });
+          // 1. evaluate data selector (use currentLoopSelector which may have been updated by self-healing)
+          const dataSelectorTransformResult = await transformData(stepInput, currentLoopSelector);
+          if (!dataSelectorTransformResult.success) {
+            throw new Error(`Loop selector for '${step.id}' failed. ${dataSelectorTransformResult.error}\nCode: ${currentLoopSelector}\nPayload: ${JSON.stringify(stepInput).slice(0, 1000)}...`);
+          }
+          const dataSelectorOutput = dataSelectorTransformResult.data || {};
 
           isLoopStep = Array.isArray(dataSelectorOutput);
           let itemsToExecuteStepOn = isLoopStep 
@@ -180,8 +195,8 @@ export class ToolExecutor implements Tool {
     
             const loopPayload = { currentItem, ...stepInput };
             let iterationResult: any = null;
-    
-            // refresh integration token if needed
+
+            // Refresh integration token if needed (important for long-running loops)
             await integrationManager?.refreshTokenIfNeeded();
             currentIntegration = await integrationManager?.getIntegration();
             
@@ -312,23 +327,6 @@ export class ToolExecutor implements Tool {
       } as {result: ToolStepResult, updatedStep: ExecutionStep};
     }
   }
-
-  private async getDataSelectorOutput({ 
-    step, 
-    stepInput, 
-  }: { 
-    step: ExecutionStep, 
-    stepInput: Record<string, any>, 
-  }): Promise<any> {
-    
-    let dataSelectorTransformResult = await transformData(stepInput, step.loopSelector);
-    if (!dataSelectorTransformResult.success) {
-      throw new Error(`Loop selector for '${step.id}' failed. ${dataSelectorTransformResult.error}\nCode: ${step.loopSelector}\nPayload: ${JSON.stringify(stepInput).slice(0, 1000)}...`);
-    }
-
-    return dataSelectorTransformResult.data || {};
-  }
-  
 
   private async initializeSelfHealingContext(
     integrationManager: IntegrationManager,

@@ -346,6 +346,11 @@ type WorkflowStepResult {
   error: String
 }
 
+type GenerateStepConfigResult {
+  config: ApiConfig!
+  dataSelector: String!
+}
+
 type WorkflowResult {
   id: ID!
   success: Boolean!
@@ -430,7 +435,7 @@ type Mutation {
     stepInput: JSON
     credentials: JSON
     errorMessage: String
-  ): ApiConfig!
+  ): GenerateStepConfigResult!
 
   upsertWorkflow(id: ID!, input: JSON!): Workflow!
   deleteWorkflow(id: ID!): Boolean!

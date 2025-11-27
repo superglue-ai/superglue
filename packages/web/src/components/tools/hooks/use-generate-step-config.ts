@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useConfig } from '@/src/app/config-context';
-import { SuperglueClient } from '@superglue/client';
+import { ApiConfig, SuperglueClient } from '@superglue/client';
 import { tokenRegistry } from '@/src/lib/token-registry';
 
 interface GenerateStepConfigParams {
@@ -26,7 +26,7 @@ export function useGenerateStepConfig() {
                 apiKey: tokenRegistry.getToken(),
             });
 
-            const result = await client.generateStepConfig({
+            const result: { config: ApiConfig, dataSelector: string } = await client.generateStepConfig({
                 currentStepConfig: params.currentStepConfig,
                 stepInput: params.stepInput,
                 integrationId: params.integrationId,
@@ -34,6 +34,7 @@ export function useGenerateStepConfig() {
                 errorMessage: params.errorMessage,
             });
 
+            // The result now has shape: { config: ApiConfig, dataSelector: string }
             return result;
         } catch (err: any) {
             const errorMessage = err?.message || 'Failed to generate step configuration';
