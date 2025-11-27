@@ -211,7 +211,7 @@ export function isSelfHealingEnabled(options: RequestOptions | undefined, type: 
   const selfHealingMode = options?.selfHealing;
 
   if (selfHealingMode === undefined || selfHealingMode === null) {
-    return true; // we default to enabled if options.selfHealing is not set
+    return false;
   }
   if (selfHealingMode === SelfHealingMode.DISABLED) {
     return false;

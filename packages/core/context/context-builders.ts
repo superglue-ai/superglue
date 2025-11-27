@@ -175,29 +175,6 @@ export function getToolBuilderContext(input: ToolBuilderContextInput, options: T
     return prompt_start + '\n' + userInstructionContext + '\n' + integrationContext + '\n' + availableVariablesContext + '\n' + payloadContext + '\n' + prompt_end;
 }
 
-export function getLoopSelectorContext(input: LoopSelectorContextInput, options: LoopSelectorContextOptions): string {
-    const budget = Math.max(0, options.characterBudget | 0);
-    if (budget === 0) return '';
-
-    const prompt_start = `Create a JavaScript function that extracts the array of items to loop over for step: ${input.step.id} from the payload (sourceData). The function should: 1. Extract an array of ACTUAL DATA ITEMS (not metadata or property definitions) 2. Apply any filtering based on the step's instruction`;
-    const instructionContext = `<instruction>${input.step.apiConfig.instruction}</instruction>`;
-    const prompt_end = `The function should return an array of items that this step will iterate over.`;
-
-    const payloadWrapperLength = '<loop_selector_input>'.length + '</loop_selector_input>'.length;
-    const newlineCount = 3;
-    const essentialLength = prompt_start.length + instructionContext.length + prompt_end.length + newlineCount + payloadWrapperLength;
-
-    if (budget <= essentialLength) {
-        logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getLoopSelectorContext`, {});
-        return prompt_start + '\n' + instructionContext + '\n' + prompt_end;
-    }
-
-    const remainingBudget = budget - essentialLength;
-    const payloadContext = `<loop_selector_input>${getObjectContext(input.payload, { include: { schema: true, preview: true, samples: false }, characterBudget: remainingBudget })}</loop_selector_input>`;
-
-    return prompt_start + '\n' + instructionContext + '\n' + payloadContext + '\n' + prompt_end;
-}
-
 export function getEvaluateStepResponseContext(input: EvaluateStepResponseContextInput, options: EvaluateStepResponseContextOptions): string {
     const budget = Math.max(0, options.characterBudget | 0);
     if (budget === 0) return '';
