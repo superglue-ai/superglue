@@ -21,9 +21,9 @@ describe('WorkflowExecutor Self-Healing Logic', () => {
     expect(isSelfHealingEnabled({ selfHealing: SelfHealingMode.REQUEST_ONLY }, 'transform')).toBe(false);
     expect(isSelfHealingEnabled({ selfHealing: SelfHealingMode.DISABLED }, 'transform')).toBe(false);
     
-    // Test defaults for transform (should be enabled)
-    expect(isSelfHealingEnabled({}, 'transform')).toBe(true);
-    expect(isSelfHealingEnabled(undefined, 'transform')).toBe(true);
+    // Test defaults for transform (should be disabled)
+    expect(isSelfHealingEnabled({}, 'transform')).toBe(false);
+    expect(isSelfHealingEnabled(undefined, 'transform')).toBe(false);
   });
 
   it('should correctly determine self-healing for API operations', () => {
@@ -35,19 +35,19 @@ describe('WorkflowExecutor Self-Healing Logic', () => {
     expect(isSelfHealingEnabled({ selfHealing: SelfHealingMode.TRANSFORM_ONLY }, 'api')).toBe(false);
     expect(isSelfHealingEnabled({ selfHealing: SelfHealingMode.DISABLED }, 'api')).toBe(false);
     
-    // Test defaults for API (should be enabled)
-    expect(isSelfHealingEnabled({}, 'api')).toBe(true);
-    expect(isSelfHealingEnabled(undefined, 'api')).toBe(true);
+    // Test defaults for API (should be disabled)
+    expect(isSelfHealingEnabled({}, 'api')).toBe(false);
+    expect(isSelfHealingEnabled(undefined, 'api')).toBe(false);
   });
 
   it('should handle edge cases in self-healing logic', () => {
     // Test with null/undefined values
-    expect(isSelfHealingEnabled({ selfHealing: null as any }, 'transform')).toBe(true);
-    expect(isSelfHealingEnabled({ selfHealing: null as any }, 'api')).toBe(true);
+    expect(isSelfHealingEnabled({ selfHealing: null as any }, 'transform')).toBe(false);
+    expect(isSelfHealingEnabled({ selfHealing: null as any }, 'api')).toBe(false);
     
     // Test with empty options object
-    expect(isSelfHealingEnabled({}, 'transform')).toBe(true);
-    expect(isSelfHealingEnabled({}, 'api')).toBe(true);
+    expect(isSelfHealingEnabled({}, 'transform')).toBe(false);
+    expect(isSelfHealingEnabled({}, 'api')).toBe(false);
   });
 
   it('should verify workflow uses this logic correctly', () => {

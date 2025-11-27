@@ -212,7 +212,7 @@ export function isSelfHealingEnabled(options: RequestOptions | undefined, type: 
   const selfHealingMode = options?.selfHealing;
 
   if (selfHealingMode === undefined || selfHealingMode === null) {
-    return true;
+    return false;
   }
   if (selfHealingMode === SelfHealingMode.DISABLED) {
     return false;

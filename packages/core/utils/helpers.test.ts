@@ -129,13 +129,13 @@ describe('tools utility functions', () => {
         expect(isSelfHealingEnabled(options, 'transform')).toBe(false);
       });
 
-      it('should default to true when selfHealing is undefined', () => {
+      it('should default to false when selfHealing is undefined', () => {
         const options = {};
-        expect(isSelfHealingEnabled(options, 'transform')).toBe(true);
+        expect(isSelfHealingEnabled(options, 'transform')).toBe(false);
       });
 
-      it('should default to true when options is undefined', () => {
-        expect(isSelfHealingEnabled(undefined, 'transform')).toBe(true);
+      it('should default to false when options is undefined', () => {
+        expect(isSelfHealingEnabled(undefined, 'transform')).toBe(false);
       });
     });
 
@@ -160,13 +160,13 @@ describe('tools utility functions', () => {
         expect(isSelfHealingEnabled(options, 'api')).toBe(false);
       });
 
-      it('should default to true when selfHealing is undefined', () => {
+      it('should default to false when selfHealing is undefined', () => {
         const options = {};
-        expect(isSelfHealingEnabled(options, 'api')).toBe(true);
+        expect(isSelfHealingEnabled(options, 'api')).toBe(false);
       });
 
-      it('should default to true when options is undefined', () => {
-        expect(isSelfHealingEnabled(undefined, 'api')).toBe(true);
+      it('should default to false when options is undefined', () => {
+        expect(isSelfHealingEnabled(undefined, 'api')).toBe(false);
       });
     });
   });
