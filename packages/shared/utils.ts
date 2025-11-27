@@ -265,3 +265,32 @@ export function resolveOAuthCertAndKey(oauthCert: string, oauthKey: string) {
     }
     return { cert: parsedCert, key: parsedKey };
 }
+
+/**
+ * Ensures code is wrapped as a valid arrow function with sourceData parameter.
+ * 
+ * Special cases:
+ * - Empty/null/undefined → returns `(sourceData) => { return {}; }` (for loopSelector - execute once with empty object)
+ * - `$` → returns `(sourceData) => { return sourceData; }` (identity transform)
+ * - Valid arrow function → returns as-is
+ * - Raw code → wraps in arrow function
+ */
+export function ensureSourceDataArrowFunction(code: string | undefined | null): string {
+  const text = (code || '').trim();
+  if (!text) return `(sourceData) => {\n  return {};\n}`;
+  
+  // Handle $ identity sentinel
+  if (text === '$') return `(sourceData) => {\n  return sourceData;\n}`;
+  
+  const validPatterns = [
+    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*\)?\s*;?\s*$/, // block body
+    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>\s*\([\s\S]*\)\s*\)?\s*;?\s*$/, // parenthesized expr
+    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>[\s\S]*\)?\s*;?\s*$/              // tolerant bare expr
+  ];
+  
+  if (validPatterns.some((re) => re.test(text))) {
+    return text;
+  }
+  
+  return `(sourceData) => {\n${text}\n}`;
+}

@@ -1,4 +1,5 @@
 import { RequestOptions, SelfHealingMode } from "@superglue/client";
+import { ensureSourceDataArrowFunction } from '@superglue/shared';
 import ivm from 'isolated-vm';
 import { Validator } from "jsonschema";
 import { z } from "zod";
@@ -15,28 +16,10 @@ export interface TransformResult {
 
 export const HttpMethodEnum = z.enum(["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]);
 
-export function ensureSourceDataArrowFunction(code: string | undefined | null): string {
-  const fallback = `(sourceData) => {\n  return sourceData;\n}`;
-  const text = (code ?? '').trim();
-  if (!text) return fallback;
-  
-  const validPatterns = [
-    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*\)?\s*;?\s*$/, // block body
-    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>\s*\([\s\S]*\)\s*\)?\s*;?\s*$/, // parenthesized expr
-    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>[\s\S]*\)?\s*;?\s*$/              // tolerant bare expr
-  ];
-  
-  if (validPatterns.some((re) => re.test(text))) {
-    return text;
-  }
-  
-  return `(sourceData) => {\n${text}\n}`;
-}
-
 export async function transformData(data: any, code: string): Promise<TransformResult> {
   try {
     if (!code) {
-      return { success: true, code: code, data: null };
+      return { success: true, code: code, data: {} };
     }
     else if(code == "$") {
       return { success: true, code: code, data: data };

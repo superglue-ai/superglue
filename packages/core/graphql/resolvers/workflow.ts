@@ -1,5 +1,5 @@
 import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
-import { generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
+import { ensureSourceDataArrowFunction, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { parseJSON } from "../../files/index.js";
@@ -7,7 +7,6 @@ import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { ToolBuilder } from "../../tools/tool-builder.js";
 import { ToolExecutor } from "../../tools/tool-executor.js";
 import { ToolFinder } from "../../tools/tool-finder.js";
-import { ensureSourceDataArrowFunction } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { Context, Metadata } from '../types.js';
