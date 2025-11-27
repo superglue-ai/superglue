@@ -16,13 +16,12 @@ import {
 import {
   Code2,
   Download,
-  FileBraces,
   FileBracesCorner,
   FileInput,
   FilePlay,
   Loader2,
   Play,
-  Wand2,
+  Wand2
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { JavaScriptCodeEditor } from "../../editors/JavaScriptCodeEditor";
@@ -147,6 +146,7 @@ export const FinalTransformMiniStepCard = ({
 
     function handleTransformChange(value: string): void {
       setLocalTransform(value);
+      if (onTransformChange) onTransformChange(value);
     }
 
     function handleSchemaChange(value: string | null): void {
@@ -165,22 +165,16 @@ export const FinalTransformMiniStepCard = ({
 
     function handleExecuteTransform(): void {
       const validTransform = ensureValidTransform(localTransform);
-      if (onTransformChange) onTransformChange(localTransform);
-      if (onResponseSchemaChange) onResponseSchemaChange(localSchema);
       if (onExecuteTransform) {
         onExecuteTransform(localSchema, validTransform);
-        // Auto-navigate to output tab when transform starts
         setActiveTab("output");
       }
     }
 
     function handleFixTransform(): void {
       const validTransform = ensureValidTransform(localTransform);
-      if (onTransformChange) onTransformChange(localTransform);
-      if (onResponseSchemaChange) onResponseSchemaChange(localSchema);
       if (onFixTransform) {
         onFixTransform(localSchema, validTransform);
-        // Auto-navigate to output tab when transform starts
         setActiveTab("output");
       }
     }
