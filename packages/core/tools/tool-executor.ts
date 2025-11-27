@@ -194,7 +194,6 @@ export class ToolExecutor implements Tool {
           
           itemsToExecuteStepOn = itemsToExecuteStepOn.slice(0, step.loopMaxIters || server_defaults.DEFAULT_LOOP_MAX_ITERS);
 
-
           stepResults = [];
           for (let i = 0; i < itemsToExecuteStepOn.length; i++) {
             const currentItem = itemsToExecuteStepOn[i];
