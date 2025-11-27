@@ -1,4 +1,4 @@
-import { findMatchingIntegration, integrations } from '@superglue/shared';
+import { ensureSourceDataArrowFunction, findMatchingIntegration, integrations } from '@superglue/shared';
 import { clsx, type ClassValue } from "clsx";
 import prettierPluginBabel from 'prettier/plugins/babel';
 import prettierPluginEstree from 'prettier/plugins/estree';
@@ -298,14 +298,6 @@ export function isValidSourceDataArrowFunction(code: string | undefined | null):
   return patterns.some((re) => re.test(text));
 }
 
-export function ensureSourceDataArrowFunction(code: string | undefined | null): string {
-  const fallback = `(sourceData) => {\n  return sourceData;\n}`;
-  const text = (code ?? '').trim();
-  if (!text) return fallback;
-  if (isValidSourceDataArrowFunction(text)) return text;
-  return `(sourceData) => {\n${text}\n}`;
-}
-
 /**
  * Wraps a loop selector function to limit the number of iterations
  * @param loopSelectorCode The original loop selector code
@@ -322,7 +314,7 @@ export function wrapLoopSelectorWithLimit(loopSelectorCode: string | undefined |
     return loopSelectorCode || '';
   }
 
-  const trimmedCode = loopSelectorCode.trim();
+  const trimmedCode = ensureSourceDataArrowFunction(loopSelectorCode);
 
   return `(sourceData) => {
   const originalFunction = ${trimmedCode};

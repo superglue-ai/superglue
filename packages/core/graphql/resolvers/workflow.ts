@@ -1,12 +1,12 @@
 import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
-import { generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
+import { ensureSourceDataArrowFunction, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { ToolBuilder } from "../../tools/tool-builder.js";
-import { ToolFinder } from "../../tools/tool-finder.js";
-import { ToolExecutor } from "../../tools/tool-executor.js";
 import { parseJSON } from "../../files/index.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
+import { ToolBuilder } from "../../tools/tool-builder.js";
+import { ToolExecutor } from "../../tools/tool-executor.js";
+import { ToolFinder } from "../../tools/tool-finder.js";
 import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { Context, Metadata } from '../types.js';
@@ -168,12 +168,17 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
       updatedAt: now
     };
 
-    // for each step, make sure that the apiConfig has an id. if not, set it to the step id
-    workflow.steps.forEach((step: any) => {
+    workflow.finalTransform = ensureSourceDataArrowFunction(workflow.finalTransform);
+
+    for (const step of workflow.steps) {
       if (!step.apiConfig.id) {
         step.apiConfig.id = step.id;
       }
-    });
+      
+      if (step.loopSelector) {
+        step.loopSelector = ensureSourceDataArrowFunction(step.loopSelector);
+      }
+    }
 
     return await context.datastore.upsertWorkflow({ id, workflow, orgId: context.orgId });
   } catch (error) {
