@@ -426,6 +426,7 @@ type Mutation {
   generateStepConfig(
     integrationId: String
     currentStepConfig: JSON
+    currentDataSelector: String
     stepInput: JSON
     credentials: JSON
     errorMessage: String

@@ -272,7 +272,7 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
 
     const instructionContext = `<step_instruction>${input.instruction}</step_instruction>`;
     const previousStepConfigContext = input.previousStepConfig ? `<previous_step_config>${JSON.stringify(input.previousStepConfig)}</previous_step_config>` : '';
-    const previousStepLoopSelectorContext = input.previousStepLoopSelector ? `<previous_step_loop_selector>${input.previousStepLoopSelector}</previous_step_loop_selector>` : '';
+    const previousStepDataSelectorContext = input.previousStepDataSelector ? `<previous_step_data_selector>${input.previousStepDataSelector}</previous_step_data_selector>` : '';
     const errorContext = input.errorMessage ? `<error_message>${input.errorMessage}</error_message>` : '';
 
     const documentationWrapperLength = '<documentation>'.length + '</documentation>'.length;
@@ -283,16 +283,16 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
 
     let newlineCount = 6;
     if (previousStepConfigContext) newlineCount += 1;
-    if (previousStepLoopSelectorContext) newlineCount += 1;
+    if (previousStepDataSelectorContext) newlineCount += 1;
     if (errorContext) newlineCount += 1;
 
-    const essentialLength = promptStart.length + instructionContext.length + previousStepConfigContext.length + previousStepLoopSelectorContext.length + errorContext.length + newlineCount + totalWrapperLength;
+    const essentialLength = promptStart.length + instructionContext.length + previousStepConfigContext.length + previousStepDataSelectorContext.length + errorContext.length + newlineCount + totalWrapperLength;
 
     if (budget <= essentialLength) {
         logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getGenerateStepConfigContext`, {});
         let minimalContext = promptStart + '\n' + instructionContext;
         if (previousStepConfigContext) minimalContext += '\n' + previousStepConfigContext;
-        if (previousStepLoopSelectorContext) minimalContext += '\n' + previousStepLoopSelectorContext;
+        if (previousStepDataSelectorContext) minimalContext += '\n' + previousStepDataSelectorContext;
         if (errorContext) minimalContext += '\n' + errorContext;
         return minimalContext;
     }

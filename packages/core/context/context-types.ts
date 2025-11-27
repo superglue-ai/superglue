@@ -80,7 +80,7 @@ export type EvaluateTransformContextOptions = {
 export type GenerateStepConfigContextInput = {
     instruction: string;
     previousStepConfig?: Partial<ApiConfig>;
-    previousStepLoopSelector?: string;
+    previousStepDataSelector?: string;
     stepInput?: any;
     credentials?: Record<string, string>;
     integrationDocumentation: string;

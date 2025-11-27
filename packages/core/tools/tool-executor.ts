@@ -343,7 +343,7 @@ export class ToolExecutor implements Tool {
     const userPrompt = getGenerateStepConfigContext({
       instruction: config.instruction,
       previousStepConfig: config,
-      previousStepLoopSelector: loopSelector,
+      previousStepDataSelector: loopSelector,
       stepInput: payload,
       credentials,
       integrationDocumentation: docs?.content || '',
