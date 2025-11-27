@@ -1,10 +1,8 @@
-import jsonata from "jsonata";
-import { Validator } from "jsonschema";
-import { TransformResult, addNullableToOptional, validateSchema } from "./helpers.js";
-import { generateWorkingTransform } from "../tools/tool-transform.js";
-import { isSelfHealingEnabled, transformData } from "./helpers.js";
 import { BaseConfig, JSONata, JSONSchema, RequestOptions } from "@superglue/client";
 import type { DataStore, Metadata } from "@superglue/shared";
+import jsonata from "jsonata";
+import { generateWorkingTransform } from "../tools/tool-transform.js";
+import { isSelfHealingEnabled, transformData, validateSchema } from "./helpers.js";
 
 export function superglueJsonata(expr: string) {
     const expression = jsonata(expr, {
@@ -94,43 +92,6 @@ export function superglueJsonata(expr: string) {
     return expression;
   }
 
-export async function applyJsonata(data: any, expr: string): Promise<any> {
-  if (!expr) {
-    return data;
-  }
-  try {
-    const expression = superglueJsonata(expr);
-    const result = await expression.evaluate(data);
-    return result;
-  } catch (error) {
-    const errorPositions = (error as any).position ? expr.substring(error.position - 10, error.position + 10) : "";
-    throw new Error(`Transformation failed: ${error.message} at ${errorPositions}.`);
-  }
-} 
-
-export async function applyJsonataWithValidation(data: any, expr: string, schema: any): Promise<TransformResult> {
-  try {
-    const result = await applyJsonata(data, expr);
-
-    // if no schema is given, skip validation
-    if (!schema) {
-      return { success: true, data: result };
-    }
-    const validator = new Validator();
-    const optionalSchema = addNullableToOptional(schema);
-    const validation = validator.validate(result, optionalSchema);
-    if (!validation.valid) {
-      return {
-        success: false,
-        data: result,
-        error: validation.errors.map(e => `${e.stack}. Computed result: ${e.instance ? JSON.stringify(e.instance) : "undefined"}.`).join('\n').slice(0, 1000) + `\n\nExpected schema: ${JSON.stringify(optionalSchema)}`
-      };
-    }
-    return { success: true, data: result };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
 
 export function oldReplaceVariables(template: string, variables: Record<string, any>): string {
   if (!template) return "";
