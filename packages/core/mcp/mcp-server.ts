@@ -60,7 +60,7 @@ export const toolDefinitions: Record<string, any> = {
       }
 
       try {
-        const result: ToolResult = await args.client.executeWorkflow({
+        const result: ToolResult & { data?: any } = await args.client.executeWorkflow({
           id: args.id,
           payload: args.payload,
           options: { selfHealing: SelfHealingMode.DISABLED },
