@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { evaluateTemplate } from '@/src/lib/template-utils';
+import { evaluateTemplate, DEFAULT_CODE_TEMPLATE } from '@/src/lib/template-utils';
 
 interface UseTemplatePreviewOptions {
   enabled?: boolean;
@@ -11,8 +11,6 @@ interface UseTemplatePreviewResult {
   previewError: string | null;
   isEvaluating: boolean;
 }
-
-const DEFAULT_CODE_TEMPLATE = '(sourceData) => ({})';
 
 export function useTemplatePreview(
   codeContent: string,

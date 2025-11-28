@@ -11,7 +11,7 @@ import { VariableSuggestion } from '../tools/templates/TemplateVariableSuggestio
 import { TemplateEditPopover } from '../tools/templates/TemplateEditPopover';
 import { templateStringToTiptap, tiptapToTemplateString } from '../tools/templates/tiptap/serialization';
 import { CopyButton } from '../tools/shared/CopyButton';
-import { evaluateTemplate, parseTemplateString } from '@/src/lib/template-utils';
+import { evaluateTemplate, parseTemplateString, prepareSourceData } from '@/src/lib/template-utils';
 import { maskCredentials } from '@superglue/shared';
 import { useTemplateAwareEditor } from '../tools/hooks/use-template-aware-editor';
 
@@ -140,7 +140,8 @@ function TemplateAwareJsonEditorInner({
                     if (canExecute) {
                         try {
                             const expression = part.rawTemplate.replace(/^<<|>>$/g, '').trim();
-                            const result = await evaluateTemplate(expression, stepData, loopData);
+                            const sourceData = prepareSourceData(stepData, loopData);
+                            const result = await evaluateTemplate(expression, sourceData);
                             const replacement = result.success && result.value !== undefined
                                 ? (typeof result.value === 'string' ? result.value : JSON.stringify(result.value))
                                 : '__PLACEHOLDER__';
