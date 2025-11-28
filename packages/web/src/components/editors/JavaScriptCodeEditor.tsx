@@ -1,7 +1,8 @@
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { useMonacoTheme } from '@/src/hooks/useMonacoTheme';
-import { formatJavaScriptCode, isValidSourceDataArrowFunction } from '@/src/lib/general-utils';
+import { formatJavaScriptCode } from '@/src/lib/general-utils';
 import Editor from '@monaco-editor/react';
+import { isArrowFunction } from '@superglue/shared';
 import React, { useEffect, useState } from 'react';
 import { CopyButton } from '../tools/shared/CopyButton';
 
@@ -10,7 +11,7 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
     const [currentHeight, setCurrentHeight] = useState(maxHeight);
     const effectiveHeight = resizable ? currentHeight : maxHeight;
     const [hasFormatted, setHasFormatted] = useState(false);
-    const hasValidPattern = (code: string): boolean => isValidSourceDataArrowFunction(code);
+    const hasValidPattern = (code: string): boolean => isArrowFunction(code);
     const displayValue = value || '';
 
     useEffect(() => {
@@ -53,7 +54,7 @@ export const JavaScriptCodeEditor = React.memo(({ value, onChange, readOnly = fa
             {isTransformEditor && displayValue && !hasValidPattern(displayValue) && (
                 <div className="text-[10px] text-amber-600 dark:text-amber-400 px-3 pt-2 flex items-center gap-1">
                     <span>⚠</span>
-                    <span>Code will be auto-wrapped with (sourceData) =&gt; {'{'} ... {'}'} when executed</span>
+                    <span>Code needs to be a valid arrow function (sourceData) =&gt; {'{'} ... {'}'}</span>
                 </div>
             )}
             <div className="overflow-hidden pr-3" style={{ height: effectiveHeight }}>
