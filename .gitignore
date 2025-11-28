@@ -2,6 +2,7 @@
 **/.env
 dist
 node_modules
+**/.tsbuildinfo
 **/.turbo
 .DS_Store
 **/.next

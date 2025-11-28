@@ -1,4 +1,8 @@
 import { executeWithVMHelpers, ensureSourceDataArrowFunction } from '@superglue/shared';
+
+export const DEFAULT_CODE_TEMPLATE = '(sourceData) => ({})';
+const CREDENTIAL_PATTERN = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
+
 export interface TemplatePart {
   type: 'text' | 'template';
   value: string;
@@ -80,11 +84,9 @@ export function normalizeTemplateExpression(expr: string): string {
 
 export async function evaluateTemplate(
   expr: string,
-  stepData: any,
-  loopData?: any
+  sourceData: any
 ): Promise<EvaluationResult> {
   try {
-    const sourceData = prepareSourceData(stepData, loopData);
     const normalizedExpr = normalizeTemplateExpression(expr);
     const result = executeTemplateCode(normalizedExpr, sourceData);
     return { success: true, value: result };
@@ -133,18 +135,6 @@ export function truncateTemplateValue(value: any, maxLength: number = 200): Trun
   };
 }
 
-export function getAvailableVariables(data: any): string[] {
-  if (!data || typeof data !== 'object') {
-    return [];
-  }
-
-  const keys = Object.keys(data);
-  return keys.filter(key => {
-    const value = data[key];
-    return value !== undefined && typeof value !== 'function';
-  });
-}
-
 export function prepareSourceData(stepData: any, loopData?: any): any {
   const base = { ...(stepData || {}) };
   
@@ -168,8 +158,8 @@ export function formatValueForDisplay(value: any): string {
   }
 }
 
-export function isCredentialVariable(expr: string, stepData: any): boolean {
-  if (!stepData || typeof stepData !== 'object') return false;
+export function isCredentialVariable(expr: string, sourceData: any): boolean {
+  if (!sourceData || typeof sourceData !== 'object') return false;
   if (!expr || typeof expr !== 'string') return false;
   
   let varName = expr.trim();
@@ -179,20 +169,23 @@ export function isCredentialVariable(expr: string, stepData: any): boolean {
     varName = arrowMatch[1];
   }
   
-  const pattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
-  if (!pattern.test(varName)) return false;
+  if (!CREDENTIAL_PATTERN.test(varName)) return false;
   
-  if (varName in stepData && stepData[varName] !== undefined) {
-    const value = stepData[varName];
+  if (varName in sourceData && sourceData[varName] !== undefined) {
+    const value = sourceData[varName];
     return typeof value === 'string' && value.length > 0;
   }
   
   return false;
 }
 
-export function maskCredentialValue(value: string): string {
-  if (!value || typeof value !== 'string') return '••••••••';
-  if (value.length <= 4) return '••••';
-  return '•'.repeat(Math.min(value.length, 20));
+export function extractCredentials(data: Record<string, unknown>): Record<string, string> {
+  if (!data || typeof data !== 'object') return {};
+  return Object.entries(data).reduce((acc, [key, value]) => {
+    if (CREDENTIAL_PATTERN.test(key) && typeof value === 'string' && value.length > 0) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {} as Record<string, string>);
 }
 

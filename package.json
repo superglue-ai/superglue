@@ -20,8 +20,6 @@
     "generate-ranking": "tsc && node --max-old-space-size=12288 --expose-gc dist/eval/api-ranking/generate-api-ranking.js"
   },
   "dependencies": {
-    "@floating-ui/dom": "^1.7.4",
-    "@floating-ui/react-dom": "^2.1.6",
     "@playwright/test": "^1.55.0",
     "@superglue/client": "^2.3.62",
     "dotenv": "^16.4.7",

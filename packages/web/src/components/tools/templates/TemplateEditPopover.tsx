@@ -6,7 +6,7 @@ import {
   PopoverTrigger,
 } from '@/src/components/ui/popover';
 import { createPortal } from 'react-dom';
-import { formatValueForDisplay, normalizeTemplateExpression } from '@/src/lib/template-utils';
+import { formatValueForDisplay, normalizeTemplateExpression, extractCredentials, DEFAULT_CODE_TEMPLATE } from '@/src/lib/template-utils';
 import { isValidSourceDataArrowFunction } from '@/src/lib/general-utils';
 import { maskCredentials } from '@superglue/shared';
 import { Download, AlertCircle, Loader2 } from 'lucide-react';
@@ -16,7 +16,6 @@ import { useMonacoTheme } from '@/src/hooks/useMonacoTheme';
 import type * as Monaco from 'monaco-editor';
 import { useTemplatePreview } from '../hooks/use-template-preview';
 
-const DEFAULT_CODE_TEMPLATE = '(sourceData) => ({})';
 const POPOVER_WIDTH = 600;
 const LINE_HEIGHT = 19;
 const EDITOR_PADDING = 16;
@@ -115,17 +114,6 @@ export function TemplateEditPopover({
     a.download = `template-result.txt`;
     a.click();
     URL.revokeObjectURL(url);
-  };
-
-  const extractCredentials = (data: Record<string, unknown>): Record<string, string> => {
-    if (!data || typeof data !== 'object') return {};
-    const pattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
-    return Object.entries(data).reduce((acc, [key, value]) => {
-      if (pattern.test(key) && typeof value === 'string' && value.length > 0) {
-        acc[key] = value;
-      }
-      return acc;
-    }, {} as Record<string, string>);
   };
 
   const credentials = extractCredentials(sourceData);
