@@ -1,0 +1,601 @@
+openapi: 3.0.0
+info:
+  title: superglue AI API
+  version: 1.0.0
+  description: API for running superglue AI tools
+  contact:
+    name: superglue AI Support
+    email: stefan@superglue.ai
+
+servers:
+  - url: https://api.superglue.cloud/v1
+    description: Production
+
+security:
+  - BearerAuth: []
+
+paths:
+  /tools:
+    get:
+      summary: List tools
+      operationId: listTools
+      tags:
+        - Tools
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        "200":
+          description: List of tools
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Tool"
+                  page:
+                    type: integer
+                    example: 1
+                  limit:
+                    type: integer
+                    example: 50
+                  total:
+                    type: integer
+                    example: 127
+                  hasMore:
+                    type: boolean
+                    example: true
+
+  /tools/{toolId}:
+    get:
+      summary: Get tool details
+      operationId: getTool
+      tags:
+        - Tools
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+      responses:
+        "200":
+          description: Tool details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tool"
+        "404":
+          description: Tool not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /tools/{toolId}/run:
+    post:
+      summary: Run a tool
+      operationId: runTool
+      tags:
+        - Tools
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunRequest"
+      responses:
+        "200":
+          description: Tool execution completed (sync)
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+              description: Maximum number of requests per time window
+              example: 100
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+              description: Number of requests remaining in current window
+              example: 95
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+              description: Unix timestamp when rate limit resets
+              example: 1640000000
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "202":
+          description: Tool execution started (async)
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+              example: 100
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+              example: 95
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+              example: 1640000000
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /runs/{runId}:
+    get:
+      summary: Get run status
+      operationId: getRun
+      tags:
+        - Runs
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 7f3e9c1a-2b4d-4e8f-9a3b-1c5d7e9f2a4b
+      responses:
+        "200":
+          description: Run details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "404":
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /runs/{runId}/cancel:
+    post:
+      summary: Cancel a run
+      operationId: cancelRun
+      tags:
+        - Runs
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Run cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "400":
+          description: Cannot cancel run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /runs:
+    get:
+      summary: List runs
+      operationId: listRuns
+      tags:
+        - Runs
+      parameters:
+        - name: toolId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [running, completed, failed, cancelled]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        "200":
+          description: List of runs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Run"
+                  page:
+                    type: integer
+                    example: 1
+                  limit:
+                    type: integer
+                    example: 50
+                  total:
+                    type: integer
+                    example: 327
+                  hasMore:
+                    type: boolean
+                    example: true
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+
+  schemas:
+    Tool:
+      type: object
+      description: A multi-step workflow tool that executes one or more protocol-specific operations
+      required:
+        - id
+        - name
+        - version
+        - inputSchema
+        - steps
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        name:
+          type: string
+          example: Web Search
+        description:
+          type: string
+          example: Search the web for information
+        version:
+          type: string
+          example: 1.0.0
+        instruction:
+          type: string
+          description: Human-readable instruction describing what the tool does
+          example: Search the web for the given query and return relevant results
+        inputSchema:
+          type: object
+          description: JSON Schema for tool inputs
+          example:
+            type: object
+            properties:
+              query:
+                type: string
+              maxResults:
+                type: integer
+                default: 10
+            required:
+              - query
+        outputSchema:
+          type: object
+          description: JSON Schema for tool outputs (after transformations applied)
+        steps:
+          type: array
+          description: Ordered execution steps that make up this tool
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ToolStep"
+        transformCode:
+          type: string
+          description: JavaScript expression for final output transformation (sourceData parameter contains step results)
+          example: "<<(sourceData) => sourceData.map(item => ({ id: item.id, title: item.name }))>>"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ToolStep:
+      type: object
+      description: |
+        A single execution step. Protocol is detected from URL scheme:
+        - HTTP/HTTPS: Standard REST API calls with query params, headers, body
+        - Postgres: postgres:// or postgresql:// URLs, body contains SQL query
+        - FTP/SFTP: ftp://, ftps://, or sftp:// URLs, body contains operation details
+      required:
+        - id
+        - url
+        - method
+        - integrationId
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for this step
+          example: 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+        url:
+          type: string
+          description: |
+            Full URL including protocol. Examples:
+            - HTTP: https://api.example.com/search
+            - Postgres: postgres://user:pass@host:5432/database
+            - FTP: ftp://user:pass@host:21/path
+            - SFTP: sftp://user:pass@host:22/path
+          example: https://api.example.com/search
+        method:
+          type: string
+          enum: [GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS]
+          description: HTTP method. For non-HTTP protocols, use POST.
+          example: GET
+        queryParams:
+          type: object
+          description: URL query parameters (HTTP only). Supports template expressions with <<(sourceData) => ...>> syntax.
+          additionalProperties: true
+          example:
+            q: "<<(sourceData) => sourceData.query>>"
+            limit: 10
+        headers:
+          type: object
+          description: HTTP headers (HTTP only). Supports template expressions with <<(sourceData) => ...>> syntax.
+          additionalProperties: true
+          example:
+            Content-Type: application/json
+            Authorization: "Bearer <<(sourceData) => sourceData.credentials.apiKey>>"
+        body:
+          type: string
+          description: |
+            Request body (protocol-specific). Supports template expressions with <<(sourceData) => ...>> syntax.
+
+            HTTP: Any content (JSON, XML, form data, etc.)
+            Example: '{"query": "<<(sourceData) => sourceData.query>>"}'
+
+            Postgres: JSON with query and optional params
+            Example: '{"query": "SELECT * FROM users WHERE id = $1", "params": ["<<(sourceData) => sourceData.userId>>"]}'
+
+            FTP/SFTP: JSON with operation, path, and optional content
+            Example: '{"operation": "get", "path": "/data/file.csv"}'
+            Example: '{"operation": "list", "path": "/data"}'
+            Example: '{"operation": "put", "path": "/data/file.txt", "content": "<<(sourceData) => sourceData.fileContent>>"}'
+          example: '{"query": "<<(sourceData) => sourceData.query>>"}'
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        integrationId:
+          type: string
+          format: uuid
+          description: Integration to use for stored credentials and configuration
+          example: 3f7c8d9e-1a2b-4c5d-8e9f-0a1b2c3d4e5f
+
+    Pagination:
+      type: object
+      description: Pagination configuration (HTTP/HTTPS only, not applicable to Postgres/FTP)
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [offsetBased, pageBased, cursorBased, disabled]
+          example: cursorBased
+        pageSize:
+          type: string
+          description: Number of items per page. Becomes available as <<(sourceData) => sourceData.limit>> in request templates.
+          example: "50"
+        cursorPath:
+          type: string
+          description: JSONPath to extract next page cursor from response body (e.g. "meta.next_cursor" for {meta:{next_cursor:"abc"}})
+          example: "meta.next_cursor"
+        stopCondition:
+          type: string
+          description: |
+            JavaScript function to determine when to stop pagination. Format: (response, pageInfo) => boolean
+            - response: Object with {data: ..., headers: ...} - access response body via response.data
+            - pageInfo: Object with {page: number, offset: number, cursor: any, totalFetched: number}
+            - Return true to STOP pagination, false to continue
+          example: "(response, pageInfo) => !response.data.pagination.has_more"
+
+    RunRequest:
+      type: object
+      required:
+        - inputs
+      properties:
+        inputs:
+          type: object
+          description: Tool-specific input parameters
+          example:
+            query: latest AI news
+            maxResults: 5
+        credentials:
+          type: object
+          description: |
+            Runtime credentials for integrations (overrides stored integration credentials if provided).
+            WARNING: These credentials are not persisted. Use integrationId for stored credentials.
+          additionalProperties: true
+          example:
+            apiKey: sk_live_abc123def456
+            apiSecret: secret_xyz789
+        options:
+          type: object
+          properties:
+            async:
+              type: boolean
+              default: false
+              description: If true, return immediately (202) and execute asynchronously. If false, wait for completion (200).
+            timeout:
+              type: integer
+              description: Request timeout in seconds (only for synchronous execution)
+            webhookUrl:
+              type: string
+              format: uri
+              description: URL to receive completion webhook (particularly useful for async executions)
+              example: https://your-app.com/webhooks/superglue
+
+    Run:
+      type: object
+      required:
+        - runId
+        - tool
+        - status
+        - metadata
+      properties:
+        runId:
+          type: string
+          format: uuid
+          example: 7f3e9c1a-2b4d-4e8f-9a3b-1c5d7e9f2a4b
+        tool:
+          type: object
+          description: Tool metadata (not full configuration)
+          required:
+            - id
+            - name
+            - version
+          properties:
+            id:
+              type: string
+              format: uuid
+            version:
+              type: string
+        status:
+          type: string
+          enum: [running, completed, failed, cancelled]
+          example: completed
+        data:
+          type: object
+          description: Tool execution results (only present when status is completed)
+          additionalProperties: true
+        error:
+          type: object
+          description: Error details (only present when failed)
+          properties:
+            code:
+              type: string
+              example: TIMEOUT
+            message:
+              type: string
+              example: Tool execution exceeded timeout
+            details:
+              type: object
+              additionalProperties: true
+        stepResults:
+          type: array
+          description: Results from each execution step (only for multi-step tools)
+          items:
+            $ref: "#/components/schemas/StepResult"
+        metadata:
+          type: object
+          required:
+            - startedAt
+          properties:
+            startedAt:
+              type: string
+              format: date-time
+            completedAt:
+              type: string
+              format: date-time
+            durationMs:
+              type: integer
+              example: 5234
+
+    StepResult:
+      type: object
+      required:
+        - stepId
+        - success
+      properties:
+        stepId:
+          type: string
+          format: uuid
+          example: 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          description: Data after outputTransform applied
+          additionalProperties: true
+        error:
+          type: string
+          description: Error message if step failed
+          example: Connection timeout
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - type
+            - message
+          properties:
+            type:
+              type: string
+              enum:
+                - validationError
+                - authenticationError
+                - permissionError
+                - notFound
+                - rateLimitExceeded
+                - internalError
+              example: validationError
+            message:
+              type: string
+              example: Invalid input parameters
+            details:
+              type: array
+              description: Detailed validation errors (for validationError type)
+              items:
+                type: object
+                required:
+                  - field
+                  - message
+                properties:
+                  field:
+                    type: string
+                    description: Field name that failed validation
+                    example: inputs.query
+                  message:
+                    type: string
+                    description: Human-readable error message
+                    example: Required field is missing
