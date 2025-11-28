@@ -275,22 +275,22 @@ export function resolveOAuthCertAndKey(oauthCert: string, oauthKey: string) {
  * - Valid arrow function → returns as-is
  * - Raw code → wraps in arrow function
  */
-export function ensureSourceDataArrowFunction(code: string | undefined | null): string {
+
+export function isArrowFunction(code: string | undefined | null): boolean {
+  const text = (code || '').trim();
+  if (!text) return false;
+  
+  return /^\s*(\([^)]*\)|[a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>/.test(text);
+}
+
+export function assertValidArrowFunction(code: string | undefined | null): string {
   const text = (code || '').trim();
   if (!text) return `(sourceData) => {\n  return {};\n}`;
-  
-  // Handle $ identity sentinel
   if (text === '$') return `(sourceData) => {\n  return sourceData;\n}`;
   
-  const validPatterns = [
-    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>\s*\{[\s\S]*\}\s*\)?\s*;?\s*$/, // block body
-    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>\s*\([\s\S]*\)\s*\)?\s*;?\s*$/, // parenthesized expr
-    /^\s*\(?\s*\(\s*sourceData\s*\)\s*=>[\s\S]*\)?\s*;?\s*$/              // tolerant bare expr
-  ];
-  
-  if (validPatterns.some((re) => re.test(text))) {
+  if (isArrowFunction(text)) {
     return text;
   }
   
-  return `(sourceData) => {\n${text}\n}`;
+  throw new Error(`Invalid arrow function: ${text}. Expected a valid arrow function.`);
 }
