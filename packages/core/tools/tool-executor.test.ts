@@ -148,27 +148,42 @@ describe('ToolExecutor Self-Healing Config Propagation', () => {
       };
     });
 
-    // Mock LLM generateObject to return updated config
-    vi.spyOn(LanguageModel, 'generateObject').mockResolvedValueOnce({
-      success: true,
-      response: {
-        dataSelector: updatedDataSelector,
-        apiConfig: {
-          urlHost: updatedConfig.urlHost,
-          urlPath: updatedConfig.urlPath,
-          method: updatedConfig.method,
-          queryParams: Object.entries(updatedConfig.queryParams || {}).map(([key, value]) => ({ key, value })),
-          headers: Object.entries(updatedConfig.headers || {}).map(([key, value]) => ({ key, value })),
-        }
-      },
-      messages: []
-    });
+    // Mock LLM generateObject - TWO calls needed:
+    // 1. First call: generateStepConfig during self-healing
+    // 2. Second call: evaluateStepResponse validation (runs when isSelfHealing is true)
+    vi.spyOn(LanguageModel, 'generateObject')
+      .mockResolvedValueOnce({
+        success: true,
+        response: {
+          dataSelector: updatedDataSelector,
+          apiConfig: {
+            urlHost: updatedConfig.urlHost,
+            urlPath: updatedConfig.urlPath,
+            method: updatedConfig.method,
+            queryParams: Object.entries(updatedConfig.queryParams || {}).map(([key, value]) => ({ key, value })),
+            headers: Object.entries(updatedConfig.headers || {}).map(([key, value]) => ({ key, value })),
+          }
+        },
+        messages: []
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        response: {
+          success: true,
+          refactorNeeded: false,
+          shortReason: 'Response is valid'
+        },
+        messages: []
+      });
 
     // Mock getDocumentation
     vi.spyOn(integrationManager, 'getDocumentation').mockResolvedValue({
       content: 'Test docs',
       isFetched: true
     });
+
+    // Mock searchDocumentation for validation step
+    vi.spyOn(integrationManager, 'searchDocumentation').mockResolvedValue('Test docs for validation');
 
     // Execute with self-healing enabled
     const result = await executor.execute({
