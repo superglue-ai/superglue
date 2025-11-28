@@ -7,12 +7,13 @@ import HardBreak from '@tiptap/extension-hard-break';
 import { cn } from '@/src/lib/general-utils';
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { TemplateExtension } from '../tools/templates/TemplateExtension';
-import { TemplateContextProvider, useTemplateContext } from '../tools/templates/TemplateContext';
-import { VariableSuggestion, createVariableSuggestionConfig } from '../tools/templates/VariableSuggestion';
+import { TemplateContextProvider, useTemplateContext, type CategorizedVariables, type CategorizedSources } from '../tools/templates/TemplateContext';
+import { VariableSuggestion, createVariableSuggestionConfig } from '../tools/templates/TemplateVariableSuggestion';
 import { TemplateEditPopover } from '../tools/templates/TemplateEditPopover';
 import { multilineTemplateStringToTiptap, multilineTiptapToTemplateString } from '../tools/templates/tiptap/serialization';
 import { CopyButton } from '../tools/shared/CopyButton';
 import { evaluateTemplate, parseTemplateString } from '@/src/lib/template-utils';
+import { maskCredentials } from '@superglue/shared';
 
 interface TemplateAwareJsonEditorProps {
     value: string;
@@ -20,6 +21,8 @@ interface TemplateAwareJsonEditorProps {
     stepData: any;
     loopData?: any;
     canExecute?: boolean;
+    categorizedVariables?: CategorizedVariables;
+    categorizedSources?: CategorizedSources;
     readOnly?: boolean;
     minHeight?: string;
     maxHeight?: string;
@@ -45,31 +48,49 @@ function TemplateAwareJsonEditorInner({
     const lastValueRef = useRef(value);
     const [currentHeight, setCurrentHeight] = useState(maxHeight);
     const [jsonError, setJsonError] = useState<string | null>(null);
-    const { availableVariables } = useTemplateContext();
+    const { categorizedVariables, categorizedSources } = useTemplateContext();
+    
+    const credentials = useMemo(() => {
+        if (!stepData || typeof stepData !== 'object') return {};
+        return Object.entries(stepData).reduce((acc, [key, value]) => {
+            const pattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
+            if (pattern.test(key) && typeof value === 'string' && value.length > 0) {
+                acc[key] = value;
+            }
+            return acc;
+        }, {} as Record<string, string>);
+    }, [stepData]);
     
     const [codePopoverOpen, setCodePopoverOpen] = useState(false);
     const [popoverAnchorRect, setPopoverAnchorRect] = useState<{ left: number; top: number } | null>(null);
     const editorRef = useRef<ReturnType<typeof useEditor> | null>(null);
+    const suggestionDestroyRef = useRef<(() => void) | null>(null);
 
     const suggestionConfig = useMemo(() => createVariableSuggestionConfig({
-        availableVariables,
-        onSelectVariable: (varName, range) => {
+        categorizedVariables,
+        categorizedSources,
+        onSelectVariable: (varName, range, categoryKey) => {
+            // All variables are code expressions now
+            const templateExpr = `(sourceData) => sourceData.${varName}`;
             editorRef.current?.chain().focus()
                 .deleteRange(range)
                 .insertContent({
                     type: 'template',
-                    attrs: { rawTemplate: `<<${varName}>>` },
+                    attrs: { rawTemplate: `<<${templateExpr}>>` },
                 })
                 .run();
         },
         onSelectCode: (range, cursorCoords) => {
-            console.log('[TemplateAwareJsonEditor] onSelectCode called', { range, cursorCoords });
+            // Get coordinates BEFORE deleting the @
+            const view = editorRef.current?.view;
+            let anchor = cursorCoords;
+            if (view) {
+                const coords = view.coordsAtPos(range.from);
+                anchor = { left: coords.left, top: coords.bottom };
+            }
             editorRef.current?.chain().focus().deleteRange(range).run();
-            setTimeout(() => {
-                console.log('[TemplateAwareJsonEditor] Opening code popover');
-                setPopoverAnchorRect(cursorCoords);
-                setCodePopoverOpen(true);
-            }, 50);
+            setPopoverAnchorRect(anchor);
+            setCodePopoverOpen(true);
         },
         onEscape: (range) => {
             editorRef.current?.chain().focus()
@@ -77,7 +98,21 @@ function TemplateAwareJsonEditorInner({
                 .insertContent('@')
                 .run();
         },
-    }), [availableVariables]);
+        onOpen: (destroy) => {
+            suggestionDestroyRef.current = destroy;
+        },
+        onClose: () => {
+            suggestionDestroyRef.current = null;
+        },
+    }), [categorizedVariables, categorizedSources]);
+
+    useEffect(() => {
+        return () => {
+            if (suggestionDestroyRef.current) {
+                suggestionDestroyRef.current();
+            }
+        };
+    }, []);
 
     const editor = useEditor({
         extensions: [
@@ -252,12 +287,12 @@ function TemplateAwareJsonEditorInner({
                         {placeholder}
                     </div>
                 )}
-            </div>
             {showValidation && jsonError && (
-                <div className="px-3 py-2 bg-destructive/10 text-destructive text-xs max-h-24 overflow-y-auto border-t">
-                    Error: {jsonError}
+                    <div className="absolute bottom-0 left-0 right-0 px-3 py-2 bg-destructive/10 text-destructive text-xs max-h-24 overflow-y-auto border-t">
+                        Error: {credentials && Object.keys(credentials).length > 0 ? maskCredentials(jsonError, credentials) : jsonError}
                 </div>
             )}
+            </div>
             <TemplateEditPopover
                 template=""
                 stepData={stepData}
@@ -266,7 +301,6 @@ function TemplateAwareJsonEditorInner({
                 externalOpen={codePopoverOpen}
                 onExternalOpenChange={setCodePopoverOpen}
                 anchorRect={popoverAnchorRect}
-                initialMode="code"
                 canExecute={canExecute}
             />
         </div>
@@ -280,6 +314,8 @@ export function TemplateAwareJsonEditor(props: TemplateAwareJsonEditorProps) {
             loopData={props.loopData} 
             readOnly={props.readOnly}
             canExecute={props.canExecute}
+            categorizedVariables={props.categorizedVariables}
+            categorizedSources={props.categorizedSources}
         >
             <TemplateAwareJsonEditorInner {...props} />
         </TemplateContextProvider>

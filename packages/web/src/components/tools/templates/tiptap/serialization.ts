@@ -74,20 +74,27 @@ export function multilineTemplateStringToTiptap(value: string): JSONContent {
         };
     }
 
-    const lines = value.split('\n');
+    const parts = parseTemplateString(value);
     const paragraphs: JSONContent[] = [];
-
-    for (const line of lines) {
-        const parts = parseTemplateString(line);
-        const content: JSONContent[] = [];
+    let currentParagraph: JSONContent[] = [];
 
         for (const part of parts) {
             if (part.type === 'text') {
-                if (part.value) {
-                    content.push({ type: 'text', text: part.value });
+            const textLines = part.value.split('\n');
+            for (let i = 0; i < textLines.length; i++) {
+                if (textLines[i]) {
+                    currentParagraph.push({ type: 'text', text: textLines[i] });
+                }
+                if (i < textLines.length - 1) {
+                    paragraphs.push({
+                        type: 'paragraph',
+                        content: currentParagraph.length > 0 ? currentParagraph : undefined,
+                    });
+                    currentParagraph = [];
+                }
                 }
             } else if (part.type === 'template') {
-                content.push({
+            currentParagraph.push({
                     type: 'template',
                     attrs: { rawTemplate: part.rawTemplate },
                 });
@@ -96,9 +103,8 @@ export function multilineTemplateStringToTiptap(value: string): JSONContent {
 
         paragraphs.push({
             type: 'paragraph',
-            content: content.length > 0 ? content : undefined,
+        content: currentParagraph.length > 0 ? currentParagraph : undefined,
         });
-    }
 
     return {
         type: 'doc',

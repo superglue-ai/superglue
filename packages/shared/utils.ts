@@ -294,3 +294,5 @@ export function assertValidArrowFunction(code: string | undefined | null): strin
   
   throw new Error(`Invalid arrow function: ${text}. Expected a valid arrow function.`);
 }
+
+

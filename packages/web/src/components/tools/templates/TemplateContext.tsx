@@ -1,13 +1,44 @@
 import { createContext, useContext, ReactNode, useMemo } from 'react';
 
+export interface CategorizedVariables {
+    credentials: string[];
+    toolInputs: string[];
+    fileInputs: string[];
+    currentStepData: string[];
+    previousStepData: string[];
+}
+
+export interface CategorizedSources {
+    manualPayload: Record<string, unknown>;
+    filePayloads: Record<string, unknown>;
+    previousStepResults: Record<string, unknown>;
+    currentItem: Record<string, unknown> | null;
+}
+
 interface TemplateContextValue {
     stepData: any;
     loopData?: any;
     readOnly: boolean;
     credentialKeys?: Set<string>;
     canExecute?: boolean;
-    availableVariables: string[];
+    categorizedVariables: CategorizedVariables;
+    categorizedSources?: CategorizedSources;
 }
+
+const emptyCategorizedVariables: CategorizedVariables = {
+    credentials: [],
+    toolInputs: [],
+    fileInputs: [],
+    currentStepData: [],
+    previousStepData: [],
+};
+
+const emptyCategorizedSources: CategorizedSources = {
+    manualPayload: {},
+    filePayloads: {},
+    previousStepResults: {},
+    currentItem: null,
+};
 
 const TemplateContext = createContext<TemplateContextValue>({
     stepData: {},
@@ -15,7 +46,8 @@ const TemplateContext = createContext<TemplateContextValue>({
     readOnly: false,
     credentialKeys: undefined,
     canExecute: true,
-    availableVariables: [],
+    categorizedVariables: emptyCategorizedVariables,
+    categorizedSources: emptyCategorizedSources,
 });
 
 export function TemplateContextProvider({
@@ -24,15 +56,20 @@ export function TemplateContextProvider({
     loopData,
     readOnly = false,
     canExecute = true,
+    categorizedVariables = emptyCategorizedVariables,
+    categorizedSources = emptyCategorizedSources,
 }: {
     children: ReactNode;
     stepData: any;
     loopData?: any;
     readOnly?: boolean;
     canExecute?: boolean;
+    categorizedVariables?: CategorizedVariables;
+    categorizedSources?: CategorizedSources;
 }) {
-    const credentialKeys = stepData && typeof stepData === 'object'
-        ? new Set(
+    const credentialKeys = useMemo(() => {
+        if (!stepData || typeof stepData !== 'object') return undefined;
+        return new Set(
             Object.keys(stepData).filter(key => {
                 const value = stepData[key];
                 if (typeof value === 'string' && value.length > 0) {
@@ -41,16 +78,11 @@ export function TemplateContextProvider({
                 }
                 return false;
             })
-        )
-        : undefined;
-
-    const availableVariables = useMemo(() => {
-        if (!stepData || typeof stepData !== 'object') return [];
-        return Object.keys(stepData).sort();
+        );
     }, [stepData]);
 
     return (
-        <TemplateContext.Provider value={{ stepData, loopData, readOnly, credentialKeys, canExecute, availableVariables }}>
+        <TemplateContext.Provider value={{ stepData, loopData, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources }}>
             {children}
         </TemplateContext.Provider>
     );

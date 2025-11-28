@@ -58,16 +58,21 @@ export function parseTemplateString(input: string): TemplatePart[] {
   return parts;
 }
 
-export function isSimpleVariableReference(expr: string): boolean {
-  return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr);
-}
-
 export function executeTemplateCode(code: string, data: any): any {
   try {
     return executeWithVMHelpers(code, data);
   } catch (error) {
     throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+export function normalizeTemplateExpression(expr: string): string {
+  const trimmed = expr.trim();
+  const isArrowFunction = /^\s*\([^)]*\)\s*=>/.test(trimmed);
+  if (isArrowFunction) {
+    return trimmed;
+  }
+  return `(sourceData) => sourceData.${trimmed}`;
 }
 
 export async function evaluateTemplate(
@@ -77,23 +82,9 @@ export async function evaluateTemplate(
 ): Promise<EvaluationResult> {
   try {
     const sourceData = prepareSourceData(stepData, loopData);
-
-    if (expr in sourceData && sourceData[expr] !== undefined) {
-      return { success: true, value: sourceData[expr] };
-    }
-
-    const isArrowFunction = /^\s*\([^)]*\)\s*=>/.test(expr);
-    
-    if (isArrowFunction) {
-      const result = executeTemplateCode(expr, sourceData);
-      return { success: true, value: result };
-    }
-
-    return {
-      success: false,
-      value: undefined,
-      error: `Variable '${expr}' not found in source data`
-    };
+    const normalizedExpr = normalizeTemplateExpression(expr);
+    const result = executeTemplateCode(normalizedExpr, sourceData);
+    return { success: true, value: result };
   } catch (error) {
     return {
       success: false,
@@ -176,14 +167,20 @@ export function formatValueForDisplay(value: any): string {
 
 export function isCredentialVariable(expr: string, stepData: any): boolean {
   if (!stepData || typeof stepData !== 'object') return false;
-  
   if (!expr || typeof expr !== 'string') return false;
   
-  const pattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
-  if (!pattern.test(expr)) return false;
+  let varName = expr.trim();
   
-  if (expr in stepData && stepData[expr] !== undefined) {
-    const value = stepData[expr];
+  const arrowMatch = varName.match(/^\s*\([^)]*\)\s*=>\s*\w+\.(\w+)\s*$/);
+  if (arrowMatch) {
+    varName = arrowMatch[1];
+  }
+  
+  const pattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
+  if (!pattern.test(varName)) return false;
+  
+  if (varName in stepData && stepData[varName] !== undefined) {
+    const value = stepData[varName];
     return typeof value === 'string' && value.length > 0;
   }
   

@@ -2,7 +2,8 @@ import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
 import { canExecuteStep } from '@/src/lib/client-utils';
 import { type UploadedFileInfo } from '@/src/lib/file-utils';
-import { buildEvolvingPayload, cn } from '@/src/lib/general-utils';
+import { buildEvolvingPayload, buildPreviousStepResults, cn } from '@/src/lib/general-utils';
+import { type CategorizedSources } from './templates/TemplateContext';
 import { Integration } from "@superglue/client";
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -233,6 +234,7 @@ export function ToolStepGallery({
         [stepResults]
     );
 
+    const manualPayload = useMemo(() => JSON.parse(rawPayloadText || '{}'), [rawPayloadText]);
     const hasTransformCompleted = completedSteps.includes('__final_transform__');
 
     const toolItems = useMemo(() => [
@@ -241,14 +243,26 @@ export function ToolStepGallery({
             data: { payloadText: rawPayloadText, inputSchema },
             stepResult: undefined,
             transformError: undefined,
-            evolvingPayload: workingPayload || {}
+            evolvingPayload: workingPayload || {},
+            categorizedSources: {
+                manualPayload,
+                filePayloads: filePayloads || {},
+                previousStepResults: {},
+                currentItem: null,
+            } as CategorizedSources
         },
         ...steps.map((step, index) => ({
             type: 'step',
             data: step,
             stepResult: stepResultsMap[step.id],
             transformError: undefined,
-            evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, index - 1)
+            evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, index - 1),
+            categorizedSources: {
+                manualPayload,
+                filePayloads: filePayloads || {},
+                previousStepResults: buildPreviousStepResults(steps, stepResultsMap, index - 1),
+                currentItem: null,
+            } as CategorizedSources
         })),
         ...(finalTransform !== undefined ? [{
             type: 'transform',
@@ -256,9 +270,15 @@ export function ToolStepGallery({
             stepResult: finalResult,
             transformError: failedSteps.includes('__final_transform__') ? stepResultsMap['__final_transform__'] : null,
             evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length - 1),
-            hasTransformCompleted
+            hasTransformCompleted,
+            categorizedSources: {
+                manualPayload,
+                filePayloads: filePayloads || {},
+                previousStepResults: buildPreviousStepResults(steps, stepResultsMap, steps.length - 1),
+                currentItem: null,
+            } as CategorizedSources
         }] : [])
-    ], [rawPayloadText, inputSchema, workingPayload, steps, stepResultsMap, finalTransform, responseSchema, finalResult, hasTransformCompleted, failedSteps]);
+    ], [rawPayloadText, inputSchema, workingPayload, steps, stepResultsMap, finalTransform, responseSchema, finalResult, hasTransformCompleted, manualPayload, filePayloads]);
 
     // Memoize canExecute checks to avoid running steps.every() on every render
     const canExecuteTransform = useMemo(() => 
@@ -394,6 +414,13 @@ export function ToolStepGallery({
 
             // Don't navigate when editing step config
             if (isConfiguratorEditing) {
+                return;
+            }
+
+            // Don't navigate when inside a popover (e.g., template code editor)
+            const activeElement = document.activeElement;
+            if (activeElement?.closest('[data-radix-popper-content-wrapper]') ||
+                activeElement?.closest('.monaco-editor')) {
                 return;
             }
 
@@ -706,6 +733,7 @@ export function ToolStepGallery({
                                     step={currentItem.data}
                                     stepIndex={activeIndex - 1} // Adjust for payload card
                                     evolvingPayload={currentItem.evolvingPayload || {}}
+                                    categorizedSources={currentItem.categorizedSources}
                                     stepResult={currentItem.stepResult}
                                     onEdit={!readOnly ? onStepEdit : undefined}
                                     onRemove={!readOnly && currentItem.type === 'step' ? handleRemoveStep : undefined}

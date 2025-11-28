@@ -6,8 +6,8 @@ import History from '@tiptap/extension-history';
 import { cn } from '@/src/lib/general-utils';
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { TemplateExtension } from '../tools/templates/TemplateExtension';
-import { TemplateContextProvider, useTemplateContext } from '../tools/templates/TemplateContext';
-import { VariableSuggestion, createVariableSuggestionConfig } from '../tools/templates/VariableSuggestion';
+import { TemplateContextProvider, useTemplateContext, type CategorizedVariables, type CategorizedSources } from '../tools/templates/TemplateContext';
+import { VariableSuggestion, createVariableSuggestionConfig } from '../tools/templates/TemplateVariableSuggestion';
 import { TemplateEditPopover } from '../tools/templates/TemplateEditPopover';
 import { templateStringToTiptap, tiptapToTemplateString } from '../tools/templates/tiptap/serialization';
 
@@ -17,6 +17,8 @@ interface TemplateAwareTextEditorProps {
     stepData: any;
     loopData?: any;
     canExecute?: boolean;
+    categorizedVariables?: CategorizedVariables;
+    categorizedSources?: CategorizedSources;
     placeholder?: string;
     className?: string;
     disabled?: boolean;
@@ -38,31 +40,38 @@ function TemplateAwareTextEditorInner({
 }: Omit<TemplateAwareTextEditorProps, 'stepData' | 'loopData'> & { stepData: any; loopData?: any; canExecute?: boolean }) {
     const isUpdatingRef = useRef(false);
     const lastValueRef = useRef(value);
-    const { availableVariables } = useTemplateContext();
+    const { categorizedVariables, categorizedSources } = useTemplateContext();
     
     const [codePopoverOpen, setCodePopoverOpen] = useState(false);
     const [popoverAnchorRect, setPopoverAnchorRect] = useState<{ left: number; top: number } | null>(null);
     const editorRef = useRef<ReturnType<typeof useEditor> | null>(null);
+    const suggestionDestroyRef = useRef<(() => void) | null>(null);
 
     const suggestionConfig = useMemo(() => createVariableSuggestionConfig({
-        availableVariables,
-        onSelectVariable: (varName, range) => {
+        categorizedVariables,
+        categorizedSources,
+        onSelectVariable: (varName, range, categoryKey) => {
+            // All variables are code expressions now
+            const templateExpr = `(sourceData) => sourceData.${varName}`;
             editorRef.current?.chain().focus()
                 .deleteRange(range)
                 .insertContent({
                     type: 'template',
-                    attrs: { rawTemplate: `<<${varName}>>` },
+                    attrs: { rawTemplate: `<<${templateExpr}>>` },
                 })
                 .run();
         },
         onSelectCode: (range, cursorCoords) => {
-            console.log('[TemplateAwareTextEditor] onSelectCode called', { range, cursorCoords });
+            // Get coordinates BEFORE deleting the @
+            const view = editorRef.current?.view;
+            let anchor = cursorCoords;
+            if (view) {
+                const coords = view.coordsAtPos(range.from);
+                anchor = { left: coords.left, top: coords.bottom };
+            }
             editorRef.current?.chain().focus().deleteRange(range).run();
-            setTimeout(() => {
-                console.log('[TemplateAwareTextEditor] Opening code popover');
-                setPopoverAnchorRect(cursorCoords);
-                setCodePopoverOpen(true);
-            }, 50);
+            setPopoverAnchorRect(anchor);
+            setCodePopoverOpen(true);
         },
         onEscape: (range) => {
             editorRef.current?.chain().focus()
@@ -70,7 +79,21 @@ function TemplateAwareTextEditorInner({
                 .insertContent('@')
                 .run();
         },
-    }), [availableVariables]);
+        onOpen: (destroy) => {
+            suggestionDestroyRef.current = destroy;
+        },
+        onClose: () => {
+            suggestionDestroyRef.current = null;
+        },
+    }), [categorizedVariables, categorizedSources]);
+
+    useEffect(() => {
+        return () => {
+            if (suggestionDestroyRef.current) {
+                suggestionDestroyRef.current();
+            }
+        };
+    }, []);
 
     const editor = useEditor({
         extensions: [
@@ -167,7 +190,6 @@ function TemplateAwareTextEditorInner({
                 externalOpen={codePopoverOpen}
                 onExternalOpenChange={setCodePopoverOpen}
                 anchorRect={popoverAnchorRect}
-                initialMode="code"
                 canExecute={canExecute}
             />
         </div>
@@ -180,12 +202,21 @@ export function TemplateAwareTextEditor({
     stepData,
     loopData,
     canExecute = true,
+    categorizedVariables,
+    categorizedSources,
     placeholder,
     className,
     disabled = false,
 }: TemplateAwareTextEditorProps) {
     return (
-        <TemplateContextProvider stepData={stepData} loopData={loopData} readOnly={disabled} canExecute={canExecute}>
+        <TemplateContextProvider 
+            stepData={stepData} 
+            loopData={loopData} 
+            readOnly={disabled} 
+            canExecute={canExecute} 
+            categorizedVariables={categorizedVariables}
+            categorizedSources={categorizedSources}
+        >
             <TemplateAwareTextEditorInner
                 value={value}
                 onChange={onChange}

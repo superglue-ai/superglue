@@ -1,7 +1,8 @@
 import { cn } from '@/src/lib/general-utils';
-import { truncateTemplateValue, isCredentialVariable, maskCredentialValue } from '@/src/lib/template-utils';
+import { truncateTemplateValue, isCredentialVariable } from '@/src/lib/template-utils';
+import { maskCredentials } from '@superglue/shared';
 import { Code2, X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TemplateEditPopover } from './TemplateEditPopover';
 
 interface TemplateChipProps {
@@ -17,6 +18,8 @@ interface TemplateChipProps {
   readOnly?: boolean;
   inline?: boolean;
   selected?: boolean;
+  forcePopoverOpen?: boolean;
+  onPopoverOpenChange?: (open: boolean) => void;
 }
 
 export function TemplateChip({
@@ -31,72 +34,123 @@ export function TemplateChip({
   onDelete,
   readOnly = false,
   inline = false,
-  selected = false
+  selected = false,
+  forcePopoverOpen = false,
+  onPopoverOpenChange
 }: TemplateChipProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  
+  const effectiveOpen = isPopoverOpen || forcePopoverOpen;
 
   const templateExpr = template.replace(/^<<|>>$/g, '').trim();
   const isCredential = isCredentialVariable(templateExpr, stepData);
 
-  const truncated = truncateTemplateValue(evaluatedValue, 150);
   const hasError = !!error;
   const isUnresolved = !hasError && (!canExecute || (evaluatedValue === undefined && !isEvaluating));
 
+  const credentials = stepData && typeof stepData === 'object'
+    ? Object.entries(stepData).reduce((acc, [key, value]) => {
+        const pattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
+        if (pattern.test(key) && typeof value === 'string' && value.length > 0) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {} as Record<string, string>)
+    : undefined;
+
   let displayText: string;
+  let isTruncated = false;
+  let originalSize = 0;
+
   if (hasError) {
     displayText = `Error: ${error.slice(0, 50)}${error.length > 50 ? '...' : ''}`;
   } else if (isUnresolved) {
     displayText = `unresolved: ${templateExpr}`;
-  } else if (isCredential && typeof evaluatedValue === 'string') {
-    displayText = maskCredentialValue(evaluatedValue);
   } else {
+    let fullDisplayText: string;
+    if (evaluatedValue === undefined) {
+      fullDisplayText = 'undefined';
+    } else if (evaluatedValue === null) {
+      fullDisplayText = 'null';
+    } else if (typeof evaluatedValue === 'string') {
+      fullDisplayText = evaluatedValue === '' ? '""' : evaluatedValue;
+    } else if (typeof evaluatedValue === 'object') {
+      try {
+        fullDisplayText = JSON.stringify(evaluatedValue);
+      } catch {
+        fullDisplayText = '[Complex Object]';
+      }
+    } else {
+      fullDisplayText = String(evaluatedValue);
+    }
+
+    originalSize = fullDisplayText.length;
+
+    if (isCredential && credentials && Object.keys(credentials).length > 0) {
+      fullDisplayText = maskCredentials(fullDisplayText, credentials);
+      const maskedTokens = fullDisplayText.match(/\{masked_[^}]+\}/g) || [];
+      if (maskedTokens.length > 0) {
+        displayText = maskedTokens[0];
+        isTruncated = fullDisplayText.length > maskedTokens[0].length;
+      } else {
+        displayText = fullDisplayText.slice(0, 150) + (fullDisplayText.length > 150 ? '...' : '');
+        isTruncated = fullDisplayText.length > 150;
+      }
+    } else {
+    const truncated = truncateTemplateValue(fullDisplayText, 150);
     displayText = truncated.display;
+      isTruncated = truncated.truncated;
+      originalSize = truncated.originalSize;
+    }
   }
 
-  const textColor = hasError 
-    ? undefined 
-    : isUnresolved 
-    ? undefined 
-    : '#B37400';
+  const isActive = selected || effectiveOpen;
+  
+  const getChipClasses = () => {
+    if (hasError) {
+      return {
+        bg: 'bg-red-500/20 dark:bg-red-500/20',
+        border: isActive ? 'border-red-500/50 dark:border-red-400/50' : 'border-transparent',
+        text: 'text-red-700 dark:text-red-300'
+      };
+    }
+    
+    if (isUnresolved) {
+      return {
+        bg: 'bg-gray-500/15 dark:bg-gray-400/20',
+        border: isActive ? 'border-gray-400/50 dark:border-gray-500/50' : 'border-transparent',
+        text: 'text-gray-600 dark:text-gray-300'
+      };
+    }
+    
+    return {
+      bg: 'bg-green-600/15 dark:bg-green-400/20',
+      border: isActive ? 'border-green-600/50 dark:border-green-400/50' : 'border-transparent',
+      text: 'text-green-700 dark:text-green-400'
+    };
+  };
+
+  const chipClasses = getChipClasses();
 
   const chipContent = (
     <span
       className={cn(
-        "inline-flex items-center gap-0.5 px-1 rounded text-xs font-mono select-none",
+        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono select-none border",
         "transition-all duration-150",
-        hasError && "bg-destructive/15 text-destructive border border-destructive/30",
-        isUnresolved && "bg-muted text-muted-foreground border border-muted-foreground/30",
-        !hasError && !isUnresolved && "border shadow-sm",
+        chipClasses.bg,
+        chipClasses.border,
+        chipClasses.text,
         !readOnly && "cursor-pointer",
         readOnly && "cursor-default",
         inline && "align-middle"
       )}
-      style={{
-        ...(!hasError && !isUnresolved ? {
-          backgroundColor: selected ? 'rgba(255, 165, 0, 0.3)' : 'rgba(255, 165, 0, 0.15)',
-          borderColor: '#FFA500',
-          boxShadow: selected 
-            ? '0 0 0 2px rgba(255, 165, 0, 0.5), 0 0 8px rgba(255, 165, 0, 0.3)' 
-            : '0 0 0 1px rgba(255, 165, 0, 0.3)'
-        } : {}),
-        ...(selected && (hasError || isUnresolved) ? {
-          boxShadow: hasError 
-            ? '0 0 0 2px rgba(239, 68, 68, 0.5), 0 0 8px rgba(239, 68, 68, 0.3)'
-            : '0 0 0 2px rgba(100, 100, 100, 0.5), 0 0 8px rgba(100, 100, 100, 0.2)'
-        } : {}),
-        lineHeight: '1.2',
-        paddingTop: '0px',
-        paddingBottom: '0px',
-        transition: 'all 0.15s ease-in-out'
-      }}
+      style={{ lineHeight: '1.3' }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      title={truncated.truncated ? `${truncated.originalSize} chars (click to view)` : undefined}
+      title={isTruncated ? `${originalSize} chars (click to view)` : undefined}
     >
-      <span 
-        className="w-3 h-3 flex items-center justify-center shrink-0"
-        style={{ color: textColor }}
-      >
+      <span className="w-3 h-3 flex items-center justify-center shrink-0">
         {isEvaluating ? (
           <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
         ) : !readOnly && isHovered ? (
@@ -114,14 +168,18 @@ export function TemplateChip({
           <Code2 className="h-3 w-3" />
         )}
       </span>
-      <span 
-        className="max-w-[200px] truncate"
-        style={{ color: textColor }}
-      >
+      <span className="max-w-[200px] truncate">
         {displayText}
       </span>
     </span>
   );
+
+  const handleOpenChange = (open: boolean) => {
+    setIsPopoverOpen(open);
+    if (!open) {
+      onPopoverOpenChange?.(false);
+    }
+  };
 
   if (readOnly) {
     return chipContent;
@@ -135,6 +193,8 @@ export function TemplateChip({
       onSave={onUpdate}
       readOnly={readOnly}
       canExecute={canExecute}
+      externalOpen={effectiveOpen}
+      onExternalOpenChange={handleOpenChange}
     >
       {chipContent}
     </TemplateEditPopover>
