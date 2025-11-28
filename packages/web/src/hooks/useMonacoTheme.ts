@@ -11,7 +11,7 @@ function getCurrentTheme(): 'light' | 'dark' {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 }
 
-function defineThemes(monaco: typeof Monaco) {
+function defineThemes(monaco: typeof Monaco | any) {
   if (themeInitialized) return;
   
   monaco.editor.defineTheme('superglue-light', {

@@ -1,4 +1,4 @@
-import { executeWithVMHelpers } from '@superglue/shared';
+import { executeWithVMHelpers, ensureSourceDataArrowFunction } from '@superglue/shared';
 export interface TemplatePart {
   type: 'text' | 'template';
   value: string;
@@ -68,9 +68,12 @@ export function executeTemplateCode(code: string, data: any): any {
 
 export function normalizeTemplateExpression(expr: string): string {
   const trimmed = expr.trim();
-  const isArrowFunction = /^\s*\([^)]*\)\s*=>/.test(trimmed);
-  if (isArrowFunction) {
-    return trimmed;
+  const hasArrowSyntax = /=>/.test(trimmed);
+  if (hasArrowSyntax) {
+    return ensureSourceDataArrowFunction(trimmed);
+  }
+  if (trimmed.startsWith('sourceData.') || trimmed === 'sourceData') {
+    return `(sourceData) => ${trimmed}`;
   }
   return `(sourceData) => sourceData.${trimmed}`;
 }
