@@ -1,8 +1,8 @@
 import { cn } from '@/src/lib/general-utils';
-import { truncateTemplateValue, isCredentialVariable } from '@/src/lib/template-utils';
+import { truncateTemplateValue, isCredentialVariable, prepareSourceData } from '@/src/lib/template-utils';
 import { maskCredentials } from '@superglue/shared';
 import { Code2, X } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { TemplateEditPopover } from './TemplateEditPopover';
 
 interface TemplateChipProps {
@@ -38,19 +38,20 @@ export function TemplateChip({
   forcePopoverOpen = false,
   onPopoverOpenChange
 }: TemplateChipProps) {
+  const sourceData = useMemo(() => prepareSourceData(stepData, loopData), [stepData, loopData]);
   const [isHovered, setIsHovered] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   
   const effectiveOpen = isPopoverOpen || forcePopoverOpen;
 
   const templateExpr = template.replace(/^<<|>>$/g, '').trim();
-  const isCredential = isCredentialVariable(templateExpr, stepData);
+  const isCredential = isCredentialVariable(templateExpr, sourceData);
 
   const hasError = !!error;
   const isUnresolved = !hasError && (!canExecute || (evaluatedValue === undefined && !isEvaluating));
 
-  const credentials = stepData && typeof stepData === 'object'
-    ? Object.entries(stepData).reduce((acc, [key, value]) => {
+  const credentials = sourceData && typeof sourceData === 'object'
+    ? Object.entries(sourceData).reduce((acc, [key, value]) => {
         const pattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
         if (pattern.test(key) && typeof value === 'string' && value.length > 0) {
           acc[key] = value;
@@ -188,10 +189,8 @@ export function TemplateChip({
   return (
     <TemplateEditPopover
       template={template}
-      stepData={stepData}
-      loopData={loopData}
+      sourceData={sourceData}
       onSave={onUpdate}
-      readOnly={readOnly}
       canExecute={canExecute}
       externalOpen={effectiveOpen}
       onExternalOpenChange={handleOpenChange}

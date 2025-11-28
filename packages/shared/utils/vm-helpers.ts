@@ -1,9 +1,18 @@
-/**
- * Shared VM helpers that can be injected into both isolated-vm contexts (backend)
- * and Function contexts (frontend) to ensure consistent behavior.
- * 
- * This ensures frontend template evaluation matches backend behavior.
- */
+export function executeWithVMHelpers(code: string, sourceData: any): any {
+  const wrappedCode = `
+    ${VM_HELPERS_CODE}
+    
+    const fn = ${code};
+    return fn(sourceData);
+  `;
+  
+  try {
+    const fn = new Function('sourceData', wrappedCode);
+    return fn(sourceData);
+  } catch (error) {
+    throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
 
 export const VM_HELPERS_CODE = `
   // String.prototype.matchAll polyfill
@@ -398,24 +407,5 @@ export const VM_HELPERS_CODE = `
   }
 `;
 
-/**
- * Execute code in a Function context with VM helpers injected.
- * This ensures frontend template evaluation matches backend behavior.
- */
-export function executeWithVMHelpers(code: string, sourceData: any): any {
-  // Create a function that includes the helpers and executes the code
-  const wrappedCode = `
-    ${VM_HELPERS_CODE}
-    
-    const fn = ${code};
-    return fn(sourceData);
-  `;
-  
-  try {
-    const fn = new Function('sourceData', wrappedCode);
-    return fn(sourceData);
-  } catch (error) {
-    throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
+
 

@@ -31,7 +31,7 @@ import { Label } from '../../ui/label';
 import { ToolStepConfigurator } from '../ToolStepConfigurator';
 import { useDataProcessor } from '../hooks/use-data-processor';
 import { CopyButton } from '../shared/CopyButton';
-import { type CategorizedSources } from '../templates/TemplateContext';
+import { type CategorizedSources } from '../templates/tiptap/TemplateContext';
 
 export const SpotlightStepCard = React.memo(({
     step,

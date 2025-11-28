@@ -5,7 +5,7 @@ import { splitUrl } from '@/src/lib/client-utils';
 import { composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/general-utils';
 import { Integration } from "@superglue/client";
 import { flattenAndNamespaceCredentials } from '@superglue/shared';
-import { type CategorizedSources, type CategorizedVariables } from './templates/TemplateContext';
+import { type CategorizedSources, type CategorizedVariables } from './templates/tiptap/TemplateContext';
 import { ArrowDown, Globe, OctagonAlert, Pencil } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { JavaScriptCodeEditor } from '../editors/JavaScriptCodeEditor';

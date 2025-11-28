@@ -1,38 +1,41 @@
 import { Node, mergeAttributes, InputRule } from '@tiptap/core';
 import { NodeViewWrapper, ReactNodeViewRenderer, NodeViewProps } from '@tiptap/react';
 import { TemplateChip } from './TemplateChip';
-import { useTemplateContext } from './TemplateContext';
-import { evaluateTemplate } from '@/src/lib/template-utils';
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import stableStringify from 'fast-safe-stringify';
+import { useTemplateContext } from './tiptap/TemplateContext';
+import { prepareSourceData } from '@/src/lib/template-utils';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useTemplatePreview } from '../hooks/use-template-preview';
 
 function TemplateNodeView(props: NodeViewProps) {
     const { node, deleteNode, updateAttributes, selected, editor } = props;
     const { stepData, loopData, readOnly, canExecute = true } = useTemplateContext();
-    const [evaluation, setEvaluation] = useState<{ value?: any; error?: string }>({});
-    const [isEvaluating, setIsEvaluating] = useState(false);
     const [isEditorFocused, setIsEditorFocused] = useState(false);
     const [forcePopoverOpen, setForcePopoverOpen] = useState(false);
+    
     const rawTemplate = node.attrs.rawTemplate as string;
     const expression = rawTemplate.startsWith('<<') && rawTemplate.endsWith('>>')
         ? rawTemplate.slice(2, -2).trim()
         : rawTemplate.trim();
 
+    const sourceData = useMemo(() => prepareSourceData(stepData, loopData), [stepData, loopData]);
+    const { previewValue, previewError, isEvaluating } = useTemplatePreview(
+        expression,
+        sourceData,
+        { enabled: canExecute, debounceMs: 100 }
+    );
+
     useEffect(() => {
-        if (!editor?.view?.dom) return;
+        const dom = editor?.view?.dom;
+        if (!dom) return;
         
-        const dom = editor.view.dom;
-        const handleFocus = () => setIsEditorFocused(true);
-        const handleBlur = () => setIsEditorFocused(false);
-        
-        dom.addEventListener('focus', handleFocus, true);
-        dom.addEventListener('blur', handleBlur, true);
-        
-        setIsEditorFocused(document.activeElement === dom || dom.contains(document.activeElement));
+        const updateFocus = () => setIsEditorFocused(dom.contains(document.activeElement));
+        dom.addEventListener('focusin', updateFocus);
+        dom.addEventListener('focusout', updateFocus);
+        updateFocus();
         
         return () => {
-            dom.removeEventListener('focus', handleFocus, true);
-            dom.removeEventListener('blur', handleBlur, true);
+            dom.removeEventListener('focusin', updateFocus);
+            dom.removeEventListener('focusout', updateFocus);
         };
     }, [editor]);
 
@@ -47,61 +50,11 @@ function TemplateNodeView(props: NodeViewProps) {
     }, [isActuallySelected, readOnly]);
 
     useEffect(() => {
-        if (!editor?.view?.dom) return;
-        const dom = editor.view.dom;
+        const dom = editor?.view?.dom;
+        if (!dom) return;
         dom.addEventListener('keydown', handleKeyDown, true);
         return () => dom.removeEventListener('keydown', handleKeyDown, true);
     }, [editor, handleKeyDown]);
-
-    const stepDataRef = useRef(stepData);
-    const loopDataRef = useRef(loopData);
-    stepDataRef.current = stepData;
-    loopDataRef.current = loopData;
-
-    const stepDataKey = useMemo(() => stableStringify(stepData), [stepData]);
-    const loopDataKey = useMemo(() => stableStringify(loopData), [loopData]);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        if (!canExecute) {
-            setEvaluation({});
-            setIsEvaluating(false);
-            return;
-        }
-
-        setIsEvaluating(true);
-
-        const evaluate = async () => {
-            try {
-                const result = await evaluateTemplate(expression, stepDataRef.current, loopDataRef.current);
-                if (!cancelled) {
-                    setEvaluation(result);
-                    setIsEvaluating(false);
-                }
-            } catch (error) {
-                if (!cancelled) {
-                    setEvaluation({ error: String(error) });
-                    setIsEvaluating(false);
-                }
-            }
-        };
-
-        const timer = setTimeout(evaluate, 100);
-        return () => {
-            cancelled = true;
-            clearTimeout(timer);
-            setIsEvaluating(false);
-        };
-    }, [expression, stepDataKey, loopDataKey, canExecute]);
-
-    const handleUpdate = (newTemplate: string) => {
-        updateAttributes({ rawTemplate: newTemplate });
-    };
-
-    const handleDelete = () => {
-        deleteNode();
-    };
 
     const handlePopoverOpenChange = useCallback((open: boolean) => {
         if (!open) setForcePopoverOpen(false);
@@ -111,14 +64,14 @@ function TemplateNodeView(props: NodeViewProps) {
         <NodeViewWrapper as="span" className="inline">
             <TemplateChip
                 template={rawTemplate}
-                evaluatedValue={evaluation?.value}
-                error={evaluation?.error}
+                evaluatedValue={previewValue}
+                error={previewError ?? undefined}
                 stepData={stepData}
                 loopData={loopData}
                 isEvaluating={isEvaluating}
                 canExecute={canExecute}
-                onUpdate={handleUpdate}
-                onDelete={handleDelete}
+                onUpdate={(newTemplate) => updateAttributes({ rawTemplate: newTemplate })}
+                onDelete={deleteNode}
                 readOnly={readOnly}
                 inline={true}
                 selected={isActuallySelected}
@@ -129,40 +82,26 @@ function TemplateNodeView(props: NodeViewProps) {
     );
 }
 
-// Regex to match <<...>> patterns when >> is typed
-// Match any content between << and >> (non-greedy to handle => in arrow functions)
 const TEMPLATE_REGEX = /<<(.+?)>>$/;
 
-// TipTap extension for template nodes
 export const TemplateExtension = Node.create({
     name: 'template',
-
     group: 'inline',
-
     inline: true,
-
-    atom: true, // This is key - makes it an atomic unit (can't place cursor inside)
+    atom: true,
 
     addAttributes() {
         return {
             rawTemplate: {
                 default: '',
                 parseHTML: element => element.getAttribute('data-template'),
-                renderHTML: attributes => {
-                    return {
-                        'data-template': attributes.rawTemplate,
-                    };
-                },
+                renderHTML: attributes => ({ 'data-template': attributes.rawTemplate }),
             },
         };
     },
 
     parseHTML() {
-        return [
-            {
-                tag: 'span[data-template]',
-            },
-        ];
+        return [{ tag: 'span[data-template]' }];
     },
 
     renderHTML({ HTMLAttributes }) {
@@ -178,15 +117,9 @@ export const TemplateExtension = Node.create({
         return [
             new InputRule({
                 find: TEMPLATE_REGEX,
-                handler: (props) => {
-                    const { state, range, match } = props;
-                    const fullMatch = match[0];
-                    console.log('[TemplateExtension] InputRule triggered:', fullMatch, 'at range', range.from, '-', range.to);
-                    
-                    const templateNode = nodeType.create({ rawTemplate: fullMatch });
-                    const { tr } = state;
-                    
-                    tr.replaceWith(range.from, range.to, templateNode);
+                handler: ({ state, range, match }) => {
+                    const templateNode = nodeType.create({ rawTemplate: match[0] });
+                    state.tr.replaceWith(range.from, range.to, templateNode);
                 },
             }),
         ];
