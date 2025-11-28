@@ -6,13 +6,7 @@ import { forwardRef, useImperativeHandle, useState, useRef, useEffect } from 're
 import { cn } from '@/src/lib/general-utils';
 import { Key, FileInput, FileJson, Route, Code2, ChevronRight, Paperclip } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useTheme } from '@/src/hooks/useTheme';
-import { type CategorizedVariables, type CategorizedSources } from './TemplateContext';
-
-const TYPE_COLORS = {
-    light: { string: '#50A14F', number: '#0184BC', object: '#0997B3', array: '#C678DD', other: '#383A42' },
-    dark: { string: '#98C379', number: '#61AFEF', object: '#56B6C2', array: '#C678DD', other: '#ABB2BF' }
-};
+import { type CategorizedVariables, type CategorizedSources } from './tiptap/TemplateContext';
 
 type ValueType = 'object' | 'array' | 'string' | 'number' | 'other';
 
@@ -32,11 +26,6 @@ function getTypeSymbol(type: ValueType): string {
         case 'number': return '123';
         default: return '';
     }
-}
-
-function getTypeColor(type: ValueType, isDarkMode: boolean): string {
-    const colors = isDarkMode ? TYPE_COLORS.dark : TYPE_COLORS.light;
-    return colors[type];
 }
 
 interface CategoryConfig {
@@ -100,8 +89,6 @@ type NavigationState =
 
 const VariableCommandMenu = forwardRef<VariableCommandMenuRef, VariableCommandMenuProps>(
     ({ categorizedVariables, categorizedSources, onSelectVariable, onSelectCode, onRequestClose }, ref) => {
-        const [, , resolvedTheme] = useTheme();
-        const isDarkMode = resolvedTheme === 'dark';
         const [navState, setNavState] = useState<NavigationState>({ level: 'categories' });
         const [selectedIndex, setSelectedIndex] = useState(0);
         const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -241,27 +228,21 @@ const VariableCommandMenu = forwardRef<VariableCommandMenuRef, VariableCommandMe
             },
         }));
 
-        const renderBreadcrumb = () => {
-            if (navState.level === 'categories') return null;
-            
-            let label = navState.category.label;
-            if (navState.level === 'nested') {
-                label = `${navState.varName}${navState.path.length > 0 ? '.' + navState.path.join('.') : ''}`;
-            }
-            
-            return (
-                <div className="px-3 py-1.5 text-xs text-muted-foreground border-b truncate">
-                    {label}
-                </div>
-            );
-        };
+        const breadcrumbLabel = navState.level === 'categories' ? null
+            : navState.level === 'nested' 
+                ? `${navState.varName}${navState.path.length > 0 ? '.' + navState.path.join('.') : ''}`
+                : navState.category.label;
 
         return (
             <div 
                 className="bg-popover border rounded-lg shadow-lg overflow-hidden" 
                 style={{ width: `${MENU_WIDTH}px` }}
             >
-                {renderBreadcrumb()}
+                {breadcrumbLabel && (
+                    <div className="px-3 py-1.5 text-xs text-muted-foreground border-b truncate">
+                        {breadcrumbLabel}
+                    </div>
+                )}
                 <div className="overflow-y-auto" style={{ maxHeight: `${MAX_LIST_HEIGHT}px` }}>
                     {navState.level === 'categories' ? (
                         nonEmptyCategories.length === 0 ? (
@@ -297,7 +278,6 @@ const VariableCommandMenu = forwardRef<VariableCommandMenuRef, VariableCommandMe
                     ) : (
                         items.map((item, index) => {
                             const typeSymbol = getTypeSymbol(types[index]);
-                            const typeColor = getTypeColor(types[index], isDarkMode);
                             return (
                                 <button
                                     key={item}
@@ -312,7 +292,7 @@ const VariableCommandMenu = forwardRef<VariableCommandMenuRef, VariableCommandMe
                                 >
                                     <span className="flex items-center gap-1.5 truncate">
                                         {typeSymbol && (
-                                            <span className="text-xs font-mono shrink-0" style={{ color: typeColor }}>
+                                            <span className="text-xs font-mono shrink-0">
                                                 {typeSymbol}
                                             </span>
                                         )}
@@ -364,9 +344,7 @@ export function createVariableSuggestionConfig(callbacks: SuggestionCallbacks) {
         startOfLine: false,
         allowedPrefixes: null,
         allow: ({ state, range }) => {
-            // Must be right after @ with no text typed yet
             if (range.from + 1 < range.to) return false;
-            // Must not have non-whitespace char immediately after cursor
             const charAfterCursor = state.doc.textBetween(range.to, range.to + 1, '\0', '\0');
             return charAfterCursor === '' || /\s/.test(charAfterCursor);
         },
@@ -383,27 +361,29 @@ export function createVariableSuggestionConfig(callbacks: SuggestionCallbacks) {
                 currentRange = null;
             };
 
+            const makeMenuProps = (props: SuggestionProps<string>) => ({
+                categorizedVariables: callbacks.categorizedVariables,
+                categorizedSources: callbacks.categorizedSources,
+                onSelectVariable: (varName: string, categoryKey: keyof CategorizedVariables) => {
+                    if (currentRange) callbacks.onSelectVariable(varName, currentRange, categoryKey);
+                    popup?.[0]?.hide();
+                },
+                onSelectCode: (anchorRect: DOMRect | null) => {
+                    if (currentRange) {
+                        const rect = anchorRect || props.clientRect?.();
+                        callbacks.onSelectCode(currentRange, rect ? { left: rect.left, top: rect.bottom } : null);
+                    }
+                    popup?.[0]?.hide();
+                },
+                onRequestClose: destroyPopup,
+            });
+
             return {
                 onStart: (props: SuggestionProps<string>) => {
                     currentRange = props.range;
 
                     component = new ReactRenderer(VariableCommandMenu, {
-                        props: {
-                            categorizedVariables: callbacks.categorizedVariables,
-                            categorizedSources: callbacks.categorizedSources,
-                            onSelectVariable: (varName: string, categoryKey: keyof CategorizedVariables) => {
-                                if (currentRange) callbacks.onSelectVariable(varName, currentRange, categoryKey);
-                                popup?.[0]?.hide();
-                            },
-                            onSelectCode: (anchorRect: DOMRect | null) => {
-                                if (currentRange) {
-                                    const rect = anchorRect || props.clientRect?.();
-                                    callbacks.onSelectCode(currentRange, rect ? { left: rect.left, top: rect.bottom } : null);
-                                }
-                                popup?.[0]?.hide();
-                            },
-                            onRequestClose: destroyPopup,
-                        },
+                        props: makeMenuProps(props),
                         editor: props.editor,
                     });
 
@@ -424,27 +404,12 @@ export function createVariableSuggestionConfig(callbacks: SuggestionCallbacks) {
                         popperOptions: { strategy: 'fixed' },
                     });
 
-                    if (callbacks.onOpen) callbacks.onOpen(destroyPopup);
+                    callbacks.onOpen?.(destroyPopup);
                 },
 
                 onUpdate: (props: SuggestionProps<string>) => {
                     currentRange = props.range;
-                    component?.updateProps({
-                        categorizedVariables: callbacks.categorizedVariables,
-                        categorizedSources: callbacks.categorizedSources,
-                        onSelectVariable: (varName: string, categoryKey: keyof CategorizedVariables) => {
-                            if (currentRange) callbacks.onSelectVariable(varName, currentRange, categoryKey);
-                            popup?.[0]?.hide();
-                        },
-                        onSelectCode: (anchorRect: DOMRect | null) => {
-                            if (currentRange) {
-                                const rect = anchorRect || props.clientRect?.();
-                                callbacks.onSelectCode(currentRange, rect ? { left: rect.left, top: rect.bottom } : null);
-                            }
-                            popup?.[0]?.hide();
-                        },
-                        onRequestClose: destroyPopup,
-                    });
+                    component?.updateProps(makeMenuProps(props));
                     if (props.clientRect && popup?.[0]) {
                         popup[0].setProps({ getReferenceClientRect: props.clientRect as () => DOMRect });
                     }
