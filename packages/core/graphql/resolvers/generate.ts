@@ -3,7 +3,7 @@ import { GraphQLResolveInfo } from "graphql";
 import { executeLLMTool, LLMToolCall } from "../../llm/llm-tool-utils.js";
 import { InstructionGenerationContext } from "../../llm/llm-tools.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { Context, Metadata } from '../types.js';
+import { GraphQLRequestContext, Metadata } from '../types.js';
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { getGenerateStepConfigContext } from "../../context/context-builders.js";
 import { LLMMessage } from "../../llm/llm-base-model.js";
@@ -23,7 +23,7 @@ interface GenerateStepConfigArgs {
 export const generateInstructionsResolver = async (
   _: any,
   { integrations }: { integrations: Integration[] },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   try {
@@ -52,6 +52,7 @@ export const generateInstructionsResolver = async (
     throw new Error("Failed to generate instructions");
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
+      traceId: context.traceId,
       integrations: integrations
     });
     throw error;
@@ -61,11 +62,11 @@ export const generateInstructionsResolver = async (
 export const generateStepConfigResolver = async (
   _: any,
   { integrationId, currentStepConfig, currentDataSelector, stepInput, credentials, errorMessage }: GenerateStepConfigArgs,
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ): Promise<{config: ApiConfig, dataSelector: string}> => {
   try {
-    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
+    const metadata: Metadata = { orgId: context.orgId, traceId: context.traceId };
 
     // Extract instruction from currentStepConfig
     const instruction = currentStepConfig?.instruction;
@@ -141,8 +142,10 @@ export const generateStepConfigResolver = async (
     return {config: mergedConfig, dataSelector: generateStepConfigResult.dataSelector};
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
+      traceId: context.traceId,
       integrationId
     });
+
     throw error;
   }
 };

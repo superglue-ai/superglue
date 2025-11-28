@@ -1,6 +1,6 @@
 import { ApiConfig } from "@superglue/client";
 import { GraphQLResolveInfo } from "graphql";
-import { Context } from '../types.js';
+import { GraphQLRequestContext } from '../types.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -12,7 +12,7 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
 export const upsertApiResolver = async (
   _: any,
   { id, input }: { id: string; input: ApiConfig; },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   if (!id) {

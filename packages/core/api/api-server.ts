@@ -4,6 +4,7 @@ import { extractTokenFromFastifyRequest, validateToken } from '../auth/auth.js';
 import { DataStore } from '../datastore/types.js';
 import { logMessage } from "../utils/logs.js";
 import { AuthenticatedFastifyRequest } from './types.js';
+import { generateTraceId } from '../utils/trace-id.js';
 
 export async function startApiServer(datastore: DataStore) {
   // Get REST API port
@@ -45,14 +46,16 @@ export async function startApiServer(datastore: DataStore) {
       return;
     }
 
+    const traceId = generateTraceId();
+
     // Authentication logic
     const token = extractTokenFromFastifyRequest(request);
     const authResult = await validateToken(token);
-    logMessage('info', `Fastify authentication result: ${JSON.stringify(authResult)}`);
+    logMessage('info', `Fastify authentication result: ${JSON.stringify(authResult)}`, { traceId });
     
     // If authentication fails, return 401 error
     if (!authResult.success) {
-      logMessage('warn', `Fastify authentication failed for token: ${token}`);
+      logMessage('warn', `Fastify authentication failed for token: ${token}`, { traceId });
       return reply.code(401).send({
         success: false,
         error: 'Authentication failed',
@@ -68,8 +71,9 @@ export async function startApiServer(datastore: DataStore) {
       orgRole: authResult.orgRole
     };
 
-    // Add datastore to request context
+    // Add datastore and traceId to request context
     (request as AuthenticatedFastifyRequest).datastore = datastore;
+    (request as AuthenticatedFastifyRequest).traceId = traceId;
   });
 
   // Register all API routes from modules

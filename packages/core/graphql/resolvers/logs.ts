@@ -1,10 +1,10 @@
 import { LogEntry } from "@superglue/shared";
 import { EventEmitter } from 'events';
 import { logEmitter } from '../../utils/logs.js';
-import { Context } from '../types.js';
+import { GraphQLRequestContext } from '../types.js';
 // Export resolver
 export const logsResolver = {
-    subscribe: (_, { }, context: Context) => {
+    subscribe: (_, { }, context: GraphQLRequestContext) => {
         const orgId = context.orgId;
         return {
             [Symbol.asyncIterator]() {

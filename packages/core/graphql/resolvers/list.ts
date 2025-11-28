@@ -1,10 +1,10 @@
 import { GraphQLResolveInfo } from 'graphql';
-import { Context } from '../types.js';
+import { GraphQLRequestContext } from '../types.js';
 
 export const listApisResolver = async (
   _: any,
   { offset, limit }: { offset: number, limit: number },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   const result = await context.datastore.listApiConfigs({ limit, offset, orgId: context.orgId });
@@ -14,7 +14,7 @@ export const listApisResolver = async (
 export const listRunsResolver = async (
   _: any,
   { offset, limit, configId }: { offset: number, limit: number, configId: string },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   const result = await context.datastore.listRuns({ limit, offset, configId, orgId: context.orgId });

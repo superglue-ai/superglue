@@ -3,7 +3,7 @@ export interface LogEntry {
   message: string;
   level: string;
   timestamp: Date;
-  runId?: string;
+  runId?: string; // this is the traceId.
   orgId?: string;
 }
 

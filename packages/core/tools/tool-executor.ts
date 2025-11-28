@@ -295,7 +295,7 @@ export class ToolExecutor implements Tool {
         }
       }
 
-      logMessage("info", `'${step.id}' Complete`, this.metadata);
+      logMessage("info", `Step '${step.id}' Complete`, this.metadata);
       
       const toolStepResult = {
         stepId: step.id,
@@ -319,7 +319,7 @@ export class ToolExecutor implements Tool {
 
       
     } catch (error) {
-      logMessage("info", `'${step.id}' Failed`, this.metadata);
+      logMessage("info", `Step '${step.id}' Failed`, this.metadata);
       
       return {
         result: {
