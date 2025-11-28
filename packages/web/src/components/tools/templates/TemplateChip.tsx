@@ -48,7 +48,8 @@ export function TemplateChip({
   const isCredential = isCredentialVariable(templateExpr, sourceData);
 
   const hasError = !!error;
-  const isUnresolved = !hasError && (!canExecute || (evaluatedValue === undefined && !isEvaluating));
+  const isUnresolved = !hasError && !canExecute;
+  const isResolvedUndefined = !hasError && canExecute && !isEvaluating && evaluatedValue === undefined;
 
   const credentials = sourceData && typeof sourceData === 'object'
     ? Object.entries(sourceData).reduce((acc, [key, value]) => {
@@ -67,12 +68,12 @@ export function TemplateChip({
   if (hasError) {
     displayText = `Error: ${error.slice(0, 50)}${error.length > 50 ? '...' : ''}`;
   } else if (isUnresolved) {
-    displayText = `unresolved: ${templateExpr}`;
+    displayText = `unresolved: ${templateExpr.slice(0, 30)}${templateExpr.length > 30 ? '...' : ''}`;
+  } else if (isResolvedUndefined) {
+    displayText = 'undefined';
   } else {
     let fullDisplayText: string;
-    if (evaluatedValue === undefined) {
-      fullDisplayText = 'undefined';
-    } else if (evaluatedValue === null) {
+    if (evaluatedValue === null) {
       fullDisplayText = 'null';
     } else if (typeof evaluatedValue === 'string') {
       fullDisplayText = evaluatedValue === '' ? '""' : evaluatedValue;
@@ -117,7 +118,7 @@ export function TemplateChip({
       };
     }
     
-    if (isUnresolved) {
+    if (isUnresolved || isResolvedUndefined) {
       return {
         bg: 'bg-gray-500/15 dark:bg-gray-400/20',
         border: isActive ? 'border-gray-400/50 dark:border-gray-500/50' : 'border-transparent',

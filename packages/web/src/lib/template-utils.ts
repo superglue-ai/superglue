@@ -1,4 +1,4 @@
-import { executeWithVMHelpers, ensureSourceDataArrowFunction } from '@superglue/shared';
+import { executeWithVMHelpers, isArrowFunction } from '@superglue/shared';
 
 export const DEFAULT_CODE_TEMPLATE = '(sourceData) => ({})';
 const CREDENTIAL_PATTERN = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
@@ -70,16 +70,23 @@ export function executeTemplateCode(code: string, data: any): any {
   }
 }
 
+const PROPERTY_PATH_PATTERN = /^[a-zA-Z_$][a-zA-Z0-9_$]*(\.[a-zA-Z_$][a-zA-Z0-9_$]*|\[[^\]]+\])*$/;
+
 export function normalizeTemplateExpression(expr: string): string {
   const trimmed = expr.trim();
-  const hasArrowSyntax = /=>/.test(trimmed);
-  if (hasArrowSyntax) {
-    return ensureSourceDataArrowFunction(trimmed);
+  if (!trimmed) {
+    throw new Error('Empty template expression');
+  }
+  if (isArrowFunction(trimmed)) {
+    return trimmed;
   }
   if (trimmed.startsWith('sourceData.') || trimmed === 'sourceData') {
     return `(sourceData) => ${trimmed}`;
   }
-  return `(sourceData) => sourceData.${trimmed}`;
+  if (PROPERTY_PATH_PATTERN.test(trimmed)) {
+    return `(sourceData) => sourceData.${trimmed}`;
+  }
+  throw new Error(`Invalid template expression: "${trimmed}". Expected an arrow function or property path.`);
 }
 
 export async function evaluateTemplate(

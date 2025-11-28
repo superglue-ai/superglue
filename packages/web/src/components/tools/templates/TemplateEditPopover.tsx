@@ -7,8 +7,7 @@ import {
 } from '@/src/components/ui/popover';
 import { createPortal } from 'react-dom';
 import { formatValueForDisplay, normalizeTemplateExpression, extractCredentials, DEFAULT_CODE_TEMPLATE } from '@/src/lib/template-utils';
-import { isValidSourceDataArrowFunction } from '@/src/lib/general-utils';
-import { maskCredentials } from '@superglue/shared';
+import { isArrowFunction, maskCredentials } from '@superglue/shared';
 import { Download, AlertCircle, Loader2 } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Editor from '@monaco-editor/react';
@@ -207,7 +206,7 @@ export function TemplateEditPopover({
             theme={theme}
           />
         </div>
-        {codeContent && !isValidSourceDataArrowFunction(codeContent) && (
+        {codeContent && !isArrowFunction(codeContent) && (
           <div className="text-[10px] text-amber-600 dark:text-amber-400 px-1 pt-1 flex items-center gap-1">
             <span>⚠</span>
             <span>Code will be auto-wrapped with (sourceData) =&gt; {'{'} ... {'}'} when executed</span>
