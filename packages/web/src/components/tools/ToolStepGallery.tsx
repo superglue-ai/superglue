@@ -241,23 +241,25 @@ export function ToolStepGallery({
             type: 'payload',
             data: { payloadText: rawPayloadText, inputSchema },
             stepResult: undefined,
+            transformError: undefined,
             evolvingPayload: workingPayload || {}
         },
         ...steps.map((step, index) => ({
             type: 'step',
             data: step,
             stepResult: stepResultsMap[step.id],
+            transformError: undefined,
             evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, index - 1)
         })),
         ...(finalTransform !== undefined ? [{
             type: 'transform',
             data: { transform: finalTransform, responseSchema },
             stepResult: finalResult,
-            transformError: typeof stepResultsMap['__final_transform__'] === 'string' ? stepResultsMap['__final_transform__'] : null,
+            transformError: failedSteps.includes('__final_transform__') ? stepResultsMap['__final_transform__'] : null,
             evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length - 1),
             hasTransformCompleted
         }] : [])
-    ], [rawPayloadText, inputSchema, workingPayload, steps, stepResultsMap, finalTransform, responseSchema, finalResult, hasTransformCompleted]);
+    ], [rawPayloadText, inputSchema, workingPayload, steps, stepResultsMap, finalTransform, responseSchema, finalResult, hasTransformCompleted, failedSteps]);
 
     // Memoize canExecute checks to avoid running steps.every() on every render
     const canExecuteTransform = useMemo(() => 

@@ -204,6 +204,12 @@ describe('tools utility functions', () => {
       expect(result).toBe(code);
     });
 
+    it('should preserve arrow function with identifier-only param', () => {
+      const code = 'param => sourceData[param]';
+      const result = assertValidArrowFunction(code);
+      expect(result).toBe(code);
+    });
+
     it('should throw error for raw code (not arrow function)', () => {
       const code = 'return sourceData.foo';
       expect(() => assertValidArrowFunction(code))
