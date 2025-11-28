@@ -177,10 +177,8 @@ export class ToolExecutor implements Tool {
       const maxRetries = isSelfHealing 
         ? (options?.retries !== undefined ? options.retries : server_defaults.MAX_CALL_RETRIES) 
         : 1;
-      // loop through retries to execute the step
       while (retryCount < maxRetries) {
         try {
-          // 1. evaluate data selector (use currentDataSelector which may have been updated by self-healing)
           const dataSelectorTransformResult = await transformData(stepInput, currentDataSelector);
           if (!dataSelectorTransformResult.success) {
             throw new Error(`Loop selector for '${step.id}' failed. ${dataSelectorTransformResult.error}\nCode: ${currentDataSelector}\nPayload: ${JSON.stringify(stepInput).slice(0, 1000)}...`);
@@ -216,7 +214,6 @@ export class ToolExecutor implements Tool {
             }
             
 
-            // execute step
             const itemExecutionResult = await this.strategyRegistry.routeAndExecute({
               stepConfig: currentConfig,
               stepInputData: loopPayload,
