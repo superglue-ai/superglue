@@ -2,7 +2,7 @@ import { Integration } from '@superglue/client';
 import { server_defaults } from '../default.js';
 import { DocumentationSearch } from '../documentation/documentation-search.js';
 import { logMessage } from '../utils/logs.js';
-import { composeUrl } from '../utils/helpers.js';
+import { composeUrl, sanitizeUnpairedSurrogates } from '../utils/helpers.js';
 import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
 import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, IntegrationContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, ToolBuilderContextInput, ToolBuilderContextOptions, GenerateStepConfigContextInput, GenerateStepConfigContextOptions } from './context-types.js';
 
@@ -93,28 +93,28 @@ function buildIntegrationContext(integration: Integration, opts: IntegrationCont
     const generalSectionSize = opts.tuning?.documentationMaxChars ?? server_defaults.CONTEXT.INTEGRATIONS.GENERAL_SECTION_SIZE_CHARS;
 
     const docSearch = new DocumentationSearch((undefined as any));
-    const authSection = docSearch.extractRelevantSections(
+    const authSection = sanitizeUnpairedSurrogates(docSearch.extractRelevantSections(
         integration.documentation,
         "authentication authorization key token bearer basic oauth credentials",
         authMaxSections,
         authSectionSize,
         integration.openApiSchema
-    );
+    ));
 
-    const paginationSection = docSearch.extractRelevantSections(
+    const paginationSection = sanitizeUnpairedSurrogates(docSearch.extractRelevantSections(
         integration.documentation,
         "pagination page offset cursor limit per_page pageSize",
         paginationMaxSections,
         paginationSectionSize,
         integration.openApiSchema
-    );
-    const generalDocSection = docSearch.extractRelevantSections(
+    ));
+    const generalDocSection = sanitizeUnpairedSurrogates(docSearch.extractRelevantSections(
         integration.documentation,
         "reference object endpoints methods properties values fields enums search query filter list create update delete get put post patch",
         generalMaxSections,
         generalSectionSize,
         integration.openApiSchema
-    );
+    ));
 
     const xml_opening_tag = `<${integration.id}>`;
     const urlSection = '<base_url>: ' + composeUrl(integration.urlHost, integration.urlPath) + '</base_url>';
@@ -303,8 +303,8 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
     const integrationInstructionsBudget = Math.floor(remainingBudget * 0.1);
     const credentialsBudget = Math.floor(remainingBudget * 0.1);
 
-    const documentationContent = input.integrationDocumentation.slice(0, documentationBudget);
-    const integrationSpecificInstructions = input.integrationSpecificInstructions.slice(0, integrationInstructionsBudget);
+    const documentationContent = sanitizeUnpairedSurrogates(input.integrationDocumentation.slice(0, documentationBudget));
+    const integrationSpecificInstructions = sanitizeUnpairedSurrogates(input.integrationSpecificInstructions.slice(0, integrationInstructionsBudget));
     const credentialsContent = Object.keys(input.credentials || {}).map(v => `<<${v}>>`).join(", ").slice(0, credentialsBudget);
 
     const documentationContext = `<documentation>${documentationContent}</documentation>`;

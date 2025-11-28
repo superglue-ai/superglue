@@ -341,6 +341,12 @@ export function convertBasicAuthToBase64(headerValue: string) {
   return headerValue;
 }
 
+export function sanitizeUnpairedSurrogates(str: string): string {
+  // Remove unpaired Unicode surrogates (U+D800 to U+DFFF) that cause JSON parsing errors
+  // when sent to external APIs like Vercel AI. These are invalid UTF-8 sequences.
+  return str.replace(/[\ud800-\udfff]/g, '');
+}
+
 export async function validateSchema(data: any, schema: any): Promise<TransformResult> {
   const validator = new Validator();
   const optionalSchema = addNullableToOptional(schema);
