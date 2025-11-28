@@ -131,9 +131,10 @@ export const generateStepConfigResolver = async (
     }
 
     // Merge the generated config with the current config
-    // Only preserve instruction which is not part of generated config
+    // Only preserve instruction and id which is not part of generated config
     const mergedConfig = {
       ...generateStepConfigResult.config,
+      id: currentStepConfig.id || crypto.randomUUID(), // Add this line
       instruction: currentStepConfig.instruction,
     } as ApiConfig;
 
