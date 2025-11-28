@@ -124,7 +124,9 @@ const VariableCommandMenu = forwardRef<VariableCommandMenuRef, VariableCommandMe
                 const canDrill = vars.map(varName => {
                     if (isCredentialsCategory) return false;
                     const value = getValueFromSources(varName, navState.category.key, categorizedSources);
-                    return getValueType(value) === 'object';
+                    if (getValueType(value) !== 'object') return false;
+                    const keys = value && typeof value === 'object' ? Object.keys(value) : [];
+                    return keys.length > 0;
                 });
                 const types = vars.map(varName => {
                     if (isCredentialsCategory) return 'string' as ValueType;
@@ -140,7 +142,9 @@ const VariableCommandMenu = forwardRef<VariableCommandMenuRef, VariableCommandMe
                     const keys = Object.keys(nestedValue as Record<string, unknown>);
                     const canDrill = keys.map(key => {
                         const val = (nestedValue as Record<string, unknown>)[key];
-                        return getValueType(val) === 'object' && navState.path.length < 1;
+                        if (getValueType(val) !== 'object' || navState.path.length >= 1) return false;
+                        const nestedKeys = val && typeof val === 'object' ? Object.keys(val) : [];
+                        return nestedKeys.length > 0;
                     });
                     const types = keys.map(key => getValueType((nestedValue as Record<string, unknown>)[key]));
                     return { items: keys, canDrill, types };
@@ -153,6 +157,7 @@ const VariableCommandMenu = forwardRef<VariableCommandMenuRef, VariableCommandMe
 
         useEffect(() => {
             setSelectedIndex(0);
+            itemRefs.current = [];
         }, [navState]);
 
         useEffect(() => {
