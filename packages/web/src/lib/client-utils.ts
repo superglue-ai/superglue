@@ -90,7 +90,7 @@ export async function executeSingleStep({
     return {
       stepId: step.id,
       success: result.success,
-      data: stepResult.transformedData,
+      data: stepResult.data,
       error: result.error,
       updatedStep: result.config?.steps?.[0]
     };

@@ -8,6 +8,7 @@
 import { server_defaults } from '../default.js';
 import { LanguageModel } from '../llm/llm-base-model.js';
 import { logMessage } from '../utils/logs.js';
+import { sanitizeUnpairedSurrogates } from '../utils/helpers.js';
 import { Metadata } from '@superglue/shared';
 
 export class DocumentationSearch {
@@ -163,7 +164,7 @@ export class DocumentationSearch {
       ? result.slice(0, maxExpectedLength)
       : result;
           
-    return documentationResult;
+    return sanitizeUnpairedSurrogates(documentationResult);
   }
 
   private extractSecurityInfo(openApiSchema: string, sectionSize: number): string {

@@ -1,15 +1,14 @@
 import { JSONSchema, RequestOptions } from "@superglue/client";
 import type { Metadata } from "@superglue/shared";
 import prettier from "prettier";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import { getEvaluateTransformContext, getTransformContext } from "../context/context-builders.js";
 import { EVALUATE_TRANSFORM_SYSTEM_PROMPT, GENERATE_TRANSFORM_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
 import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
-import { validateSchema } from "../utils/helpers.js";
+import { isSelfHealingEnabled, transformData, validateSchema } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
-import { isSelfHealingEnabled, transformData } from "../utils/helpers.js";
-import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 export interface ExecuteAndEvaluateFinalTransformInput {
   finalTransform: string;
@@ -23,11 +22,11 @@ export interface ExecuteAndEvaluateFinalTransformInput {
 export interface ExecuteAndEvaluateFinalTransformOutput {
   success: boolean;
   transformedData?: any;
-  successfulTransformCode?: string;
+  finalTransform: string;
   error?: string;
 }
 
-export async function executeAndEvaluateFinalTransform(input: ExecuteAndEvaluateFinalTransformInput) {
+export async function executeAndEvaluateFinalTransform(input: ExecuteAndEvaluateFinalTransformInput): Promise<ExecuteAndEvaluateFinalTransformOutput> {
   const { finalTransform, responseSchema, aggregatedStepData, instruction, options, metadata } = input;
   
     try {
@@ -46,7 +45,7 @@ export async function executeAndEvaluateFinalTransform(input: ExecuteAndEvaluate
       if (options?.testMode) {
         const testResult = await evaluateTransform(
           finalResult.data,
-          finalTransform,
+          finalResult.code,
           aggregatedStepData,
           responseSchema,
           instruction,
@@ -60,14 +59,15 @@ export async function executeAndEvaluateFinalTransform(input: ExecuteAndEvaluate
       return {
         success: true,
         transformedData: finalResult.data,
-        successfulTransformCode: finalTransform
+        finalTransform: finalResult.code
       };
     } catch (transformError) {
       
       if (!isSelfHealingEnabled(options, "transform")) {
         return {
           success: false,
-          error: transformError?.message || transformError
+          error: transformError?.message || transformError,
+          finalTransform: finalTransform
         };
       }
 
@@ -86,14 +86,15 @@ export async function executeAndEvaluateFinalTransform(input: ExecuteAndEvaluate
       if (!transformationResult) {
         return {
           success: false,
-          error: "Failed to generate new final transform"
+          error: "Failed to generate new final transform",
+          finalTransform: finalTransform
       }
     }
 
     return {
       success: true,
       transformedData: transformationResult.data,
-      successfulTransformCode: transformationResult.transformCode
+      finalTransform: transformationResult.transformCode
     };
   }
 }

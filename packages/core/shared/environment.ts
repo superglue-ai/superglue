@@ -26,6 +26,10 @@ export function validateEnvironment() {
     throw new Error('ANTHROPIC_API_KEY is not set.');
   }
 
+  if ((process.env.LLM_PROVIDER?.toUpperCase() === 'BEDROCK') && (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION)) {
+    throw new Error('AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION must be set when using BEDROCK provider.');
+  }
+
   if (!process.env.AUTH_TOKEN && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
     throw new Error('AUTH_TOKEN is not set and no other authentication provider is configured.');
   }

@@ -43,68 +43,29 @@ export class ToolRunnerService {
             return queue ? queue.enqueue(wrappedFn) : wrappedFn();
         };
 
-        const allAttempts: ToolAttempt[] = [];
+        // Run all one-shot attempts first
+        const promises: Promise<ToolAttempt>[] = [];
 
-        if (settings.runOneShotMode) {
-            // Run all one-shot attempts first
-            const oneShotPromises: Promise<ToolAttempt>[] = [];
-            
-            for (const tool of tools) {
-                const toolIntegrations = integrations.filter(i => tool.integrationIds.includes(i.id));
-                for (let i = 0; i < settings.attemptsEachMode; i++) {
-                    oneShotPromises.push(
+        for (const tool of tools) {
+            const toolIntegrations = integrations.filter(i => tool.integrationIds.includes(i.id));
+            for (let i = 0; i < settings.attemptsEachMode; i++) {
+                // If one-shot mode is enabled, run one-shot attempts
+                if (settings.runOneShotMode) {
+                    promises.push(
                         runAttempt(() => toolAttemptService.runToolAttempt(tool, toolIntegrations, false), tool.id)
                     );
                 }
-            }
 
-            const oneShotAttempts = await Promise.all(oneShotPromises);
-            allAttempts.push(...oneShotAttempts);
-
-            // Determine which tools need self-healing
-            if (settings.runSelfHealingMode) {
-                const toolsNeedingSelfHealing = tools.filter(tool => {
-                    const toolOneShotAttempts = oneShotAttempts.filter(a => a.toolConfig.id === tool.id);
-                    const hadSuccess = toolOneShotAttempts.some(a => 
-                        a.buildSuccess && 
-                        a.executionSuccess && 
-                        (!a.validationResult || a.validationResult.passed)
-                    );
-                    return !hadSuccess;
-                });
-
-                // Run self-healing attempts for failed tools
-                const selfHealingPromises: Promise<ToolAttempt>[] = [];
-                
-                for (const tool of toolsNeedingSelfHealing) {
-                    const toolIntegrations = integrations.filter(i => tool.integrationIds.includes(i.id));
-                    for (let i = 0; i < settings.attemptsEachMode; i++) {
-                        selfHealingPromises.push(
-                            runAttempt(() => toolAttemptService.runToolAttempt(tool, toolIntegrations, true), tool.id)
-                        );
-                    }
-                }
-
-                const selfHealingAttempts = await Promise.all(selfHealingPromises);
-                allAttempts.push(...selfHealingAttempts);
-            }
-        } else if (settings.runSelfHealingMode) {
-            // One-shot mode disabled, run self-healing mode only
-            const selfHealingPromises: Promise<ToolAttempt>[] = [];
-            
-            for (const tool of tools) {
-                const toolIntegrations = integrations.filter(i => tool.integrationIds.includes(i.id));
-                for (let i = 0; i < settings.attemptsEachMode; i++) {
-                    selfHealingPromises.push(
+                // If self-healing mode is enabled, run self-healing attempts
+                if (settings.runSelfHealingMode) {
+                    promises.push(
                         runAttempt(() => toolAttemptService.runToolAttempt(tool, toolIntegrations, true), tool.id)
                     );
                 }
             }
-
-            const selfHealingAttempts = await Promise.all(selfHealingPromises);
-            allAttempts.push(...selfHealingAttempts);
         }
 
-        return allAttempts;
+        const attempts = await Promise.all(promises); // wait for all attempts to complete
+        return attempts;
     }
 }

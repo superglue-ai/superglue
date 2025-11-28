@@ -29,11 +29,18 @@ export class ConsoleReporter {
   }
 
   private static printMetrics(metrics: Metrics): void {
-    const selfHealingRate = metrics.toolSelfHealingSuccessRate !== null 
+    const selfHealingAtLeastOneRate = metrics.toolSelfHealingSuccessRate !== null 
       ? metrics.toolSelfHealingSuccessRate * 100 
       : null;
-    const oneShotRate = metrics.toolOneShotSuccessRate !== null 
+    const oneShotAtLeastOneRate = metrics.toolOneShotSuccessRate !== null 
       ? metrics.toolOneShotSuccessRate * 100 
+      : null;
+    
+    const oneShotAvgRate = metrics.toolOneShotAverageSuccessRate !== null
+      ? metrics.toolOneShotAverageSuccessRate * 100
+      : null;
+    const selfHealingAvgRate = metrics.toolSelfHealingAverageSuccessRate !== null
+      ? metrics.toolSelfHealingAverageSuccessRate * 100
       : null;
     
     const selfHealingSuccessCount = metrics.toolMetrics.filter(
@@ -42,12 +49,18 @@ export class ConsoleReporter {
     const oneShotSuccessCount = metrics.toolMetrics.filter(t => t.hadOneShotSuccess).length;
     const toolCount = metrics.toolCount;
 
-    if (oneShotRate !== null) {
-      console.log(`One-Shot Success:     ${oneShotRate.toFixed(1)}% (${oneShotSuccessCount}/${toolCount})`);
+    if (oneShotAvgRate !== null || oneShotAtLeastOneRate !== null) {
+      console.log(`One-Shot Avg Success: ${oneShotAvgRate !== null ? oneShotAvgRate.toFixed(1) + '%' : 'N/A'}`);
+      if (oneShotAtLeastOneRate !== null) {
+        console.log(`  At least one:       ${oneShotAtLeastOneRate.toFixed(1)}% (${oneShotSuccessCount}/${toolCount})`);
+      }
     }
     
-    if (selfHealingRate !== null) {
-      console.log(`Self-Healing Success: ${selfHealingRate.toFixed(1)}% (${selfHealingSuccessCount}/${toolCount})`);
+    if (selfHealingAvgRate !== null || selfHealingAtLeastOneRate !== null) {
+      console.log(`Self-Healing Avg:     ${selfHealingAvgRate !== null ? selfHealingAvgRate.toFixed(1) + '%' : 'N/A'}`);
+      if (selfHealingAtLeastOneRate !== null) {
+        console.log(`  At least one:       ${selfHealingAtLeastOneRate.toFixed(1)}% (${selfHealingSuccessCount}/${toolCount})`);
+      }
     }
     
     console.log('');

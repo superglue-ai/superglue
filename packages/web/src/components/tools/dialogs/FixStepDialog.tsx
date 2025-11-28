@@ -57,19 +57,28 @@ export function FixStepDialog({
                 instruction: instruction.trim(),
             };
 
-            const newConfig = await generateConfig({
+            const result = await generateConfig({
                 currentStepConfig: updatedStepConfig,
                 stepInput,
                 integrationId,
                 errorMessage,
             });
 
+            console.log('[FixStepDialog] generateConfig returned:', result);
+
+            // Result now has shape: { config: ApiConfig, dataSelector: string }
+            const updatedStep = {
+                ...step,
+                apiConfig: result.config,
+                loopSelector: result.dataSelector
+            };
+
             toast({
                 title: 'Step fixed successfully',
                 description: 'The step configuration has been updated.',
             });
 
-            onSuccess(newConfig);
+            onSuccess(updatedStep);
             handleClose();
         } catch (err) {
             toast({

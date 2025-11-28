@@ -1,4 +1,5 @@
 import { inferJsonSchema } from '@superglue/shared';
+import { sanitizeUnpairedSurrogates } from '../utils/helpers.js';
 
 export function mergeSectionsWithNewlines(sections: string[]): string {
     return sections.join('\n\n');
@@ -111,6 +112,7 @@ export function stringifyWithLimits(value: any, depthLimit: number, arrayLimit: 
             for (const k of limitedKeys) out[k] = walk(v[k], depth + 1);
             return out;
         }
+        if (typeof v === 'string') return sanitizeUnpairedSurrogates(v);
         if (typeof v === 'bigint') return String(v);
         if (v instanceof Date) return v.toISOString();
         return v;
@@ -151,7 +153,12 @@ export function randomSampleHeadAware(arr: any[], count: number): any[] {
 }
 
 export function compactSampleItem(v: any, depth: number = 0, maxDepth: number = 5): string {
-    if (v === null || typeof v !== 'object') return JSON.stringify(v);
+    if (v === null || typeof v !== 'object') {
+        if (typeof v === 'string') {
+            return JSON.stringify(sanitizeUnpairedSurrogates(v));
+        }
+        return JSON.stringify(v);
+    }
     if (Array.isArray(v)) {
         const MAX_ITEMS = 3;
         if (v.length === 0) return JSON.stringify([]);
@@ -159,6 +166,9 @@ export function compactSampleItem(v: any, depth: number = 0, maxDepth: number = 
         const items = v.slice(0, MAX_ITEMS).map(x => {
             if (x && typeof x === 'object') {
                 return JSON.parse(compactSampleItem(x, depth + 1, maxDepth));
+            }
+            if (typeof x === 'string') {
+                return sanitizeUnpairedSurrogates(x);
             }
             return x;
         });
@@ -173,10 +183,17 @@ export function compactSampleItem(v: any, depth: number = 0, maxDepth: number = 
         const val = v[k];
         if (Array.isArray(val)) {
             if (depth < maxDepth) {
-                // include small nested array preview
                 const arr = val as any[];
                 const MAX_ITEMS = 2;
-                const items = arr.slice(0, MAX_ITEMS).map(x => (x && typeof x === 'object') ? JSON.parse(compactSampleItem(x, depth + 1, maxDepth)) : x);
+                const items = arr.slice(0, MAX_ITEMS).map(x => {
+                    if (x && typeof x === 'object') {
+                        return JSON.parse(compactSampleItem(x, depth + 1, maxDepth));
+                    }
+                    if (typeof x === 'string') {
+                        return sanitizeUnpairedSurrogates(x);
+                    }
+                    return x;
+                });
                 if (arr.length > MAX_ITEMS) items.push(`... (len=${arr.length})`);
                 out[k] = items;
             } else {
@@ -189,7 +206,8 @@ export function compactSampleItem(v: any, depth: number = 0, maxDepth: number = 
                 out[k] = '{…}';
             }
         } else if (typeof val === 'string') {
-            out[k] = val.length <= 200 ? val : val.slice(0, 200) + '…';
+            const sanitized = sanitizeUnpairedSurrogates(val);
+            out[k] = sanitized.length <= 200 ? sanitized : sanitized.slice(0, 200) + '…';
         } else if (typeof val === 'bigint') {
             out[k] = String(val);
         } else if (val instanceof Date) {

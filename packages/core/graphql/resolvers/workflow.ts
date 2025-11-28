@@ -1,12 +1,12 @@
-import { Integration, RequestOptions, Workflow, WorkflowResult } from "@superglue/client";
-import { generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared/utils";
+import { Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
+import { ensureSourceDataArrowFunction, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { ToolBuilder } from "../../tools/tool-builder.js";
-import { ToolFinder } from "../../tools/tool-finder.js";
-import { ToolExecutor } from "../../tools/tool-executor.js";
 import { parseJSON } from "../../files/index.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
+import { ToolBuilder } from "../../tools/tool-builder.js";
+import { ToolExecutor } from "../../tools/tool-executor.js";
+import { ToolFinder } from "../../tools/tool-finder.js";
 import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { GraphQLRequestContext, Metadata } from '../types.js';
@@ -32,12 +32,14 @@ interface BuildWorkflowArgs {
   responseSchema?: JSONSchema;
 }
 
+type GraphQLWorkflowResult = Omit<WorkflowResult, 'stepResults'> & { data?: any, stepResults: (WorkflowStepResult & { rawData: any, transformedData: any })[] };
+
 export const executeWorkflowResolver = async (
   _: unknown,
   args: ExecuteWorkflowArgs,
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
-): Promise<WorkflowResult> => {
+): Promise<GraphQLWorkflowResult> => {
   const startedAt = new Date();
   const metadata: Metadata = { orgId: context.orgId, traceId: context.traceId };
 
@@ -99,14 +101,23 @@ export const executeWorkflowResolver = async (
     const executor = new ToolExecutor({ tool: workflow, metadata, integrations: integrationManagers });
     const result = await executor.execute({ payload: args.payload, credentials: args.credentials, options: args.options });
 
+    const graphqlResult: GraphQLWorkflowResult = {
+      ...result,
+      stepResults: result.stepResults.map(stepResult => ({
+        ...stepResult,
+        rawData: undefined,
+        transformedData: stepResult.data
+      }))
+    };
+
     // Save run to datastore
     const runId = crypto.randomUUID();
     context.datastore.createRun({
       result: {
         id: runId,
-        success: result.success,
-        error: result.error || undefined,
-        config: result.config || workflow,
+        success: graphqlResult.success,
+        error: graphqlResult.error || undefined,
+        config: graphqlResult.config || workflow,
         stepResults: [],
         startedAt,
         completedAt: new Date()
@@ -116,17 +127,17 @@ export const executeWorkflowResolver = async (
 
     // Notify webhook if configured (fire-and-forget)
     if (args.options?.webhookUrl?.startsWith('http')) {
-      notifyWebhook(args.options.webhookUrl, runId, context.traceId, result.success, result.data, result.error);
+      notifyWebhook(args.options.webhookUrl, runId, context.traceId, graphqlResult.success, graphqlResult.data, graphqlResult.error);
     } else if(args.options?.webhookUrl?.startsWith('tool:')) {
       const toolId = args.options.webhookUrl.split(':')[1];
       if(toolId == args.input.id) {
         logMessage('warn', "Tool cannot trigger itself", metadata);
         return;
       }
-      executeWorkflowResolver(_, { input: { id: toolId }, payload: result.data, credentials: args.credentials, options: { ...args.options, webhookUrl: undefined } }, context, info);
+      executeWorkflowResolver(_, { input: { id: toolId }, payload: graphqlResult.data, credentials: args.credentials, options: { ...args.options, webhookUrl: undefined } }, context, info);
     }
 
-    return result;
+    return graphqlResult;
 
   } catch (error) {
     logMessage('error', "Workflow execution error: " + String(error), metadata);
@@ -142,7 +153,7 @@ export const executeWorkflowResolver = async (
     // Save run to datastore
     // do not trigger webhook on failure
     context.datastore.createRun({ result, orgId: context.orgId });
-    return { ...result, data: {}, stepResults: [] } as WorkflowResult;
+    return { ...result, data: undefined, stepResults: [] } as GraphQLWorkflowResult;
   }
 };
 
@@ -167,12 +178,17 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
       updatedAt: now
     };
 
-    // for each step, make sure that the apiConfig has an id. if not, set it to the step id
-    workflow.steps.forEach((step: any) => {
+    workflow.finalTransform = ensureSourceDataArrowFunction(workflow.finalTransform);
+
+    for (const step of workflow.steps) {
       if (!step.apiConfig.id) {
         step.apiConfig.id = step.id;
       }
-    });
+      
+      if (step.loopSelector) {
+        step.loopSelector = ensureSourceDataArrowFunction(step.loopSelector);
+      }
+    }
 
     return await context.datastore.upsertWorkflow({ id, workflow, orgId: context.orgId });
   } catch (error) {

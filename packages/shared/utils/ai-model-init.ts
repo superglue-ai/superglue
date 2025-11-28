@@ -1,3 +1,4 @@
+import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createAzure } from '@ai-sdk/azure';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
@@ -84,8 +85,24 @@ export function initializeAIModel(options?: {
             modelId = process.env.AZURE_MODEL || defaultModel;
             break;
         }
+        case 'bedrock': {
+            const bedrockOptions: any = {
+                region: process.env.AWS_REGION,
+                accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+            };
+            if (process.env.AWS_SESSION_TOKEN) {
+                bedrockOptions.sessionToken = process.env.AWS_SESSION_TOKEN;
+            }
+            if (process.env.AWS_BASE_URL) {
+                bedrockOptions.baseURL = process.env.AWS_BASE_URL;
+            }
+            provider = createAmazonBedrock(bedrockOptions);
+            modelId = process.env.BEDROCK_MODEL || defaultModel;
+            break;
+        }
         default:
-            throw new Error(`Invalid provider: ${providerType}. Must be one of: anthropic, openai, gemini, azure`);
+            throw new Error(`Invalid provider: ${providerType}. Must be one of: anthropic, openai, gemini, azure, bedrock`);
     }
 
     return provider(modelId);
