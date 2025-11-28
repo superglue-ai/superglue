@@ -27,7 +27,9 @@ const PROVIDERS = [
   { name: 'gpt-5', envProvider: 'openai', envModel: 'gpt-5' },
   { name: 'claude-sonnet-4-5', envProvider: 'anthropic', envModel: 'claude-sonnet-4-5' },
   { name: 'claude-sonnet-4-20250514', envProvider: 'anthropic', envModel: 'claude-sonnet-4-20250514' },
-  { name: 'gemini-2.5-flash-lite', envProvider: 'google', envModel: 'gemini-2.5-flash-lite' },
+  { name: 'gemini-2.5-flash-lite', envProvider: 'gemini', envModel: 'gemini-2.5-flash-lite' },
+  { name: 'gemini-3-pro-preview', envProvider: 'gemini', envModel: 'gemini-3-pro-preview' },
+  { name: 'claude-opus-4-5-20251101', envProvider: 'anthropic', envModel: 'claude-opus-4-5-20251101' },
 ];
 
 function applyEnvironmentVariablesToCredentials(

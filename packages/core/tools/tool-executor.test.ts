@@ -1,6 +1,10 @@
-import { SelfHealingMode } from '@superglue/client';
-import { describe, expect, it, vi } from 'vitest';
+import { ApiConfig, HttpMethod, Integration, SelfHealingMode } from '@superglue/client';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryStore } from '../datastore/memory.js';
+import { IntegrationManager } from '../integrations/integration-manager.js';
+import { LanguageModel } from '../llm/llm-base-model.js';
 import { isSelfHealingEnabled } from '../utils/helpers.js';
+import { ToolExecutor } from './tool-executor.js';
 
 // Mock the tools module but keep isSelfHealingEnabled real
 vi.mock('../utils/helpers.js', async () => {
@@ -62,5 +66,185 @@ describe('WorkflowExecutor Self-Healing Logic', () => {
     expect(SelfHealingMode.DISABLED).toBe('DISABLED');
     expect(SelfHealingMode.REQUEST_ONLY).toBe('REQUEST_ONLY');
     expect(SelfHealingMode.TRANSFORM_ONLY).toBe('TRANSFORM_ONLY');
+  });
+});
+
+describe('ToolExecutor Self-Healing Config Propagation', () => {
+  let dataStore: MemoryStore;
+  let mockIntegration: Integration;
+  
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dataStore = new MemoryStore();
+    
+    mockIntegration = {
+      id: 'test-integration',
+      name: 'Test Integration',
+      credentials: { apiKey: 'test-key' },
+      specificInstructions: 'Test instructions',
+      orgId: 'test-org'
+    } as Integration;
+  });
+
+  it('should propagate updated config and dataSelector from self-healing back to result', async () => {
+    const originalConfig: ApiConfig = {
+      id: 'original-config',
+      instruction: 'Fetch users',
+      urlHost: 'https://api.example.com',
+      urlPath: '/v1/users',
+      method: 'GET' as HttpMethod,
+      queryParams: { limit: '10' },
+    };
+
+    const updatedConfig: Partial<ApiConfig> = {
+      urlHost: 'https://api.example.com',
+      urlPath: '/v2/users',
+      method: 'GET' as HttpMethod,
+      queryParams: { limit: '20', offset: '0' },
+      headers: { 'X-API-Version': '2' }
+    };
+
+    const originalDataSelector = '(sourceData) => sourceData';
+    const updatedDataSelector = '(sourceData) => ({ userId: sourceData.userId })';
+
+    const tool = {
+      id: 'test-tool',
+      integrationIds: ['test-integration'],
+      steps: [
+        {
+          id: 'step-1',
+          integrationId: 'test-integration',
+          apiConfig: originalConfig,
+          loopSelector: originalDataSelector,
+        }
+      ],
+    };
+
+    const integrationManager = IntegrationManager.fromIntegration(mockIntegration, dataStore, 'test-org');
+    const executor = new ToolExecutor({
+      tool,
+      metadata: { orgId: 'test-org', userId: 'test-user' },
+      integrations: [integrationManager]
+    });
+
+    let apiCallCount = 0;
+    
+    // Mock strategy execution: fail first call, succeed second call
+    vi.spyOn(executor['strategyRegistry'], 'routeAndExecute').mockImplementation(async () => {
+      apiCallCount++;
+      
+      if (apiCallCount === 1) {
+        return {
+          success: false,
+          strategyExecutionData: undefined,
+          error: 'API returned 404: endpoint not found'
+        };
+      }
+      
+      // Second call succeeds
+      return {
+        success: true,
+        strategyExecutionData: { users: [{ id: 1, name: 'John' }] }
+      };
+    });
+
+    // Mock LLM generateObject to return updated config
+    vi.spyOn(LanguageModel, 'generateObject').mockResolvedValueOnce({
+      success: true,
+      response: {
+        dataSelector: updatedDataSelector,
+        apiConfig: {
+          urlHost: updatedConfig.urlHost,
+          urlPath: updatedConfig.urlPath,
+          method: updatedConfig.method,
+          queryParams: Object.entries(updatedConfig.queryParams || {}).map(([key, value]) => ({ key, value })),
+          headers: Object.entries(updatedConfig.headers || {}).map(([key, value]) => ({ key, value })),
+        }
+      },
+      messages: []
+    });
+
+    // Mock getDocumentation
+    vi.spyOn(integrationManager, 'getDocumentation').mockResolvedValue({
+      content: 'Test docs',
+      isFetched: true
+    });
+
+    // Execute with self-healing enabled
+    const result = await executor.execute({
+      payload: { userId: '123' },
+      credentials: {},
+      options: { selfHealing: SelfHealingMode.ENABLED, retries: 2 }
+    });
+
+    // Verify execution succeeded
+    expect(result.success).toBe(true);
+    expect(apiCallCount).toBe(2);
+
+    // Verify the returned config has the updated values
+    expect(result.config).toBeDefined();
+    expect(result.config.steps[0].apiConfig.urlPath).toBe('/v2/users');
+    expect(result.config.steps[0].apiConfig.queryParams).toEqual({ limit: '20', offset: '0' });
+    expect(result.config.steps[0].apiConfig.headers).toEqual({ 'X-API-Version': '2' });
+    expect(result.config.steps[0].loopSelector).toBe(updatedDataSelector);
+
+    // Verify original config was not mutated in place (check the tool object)
+    expect(tool.steps[0].apiConfig.urlPath).not.toBe(originalConfig.urlPath);
+    expect(tool.steps[0].loopSelector).not.toBe(originalDataSelector);
+  });
+
+  it('should not propagate config when self-healing is disabled', async () => {
+    const originalConfig: ApiConfig = {
+      id: 'original-config',
+      instruction: 'Fetch users',
+      urlHost: 'https://api.example.com',
+      urlPath: '/v1/users',
+      method: 'GET' as HttpMethod,
+    };
+
+    const tool = {
+      id: 'test-tool',
+      integrationIds: ['test-integration'],
+      steps: [
+        {
+          id: 'step-1',
+          integrationId: 'test-integration',
+          apiConfig: originalConfig,
+          loopSelector: '(sourceData) => sourceData',
+        }
+      ],
+    };
+
+    const integrationManager = IntegrationManager.fromIntegration(mockIntegration, dataStore, 'test-org');
+    const executor = new ToolExecutor({
+      tool,
+      metadata: { orgId: 'test-org', userId: 'test-user' },
+      integrations: [integrationManager]
+    });
+
+    // Mock strategy to fail
+    vi.spyOn(executor['strategyRegistry'], 'routeAndExecute').mockResolvedValue({
+      success: false,
+      strategyExecutionData: undefined,
+      error: 'API error'
+    });
+
+    // Execute without self-healing
+    const result = await executor.execute({
+      payload: {},
+      credentials: {},
+      options: { selfHealing: SelfHealingMode.DISABLED }
+    });
+
+    // Verify execution failed
+    expect(result.success).toBe(false);
+    
+    // Verify generateObject was never called (no self-healing)
+    expect(vi.mocked(LanguageModel.generateObject)).not.toHaveBeenCalled();
+    
+    // Config should not be returned on failure
+    expect(result.config).toBeDefined();
+    // Verify config was not changed
+    expect(result.config.steps[0].apiConfig.urlPath).toBe('/v1/users');
   });
 });
