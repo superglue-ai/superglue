@@ -53,7 +53,6 @@ You can interact with superglue via three interfaces, regardless of whether you 
 
       const superglue = new SuperglueClient({
         apiKey: "your_api_key_here", // Get from app.superglue.cloud
-        baseUrl: "https://api.superglue.cloud", // Optional, defaults to hosted version but can be localhost when self-hosting
       });
     ```
 
