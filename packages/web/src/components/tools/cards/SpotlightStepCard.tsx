@@ -546,25 +546,6 @@ export const SpotlightStepCard = React.memo(({
                                                     </div>
                                                     <pre className="text-xs whitespace-pre-wrap font-mono w-full overflow-x-auto">
                                                     {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
-                                                    {outputString || 'Step execution failed'}
                                                     </pre>
                                                     <p className="text-xs text-muted-foreground mt-2">
                                                         Use the "Fix Step" button above to automatically repair the step configuration.
