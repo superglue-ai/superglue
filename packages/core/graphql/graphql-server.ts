@@ -75,8 +75,6 @@ export async function startGraphqlServer(datastore: DataStore) {
         return false;
       }
       
-      logMessage('debug', `Websocket Subscription connected`, { traceId });
-
       return { 
         datastore,
         traceId, 

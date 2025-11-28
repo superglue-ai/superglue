@@ -68,7 +68,6 @@ export const generateStepConfigResolver = async (
   try {
     const metadata: Metadata = { orgId: context.orgId, traceId: context.traceId };
 
-  try {
     // Extract instruction from currentStepConfig
     const instruction = currentStepConfig?.instruction;
     if (!instruction) {
