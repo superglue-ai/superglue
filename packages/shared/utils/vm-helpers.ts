@@ -255,9 +255,9 @@ export const VM_HELPERS_CODE = `
     };
   }
   
-  // escape function - encode each byte of UTF-8
-  if (typeof escape === 'undefined') {
-    escape = function(str) {
+  // escape function - override built-in deprecated escape() to match URL encoding standards
+  // The built-in escape() encodes ! as %21 which breaks many APIs
+  escape = function(str) {
       let result = '';
       for (let i = 0; i < str.length; i++) {
         const char = str[i];
@@ -279,7 +279,6 @@ export const VM_HELPERS_CODE = `
       }
       return result;
     };
-  }
   
   // decodeURIComponent function
   if (typeof decodeURIComponent === 'undefined') {
