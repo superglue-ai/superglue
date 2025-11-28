@@ -253,6 +253,7 @@ export function ToolStepGallery({
             type: 'transform',
             data: { transform: finalTransform, responseSchema },
             stepResult: finalResult,
+            transformError: typeof stepResultsMap['__final_transform__'] === 'string' ? stepResultsMap['__final_transform__'] : null,
             evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length - 1),
             hasTransformCompleted
         }] : [])
@@ -682,6 +683,7 @@ export function ToolStepGallery({
                                     isFixingTransform={isFixingTransform}
                                     canExecute={canExecuteTransform}
                                     transformResult={finalResult}
+                                    transformError={currentItem.transformError}
                                     stepInputs={currentItem.evolvingPayload}
                                     hasTransformCompleted={hasTransformCompleted}
                                 />

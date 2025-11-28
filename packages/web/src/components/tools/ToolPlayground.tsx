@@ -798,7 +798,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setCompletedSteps(state.completedSteps);
       setFailedSteps(state.failedSteps);
 
-      if (state.failedSteps.length === 0 && !state.interrupted) {
+      if (!state.interrupted) {
         setNavigateToFinalSignal(Date.now());
       } else {
         const firstFailed = state.failedSteps[0];

@@ -21,8 +21,8 @@ import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { downloadJson } from '@/src/lib/download-utils';
 import { formatJavaScriptCode, isEmptyData, truncateForDisplay } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
-import { ensureSourceDataArrowFunction } from '@superglue/shared';
-import { BugPlay, ChevronDown, Download, FileBraces, FileInput, FileOutput, Loader2, Play, Route, Trash2, Wand2 } from 'lucide-react';
+import { assertValidArrowFunction } from '@superglue/shared';
+import { BugPlay, ChevronDown, Download, FileBraces, FileInput, FileOutput, Loader2, Play, Route, Trash2, Wand2, X } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { JavaScriptCodeEditor } from '../../editors/JavaScriptCodeEditor';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
@@ -163,8 +163,8 @@ export const SpotlightStepCard = React.memo(({
         const t = window.setTimeout(() => {
             setIsLoopItemsEvaluating(true);
             try {
-                let sel = step?.loopSelector || "(sourceData) => { }";
-                const raw = ensureSourceDataArrowFunction(sel).trim();
+                let sel = step?.loopSelector;
+                const raw = assertValidArrowFunction(sel).trim();
                 const stripped = raw.replace(/;\s*$/, '');
                 const body = `const __selector = (${stripped});\nreturn __selector(sourceData);`;
                 // eslint-disable-next-line no-new-func
@@ -538,12 +538,39 @@ export const SpotlightStepCard = React.memo(({
                                     const showEmptyWarning = !stepFailed && !isPending && !errorResult && outputViewMode === 'preview' && isEmptyData(outputString || '');
                                     return (
                                         <>
-                                            {stepFailed && (
-                                                <div className="mb-2 p-2 bg-destructive/10 border border-destructive/20 rounded-md">
-                                                    <p className="text-xs text-destructive">Step execution failed</p>
+                                            {errorResult ? (
+                                                <div className="flex flex-col items-start justify-start p-4 border rounded-lg bg-muted/30 border-border">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <X className="h-4 w-4 text-red-500 dark:text-red-400" />
+                                                        <p className="text-sm font-semibold text-red-500 dark:text-red-400">Step Error</p>
+                                                    </div>
+                                                    <pre className="text-xs whitespace-pre-wrap font-mono w-full overflow-x-auto">
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    {outputString || 'Step execution failed'}
+                                                    </pre>
+                                                    <p className="text-xs text-muted-foreground mt-2">
+                                                        Use the "Fix Step" button above to automatically repair the step configuration.
+                                                    </p>
                                                 </div>
-                                            )}
-                                            {isPending ? (
+                                            ) : isPending ? (
                                                 isActivelyRunning ? (
                                                     <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
                                                         <div className="flex items-center gap-2 mb-1">
@@ -568,29 +595,25 @@ export const SpotlightStepCard = React.memo(({
                                                         resizable={true}
                                                         overlay={
                                                             <div className="flex items-center gap-1">
-                                                                {!errorResult && (outputProcessor.isComputingPreview || outputProcessor.isComputingSchema) && (
+                                                                {(outputProcessor.isComputingPreview || outputProcessor.isComputingSchema) && (
                                                                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                                                                 )}
-                                                                {!errorResult && (
-                                                                    <Tabs value={outputViewMode} onValueChange={(v) => handleOutputViewModeChange(v as 'preview' | 'schema')} className="w-auto">
-                                                                        <TabsList className="h-6 p-0.5 rounded-md">
-                                                                            <TabsTrigger value="preview" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Preview</TabsTrigger>
-                                                                            <TabsTrigger value="schema" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Schema</TabsTrigger>
-                                                                        </TabsList>
-                                                                    </Tabs>
-                                                                )}
+                                                                <Tabs value={outputViewMode} onValueChange={(v) => handleOutputViewModeChange(v as 'preview' | 'schema')} className="w-auto">
+                                                                    <TabsList className="h-6 p-0.5 rounded-md">
+                                                                        <TabsTrigger value="preview" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Preview</TabsTrigger>
+                                                                        <TabsTrigger value="schema" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Schema</TabsTrigger>
+                                                                    </TabsList>
+                                                                </Tabs>
                                                                 <CopyButton text={outputString} />
-                                                                {!errorResult && (
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-6 w-6"
-                                                                        onClick={() => downloadJson(stepResult, `step_${step.id}_result.json`)}
-                                                                        title="Download step result as JSON"
-                                                                    >
-                                                                        <Download className="h-3 w-3" />
-                                                                    </Button>
-                                                                )}
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-6 w-6"
+                                                                    onClick={() => downloadJson(stepResult, `step_${step.id}_result.json`)}
+                                                                    title="Download step result as JSON"
+                                                                >
+                                                                    <Download className="h-3 w-3" />
+                                                                </Button>
                                                             </div>
                                                         }
                                                     />

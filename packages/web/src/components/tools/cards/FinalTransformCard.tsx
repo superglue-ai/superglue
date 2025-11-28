@@ -20,7 +20,8 @@ import {
   FilePlay,
   Loader2,
   Play,
-  Wand2
+  Wand2,
+  X
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { JavaScriptCodeEditor } from "../../editors/JavaScriptCodeEditor";
@@ -40,6 +41,7 @@ export const FinalTransformMiniStepCard = ({
   isFixingTransform,
   canExecute,
   transformResult,
+  transformError,
   stepInputs,
   hasTransformCompleted
 }: {
@@ -54,6 +56,7 @@ export const FinalTransformMiniStepCard = ({
   isFixingTransform?: boolean;
   canExecute?: boolean;
   transformResult?: any;
+  transformError?: string | null;
   stepInputs?: any;
   hasTransformCompleted?: boolean;
 }) => {
@@ -373,6 +376,19 @@ export const FinalTransformMiniStepCard = ({
                     </p>
                     <p className="text-xs mt-1">
                       Please wait while the transform executes
+                    </p>
+                  </div>
+                ) : transformError ? (
+                  <div className="flex flex-col items-start justify-start p-4 border rounded-lg bg-muted/30 border-border">
+                    <div className="flex items-center gap-2 mb-2">
+                      <X className="h-4 w-4 text-red-500 dark:text-red-400" />
+                      <p className="text-sm font-semibold text-red-500 dark:text-red-400">Transform Error</p>
+                    </div>
+                    <pre className="text-xs whitespace-pre-wrap font-mono w-full overflow-x-auto">
+                      {transformError}
+                    </pre>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Use the "Fix Transform" button above to automatically repair the transform code.
                     </p>
                   </div>
                 ) : transformResult === undefined ? (
