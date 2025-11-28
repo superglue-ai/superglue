@@ -1,5 +1,5 @@
 import { SelfHealingMode } from '@superglue/client';
-import { ensureSourceDataArrowFunction } from '@superglue/shared';
+import { assertValidArrowFunction } from '@superglue/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { applyAuthFormat, composeUrl, isSelfHealingEnabled, maskCredentials, replaceVariables, sample, transformData } from './helpers.js';
 
@@ -171,43 +171,43 @@ describe('tools utility functions', () => {
     });
   });
 
-  describe('ensureSourceDataArrowFunction', () => {
+  describe('assertValidArrowFunction', () => {
     it('should convert $ identity sentinel to identity function', () => {
-      const result = ensureSourceDataArrowFunction('$');
+      const result = assertValidArrowFunction('$');
       expect(result).toBe('(sourceData) => {\n  return sourceData;\n}');
     });
 
     it('should return empty object function for empty string (for loopSelector)', () => {
-      const result = ensureSourceDataArrowFunction('');
+      const result = assertValidArrowFunction('');
       expect(result).toBe('(sourceData) => {\n  return {};\n}');
     });
 
     it('should return empty object function for null', () => {
-      const result = ensureSourceDataArrowFunction(null);
+      const result = assertValidArrowFunction(null);
       expect(result).toBe('(sourceData) => {\n  return {};\n}');
     });
 
     it('should return empty object function for undefined', () => {
-      const result = ensureSourceDataArrowFunction(undefined);
+      const result = assertValidArrowFunction(undefined);
       expect(result).toBe('(sourceData) => {\n  return {};\n}');
     });
 
     it('should preserve valid arrow function with block body', () => {
       const code = '(sourceData) => { return sourceData.foo; }';
-      const result = ensureSourceDataArrowFunction(code);
+      const result = assertValidArrowFunction(code);
       expect(result).toBe(code);
     });
 
     it('should preserve valid arrow function with parenthesized expr', () => {
       const code = '(sourceData) => (sourceData.foo)';
-      const result = ensureSourceDataArrowFunction(code);
+      const result = assertValidArrowFunction(code);
       expect(result).toBe(code);
     });
 
-    it('should wrap raw code in arrow function', () => {
+    it('should throw error for raw code (not arrow function)', () => {
       const code = 'return sourceData.foo';
-      const result = ensureSourceDataArrowFunction(code);
-      expect(result).toBe('(sourceData) => {\nreturn sourceData.foo\n}');
+      expect(() => assertValidArrowFunction(code))
+        .toThrow('Invalid arrow function');
     });
   });
 
@@ -220,9 +220,9 @@ describe('tools utility functions', () => {
       expect(result.code).toBe('$');
     });
 
-    it('should handle $ sentinel after ensureSourceDataArrowFunction', async () => {
+    it('should handle $ sentinel after assertValidArrowFunction', async () => {
       const testData = { test: 'value', nested: { foo: 'bar' } };
-      const wrappedCode = ensureSourceDataArrowFunction('$');
+      const wrappedCode = assertValidArrowFunction('$');
       const result = await transformData(testData, wrappedCode);
       expect(result.success).toBe(true);
       expect(result.data).toEqual(testData);
@@ -235,9 +235,9 @@ describe('tools utility functions', () => {
       expect(result.data).toStrictEqual({});
     });
 
-    it('should return empty object when empty code is wrapped with ensureSourceDataArrowFunction', async () => {
+    it('should return empty object when empty code is wrapped with assertValidArrowFunction', async () => {
       const testData = { test: 'value' };
-      const wrappedCode = ensureSourceDataArrowFunction('');
+      const wrappedCode = assertValidArrowFunction('');
       const result = await transformData(testData, wrappedCode);
       expect(result.success).toBe(true);
       expect(result.data).toEqual({});
