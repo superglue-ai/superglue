@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, Integration, Pagination } from "@superglue/client";
+import { ApiConfig, ExecutionStep, HttpMethod, Integration, Pagination } from "@superglue/client";
 import { LLMMessage, LLMToolWithContext } from "../llm/llm-base-model.js";
 import { LanguageModel } from "../llm/llm-base-model.js";
 import { getWebSearchTool, searchDocumentationToolDefinition } from "../llm/llm-tools.js";
@@ -15,11 +15,13 @@ export interface GenerateStepConfigResult {
     success: boolean;
     error?: string;
     config?: Partial<ApiConfig>;
+    dataSelector?: string;
     messages?: LLMMessage[];
 }
 
 const stepConfigSchema = z.object({
-    stepConfig: z.object({
+    dataSelector: z.string().describe("JavaScript function that returns OBJECT for direct execution or ARRAY for loop execution. If returns OBJECT (including {}), step executes once with object as currentItem. If returns ARRAY, step executes once per array item. Examples: (sourceData) => ({ userId: sourceData.userId }) OR (sourceData) => sourceData.getContacts.data.filter(c => c.active)"),
+    apiConfig: z.object({
       urlHost: z.string().describe("The base URL host (e.g., https://api.example.com). Must not be empty."),
       urlPath: z.string().describe("The API endpoint path (e.g., /v1/users)."),
       method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"] as [string, ...string[]]).describe("HTTP method: GET, POST, PUT, DELETE, or PATCH"),
@@ -69,7 +71,8 @@ export async function generateStepConfig({ retryCount, messages, integration }: 
         };
     }
 
-    const generatedConfig = generateStepConfigResult.response.stepConfig;
+    const generatedConfig = generateStepConfigResult.response.apiConfig;
+    const generatedDataSelector = generateStepConfigResult.response.dataSelector;
     
     if (!generatedConfig) {
         return {
@@ -95,7 +98,8 @@ export async function generateStepConfig({ retryCount, messages, integration }: 
     
     return {
         success: true,
-        config,
+        config: config,
+        dataSelector: generatedDataSelector,
         messages: generateStepConfigResult.messages
     };
 };

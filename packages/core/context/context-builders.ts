@@ -2,9 +2,9 @@ import { Integration } from '@superglue/client';
 import { server_defaults } from '../default.js';
 import { DocumentationSearch } from '../documentation/documentation-search.js';
 import { logMessage } from '../utils/logs.js';
-import { composeUrl } from '../utils/helpers.js';
+import { composeUrl, sanitizeUnpairedSurrogates } from '../utils/helpers.js';
 import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
-import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, IntegrationContextOptions, LoopSelectorContextInput, LoopSelectorContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, ToolBuilderContextInput, ToolBuilderContextOptions, GenerateStepConfigContextInput, GenerateStepConfigContextOptions } from './context-types.js';
+import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, IntegrationContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, ToolBuilderContextInput, ToolBuilderContextOptions, GenerateStepConfigContextInput, GenerateStepConfigContextOptions } from './context-types.js';
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
@@ -93,28 +93,28 @@ function buildIntegrationContext(integration: Integration, opts: IntegrationCont
     const generalSectionSize = opts.tuning?.documentationMaxChars ?? server_defaults.CONTEXT.INTEGRATIONS.GENERAL_SECTION_SIZE_CHARS;
 
     const docSearch = new DocumentationSearch((undefined as any));
-    const authSection = docSearch.extractRelevantSections(
+    const authSection = sanitizeUnpairedSurrogates(docSearch.extractRelevantSections(
         integration.documentation,
         "authentication authorization key token bearer basic oauth credentials",
         authMaxSections,
         authSectionSize,
         integration.openApiSchema
-    );
+    ));
 
-    const paginationSection = docSearch.extractRelevantSections(
+    const paginationSection = sanitizeUnpairedSurrogates(docSearch.extractRelevantSections(
         integration.documentation,
         "pagination page offset cursor limit per_page pageSize",
         paginationMaxSections,
         paginationSectionSize,
         integration.openApiSchema
-    );
-    const generalDocSection = docSearch.extractRelevantSections(
+    ));
+    const generalDocSection = sanitizeUnpairedSurrogates(docSearch.extractRelevantSections(
         integration.documentation,
         "reference object endpoints methods properties values fields enums search query filter list create update delete get put post patch",
         generalMaxSections,
         generalSectionSize,
         integration.openApiSchema
-    );
+    ));
 
     const xml_opening_tag = `<${integration.id}>`;
     const urlSection = '<base_url>: ' + composeUrl(integration.urlHost, integration.urlPath) + '</base_url>';
@@ -173,29 +173,6 @@ export function getToolBuilderContext(input: ToolBuilderContextInput, options: T
     const integrationContext = options.include?.integrationContext ? `<available_integrations_and_documentation>${integrationContent}</available_integrations_and_documentation>` : '';
 
     return prompt_start + '\n' + userInstructionContext + '\n' + integrationContext + '\n' + availableVariablesContext + '\n' + payloadContext + '\n' + prompt_end;
-}
-
-export function getLoopSelectorContext(input: LoopSelectorContextInput, options: LoopSelectorContextOptions): string {
-    const budget = Math.max(0, options.characterBudget | 0);
-    if (budget === 0) return '';
-
-    const prompt_start = `Create a JavaScript function that extracts the array of items to loop over for step: ${input.step.id} from the payload (sourceData). The function should: 1. Extract an array of ACTUAL DATA ITEMS (not metadata or property definitions) 2. Apply any filtering based on the step's instruction`;
-    const instructionContext = `<instruction>${input.step.apiConfig.instruction}</instruction>`;
-    const prompt_end = `The function should return an array of items that this step will iterate over.`;
-
-    const payloadWrapperLength = '<loop_selector_input>'.length + '</loop_selector_input>'.length;
-    const newlineCount = 3;
-    const essentialLength = prompt_start.length + instructionContext.length + prompt_end.length + newlineCount + payloadWrapperLength;
-
-    if (budget <= essentialLength) {
-        logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getLoopSelectorContext`, {});
-        return prompt_start + '\n' + instructionContext + '\n' + prompt_end;
-    }
-
-    const remainingBudget = budget - essentialLength;
-    const payloadContext = `<loop_selector_input>${getObjectContext(input.payload, { include: { schema: true, preview: true, samples: false }, characterBudget: remainingBudget })}</loop_selector_input>`;
-
-    return prompt_start + '\n' + instructionContext + '\n' + payloadContext + '\n' + prompt_end;
 }
 
 export function getEvaluateStepResponseContext(input: EvaluateStepResponseContextInput, options: EvaluateStepResponseContextOptions): string {
@@ -295,6 +272,7 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
 
     const instructionContext = `<step_instruction>${input.instruction}</step_instruction>`;
     const previousStepConfigContext = input.previousStepConfig ? `<previous_step_config>${JSON.stringify(input.previousStepConfig)}</previous_step_config>` : '';
+    const previousStepDataSelectorContext = input.previousStepDataSelector ? `<previous_step_data_selector>${input.previousStepDataSelector}</previous_step_data_selector>` : '';
     const errorContext = input.errorMessage ? `<error_message>${input.errorMessage}</error_message>` : '';
 
     const documentationWrapperLength = '<documentation>'.length + '</documentation>'.length;
@@ -305,14 +283,16 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
 
     let newlineCount = 6;
     if (previousStepConfigContext) newlineCount += 1;
+    if (previousStepDataSelectorContext) newlineCount += 1;
     if (errorContext) newlineCount += 1;
 
-    const essentialLength = promptStart.length + instructionContext.length + previousStepConfigContext.length + errorContext.length + newlineCount + totalWrapperLength;
+    const essentialLength = promptStart.length + instructionContext.length + previousStepConfigContext.length + previousStepDataSelectorContext.length + errorContext.length + newlineCount + totalWrapperLength;
 
     if (budget <= essentialLength) {
         logMessage('warn', `Character budget (${budget}) is less than or equal to essential context length (${essentialLength}) in getGenerateStepConfigContext`, {});
         let minimalContext = promptStart + '\n' + instructionContext;
         if (previousStepConfigContext) minimalContext += '\n' + previousStepConfigContext;
+        if (previousStepDataSelectorContext) minimalContext += '\n' + previousStepDataSelectorContext;
         if (errorContext) minimalContext += '\n' + errorContext;
         return minimalContext;
     }
@@ -323,8 +303,8 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
     const integrationInstructionsBudget = Math.floor(remainingBudget * 0.1);
     const credentialsBudget = Math.floor(remainingBudget * 0.1);
 
-    const documentationContent = input.integrationDocumentation.slice(0, documentationBudget);
-    const integrationSpecificInstructions = input.integrationSpecificInstructions.slice(0, integrationInstructionsBudget);
+    const documentationContent = sanitizeUnpairedSurrogates(input.integrationDocumentation.slice(0, documentationBudget));
+    const integrationSpecificInstructions = sanitizeUnpairedSurrogates(input.integrationSpecificInstructions.slice(0, integrationInstructionsBudget));
     const credentialsContent = Object.keys(input.credentials || {}).map(v => `<<${v}>>`).join(", ").slice(0, credentialsBudget);
 
     const documentationContext = `<documentation>${documentationContent}</documentation>`;
@@ -334,6 +314,7 @@ export function getGenerateStepConfigContext(input: GenerateStepConfigContextInp
 
     let contextParts = [promptStart, instructionContext];
     if (previousStepConfigContext) contextParts.push(previousStepConfigContext);
+    if (previousStepDataSelectorContext) contextParts.push(previousStepDataSelectorContext);
     if (errorContext) contextParts.push(errorContext);
     contextParts.push(documentationContext, stepInputContext, integrationInstructionsContext, credentialsContext);
 

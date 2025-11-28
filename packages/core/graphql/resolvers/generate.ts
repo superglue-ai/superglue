@@ -14,6 +14,7 @@ import { generateStepConfig } from "../../tools/tool-step-builder.js";
 interface GenerateStepConfigArgs {
   integrationId?: string;
   currentStepConfig?: Partial<ApiConfig>;
+  currentDataSelector?: string;
   stepInput?: Record<string, any>;
   credentials?: Record<string, string>;
   errorMessage?: string;
@@ -59,10 +60,10 @@ export const generateInstructionsResolver = async (
 
 export const generateStepConfigResolver = async (
   _: any,
-  { integrationId, currentStepConfig, stepInput, credentials, errorMessage }: GenerateStepConfigArgs,
+  { integrationId, currentStepConfig, currentDataSelector, stepInput, credentials, errorMessage }: GenerateStepConfigArgs,
   context: Context,
   info: GraphQLResolveInfo
-): Promise<ApiConfig> => {
+): Promise<{config: ApiConfig, dataSelector: string}> => {
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
 
@@ -100,6 +101,7 @@ export const generateStepConfigResolver = async (
     const userPrompt = getGenerateStepConfigContext({
       instruction,
       previousStepConfig: currentStepConfig,
+      previousStepDataSelector: currentDataSelector,
       stepInput,
       credentials,
       integrationDocumentation: integrationDocs,
@@ -128,14 +130,15 @@ export const generateStepConfigResolver = async (
       throw new Error(generateStepConfigResult.error || "No step config generated");
     }
 
-    // Merge the generated config with the current config to ensure all required fields are present
+    // Merge the generated config with the current config
+    // Only preserve instruction and id which is not part of generated config
     const mergedConfig = {
-      ...currentStepConfig,
       ...generateStepConfigResult.config,
-      id: currentStepConfig?.id || crypto.randomUUID(),
+      id: currentStepConfig.id || crypto.randomUUID(), // Add this line
+      instruction: currentStepConfig.instruction,
     } as ApiConfig;
 
-    return mergedConfig;
+    return {config: mergedConfig, dataSelector: generateStepConfigResult.dataSelector};
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
       integrationId

@@ -984,18 +984,14 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     setFixStepIndex(null);
   };
 
-  const handleFixStepSuccess = (newConfig: any) => {
+  const handleFixStepSuccess = (updatedStep: any) => {
     if (fixStepIndex === null) return;
 
     const step = steps[fixStepIndex];
-    const updatedStep = {
-      ...step,
-      apiConfig: {
-        ...step.apiConfig,
-        ...newConfig,
-      },
-    };
-
+    
+    console.log('[ToolPlayground] handleFixStepSuccess received:', updatedStep);
+    
+    // updatedStep now contains the full step with both apiConfig and loopSelector updated
     handleStepEdit(step.id, updatedStep, true);
   };
 

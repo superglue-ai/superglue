@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
     getEvaluateStepResponseContext,
     getEvaluateTransformContext,
-    getLoopSelectorContext,
     getObjectContext,
     getTransformContext,
     getToolBuilderContext
@@ -191,19 +190,6 @@ describe('getWorkflowBuilderContext budget and include combinations', () => {
         const out = getToolBuilderContext(input, { characterBudget: 1000, include: { availableVariablesContext: true } as any });
         expect(out).toMatch(/<<test_integration_apiKey>>/);
         expect(out).toMatch(/<<foo>>/);
-    });
-});
-
-describe('getLoopSelectorContext budgets and content', () => {
-    const step = { id: 's1', apiConfig: { instruction: 'Filter by status=active' } } as any;
-    const input = { step, payload: { data: [{ id: 1 }, { id: 2 }] }, instruction: 'loop' } as any;
-
-    it('enforces budget and contains step and payload context plus explicit end prompt', () => {
-        const out = getLoopSelectorContext(input, { characterBudget: 550 });
-        expect(out.length).toBeLessThanOrEqual(550);
-        expect(out).toMatch(/<instruction>/);
-        expect(out).toMatch(/<loop_selector_input>/);
-        expect(out).toMatch(/The function should return an array of items/);
     });
 });
 

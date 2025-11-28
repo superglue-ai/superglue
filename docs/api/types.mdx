@@ -222,8 +222,7 @@ Result of individual workflow step execution.
 type WorkflowStepResult {
   stepId: String!
   success: Boolean!
-  rawData: JSON
-  transformedData: JSON
+  data: JSON
   error: String
 }
 ```
@@ -440,15 +439,13 @@ Result of an individual step within a workflow execution.
 type WorkflowStepResult {
   stepId: String!
   success: Boolean!
-  rawData: JSON
-  transformedData: JSON
+  data: JSON
   error: String
 }
 ```
 
 - `stepId`: Identifier of the step within the workflow
-- `rawData`: Raw response data before transformation
-- `transformedData`: Data after applying transformations
+- `data`: Response Data
 
 ### ExecutionStep
 

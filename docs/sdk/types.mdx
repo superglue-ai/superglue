@@ -110,8 +110,7 @@ interface WorkflowStepResult {
   stepId: string;
   config?: ApiConfig;
   success: boolean;
-  rawData?: any;
-  transformedData?: any;
+  data?: any;
   error?: string;
 }
 ```
@@ -119,8 +118,7 @@ interface WorkflowStepResult {
 **Fields:**
 - `stepId` - Which step this result is for
 - `success` - Whether the step succeeded
-- `rawData` - API response before transformations
-- `transformedData` - API response after transformations
+- `data` - API response data
 - `error` - Error message if failed
 - `config` - The actual config used (may differ if self-healing occurred)
 

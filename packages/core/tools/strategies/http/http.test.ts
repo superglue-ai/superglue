@@ -432,8 +432,8 @@ describe('API Utilities', () => {
       expect(isSelfHealingEnabled({ selfHealing: SelfHealingMode.TRANSFORM_ONLY }, 'api')).toBe(false);
 
       // Test defaults
-      expect(isSelfHealingEnabled({}, 'api')).toBe(true);
-      expect(isSelfHealingEnabled(undefined, 'api')).toBe(true);
+      expect(isSelfHealingEnabled({}, 'api')).toBe(false);
+      expect(isSelfHealingEnabled(undefined, 'api')).toBe(false);
     });
 
     it('should verify self-healing flag is passed to API execution logic', () => {
