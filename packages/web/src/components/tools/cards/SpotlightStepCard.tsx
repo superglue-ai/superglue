@@ -31,11 +31,13 @@ import { Label } from '../../ui/label';
 import { ToolStepConfigurator } from '../ToolStepConfigurator';
 import { useDataProcessor } from '../hooks/use-data-processor';
 import { CopyButton } from '../shared/CopyButton';
+import { type CategorizedSources } from '../templates/TemplateContext';
 
 export const SpotlightStepCard = React.memo(({
     step,
     stepIndex,
     evolvingPayload,
+    categorizedSources,
     stepResult,
     onEdit,
     onRemove,
@@ -57,6 +59,7 @@ export const SpotlightStepCard = React.memo(({
     step: any;
     stepIndex: number;
     evolvingPayload: any;
+    categorizedSources?: CategorizedSources;
     stepResult?: any;
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onRemove?: (stepId: string) => void;
@@ -370,12 +373,12 @@ export const SpotlightStepCard = React.memo(({
                                     return (
                                         <>
                                             <p className="text-xs text-muted-foreground mb-2">
-                                                Step data selector extracts step data from the aggregated step input.
+                                                Step data selector extracts step data from the aggregated tool data.
                                             </p>
                                             <div className="flex gap-3">
                                                 <div className="flex-1">
                                                     <Label className="text-xs flex items-center gap-1 mb-1">
-                                                        Aggregated Step Input
+                                                        Aggregated Step Data
                                                         <HelpTooltip text="This is an object combined from the tool payload and the previous step results." />
                                                     </Label>
                                                     {cannotExecuteYet ? (
@@ -427,7 +430,7 @@ export const SpotlightStepCard = React.memo(({
                                                 <div className="flex-1 flex flex-col gap-3">
                                                     <div className="flex-1">
                                                         <Label className="text-xs flex items-center gap-1 mb-1">
-                                                            Step Data Selector (JavaScript)
+                                                            Current Step Data Selector (JavaScript)
                                                             <HelpTooltip text="JavaScript arrow function that receives the aggregatedstep input as sourceData. It should return the part of the data this step needs. If it returns an object, the step runs once. If it returns an array, the step runs once for each item and sourceData.currentItem is set for every iteration." />
                                                         </Label>
                                                         <JavaScriptCodeEditor
@@ -448,7 +451,7 @@ export const SpotlightStepCard = React.memo(({
 
                                                     <div className="flex-1">
                                                         <Label className="text-xs flex items-center gap-1 mb-1">
-                                                            Step Data
+                                                            Current Step Data
                                                             <HelpTooltip text="Preview of the step data. Evaluates the step data selector against the aggregated step input." />
                                                             {isLoopItemsEvaluating && (
                                                                 <div className="ml-1 h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/70 border-t-transparent" />
@@ -515,6 +518,7 @@ export const SpotlightStepCard = React.memo(({
                                     onEditingChange={onConfigEditingChange}
                                     stepInput={evolvingPayload}
                                     loopItems={loopItems}
+                                    categorizedSources={categorizedSources}
                                     onOpenFixStepDialog={onOpenFixStepDialog}
                                     canExecute={canExecute}
                                 />

@@ -5,6 +5,7 @@ import { splitUrl } from '@/src/lib/client-utils';
 import { composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/general-utils';
 import { Integration } from "@superglue/client";
 import { flattenAndNamespaceCredentials } from '@superglue/shared';
+import { type CategorizedSources, type CategorizedVariables } from './templates/TemplateContext';
 import { ArrowDown, Globe, OctagonAlert, Pencil } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { JavaScriptCodeEditor } from '../editors/JavaScriptCodeEditor';
@@ -29,11 +30,12 @@ interface ToolStepConfiguratorProps {
     disabled?: boolean;
     stepInput?: any;
     loopItems?: any;
+    categorizedSources?: CategorizedSources;
     onOpenFixStepDialog?: () => void;
     canExecute?: boolean;
 }
 
-export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, loopItems, onOpenFixStepDialog, canExecute = true }: ToolStepConfiguratorProps) {
+export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, loopItems, categorizedSources, onOpenFixStepDialog, canExecute = true }: ToolStepConfiguratorProps) {
     const [headersText, setHeadersText] = useState('');
     const [queryParamsText, setQueryParamsText] = useState('');
 
@@ -130,18 +132,51 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         ? propIntegrations.find(integration => integration.id === step.integrationId)
         : undefined;
 
+    const credentialsMap = useMemo(() => 
+        flattenAndNamespaceCredentials([linkedIntegration]),
+        [linkedIntegration]
+    );
+
+    // Derive current item from loopItems
+    const currentItemObj = useMemo(() => {
+        if (loopItems && typeof loopItems === 'object' && !Array.isArray(loopItems)) {
+            return loopItems as Record<string, unknown>;
+        }
+        if (Array.isArray(loopItems) && loopItems.length > 0) {
+            return loopItems[0] as Record<string, unknown>;
+        }
+        return null;
+    }, [loopItems]);
+
     const templateStepData = useMemo<Record<string, unknown>>(() => {
         const baseData = (stepInput && typeof stepInput === 'object')
             ? stepInput as Record<string, unknown>
             : {};
 
-        const credentialsMap = flattenAndNamespaceCredentials([linkedIntegration]);
-
         return {
             ...credentialsMap,
             ...baseData,
+            ...(currentItemObj ? { currentItem: currentItemObj } : {}),
         };
-    }, [stepInput, linkedIntegration]);
+    }, [stepInput, credentialsMap, currentItemObj]);
+
+    const categorizedVariables = useMemo<CategorizedVariables>(() => {
+        return {
+            credentials: Object.keys(credentialsMap),
+            toolInputs: Object.keys(categorizedSources?.manualPayload || {}),
+            fileInputs: Object.keys(categorizedSources?.filePayloads || {}),
+            currentStepData: currentItemObj ? ['currentItem'] : [],
+            previousStepData: Object.keys(categorizedSources?.previousStepResults || {}),
+        };
+    }, [credentialsMap, categorizedSources, currentItemObj]);
+
+    // Build complete categorizedSources including currentItem
+    const completeCategorizedSources = useMemo<CategorizedSources>(() => ({
+        manualPayload: categorizedSources?.manualPayload || {},
+        filePayloads: categorizedSources?.filePayloads || {},
+        previousStepResults: categorizedSources?.previousStepResults || {},
+        currentItem: currentItemObj,
+    }), [categorizedSources, currentItemObj]);
 
     return (
         <div className="flex flex-col items-center">
@@ -217,6 +252,8 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                     stepData={templateStepData}
                                                     loopData={loopItems}
                                                     canExecute={canExecute}
+                                                    categorizedVariables={categorizedVariables}
+                                                    categorizedSources={completeCategorizedSources}
                                                     className="flex-1" 
                                                     placeholder="https://api.example.com/endpoint" 
                                                     disabled={disabled} 
@@ -239,6 +276,8 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             stepData={templateStepData}
                                             loopData={loopItems}
                                             canExecute={canExecute}
+                                            categorizedVariables={categorizedVariables}
+                                            categorizedSources={completeCategorizedSources}
                                             readOnly={disabled}
                                             minHeight="100px"
                                             maxHeight="150px"
@@ -262,6 +301,8 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             stepData={templateStepData}
                                             loopData={loopItems}
                                             canExecute={canExecute}
+                                            categorizedVariables={categorizedVariables}
+                                            categorizedSources={completeCategorizedSources}
                                             readOnly={disabled}
                                             minHeight="100px"
                                             maxHeight="150px"
@@ -282,6 +323,8 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 stepData={templateStepData}
                                                 loopData={loopItems}
                                                 canExecute={canExecute}
+                                                categorizedVariables={categorizedVariables}
+                                                categorizedSources={completeCategorizedSources}
                                                 readOnly={disabled}
                                                 minHeight="100px"
                                                 maxHeight="150px"
