@@ -145,8 +145,20 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
       if (!operation.content) throw new Error('content required for put operation');
 
       const { Readable } = await import('stream');
-      const buffer = Buffer.isBuffer(operation.content) ? operation.content : Buffer.from(operation.content);
-      const stream = Readable.from(buffer);
+      const buffer = Buffer.isBuffer(operation.content) 
+        ? operation.content 
+        : Buffer.from(
+            typeof operation.content === 'string' 
+              ? operation.content 
+              : JSON.stringify(operation.content, null, 2)
+          );
+      
+      const stream = new Readable({
+        read() {
+          this.push(buffer);
+          this.push(null);
+        }
+      });
       await client.uploadFrom(stream, operation.path);
 
       return {
@@ -258,7 +270,13 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
       if (!operation.path) throw new Error('path required for put operation');
       if (!operation.content) throw new Error('content required for put operation');
 
-      const buffer = Buffer.isBuffer(operation.content) ? operation.content : Buffer.from(operation.content);
+      const buffer = Buffer.isBuffer(operation.content) 
+        ? operation.content 
+        : Buffer.from(
+            typeof operation.content === 'string' 
+              ? operation.content 
+              : JSON.stringify(operation.content, null, 2)
+          );
       await client.put(buffer, operation.path);
 
       return {
@@ -346,7 +364,7 @@ export async function callFTP({ endpoint, stepInputData, credentials, options }:
       operations = body;
     }
   } catch (error) {
-    throw new Error(`Invalid JSON in body: ${error.message}. Body must be a JSON object with an 'operation' field. Supported operations: ${SUPPORTED_OPERATIONS.join(', ')}`);
+    throw new Error(`Invalid JSON in body: ${error.message}. Body must be valid JSON. Supported operations: ${SUPPORTED_OPERATIONS.join(', ')}`);
   }
 
   // Validate operation

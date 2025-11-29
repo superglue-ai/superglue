@@ -1,7 +1,8 @@
 import { SelfHealingMode } from '@superglue/client';
 import { assertValidArrowFunction } from '@superglue/shared';
 import { describe, expect, it, vi } from 'vitest';
-import { applyAuthFormat, composeUrl, isSelfHealingEnabled, maskCredentials, replaceVariables, sample, transformData } from './helpers.js';
+import { applyAuthFormat, composeUrl, isSelfHealingEnabled, replaceVariables, sample, transformData } from './helpers.js';
+import { maskCredentials } from '@superglue/shared';
 
 vi.mock('axios');
 

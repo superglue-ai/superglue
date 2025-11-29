@@ -7,6 +7,7 @@ import { parseJSON } from "../files/index.js";
 import { oldReplaceVariables } from "./helpers.legacy.js";
 import { injectVMHelpersIndividually } from "./vm-helpers.js";
 
+
 export interface TransformResult {
   success: boolean;
   code: string;
@@ -148,21 +149,6 @@ export function sample(value: any, sampleSize = 10): any {
   return value;
 }
 
-export function maskCredentials(message: string, credentials?: Record<string, string>): string {
-  if (!credentials) {
-    return message;
-  }
-
-  let maskedMessage = message;
-  Object.entries(credentials).forEach(([key, value]) => {
-    const valueString = String(value);
-    if (value && valueString) {
-      const regex = new RegExp(valueString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-      maskedMessage = maskedMessage.replace(regex, `{masked_${key}}`);
-    }
-  });
-  return maskedMessage;
-}
 
 export function addNullableToOptional(schema: any, required: boolean = true): any {
   if (!schema || typeof schema !== 'object') return schema;

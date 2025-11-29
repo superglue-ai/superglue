@@ -19,10 +19,11 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { downloadJson } from '@/src/lib/download-utils';
-import { formatJavaScriptCode, isEmptyData, truncateForDisplay } from '@/src/lib/general-utils';
+import { formatJavaScriptCode, isEmptyData, truncateForDisplay, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/client';
 import { assertValidArrowFunction } from '@superglue/shared';
-import { BugPlay, ChevronDown, Download, FileBraces, FileInput, FileOutput, Loader2, Play, Route, Trash2, Wand2, X } from 'lucide-react';
+import { BugPlay, ChevronDown, Download, FileBraces, FileInput, FileOutput, Loader2, Play, Route, Trash2, Wand2, Globe, X } from 'lucide-react';
+import { Badge } from '@/src/components/ui/badge';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { JavaScriptCodeEditor } from '../../editors/JavaScriptCodeEditor';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
@@ -30,11 +31,13 @@ import { Label } from '../../ui/label';
 import { ToolStepConfigurator } from '../ToolStepConfigurator';
 import { useDataProcessor } from '../hooks/use-data-processor';
 import { CopyButton } from '../shared/CopyButton';
+import { type CategorizedSources } from '../templates/tiptap/TemplateContext';
 
 export const SpotlightStepCard = React.memo(({
     step,
     stepIndex,
     evolvingPayload,
+    categorizedSources,
     stepResult,
     onEdit,
     onRemove,
@@ -56,6 +59,7 @@ export const SpotlightStepCard = React.memo(({
     step: any;
     stepIndex: number;
     evolvingPayload: any;
+    categorizedSources?: CategorizedSources;
     stepResult?: any;
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onRemove?: (stepId: string) => void;
@@ -228,14 +232,34 @@ export const SpotlightStepCard = React.memo(({
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50 overflow-hidden">
             <div className="p-3">
                 <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <Route className="h-4 w-4 text-muted-foreground" />
-                        <h3 className="text-lg font-semibold">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Route className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <h3 className="text-lg font-semibold truncate">
                             {step.id || `Step ${stepIndex + 1}`}
                         </h3>
                         {step.name && step.name !== step.id && (
-                            <span className="text-sm text-muted-foreground">({step.name})</span>
+                            <span className="text-sm text-muted-foreground truncate">({step.name})</span>
                         )}
+                        {integrations && step.integrationId && (() => {
+                            const linkedIntegration = integrations.find(integration => integration.id === step.integrationId);
+                            if (!linkedIntegration) return null;
+                            const iconName = getIntegrationIconName(linkedIntegration);
+                            const icon = iconName ? getSimpleIcon(iconName) : null;
+                            return (
+                                <Badge variant="outline" className="text-xs flex-shrink-0">
+                                    <div className="text-xs flex items-center gap-1">
+                                        {icon ? (
+                                            <svg width="10" height="10" viewBox="0 0 24 24" fill={`#${icon.hex}`} className="flex-shrink-0">
+                                                <path d={icon.path || ''} />
+                                            </svg>
+                                        ) : (
+                                            <Globe className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                                        )}
+                                        <span className="truncate">{linkedIntegration.id}</span>
+                                    </div>
+                                </Badge>
+                            );
+                        })()}
                     </div>
                     <div className="flex items-center gap-2">
                         {!readOnly && onExecuteStep && (
@@ -349,12 +373,12 @@ export const SpotlightStepCard = React.memo(({
                                     return (
                                         <>
                                             <p className="text-xs text-muted-foreground mb-2">
-                                                Step data selector extracts step data from the aggregated step input.
+                                                Step data selector extracts step data from the aggregated tool data.
                                             </p>
                                             <div className="flex gap-3">
                                                 <div className="flex-1">
                                                     <Label className="text-xs flex items-center gap-1 mb-1">
-                                                        Aggregated Step Input
+                                                        Aggregated Step Data
                                                         <HelpTooltip text="This is an object combined from the tool payload and the previous step results." />
                                                     </Label>
                                                     {cannotExecuteYet ? (
@@ -406,7 +430,7 @@ export const SpotlightStepCard = React.memo(({
                                                 <div className="flex-1 flex flex-col gap-3">
                                                     <div className="flex-1">
                                                         <Label className="text-xs flex items-center gap-1 mb-1">
-                                                            Step Data Selector (JavaScript)
+                                                            Current Step Data Selector (JavaScript)
                                                             <HelpTooltip text="JavaScript arrow function that receives the aggregatedstep input as sourceData. It should return the part of the data this step needs. If it returns an object, the step runs once. If it returns an array, the step runs once for each item and sourceData.currentItem is set for every iteration." />
                                                         </Label>
                                                         <JavaScriptCodeEditor
@@ -427,7 +451,7 @@ export const SpotlightStepCard = React.memo(({
 
                                                     <div className="flex-1">
                                                         <Label className="text-xs flex items-center gap-1 mb-1">
-                                                            Step Data
+                                                            Current Step Data
                                                             <HelpTooltip text="Preview of the step data. Evaluates the step data selector against the aggregated step input." />
                                                             {isLoopItemsEvaluating && (
                                                                 <div className="ml-1 h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/70 border-t-transparent" />
@@ -494,7 +518,9 @@ export const SpotlightStepCard = React.memo(({
                                     onEditingChange={onConfigEditingChange}
                                     stepInput={evolvingPayload}
                                     loopItems={loopItems}
+                                    categorizedSources={categorizedSources}
                                     onOpenFixStepDialog={onOpenFixStepDialog}
+                                    canExecute={canExecute}
                                 />
                             </div>
                         )}

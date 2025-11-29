@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Tippy.js base styles for suggestions dropdown */
+.tippy-box {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+}
+
+.tippy-content {
+  padding: 0;
+}
+
 body {
   overflow: hidden;
   font-family: var(--font-jetbrains-sans);
