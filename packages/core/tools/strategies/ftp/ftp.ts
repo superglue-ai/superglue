@@ -158,13 +158,7 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
 
       const { Readable } = await import('stream');
       const buffer = contentToBuffer(operation.content);
-      
-      const stream = new Readable({
-        read() {
-          this.push(buffer);
-          this.push(null);
-        }
-      });
+      const stream = Readable.from(buffer);
       await client.uploadFrom(stream, operation.path);
 
       return {
