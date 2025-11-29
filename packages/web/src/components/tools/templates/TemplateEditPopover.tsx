@@ -8,7 +8,7 @@ import {
 import { createPortal } from 'react-dom';
 import { formatValueForDisplay, normalizeTemplateExpression, extractCredentials, DEFAULT_CODE_TEMPLATE } from '@/src/lib/template-utils';
 import { isArrowFunction, maskCredentials } from '@superglue/shared';
-import { Download, AlertCircle, Loader2 } from 'lucide-react';
+import { Download, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Editor from '@monaco-editor/react';
 import { useMonacoTheme } from '@/src/hooks/useMonacoTheme';
@@ -67,6 +67,7 @@ export function TemplateEditPopover({
   const { theme, onMount } = useMonacoTheme();
   
   const [codeContent, setCodeContent] = useState(DEFAULT_CODE_TEMPLATE);
+  const [showCredentials, setShowCredentials] = useState(false);
   const codeEditorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   
@@ -117,9 +118,11 @@ export function TemplateEditPopover({
 
   const credentials = extractCredentials(sourceData);
   const previewDisplayRaw = formatValueForDisplay(previewValue);
-  const previewDisplay = Object.keys(credentials).length > 0 
+  const maskedPreview = Object.keys(credentials).length > 0 
     ? maskCredentials(previewDisplayRaw, credentials) 
     : previewDisplayRaw;
+  const credentialsAreMasked = maskedPreview !== previewDisplayRaw;
+  const previewDisplay = credentialsAreMasked && !showCredentials ? maskedPreview : previewDisplayRaw;
   const canDownload = previewDisplayRaw.length > 1000;
 
   useEffect(() => {
@@ -164,12 +167,12 @@ export function TemplateEditPopover({
     glyphMargin: false,
     folding: false,
     scrollBeyondLastLine: false,
-    wordWrap: 'off',
+    wordWrap: 'on',
     contextmenu: false,
     renderLineHighlight: 'none',
     scrollbar: {
       vertical: 'auto',
-      horizontal: 'auto',
+      horizontal: 'hidden',
       verticalScrollbarSize: 6,
       horizontalScrollbarSize: 6,
     },
@@ -217,20 +220,17 @@ export function TemplateEditPopover({
       <div>
         <div className="flex items-center justify-between mb-2">
           <Label className="text-xs text-muted-foreground">Result Preview</Label>
-          <div className="flex items-center gap-2">
-            {isEvaluating && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-            {canDownload && !previewError && canExecute && hasSourceData && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleDownload}
-                className="h-6 text-xs px-2"
-              >
-                <Download className="h-3 w-3 mr-1" />
-                Download
-              </Button>
-            )}
-          </div>
+          {canDownload && !previewError && canExecute && hasSourceData && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDownload}
+              className="h-6 text-xs px-2"
+            >
+              <Download className="h-3 w-3 mr-1" />
+              Download
+            </Button>
+          )}
         </div>
         {!canExecute || !hasSourceData ? (
           <div className="flex items-center gap-2 p-3 bg-muted/50 border border-muted-foreground/20 rounded-md text-xs text-muted-foreground">
@@ -241,9 +241,16 @@ export function TemplateEditPopover({
           <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-xs text-destructive max-h-24 overflow-auto">
             {previewError}
           </div>
+        ) : isEvaluating ? (
+          <div 
+            className="flex items-center justify-center rounded-md border bg-muted/30"
+            style={{ height: previewEditorHeight }}
+          >
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
         ) : (
           <div 
-            className="rounded-md border bg-muted/30 overflow-hidden transition-[height] duration-150" 
+            className="relative rounded-md border bg-muted/30 overflow-hidden transition-[height] duration-150" 
             style={{ height: previewEditorHeight }}
           >
             <Editor
@@ -254,6 +261,15 @@ export function TemplateEditPopover({
               options={{ ...monacoOptions, readOnly: true, fontSize: 11 }}
               theme={theme}
             />
+            {credentialsAreMasked && (
+              <button
+                onClick={() => setShowCredentials(!showCredentials)}
+                className="absolute top-1 right-2 p-1 rounded hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
+                title={showCredentials ? 'Hide credentials' : 'Show credentials'}
+              >
+                {showCredentials ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+              </button>
+            )}
           </div>
         )}
       </div>

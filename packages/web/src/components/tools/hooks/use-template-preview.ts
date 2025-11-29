@@ -22,9 +22,14 @@ export function useTemplatePreview(
   const [previewValue, setPreviewValue] = useState<any>({});
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
-  const lastEvaluatedCodeRef = useRef<string>('');
+  const lastEvalKeyRef = useRef<string>('');
+  const sourceDataIdRef = useRef(0);
 
   const hasSourceData = sourceData && typeof sourceData === 'object' && Object.keys(sourceData).length > 0;
+
+  useEffect(() => {
+    sourceDataIdRef.current += 1;
+  }, [sourceData]);
 
   useEffect(() => {
     if (!enabled || !hasSourceData) {
@@ -37,11 +42,12 @@ export function useTemplatePreview(
       setPreviewValue({});
       setPreviewError(null);
       setIsEvaluating(false);
-      lastEvaluatedCodeRef.current = codeContent;
+      lastEvalKeyRef.current = `${codeContent}:${sourceDataIdRef.current}`;
       return;
     }
 
-    if (codeContent === lastEvaluatedCodeRef.current) {
+    const evalKey = `${codeContent}:${sourceDataIdRef.current}`;
+    if (evalKey === lastEvalKeyRef.current) {
       return;
     }
 
@@ -50,7 +56,7 @@ export function useTemplatePreview(
     const timer = setTimeout(async () => {
       try {
         const result = await evaluateTemplate(codeContent, sourceData);
-        lastEvaluatedCodeRef.current = codeContent;
+        lastEvalKeyRef.current = evalKey;
         if (result.success) {
           setPreviewValue(result.value);
           setPreviewError(null);
@@ -68,9 +74,8 @@ export function useTemplatePreview(
   }, [codeContent, sourceData, enabled, hasSourceData, debounceMs]);
 
   useEffect(() => {
-    lastEvaluatedCodeRef.current = '';
+    lastEvalKeyRef.current = '';
   }, [enabled]);
 
   return { previewValue, previewError, isEvaluating };
 }
-
