@@ -67,8 +67,8 @@ class WorkerManager {
   }
 
   async compute<T = any>(taskType: TaskType, data: any): Promise<T> {
-    if (!data || typeof data !== 'object') {
-      throw new Error('Data must be an object');
+    if (data === null || data === undefined) {
+      throw new Error('Data cannot be null or undefined');
     }
 
     const cached = this.getCached(data, taskType);

@@ -24,7 +24,7 @@ function isLikelyCSV(buffer: Buffer): boolean {
 
     if (lines.length < 2) return false;
 
-    const delimiters = [',', '\t', ';', '|'];
+    const delimiters = [',', '\t', ';'];
 
     for (const delimiter of delimiters) {
         const delimiterCounts = lines.map(line => {
@@ -177,4 +177,3 @@ export async function parseCSV(buffer: Buffer): Promise<any> {
         });
     });
 }
-
