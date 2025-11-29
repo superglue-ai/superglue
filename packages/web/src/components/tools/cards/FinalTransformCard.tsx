@@ -23,7 +23,7 @@ import {
   Wand2,
   X
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { JavaScriptCodeEditor } from "../../editors/JavaScriptCodeEditor";
 import { JsonCodeEditor } from "../../editors/JsonCodeEditor";
 import { useDataProcessor } from "../hooks/use-data-processor";
@@ -70,9 +70,13 @@ export const FinalTransformMiniStepCard = ({
       "preview"
     );
     const [schemaInitialized, setSchemaInitialized] = useState(false);
+    const isInternalChangeRef = useRef(false);
 
     useEffect(() => {
-      setLocalTransform(transform || "");
+      if (!isInternalChangeRef.current) {
+        setLocalTransform(transform || "");
+      }
+      isInternalChangeRef.current = false;
     }, [transform]);
 
     useEffect(() => {
@@ -147,6 +151,7 @@ export const FinalTransformMiniStepCard = ({
     };
 
     function handleTransformChange(value: string): void {
+      isInternalChangeRef.current = true;
       setLocalTransform(value);
       if (onTransformChange) onTransformChange(value);
     }
