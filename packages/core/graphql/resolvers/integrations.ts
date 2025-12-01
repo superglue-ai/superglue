@@ -111,6 +111,8 @@ export const upsertIntegrationResolver = async (
           logMessage('warn', `No Template Documentation found for template ${templateName} to copy to user integration ${input.id}`, { orgId: context.orgId });
           // set shouldFetchDoc to true to trigger a fetch
           shouldFetchDoc = true;
+        } else {
+          logMessage('info', `Skipping documentation scrape for integration '${input.id}' - copied from template`, { orgId: context.orgId });
         }
       }
     }
