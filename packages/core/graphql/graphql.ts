@@ -73,7 +73,10 @@ export const resolvers = {
     // for union type compatibility with ApiConfig
     id: (parent: any) => {
       // If id is null/undefined, generate one (shouldn't happen, but safety check)
-      return parent.id || crypto.randomUUID();
+      if (!parent.id) {
+        throw new Error("Workflow.id is missing");
+      }
+      return parent.id;
     },
   },
   Workflow: {
