@@ -74,8 +74,12 @@ export function useTemplateAwareEditor({
         if (popoverAnchorPos === null) return null;
         const view = editorRef.current?.view;
         if (!view) return null;
-        const coords = view.coordsAtPos(popoverAnchorPos);
-        return { left: coords.left, top: coords.bottom };
+        try {
+            const coords = view.coordsAtPos(popoverAnchorPos);
+            return { left: coords.left, top: coords.bottom };
+        } catch {
+            return null;
+        }
     }, [popoverAnchorPos]);
 
     const cleanupSuggestion = useCallback(() => {
