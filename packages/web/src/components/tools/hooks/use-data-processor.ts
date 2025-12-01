@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useComputeWorkerCached } from '@/src/hooks/use-compute-worker-cached';
+import { getDataHash } from '@/src/lib/weak-cache';
 import { TaskType } from '@/src/workers/compute-worker';
 
 interface CachedData {
@@ -58,10 +59,10 @@ export function useDataProcessor(
         schemaComputedRef.current = true;
     }, [schemaCompute.isComputing]);
 
-    // Reset schema trigger when data changes
-    const lastDataRef = useRef<any>(null);
-    if (lastDataRef.current !== data) {
-        lastDataRef.current = data;
+    const lastDataHashRef = useRef<string>('');
+    const currentHash = data ? getDataHash(data) : '';
+    if (lastDataHashRef.current !== currentHash) {
+        lastDataHashRef.current = currentHash;
         setSchemaTriggered(false);
         schemaComputedRef.current = false;
     }

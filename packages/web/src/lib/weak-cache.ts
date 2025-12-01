@@ -1,40 +1,34 @@
 import type { TaskType } from '../workers/compute-worker';
 
-export class WeakCacheManager {
-  private cache = new WeakMap<object, Map<TaskType, any>>();
+function hash(str: string): string {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  }
+  return h.toString(36);
+}
+
+export function getDataHash(data: any): string {
+  const str = typeof data === 'string' ? data : JSON.stringify(data);
+  return str.length > 500 ? hash(str) : str;
+}
+
+class CacheManager {
+  private cache = new Map<string, Map<TaskType, any>>();
 
   get(data: any, taskType: TaskType): any | null {
-    if (!data || typeof data !== 'object') return null;
-    
-    const taskCache = this.cache.get(data);
-    if (!taskCache) return null;
-    
-    return taskCache.get(taskType) || null;
+    return this.cache.get(getDataHash(data))?.get(taskType) ?? null;
   }
 
   set(data: any, taskType: TaskType, result: any): void {
-    if (!data || typeof data !== 'object') return;
-    
-    let taskCache = this.cache.get(data);
-    if (!taskCache) {
-      taskCache = new Map();
-      this.cache.set(data, taskCache);
-    }
-    taskCache.set(taskType, result);
-  }
-
-  has(data: any, taskType: TaskType): boolean {
-    return this.get(data, taskType) !== null;
+    const key = getDataHash(data);
+    if (!this.cache.has(key)) this.cache.set(key, new Map());
+    this.cache.get(key)!.set(taskType, result);
   }
 
   clear(): void {
-    this.cache = new WeakMap();
-  }
-
-  clearForData(data: any): void {
-    if (!data || typeof data !== 'object') return;
-    this.cache.delete(data);
+    this.cache.clear();
   }
 }
 
-export const globalCache = new WeakCacheManager();
+export const globalCache = new CacheManager();
