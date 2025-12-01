@@ -39,6 +39,7 @@ export function useTemplatePreview(
 
   useEffect(() => {
     if (!enabled || !hasSourceData) {
+      setPreviewValue(undefined);
       setPreviewError(null);
       setIsEvaluating(false);
       return;
@@ -70,10 +71,12 @@ export function useTemplatePreview(
           setPreviewValue(result.value);
           setPreviewError(null);
         } else {
+          setPreviewValue(undefined);
           setPreviewError(result.error || 'Evaluation failed');
         }
       } catch (error) {
         if (thisVersion !== evalVersionRef.current) return;
+        setPreviewValue(undefined);
         setPreviewError(error instanceof Error ? error.message : String(error));
       } finally {
         if (thisVersion === evalVersionRef.current) {

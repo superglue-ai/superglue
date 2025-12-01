@@ -80,7 +80,7 @@ export function normalizeTemplateExpression(expr: string): string {
   if (isArrowFunction(trimmed)) {
     return trimmed;
   }
-  if (trimmed.startsWith('sourceData.') || trimmed === 'sourceData') {
+  if (trimmed.startsWith('sourceData.') || trimmed.startsWith('sourceData[') || trimmed === 'sourceData') {
     return `(sourceData) => ${trimmed}`;
   }
   if (PROPERTY_PATH_PATTERN.test(trimmed)) {
