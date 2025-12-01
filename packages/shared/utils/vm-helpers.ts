@@ -255,12 +255,12 @@ export const VM_HELPERS_CODE = `
     };
   }
   
-  // escape function - matches standard escape() behavior including %uXXXX for non-ASCII
+  // escape function - matches standard escape() with %uXXXX for non-ASCII, keeps ! unencoded for API compatibility
     escape = function(str) {
       let result = '';
       for (let i = 0; i < str.length; i++) {
         const code = str.charCodeAt(i);
-        if (/[A-Za-z0-9@*_+./-]/.test(str[i])) {
+        if (/[A-Za-z0-9@*_+.\-/!~'()]/.test(str[i])) {
           result += str[i];
         } else if (code < 256) {
           result += '%' + code.toString(16).toUpperCase().padStart(2, '0');
