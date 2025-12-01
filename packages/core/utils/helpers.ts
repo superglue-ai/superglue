@@ -1,5 +1,5 @@
 import { RequestOptions, SelfHealingMode } from "@superglue/client";
-import { ensureSourceDataArrowFunction } from '@superglue/shared';
+import { assertValidArrowFunction } from '@superglue/shared';
 import ivm from 'isolated-vm';
 import { Validator } from "jsonschema";
 import { z } from "zod";
@@ -25,7 +25,7 @@ export async function transformData(data: any, code: string): Promise<TransformR
       return { success: true, code: code, data: data };
     }
     
-    const wrappedCode = ensureSourceDataArrowFunction(code);
+    const wrappedCode = assertValidArrowFunction(code);
     
     const result = await runCodeInIVM(data, wrappedCode);
     
@@ -101,10 +101,10 @@ export async function replaceVariables(template: string, payload: Record<string,
       resolvedValue = payload[expression];
     }
     else {
-      const isArrowFunction = /^\s*\([^)]*\)\s*=>/.test(expression);
+      const isArrowFunction = /^\s*(\([^)]*\)|[a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>/.test(expression);
       
       if (isArrowFunction) {
-        const transformResult = await transformData(payload, expression);
+        const transformResult = await runCodeInIVM(payload, expression);
         if (!transformResult.success) {
           throw new Error(`Failed to run JS expression: ${expression} - ${transformResult.error}`);
         }

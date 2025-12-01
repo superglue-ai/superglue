@@ -44,6 +44,16 @@ function safeDecodeURIComponent(str: string): string {
   }
 }
 
+function contentToBuffer(content: string | Buffer | any): Buffer {
+  if (Buffer.isBuffer(content)) {
+    return content;
+  }
+  if (typeof content === 'string') {
+    return Buffer.from(content, 'utf8');
+  }
+  return Buffer.from(JSON.stringify(content, null, 2), 'utf8');
+}
+
 export function parseConnectionUrl(urlString: string): {
   protocol: 'ftp' | 'ftps' | 'sftp';
   host: string;
@@ -142,10 +152,12 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
 
     case 'put': {
       if (!operation.path) throw new Error('path required for put operation');
-      if (!operation.content) throw new Error('content required for put operation');
+      if (operation.content === undefined || operation.content === null) {
+        throw new Error('content required for put operation');
+      }
 
       const { Readable } = await import('stream');
-      const buffer = Buffer.isBuffer(operation.content) ? operation.content : Buffer.from(operation.content);
+      const buffer = contentToBuffer(operation.content);
       const stream = Readable.from(buffer);
       await client.uploadFrom(stream, operation.path);
 
@@ -256,9 +268,11 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
 
     case 'put': {
       if (!operation.path) throw new Error('path required for put operation');
-      if (!operation.content) throw new Error('content required for put operation');
+      if (operation.content === undefined || operation.content === null) {
+        throw new Error('content required for put operation');
+      }
 
-      const buffer = Buffer.isBuffer(operation.content) ? operation.content : Buffer.from(operation.content);
+      const buffer = contentToBuffer(operation.content);
       await client.put(buffer, operation.path);
 
       return {
@@ -346,7 +360,7 @@ export async function callFTP({ endpoint, stepInputData, credentials, options }:
       operations = body;
     }
   } catch (error) {
-    throw new Error(`Invalid JSON in body: ${error.message}. Body must be a JSON object with an 'operation' field. Supported operations: ${SUPPORTED_OPERATIONS.join(', ')}`);
+    throw new Error(`Invalid JSON in body: ${error.message}. Body must be valid JSON. Supported operations: ${SUPPORTED_OPERATIONS.join(', ')}`);
   }
 
   // Validate operation
@@ -440,4 +454,3 @@ export async function callFTP({ endpoint, stepInputData, credentials, options }:
 
   return results.length === 1 ? results[0] : results;
 }
-

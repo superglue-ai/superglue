@@ -5,7 +5,7 @@ scalar DateTime
 scalar Upload
 
 interface BaseConfig {
-  id: ID!
+  id: ID
   version: String
   createdAt: DateTime
   updatedAt: DateTime
@@ -16,7 +16,7 @@ union ConfigType = ApiConfig | Workflow | ExtractConfig
 # deprecated - only left in for backwards compatibility with one customer
 type ApiConfig implements BaseConfig {
   # BaseConfig
-  id: ID!
+  id: ID
   version: String
   createdAt: DateTime
   updatedAt: DateTime
@@ -40,7 +40,7 @@ type ApiConfig implements BaseConfig {
 # used by the tool creation for file content extraction
 type ExtractConfig implements BaseConfig {
   # BaseConfig
-  id: ID!
+  id: ID
   version: String
   createdAt: DateTime
   updatedAt: DateTime

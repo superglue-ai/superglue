@@ -1,5 +1,5 @@
 import { Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
-import { ensureSourceDataArrowFunction, generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared";
+import { generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { parseJSON } from "../../files/index.js";
@@ -177,18 +177,6 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
       createdAt: oldWorkflow?.createdAt || now,
       updatedAt: now
     };
-
-    workflow.finalTransform = ensureSourceDataArrowFunction(workflow.finalTransform);
-
-    for (const step of workflow.steps) {
-      if (!step.apiConfig.id) {
-        step.apiConfig.id = step.id;
-      }
-      
-      if (step.loopSelector) {
-        step.loopSelector = ensureSourceDataArrowFunction(step.loopSelector);
-      }
-    }
 
     return await context.datastore.upsertWorkflow({ id, workflow, orgId: context.orgId });
   } catch (error) {
