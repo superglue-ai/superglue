@@ -1,5 +1,5 @@
 import { ApiConfig as StepConfig, HttpMethod, PaginationType, RequestOptions } from "@superglue/client";
-import { SupportedFileType } from "@superglue/shared";
+import { maskCredentials, SupportedFileType } from "@superglue/shared";
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import https from 'https';
 import ivm from "isolated-vm";
@@ -7,7 +7,7 @@ import { JSONPath } from "jsonpath-plus";
 import { server_defaults } from "../../../default.js";
 import { parseJSON } from "../../../files/index.js";
 import { logMessage } from "../../../utils/logs.js";
-import { convertBasicAuthToBase64, maskCredentials, replaceVariables } from "../../../utils/helpers.js";
+import { convertBasicAuthToBase64, replaceVariables } from "../../../utils/helpers.js";
 import { callPostgres } from "../postgres/postgres.js";
 import { callFTP } from "../ftp/ftp.js";
 import { composeUrl } from "../../../utils/helpers.js";
