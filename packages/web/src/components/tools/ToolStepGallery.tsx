@@ -118,7 +118,6 @@ export function ToolStepGallery({
     const [isConfiguratorEditing, setIsConfiguratorEditing] = useState<boolean>(false);
 
     const [isAddStepDialogOpen, setIsAddStepDialogOpen] = useState(false);
-    const [defaultStepId, setDefaultStepId] = useState('');
     const [pendingInsertIndex, setPendingInsertIndex] = useState<number | null>(null);
     const isConfiguratorEditingRef = useRef<boolean>(false);
     const [hiddenLeftCount, setHiddenLeftCount] = useState(0);
@@ -297,8 +296,6 @@ export function ToolStepGallery({
     const handleInsertStep = (afterIndex: number) => {
         if (!onStepsChange || readOnly) return;
 
-        const defaultId = `step_${Date.now()}`;
-        setDefaultStepId(defaultId);
         setPendingInsertIndex(afterIndex);
         setIsAddStepDialogOpen(true);
     };
@@ -352,6 +349,21 @@ export function ToolStepGallery({
         setPendingInsertIndex(null);
 
         // Navigate to the first newly inserted step
+        setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
+    };
+
+    const handleConfirmGenerateStep = (step: any) => {
+        if (pendingInsertIndex === null || !onStepsChange) return;
+
+        const newSteps = [...steps];
+        newSteps.splice(pendingInsertIndex, 0, step);
+        onStepsChange(newSteps);
+
+        const insertedIndex = pendingInsertIndex;
+        setIsAddStepDialogOpen(false);
+        setPendingInsertIndex(null);
+
+        // Navigate to the newly inserted step
         setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
     };
 
@@ -723,8 +735,9 @@ export function ToolStepGallery({
                 onOpenChange={setIsAddStepDialogOpen}
                 onConfirm={handleConfirmInsertStep}
                 onConfirmTool={handleConfirmInsertTool}
+                onConfirmGenerate={handleConfirmGenerateStep}
                 existingStepIds={steps.map((s: any) => s.id)}
-                defaultId={defaultStepId}
+                stepInput={pendingInsertIndex !== null ? buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, pendingInsertIndex - 1) : undefined}
             />
         </div>
     );
