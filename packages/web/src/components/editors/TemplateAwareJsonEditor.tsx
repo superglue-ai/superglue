@@ -11,7 +11,7 @@ import { VariableSuggestion } from '../tools/templates/TemplateVariableSuggestio
 import { TemplateEditPopover } from '../tools/templates/TemplateEditPopover';
 import { templateStringToTiptap, tiptapToTemplateString } from '../tools/templates/tiptap/serialization';
 import { CopyButton } from '../tools/shared/CopyButton';
-import { evaluateTemplate, parseTemplateString, prepareSourceData } from '@/src/lib/template-utils';
+import { evaluateTemplate, parseTemplateString, prepareSourceData } from '@/src/lib/templating-utils';
 import { maskCredentials } from '@superglue/shared';
 import { useTemplateAwareEditor } from '../tools/hooks/use-template-aware-editor';
 

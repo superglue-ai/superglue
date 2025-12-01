@@ -1,5 +1,5 @@
 import { useRef, useState, useMemo, useCallback } from 'react';
-import { prepareSourceData } from '@/src/lib/template-utils';
+import { prepareSourceData } from '@/src/lib/templating-utils';
 import { createVariableSuggestionConfig } from '../templates/TemplateVariableSuggestion';
 import type { CategorizedVariables, CategorizedSources } from '../templates/tiptap/TemplateContext';
 import type { Editor } from '@tiptap/react';

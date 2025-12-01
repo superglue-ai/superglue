@@ -4,7 +4,7 @@ import { canExecuteStep } from '@/src/lib/client-utils';
 import { type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, buildPreviousStepResults, cn } from '@/src/lib/general-utils';
 import { type CategorizedSources } from './templates/tiptap/TemplateContext';
-import { buildCategorizedSources } from '@/src/lib/template-utils';
+import { buildCategorizedSources } from '@/src/lib/templating-utils';
 import { Integration } from "@superglue/client";
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';

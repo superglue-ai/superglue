@@ -6,7 +6,7 @@ import { composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon
 import { Integration } from "@superglue/client";
 import { flattenAndNamespaceCredentials } from '@superglue/shared';
 import { type CategorizedSources, type CategorizedVariables } from './templates/tiptap/TemplateContext';
-import { buildPaginationData, buildCategorizedVariables, buildCategorizedSources, deriveCurrentItem } from '@/src/lib/template-utils';
+import { buildPaginationData, buildCategorizedVariables, buildCategorizedSources, deriveCurrentItem } from '@/src/lib/templating-utils';
 import { ArrowDown, Globe, OctagonAlert, Pencil } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { JavaScriptCodeEditor } from '../editors/JavaScriptCodeEditor';

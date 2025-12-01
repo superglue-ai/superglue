@@ -6,7 +6,7 @@ import {
   PopoverTrigger,
   PopoverAnchor,
 } from '@/src/components/ui/popover';
-import { formatValueForDisplay, normalizeTemplateExpression, extractCredentials, DEFAULT_CODE_TEMPLATE } from '@/src/lib/template-utils';
+import { formatValueForDisplay, normalizeTemplateExpression, extractCredentials, DEFAULT_CODE_TEMPLATE } from '@/src/lib/templating-utils';
 import { isArrowFunction, maskCredentials } from '@superglue/shared';
 import { Download, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';

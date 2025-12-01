@@ -2,7 +2,7 @@ import { Node, mergeAttributes, InputRule } from '@tiptap/core';
 import { NodeViewWrapper, ReactNodeViewRenderer, NodeViewProps } from '@tiptap/react';
 import { TemplateChip } from './TemplateChip';
 import { useTemplateContext } from './tiptap/TemplateContext';
-import { prepareSourceData } from '@/src/lib/template-utils';
+import { prepareSourceData } from '@/src/lib/templating-utils';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useTemplatePreview } from '../hooks/use-template-preview';
 

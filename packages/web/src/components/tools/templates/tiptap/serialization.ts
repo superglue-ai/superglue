@@ -1,5 +1,5 @@
 import { JSONContent } from '@tiptap/core';
-import { parseTemplateString } from '@/src/lib/template-utils';
+import { parseTemplateString } from '@/src/lib/templating-utils';
 
 export function templateStringToTiptap(value: string): JSONContent {
     if (!value) {

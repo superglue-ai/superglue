@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { evaluateTemplate, DEFAULT_CODE_TEMPLATE } from '@/src/lib/template-utils';
+import { evaluateTemplate, DEFAULT_CODE_TEMPLATE } from '@/src/lib/templating-utils';
 
 interface UseTemplatePreviewOptions {
   enabled?: boolean;

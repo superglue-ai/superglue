@@ -1,5 +1,5 @@
 import { cn } from '@/src/lib/general-utils';
-import { truncateTemplateValue, isCredentialVariable, prepareSourceData } from '@/src/lib/template-utils';
+import { truncateTemplateValue, isCredentialVariable, prepareSourceData } from '@/src/lib/templating-utils';
 import { maskCredentials } from '@superglue/shared';
 import { Code2, X } from 'lucide-react';
 import { useState, useMemo } from 'react';
