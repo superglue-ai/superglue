@@ -11,20 +11,23 @@ import { type CategorizedVariables, type CategorizedSources } from './tiptap/Tem
 type ValueType = 'object' | 'array' | 'string' | 'number' | 'other';
 
 function getValueType(value: unknown): ValueType {
+    if (value === null || value === undefined) return 'other';
     if (Array.isArray(value)) return 'array';
-    if (value !== null && typeof value === 'object') return 'object';
+    if (typeof value === 'object') return 'object';
     if (typeof value === 'string') return 'string';
     if (typeof value === 'number') return 'number';
     return 'other';
 }
 
-function getTypeSymbol(type: ValueType): string {
+function getTypeSymbol(type: ValueType, value?: unknown): string {
+    if (value === null) return '∅';
+    if (value === undefined) return '∅';
     switch (type) {
         case 'object': return '{}';
         case 'array': return '[]';
         case 'string': return '""';
         case 'number': return '123';
-        default: return '';
+        default: return '∅';
     }
 }
 
@@ -99,50 +102,51 @@ const VariableCommandMenu = forwardRef<VariableCommandMenuRef, VariableCommandMe
             (config) => categorizedVariables[config.key]?.length > 0
         );
 
-        const getCurrentItems = (): { items: string[]; canDrill: boolean[]; types: ValueType[] } => {
+        const getCurrentItems = (): { items: string[]; canDrill: boolean[]; types: ValueType[]; values: unknown[] } => {
             if (navState.level === 'categories') {
                 return { 
                     items: nonEmptyCategories.map(c => c.key), 
                     canDrill: nonEmptyCategories.map(() => true),
-                    types: nonEmptyCategories.map(() => 'other' as ValueType)
+                    types: nonEmptyCategories.map(() => 'other' as ValueType),
+                    values: nonEmptyCategories.map(() => undefined)
                 };
             }
             if (navState.level === 'variables') {
                 const vars = categorizedVariables[navState.category.key] || [];
                 const isCredentialsCategory = navState.category.key === 'credentials';
-                const canDrill = vars.map(varName => {
+                const values = vars.map(varName => 
+                    isCredentialsCategory ? undefined : getValueFromSources(varName, navState.category.key, categorizedSources)
+                );
+                const canDrill = values.map(value => {
                     if (isCredentialsCategory) return false;
-                    const value = getValueFromSources(varName, navState.category.key, categorizedSources);
                     if (getValueType(value) !== 'object') return false;
                     const keys = value && typeof value === 'object' ? Object.keys(value) : [];
                     return keys.length > 0;
                 });
-                const types = vars.map(varName => {
-                    if (isCredentialsCategory) return 'string' as ValueType;
-                    const value = getValueFromSources(varName, navState.category.key, categorizedSources);
-                    return getValueType(value);
-                });
-                return { items: vars, canDrill, types };
+                const types = values.map(value => 
+                    isCredentialsCategory ? 'string' as ValueType : getValueType(value)
+                );
+                return { items: vars, canDrill, types, values };
             }
             if (navState.level === 'nested') {
                 const baseValue = getValueFromSources(navState.varName, navState.category.key, categorizedSources);
                 const nestedValue = navState.path.length > 0 ? getNestedValue(baseValue, navState.path) : baseValue;
                 if (nestedValue && typeof nestedValue === 'object' && !Array.isArray(nestedValue)) {
                     const keys = Object.keys(nestedValue as Record<string, unknown>);
-                    const canDrill = keys.map(key => {
-                        const val = (nestedValue as Record<string, unknown>)[key];
+                    const values = keys.map(key => (nestedValue as Record<string, unknown>)[key]);
+                    const canDrill = values.map((val, i) => {
                         if (getValueType(val) !== 'object' || navState.path.length >= 1) return false;
                         const nestedKeys = val && typeof val === 'object' ? Object.keys(val) : [];
                         return nestedKeys.length > 0;
                     });
-                    const types = keys.map(key => getValueType((nestedValue as Record<string, unknown>)[key]));
-                    return { items: keys, canDrill, types };
+                    const types = values.map(val => getValueType(val));
+                    return { items: keys, canDrill, types, values };
                 }
             }
-            return { items: [], canDrill: [], types: [] };
+            return { items: [], canDrill: [], types: [], values: [] };
         };
 
-        const { items, canDrill, types } = getCurrentItems();
+        const { items, canDrill, types, values } = getCurrentItems();
 
         useEffect(() => {
             setSelectedIndex(0);
@@ -192,11 +196,11 @@ const VariableCommandMenu = forwardRef<VariableCommandMenuRef, VariableCommandMe
             }
             if (navState.level === 'nested') {
                 const propKey = items[index];
-                const fullPath = [navState.varName, ...navState.path, propKey].join('.');
+                const pathSegments = [navState.varName, ...navState.path, propKey];
                 if (canDrill[index]) {
                     setNavState({ ...navState, path: [...navState.path, propKey] });
                 } else {
-                    onSelectVariable(fullPath, navState.category.key);
+                    onSelectVariable(pathSegments.join('\x00'), navState.category.key);
                 }
             }
         };
@@ -279,7 +283,7 @@ const VariableCommandMenu = forwardRef<VariableCommandMenuRef, VariableCommandMe
                         )
                     ) : (
                         items.map((item, index) => {
-                            const typeSymbol = getTypeSymbol(types[index]);
+                            const typeSymbol = getTypeSymbol(types[index], values[index]);
                             return (
                                 <button
                                     key={item}

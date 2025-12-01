@@ -1,6 +1,6 @@
 import { executeWithVMHelpers, isArrowFunction } from '@superglue/shared';
 
-export const DEFAULT_CODE_TEMPLATE = '(sourceData) => ({})';
+export const DEFAULT_CODE_TEMPLATE = '(sourceData) => { return {} }';
 const CREDENTIAL_PATTERN = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
 
 export interface TemplatePart {

@@ -21,10 +21,15 @@ const EDITOR_PADDING = 16;
 const MIN_HEIGHT = 50;
 const MAX_CODE_HEIGHT = 300;
 const MAX_PREVIEW_HEIGHT = 250;
+const CHARS_PER_LINE = 85;
 
 const calcHeight = (content: string, maxHeight: number): number => {
-  const lines = Math.max(1, (content || '').split('\n').length);
-  return Math.min(maxHeight, Math.max(MIN_HEIGHT, lines * LINE_HEIGHT + EDITOR_PADDING));
+  const lines = (content || '').split('\n');
+  let totalLines = 0;
+  for (const line of lines) {
+    totalLines += Math.max(1, Math.ceil(line.length / CHARS_PER_LINE));
+  }
+  return Math.min(maxHeight, Math.max(MIN_HEIGHT, totalLines * LINE_HEIGHT + EDITOR_PADDING));
 };
 
 interface TemplateEditPopoverProps {
@@ -161,6 +166,7 @@ export function TemplateEditPopover({
     parameterHints: { enabled: false },
     codeLens: false,
     automaticLayout: true,
+    stickyScroll: { enabled: false },
   };
 
   const codeEditorHeight = calcHeight(codeContent, MAX_CODE_HEIGHT);

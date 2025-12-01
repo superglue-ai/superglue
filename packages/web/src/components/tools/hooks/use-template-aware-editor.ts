@@ -28,8 +28,11 @@ export function useTemplateAwareEditor({
         categorizedVariables,
         categorizedSources,
         onSelectVariable: (varName, range) => {
-            const needsBracket = /[^a-zA-Z0-9_$]/.test(varName) || /^\d/.test(varName);
-            const accessor = needsBracket ? `["${varName}"]` : `.${varName}`;
+            const isValidIdentifier = (s: string) => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(s);
+            const segments = varName.includes('\x00') ? varName.split('\x00') : [varName];
+            const accessor = segments.map(seg => 
+                isValidIdentifier(seg) ? `.${seg}` : `["${seg}"]`
+            ).join('');
             const templateExpr = `(sourceData) => sourceData${accessor}`;
             editorRef.current?.chain().focus()
                 .deleteRange(range)
