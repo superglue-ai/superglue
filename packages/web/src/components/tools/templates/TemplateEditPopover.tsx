@@ -4,8 +4,8 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  PopoverAnchor,
 } from '@/src/components/ui/popover';
-import { createPortal } from 'react-dom';
 import { formatValueForDisplay, normalizeTemplateExpression, extractCredentials, DEFAULT_CODE_TEMPLATE } from '@/src/lib/template-utils';
 import { isArrowFunction, maskCredentials } from '@superglue/shared';
 import { Download, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
@@ -36,7 +36,7 @@ interface TemplateEditPopoverProps {
   externalOpen?: boolean;
   onExternalOpenChange?: (open: boolean) => void;
   onOpenChange?: (open: boolean) => void;
-  anchorRect?: { left: number; top: number } | null;
+  anchorRect?: { left: number; top: number } | (() => { left: number; top: number } | null) | null;
 }
 
 export function TemplateEditPopover({
@@ -69,7 +69,6 @@ export function TemplateEditPopover({
   const [codeContent, setCodeContent] = useState(DEFAULT_CODE_TEMPLATE);
   const [showCredentials, setShowCredentials] = useState(false);
   const codeEditorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
   
   const hasSourceData = sourceData && typeof sourceData === 'object' && Object.keys(sourceData).length > 0;
 
@@ -137,28 +136,6 @@ export function TemplateEditPopover({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [open, setOpen]);
 
-  useEffect(() => {
-    if (!open || !anchorRect) return;
-    const handleScroll = (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (target?.closest?.('.monaco-editor') || popoverRef.current?.contains(target)) {
-        return;
-      }
-      setOpen(false);
-    };
-    const handleClickOutside = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    window.addEventListener('scroll', handleScroll, true);
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      window.removeEventListener('scroll', handleScroll, true);
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [open, anchorRect, setOpen]);
-
   const monacoOptions: Monaco.editor.IStandaloneEditorConstructionOptions = {
     minimap: { enabled: false },
     fontSize: 12,
@@ -188,6 +165,16 @@ export function TemplateEditPopover({
 
   const codeEditorHeight = calcHeight(codeContent, MAX_CODE_HEIGHT);
   const previewEditorHeight = calcHeight(previewDisplay, MAX_PREVIEW_HEIGHT);
+
+  const [, forceUpdate] = useState(0);
+  const resolvedAnchorRect = typeof anchorRect === 'function' ? anchorRect() : anchorRect;
+
+  useEffect(() => {
+    if (!open || typeof anchorRect !== 'function') return;
+    const handleScroll = () => forceUpdate(n => n + 1);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => window.removeEventListener('scroll', handleScroll, true);
+  }, [open, anchorRect]);
 
   const popoverContent = (
     <div className="space-y-4">
@@ -285,24 +272,34 @@ export function TemplateEditPopover({
     </div>
   );
 
-  if (anchorRect && open) {
-    const wouldOverflowRight = anchorRect.left + POPOVER_WIDTH > window.innerWidth - 16;
-    const left = wouldOverflowRight ? anchorRect.left - POPOVER_WIDTH : anchorRect.left;
-    
-    return createPortal(
-      <div
-        ref={popoverRef}
-        className="fixed z-50 rounded-md border bg-popover p-4 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
-        style={{
-          left: Math.max(16, left),
-          top: anchorRect.top,
-          width: POPOVER_WIDTH,
-          maxWidth: '90vw',
-        }}
-      >
-        {popoverContent}
-      </div>,
-      document.body
+  const popoverProps = {
+    className: "p-4",
+    align: "start" as const,
+    side: "bottom" as const,
+    sideOffset: 4,
+    style: { width: POPOVER_WIDTH, maxWidth: '90vw' },
+    onOpenAutoFocus: (e: Event) => e.preventDefault(),
+  };
+
+  if (resolvedAnchorRect) {
+    return (
+      <Popover open={open} onOpenChange={setOpen} modal={false}>
+        <PopoverAnchor asChild>
+          <span
+            style={{
+              position: 'fixed',
+              left: resolvedAnchorRect.left,
+              top: resolvedAnchorRect.top,
+              width: 0,
+              height: 0,
+              pointerEvents: 'none',
+            }}
+          />
+        </PopoverAnchor>
+        <PopoverContent {...popoverProps}>
+          {popoverContent}
+        </PopoverContent>
+      </Popover>
     );
   }
 
@@ -312,13 +309,7 @@ export function TemplateEditPopover({
         <PopoverTrigger asChild>
           {children}
         </PopoverTrigger>
-        <PopoverContent 
-          className="p-4"
-          align="start" 
-          side="bottom"
-          sideOffset={4}
-          style={{ width: POPOVER_WIDTH, maxWidth: '90vw' }}
-        >
+        <PopoverContent {...popoverProps}>
           {popoverContent}
         </PopoverContent>
       </Popover>

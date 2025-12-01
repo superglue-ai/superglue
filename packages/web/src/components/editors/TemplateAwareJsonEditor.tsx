@@ -60,10 +60,10 @@ function TemplateAwareJsonEditorInner({
         editorRef,
         cleanupSuggestion,
     } = useTemplateAwareEditor({ stepData, loopData, categorizedVariables, categorizedSources });
-
+    
     const credentials = useMemo(() => {
         if (!sourceData || typeof sourceData !== 'object') return {};
-        const pattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
+            const pattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
         return Object.entries(sourceData).reduce((acc, [key, val]) => {
             if (pattern.test(key) && typeof val === 'string' && val.length > 0) {
                 acc[key] = val;
@@ -145,7 +145,7 @@ function TemplateAwareJsonEditorInner({
                             const replacement = result.success && result.value !== undefined
                                 ? (typeof result.value === 'string' ? result.value : JSON.stringify(result.value))
                                 : '__PLACEHOLDER__';
-                            evaluatedValue = evaluatedValue.replace(part.rawTemplate, replacement);
+                                evaluatedValue = evaluatedValue.replace(part.rawTemplate, replacement);
                         } catch {
                             evaluatedValue = evaluatedValue.replace(part.rawTemplate, '__PLACEHOLDER__');
                         }
@@ -205,11 +205,11 @@ function TemplateAwareJsonEditorInner({
                         {placeholder}
                     </div>
                 )}
-                {showValidation && jsonError && (
+            {showValidation && jsonError && (
                     <div className="absolute bottom-0 left-0 right-0 px-3 py-2 bg-destructive/10 text-destructive text-xs max-h-24 overflow-y-auto border-t">
                         Error: {Object.keys(credentials).length > 0 ? maskCredentials(jsonError, credentials) : jsonError}
-                    </div>
-                )}
+                </div>
+            )}
             </div>
             <TemplateEditPopover
                 template=""

@@ -46,7 +46,7 @@ interface VariableCommandMenuProps {
     categorizedVariables: CategorizedVariables;
     categorizedSources?: CategorizedSources;
     onSelectVariable: (varName: string, categoryKey: keyof CategorizedVariables) => void;
-    onSelectCode: (anchorRect: DOMRect | null) => void;
+    onSelectCode: () => void;
     onRequestClose: () => void;
 }
 
@@ -216,7 +216,7 @@ const VariableCommandMenu = forwardRef<VariableCommandMenuRef, VariableCommandMe
                 }
                 if (event.key === 'Enter' || event.key === 'ArrowRight') {
                     if (selectedIndex === items.length) {
-                        onSelectCode(null);
+                        onSelectCode();
                         return true;
                     }
                     if (selectedIndex < items.length) {
@@ -309,7 +309,7 @@ const VariableCommandMenu = forwardRef<VariableCommandMenuRef, VariableCommandMe
                 <div className="h-px bg-border" />
                 <button
                     ref={(el) => { itemRefs.current[items.length] = el; }}
-                    onClick={() => onSelectCode(null)}
+                    onClick={() => onSelectCode()}
                     onMouseEnter={() => setSelectedIndex(items.length)}
                     onMouseDown={(e) => e.preventDefault()}
                     className={cn(
@@ -331,7 +331,7 @@ interface SuggestionCallbacks {
     categorizedVariables: CategorizedVariables;
     categorizedSources?: CategorizedSources;
     onSelectVariable: (varName: string, range: { from: number; to: number }, categoryKey: keyof CategorizedVariables) => void;
-    onSelectCode: (range: { from: number; to: number }, cursorCoords: { left: number; top: number } | null) => void;
+    onSelectCode: (range: { from: number; to: number }) => void;
     onEscape: (range: { from: number; to: number }) => void;
     onOpen?: (destroy: () => void) => void;
     onClose?: () => void;
@@ -354,25 +354,29 @@ export function createVariableSuggestionConfig(callbacks: SuggestionCallbacks) {
             let component: ReactRenderer<VariableCommandMenuRef> | null = null;
             let popup: TippyInstance[] | null = null;
             let currentRange: { from: number; to: number } | null = null;
+            let scrollHandler: (() => void) | null = null;
+            let currentClientRect: (() => DOMRect) | null = null;
 
             const destroyPopup = () => {
+                if (scrollHandler) {
+                    window.removeEventListener('scroll', scrollHandler, true);
+                    scrollHandler = null;
+                }
                 popup?.[0]?.destroy();
                 component?.destroy();
                 currentRange = null;
+                currentClientRect = null;
             };
 
-            const makeMenuProps = (props: SuggestionProps<string>) => ({
+            const makeMenuProps = () => ({
                 categorizedVariables: callbacks.categorizedVariables,
                 categorizedSources: callbacks.categorizedSources,
                 onSelectVariable: (varName: string, categoryKey: keyof CategorizedVariables) => {
                     if (currentRange) callbacks.onSelectVariable(varName, currentRange, categoryKey);
                     popup?.[0]?.hide();
                 },
-                onSelectCode: (anchorRect: DOMRect | null) => {
-                    if (currentRange) {
-                        const rect = anchorRect || props.clientRect?.();
-                        callbacks.onSelectCode(currentRange, rect ? { left: rect.left, top: rect.bottom } : null);
-                    }
+                onSelectCode: () => {
+                    if (currentRange) callbacks.onSelectCode(currentRange);
                     popup?.[0]?.hide();
                 },
                 onRequestClose: destroyPopup,
@@ -381,9 +385,10 @@ export function createVariableSuggestionConfig(callbacks: SuggestionCallbacks) {
             return {
                 onStart: (props: SuggestionProps<string>) => {
                     currentRange = props.range;
+                    currentClientRect = props.clientRect as () => DOMRect;
 
                     component = new ReactRenderer(VariableCommandMenu, {
-                        props: makeMenuProps(props),
+                        props: makeMenuProps(),
                         editor: props.editor,
                     });
 
@@ -393,7 +398,7 @@ export function createVariableSuggestionConfig(callbacks: SuggestionCallbacks) {
                     const wouldOverflowRight = rect && (rect.left + MENU_WIDTH > window.innerWidth - 16);
                     
                     popup = tippy('body', {
-                        getReferenceClientRect: props.clientRect as () => DOMRect,
+                        getReferenceClientRect: () => currentClientRect?.() ?? rect!,
                         appendTo: () => document.body,
                         content: component.element,
                         showOnCreate: true,
@@ -401,15 +406,17 @@ export function createVariableSuggestionConfig(callbacks: SuggestionCallbacks) {
                         trigger: 'manual',
                         placement: wouldOverflowRight ? 'bottom-end' : 'bottom-start',
                         offset: [0, 4],
-                        popperOptions: { strategy: 'fixed' },
                     });
+
+                    scrollHandler = () => popup?.[0]?.popperInstance?.update();
+                    window.addEventListener('scroll', scrollHandler, true);
 
                     callbacks.onOpen?.(destroyPopup);
                 },
 
                 onUpdate: (props: SuggestionProps<string>) => {
                     currentRange = props.range;
-                    component?.updateProps(makeMenuProps(props));
+                    component?.updateProps(makeMenuProps());
                     if (props.clientRect && popup?.[0]) {
                         popup[0].setProps({ getReferenceClientRect: props.clientRect as () => DOMRect });
                     }

@@ -257,7 +257,7 @@ export const VM_HELPERS_CODE = `
   
   // escape function - override built-in deprecated escape() to match URL encoding standards
   // The built-in escape() encodes ! as %21 which breaks many APIs
-  escape = function(str) {
+    escape = function(str) {
       let result = '';
       for (let i = 0; i < str.length; i++) {
         const char = str[i];

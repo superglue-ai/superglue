@@ -18,7 +18,7 @@ export function useTemplateAwareEditor({
     categorizedSources,
 }: UseTemplateAwareEditorOptions) {
     const [codePopoverOpen, setCodePopoverOpen] = useState(false);
-    const [popoverAnchorRect, setPopoverAnchorRect] = useState<{ left: number; top: number } | null>(null);
+    const [popoverAnchorPos, setPopoverAnchorPos] = useState<number | null>(null);
     const editorRef = useRef<Editor | null>(null);
     const suggestionDestroyRef = useRef<(() => void) | null>(null);
 
@@ -37,15 +37,10 @@ export function useTemplateAwareEditor({
                 })
                 .run();
         },
-        onSelectCode: (range, cursorCoords) => {
-            const view = editorRef.current?.view;
-            let anchor = cursorCoords;
-            if (view) {
-                const coords = view.coordsAtPos(range.from);
-                anchor = { left: coords.left, top: coords.bottom };
-            }
+        onSelectCode: (range) => {
             editorRef.current?.chain().focus().deleteRange(range).run();
-            setPopoverAnchorRect(anchor);
+            const pos = editorRef.current?.state.selection.from ?? range.from;
+            setPopoverAnchorPos(pos);
             setCodePopoverOpen(true);
         },
         onEscape: (range) => {
@@ -70,8 +65,16 @@ export function useTemplateAwareEditor({
             })
             .run();
         setCodePopoverOpen(false);
-        setPopoverAnchorRect(null);
+        setPopoverAnchorPos(null);
     }, []);
+
+    const getPopoverAnchorRect = useCallback(() => {
+        if (popoverAnchorPos === null) return null;
+        const view = editorRef.current?.view;
+        if (!view) return null;
+        const coords = view.coordsAtPos(popoverAnchorPos);
+        return { left: coords.left, top: coords.bottom };
+    }, [popoverAnchorPos]);
 
     const cleanupSuggestion = useCallback(() => {
         suggestionDestroyRef.current?.();
@@ -82,7 +85,7 @@ export function useTemplateAwareEditor({
         suggestionConfig,
         codePopoverOpen,
         setCodePopoverOpen,
-        popoverAnchorRect,
+        popoverAnchorRect: getPopoverAnchorRect,
         handleCodeSave,
         editorRef,
         cleanupSuggestion,

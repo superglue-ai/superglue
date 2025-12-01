@@ -10,8 +10,8 @@ export function templateStringToTiptap(value: string): JSONContent {
     const paragraphs: JSONContent[] = [];
     let currentParagraph: JSONContent[] = [];
 
-    for (const part of parts) {
-        if (part.type === 'text') {
+        for (const part of parts) {
+            if (part.type === 'text') {
             const textLines = part.value.split('\n');
             for (let i = 0; i < textLines.length; i++) {
                 if (textLines[i]) {
@@ -24,19 +24,19 @@ export function templateStringToTiptap(value: string): JSONContent {
                     });
                     currentParagraph = [];
                 }
-            }
-        } else if (part.type === 'template') {
+                }
+            } else if (part.type === 'template') {
             currentParagraph.push({
-                type: 'template',
-                attrs: { rawTemplate: part.rawTemplate },
-            });
+                    type: 'template',
+                    attrs: { rawTemplate: part.rawTemplate },
+                });
+            }
         }
-    }
 
-    paragraphs.push({
-        type: 'paragraph',
+        paragraphs.push({
+            type: 'paragraph',
         content: currentParagraph.length > 0 ? currentParagraph : undefined,
-    });
+        });
 
     return { type: 'doc', content: paragraphs };
 }

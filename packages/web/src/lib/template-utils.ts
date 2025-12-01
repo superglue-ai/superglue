@@ -84,7 +84,7 @@ export function normalizeTemplateExpression(expr: string): string {
     return `(sourceData) => ${trimmed}`;
   }
   if (PROPERTY_PATH_PATTERN.test(trimmed)) {
-    return `(sourceData) => sourceData.${trimmed}`;
+  return `(sourceData) => sourceData.${trimmed}`;
   }
   throw new Error(`Invalid template expression: "${trimmed}". Expected an arrow function or property path.`);
 }
