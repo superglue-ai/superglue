@@ -279,6 +279,8 @@ export function TemplateEditPopover({
     sideOffset: 4,
     style: { width: POPOVER_WIDTH, maxWidth: '90vw' },
     onOpenAutoFocus: (e: Event) => e.preventDefault(),
+    onInteractOutside: (e: Event) => e.preventDefault(),
+    onPointerDownOutside: (e: Event) => e.preventDefault(),
   };
 
   if (resolvedAnchorRect) {
