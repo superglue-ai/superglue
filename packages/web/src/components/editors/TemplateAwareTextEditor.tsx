@@ -69,7 +69,7 @@ function TemplateAwareTextEditorInner({
             attributes: {
                 class: cn(
                     'w-full h-9 px-3 py-2 text-xs font-mono rounded-md border border-input bg-transparent shadow-sm',
-                    'focus:outline-none overflow-hidden whitespace-nowrap',
+                    'focus:outline-none overflow-x-auto overflow-y-hidden whitespace-nowrap',
                     disabled && 'opacity-50 cursor-not-allowed'
                 ),
                 style: 'min-height: 36px; line-height: 20px;',

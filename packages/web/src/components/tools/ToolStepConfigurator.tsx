@@ -133,7 +133,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         : undefined;
 
     const credentialsMap = useMemo(() => 
-        flattenAndNamespaceCredentials([linkedIntegration]),
+        flattenAndNamespaceCredentials(linkedIntegration ? [linkedIntegration] : []),
         [linkedIntegration]
     );
 
@@ -148,6 +148,17 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         return null;
     }, [loopItems]);
 
+    const paginationConfig = step.apiConfig?.pagination;
+    const pageSize = paginationConfig?.pageSize || '50';
+    
+    const paginationData = useMemo(() => ({
+        page: 1,
+        offset: 0,
+        cursor: `[cursor from ${paginationConfig?.cursorPath || 'response'} - evaluated at runtime]`,
+        limit: pageSize,
+        pageSize: pageSize,
+    }), [pageSize, paginationConfig?.cursorPath]);
+
     const templateStepData = useMemo<Record<string, unknown>>(() => {
         const baseData = (stepInput && typeof stepInput === 'object')
             ? stepInput as Record<string, unknown>
@@ -157,8 +168,9 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
             ...credentialsMap,
             ...baseData,
             ...(currentItemObj ? { currentItem: currentItemObj } : {}),
+            ...paginationData,
         };
-    }, [stepInput, credentialsMap, currentItemObj]);
+    }, [stepInput, credentialsMap, currentItemObj, paginationData]);
 
     const categorizedVariables = useMemo<CategorizedVariables>(() => {
         return {
@@ -167,16 +179,17 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
             fileInputs: Object.keys(categorizedSources?.filePayloads || {}),
             currentStepData: currentItemObj ? ['currentItem'] : [],
             previousStepData: Object.keys(categorizedSources?.previousStepResults || {}),
+            paginationVariables: ['page', 'offset', 'cursor', 'limit', 'pageSize'],
         };
     }, [credentialsMap, categorizedSources, currentItemObj]);
 
-    // Build complete categorizedSources including currentItem
     const completeCategorizedSources = useMemo<CategorizedSources>(() => ({
         manualPayload: categorizedSources?.manualPayload || {},
         filePayloads: categorizedSources?.filePayloads || {},
         previousStepResults: categorizedSources?.previousStepResults || {},
         currentItem: currentItemObj,
-    }), [categorizedSources, currentItemObj]);
+        paginationData,
+    }), [categorizedSources, currentItemObj, paginationData]);
 
     return (
         <div className="flex flex-col items-center">

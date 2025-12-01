@@ -105,13 +105,14 @@ export function useMonacoTheme() {
 
   useEffect(() => {
     initThemeObserver();
-    
+    let mounted = true;
     loader.init().then((monaco) => {
       defineThemes(monaco);
       const theme = getCurrentTheme();
-      setCurrentTheme(theme);
+      if (mounted) setCurrentTheme(theme);
       monaco.editor.setTheme(theme === 'dark' ? 'superglue-dark' : 'superglue-light');
     });
+    return () => { mounted = false; };
   }, []);
 
   const handleEditorMount = useCallback((editor: Monaco.editor.IStandaloneCodeEditor) => {

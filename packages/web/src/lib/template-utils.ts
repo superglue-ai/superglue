@@ -175,6 +175,11 @@ export function isCredentialVariable(expr: string, sourceData: any): boolean {
   if (arrowMatch) {
     varName = arrowMatch[1];
   }
+
+  const sourceDataMatch = varName.match(/^sourceData\.(\w+)$/);
+  if (sourceDataMatch) {
+    varName = sourceDataMatch[1];
+  }
   
   if (!CREDENTIAL_PATTERN.test(varName)) return false;
   

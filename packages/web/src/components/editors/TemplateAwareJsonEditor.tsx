@@ -121,42 +121,49 @@ function TemplateAwareJsonEditorInner({
     useEffect(() => { editor?.setEditable(!readOnly); }, [editor, readOnly]);
 
     useEffect(() => {
-        if (!showValidation) {
+        if (!showValidation || !value?.trim()) {
             setJsonError(null);
             return;
         }
 
+        let cancelled = false;
+        const sourceData = prepareSourceData(stepData, loopData);
+
+        const escapeForJson = (str: string) => 
+            str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+
+        const toJsonValue = (val: unknown, isInsideQuotes: boolean): string => {
+            if (typeof val === 'string') {
+                return isInsideQuotes ? escapeForJson(val) : val;
+            }
+            return JSON.stringify(val);
+        };
+
         const validateJson = async () => {
-            if (!value?.trim()) {
-                setJsonError(null);
-                return;
+            let json = value;
+
+            for (const part of parseTemplateString(value)) {
+                if (cancelled) return;
+                if (part.type !== 'template' || !part.rawTemplate) continue;
+
+                const expression = part.rawTemplate.slice(2, -2).trim();
+                const result = canExecute 
+                    ? await evaluateTemplate(expression, sourceData).catch(() => null) 
+                    : null;
+
+                if (cancelled) return;
+
+                const evaluated = result?.success ? result.value : null;
+                const insertPos = json.indexOf(part.rawTemplate);
+                const isInsideQuotes = insertPos > 0 && json[insertPos - 1] === '"';
+
+                json = json.replace(part.rawTemplate, toJsonValue(evaluated, isInsideQuotes));
             }
 
-            const parts = parseTemplateString(value);
-            let evaluatedValue = value;
-
-            for (const part of parts) {
-                if (part.type === 'template' && part.rawTemplate) {
-                    if (canExecute) {
-                        try {
-                            const expression = part.rawTemplate.replace(/^<<|>>$/g, '').trim();
-                            const sourceData = prepareSourceData(stepData, loopData);
-                            const result = await evaluateTemplate(expression, sourceData);
-                            const replacement = result.success && result.value !== undefined
-                                ? (typeof result.value === 'string' ? result.value : JSON.stringify(result.value))
-                                : '__PLACEHOLDER__';
-                                evaluatedValue = evaluatedValue.replace(part.rawTemplate, replacement);
-                        } catch {
-                            evaluatedValue = evaluatedValue.replace(part.rawTemplate, '__PLACEHOLDER__');
-                        }
-                    } else {
-                        evaluatedValue = evaluatedValue.replace(part.rawTemplate, '__PLACEHOLDER__');
-                    }
-                }
-            }
+            if (cancelled) return;
 
             try {
-                JSON.parse(evaluatedValue);
+                JSON.parse(json);
                 setJsonError(null);
             } catch (e) {
                 setJsonError((e as Error).message);
@@ -164,7 +171,7 @@ function TemplateAwareJsonEditorInner({
         };
 
         const timer = setTimeout(validateJson, 300);
-        return () => clearTimeout(timer);
+        return () => { cancelled = true; clearTimeout(timer); };
     }, [showValidation, value, stepData, loopData, canExecute]);
 
     const handleResize = (e: React.MouseEvent) => {

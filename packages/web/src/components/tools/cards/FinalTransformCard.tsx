@@ -75,7 +75,7 @@ export const FinalTransformMiniStepCard = ({
 
     useEffect(() => {
       if (!isInternalChangeRef.current) {
-        setLocalTransform(transform || "");
+      setLocalTransform(transform || "");
       }
       isInternalChangeRef.current = false;
     }, [transform]);

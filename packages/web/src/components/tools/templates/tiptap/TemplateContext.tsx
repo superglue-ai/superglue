@@ -6,6 +6,7 @@ export interface CategorizedVariables {
     fileInputs: string[];
     currentStepData: string[];
     previousStepData: string[];
+    paginationVariables: string[];
 }
 
 export interface CategorizedSources {
@@ -13,6 +14,7 @@ export interface CategorizedSources {
     filePayloads: Record<string, unknown>;
     previousStepResults: Record<string, unknown>;
     currentItem: Record<string, unknown> | null;
+    paginationData: Record<string, unknown>;
 }
 
 interface TemplateContextValue {
@@ -31,6 +33,7 @@ const emptyCategorizedVariables: CategorizedVariables = {
     fileInputs: [],
     currentStepData: [],
     previousStepData: [],
+    paginationVariables: [],
 };
 
 const emptyCategorizedSources: CategorizedSources = {
@@ -38,6 +41,7 @@ const emptyCategorizedSources: CategorizedSources = {
     filePayloads: {},
     previousStepResults: {},
     currentItem: null,
+    paginationData: {},
 };
 
 const TemplateContext = createContext<TemplateContextValue>({
@@ -81,8 +85,12 @@ export function TemplateContextProvider({
         );
     }, [stepData]);
 
+    const value = useMemo(() => ({
+        stepData, loopData, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources
+    }), [stepData, loopData, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources]);
+
     return (
-        <TemplateContext.Provider value={{ stepData, loopData, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources }}>
+        <TemplateContext.Provider value={value}>
             {children}
         </TemplateContext.Provider>
     );

@@ -4,7 +4,7 @@ import Suggestion, { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/sug
 import tippy, { Instance as TippyInstance } from 'tippy.js';
 import { forwardRef, useImperativeHandle, useState, useRef, useEffect } from 'react';
 import { cn } from '@/src/lib/general-utils';
-import { Key, FileInput, FileJson, Route, Code2, ChevronRight, Paperclip } from 'lucide-react';
+import { Key, FileInput, FileJson, Route, Code2, ChevronRight, Paperclip, ListOrdered } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { type CategorizedVariables, type CategorizedSources } from './tiptap/TemplateContext';
 
@@ -40,6 +40,7 @@ const CATEGORY_CONFIGS: CategoryConfig[] = [
     { key: 'fileInputs', label: 'File Inputs', icon: <Paperclip className="h-4 w-4" /> },
     { key: 'currentStepData', label: 'Current Step Data', icon: <FileInput className="h-4 w-4" /> },
     { key: 'previousStepData', label: 'Previous Step Data', icon: <Route className="h-4 w-4" /> },
+    { key: 'paginationVariables', label: 'Pagination', icon: <ListOrdered className="h-4 w-4" /> },
 ];
 
 interface VariableCommandMenuProps {
@@ -69,6 +70,7 @@ function getValueFromSources(
         case 'fileInputs': return sources.filePayloads?.[varName];
         case 'currentStepData': return varName === 'currentItem' ? sources.currentItem : undefined;
         case 'previousStepData': return sources.previousStepResults?.[varName];
+        case 'paginationVariables': return sources.paginationData?.[varName];
         default: return undefined;
     }
 }
@@ -343,11 +345,7 @@ export function createVariableSuggestionConfig(callbacks: SuggestionCallbacks) {
         allowSpaces: false,
         startOfLine: false,
         allowedPrefixes: null,
-        allow: ({ state, range }) => {
-            if (range.from + 1 < range.to) return false;
-            const charAfterCursor = state.doc.textBetween(range.to, range.to + 1, '\0', '\0');
-            return charAfterCursor === '' || /\s/.test(charAfterCursor);
-        },
+        allow: ({ range }) => range.from + 1 >= range.to,
         items: () => [],
 
         render: () => {

@@ -255,37 +255,44 @@ export const VM_HELPERS_CODE = `
     };
   }
   
-  // escape function - override built-in deprecated escape() to match URL encoding standards
-  // The built-in escape() encodes ! as %21 which breaks many APIs
+  // escape function - matches standard escape() behavior including %uXXXX for non-ASCII
     escape = function(str) {
       let result = '';
       for (let i = 0; i < str.length; i++) {
-        const char = str[i];
-        const code = char.charCodeAt(0);
-        
-        if (code < 128) {
-          // ASCII characters - don't encode safe characters including !
-          if (/[A-Za-z0-9_.~!*'()-]/.test(char)) {
-            result += char;
-          } else {
-            result += '%' + code.toString(16).toUpperCase().padStart(2, '0');
-          }
+        const code = str.charCodeAt(i);
+        if (/[A-Za-z0-9@*_+./-]/.test(str[i])) {
+          result += str[i];
+        } else if (code < 256) {
+          result += '%' + code.toString(16).toUpperCase().padStart(2, '0');
         } else {
-          // For UTF-8 multi-byte sequences, we need to encode each byte
-          // This is a simplified approach - just encode the raw char code
-          result += '%' + ((code >> 8) & 0xFF).toString(16).toUpperCase().padStart(2, '0');
-          result += '%' + (code & 0xFF).toString(16).toUpperCase().padStart(2, '0');
+          result += '%u' + code.toString(16).toUpperCase().padStart(4, '0');
         }
       }
       return result;
     };
   
-  // decodeURIComponent function
+  // decodeURIComponent - handles UTF-8 multi-byte sequences
   if (typeof decodeURIComponent === 'undefined') {
     decodeURIComponent = function(str) {
-      return str.replace(/%([0-9A-F]{2})/gi, function(match, p1) {
-        return String.fromCharCode(parseInt(p1, 16));
-      });
+      const decoded = str.replace(/%([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+      try {
+        const bytes = [];
+        for (let i = 0; i < decoded.length; i++) bytes.push(decoded.charCodeAt(i));
+        let result = '', j = 0;
+        while (j < bytes.length) {
+          const b = bytes[j];
+          if (b < 0x80) { result += String.fromCharCode(b); j++; }
+          else if ((b & 0xE0) === 0xC0 && j + 1 < bytes.length) {
+            result += String.fromCharCode(((b & 0x1F) << 6) | (bytes[j+1] & 0x3F)); j += 2;
+          } else if ((b & 0xF0) === 0xE0 && j + 2 < bytes.length) {
+            result += String.fromCharCode(((b & 0x0F) << 12) | ((bytes[j+1] & 0x3F) << 6) | (bytes[j+2] & 0x3F)); j += 3;
+          } else if ((b & 0xF8) === 0xF0 && j + 3 < bytes.length) {
+            const cp = ((b & 0x07) << 18) | ((bytes[j+1] & 0x3F) << 12) | ((bytes[j+2] & 0x3F) << 6) | (bytes[j+3] & 0x3F);
+            result += String.fromCodePoint(cp); j += 4;
+          } else { result += String.fromCharCode(b); j++; }
+        }
+        return result;
+      } catch { return decoded; }
     };
   }
   

@@ -50,11 +50,9 @@ export function tiptapToTemplateString(json: JSONContent): string {
             let line = '';
             if (paragraph.content) {
                 for (const node of paragraph.content) {
-                    if (node.type === 'text') {
-                        line += node.text || '';
-                    } else if (node.type === 'template') {
-                        line += node.attrs?.rawTemplate || '';
-                    }
+                    if (node.type === 'text') line += node.text || '';
+                    else if (node.type === 'template') line += node.attrs?.rawTemplate || '';
+                    else if (node.type === 'hardBreak') line += '\n';
                 }
             }
             lines.push(line);

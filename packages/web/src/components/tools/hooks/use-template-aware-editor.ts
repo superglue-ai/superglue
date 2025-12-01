@@ -28,7 +28,9 @@ export function useTemplateAwareEditor({
         categorizedVariables,
         categorizedSources,
         onSelectVariable: (varName, range) => {
-            const templateExpr = `(sourceData) => sourceData.${varName}`;
+            const needsBracket = /[^a-zA-Z0-9_$]/.test(varName) || /^\d/.test(varName);
+            const accessor = needsBracket ? `["${varName}"]` : `.${varName}`;
+            const templateExpr = `(sourceData) => sourceData${accessor}`;
             editorRef.current?.chain().focus()
                 .deleteRange(range)
                 .insertContent({

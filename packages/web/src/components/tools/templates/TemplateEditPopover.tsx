@@ -105,7 +105,7 @@ export function TemplateEditPopover({
   };
 
   const handleDownload = () => {
-    const downloadContent = formatValueForDisplay(previewValue);
+    const downloadContent = credentialsAreMasked ? maskedPreview : formatValueForDisplay(previewValue);
     const blob = new Blob([downloadContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

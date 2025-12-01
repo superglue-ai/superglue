@@ -234,7 +234,7 @@ export function ToolStepGallery({
         [stepResults]
     );
 
-    const manualPayload = useMemo(() => JSON.parse(rawPayloadText || '{}'), [rawPayloadText]);
+    const manualPayload = useMemo(() => { try { return JSON.parse(rawPayloadText || '{}'); } catch { return {}; } }, [rawPayloadText]);
     const hasTransformCompleted = completedSteps.includes('__final_transform__');
 
     const toolItems = useMemo(() => [
@@ -249,6 +249,7 @@ export function ToolStepGallery({
                 filePayloads: filePayloads || {},
                 previousStepResults: {},
                 currentItem: null,
+                paginationData: {},
             } as CategorizedSources
         },
         ...steps.map((step, index) => ({
@@ -262,6 +263,7 @@ export function ToolStepGallery({
                 filePayloads: filePayloads || {},
                 previousStepResults: buildPreviousStepResults(steps, stepResultsMap, index - 1),
                 currentItem: null,
+                paginationData: {},
             } as CategorizedSources
         })),
         ...(finalTransform !== undefined ? [{
@@ -276,6 +278,7 @@ export function ToolStepGallery({
                 filePayloads: filePayloads || {},
                 previousStepResults: buildPreviousStepResults(steps, stepResultsMap, steps.length - 1),
                 currentItem: null,
+                paginationData: {},
             } as CategorizedSources
         }] : [])
     ], [rawPayloadText, inputSchema, workingPayload, steps, stepResultsMap, finalTransform, responseSchema, finalResult, hasTransformCompleted, manualPayload, filePayloads]);
