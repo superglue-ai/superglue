@@ -68,6 +68,22 @@ export const resolvers = {
   JSONSchema: JSONSchemaResolver,
   JSONata: JSONataResolver,
   Upload: GraphQLUpload,
+  ExtractConfig: {
+    // Ensure ExtractConfig.id is always non-null at runtime, even though schema allows nullable
+    // for union type compatibility with ApiConfig
+    id: (parent: any) => {
+      // If id is null/undefined, generate one (shouldn't happen, but safety check)
+      return parent.id || crypto.randomUUID();
+    },
+  },
+  Workflow: {
+    // Ensure Workflow.id is always non-null at runtime, even though schema allows nullable
+    // for union type compatibility with ApiConfig
+    id: (parent: any) => {
+      // If id is null/undefined, generate one (shouldn't happen, but safety check)
+      return parent.id || crypto.randomUUID();
+    },
+  },
   ConfigType: {
     __resolveType(obj: any, context: any, info: any) {
       // Get the parent field name from the path
