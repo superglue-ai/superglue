@@ -4,7 +4,7 @@ import { GraphQLResolveInfo } from "graphql";
 import { parseFile } from "../../files/index.js";
 import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { maskCredentials } from "../../utils/helpers.js";
+import { maskCredentials } from '@superglue/shared';
 import { GraphQLRequestContext, Metadata } from '../types.js';
 
 export const extractResolver = async (

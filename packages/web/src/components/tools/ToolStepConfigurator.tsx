@@ -4,14 +4,18 @@ import { useToast } from '@/src/hooks/use-toast';
 import { splitUrl } from '@/src/lib/client-utils';
 import { composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/general-utils';
 import { Integration } from "@superglue/client";
+import { flattenAndNamespaceCredentials } from '@superglue/shared';
+import { type CategorizedSources, type CategorizedVariables } from './templates/tiptap/TemplateContext';
+import { buildPaginationData, buildCategorizedVariables, buildCategorizedSources, deriveCurrentItem } from '@/src/lib/templating-utils';
 import { ArrowDown, Globe, OctagonAlert, Pencil } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { JavaScriptCodeEditor } from '../editors/JavaScriptCodeEditor';
-import { JsonCodeEditor } from '../editors/JsonCodeEditor';
 import { Badge } from "../ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { TemplateAwareTextEditor } from '../editors/TemplateAwareTextEditor';
+import { TemplateAwareJsonEditor } from '../editors/TemplateAwareJsonEditor';
 import { HelpTooltip } from '../utils/HelpTooltip';
 import { CopyButton } from './shared/CopyButton';
 import { IntegrationSelector } from './shared/IntegrationSelector';
@@ -27,10 +31,12 @@ interface ToolStepConfiguratorProps {
     disabled?: boolean;
     stepInput?: any;
     loopItems?: any;
+    categorizedSources?: CategorizedSources;
     onOpenFixStepDialog?: () => void;
+    canExecute?: boolean;
 }
 
-export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, loopItems, onOpenFixStepDialog }: ToolStepConfiguratorProps) {
+export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, loopItems, categorizedSources, onOpenFixStepDialog, canExecute = true }: ToolStepConfiguratorProps) {
     const [headersText, setHeadersText] = useState('');
     const [queryParamsText, setQueryParamsText] = useState('');
 
@@ -127,57 +133,47 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         ? propIntegrations.find(integration => integration.id === step.integrationId)
         : undefined;
 
+    const credentialsMap = useMemo(() => 
+        flattenAndNamespaceCredentials(linkedIntegration ? [linkedIntegration] : []),
+        [linkedIntegration]
+    );
+
+    const currentItemObj = useMemo(() => deriveCurrentItem(loopItems), [loopItems]);
+    const paginationConfig = step.apiConfig?.pagination;
+    const paginationData = useMemo(() => buildPaginationData(paginationConfig), [paginationConfig]);
+
+    const templateStepData = useMemo<Record<string, unknown>>(() => {
+        const baseData = (stepInput && typeof stepInput === 'object') ? stepInput as Record<string, unknown> : {};
+        return { ...credentialsMap, ...baseData, ...(currentItemObj ? { currentItem: currentItemObj } : {}), ...paginationData };
+    }, [stepInput, credentialsMap, currentItemObj, paginationData]);
+
+    const categorizedVariables = useMemo<CategorizedVariables>(
+        () => buildCategorizedVariables(Object.keys(credentialsMap), categorizedSources, !!currentItemObj),
+        [credentialsMap, categorizedSources, currentItemObj]
+    );
+
+    const completeCategorizedSources = useMemo<CategorizedSources>(
+        () => buildCategorizedSources(categorizedSources, currentItemObj, paginationData),
+        [categorizedSources, currentItemObj, paginationData]
+    );
+
     return (
         <div className="flex flex-col items-center">
-            <Card className="w-full border-primary/50 opacity-100">
-                <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between min-w-0">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <CardTitle className="text-sm font-medium flex items-center gap-2 min-w-0">
-                                <span className="font-mono truncate">{step.id}</span>
-                                {linkedIntegration && (() => {
-                                    const icon = getIntegrationIcon(linkedIntegration);
-                                    return (
-                                        <Badge variant="outline" className="text-xs flex-shrink-0">
-                                            <div className="text-xs flex items-center gap-1">
-                                                {icon ? (
-                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill={`#${icon.hex}`} className="flex-shrink-0">
-                                                        <path d={icon.path || ''} />
-                                                    </svg>
-                                                ) : (
-                                                    <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                                )}
-                                                <span className="truncate">{linkedIntegration.id}</span>
-                                            </div>
-                                        </Badge>
-                                    );
-                                })()}
-                                
-                            </CardTitle>
-                        </div>
-                        {(step.modify === true) && (
-                            <Badge variant="outline" className="flex items-center gap-1 bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/30 text-amber-800 dark:text-amber-400 flex-shrink-0">
-                                <OctagonAlert className="h-3 w-3 text-amber-800 dark:text-amber-400" aria-label="Modifies data" />
-                                <span className="text-xs font-normal">Step modifies data on system</span>
-                            </Badge>
-                        )}
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                    <div className="space-y-2">
+            <Card className="w-full border-none shadow-none opacity-100">
+                <CardContent className="space-y-3 text-sm p-3">
                                     <div>
                                         <Label className="text-xs flex items-center gap-1">
                                             Step Instruction
                                             <HelpTooltip text="Instruction for this step. This describes what the step does and how it should behave." />
                                         </Label>
                                         
-                                        <div className="relative my-2">
-                                            <div className="absolute top-0 right-0 z-10 flex items-center gap-1">
+                                        <div className="relative mt-1 rounded-lg border shadow-sm bg-muted/30">
+                                            <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
                                                 {onOpenFixStepDialog && (
                                                     <button
                                                         type="button"
                                                         onClick={onOpenFixStepDialog}
-                                                        className="h-6 w-6 flex items-center justify-center rounded transition-colors"
+                                                        className="h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-muted/50"
                                                         title="Fix this step with AI"
                                                         aria-label="Fix this step with AI"
                                                     >
@@ -186,7 +182,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 )}
                                                 <CopyButton text={step.apiConfig.instruction || ''} />
                                             </div>
-                                            <div className="text-xs text-muted-foreground min-h-[5rem] whitespace-pre-wrap">
+                                            <div className="text-xs text-muted-foreground whitespace-pre-wrap p-3 pr-16" style={{ minHeight: '5rem' }}>
                                                 {step.apiConfig.instruction || (
                                                     <span className="text-muted-foreground italic">Describe what this step should do...</span>
                                                 )}
@@ -213,8 +209,8 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                     </div>
                                     <div>
                                         <Label className="text-xs flex items-center gap-1">
-                                            API Config
-                                            <HelpTooltip text="Configure the HTTP method and URL for this API call. Use variables like {variable} to reference previous step outputs." />
+                                            Request &amp; URL
+                                            <HelpTooltip text="Configure the HTTP method and URL for this request. Use variables like {variable} to reference previous step outputs." />
                                         </Label>
                                         <div className="space-y-2 mt-1">
                                             <div className="flex gap-2">
@@ -226,13 +222,18 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                         {['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map(method => (<SelectItem key={method} value={method}>{method}</SelectItem>))}
                                                     </SelectContent>
                                                 </Select>
-                                                <Input 
+                                                <TemplateAwareTextEditor 
                                                     value={composeUrl(step.apiConfig.urlHost || '', step.apiConfig.urlPath || '')} 
-                                                    onChange={(e) => {
-                                                        const { urlHost, urlPath } = splitUrl(e.target.value);
+                                                    onChange={(newValue) => {
+                                                        const { urlHost, urlPath } = splitUrl(newValue);
                                                         handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, urlHost, urlPath } }));
-                                                    }} 
-                                                    className="text-xs flex-1 focus:ring-0 focus:ring-offset-0" 
+                                                    }}
+                                                    stepData={templateStepData}
+                                                    loopData={loopItems}
+                                                    canExecute={canExecute}
+                                                    categorizedVariables={categorizedVariables}
+                                                    categorizedSources={completeCategorizedSources}
+                                                    className="flex-1" 
                                                     placeholder="https://api.example.com/endpoint" 
                                                     disabled={disabled} 
                                                 />
@@ -241,16 +242,21 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                     </div>
                                     <div>
                                         <Label className="text-xs flex items-center gap-1">
-                                            Headers (JSON)
+                                            Headers
                                             <HelpTooltip text="HTTP headers to include with the request. Use JSON format. Common headers include Content-Type, Authorization, etc." />
                                         </Label>
-                                        <JsonCodeEditor
+                                        <TemplateAwareJsonEditor
                                             value={headersText}
                                             onChange={(val) => {
                                                 if (disabled) return;
                                                 setHeadersText(val || '');
                                                 handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, headers: val || '' } }));
                                             }}
+                                            stepData={templateStepData}
+                                            loopData={loopItems}
+                                            canExecute={canExecute}
+                                            categorizedVariables={categorizedVariables}
+                                            categorizedSources={completeCategorizedSources}
                                             readOnly={disabled}
                                             minHeight="100px"
                                             maxHeight="150px"
@@ -264,13 +270,18 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                             Query Parameters
                                             <HelpTooltip text='URL query parameters to append to the request. Can be JSON object or any text format like "param1=value1&param2=value2"' />
                                         </Label>
-                                        <JsonCodeEditor
+                                        <TemplateAwareJsonEditor
                                             value={queryParamsText}
                                             onChange={(val) => {
                                                 if (disabled) return;
                                                 setQueryParamsText(val || '');
                                                 handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, queryParams: val || '' } }));
                                             }}
+                                            stepData={templateStepData}
+                                            loopData={loopItems}
+                                            canExecute={canExecute}
+                                            categorizedVariables={categorizedVariables}
+                                            categorizedSources={completeCategorizedSources}
                                             readOnly={disabled}
                                             minHeight="100px"
                                             maxHeight="150px"
@@ -285,9 +296,14 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 Body
                                                 <HelpTooltip text="Request body content. Can be JSON, form data, plain text, or any format. Use JavaScript expressions to transform data from previous steps." />
                                             </Label>
-                                            <JsonCodeEditor
+                                            <TemplateAwareJsonEditor
                                                 value={step.apiConfig.body || ''}
                                                 onChange={(val) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, body: val || '' } }))}
+                                                stepData={templateStepData}
+                                                loopData={loopItems}
+                                                canExecute={canExecute}
+                                                categorizedVariables={categorizedVariables}
+                                                categorizedSources={completeCategorizedSources}
                                                 readOnly={disabled}
                                                 minHeight="100px"
                                                 maxHeight="150px"
@@ -353,7 +369,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                     </div>
                                                 </>
                                             )}
-                                        </div>
                                     </div>
                     </div>
                 </CardContent>

@@ -40,6 +40,9 @@ export const executeWorkflowResolver = async (
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ): Promise<GraphQLWorkflowResult> => {
+  // NOTE: Consider making run_id an input argument to create a DB entry at the start
+  // and only update the status at the end, rather than creating it after execution
+  const runId = crypto.randomUUID();
   const startedAt = new Date();
   const metadata: Metadata = { orgId: context.orgId, traceId: context.traceId };
 
@@ -58,6 +61,8 @@ export const executeWorkflowResolver = async (
     } else {
       throw new Error("Must provide either workflow ID or workflow object");
     }
+
+    logMessage('info', `Executing workflow with id: ${workflow.id}, run_id: ${runId}`, metadata);
 
     // Parse schemas if they're strings
     if (workflow.inputSchema && typeof workflow.inputSchema === 'string') {
@@ -111,7 +116,6 @@ export const executeWorkflowResolver = async (
     };
 
     // Save run to datastore
-    const runId = crypto.randomUUID();
     context.datastore.createRun({
       result: {
         id: runId,
@@ -142,7 +146,7 @@ export const executeWorkflowResolver = async (
   } catch (error) {
     logMessage('error', "Workflow execution error: " + String(error), metadata);
     const result = {
-      id: crypto.randomUUID(),
+      id: runId,
       success: false,
       config: workflow || { id: args.input.id, steps: [] },
       error: String(error),

@@ -71,7 +71,7 @@ export async function startGraphqlServer(datastore: DataStore) {
       const authResult = await validateToken(token);
 
       if (!authResult.success) {
-        logMessage('warn', `Websocket Subscription authentication failed for token: ${token}`, { traceId });
+        logMessage('warn', `GraphQL Server: Websocket Subscription authentication failed for token: ${token}`, { traceId });
         return false;
       }
       
@@ -85,7 +85,7 @@ export async function startGraphqlServer(datastore: DataStore) {
       };
     },
     onDisconnect(ctx: any, code, reason) {
-      logMessage('debug', `Websocket Subscription disconnected. code=${code} reason=${reason}`, { traceId: ctx.traceId });
+      logMessage('debug', `GraphQL Server: Websocket Subscription disconnected. code=${code} reason=${reason}`, { traceId: ctx.traceId });
     },
   }, wsServer);
 

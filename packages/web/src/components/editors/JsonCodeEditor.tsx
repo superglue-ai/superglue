@@ -35,6 +35,7 @@ export const JsonCodeEditor = (
     const { theme, onMount } = useMonacoTheme();
     const [currentHeight, setCurrentHeight] = useState(maxHeight);
     const [jsonError, setJsonError] = useState<string | null>(null);
+    
     const displayValue = useMemo(() => {
         const base = value || placeholder;
         if (readOnly && (base?.length || 0) > HIGHLIGHTING_THRESHOLD) return `${base.slice(0, HIGHLIGHTING_THRESHOLD)}\n...truncated...`;

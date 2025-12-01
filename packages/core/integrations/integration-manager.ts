@@ -54,12 +54,13 @@ export class IntegrationManager {
         // Prevent multiple simultaneous loads
         if (this._basicDataPromise) {
             await this._basicDataPromise;
-            return;
+            return this._integration;
         }
 
         this._basicDataPromise = (async () => {
             try {
                 const integration = await this.dataStore.getIntegration({ id: this.id, includeDocs: false, orgId: this.orgId });
+                this._integration = integration;
                 return integration;
             } finally {
                 this._basicDataPromise = undefined;

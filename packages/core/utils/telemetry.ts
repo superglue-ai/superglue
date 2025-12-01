@@ -38,7 +38,7 @@ export const telemetryMiddleware = (req: any, res: any, next: any) => {
   }
   const operation = extractOperationName(req.body.query);
 
-  logMessage('debug', `Middleware: Executing Operation:${operation}`, {
+  logMessage('debug', `Middleware: Executing Operation: ${operation}`, {
     orgId: req.orgId,
     traceId: req.traceId
   });

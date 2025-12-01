@@ -77,6 +77,7 @@ export const generateStepConfigResolver = async (
     let integration: Integration | undefined;
     let integrationDocs = '';
     let integrationSpecificInstructions = '';
+    let integrationCredentials: Record<string, string> = {};
 
     if (errorMessage && errorMessage.length < 100) {
       throw new Error('Error message must be at least 100 characters long');
@@ -89,12 +90,25 @@ export const generateStepConfigResolver = async (
         integration = await integrationManager.getIntegration();
         integrationDocs = (await integrationManager.getDocumentation())?.content || '';
         integrationSpecificInstructions = integration.specificInstructions || '';
+        
+        // Get integration credentials and prefix keys with integration ID
+        if (integration?.credentials) {
+          Object.entries(integration.credentials).forEach(([key, value]) => {
+            integrationCredentials[`${integrationId}_${key}`] = value;
+          });
+        }
       } catch (error) {
         telemetryClient?.captureException(error, context.orgId, {
           integrationId
         });
       }
     }
+
+    // Merge provided credentials with integration credentials (provided credentials take precedence)
+    const mergedCredentials = {
+      ...integrationCredentials,
+      ...(credentials || {})
+    };
 
     // Mode is either 'self-healing' if there's an error, or 'edit' (since we're always editing based on updated instruction)
     const mode = errorMessage ? 'self-healing' : 'edit';
@@ -104,7 +118,7 @@ export const generateStepConfigResolver = async (
       previousStepConfig: currentStepConfig,
       previousStepDataSelector: currentDataSelector,
       stepInput,
-      credentials,
+      credentials: mergedCredentials,
       integrationDocumentation: integrationDocs,
       integrationSpecificInstructions: integrationSpecificInstructions,
       errorMessage

@@ -324,7 +324,7 @@ input ExecutionStepInput {
 
 type Workflow implements BaseConfig {
   # BaseConfig
-  id: ID!
+  id: ID
   version: String
   createdAt: DateTime
   updatedAt: DateTime

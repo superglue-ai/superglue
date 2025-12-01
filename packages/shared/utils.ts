@@ -275,7 +275,6 @@ export function resolveOAuthCertAndKey(oauthCert: string, oauthKey: string) {
  * - Valid arrow function → returns as-is
  * - Raw code → wraps in arrow function
  */
-
 export function isArrowFunction(code: string | undefined | null): boolean {
   const text = (code || '').trim();
   if (!text) return false;
@@ -294,3 +293,19 @@ export function assertValidArrowFunction(code: string | undefined | null): strin
   
   throw new Error(`Invalid arrow function: ${text}. Expected a valid arrow function.`);
 }
+
+export function maskCredentials(message: string, credentials?: Record<string, string>): string {
+  if (!credentials) {
+    return message;
+  }
+  let maskedMessage = message;
+  Object.entries(credentials).forEach(([key, value]) => {
+    const valueString = String(value);
+    if (value && valueString) {
+      const regex = new RegExp(valueString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+      maskedMessage = maskedMessage.replace(regex, `{masked_${key}}`);
+    }
+  });
+  return maskedMessage;
+}
+
