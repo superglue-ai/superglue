@@ -272,7 +272,7 @@ export function ToolStepGallery({
                 previousStepResults: buildPreviousStepResults(steps, stepResultsMap, steps.length - 1),
             })
         }] : [])
-    ], [rawPayloadText, inputSchema, workingPayload, steps, stepResultsMap, finalTransform, responseSchema, finalResult, hasTransformCompleted, manualPayload, filePayloads]);
+    ], [rawPayloadText, inputSchema, workingPayload, steps, stepResultsMap, finalTransform, responseSchema, finalResult, hasTransformCompleted, manualPayload, filePayloads, failedSteps]);
 
     // Memoize canExecute checks to avoid running steps.every() on every render
     const canExecuteTransform = useMemo(() => 
