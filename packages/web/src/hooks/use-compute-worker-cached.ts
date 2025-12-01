@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { workerManager } from '@/src/workers/worker-manager';
+import { getDataHash } from '@/src/lib/weak-cache';
 import type { TaskType } from '@/src/workers/compute-worker';
 
 interface UseWorkerComputeResult<T> {
@@ -17,21 +18,23 @@ export function useComputeWorkerCached<T = any>(
   const [isComputing, setIsComputing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const lastDataHashRef = useRef<string>('');
   const lastDataRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!data || !isActive) {
+    if (data === null || data === undefined || !isActive) {
       return;
     }
 
-    const dataChanged = lastDataRef.current !== data;
-    if (!dataChanged) {
+    const currentHash = getDataHash(data);
+    if (currentHash === lastDataHashRef.current) {
       return;
     }
 
+    lastDataHashRef.current = currentHash;
     lastDataRef.current = data;
 
-    // Check cache first
+    // Check cache first (use the actual data reference for cache lookup)
     const cached = workerManager.getCached(data, taskType);
     if (cached !== null) {
       setResult(cached);
@@ -39,7 +42,6 @@ export function useComputeWorkerCached<T = any>(
       return;
     }
 
-    // Trigger computation
     setIsComputing(true);
     setError(null);
 

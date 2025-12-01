@@ -70,6 +70,7 @@ export const FinalTransformMiniStepCard = ({
       "preview"
     );
     const [schemaInitialized, setSchemaInitialized] = useState(false);
+    const [isPendingExecution, setIsPendingExecution] = useState(false);
     const isInternalChangeRef = useRef(false);
 
     useEffect(() => {
@@ -78,6 +79,12 @@ export const FinalTransformMiniStepCard = ({
       }
       isInternalChangeRef.current = false;
     }, [transform]);
+
+    useEffect(() => {
+      if (isRunningTransform || isFixingTransform) {
+        setIsPendingExecution(false);
+      }
+    }, [isRunningTransform, isFixingTransform]);
 
     useEffect(() => {
       if (!schemaInitialized) {
@@ -168,15 +175,17 @@ export const FinalTransformMiniStepCard = ({
 
     function handleExecuteTransform(): void {
       if (onExecuteTransform) {
-        onExecuteTransform(localSchema, localTransform);
+        setIsPendingExecution(true);
         setActiveTab("output");
+        onExecuteTransform(localSchema, localTransform);
       }
     }
 
     function handleFixTransform(): void {
       if (onFixTransform) {
-        onFixTransform(localSchema, localTransform);
+        setIsPendingExecution(true);
         setActiveTab("output");
+        onFixTransform(localSchema, localTransform);
       }
     }
     
@@ -373,7 +382,7 @@ export const FinalTransformMiniStepCard = ({
             </TabsContent>
             <TabsContent value="output" className="mt-2">
               <>
-                {(isRunningTransform || isFixingTransform) ? (
+                {(isPendingExecution || isRunningTransform || isFixingTransform) ? (
                   <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border rounded-lg">
                     <Loader2 className="h-8 w-8 mb-2 animate-spin" />
                     <p className="text-sm">
@@ -404,6 +413,10 @@ export const FinalTransformMiniStepCard = ({
                       Run the tool or test the transform to see results
                     </p>
                   </div>
+                ) : outputProcessor.isComputingPreview ? (
+                  <div className="flex items-center justify-center py-12 border rounded-lg">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
                 ) : (
                     <>
                       <JsonCodeEditor
@@ -414,7 +427,7 @@ export const FinalTransformMiniStepCard = ({
                         resizable={true}
                         overlay={
                           <div className="flex items-center gap-2">
-                            {(outputProcessor.isComputingPreview || outputProcessor.isComputingSchema) && (
+                            {outputProcessor.isComputingSchema && (
                               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                             )}
                             <Tabs
