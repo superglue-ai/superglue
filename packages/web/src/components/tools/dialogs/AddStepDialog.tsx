@@ -27,7 +27,6 @@ interface AddStepDialogProps {
     onConfirmTool?: (steps: ExecutionStep[]) => void;
     onConfirmGenerate?: (step: ExecutionStep) => void;
     existingStepIds: string[];
-    defaultId?: string;
     stepInput?: Record<string, any>;
 }
 
@@ -38,7 +37,6 @@ export function AddStepDialog({
     onConfirmTool,
     onConfirmGenerate,
     existingStepIds,
-    defaultId,
     stepInput
 }: AddStepDialogProps) {
     const [stepId, setStepId] = useState('');

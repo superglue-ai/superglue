@@ -118,7 +118,6 @@ export function ToolStepGallery({
     const [isConfiguratorEditing, setIsConfiguratorEditing] = useState<boolean>(false);
 
     const [isAddStepDialogOpen, setIsAddStepDialogOpen] = useState(false);
-    const [defaultStepId, setDefaultStepId] = useState('');
     const [pendingInsertIndex, setPendingInsertIndex] = useState<number | null>(null);
     const isConfiguratorEditingRef = useRef<boolean>(false);
     const [hiddenLeftCount, setHiddenLeftCount] = useState(0);
@@ -297,8 +296,6 @@ export function ToolStepGallery({
     const handleInsertStep = (afterIndex: number) => {
         if (!onStepsChange || readOnly) return;
 
-        const defaultId = `step_${Date.now()}`;
-        setDefaultStepId(defaultId);
         setPendingInsertIndex(afterIndex);
         setIsAddStepDialogOpen(true);
     };
@@ -740,7 +737,6 @@ export function ToolStepGallery({
                 onConfirmTool={handleConfirmInsertTool}
                 onConfirmGenerate={handleConfirmGenerateStep}
                 existingStepIds={steps.map((s: any) => s.id)}
-                defaultId={defaultStepId}
                 stepInput={pendingInsertIndex !== null ? buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, pendingInsertIndex - 1) : undefined}
             />
         </div>
