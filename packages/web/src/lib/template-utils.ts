@@ -201,3 +201,75 @@ export function extractCredentials(data: Record<string, unknown>): Record<string
   }, {} as Record<string, string>);
 }
 
+export interface PaginationConfig {
+  pageSize?: string;
+  cursorPath?: string;
+}
+
+export interface CategorizedVariables {
+  credentials: string[];
+  toolInputs: string[];
+  fileInputs: string[];
+  currentStepData: string[];
+  previousStepData: string[];
+  paginationVariables: string[];
+}
+
+export interface CategorizedSources {
+  manualPayload: Record<string, unknown>;
+  filePayloads: Record<string, unknown>;
+  previousStepResults: Record<string, unknown>;
+  currentItem: Record<string, unknown> | null;
+  paginationData: Record<string, unknown>;
+}
+
+export function buildPaginationData(config?: PaginationConfig): Record<string, unknown> {
+  const pageSize = config?.pageSize || '50';
+  return {
+    page: 1,
+    offset: 0,
+    cursor: `[cursor from ${config?.cursorPath || 'response'} - evaluated at runtime]`,
+    limit: pageSize,
+    pageSize,
+  };
+}
+
+export function buildCategorizedVariables(
+  credentialKeys: string[],
+  sources?: Partial<CategorizedSources>,
+  hasCurrentItem?: boolean
+): CategorizedVariables {
+  return {
+    credentials: credentialKeys,
+    toolInputs: Object.keys(sources?.manualPayload || {}),
+    fileInputs: Object.keys(sources?.filePayloads || {}),
+    currentStepData: hasCurrentItem ? ['currentItem'] : [],
+    previousStepData: Object.keys(sources?.previousStepResults || {}),
+    paginationVariables: ['page', 'offset', 'cursor', 'limit', 'pageSize'],
+  };
+}
+
+export function buildCategorizedSources(
+  sources?: Partial<CategorizedSources>,
+  currentItem?: Record<string, unknown> | null,
+  paginationData?: Record<string, unknown>
+): CategorizedSources {
+  return {
+    manualPayload: sources?.manualPayload || {},
+    filePayloads: sources?.filePayloads || {},
+    previousStepResults: sources?.previousStepResults || {},
+    currentItem: currentItem || null,
+    paginationData: paginationData || {},
+  };
+}
+
+export function deriveCurrentItem(loopItems: unknown): Record<string, unknown> | null {
+  if (loopItems && typeof loopItems === 'object' && !Array.isArray(loopItems)) {
+    return loopItems as Record<string, unknown>;
+  }
+  if (Array.isArray(loopItems) && loopItems.length > 0) {
+    return loopItems[0] as Record<string, unknown>;
+  }
+  return null;
+}
+

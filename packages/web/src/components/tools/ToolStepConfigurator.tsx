@@ -6,6 +6,7 @@ import { composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon
 import { Integration } from "@superglue/client";
 import { flattenAndNamespaceCredentials } from '@superglue/shared';
 import { type CategorizedSources, type CategorizedVariables } from './templates/tiptap/TemplateContext';
+import { buildPaginationData, buildCategorizedVariables, buildCategorizedSources, deriveCurrentItem } from '@/src/lib/template-utils';
 import { ArrowDown, Globe, OctagonAlert, Pencil } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { JavaScriptCodeEditor } from '../editors/JavaScriptCodeEditor';
@@ -137,59 +138,24 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         [linkedIntegration]
     );
 
-    // Derive current item from loopItems
-    const currentItemObj = useMemo(() => {
-        if (loopItems && typeof loopItems === 'object' && !Array.isArray(loopItems)) {
-            return loopItems as Record<string, unknown>;
-        }
-        if (Array.isArray(loopItems) && loopItems.length > 0) {
-            return loopItems[0] as Record<string, unknown>;
-        }
-        return null;
-    }, [loopItems]);
-
+    const currentItemObj = useMemo(() => deriveCurrentItem(loopItems), [loopItems]);
     const paginationConfig = step.apiConfig?.pagination;
-    const pageSize = paginationConfig?.pageSize || '50';
-    
-    const paginationData = useMemo(() => ({
-        page: 1,
-        offset: 0,
-        cursor: `[cursor from ${paginationConfig?.cursorPath || 'response'} - evaluated at runtime]`,
-        limit: pageSize,
-        pageSize: pageSize,
-    }), [pageSize, paginationConfig?.cursorPath]);
+    const paginationData = useMemo(() => buildPaginationData(paginationConfig), [paginationConfig]);
 
     const templateStepData = useMemo<Record<string, unknown>>(() => {
-        const baseData = (stepInput && typeof stepInput === 'object')
-            ? stepInput as Record<string, unknown>
-            : {};
-
-        return {
-            ...credentialsMap,
-            ...baseData,
-            ...(currentItemObj ? { currentItem: currentItemObj } : {}),
-            ...paginationData,
-        };
+        const baseData = (stepInput && typeof stepInput === 'object') ? stepInput as Record<string, unknown> : {};
+        return { ...credentialsMap, ...baseData, ...(currentItemObj ? { currentItem: currentItemObj } : {}), ...paginationData };
     }, [stepInput, credentialsMap, currentItemObj, paginationData]);
 
-    const categorizedVariables = useMemo<CategorizedVariables>(() => {
-        return {
-            credentials: Object.keys(credentialsMap),
-            toolInputs: Object.keys(categorizedSources?.manualPayload || {}),
-            fileInputs: Object.keys(categorizedSources?.filePayloads || {}),
-            currentStepData: currentItemObj ? ['currentItem'] : [],
-            previousStepData: Object.keys(categorizedSources?.previousStepResults || {}),
-            paginationVariables: ['page', 'offset', 'cursor', 'limit', 'pageSize'],
-        };
-    }, [credentialsMap, categorizedSources, currentItemObj]);
+    const categorizedVariables = useMemo<CategorizedVariables>(
+        () => buildCategorizedVariables(Object.keys(credentialsMap), categorizedSources, !!currentItemObj),
+        [credentialsMap, categorizedSources, currentItemObj]
+    );
 
-    const completeCategorizedSources = useMemo<CategorizedSources>(() => ({
-        manualPayload: categorizedSources?.manualPayload || {},
-        filePayloads: categorizedSources?.filePayloads || {},
-        previousStepResults: categorizedSources?.previousStepResults || {},
-        currentItem: currentItemObj,
-        paginationData,
-    }), [categorizedSources, currentItemObj, paginationData]);
+    const completeCategorizedSources = useMemo<CategorizedSources>(
+        () => buildCategorizedSources(categorizedSources, currentItemObj, paginationData),
+        [categorizedSources, currentItemObj, paginationData]
+    );
 
     return (
         <div className="flex flex-col items-center">

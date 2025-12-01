@@ -4,6 +4,7 @@ import { canExecuteStep } from '@/src/lib/client-utils';
 import { type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, buildPreviousStepResults, cn } from '@/src/lib/general-utils';
 import { type CategorizedSources } from './templates/tiptap/TemplateContext';
+import { buildCategorizedSources } from '@/src/lib/template-utils';
 import { Integration } from "@superglue/client";
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -244,13 +245,7 @@ export function ToolStepGallery({
             stepResult: undefined,
             transformError: undefined,
             evolvingPayload: workingPayload || {},
-            categorizedSources: {
-                manualPayload,
-                filePayloads: filePayloads || {},
-                previousStepResults: {},
-                currentItem: null,
-                paginationData: {},
-            } as CategorizedSources
+            categorizedSources: buildCategorizedSources({ manualPayload, filePayloads: filePayloads || {} })
         },
         ...steps.map((step, index) => ({
             type: 'step',
@@ -258,13 +253,11 @@ export function ToolStepGallery({
             stepResult: stepResultsMap[step.id],
             transformError: undefined,
             evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, index - 1),
-            categorizedSources: {
+            categorizedSources: buildCategorizedSources({
                 manualPayload,
                 filePayloads: filePayloads || {},
                 previousStepResults: buildPreviousStepResults(steps, stepResultsMap, index - 1),
-                currentItem: null,
-                paginationData: {},
-            } as CategorizedSources
+            })
         })),
         ...(finalTransform !== undefined ? [{
             type: 'transform',
@@ -273,13 +266,11 @@ export function ToolStepGallery({
             transformError: failedSteps.includes('__final_transform__') ? stepResultsMap['__final_transform__'] : null,
             evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length - 1),
             hasTransformCompleted,
-            categorizedSources: {
+            categorizedSources: buildCategorizedSources({
                 manualPayload,
                 filePayloads: filePayloads || {},
                 previousStepResults: buildPreviousStepResults(steps, stepResultsMap, steps.length - 1),
-                currentItem: null,
-                paginationData: {},
-            } as CategorizedSources
+            })
         }] : [])
     ], [rawPayloadText, inputSchema, workingPayload, steps, stepResultsMap, finalTransform, responseSchema, finalResult, hasTransformCompleted, manualPayload, filePayloads]);
 
