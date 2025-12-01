@@ -11,20 +11,24 @@ import {
     DialogTitle,
 } from '@/src/components/ui/dialog';
 import { Input } from '@/src/components/ui/input';
+import { Textarea } from '@/src/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { cn } from '@/src/lib/general-utils';
 import { ExecutionStep } from '@superglue/client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, WandSparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { IntegrationSelector } from '../shared/IntegrationSelector';
+import { useGenerateStepConfig } from '../hooks/use-generate-step-config';
 
 interface AddStepDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onConfirm: (stepId: string, instruction: string, integrationId?: string) => void;
     onConfirmTool?: (steps: ExecutionStep[]) => void;
+    onConfirmGenerate?: (step: ExecutionStep) => void;
     existingStepIds: string[];
     defaultId?: string;
+    stepInput?: Record<string, any>;
 }
 
 export function AddStepDialog({
@@ -32,10 +36,12 @@ export function AddStepDialog({
     onOpenChange,
     onConfirm,
     onConfirmTool,
+    onConfirmGenerate,
     existingStepIds,
-    defaultId
+    defaultId,
+    stepInput
 }: AddStepDialogProps) {
-    const [stepId, setStepId] = useState(defaultId || '');
+    const [stepId, setStepId] = useState('');
     const [instruction, setInstruction] = useState('');
     const [selectedIntegrationId, setSelectedIntegrationId] = useState<string>('');
     const [error, setError] = useState('');
@@ -43,18 +49,20 @@ export function AddStepDialog({
     const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const { tools, isInitiallyLoading, isRefreshing, refreshTools } = useTools();
+    const { generateConfig, isGenerating, error: generateError } = useGenerateStepConfig();
 
     useEffect(() => {
         refreshTools();
     }, []);
 
     useEffect(() => {
-        if (open && defaultId) {
-            setStepId(defaultId);
+        if (open) {
+            setStepId('');
             setInstruction('');
+            setSelectedIntegrationId('');
             setError('');
         }
-    }, [open, defaultId]);
+    }, [open]);
 
     const handleOpenChange = (newOpen: boolean) => {
         if (!newOpen) {
@@ -81,12 +89,7 @@ export function AddStepDialog({
         const trimmedId = stepId.trim();
 
         if (!trimmedId) {
-            setError('Step ID cannot be empty');
-            return;
-        }
-
-        if (!selectedIntegrationId) {
-            setError('Please select an integration');
+            setError('Step ID is required');
             return;
         }
 
@@ -118,18 +121,64 @@ export function AddStepDialog({
         setSelectedToolId(null);
     };
 
+    const handleConfirmGenerate = async () => {
+        const trimmedId = stepId.trim();
+        const trimmedInstruction = instruction.trim();
+
+        if (!trimmedId) {
+            setError('Step ID is required');
+            return;
+        }
+
+        if (existingStepIds.includes(trimmedId)) {
+            setError(`Step with ID "${trimmedId}" already exists`);
+            return;
+        }
+
+        if (!selectedIntegrationId) {
+            setError('Please select an integration');
+            return;
+        }
+
+        if (!trimmedInstruction) {
+            setError('Instruction is required to automatically generate step');
+            return;
+        }
+
+        try {
+            setError('');
+            const result = await generateConfig({
+                currentStepConfig: {
+                    id: trimmedId,
+                    instruction: trimmedInstruction
+                },
+                stepInput: stepInput,
+                integrationId: selectedIntegrationId
+            });
+
+            const newStep: ExecutionStep = {
+                id: trimmedId,
+                integrationId: selectedIntegrationId,
+                apiConfig: {
+                    ...result.config,
+                    id: trimmedId,
+                    instruction: trimmedInstruction
+                },
+                loopSelector: result.dataSelector
+            };
+
+            if (onConfirmGenerate) {
+                onConfirmGenerate(newStep);
+            }
+            handleOpenChange(false);
+        } catch (err: any) {
+            setError(err.message || 'Failed to generate step configuration');
+        }
+    };
+
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="max-w-2xl" onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'BUTTON') {
-                    e.preventDefault();
-                    if (activeTab === 'scratch') {
-                        handleConfirmScratch();
-                    } else {
-                        handleConfirmTool();
-                    }
-                }
-            }}>
+            <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Add</DialogTitle>
                     <DialogDescription>
@@ -143,20 +192,7 @@ export function AddStepDialog({
                         <TabsTrigger value="tool">Import tool</TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="scratch" className="space-y-4 py-4 overflow-hidden">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">
-                                Integration
-                            </label>
-                            <IntegrationSelector
-                                value={selectedIntegrationId}
-                                onValueChange={(value) => {
-                                    setSelectedIntegrationId(value);
-                                    setError('');
-                                }}
-                                triggerClassName={cn(error && !selectedIntegrationId && "border-destructive")}
-                            />
-                        </div>
+                    <TabsContent value="scratch" className="space-y-4 py-4">
                         <div className="space-y-2">
                             <label htmlFor="step-id" className="text-sm font-medium">
                                 Step ID
@@ -169,20 +205,34 @@ export function AddStepDialog({
                                     setError('');
                                 }}
                                 placeholder="e.g., fetch_users"
-                                className={cn(error && !stepId && "border-destructive")}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">
+                                Integration
+                            </label>
+                            <IntegrationSelector
+                                value={selectedIntegrationId}
+                                onValueChange={(value) => {
+                                    setSelectedIntegrationId(value);
+                                    setError('');
+                                }}
                             />
                         </div>
                         <div className="space-y-2">
                             <label htmlFor="step-instruction" className="text-sm font-medium">
                                 Instruction
                             </label>
-                            <Input
+                            <Textarea
                                 id="step-instruction"
                                 value={instruction}
                                 onChange={(e) => {
                                     setInstruction(e.target.value);
+                                    setError('');
                                 }}
                                 placeholder="e.g., Fetch all users from the API"
+                                rows={4}
+                                className="resize-none focus:ring-inset"
                             />
                         </div>
                         {error && (
@@ -255,12 +305,40 @@ export function AddStepDialog({
                     >
                         Cancel
                     </Button>
-                    <Button
-                        onClick={activeTab === 'scratch' ? handleConfirmScratch : handleConfirmTool}
-                        disabled={isInitiallyLoading}
-                    >
-                        {activeTab === 'scratch' ? 'Add Step' : 'Import Steps'}
-                    </Button>
+                    {activeTab === 'scratch' ? (
+                        <>
+                            <Button
+                                variant="outline"
+                                onClick={handleConfirmScratch}
+                                disabled={isGenerating}
+                            >
+                                Add Step
+                            </Button>
+                            <Button
+                                onClick={handleConfirmGenerate}
+                                disabled={isGenerating}
+                            >
+                                {isGenerating ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Generating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <WandSparkles className="h-4 w-4" />
+                                        Generate Step
+                                    </>
+                                )}
+                            </Button>
+                        </>
+                    ) : (
+                        <Button
+                            onClick={handleConfirmTool}
+                            disabled={isInitiallyLoading}
+                        >
+                            Import Steps
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

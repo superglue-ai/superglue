@@ -355,6 +355,21 @@ export function ToolStepGallery({
         setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
     };
 
+    const handleConfirmGenerateStep = (step: any) => {
+        if (pendingInsertIndex === null || !onStepsChange) return;
+
+        const newSteps = [...steps];
+        newSteps.splice(pendingInsertIndex, 0, step);
+        onStepsChange(newSteps);
+
+        const insertedIndex = pendingInsertIndex;
+        setIsAddStepDialogOpen(false);
+        setPendingInsertIndex(null);
+
+        // Navigate to the newly inserted step
+        setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
+    };
+
     const onStepEdit = (stepId: string, updatedStep: any, isUserInitiated: boolean = false) => {
         // Suppress user-initiated edits during navigation to prevent spurious resets
         if (isNavigatingRef.current && isUserInitiated) {
@@ -723,8 +738,10 @@ export function ToolStepGallery({
                 onOpenChange={setIsAddStepDialogOpen}
                 onConfirm={handleConfirmInsertStep}
                 onConfirmTool={handleConfirmInsertTool}
+                onConfirmGenerate={handleConfirmGenerateStep}
                 existingStepIds={steps.map((s: any) => s.id)}
                 defaultId={defaultStepId}
+                stepInput={pendingInsertIndex !== null ? buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, pendingInsertIndex - 1) : undefined}
             />
         </div>
     );
