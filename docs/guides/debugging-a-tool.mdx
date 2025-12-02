@@ -90,6 +90,21 @@ The **Step Config** tab shows how this step calls the external system:
 - **Pagination** – controls how the step fetches multiple pages (strategy, page size, cursor/offset paths) or shows *No pagination* when pagination is disabled
 - **Stop Condition (JavaScript)** – optional JavaScript function that inspects each `response` and pagination state to decide when to stop fetching more pages
 
+#### Template Chips
+
+<video
+  autoPlay
+  muted
+  loop
+  playsInline
+  className="w-full rounded-lg"
+  src="../resources/step-config-video.mp4"
+/>
+
+Dynamic values in the config appear as **template chips** – small green badges showing the evaluated result. Click a chip to open its **the templating popover**, where you can edit the JavaScript expression and see a live preview of your code expression.
+
+To insert a new template, type `@` anywhere in a text field to open the **variable picker**. Browse available variables by category (previous step results, credentials, loop context) and drill into nested properties. Selecting a variable inserts a chip with the correct accessor path.
+
 ### Step Result
 
 <img
