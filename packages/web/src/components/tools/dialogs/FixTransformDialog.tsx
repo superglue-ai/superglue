@@ -10,7 +10,7 @@ import {
 import { Textarea } from '@/src/components/ui/textarea';
 import { useToast } from '@/src/hooks/use-toast';
 import { Loader2, WandSparkles, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGenerateTransform } from '../hooks/use-generate-transform';
 
 interface FixTransformDialogProps {
@@ -21,6 +21,7 @@ interface FixTransformDialogProps {
     stepData: Record<string, any>;
     errorMessage?: string;
     onSuccess: (newTransform: string, transformedData: any) => void;
+    onLoadingChange?: (isLoading: boolean) => void;
 }
 
 export function FixTransformDialog({
@@ -31,10 +32,15 @@ export function FixTransformDialog({
     stepData,
     errorMessage,
     onSuccess,
+    onLoadingChange,
 }: FixTransformDialogProps) {
     const [fixCommand, setFixCommand] = useState('');
     const { generateTransform, isGenerating, error } = useGenerateTransform();
     const { toast } = useToast();
+
+    useEffect(() => {
+        onLoadingChange?.(isGenerating);
+    }, [isGenerating, onLoadingChange]);
 
     const handleFix = async () => {
         try {

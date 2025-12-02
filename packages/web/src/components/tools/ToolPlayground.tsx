@@ -1136,8 +1136,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
   const handleFixTransformSuccess = (newTransform: string, transformedData: any) => {
     setFinalTransform(newTransform);
+    setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
+    setFailedSteps(prev => prev.filter(id => id !== '__final_transform__'));
     setStepResultsMap(prev => ({ ...prev, __final_transform__: transformedData }));
     setFinalPreviewResult(transformedData);
+    setNavigateToFinalSignal(Date.now());
   };
 
   // Tool action handlers
@@ -1514,6 +1517,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
             : undefined
         }
         onSuccess={handleFixTransformSuccess}
+        onLoadingChange={setIsFixingTransform}
       />
     </div>
   );
