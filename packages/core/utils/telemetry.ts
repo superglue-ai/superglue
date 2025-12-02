@@ -38,7 +38,7 @@ export const telemetryMiddleware = (req: any, res: any, next: any) => {
   }
   const operation = extractOperationName(req.body.query);
 
-  logMessage('debug', `Middleware: Executing Operation: ${operation}`, {
+  logMessage('debug', `Middleware: Executing Operation ${operation}`, {
     orgId: req.orgId,
     traceId: req.traceId
   });
@@ -120,10 +120,10 @@ const handleQuerySuccess = (query: string, orgId: string, requestContext: any) =
   const properties = createCallProperties(query, requestContext.response?.body, isSelfHosted, operation);
   properties.success = true;
 
-  logMessage('debug', `Middleware: Operation ${operation} successful`, {
-    orgId: orgId,
-    traceId: requestContext?.contextValue?.traceId
-  });
+  // logMessage('debug', `Middleware: Operation ${operation} successful.`, {
+  //   orgId: orgId,
+  //   traceId: requestContext?.contextValue?.traceId
+  // });
 
   telemetryClient?.capture({
     distinctId: distinctId,
