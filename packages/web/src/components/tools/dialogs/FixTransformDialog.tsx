@@ -37,15 +37,6 @@ export function FixTransformDialog({
     const { toast } = useToast();
 
     const handleFix = async () => {
-        if (!fixCommand.trim()) {
-            toast({
-                title: 'Instruction required',
-                description: 'Please provide a fix instruction.',
-                variant: 'destructive',
-            });
-            return;
-        }
-
         try {
             const result = await generateTransform({
                 currentTransform,
@@ -55,10 +46,6 @@ export function FixTransformDialog({
                 instruction: fixCommand.trim(),
             });
 
-            toast({
-                title: 'Transform fixed successfully',
-                description: 'The transform code has been updated.',
-            });
 
             onSuccess(result.transformCode, result.data);
             handleClose();
