@@ -1,8 +1,7 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
 import { splitUrl } from '@/src/lib/client-utils';
 import { composeUrl } from '@/src/lib/general-utils';
-import { Integration } from "@superglue/client";
-import { flattenAndNamespaceCredentials } from '@superglue/shared';
+import { Integration, flattenAndNamespaceCredentials } from '@superglue/shared';
 import { type CategorizedSources, type CategorizedVariables } from './templates/tiptap/TemplateContext';
 import { buildPaginationData, buildCategorizedVariables, buildCategorizedSources, deriveCurrentItem } from '@/src/lib/templating-utils';
 import { ArrowDown, Pencil } from 'lucide-react';
