@@ -11,15 +11,8 @@ import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Switch } from "../ui/switch";
 import { useToken } from "@/src/hooks/use-token";
+import { LogEntry } from "@superglue/shared";
 
-export interface LogEntry {
-  id: string;
-  message: string;
-  level: string;
-  timestamp: Date;
-  runId?: string;
-  orgId?: string;
-}
 
 const LOGS_SUBSCRIPTION = gql`
   subscription OnNewLog {
@@ -28,7 +21,7 @@ const LOGS_SUBSCRIPTION = gql`
       message   
       level
       timestamp
-      runId
+      traceId
     }
   }
 `
@@ -91,7 +84,7 @@ export function LogSidebar() {
     client,
     shouldResubscribe: true,
     onError: (error) => {
-      console.warn('Subscription error:', error)
+      console.warn('Log subscription error:', error)
     },
     onData: ({ data }) => {
       if (data.data?.logs) {

@@ -3,7 +3,7 @@ export interface LogEntry {
   message: string;
   level: string;
   timestamp: Date;
-  runId?: string; // this is the traceId.
+  traceId?: string;
   orgId?: string;
 }
 
@@ -45,7 +45,7 @@ export interface ToolCall {
       message: string;
       level: string;
       timestamp: Date;
-      runId?: string;
+      traceId?: string;
       orgId?: string;
   }>;
   buildResult?: any;

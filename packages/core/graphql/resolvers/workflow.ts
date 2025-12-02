@@ -62,7 +62,7 @@ export const executeWorkflowResolver = async (
       throw new Error("Must provide either workflow ID or workflow object");
     }
 
-    logMessage('info', `Executing workflow with id: ${workflow.id}, run_id: ${runId}`, metadata);
+    logMessage('debug', `Executing workflow with id: ${workflow.id}, run_id: ${runId}`, metadata);
 
     // Parse schemas if they're strings
     if (workflow.inputSchema && typeof workflow.inputSchema === 'string') {

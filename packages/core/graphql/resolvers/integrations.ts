@@ -153,7 +153,7 @@ export const findRelevantIntegrationsResolver = async (
   logMessage('info', `Finding relevant integrations for ${logSearchTerms}`, { orgId: context.orgId });
 
   try {
-    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
+    const metadata: Metadata = { orgId: context.orgId, traceId: crypto.randomUUID() };
     const allIntegrations = await context.datastore.listIntegrations({ limit: 1000, offset: 0, includeDocs: false, orgId: context.orgId });
 
     const selector = new IntegrationFinder(metadata);

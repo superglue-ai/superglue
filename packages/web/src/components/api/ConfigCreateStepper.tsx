@@ -67,7 +67,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
       message
       level
       timestamp
-      runId
+      traceId
     }
   }
 `

@@ -27,9 +27,7 @@ export const logsResolver = {
                     next() {
                         return new Promise((resolve) => {
                             emitter.once('data', (value) => {
-                                if (value?.logs?.orgId === orgId) {
-                                    resolve({ value, done: false });
-                                }
+                                resolve({ value, done: false });
                             });
                         });
                     },

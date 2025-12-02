@@ -46,7 +46,7 @@ export const logger = pino({
         message: message,
         level: String(levelMap[level]).toUpperCase(),
         timestamp: new Date(),
-        runId: metadata.traceId || '',
+        traceId: metadata.traceId || '',
         orgId: metadata.orgId || ''
       };
 

@@ -252,7 +252,7 @@ type Log {
   message: String!
   level: LogLevel!
   timestamp: DateTime!
-  runId: ID # this is the traceId
+  traceId: ID
 }
 
 type SuggestedIntegration {
