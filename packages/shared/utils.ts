@@ -290,7 +290,11 @@ export function assertValidArrowFunction(code: string | undefined | null): strin
   if (isArrowFunction(text)) {
     return text;
   }
-  
+
+  if (text.startsWith('//')) {
+    throw new Error(`Found comment in code: ${text}.`);
+  }
+
   throw new Error(`Invalid arrow function: ${text}. Expected a valid arrow function.`);
 }
 
