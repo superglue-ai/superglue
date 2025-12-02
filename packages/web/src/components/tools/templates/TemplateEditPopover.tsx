@@ -115,7 +115,7 @@ export function TemplateEditPopover({
   };
 
   const handleDownload = () => {
-    const downloadContent = credentialsAreMasked ? maskedPreview : formatValueForDisplay(previewValue);
+    const downloadContent = (showRevealButton && showCredentials) ? previewDisplayRaw : maskedPreview;
     const blob = new Blob([downloadContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -131,7 +131,9 @@ export function TemplateEditPopover({
     ? maskCredentials(previewDisplayRaw, credentials) 
     : previewDisplayRaw;
   const credentialsAreMasked = maskedPreview !== previewDisplayRaw;
-  const previewDisplay = credentialsAreMasked && !showCredentials ? maskedPreview : previewDisplayRaw;
+  const isDirectCredentialRef = Object.keys(credentials).includes(templateContent.trim());
+  const showRevealButton = credentialsAreMasked && isDirectCredentialRef;
+  const previewDisplay = showRevealButton && showCredentials ? previewDisplayRaw : maskedPreview;
   const canDownload = previewDisplayRaw.length > 1000;
 
   useEffect(() => {
@@ -259,7 +261,7 @@ export function TemplateEditPopover({
               options={{ ...monacoOptions, readOnly: true, fontSize: 11 }}
               theme={theme}
             />
-            {credentialsAreMasked && (
+            {showRevealButton && (
               <button
                 onClick={() => setShowCredentials(!showCredentials)}
                 className="absolute top-1 right-2 p-1 rounded hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"

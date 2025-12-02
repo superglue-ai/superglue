@@ -80,23 +80,10 @@ export function TemplateChip({
 
     originalSize = fullDisplayText.length;
     const masked = maskCredentials(fullDisplayText, credentials);
-    const wasMasked = masked !== fullDisplayText;
-
-    if (wasMasked) {
-      const maskedTokens = masked.match(/\{masked_[^}]+\}/g) || [];
-      if (maskedTokens.length > 0) {
-        displayText = maskedTokens[0];
-        isTruncated = masked.length > maskedTokens[0].length;
-      } else {
-        displayText = masked.slice(0, 150) + (masked.length > 150 ? '...' : '');
-        isTruncated = masked.length > 150;
-      }
-    } else {
-      const truncated = truncateTemplateValue(fullDisplayText, 150);
-      displayText = truncated.display;
-      isTruncated = truncated.truncated;
-      originalSize = truncated.originalSize;
-    }
+    const truncated = truncateTemplateValue(masked, 150);
+    displayText = truncated.display;
+    isTruncated = truncated.truncated;
+    originalSize = truncated.originalSize;
   }
 
   const isActive = selected || effectiveOpen;
