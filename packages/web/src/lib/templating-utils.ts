@@ -184,32 +184,6 @@ export function formatValueForDisplay(value: any): string {
   }
 }
 
-export function isCredentialVariable(expr: string, sourceData: any): boolean {
-  if (!sourceData || typeof sourceData !== 'object') return false;
-  if (!expr || typeof expr !== 'string') return false;
-  
-  let varName = expr.trim();
-  
-  const arrowMatch = varName.match(/^\s*\([^)]*\)\s*=>\s*\w+\.(\w+)\s*$/);
-  if (arrowMatch) {
-    varName = arrowMatch[1];
-  }
-
-  const sourceDataMatch = varName.match(/^sourceData\.(\w+)$/);
-  if (sourceDataMatch) {
-    varName = sourceDataMatch[1];
-  }
-  
-  if (!CREDENTIAL_PATTERN.test(varName)) return false;
-  
-  if (varName in sourceData && sourceData[varName] !== undefined) {
-    const value = sourceData[varName];
-    return typeof value === 'string' && value.length > 0;
-  }
-  
-  return false;
-}
-
 export function extractCredentials(data: Record<string, unknown>): Record<string, string> {
   if (!data || typeof data !== 'object') return {};
   return Object.entries(data).reduce((acc, [key, value]) => {
