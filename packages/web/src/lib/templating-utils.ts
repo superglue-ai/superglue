@@ -70,7 +70,17 @@ export function executeTemplateCode(code: string, data: any): any {
   }
 }
 
-const PROPERTY_PATH_PATTERN = /^[a-zA-Z_$][a-zA-Z0-9_$]*(\.[a-zA-Z_$][a-zA-Z0-9_$]*|\[[^\]]+\])*$/;
+const VALID_IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+
+function escapeForBracket(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function buildAccessor(segments: string[]): string {
+  return segments.map(seg => 
+    VALID_IDENTIFIER.test(seg) ? `.${seg}` : `["${escapeForBracket(seg)}"]`
+  ).join('');
+}
 
 export function normalizeTemplateExpression(expr: string): string {
   const trimmed = expr.trim();
@@ -83,10 +93,19 @@ export function normalizeTemplateExpression(expr: string): string {
   if (trimmed.startsWith('sourceData.') || trimmed.startsWith('sourceData[') || trimmed === 'sourceData') {
     return `(sourceData) => ${trimmed}`;
   }
-  if (PROPERTY_PATH_PATTERN.test(trimmed)) {
-  return `(sourceData) => sourceData.${trimmed}`;
+  if (trimmed.includes('[') && /^[a-zA-Z_$]/.test(trimmed)) {
+    return `(sourceData) => sourceData.${trimmed}`;
   }
-  throw new Error(`Invalid template expression: "${trimmed}". Expected an arrow function or property path.`);
+  if (trimmed.includes('.') && !trimmed.includes(' ')) {
+    const segments = trimmed.split('.');
+    const accessor = buildAccessor(segments);
+    return `(sourceData) => sourceData${accessor}`;
+  }
+  // Single segment - use dot notation if valid identifier, bracket notation otherwise
+  if (VALID_IDENTIFIER.test(trimmed)) {
+    return `(sourceData) => sourceData.${trimmed}`;
+  }
+  return `(sourceData) => sourceData["${escapeForBracket(trimmed)}"]`;
 }
 
 export async function evaluateTemplate(

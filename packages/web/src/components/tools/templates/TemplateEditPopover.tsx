@@ -93,9 +93,14 @@ export function TemplateEditPopover({
 
   useEffect(() => {
     if (open) {
-      const initialCode = templateContent 
-        ? normalizeTemplateExpression(templateContent)
-        : DEFAULT_CODE_TEMPLATE;
+      let initialCode = DEFAULT_CODE_TEMPLATE;
+      if (templateContent) {
+        try {
+          initialCode = normalizeTemplateExpression(templateContent);
+        } catch {
+          initialCode = templateContent;
+        }
+      }
       setCodeContent(initialCode);
       setTimeout(() => {
         codeEditorRef.current?.getAction('editor.action.formatDocument')?.run();
