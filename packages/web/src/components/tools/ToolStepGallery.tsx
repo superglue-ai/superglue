@@ -34,7 +34,7 @@ export interface ToolStepGalleryProps {
     onOpenFixStepDialog?: (stepIndex: number) => void;
     onExecuteAllSteps?: () => Promise<void>;
     onExecuteTransform?: (schema: string, transform: string) => Promise<void>;
-    onFixTransform?: (schema: string, transform: string) => Promise<void>;
+    onOpenFixTransformDialog?: () => void;
     completedSteps?: string[];
     failedSteps?: string[];
     integrations?: Integration[];
@@ -83,7 +83,7 @@ export function ToolStepGallery({
     onOpenFixStepDialog,
     onExecuteAllSteps,
     onExecuteTransform,
-    onFixTransform,
+    onOpenFixTransformDialog,
     completedSteps = [],
     failedSteps = [],
     integrations,
@@ -712,7 +712,7 @@ export function ToolStepGallery({
                                     onResponseSchemaChange={onResponseSchemaChange}
                                     readOnly={readOnly}
                                     onExecuteTransform={onExecuteTransform}
-                                    onFixTransform={onFixTransform}
+                                    onOpenFixTransformDialog={onOpenFixTransformDialog}
                                     isRunningTransform={isRunningTransform}
                                     isFixingTransform={isFixingTransform}
                                     canExecute={canExecuteTransform}

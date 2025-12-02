@@ -352,6 +352,11 @@ type GenerateStepConfigResult {
   dataSelector: String!
 }
 
+type GenerateTransformResult {
+  transformCode: String!
+  data: JSON
+}
+
 type WorkflowResult {
   id: ID!
   success: Boolean!
@@ -437,6 +442,14 @@ type Mutation {
     credentials: JSON
     errorMessage: String
   ): GenerateStepConfigResult!
+
+  generateTransform(
+    currentTransform: String!
+    responseSchema: JSONSchema
+    stepData: JSON!
+    errorMessage: String
+    instruction: String
+  ): GenerateTransformResult!
 
   upsertWorkflow(id: ID!, input: JSON!): Workflow!
   deleteWorkflow(id: ID!): Boolean!

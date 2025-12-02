@@ -5,11 +5,11 @@
  * It uses keyword matching and scoring algorithms to identify the most relevant content.
  */
 
+import { Metadata } from '@superglue/shared';
 import { server_defaults } from '../default.js';
 import { LanguageModel } from '../llm/llm-base-model.js';
-import { logMessage } from '../utils/logs.js';
 import { sanitizeUnpairedSurrogates } from '../utils/helpers.js';
-import { Metadata } from '@superglue/shared';
+import { logMessage } from '../utils/logs.js';
 
 export class DocumentationSearch {
   private readonly metadata: Metadata;
@@ -42,7 +42,7 @@ export class DocumentationSearch {
     openApiSchema: string = ''
   ): string {
     if ((!documentation || documentation.length === 0) && !openApiSchema) {
-      // logMessage('warn', 'Cannot extract relevant sections: No documentation or openApiSchema provided', this.metadata);
+      logMessage('debug', 'Cannot extract relevant sections: No documentation or openApiSchema provided', this.metadata);
       return '';
     }
 
@@ -92,7 +92,6 @@ export class DocumentationSearch {
         openApiOperationsText = topOperations
           .map(op => `[${op.method} ${op.path}]\n${op.operation}`)
           .join('\n\n---\n\n');
-        logMessage('debug', 'Extract Relevant Documentation Sections: Adding openapi sections to result', this.metadata);
         remainingSections = remainingSections - topOperations.length;
       }
     }
@@ -163,7 +162,7 @@ export class DocumentationSearch {
     const documentationResult = result.length > maxExpectedLength
       ? result.slice(0, maxExpectedLength)
       : result;
-          
+    logMessage('debug', `Found ${documentationResult.length} characters of documentation for query: "${searchQuery}"`, this.metadata);
     return sanitizeUnpairedSurrogates(documentationResult);
   }
 

@@ -1,15 +1,16 @@
 import { ApiConfig, Integration } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
+import { getGenerateStepConfigContext } from "../../context/context-builders.js";
+import { GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../../context/context-prompts.js";
+import { IntegrationManager } from "../../integrations/integration-manager.js";
+import { LLMMessage } from "../../llm/llm-base-model.js";
 import { executeLLMTool, LLMToolCall } from "../../llm/llm-tool-utils.js";
 import { InstructionGenerationContext } from "../../llm/llm-tools.js";
+import { generateStepConfig } from "../../tools/tool-step-builder.js";
+import { generateWorkingTransform } from "../../tools/tool-transform.js";
+import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { Context, Metadata } from '../types.js';
-import { IntegrationManager } from "../../integrations/integration-manager.js";
-import { getGenerateStepConfigContext } from "../../context/context-builders.js";
-import { LLMMessage } from "../../llm/llm-base-model.js";
-import { GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../../context/context-prompts.js";
-import { logMessage } from "../../utils/logs.js";
-import { generateStepConfig } from "../../tools/tool-step-builder.js";
 
 interface GenerateStepConfigArgs {
   integrationId?: string;
@@ -156,6 +157,51 @@ export const generateStepConfigResolver = async (
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
       integrationId
+    });
+    throw error;
+  }
+};
+
+interface GenerateTransformArgs {
+  currentTransform: string;
+  responseSchema?: any;
+  stepData: Record<string, any>;
+  errorMessage?: string;
+  instruction?: string;
+}
+
+export const generateTransformResolver = async (
+  _: any,
+  { currentTransform, responseSchema, stepData, errorMessage, instruction }: GenerateTransformArgs,
+  context: Context,
+  info: GraphQLResolveInfo
+): Promise<{ transformCode: string; data?: any }> => {
+  try {
+    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
+
+    const prompt = (instruction || "Create transformation code.") +
+      (currentTransform ? `\nOriginally, we used the following transformation: ${currentTransform}` : "") +
+      (errorMessage ? `\nThe transformation failed with the following error: ${errorMessage}` : "");
+
+    const result = await generateWorkingTransform({
+      targetSchema: responseSchema,
+      inputData: stepData,
+      instruction: prompt,
+      metadata
+    });
+
+    if (!result) {
+      throw new Error('Failed to generate transform code');
+    }
+
+    return { 
+      transformCode: result.transformCode,
+      data: result.data 
+    };
+  } catch (error) {
+    telemetryClient?.captureException(error, context.orgId, {
+      errorMessage,
+      instruction
     });
     throw error;
   }
