@@ -237,11 +237,6 @@ export interface ToolResult extends BaseResult {
   stepResults: ToolStepResult[];
 }
 
-// Legacy aliases for backwards compatibility with GraphQL
-export type Workflow = Tool;
-export type WorkflowStepResult = ToolStepResult;
-export type WorkflowResult = ToolResult;
-
 export interface Integration extends BaseConfig {
   name?: string;
   type?: string;

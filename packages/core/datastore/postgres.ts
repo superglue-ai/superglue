@@ -1,4 +1,4 @@
-import type { ApiConfig, Integration, RunResult, Tool, Workflow } from "@superglue/shared";
+import type { ApiConfig, Integration, RunResult, Tool } from "@superglue/shared";
 import { Pool, PoolConfig } from 'pg';
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
@@ -34,7 +34,7 @@ export class PostgresService implements DataStore {
 
         this.initializeTables();
     }
-    async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Workflow[]> {
+    async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Tool[]> {
         const { ids, orgId } = params;
         const client = await this.pool.connect();
         try {
@@ -465,17 +465,17 @@ export class PostgresService implements DataStore {
         }
     }
 
-    async getWorkflow(params: { id: string; orgId?: string }): Promise<Workflow | null> {
+    async getWorkflow(params: { id: string; orgId?: string }): Promise<Tool | null> {
         const { id, orgId } = params;
-        return this.getConfig<Workflow>(id, 'workflow', orgId);
+        return this.getConfig<Tool>(id, 'workflow', orgId);
     }
 
-    async listWorkflows(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: Workflow[], total: number }> {
+    async listWorkflows(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: Tool[], total: number }> {
         const { limit = 10, offset = 0, orgId } = params || {};
-        return this.listConfigs<Workflow>('workflow', limit, offset, orgId);
+        return this.listConfigs<Tool>('workflow', limit, offset, orgId);
     }
 
-    async upsertWorkflow(params: { id: string; workflow: Workflow; orgId?: string }): Promise<Workflow> {
+    async upsertWorkflow(params: { id: string; workflow: Tool; orgId?: string }): Promise<Tool> {
         const { id, workflow, orgId } = params;
         const integrationIds: string[] = [];
         return this.upsertConfig(id, workflow, 'workflow', orgId, integrationIds);
@@ -486,7 +486,7 @@ export class PostgresService implements DataStore {
         return this.deleteConfig(id, 'workflow', orgId);
     }
 
-    async renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Workflow> {
+    async renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Tool> {
         const { oldId, newId, orgId = '' } = params;
         const client = await this.pool.connect();
         
@@ -513,11 +513,11 @@ export class PostgresService implements DataStore {
                 throw new Error(`Workflow with ID '${oldId}' not found`);
             }
 
-            const oldWorkflow = oldWorkflowResult.rows[0].data as Workflow;
+            const oldWorkflow = oldWorkflowResult.rows[0].data as Tool;
             const now = new Date();
 
             // 3. Create new workflow with newId
-            const newWorkflow: Workflow = {
+            const newWorkflow: Tool = {
                 ...oldWorkflow,
                 id: newId,
                 updatedAt: now
