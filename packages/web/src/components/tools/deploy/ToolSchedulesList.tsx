@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 import { tokenRegistry } from '@/src/lib/token-registry';
-import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/client';
+import { SuperglueClient, ToolSchedule } from '@superglue/shared';
 import cronstrue from 'cronstrue';
 import ToolScheduleModal from './ToolScheduleModal';
 
@@ -114,13 +114,13 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
         apiKey: tokenRegistry.getToken()
       });
 
-      const workflow = await superglueClient.getWorkflow(schedule.workflowId);
-      if (!workflow) {
+      const tool = await superglueClient.getWorkflow(schedule.workflowId);
+      if (!tool) {
         throw new Error('Workflow not found');
       }
 
       const result = await superglueClient.executeWorkflow({
-        workflow,
+        tool: tool,
         payload: schedule.payload || {},
         options: schedule.options || {}
       });

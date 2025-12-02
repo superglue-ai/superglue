@@ -1,4 +1,4 @@
-import { JSONSchema, RequestOptions } from "@superglue/client";
+import { JSONSchema, RequestOptions } from "@superglue/shared";
 import type { Metadata } from "@superglue/shared";
 import prettier from "prettier";
 import { z } from "zod";

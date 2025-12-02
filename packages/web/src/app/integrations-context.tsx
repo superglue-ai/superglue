@@ -1,4 +1,4 @@
-import { Integration, SuperglueClient } from '@superglue/client'
+import { Integration, SuperglueClient } from '@superglue/shared'
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react'
 import { useConfig } from './config-context'
 import { tokenRegistry } from '@/src/lib/token-registry'

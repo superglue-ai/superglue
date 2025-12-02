@@ -1,9 +1,9 @@
 import { ToolBuilder } from '@/packages/core/tools/tool-builder.js';
 import { DataStore } from '@core/datastore/types.js';
-import { WorkflowExecutor } from '@/packages/core/tools/tool-executor.js';
+import { ToolExecutor } from '@/packages/core/tools/tool-executor.js';
 import { IntegrationManager } from '@core/integrations/integration-manager.js';
 import { logEmitter, logMessage } from '@core/utils/logs.js';
-import { Integration, Workflow, WorkflowResult } from '@superglue/client';
+import { Integration, Workflow, WorkflowResult } from '@superglue/shared';
 import { generateUniqueId } from '@superglue/shared/utils';
 import { BaseWorkflowConfig } from './config-loader.js';
 import { validateWorkflowResult, type SoftValidationResult } from './soft-validator.js';
@@ -269,8 +269,8 @@ export class WorkflowRunner {
                     runId: `${workflowConfig.id}-${attemptNumber}`
                 };
 
-                const executor = new WorkflowExecutor(
-                    { workflow, metadata: metadataWithWorkflowId, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId) }
+                const executor = new ToolExecutor(
+                    { tool: workflow, metadata: metadataWithWorkflowId, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId) }
                 );
 
                 // Combine all credentials from integrations

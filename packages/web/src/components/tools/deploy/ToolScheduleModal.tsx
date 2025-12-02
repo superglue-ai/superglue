@@ -3,7 +3,7 @@ import { useTools } from '@/src/app/tools-context';
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, getGroupedTimezones } from '@/src/lib/general-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
-import { SuperglueClient, WorkflowSchedule as ToolSchedule } from '@superglue/client';
+import { SuperglueClient, ToolSchedule } from '@superglue/shared';
 import { validateCronExpression } from '@superglue/shared';
 import { Check, ChevronRight, ChevronsUpDown, Loader2 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';

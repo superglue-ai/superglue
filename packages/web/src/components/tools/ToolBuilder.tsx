@@ -5,11 +5,10 @@ import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { FileChip } from '@/src/components/ui/FileChip';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
-import { ExtendedSuperglueClient } from '@/src/lib/extended-superglue-client';
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/general-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
-import { Integration, IntegrationInput, Workflow as Tool, UpsertMode } from '@superglue/client';
+import { Integration, IntegrationInput, Tool, UpsertMode, SuperglueClient } from '@superglue/shared';
 import { ALLOWED_FILE_EXTENSIONS, generateDefaultFromSchema, integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { Validator } from 'jsonschema';
@@ -135,7 +134,7 @@ export function ToolBuilder({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const client = useMemo(() => new ExtendedSuperglueClient({
+  const client = useMemo(() => new SuperglueClient({
     endpoint: superglueConfig.superglueEndpoint,
     apiKey: tokenRegistry.getToken(),
   }), [superglueConfig.superglueEndpoint]);

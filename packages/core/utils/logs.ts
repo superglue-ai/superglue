@@ -1,4 +1,4 @@
-import { LogEntry, Metadata } from "@superglue/shared";
+import { Log, Metadata } from "@superglue/shared";
 import EventEmitter from "events";
 import pino from "pino";
 
@@ -41,7 +41,7 @@ export const logger = pino({
         message = inputArgs[1] || '';
       }
 
-      const logEntry: LogEntry = {
+      const logEntry: Log = {
         id: crypto.randomUUID(),
         message: message,
         level: String(levelMap[level]).toUpperCase(),

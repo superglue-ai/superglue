@@ -1,4 +1,4 @@
-import type { ApiConfig, Integration, RunResult, Workflow, WorkflowSchedule } from "@superglue/client";
+import type { ApiConfig, Integration, RunResult, Tool, ToolSchedule } from "@superglue/shared";
 
 export interface DataStore {
   // API Config Methods
@@ -15,12 +15,12 @@ export interface DataStore {
   deleteAllRuns(params?: { orgId?: string }): Promise<boolean>;
 
   // Workflow Methods
-  getWorkflow(params: { id: string; orgId?: string }): Promise<Workflow | null>;
-  listWorkflows(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: Workflow[], total: number }>;
-  upsertWorkflow(params: { id: string; workflow: Workflow; orgId?: string }): Promise<Workflow>;
+  getWorkflow(params: { id: string; orgId?: string }): Promise<Tool | null>;
+  listWorkflows(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: Tool[], total: number }>;
+  upsertWorkflow(params: { id: string; workflow: Tool; orgId?: string }): Promise<Tool>;
   deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean>;
-  renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Workflow>;
-  getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Workflow[]>;
+  renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Tool>;
+  getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Tool[]>;
 
   // Tenant Information Methods
   getTenantInfo(): Promise<{ email: string | null, emailEntrySkipped: boolean }>;
@@ -41,14 +41,14 @@ export interface DataStore {
   copyTemplateDocumentationToUserIntegration(params: { templateId: string; userIntegrationId: string; orgId?: string }): Promise<boolean>;
 
   // Workflow Schedule
-  listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]>;
-  getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<WorkflowScheduleInternal | null>;
-  upsertWorkflowSchedule(params: { schedule: WorkflowScheduleInternal })
+  listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<ToolScheduleInternal[]>;
+  getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<ToolScheduleInternal | null>;
+  upsertWorkflowSchedule(params: { schedule: ToolScheduleInternal })
   deleteWorkflowSchedule(params: { id: string, orgId: string }): Promise<boolean>;
-  listDueWorkflowSchedules(): Promise<WorkflowScheduleInternal[]>;
+  listDueWorkflowSchedules(): Promise<ToolScheduleInternal[]>;
   updateScheduleNextRun(params: { id: string; nextRunAt: Date; lastRunAt: Date; }): Promise<boolean>;
 }
 
-export type WorkflowScheduleInternal = WorkflowSchedule & {
+export type ToolScheduleInternal = ToolSchedule & {
   orgId: string;
 }

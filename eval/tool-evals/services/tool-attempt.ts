@@ -1,5 +1,5 @@
 import { Metadata } from "@playwright/test";
-import { Integration, SelfHealingMode, Workflow, WorkflowResult } from "@superglue/client";
+import { Integration, SelfHealingMode, Tool, ToolResult } from "@superglue/shared";
 import { generateUniqueId } from "@superglue/shared/utils";
 import { ToolBuilder } from "../../../packages/core/tools/tool-builder.js";
 import { DataStore } from "../../../packages/core/datastore/types.js";
@@ -36,7 +36,7 @@ export class SuperglueToolAttemptService {
         };
 
         const buildStart = Date.now();
-        let workflow: Workflow | undefined;
+        let workflow: Tool | undefined;
         try {
             workflow = await this.buildWorkflow(toolConfig, integrations);
 
@@ -94,7 +94,7 @@ export class SuperglueToolAttemptService {
     private async buildWorkflow(
         toolConfig: ToolConfig,
         integrations: Integration[]
-    ): Promise<Workflow> {
+    ): Promise<Tool> {
         const builder = new ToolBuilder(
             toolConfig.instruction,
             integrations,
@@ -118,10 +118,10 @@ export class SuperglueToolAttemptService {
 
     private async executeWorkflow(
         toolConfig: ToolConfig,
-        workflow: Workflow,
+        workflow: Tool,
         integrations: Integration[],
         selfHealingEnabled: boolean
-    ): Promise<WorkflowResult> {
+    ): Promise<ToolResult> {
         const executor = new ToolExecutor(
             { tool: workflow, metadata: this.metadata, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId) }
         );
@@ -145,7 +145,7 @@ export class SuperglueToolAttemptService {
         return workflowResult;
     }
 
-    private determineErrorMessage(workflowResult: WorkflowResult): string | undefined {
+    private determineErrorMessage(workflowResult: ToolResult): string | undefined {
         if (workflowResult.success) {
             return;
         }

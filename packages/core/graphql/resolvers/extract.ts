@@ -1,4 +1,4 @@
-import { ExtractInputRequest, RequestOptions } from "@superglue/client";
+import { ExtractInputRequest, RequestOptions } from "@superglue/shared";
 import { SupportedFileType } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { parseFile } from "../../files/index.js";

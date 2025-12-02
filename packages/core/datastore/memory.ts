@@ -1,14 +1,14 @@
-import { ApiConfig, Integration, RunResult, Workflow } from "@superglue/client";
+import { ApiConfig, Integration, RunResult, Tool } from "@superglue/shared";
 import { createHash } from 'node:crypto';
-import type { DataStore, WorkflowScheduleInternal } from "./types.js";
+import type { DataStore, ToolScheduleInternal } from "./types.js";
 
 export class MemoryStore implements DataStore {
   private storage: {
     apis: Map<string, ApiConfig>;
     runs: Map<string, RunResult>;
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
-    workflows: Map<string, Workflow>;
-    workflowSchedules: Map<string, WorkflowScheduleInternal>;
+    workflows: Map<string, Tool>;
+    workflowSchedules: Map<string, ToolScheduleInternal>;
     integrations: Map<string, Integration>;
   };
 
@@ -212,7 +212,7 @@ export class MemoryStore implements DataStore {
   }
 
   // Workflow Methods
-  async getWorkflow(params: { id: string; orgId?: string }): Promise<Workflow | null> {
+  async getWorkflow(params: { id: string; orgId?: string }): Promise<Tool | null> {
     const { id, orgId } = params;
     if (!id) return null;
     const key = this.getKey('workflow', id, orgId);
@@ -220,14 +220,14 @@ export class MemoryStore implements DataStore {
     return workflow ? { ...workflow, id } : null;
   }
 
-  async listWorkflows(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: Workflow[], total: number }> {
+  async listWorkflows(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: Tool[], total: number }> {
     const { limit = 10, offset = 0, orgId } = params || {};
     const items = this.getOrgItems(this.storage.workflows, 'workflow', orgId).slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.workflows, 'workflow', orgId).length;
     return { items, total };
   }
 
-  async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Workflow[]> {
+  async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Tool[]> {
     const { ids, orgId } = params;
     return ids
       .map(id => {
@@ -235,10 +235,10 @@ export class MemoryStore implements DataStore {
         const workflow = this.storage.workflows.get(key);
         return workflow ? { ...workflow, id } : null;
       })
-      .filter((w): w is Workflow => w !== null);
+      .filter((w): w is Tool => w !== null);
   }
 
-  async upsertWorkflow(params: { id: string; workflow: Workflow; orgId?: string }): Promise<Workflow> {
+  async upsertWorkflow(params: { id: string; workflow: Tool; orgId?: string }): Promise<Tool> {
     const { id, workflow, orgId } = params;
     if (!id || !workflow) return null;
     const key = this.getKey('workflow', id, orgId);
@@ -252,7 +252,7 @@ export class MemoryStore implements DataStore {
     return this.storage.workflows.delete(key);
   }
 
-  async renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Workflow> {
+  async renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Tool> {
     const { oldId, newId, orgId } = params;
     
     // Check if newId already exists
@@ -269,7 +269,7 @@ export class MemoryStore implements DataStore {
     }
 
     // Create new workflow with newId
-    const newWorkflow: Workflow = {
+    const newWorkflow: Tool = {
       ...oldWorkflow,
       id: newId,
       updatedAt: new Date()
@@ -344,13 +344,13 @@ export class MemoryStore implements DataStore {
   }
 
   // Workflow Schedule Methods
-  async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]> {
+  async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<ToolScheduleInternal[]> {
     const { workflowId, orgId } = params;
     return this.getOrgItems(this.storage.workflowSchedules, 'workflow-schedule', orgId)
       .filter(schedule => schedule.workflowId === workflowId);
   }
 
-  async getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<WorkflowScheduleInternal | null> {
+  async getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<ToolScheduleInternal | null> {
     const { id, orgId } = params;
     if (!id) return null;
     const key = this.getKey('workflow-schedule', id, orgId);
@@ -358,7 +358,7 @@ export class MemoryStore implements DataStore {
     return schedule ? { ...schedule, id } : null;
   }
 
-  async upsertWorkflowSchedule(params: { schedule: WorkflowScheduleInternal }): Promise<void> {
+  async upsertWorkflowSchedule(params: { schedule: ToolScheduleInternal }): Promise<void> {
     const { schedule } = params;
     if (!schedule || !schedule.id) return;
     const key = this.getKey('workflow-schedule', schedule.id, schedule.orgId);
@@ -372,7 +372,7 @@ export class MemoryStore implements DataStore {
     return this.storage.workflowSchedules.delete(key);
   }
 
-  async listDueWorkflowSchedules(): Promise<WorkflowScheduleInternal[]> {
+  async listDueWorkflowSchedules(): Promise<ToolScheduleInternal[]> {
     const now = new Date();
     return Array.from(this.storage.workflowSchedules.entries())
       .filter(([key]) => key.includes(':workflow-schedule:'))

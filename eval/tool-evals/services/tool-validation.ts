@@ -1,5 +1,5 @@
 import { ToolConfig, ValidationResult, ValidationLLMConfig, AttemptStatus } from "../types.js";
-import { WorkflowResult } from "@superglue/client";
+import { ToolResult } from "@superglue/shared";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
 import { z } from "zod";
@@ -25,7 +25,7 @@ export class ToolValidationService {
 
     public async validate(
         toolConfig: ToolConfig,
-        workflowResult: WorkflowResult
+        workflowResult: ToolResult
     ): Promise<ValidationResult> {
         const skipFunction = toolConfig.skipValidationFunction === true;
 
@@ -115,7 +115,7 @@ export class ToolValidationService {
 
     private async runValidationFunction(
         toolConfig: ToolConfig,
-        workflowResult: WorkflowResult
+        workflowResult: ToolResult
     ): Promise<void> {
         if (!toolConfig.validationFunction) {
             return;
@@ -136,7 +136,7 @@ export class ToolValidationService {
 
     private async runLLMJudge(
         toolConfig: ToolConfig,
-        workflowResult: WorkflowResult,
+        workflowResult: ToolResult,
         functionError?: string
     ): Promise<z.infer<typeof llmJudgmentSchema>> {
         const outputStr = JSON.stringify(workflowResult.data);

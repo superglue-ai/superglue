@@ -1,4 +1,4 @@
-import { ApiConfig } from "@superglue/client";
+import { ApiConfig } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { Context } from '../types.js';
 

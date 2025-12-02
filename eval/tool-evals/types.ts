@@ -1,4 +1,4 @@
-import { Workflow, WorkflowResult } from "@superglue/client";
+import { Workflow, WorkflowResult } from "@superglue/shared";
 
 export interface IntegrationConfig {
     id: string;

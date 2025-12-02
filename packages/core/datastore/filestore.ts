@@ -1,16 +1,16 @@
-import type { ApiConfig, Integration, RunResult, Workflow } from "@superglue/client";
+import type { ApiConfig, Integration, RunResult, Tool } from "@superglue/shared";
 import fs from 'node:fs';
 import path from 'node:path';
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
-import type { DataStore, WorkflowScheduleInternal } from "./types.js";
+import type { DataStore, ToolScheduleInternal } from "./types.js";
 
 export class FileStore implements DataStore {
 
   private storage: {
     apis: Map<string, ApiConfig>;
-    workflows: Map<string, Workflow>;
-    workflowSchedules: Map<string, WorkflowScheduleInternal>;
+    workflows: Map<string, Tool>;
+    workflowSchedules: Map<string, ToolScheduleInternal>;
     integrations: Map<string, Integration>;
     tenant: {
       email: string | null;
@@ -475,7 +475,7 @@ export class FileStore implements DataStore {
   }
 
   // Workflow Methods
-  async getWorkflow(params: { id: string; orgId?: string }): Promise<Workflow | null> {
+  async getWorkflow(params: { id: string; orgId?: string }): Promise<Tool | null> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return null;
@@ -484,7 +484,7 @@ export class FileStore implements DataStore {
     return workflow ? { ...workflow, id } : null;
   }
 
-  async listWorkflows(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: Workflow[], total: number }> {
+  async listWorkflows(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: Tool[], total: number }> {
     await this.ensureInitialized();
     const { limit = 10, offset = 0, orgId } = params || {};
     const items = this.getOrgItems(this.storage.workflows, 'workflow', orgId)
@@ -493,7 +493,7 @@ export class FileStore implements DataStore {
     return { items, total };
   }
 
-  async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Workflow[]> {
+  async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Tool[]> {
     await this.ensureInitialized();
     const { ids, orgId } = params;
     return ids
@@ -502,10 +502,10 @@ export class FileStore implements DataStore {
         const workflow = this.storage.workflows.get(key);
         return workflow ? { ...workflow, id } : null;
       })
-      .filter((w): w is Workflow => w !== null);
+      .filter((w): w is Tool => w !== null);
   }
 
-  async upsertWorkflow(params: { id: string; workflow: Workflow; orgId?: string }): Promise<Workflow> {
+  async upsertWorkflow(params: { id: string; workflow: Tool; orgId?: string }): Promise<Tool> {
     await this.ensureInitialized();
     const { id, workflow, orgId } = params;
     if (!id || !workflow) return null;
@@ -525,7 +525,7 @@ export class FileStore implements DataStore {
     return deleted;
   }
 
-  async renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Workflow> {
+  async renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Tool> {
     await this.ensureInitialized();
     const { oldId, newId, orgId } = params;
     
@@ -543,7 +543,7 @@ export class FileStore implements DataStore {
     }
 
     // Create new workflow with newId
-    const newWorkflow: Workflow = {
+    const newWorkflow: Tool = {
       ...oldWorkflow,
       id: newId,
       updatedAt: new Date()
@@ -656,14 +656,14 @@ export class FileStore implements DataStore {
   }
 
   // Workflow Schedule Methods
-  async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]> {
+  async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<ToolScheduleInternal[]> {
     await this.ensureInitialized();
     const { workflowId, orgId } = params;
     return this.getOrgItems(this.storage.workflowSchedules, 'workflow-schedule', orgId)
       .filter(schedule => schedule.workflowId === workflowId);
   }
 
-  async getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<WorkflowScheduleInternal | null> {
+  async getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<ToolScheduleInternal | null> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return null;
@@ -672,7 +672,7 @@ export class FileStore implements DataStore {
     return schedule ? { ...schedule, id } : null;
   }
 
-  async upsertWorkflowSchedule(params: { schedule: WorkflowScheduleInternal }): Promise<void> {
+  async upsertWorkflowSchedule(params: { schedule: ToolScheduleInternal }): Promise<void> {
     await this.ensureInitialized();
     const { schedule } = params;
     if (!schedule || !schedule.id) return;
@@ -691,7 +691,7 @@ export class FileStore implements DataStore {
     return deleted;
   }
 
-  async listDueWorkflowSchedules(): Promise<WorkflowScheduleInternal[]> {
+  async listDueWorkflowSchedules(): Promise<ToolScheduleInternal[]> {
     await this.ensureInitialized();
     const now = new Date();
     return Array.from(this.storage.workflowSchedules.entries())

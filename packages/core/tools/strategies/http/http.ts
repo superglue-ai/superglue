@@ -1,4 +1,4 @@
-import { ApiConfig as StepConfig, HttpMethod, PaginationType, RequestOptions } from "@superglue/client";
+import { ApiConfig as StepConfig, HttpMethod, PaginationType, RequestOptions } from "@superglue/shared";
 import { maskCredentials, SupportedFileType } from "@superglue/shared";
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import https from 'https';

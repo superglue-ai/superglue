@@ -4,7 +4,7 @@
  * Attempts to fetch GraphQL schema through introspection queries.
  */
 
-import { ApiConfig } from "@superglue/client";
+import { ApiConfig } from "@superglue/shared";
 import { Metadata } from "@superglue/shared";
 import axios from "axios";
 import { getIntrospectionQuery } from "graphql";

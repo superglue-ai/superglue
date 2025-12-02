@@ -1,7 +1,7 @@
 import { useConfig } from '@/src/app/config-context';
 import { useIntegrations } from '@/src/app/integrations-context';
 import { useToast } from '@/src/hooks/use-toast';
-import { Workflow as Tool } from '@superglue/client';
+import { Tool } from '@superglue/shared';
 import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';

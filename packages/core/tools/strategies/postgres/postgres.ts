@@ -1,4 +1,4 @@
-import { ApiConfig as StepConfig, RequestOptions, HttpMethod } from "@superglue/client";
+import { ApiConfig as StepConfig, RequestOptions, HttpMethod } from "@superglue/shared";
 import { Pool, PoolConfig } from 'pg';
 import { server_defaults } from "../../../default.js";
 import { parseJSON } from "../../../files/index.js";

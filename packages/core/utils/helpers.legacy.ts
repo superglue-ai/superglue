@@ -1,4 +1,4 @@
-import { BaseConfig, JSONata, JSONSchema, RequestOptions } from "@superglue/client";
+import { BaseConfig, JSONata, JSONSchema, RequestOptions } from "@superglue/shared";
 import type { DataStore, Metadata } from "@superglue/shared";
 import { generateWorkingTransform } from "../tools/tool-transform.js";
 import { isSelfHealingEnabled, transformData, validateSchema } from "./helpers.js";
@@ -71,9 +71,10 @@ export async function executeTransformLegacy(args: {
   metadata: Metadata
 }): Promise<{ data?: any; config?: TransformConfig }> {
   const { datastore, fromCache, input, data, metadata, options } = args;
-  let currentConfig = input.endpoint;
-  if (fromCache && datastore) {
-    const cached = await datastore.getTransformConfig(input.id || input.endpoint.id, metadata.orgId);
+  let currentConfig: TransformConfig | undefined = input.endpoint;
+  if (fromCache && datastore && input.endpoint) {
+    const configId = input.id || (input.endpoint as any).id || '';
+    const cached = await datastore.getTransformConfig(configId, metadata.orgId);
     if (cached) {
       currentConfig = { ...cached, ...input.endpoint };
     }
@@ -133,12 +134,12 @@ export async function executeTransformLegacy(args: {
     }
 
     currentConfig = {
-      id: crypto.randomUUID(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
       ...currentConfig,
-      responseMapping: result.transformCode
-    };
+      responseMapping: result.transformCode,
+      id: (currentConfig as any).id || crypto.randomUUID(),
+      createdAt: (currentConfig as any).createdAt || new Date(),
+      updatedAt: new Date()
+    } as any;
 
     return {
       data: data,

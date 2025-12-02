@@ -10,7 +10,7 @@ import {
 } from "@/src/components/ui/accordion";
 import { Button } from "@/src/components/ui/button";
 import { composeUrl } from '@/src/lib/general-utils';
-import { ApiConfig, SuperglueClient } from '@superglue/client';
+import { ApiConfig, SuperglueClient } from '@superglue/shared';
 import { ExternalLink } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import React from 'react';

@@ -1,11 +1,11 @@
-import type { ApiConfig, Integration, RunResult, Workflow } from "@superglue/client";
+import type { ApiConfig, Integration, RunResult, Tool, Workflow } from "@superglue/shared";
 import { Pool, PoolConfig } from 'pg';
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
-import type { DataStore, WorkflowScheduleInternal } from "./types.js";
+import type { DataStore, ToolScheduleInternal } from "./types.js";
 
 type ConfigType = 'api' | 'workflow';
-type ConfigData = ApiConfig | Workflow;
+type ConfigData = ApiConfig | Tool;
 
 export class PostgresService implements DataStore {
     private pool: Pool;
@@ -564,7 +564,7 @@ export class PostgresService implements DataStore {
     }
 
     // Workflow Schedule Methods
-    async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]> {
+    async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<ToolScheduleInternal[]> {
         const client = await this.pool.connect();
 
         try {
@@ -577,7 +577,7 @@ export class PostgresService implements DataStore {
         }
     }
 
-    async getWorkflowSchedule({ id, orgId }: { id: string; orgId?: string }): Promise<WorkflowScheduleInternal | null> {
+    async getWorkflowSchedule({ id, orgId }: { id: string; orgId?: string }): Promise<ToolScheduleInternal | null> {
         const client = await this.pool.connect();
         try {
             const query = 'SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE id = $1 AND org_id = $2';
@@ -593,7 +593,7 @@ export class PostgresService implements DataStore {
         }
     }
 
-    async upsertWorkflowSchedule({ schedule }: { schedule: WorkflowScheduleInternal }): Promise<void> {
+    async upsertWorkflowSchedule({ schedule }: { schedule: ToolScheduleInternal }): Promise<void> {
         const client = await this.pool.connect();
         try {
             const query = `
@@ -642,7 +642,7 @@ export class PostgresService implements DataStore {
         }
     }
 
-    async listDueWorkflowSchedules(): Promise<WorkflowScheduleInternal[]> {
+    async listDueWorkflowSchedules(): Promise<ToolScheduleInternal[]> {
         const client = await this.pool.connect();
 
         // We check for schedules that are enabled and have a next run time that is in the past (all timestamps in the database are in UTC)
@@ -668,7 +668,7 @@ export class PostgresService implements DataStore {
         }
     }
 
-    private mapWorkflowSchedule(row: any): WorkflowScheduleInternal {
+    private mapWorkflowSchedule(row: any): ToolScheduleInternal {
         return {
             id: row.id,
             workflowId: row.workflow_id,

@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, Integration, SelfHealingMode } from '@superglue/client';
+import { ApiConfig, HttpMethod, Integration, SelfHealingMode } from '@superglue/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryStore } from '../datastore/memory.js';
 import { IntegrationManager } from '../integrations/integration-manager.js';

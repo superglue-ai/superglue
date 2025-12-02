@@ -6,7 +6,7 @@ import { useTools } from "@/src/app/tools-context";
 import { createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, computeStepOutput, computeToolPayload, removeFileKeysFromPayload, wrapLoopSelectorWithLimit } from "@/src/lib/general-utils";
-import { ExecutionStep, Integration, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
+import { ExecutionStep, Integration, Tool, ToolResult } from "@superglue/shared";
 import { generateDefaultFromSchema } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import isEqual from "lodash.isequal";
