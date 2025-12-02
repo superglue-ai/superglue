@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "tsx index.ts"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@superglue/client": "^2.3.62",
@@ -12,9 +13,10 @@
   },
   "devDependencies": {
     "@types/node": "^20.17.19",
+    "@vitest/ui": "^4.0.14",
     "dotenv": "^16.4.7",
     "tsx": "^4.20.6",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^4.0.14"
   }
 }
-

@@ -6,29 +6,34 @@ const INTEGRATION_ID = 'github-test';
 let client: SuperglueClient;
 let toolId: string | null = null;
 
-const endpoint = process.env.GRAPHQL_ENDPOINT || 'http://localhost:3000';
-const apiKey = process.env.AUTH_TOKEN;
-const githubToken = process.env.GITHUB_API_TOKEN;
-
 beforeAll(() => {
+  const endpoint = process.env.GRAPHQL_ENDPOINT || 'http://localhost:3000';
+  const apiKey = process.env.AUTH_TOKEN;
+  const githubToken = process.env.GITHUB_API_TOKEN;
+
   if (!apiKey) {
     throw new Error('AUTH_TOKEN environment variable is required');
   }
   if (!githubToken) {
     throw new Error('GITHUB_API_TOKEN environment variable is required');
   }
+  
   client = new SuperglueClient({ endpoint, apiKey });
 });
 
 afterAll(async () => {
-  if (toolId) {
-    await client.deleteWorkflow(toolId).catch(() => {});
+  if (client) {
+    if (toolId) {
+      await client.deleteWorkflow(toolId).catch(() => {});
+    }
+    await client.deleteIntegration(INTEGRATION_ID).catch(() => {});
   }
-  await client.deleteIntegration(INTEGRATION_ID).catch(() => {});
 });
 
 describe('Superglue SDK Integration Tests', () => {
   it('should create GitHub integration', async () => {
+    const githubToken = process.env.GITHUB_API_TOKEN!;
+    
     const integration = await client.upsertIntegration(INTEGRATION_ID, {
       name: 'GitHub',
       urlHost: 'https://api.github.com',
@@ -77,6 +82,8 @@ describe('Superglue SDK Integration Tests', () => {
 
   it('should execute the workflow', async () => {
     expect(toolId).toBeDefined();
+    
+    const githubToken = process.env.GITHUB_API_TOKEN!;
 
     const result = await client.executeWorkflow({
       id: toolId!,

@@ -187,7 +187,7 @@ async function runTests() {
     let stdout = '';
     let stderr = '';
     
-    const testProcess = spawn('npx', ['tsx', 'index.ts'], {
+    const testProcess = spawn('npm', ['test'], {
       cwd: __dirname,
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: true,
@@ -246,14 +246,7 @@ async function main() {
     log('='.repeat(60));
     // Run the tests
     await runTests();
-    
-    log('='.repeat(60));
-    log('✅ All tests completed successfully!');
-    log('='.repeat(60));
   } catch (error) {
-    log('='.repeat(60));
-    log(`❌ Error: ${error.message}`);
-    log('='.repeat(60));
     exitCode = 1;
   } finally {
     // Always stop the server
