@@ -1,5 +1,5 @@
 import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
+import { createSuperglueClient } from '@/src/lib/client-utils';
 import { useState } from 'react';
 
 interface GenerateTransformParams {
@@ -20,51 +20,17 @@ export function useGenerateTransform() {
         setError(null);
 
         try {
-            const query = `
-                mutation GenerateTransform(
-                    $currentTransform: String!,
-                    $responseSchema: JSONSchema,
-                    $stepData: JSON!,
-                    $errorMessage: String,
-                    $instruction: String
-                ) {
-                    generateTransform(
-                        currentTransform: $currentTransform,
-                        responseSchema: $responseSchema,
-                        stepData: $stepData,
-                        errorMessage: $errorMessage,
-                        instruction: $instruction
-                    ) {
-                        transformCode
-                    }
-                }
-            `;
-
-            const response = await fetch(config.superglueEndpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${tokenRegistry.getToken()}`,
-                },
-                body: JSON.stringify({
-                    query,
-                    variables: {
-                        currentTransform: params.currentTransform,
-                        responseSchema: params.responseSchema,
-                        stepData: params.stepData,
-                        errorMessage: params.errorMessage,
-                        instruction: params.instruction,
-                    },
-                }),
+            const client = createSuperglueClient(config.superglueEndpoint);
+            
+            const transformCode = await client.generateTransform({
+                currentTransform: params.currentTransform,
+                responseSchema: params.responseSchema,
+                stepData: params.stepData,
+                errorMessage: params.errorMessage,
+                instruction: params.instruction,
             });
 
-            const json = await response.json();
-
-            if (json.errors) {
-                throw new Error(json.errors[0]?.message || 'Failed to generate transform');
-            }
-
-            return json.data.generateTransform.transformCode;
+            return transformCode;
         } catch (err: any) {
             const errorMessage = err?.message || 'Failed to generate transform code';
             setError(errorMessage);
@@ -80,4 +46,3 @@ export function useGenerateTransform() {
         error,
     };
 }
-
