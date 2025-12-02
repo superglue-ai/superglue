@@ -20,7 +20,7 @@ export class WebSocketManager {
   private subscriptions: Map<string, () => void> = new Map();
 
   constructor(endpoint: string, apiKey: string) {
-    this.wsEndpoint = endpoint.replace('https', 'wss').replace('http', 'ws');
+    this.wsEndpoint = endpoint.replace('https:', 'wss:').replace('http:', 'ws:');
     this.apiKey = apiKey;
   }
 
