@@ -91,7 +91,7 @@ export const callResolver = async (
 
     // Notify webhook if configured
     if (options?.webhookUrl) {
-      notifyWebhook(options.webhookUrl, runId, context.traceId, true, transformResult.data);
+      notifyWebhook(options.webhookUrl, runId, true, transformResult.data, undefined, metadata);
     }
 
     const result = {
@@ -110,7 +110,7 @@ export const callResolver = async (
     const runId = crypto.randomUUID();
 
     if (options?.webhookUrl) {
-      notifyWebhook(options.webhookUrl, runId, context.traceId, false, undefined, error.message);
+      notifyWebhook(options.webhookUrl, runId, false, undefined, error.message, metadata);
     }
     const result = {
       id: runId,
