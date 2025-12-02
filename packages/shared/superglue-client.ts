@@ -1091,5 +1091,36 @@ export class SuperglueClient {
         }
         return instructions;
     }
+
+    async generateTransform(args: {
+        currentTransform: string;
+        responseSchema?: any;
+        stepData: Record<string, any>;
+        errorMessage?: string;
+        instruction?: string;
+    }): Promise<string> {
+        const mutation = `
+            mutation GenerateTransform(
+                $currentTransform: String!,
+                $responseSchema: JSONSchema,
+                $stepData: JSON!,
+                $errorMessage: String,
+                $instruction: String
+            ) {
+                generateTransform(
+                    currentTransform: $currentTransform,
+                    responseSchema: $responseSchema,
+                    stepData: $stepData,
+                    errorMessage: $errorMessage,
+                    instruction: $instruction
+                ) {
+                    transformCode
+                }
+            }
+        `;
+
+        const response = await this.request<{ generateTransform: { transformCode: string } }>(mutation, args);
+        return response.generateTransform.transformCode;
+    }
 }
 

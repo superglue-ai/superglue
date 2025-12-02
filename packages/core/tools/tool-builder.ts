@@ -1,5 +1,4 @@
-import { HttpMethod, Integration, Tool } from "@superglue/shared";
-import { convertRequiredToArray, Metadata, toJsonSchema } from "@superglue/shared";
+import { convertRequiredToArray, HttpMethod, Integration, Metadata, toJsonSchema, Tool } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import z from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -96,7 +95,7 @@ export class ToolBuilder {
       });
     }
 
-    if(!hasSteps && !Object.keys(this.initialPayload)) {
+    if(!hasSteps && Object.keys(this.initialPayload).length === 0) {
       errors.push("Tool is missing steps and initial payload. You probably need to add steps.");
     }
 

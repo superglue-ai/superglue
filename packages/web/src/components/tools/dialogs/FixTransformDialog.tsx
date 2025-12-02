@@ -65,7 +65,7 @@ export function FixTransformDialog({
         } catch (err: any) {
             toast({
                 title: 'Failed to fix transform',
-                description: error || err?.message || 'An error occurred while generating the transform.',
+                description: err?.message || 'An error occurred while generating the transform.',
                 variant: 'destructive',
             });
         }
