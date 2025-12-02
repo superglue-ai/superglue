@@ -179,9 +179,9 @@ export const generateTransformResolver = async (
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
 
-    const prompt = instruction || "Fix the transformation code." +
-      (errorMessage ? ` Error: ${errorMessage}` : "") +
-      (currentTransform ? ` Originally, we used the following transformation, fix it: ${currentTransform}` : "");
+    const prompt = (instruction || "Create transformation code.") +
+      (currentTransform ? `\nOriginally, we used the following transformation: ${currentTransform}` : "") +
+      (errorMessage ? `\nThe transformation failed with the following error: ${errorMessage}` : "");
 
     const result = await generateWorkingTransform({
       targetSchema: responseSchema,
