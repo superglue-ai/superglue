@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useConfig } from '@/src/app/config-context';
-import { ApiConfig, SuperglueClient } from '@superglue/client';
+import { ApiConfig, SuperglueClient } from '@superglue/shared';
 import { tokenRegistry } from '@/src/lib/token-registry';
 
 interface GenerateStepConfigParams {

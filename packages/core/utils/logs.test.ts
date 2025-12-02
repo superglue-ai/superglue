@@ -1,4 +1,4 @@
-import { LogEntry } from '@superglue/shared';
+import { Log } from '@superglue/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { logEmitter, logger, logMessage } from './logs.js';
 
@@ -43,7 +43,7 @@ describe('Logging Module', () => {
       const testMessage = 'test log message'
       const testMetadata = { orgId: 'test-org' }
 
-      logEmitter.once('log', (logEntry: LogEntry) => {
+      logEmitter.once('log', (logEntry: Log) => {
         expect(logEntry).toMatchObject({
           message: testMessage,
           level: 'INFO',
@@ -58,7 +58,7 @@ describe('Logging Module', () => {
 
     it('generates unique IDs for each log entry', () => {
       const logIds = new Set()
-      const listener = (logEntry: LogEntry) => {
+      const listener = (logEntry: Log) => {
         logIds.add(logEntry.id)
       }
 

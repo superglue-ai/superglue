@@ -1,11 +1,11 @@
-import { WorkflowSchedule } from "@superglue/client";
+import { ToolSchedule } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { WorkflowScheduleInternal } from "../../datastore/types.js";
+import { ToolScheduleInternal } from "../../datastore/types.js";
 import { WorkflowScheduler } from "../../scheduler/scheduler-service.js";
 import { logMessage } from "../../utils/logs.js";
 import { Context } from "../types.js";
 
-function toPublicSchedule(internal: WorkflowScheduleInternal): WorkflowSchedule {
+function toPublicSchedule(internal: ToolScheduleInternal): ToolSchedule {
     return {
         id: internal.id,
         workflowId: internal.workflowId,
@@ -29,7 +29,7 @@ export const listWorkflowSchedulesResolver = async (
 ) => {
     try {
         const workflowSchedulerService = new WorkflowScheduler(context.datastore);
-        const schedulesInternal: WorkflowScheduleInternal[] =  await workflowSchedulerService.listWorkflowSchedules({ workflowId, orgId: context.orgId });
+        const schedulesInternal: ToolScheduleInternal[] =  await workflowSchedulerService.listWorkflowSchedules({ workflowId, orgId: context.orgId });
         
         return schedulesInternal.map(toPublicSchedule);
     } catch (error) {
@@ -55,7 +55,7 @@ export const upsertWorkflowScheduleResolver = async (
   { schedule }: UpsertWorkflowScheduleArgs,
   context: Context,
   info: GraphQLResolveInfo
-): Promise<WorkflowSchedule> => {
+): Promise<ToolSchedule> => {
     try {
         const workflowSchedulerService = new WorkflowScheduler(context.datastore);
 

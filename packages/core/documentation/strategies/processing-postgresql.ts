@@ -4,7 +4,7 @@
  * Generates database schema documentation for PostgreSQL connections.
  */
 
-import { ApiConfig } from "@superglue/client";
+import { ApiConfig } from "@superglue/shared";
 import { Metadata } from "@superglue/shared";
 import { callPostgres } from '../../tools/strategies/postgres/postgres.js';
 import { logMessage } from "../../utils/logs.js";

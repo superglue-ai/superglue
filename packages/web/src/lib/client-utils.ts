@@ -1,4 +1,4 @@
-import { ExecutionStep, Integration, SelfHealingMode, SuperglueClient, Workflow as Tool } from "@superglue/client";
+import { ExecutionStep, Integration, SelfHealingMode, SuperglueClient, Tool } from "@superglue/shared";
 import { tokenRegistry } from "./token-registry";
 
 const BASE62_REGEX = /^[a-zA-Z0-9_-]*$/;
@@ -76,7 +76,7 @@ export async function executeSingleStep({
     };
 
     const result = await client.executeWorkflow({
-      workflow: singleStepTool,
+      tool: singleStepTool,
       payload: executionPayload,
       options: {
         testMode: selfHealing,
@@ -251,7 +251,7 @@ export async function executeFinalTransform(
       ...previousResults
     };
     const result = await client.executeWorkflow({
-      workflow: {
+      tool: {
         id: `${toolId}_final_transform`,
         steps: [],
         finalTransform,

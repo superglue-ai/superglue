@@ -3,7 +3,7 @@
 import { useConfig } from '@/src/app/config-context';
 import { useToast } from '@/src/hooks/use-toast';
 import { tokenRegistry } from '@/src/lib/token-registry';
-import { ApiConfig, CacheMode, SuperglueClient } from '@superglue/client';
+import { ApiConfig, CacheMode, SuperglueClient } from '@superglue/shared';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AutoSizer, List } from 'react-virtualized';

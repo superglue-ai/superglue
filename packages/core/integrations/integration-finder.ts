@@ -1,4 +1,4 @@
-import { Integration } from "@superglue/client";
+import { Integration } from "@superglue/shared";
 import { Metadata } from "@superglue/shared";
 import { logMessage } from "../utils/logs.js";
 

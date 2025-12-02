@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, Workflow } from '@superglue/client';
+import { ApiConfig, HttpMethod, Tool } from '@superglue/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as logs from '../utils/logs.js';
 import { ToolFinder } from './tool-finder.js';
@@ -9,7 +9,7 @@ vi.mock('../utils/logs.js', () => ({
 
 describe('ToolFinder', () => {
   let toolFinder: ToolFinder;
-  let mockTools: Workflow[];
+  let mockTools: Tool[];
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -222,7 +222,7 @@ describe('ToolFinder', () => {
     });
 
     it('should handle tools with multiple steps', async () => {
-      const complexTool: Workflow = {
+      const complexTool: Tool = {
         id: 'complex-workflow',
         instruction: 'Complex workflow with multiple steps',
         steps: [
@@ -264,7 +264,7 @@ describe('ToolFinder', () => {
     });
 
     it('should handle tools without integration IDs', async () => {
-      const simpleWorkflow: Workflow = {
+      const simpleWorkflow: Tool = {
         id: 'simple-http-call',
         instruction: 'Make a simple HTTP call',
         steps: [
@@ -304,7 +304,7 @@ describe('ToolFinder', () => {
     });
 
     it('should sort results by score (most matches first)', async () => {
-      const highScoreTool: Workflow = {
+      const highScoreTool: Tool = {
         id: 'high-score-tool',
         instruction: 'Notification alert message notification',
         steps: [
@@ -323,7 +323,7 @@ describe('ToolFinder', () => {
         ],
       };
 
-      const lowScoreTool: Workflow = {
+      const lowScoreTool: Tool = {
         id: 'low-score-tool',
         instruction: 'Process data',
         steps: [
@@ -355,7 +355,7 @@ describe('ToolFinder', () => {
 
   describe('edge cases', () => {
     it('should handle tools with undefined instruction', async () => {
-      const toolWithoutInstruction: Workflow = {
+      const toolWithoutInstruction: Tool = {
         id: 'no-instruction-tool',
         steps: [
           {
@@ -381,7 +381,7 @@ describe('ToolFinder', () => {
     });
 
     it('should handle tools with empty steps array', async () => {
-      const toolWithNoSteps: Workflow = {
+      const toolWithNoSteps: Tool = {
         id: 'empty-steps-tool',
         instruction: 'Tool with no steps',
         steps: [],
@@ -395,7 +395,7 @@ describe('ToolFinder', () => {
     });
 
     it('should handle steps with null apiConfig', async () => {
-      const toolWithNullConfig: Workflow = {
+      const toolWithNullConfig: Tool = {
         id: 'null-config-tool',
         instruction: 'Tool with null config',
         steps: [
@@ -415,7 +415,7 @@ describe('ToolFinder', () => {
     });
 
     it('should handle steps with undefined apiConfig instruction', async () => {
-      const toolWithUndefinedInstruction: Workflow = {
+      const toolWithUndefinedInstruction: Tool = {
         id: 'undefined-instruction-tool',
         instruction: 'Tool with undefined step instruction',
         steps: [
@@ -430,7 +430,7 @@ describe('ToolFinder', () => {
             } as unknown as ApiConfig,
           },
         ],
-      } as Workflow;
+      } as Tool;
 
       const results = await toolFinder.findTools('test', [toolWithUndefinedInstruction]);
       expect(results).toHaveLength(1);
@@ -438,7 +438,7 @@ describe('ToolFinder', () => {
     });
 
     it('should handle special characters in query', async () => {
-      const toolWithSpecialChars: Workflow = {
+      const toolWithSpecialChars: Tool = {
         id: 'special-chars-tool',
         instruction: 'Tool with special chars @#$%',
         steps: [
@@ -474,7 +474,7 @@ describe('ToolFinder', () => {
     });
 
     it('should handle unicode characters in query', async () => {
-      const toolWithUnicode: Workflow = {
+      const toolWithUnicode: Tool = {
         id: 'unicode-tool',
         instruction: 'Send notification to 用户',
         steps: [
@@ -500,7 +500,7 @@ describe('ToolFinder', () => {
     });
 
     it('should handle regex special characters in query', async () => {
-      const toolWithRegexChars: Workflow = {
+      const toolWithRegexChars: Tool = {
         id: 'regex-tool',
         instruction: 'Process data with pattern [a-z]+ and (test)',
         steps: [
@@ -525,7 +525,7 @@ describe('ToolFinder', () => {
     });
 
     it('should handle tools with null values in various fields', async () => {
-      const toolWithNulls: Workflow = {
+      const toolWithNulls: Tool = {
         id: 'null-fields-tool',
         instruction: null as any,
         inputSchema: null as any,
@@ -555,7 +555,7 @@ describe('ToolFinder', () => {
 
     it('should handle tools with very long text content', async () => {
       const longInstruction = 'A'.repeat(10000);
-      const toolWithLongText: Workflow = {
+      const toolWithLongText: Tool = {
         id: 'long-text-tool',
         instruction: longInstruction,
         steps: [
@@ -580,7 +580,7 @@ describe('ToolFinder', () => {
     });
 
     it('should handle empty string in step integrationId', async () => {
-      const toolWithEmptyIntegrationId: Workflow = {
+      const toolWithEmptyIntegrationId: Tool = {
         id: 'empty-integration-id',
         instruction: 'Tool with empty integration ID',
         steps: [
@@ -623,7 +623,7 @@ describe('ToolFinder', () => {
     });
 
     it('should handle tools with complex nested schemas', async () => {
-      const toolWithSchemas: Workflow = {
+      const toolWithSchemas: Tool = {
         id: 'complex-schema-tool',
         instruction: 'Tool with complex schemas',
         inputSchema: {
@@ -669,7 +669,7 @@ describe('ToolFinder', () => {
     });
 
     it('should handle multiple tools with same score (stable sort)', async () => {
-      const tool1: Workflow = {
+      const tool1: Tool = {
         id: 'tool-a',
         instruction: 'Process data',
         steps: [
@@ -687,7 +687,7 @@ describe('ToolFinder', () => {
         ],
       };
 
-      const tool2: Workflow = {
+      const tool2: Tool = {
         id: 'tool-b',
         instruction: 'Process information',
         steps: [
@@ -705,7 +705,7 @@ describe('ToolFinder', () => {
         ],
       };
 
-      const tool3: Workflow = {
+      const tool3: Tool = {
         id: 'tool-c',
         instruction: 'Process records',
         steps: [
@@ -753,7 +753,7 @@ describe('ToolFinder', () => {
     });
 
     it('should handle extremely large number of tools efficiently', async () => {
-      const manyTools: Workflow[] = [];
+      const manyTools: Tool[] = [];
       for (let i = 0; i < 1000; i++) {
         manyTools.push({
           id: `tool-${i}`,

@@ -1,4 +1,4 @@
-import { LogEntry } from "@superglue/shared";
+import { Log } from "@superglue/shared";
 import { EventEmitter } from 'events';
 import { logEmitter } from '../../utils/logs.js';
 import { Context } from '../types.js';
@@ -11,7 +11,7 @@ export const logsResolver = {
                 const emitter = new EventEmitter();
 
                 // Handler for new logs
-                const logHandler = (log: LogEntry) => {
+                const logHandler = (log: Log) => {
                     if (log.orgId === orgId) {
                         // Add small delay to ensure subscription is ready
                         setTimeout(() => {

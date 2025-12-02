@@ -1,4 +1,4 @@
-import { Workflow as Tool } from '@superglue/client'
+import { Tool } from '@superglue/shared'
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react'
 import { useConfig } from './config-context'
 import { loadFromCache, saveToCache } from '@/src/lib/cache-utils'

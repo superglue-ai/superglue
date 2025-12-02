@@ -55,7 +55,7 @@ import {
 import { useToast } from "@/src/hooks/use-toast";
 import { isJsonEmpty } from '@/src/lib/client-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
-import { ApiConfig, AuthType, CacheMode, HttpMethod, PaginationType, SuperglueClient } from '@superglue/client';
+import { ApiConfig, AuthType, CacheMode, HttpMethod, PaginationType, SuperglueClient } from '@superglue/shared';
 import { ArrowLeft, Info } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React from 'react';

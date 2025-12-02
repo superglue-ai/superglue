@@ -1,5 +1,4 @@
-import { Integration, JSONSchema, ExecutionStep, ApiConfig } from "@superglue/client";
-import { IntegrationManager } from "../integrations/integration-manager.js";
+import { Integration, JSONSchema, ApiConfig } from "@superglue/shared";
 
 export type ObjectContextOptions = {
     characterBudget: number;

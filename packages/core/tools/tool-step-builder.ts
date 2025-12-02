@@ -1,4 +1,4 @@
-import { ApiConfig, ExecutionStep, HttpMethod, Integration, Pagination } from "@superglue/client";
+import { ApiConfig, HttpMethod, Integration, Pagination } from "@superglue/shared";
 import { LLMMessage, LLMToolWithContext } from "../llm/llm-base-model.js";
 import { LanguageModel } from "../llm/llm-base-model.js";
 import { getWebSearchTool, searchDocumentationToolDefinition } from "../llm/llm-tools.js";

@@ -1,7 +1,7 @@
-import { ApiConfig, HttpMethod, Integration, RunResult, Workflow } from '@superglue/client';
+import { ApiConfig, HttpMethod, Integration, RunResult, Tool } from '@superglue/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MemoryStore } from './memory.js';
-import { WorkflowScheduleInternal } from './types.js';
+import { ToolScheduleInternal } from './types.js';
 
 describe('MemoryStore', () => {
   let store: MemoryStore;
@@ -244,7 +244,7 @@ describe('MemoryStore', () => {
   });
 
   describe('Workflow', () => {
-    const testWorkflow: Workflow = {
+    const testWorkflow: Tool = {
       id: 'test-workflow-id',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -293,7 +293,7 @@ describe('MemoryStore', () => {
   });
 
   describe('Workflow Schedule', () => {
-    const testWorkflow: Workflow = {
+    const testWorkflow: Tool = {
         id: 'test-workflow-id',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -302,7 +302,7 @@ describe('MemoryStore', () => {
         inputSchema: {}
     };
 
-    const testWorkflowSchedule: WorkflowScheduleInternal = {
+    const testWorkflowSchedule: ToolScheduleInternal = {
         id: '68d51b90-605d-4e85-8c9a-c82bad2c7337',
         orgId: testOrgId,
         workflowId: testWorkflow.id,
@@ -393,7 +393,7 @@ describe('MemoryStore', () => {
     });
 
     it('should list due workflow schedules only', async () => {
-        const futureSchedule: WorkflowScheduleInternal = {
+        const futureSchedule: ToolScheduleInternal = {
             ...testWorkflowSchedule,
             id: '57f65914-69fa-40ad-a4d1-6d2c372619c4',
             nextRunAt: new Date(Date.now() + 1000 * 60),
@@ -414,7 +414,7 @@ describe('MemoryStore', () => {
     });
 
     it('should list enabled due workflow schedules only', async () => {
-        const disabledSchedule: WorkflowScheduleInternal = {
+        const disabledSchedule: ToolScheduleInternal = {
             ...testWorkflowSchedule,
             id: '57f65914-69fa-40ad-a4d1-6d2c372619c4',
             enabled: false,
@@ -486,7 +486,7 @@ describe('MemoryStore', () => {
         updatedAt: new Date(),
       };
 
-      const testWorkflow: Workflow = {
+      const testWorkflow: Tool = {
         id: 'test-workflow',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -495,7 +495,7 @@ describe('MemoryStore', () => {
         inputSchema: {}
       };
 
-      const testWorkflowSchedule: WorkflowScheduleInternal = {
+      const testWorkflowSchedule: ToolScheduleInternal = {
         id: 'test-schedule',
         orgId: testOrgId,
         workflowId: testWorkflow.id,

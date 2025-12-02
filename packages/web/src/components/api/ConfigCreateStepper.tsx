@@ -9,7 +9,7 @@ import { tokenRegistry } from '@/src/lib/token-registry';
 import { ApolloClient, gql, InMemoryCache, useSubscription } from '@apollo/client';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { Label } from '@radix-ui/react-label';
-import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/client';
+import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/shared';
 import { integrations } from '@superglue/shared';
 import { createClient } from 'graphql-ws';
 import { Loader2, Terminal, Upload, X } from 'lucide-react';
@@ -355,7 +355,7 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
     return `npm install @superglue/client
 
 // in your app:
-import { SuperglueClient } from "@superglue/client";
+import { SuperglueClient } from "@superglue/shared";
 const superglue = new SuperglueClient({
   apiKey: "${tokenRegistry.getToken()}"
 });

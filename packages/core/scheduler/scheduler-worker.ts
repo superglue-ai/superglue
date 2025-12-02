@@ -1,4 +1,4 @@
-import { SelfHealingMode } from "@superglue/client";
+import { SelfHealingMode } from "@superglue/shared";
 import { calculateNextRun } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { DataStore } from "../datastore/types.js";

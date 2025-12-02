@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog";
 import { tokenRegistry } from "@/src/lib/token-registry";
-import { ApiConfig, SuperglueClient, Workflow as Tool } from "@superglue/client";
+import { ApiConfig, SuperglueClient, Tool } from "@superglue/shared";
 
 interface DeleteConfigDialogProps {
   config: ApiConfig | Tool | null;

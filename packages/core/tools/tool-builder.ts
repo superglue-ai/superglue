@@ -1,4 +1,4 @@
-import { HttpMethod, Integration, Workflow as Tool } from "@superglue/client";
+import { HttpMethod, Integration, Tool } from "@superglue/shared";
 import { convertRequiredToArray, Metadata, toJsonSchema } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { getToolBuilderContext } from "../context/context-builders.js";

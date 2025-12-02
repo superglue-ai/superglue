@@ -2,10 +2,10 @@ import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server_defaults } from "../../../default.js";
 import * as httpModule from "./http.js";
-import { ApiConfig, HttpMethod, PaginationType } from '@superglue/client';
+import { ApiConfig, HttpMethod, PaginationType } from '@superglue/shared';
 import { convertBasicAuthToBase64 } from '../../../utils/helpers.js';
 import { isSelfHealingEnabled } from '../../../utils/helpers.js';
-import { SelfHealingMode } from '@superglue/client';
+import { SelfHealingMode } from '@superglue/shared';
 
 vi.mock('axios');
 vi.mock('openai');

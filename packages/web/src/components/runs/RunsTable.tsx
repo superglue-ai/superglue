@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import { RunResult, SuperglueClient } from '@superglue/client';
+import { RunResult, SuperglueClient } from '@superglue/shared';
 import { AlertCircle, Calendar, CheckCircle, ChevronRight, Clock, Hash, Loader2 } from 'lucide-react';
 import React from 'react';
 

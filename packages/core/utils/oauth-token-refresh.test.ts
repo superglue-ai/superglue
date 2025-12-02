@@ -1,4 +1,4 @@
-import type { Integration } from '@superglue/client';
+import type { Integration } from '@superglue/shared';
 import { getOAuthTokenUrl } from '@superglue/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as logs from './logs.js';

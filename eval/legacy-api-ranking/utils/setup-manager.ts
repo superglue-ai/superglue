@@ -1,4 +1,4 @@
-import { Integration } from '@superglue/client';
+import { Integration } from '@superglue/shared';
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import fs from 'fs';
 import { FileStore } from '@core/datastore/filestore.js';

@@ -1,4 +1,4 @@
-import { Integration } from '@superglue/client';
+import { Integration } from '@superglue/shared';
 import { Context, findMatchingIntegration, integrations, Metadata } from "@superglue/shared";
 import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";

@@ -1,4 +1,4 @@
-import { ApiConfig as StepConfig, HttpMethod, RequestOptions } from "@superglue/client";
+import { ApiConfig as StepConfig, HttpMethod, RequestOptions } from "@superglue/shared";
 import { SupportedFileType } from "@superglue/shared";
 import { Client as FTPClient } from "basic-ftp";
 import * as path from "path";

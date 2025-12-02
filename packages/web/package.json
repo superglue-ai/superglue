@@ -37,6 +37,7 @@
         "@tiptap/suggestion": "^3.11.0",
         "asynckit": "^0.4.0",
         "autoprefixer": "^10.4.20",
+        "axios": "^1.7.9",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",

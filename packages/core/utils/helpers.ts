@@ -1,4 +1,4 @@
-import { RequestOptions, SelfHealingMode } from "@superglue/client";
+import { RequestOptions, SelfHealingMode } from "@superglue/shared";
 import { assertValidArrowFunction } from '@superglue/shared';
 import ivm from 'isolated-vm';
 import { Validator } from "jsonschema";

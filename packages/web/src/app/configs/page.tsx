@@ -27,7 +27,7 @@ import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { createSuperglueClient } from '@/src/lib/client-utils';
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
-import { ApiConfig, Integration, Workflow as Tool } from '@superglue/client';
+import { ApiConfig, Integration, Tool } from '@superglue/shared';
 import { CloudUpload, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';

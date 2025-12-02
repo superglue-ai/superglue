@@ -11,7 +11,6 @@ import {
 } from "@/src/components/ui/dialog";
 import { Input } from "@/src/components/ui/input";
 import { useToast } from "@/src/hooks/use-toast";
-import { SuperglueClient } from '@superglue/client';
 import React, { useState } from "react";
 
 type ApiConfigIdEditModalProps = {

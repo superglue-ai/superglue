@@ -1,4 +1,4 @@
-import { Integration } from "@superglue/client";
+import { Integration } from "./types.js";
 import { toJsonSchema } from './json-schema.js';
 import { UserRole } from "./types.js";
 

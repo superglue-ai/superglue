@@ -1,4 +1,4 @@
-import { Workflow } from "@superglue/client";
+import { Tool } from "@superglue/shared";
 import { Metadata } from "@superglue/shared";
 import { logMessage } from "../utils/logs.js";
 
@@ -21,7 +21,7 @@ export class ToolFinder {
         this.metadata = metadata;
     }
 
-    private enrichTool(tool: Workflow, reason: string): FoundTool {
+    private enrichTool(tool: Tool, reason: string): FoundTool {
         return {
             id: tool.id,
             instruction: tool.instruction,
@@ -35,7 +35,7 @@ export class ToolFinder {
         };
     }
 
-    private keywordSearch(query: string, tools: Workflow[]): FoundTool[] {
+    private keywordSearch(query: string, tools: Tool[]): FoundTool[] {
         const keywords = query.toLowerCase().split(/\s+/).filter(k => k.length > 0);
 
         const scored = tools.map(tool => {
@@ -71,7 +71,7 @@ export class ToolFinder {
 
     public async findTools(
         query: string | undefined,
-        tools: Workflow[]
+        tools: Tool[]
     ): Promise<FoundTool[]> {
         if (!tools || tools.length === 0) {
             logMessage('info', 'No tools available for selection.', this.metadata);

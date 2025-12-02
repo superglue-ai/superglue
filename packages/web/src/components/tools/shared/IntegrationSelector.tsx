@@ -3,7 +3,7 @@
 import { useIntegrations } from '@/src/app/integrations-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
 import { getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/general-utils';
-import { Integration } from '@superglue/client';
+import { Integration } from '@superglue/shared';
 import { Globe } from 'lucide-react';
 
 interface IntegrationSelectorProps {

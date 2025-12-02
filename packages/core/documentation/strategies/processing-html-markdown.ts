@@ -4,7 +4,7 @@
  * Converts HTML content to Markdown using a shared pool.
  */
 
-import { ApiConfig } from "@superglue/client";
+import { ApiConfig } from "@superglue/shared";
 import { Metadata } from "@superglue/shared";
 import { getSharedHtmlMarkdownPool } from '../../utils/html-markdown-pool.js';
 import { logMessage } from "../../utils/logs.js";

@@ -1,5 +1,5 @@
-import type { Integration } from '@superglue/client';
-import { ExtendedSuperglueClient } from './extended-superglue-client';
+import type { Integration } from '@superglue/shared';
+import { SuperglueClient } from '@superglue/shared';
 import { resolveOAuthCertAndKey } from '@superglue/shared';
 
 type OAuthFields = {
@@ -306,7 +306,7 @@ export const triggerOAuthFlow = (
 
     if (!usingTemplate && oauthFields.client_secret && oauthFields.client_id && apiKey && endpoint) {
         clientCredentialsUid = crypto.randomUUID();
-        const client = new ExtendedSuperglueClient({ endpoint, apiKey });
+        const client = new SuperglueClient({ endpoint, apiKey });
         cachePromise = client.cacheOauthClientCredentials({
             clientCredentialsUid,
             clientId: oauthFields.client_id,

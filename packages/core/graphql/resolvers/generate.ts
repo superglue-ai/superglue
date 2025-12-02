@@ -1,4 +1,4 @@
-import { ApiConfig, Integration } from "@superglue/client";
+import { ApiConfig, Integration } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { executeLLMTool, LLMToolCall } from "../../llm/llm-tool-utils.js";
 import { InstructionGenerationContext } from "../../llm/llm-tools.js";
@@ -93,7 +93,7 @@ export const generateStepConfigResolver = async (
         // Get integration credentials and prefix keys with integration ID
         if (integration?.credentials) {
           Object.entries(integration.credentials).forEach(([key, value]) => {
-            integrationCredentials[`${integrationId}_${key}`] = value;
+            integrationCredentials[`${integrationId}_${key}`] = String(value);
           });
         }
       } catch (error) {

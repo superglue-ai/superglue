@@ -14,7 +14,7 @@ import { Input } from '@/src/components/ui/input';
 import { Textarea } from '@/src/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { cn } from '@/src/lib/general-utils';
-import { ExecutionStep } from '@superglue/client';
+import { ExecutionStep } from '@superglue/shared';
 import { Loader2, WandSparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { IntegrationSelector } from '../shared/IntegrationSelector';
