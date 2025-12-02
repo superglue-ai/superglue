@@ -1,4 +1,4 @@
-import { ApiConfig, ExecutionStep, Integration, RequestOptions, Workflow as Tool, WorkflowResult as ToolResult, WorkflowStepResult as ToolStepResult } from "@superglue/client";
+import { ApiConfig, ExecutionStep, Integration, RequestOptions, Tool, ToolResult, ToolStepResult } from "@superglue/shared";
 import { maskCredentials, Metadata } from "@superglue/shared";
 import { flattenAndNamespaceCredentials } from "@superglue/shared/utils";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";

@@ -20,7 +20,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { downloadJson } from '@/src/lib/download-utils';
 import { formatJavaScriptCode, isEmptyData, truncateForDisplay, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/general-utils';
-import { Integration } from '@superglue/client';
+import { Integration } from '@superglue/shared';
 import { assertValidArrowFunction } from '@superglue/shared';
 import { BugPlay, ChevronDown, Download, FileBraces, FileInput, FileOutput, Loader2, Play, Route, Trash2, Wand2, Globe, X } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';

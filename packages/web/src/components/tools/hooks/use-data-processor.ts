@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useComputeWorkerCached } from '@/src/hooks/use-compute-worker-cached';
 import { getDataHash } from '@/src/lib/weak-cache';
 import { TaskType } from '@/src/workers/compute-worker';
@@ -40,7 +40,7 @@ export function useDataProcessor(
     const previewCompute = useComputeWorkerCached<PreviewResult>(
         TaskType.COMPUTE_PREVIEW,
         data,
-        true // Always compute preview
+        isActive
     );
 
     const schemaCompute = useComputeWorkerCached<SchemaResult>(
@@ -60,7 +60,7 @@ export function useDataProcessor(
     }, [schemaCompute.isComputing]);
 
     const lastDataHashRef = useRef<string>('');
-    const currentHash = data ? getDataHash(data) : '';
+    const currentHash = useMemo(() => data ? getDataHash(data) : '', [data]);
     if (lastDataHashRef.current !== currentHash) {
         lastDataHashRef.current = currentHash;
         setSchemaTriggered(false);

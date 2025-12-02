@@ -1,13 +1,12 @@
-import { HttpMethod, Integration, Workflow as Tool } from "@superglue/client";
-import { convertRequiredToArray, Metadata, toJsonSchema } from "@superglue/shared";
+import { convertRequiredToArray, HttpMethod, Integration, Metadata, toJsonSchema, Tool } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import z from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import { getToolBuilderContext } from "../context/context-builders.js";
 import { BUILD_TOOL_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
-import { logMessage } from "../utils/logs.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
-import z from "zod";
 import { getWebSearchTool } from "../llm/llm-tools.js";
+import { logMessage } from "../utils/logs.js";
 
 export class ToolBuilder {
   private integrations: Record<string, Integration>;
@@ -94,6 +93,10 @@ export class ToolBuilder {
           errors.push(`Step ${index + 1} (${step.id}): Missing URL configuration (urlHost: '${step.apiConfig?.urlHost || 'undefined'}'). Please ensure that all steps correspond to a single API call, or merge this step with the previous one.`);
         }
       });
+    }
+
+    if(!hasSteps && Object.keys(this.initialPayload).length === 0) {
+      errors.push("Tool is missing steps and initial payload. You probably need to add steps.");
     }
 
     return {

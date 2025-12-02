@@ -1,4 +1,4 @@
-import { Integration, RequestOptions, Workflow, WorkflowResult, WorkflowStepResult } from "@superglue/client";
+import { Integration, RequestOptions, Tool, ToolResult, ToolStepResult } from "@superglue/shared";
 import { generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
@@ -19,7 +19,7 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
 }
 
 interface ExecuteWorkflowArgs {
-  input: { workflow: Workflow; id?: never } | { workflow?: never; id: string };
+  input: { workflow: Tool; id?: never } | { workflow?: never; id: string };
   payload?: any;
   credentials?: any;
   options?: RequestOptions;
@@ -32,7 +32,7 @@ interface BuildWorkflowArgs {
   responseSchema?: JSONSchema;
 }
 
-type GraphQLWorkflowResult = Omit<WorkflowResult, 'stepResults'> & { data?: any, stepResults: (WorkflowStepResult & { rawData: any, transformedData: any })[] };
+type GraphQLWorkflowResult = Omit<ToolResult, 'stepResults'> & { data?: any, stepResults: (ToolStepResult & { rawData: any, transformedData: any })[] };
 
 export const executeWorkflowResolver = async (
   _: unknown,
@@ -46,7 +46,7 @@ export const executeWorkflowResolver = async (
   const startedAt = new Date();
   const metadata: Metadata = { orgId: context.orgId, traceId: context.traceId };
 
-  let workflow: Workflow | undefined;
+  let workflow: Tool | undefined;
   try {
     if (args.input.id) {
       workflow = await context.datastore.getWorkflow({ id: args.input.id, orgId: context.orgId });
@@ -274,7 +274,7 @@ export const buildWorkflowResolver = async (
   args: BuildWorkflowArgs,
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
-): Promise<Workflow> => {
+): Promise<Tool> => {
   const metadata: Metadata = { orgId: context.orgId, traceId: context.traceId };
 
   try {

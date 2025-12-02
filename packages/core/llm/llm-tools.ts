@@ -6,7 +6,7 @@ import { BaseLLMToolContext, LLMToolDefinition, LLMToolImplementation } from "./
 import { sanitizeInstructionSuggestions } from "../utils/helpers.js";
 import { LanguageModel, LLMMessage } from "./llm-base-model.js";
 import { GENERATE_INSTRUCTIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
-import { Integration } from "@superglue/client";
+import { Integration } from "@superglue/shared";
 
 export function getWebSearchTool(): any {
     const provider = process.env.LLM_PROVIDER?.toLowerCase();

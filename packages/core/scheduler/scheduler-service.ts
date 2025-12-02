@@ -1,6 +1,6 @@
 import { calculateNextRun, validateCronExpression } from "@superglue/shared";
 import crypto from "crypto";
-import { DataStore, WorkflowScheduleInternal } from "../datastore/types.js";
+import { DataStore, ToolScheduleInternal } from "../datastore/types.js";
 import { server_defaults } from "../default.js";
 import { isValidTimezone } from "../utils/timezone.js";
 
@@ -20,7 +20,7 @@ export class WorkflowScheduler {
         enabled?: boolean,
         payload?: Record<string, any>,
         options?: Record<string, any>
-    }): Promise<WorkflowScheduleInternal> {
+    }): Promise<ToolScheduleInternal> {
         if (!params.id && !params.workflowId) {
             throw new Error("Failed to upsert workflow schedule: Provide either ID (for updates) or Workflow ID (for new schedules)");
         }
@@ -70,7 +70,7 @@ export class WorkflowScheduler {
             nextRunAt = calculateNextRun(cronExpression, timezone, currentDate);
         }
 
-        const scheduleToSave: WorkflowScheduleInternal = {
+        const scheduleToSave: ToolScheduleInternal = {
             id,
             orgId: existingScheduleOrNull?.orgId ?? params.orgId,
             workflowId,
@@ -93,7 +93,7 @@ export class WorkflowScheduler {
         return await this.datastore.deleteWorkflowSchedule({ id, orgId });
     }
 
-    public async listWorkflowSchedules({ workflowId, orgId }: { workflowId: string, orgId: string }): Promise<WorkflowScheduleInternal[]> {
+    public async listWorkflowSchedules({ workflowId, orgId }: { workflowId: string, orgId: string }): Promise<ToolScheduleInternal[]> {
         return await this.datastore.listWorkflowSchedules({ workflowId, orgId });
     }
 }

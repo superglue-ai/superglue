@@ -1717,7 +1717,7 @@ export function getSDKCode(opts: SdkCodegenOptions): SdkCode {
 
   return {
       typescript:
-          `// if not installed, run: npm install @superglue/client
+        `// if not installed, run: npm install @superglue/client
 // ALWAYS USE THE SDK, do not use the graphql endpoint directly
 import { SuperglueClient } from '@superglue/client';
 

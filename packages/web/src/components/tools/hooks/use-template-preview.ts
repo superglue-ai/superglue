@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { evaluateTemplate, DEFAULT_CODE_TEMPLATE } from '@/src/lib/templating-utils';
 
 interface UseTemplatePreviewOptions {
@@ -12,15 +12,6 @@ interface UseTemplatePreviewResult {
   isEvaluating: boolean;
 }
 
-function getSourceDataKey(data: any): string {
-  if (!data || typeof data !== 'object') return '';
-  try {
-    return JSON.stringify(data);
-  } catch {
-    return String(Object.keys(data).length);
-  }
-}
-
 export function useTemplatePreview(
   codeContent: string,
   sourceData: any,
@@ -31,14 +22,15 @@ export function useTemplatePreview(
   const [previewValue, setPreviewValue] = useState<any>(undefined);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
-  const lastEvalKeyRef = useRef<string>('');
+  const lastCodeRef = useRef<string>('');
+  const lastSourceDataRef = useRef<any>(null);
   const evalVersionRef = useRef(0);
 
   const hasSourceData = sourceData && typeof sourceData === 'object' && Object.keys(sourceData).length > 0;
-  const sourceDataKey = useMemo(() => getSourceDataKey(sourceData), [sourceData]);
 
   useEffect(() => {
     if (!enabled || !hasSourceData) {
+      setPreviewValue(undefined);
       setPreviewError(null);
       setIsEvaluating(false);
       return;
@@ -48,32 +40,36 @@ export function useTemplatePreview(
       setPreviewValue(undefined);
       setPreviewError(null);
       setIsEvaluating(false);
-      lastEvalKeyRef.current = `${codeContent}:${sourceDataKey}`;
+      lastCodeRef.current = codeContent;
+      lastSourceDataRef.current = sourceData;
       return;
     }
 
-    const evalKey = `${codeContent}:${sourceDataKey}`;
-    if (evalKey === lastEvalKeyRef.current) {
+    if (codeContent === lastCodeRef.current && sourceData === lastSourceDataRef.current) {
       return;
     }
 
     evalVersionRef.current += 1;
     const thisVersion = evalVersionRef.current;
-    setIsEvaluating(true);
 
     const timer = setTimeout(async () => {
+      if (thisVersion !== evalVersionRef.current) return;
+      setIsEvaluating(true);
       try {
         const result = await evaluateTemplate(codeContent, sourceData);
         if (thisVersion !== evalVersionRef.current) return;
-        lastEvalKeyRef.current = evalKey;
+        lastCodeRef.current = codeContent;
+        lastSourceDataRef.current = sourceData;
         if (result.success) {
           setPreviewValue(result.value);
           setPreviewError(null);
         } else {
+          setPreviewValue(undefined);
           setPreviewError(result.error || 'Evaluation failed');
         }
       } catch (error) {
         if (thisVersion !== evalVersionRef.current) return;
+        setPreviewValue(undefined);
         setPreviewError(error instanceof Error ? error.message : String(error));
       } finally {
         if (thisVersion === evalVersionRef.current) {
@@ -83,10 +79,11 @@ export function useTemplatePreview(
     }, debounceMs);
 
     return () => clearTimeout(timer);
-  }, [codeContent, sourceDataKey, sourceData, enabled, hasSourceData, debounceMs]);
+  }, [codeContent, sourceData, enabled, hasSourceData, debounceMs]);
 
   useEffect(() => {
-    lastEvalKeyRef.current = '';
+    lastCodeRef.current = '';
+    lastSourceDataRef.current = null;
   }, [enabled]);
 
   return { previewValue, previewError, isEvaluating };

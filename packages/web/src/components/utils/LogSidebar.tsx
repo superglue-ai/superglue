@@ -11,8 +11,7 @@ import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Switch } from "../ui/switch";
 import { useToken } from "@/src/hooks/use-token";
-import { LogEntry } from "@superglue/shared";
-
+import { Log } from "@superglue/shared";
 
 const LOGS_SUBSCRIPTION = gql`
   subscription OnNewLog {
@@ -32,7 +31,7 @@ const LOG_COLLAPSED_WIDTH = 50
 
 export function LogSidebar() {
   const [isExpanded, setIsExpanded] = useState(false)
-  const [logs, setLogs] = useState<LogEntry[]>([])
+  const [logs, setLogs] = useState<Log[]>([])
   const [hasNewLogs, setHasNewLogs] = useState(false)
   const [transitionDuration, setTransitionDuration] = useState(0.3)
   const [logViewWidth, setLogViewWidth] = useState(LOG_MIN_WIDTH)

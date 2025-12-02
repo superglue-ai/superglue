@@ -1,7 +1,8 @@
-import { ApiConfig, Integration } from "@superglue/client";
+import { ApiConfig, Integration } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { executeLLMTool, LLMToolCall } from "../../llm/llm-tool-utils.js";
 import { InstructionGenerationContext } from "../../llm/llm-tools.js";
+import { generateWorkingTransform } from "../../tools/tool-transform.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { GraphQLRequestContext, Metadata } from '../types.js';
 import { IntegrationManager } from "../../integrations/integration-manager.js";
@@ -94,7 +95,7 @@ export const generateStepConfigResolver = async (
         // Get integration credentials and prefix keys with integration ID
         if (integration?.credentials) {
           Object.entries(integration.credentials).forEach(([key, value]) => {
-            integrationCredentials[`${integrationId}_${key}`] = value;
+            integrationCredentials[`${integrationId}_${key}`] = String(value);
           });
         }
       } catch (error) {
@@ -160,6 +161,51 @@ export const generateStepConfigResolver = async (
       integrationId
     });
 
+    throw error;
+  }
+};
+
+interface GenerateTransformArgs {
+  currentTransform: string;
+  responseSchema?: any;
+  stepData: Record<string, any>;
+  errorMessage?: string;
+  instruction?: string;
+}
+
+export const generateTransformResolver = async (
+  _: any,
+  { currentTransform, responseSchema, stepData, errorMessage, instruction }: GenerateTransformArgs,
+  context: GraphQLRequestContext,
+  info: GraphQLResolveInfo
+): Promise<{ transformCode: string; data?: any }> => {
+  try {
+    const metadata: Metadata = { orgId: context.orgId, traceId: context.traceId };
+
+    const prompt = (instruction || "Create transformation code.") +
+      (currentTransform ? `\nOriginally, we used the following transformation: ${currentTransform}` : "") +
+      (errorMessage ? `\nThe transformation failed with the following error: ${errorMessage}` : "");
+
+    const result = await generateWorkingTransform({
+      targetSchema: responseSchema,
+      inputData: stepData,
+      instruction: prompt,
+      metadata
+    });
+
+    if (!result) {
+      throw new Error('Failed to generate transform code');
+    }
+
+    return { 
+      transformCode: result.transformCode,
+      data: result.data 
+    };
+  } catch (error) {
+    telemetryClient?.captureException(error, context.orgId, {
+      errorMessage,
+      instruction
+    });
     throw error;
   }
 };

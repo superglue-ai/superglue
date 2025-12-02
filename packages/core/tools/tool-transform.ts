@@ -1,4 +1,4 @@
-import { JSONSchema, RequestOptions } from "@superglue/client";
+import { JSONSchema, RequestOptions } from "@superglue/shared";
 import type { Metadata } from "@superglue/shared";
 import prettier from "prettier";
 import { z } from "zod";
@@ -71,7 +71,7 @@ export async function executeAndEvaluateFinalTransform(input: ExecuteAndEvaluate
         };
       }
 
-      logMessage("info", `Final transform failed with error: ${transformError?.message || transformError}. Generating new final transform`,metadata);
+      logMessage("info", `Transform needs to be fixed: ${transformError?.message || transformError}. Generating new final transform`,metadata);
       const prompt = "Generate the final transformation code." +
         (instruction ? " with the following instruction: " + instruction : "") +
         (finalTransform ? "\nOriginally, we used the following transformation, fix it without messing up future transformations with the original data: " + finalTransform : "");

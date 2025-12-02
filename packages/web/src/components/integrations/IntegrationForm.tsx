@@ -17,7 +17,7 @@ import { URLField } from '@/src/components/utils/URLField';
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, composeUrl, inputErrorStyles } from '@/src/lib/general-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
-import type { Integration } from '@superglue/client';
+import type { Integration } from '@superglue/shared';
 
 import { createOAuthErrorHandler, getOAuthCallbackUrl, triggerOAuthFlow } from '@/src/lib/oauth-utils';
 import { integrations, resolveOAuthCertAndKey } from '@superglue/shared';

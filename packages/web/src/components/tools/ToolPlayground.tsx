@@ -6,8 +6,7 @@ import { useTools } from "@/src/app/tools-context";
 import { createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, computeStepOutput, computeToolPayload, removeFileKeysFromPayload, wrapLoopSelectorWithLimit } from "@/src/lib/general-utils";
-import { ExecutionStep, Integration, Workflow as Tool, WorkflowResult as ToolResult } from "@superglue/client";
-import { generateDefaultFromSchema } from "@superglue/shared";
+import { ExecutionStep, generateDefaultFromSchema, Integration, Tool, ToolResult } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import isEqual from "lodash.isequal";
 import { Check, CloudUpload, CopyPlus, Edit2, Hammer, Loader2, Play, Trash2, X } from "lucide-react";
@@ -30,6 +29,7 @@ import { ToolDeployModal } from "./deploy/ToolDeployModal";
 import { DeleteConfigDialog } from "./dialogs/DeleteConfigDialog";
 import { DuplicateToolDialog } from "./dialogs/DuplicateToolDialog";
 import { FixStepDialog } from "./dialogs/FixStepDialog";
+import { FixTransformDialog } from "./dialogs/FixTransformDialog";
 import { ModifyStepConfirmDialog } from "./dialogs/ModifyStepConfirmDialog";
 import { RenameToolDialog } from "./dialogs/RenameToolDialog";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
@@ -136,6 +136,16 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     [manualPayloadText, filePayloads]
   );
   
+  const parsedResponseSchema = useMemo(() => {
+    if (!responseSchema) return undefined;
+    try {
+      return JSON.parse(responseSchema);
+    } catch (error) {
+      console.error('Failed to parse response schema:', error);
+      return undefined;
+    }
+  }, [responseSchema]);
+  
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -165,6 +175,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [isStopping, setIsStopping] = useState(false);
   const [isRunningTransform, setIsRunningTransform] = useState(false);
   const [isFixingTransform, setIsFixingTransform] = useState(false);
+  const [showFixTransformDialog, setShowFixTransformDialog] = useState(false);
   // Computed: any transform execution in progress
   const isExecutingTransform = isRunningTransform || isFixingTransform;
   // Single source of truth for stopping across modes (embedded/standalone)
@@ -1115,8 +1126,21 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
   };
 
-  const handleFixTransform = async (schemaStr: string, transformStr: string) => {
-    await handleExecuteTransform(schemaStr, transformStr, true);
+  const handleOpenFixTransformDialog = () => {
+    setShowFixTransformDialog(true);
+  };
+
+  const handleCloseFixTransformDialog = () => {
+    setShowFixTransformDialog(false);
+  };
+
+  const handleFixTransformSuccess = (newTransform: string, transformedData: any) => {
+    setFinalTransform(newTransform);
+    setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
+    setFailedSteps(prev => prev.filter(id => id !== '__final_transform__'));
+    setStepResultsMap(prev => ({ ...prev, __final_transform__: transformedData }));
+    setFinalPreviewResult(transformedData);
+    setNavigateToFinalSignal(Date.now());
   };
 
   // Tool action handlers
@@ -1351,7 +1375,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   onExecuteStepWithLimit={handleExecuteStepWithLimit}
                   onOpenFixStepDialog={handleOpenFixStepDialog}
                   onExecuteTransform={handleExecuteTransform}
-                  onFixTransform={handleFixTransform}
+                  onOpenFixTransformDialog={handleOpenFixTransformDialog}
                   onFinalTransformChange={setFinalTransform}
                   onResponseSchemaChange={setResponseSchema}
                   onPayloadChange={setManualPayloadText}
@@ -1477,6 +1501,23 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onDeleted={handleDeleted}
+      />
+
+      <FixTransformDialog
+        open={showFixTransformDialog}
+        onClose={handleCloseFixTransformDialog}
+        currentTransform={finalTransform}
+        responseSchema={parsedResponseSchema}
+        stepData={Object.entries(stepResultsMap)
+          .filter(([key]) => key !== '__final_transform__')
+          .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {})}
+        errorMessage={
+          typeof stepResultsMap['__final_transform__'] === 'string'
+            ? stepResultsMap['__final_transform__']
+            : undefined
+        }
+        onSuccess={handleFixTransformSuccess}
+        onLoadingChange={setIsFixingTransform}
       />
     </div>
   );

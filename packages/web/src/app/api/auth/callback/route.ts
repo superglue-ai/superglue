@@ -1,4 +1,4 @@
-import { ExtendedSuperglueClient } from '@/src/lib/extended-superglue-client';
+import { SuperglueClient } from '@superglue/shared';
 import { OAuthState } from '@/src/lib/oauth-utils';
 import { resolveOAuthCertAndKey } from '@superglue/shared';
 import axios from 'axios';
@@ -262,7 +262,7 @@ export async function GET(request: NextRequest) {
                 client_secret: '',
             }
         } else {
-            const client = new ExtendedSuperglueClient({ endpoint, apiKey: apiKey });
+            const client = new SuperglueClient({ endpoint, apiKey: apiKey });
             resolved = await client.getOAuthClientCredentials({ templateId, clientCredentialsUid: client_credentials_uid });
             if (!resolved?.client_secret || !resolved?.client_id) {
                 throw new Error('[OAUTH_STAGE:CREDENTIAL_RESOLUTION] OAuth client credentials could not be resolved from backend. The client_id or client_secret may not have been properly stored.');

@@ -1,6 +1,6 @@
 import { Card } from '@/src/components/ui/card';
 import { cn, getIntegrationIcon, getSimpleIcon } from '@/src/lib/general-utils';
-import { Integration } from '@superglue/client';
+import { Integration } from '@superglue/shared';
 import { FileJson, FilePlay, Globe, OctagonAlert, RotateCw } from 'lucide-react';
 import React from 'react';
 

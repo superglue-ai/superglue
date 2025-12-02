@@ -1,4 +1,4 @@
-import { Integration } from "@superglue/client";
+import { Integration } from "@superglue/shared";
 import { DataStore } from "../datastore/types.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { logMessage } from "../utils/logs.js";

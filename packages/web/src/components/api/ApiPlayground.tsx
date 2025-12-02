@@ -8,7 +8,7 @@ import { useToast } from "@/src/hooks/use-toast";
 import { generateUUID } from "@/src/lib/client-utils";
 import { composeUrl } from "@/src/lib/general-utils";
 import { tokenRegistry } from '@/src/lib/token-registry';
-import { ApiConfig, CacheMode, SuperglueClient } from "@superglue/client";
+import { ApiConfig, CacheMode, SuperglueClient } from "@superglue/shared";
 import { AlertCircle, Clock, Play, Plus, X } from "lucide-react";
 import { useParams } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";

@@ -1,4 +1,4 @@
-import { Workflow } from "@superglue/client";
+import { Tool } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { logMessage } from "../../utils/logs.js";
 import { GraphQLRequestContext } from '../types.js';
@@ -8,7 +8,7 @@ export const renameWorkflowResolver = async (
   { oldId, newId }: { oldId: string; newId: string },
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo
-): Promise<Workflow> => {
+): Promise<Tool> => {
   if (!oldId) {
     throw new Error("oldId is required");
   }

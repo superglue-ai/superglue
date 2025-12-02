@@ -1,17 +1,13 @@
-import { useConfig } from '@/src/app/config-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
-import { useToast } from '@/src/hooks/use-toast';
 import { splitUrl } from '@/src/lib/client-utils';
-import { composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/general-utils';
-import { Integration } from "@superglue/client";
-import { flattenAndNamespaceCredentials } from '@superglue/shared';
+import { composeUrl } from '@/src/lib/general-utils';
+import { Integration, flattenAndNamespaceCredentials } from '@superglue/shared';
 import { type CategorizedSources, type CategorizedVariables } from './templates/tiptap/TemplateContext';
 import { buildPaginationData, buildCategorizedVariables, buildCategorizedSources, deriveCurrentItem } from '@/src/lib/templating-utils';
-import { ArrowDown, Globe, OctagonAlert, Pencil } from 'lucide-react';
+import { ArrowDown, Pencil } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { JavaScriptCodeEditor } from '../editors/JavaScriptCodeEditor';
-import { Badge } from "../ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { TemplateAwareTextEditor } from '../editors/TemplateAwareTextEditor';
@@ -39,14 +35,6 @@ interface ToolStepConfiguratorProps {
 export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, loopItems, categorizedSources, onOpenFixStepDialog, canExecute = true }: ToolStepConfiguratorProps) {
     const [headersText, setHeadersText] = useState('');
     const [queryParamsText, setQueryParamsText] = useState('');
-
-    const config = useConfig();
-    const { toast } = useToast();
-
-    const getIntegrationIcon = (integration: Integration) => {
-        const iconName = getIntegrationIconName(integration);
-        return iconName ? getSimpleIcon(iconName) : null;
-    };
 
     useEffect(() => {
         try {

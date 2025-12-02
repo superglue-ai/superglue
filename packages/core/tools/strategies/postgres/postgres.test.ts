@@ -1,4 +1,4 @@
-import { ApiConfig, RequestOptions } from '@superglue/client';
+import { ApiConfig, RequestOptions } from '@superglue/shared';
 import { Pool } from 'pg';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server_defaults } from '../../../default.js';

@@ -1,5 +1,5 @@
 import { cn } from '@/src/lib/general-utils';
-import { truncateTemplateValue, isCredentialVariable, prepareSourceData } from '@/src/lib/templating-utils';
+import { truncateTemplateValue, prepareSourceData, extractCredentials } from '@/src/lib/templating-utils';
 import { maskCredentials } from '@superglue/shared';
 import { Code2, X } from 'lucide-react';
 import { useState, useMemo } from 'react';
@@ -45,21 +45,12 @@ export function TemplateChip({
   const effectiveOpen = isPopoverOpen || forcePopoverOpen;
 
   const templateExpr = template.replace(/^<<|>>$/g, '').trim();
-  const isCredential = isCredentialVariable(templateExpr, sourceData);
 
   const hasError = !!error;
   const isUnresolved = !hasError && !canExecute;
   const isResolvedUndefined = !hasError && canExecute && !isEvaluating && evaluatedValue === undefined;
 
-  const credentials = sourceData && typeof sourceData === 'object'
-    ? Object.entries(sourceData).reduce((acc, [key, value]) => {
-        const pattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
-        if (pattern.test(key) && typeof value === 'string' && value.length > 0) {
-          acc[key] = value;
-        }
-        return acc;
-      }, {} as Record<string, string>)
-    : undefined;
+  const credentials = useMemo(() => extractCredentials(sourceData), [sourceData]);
 
   let displayText: string;
   let isTruncated = false;
@@ -88,23 +79,11 @@ export function TemplateChip({
     }
 
     originalSize = fullDisplayText.length;
-
-    if (isCredential && credentials && Object.keys(credentials).length > 0) {
-      fullDisplayText = maskCredentials(fullDisplayText, credentials);
-      const maskedTokens = fullDisplayText.match(/\{masked_[^}]+\}/g) || [];
-      if (maskedTokens.length > 0) {
-        displayText = maskedTokens[0];
-        isTruncated = fullDisplayText.length > maskedTokens[0].length;
-      } else {
-        displayText = fullDisplayText.slice(0, 150) + (fullDisplayText.length > 150 ? '...' : '');
-        isTruncated = fullDisplayText.length > 150;
-      }
-    } else {
-    const truncated = truncateTemplateValue(fullDisplayText, 150);
+    const masked = maskCredentials(fullDisplayText, credentials);
+    const truncated = truncateTemplateValue(masked, 150);
     displayText = truncated.display;
-      isTruncated = truncated.truncated;
-      originalSize = truncated.originalSize;
-    }
+    isTruncated = truncated.truncated;
+    originalSize = truncated.originalSize;
   }
 
   const isActive = selected || effectiveOpen;

@@ -1,9 +1,9 @@
-import { ApiConfig, HttpMethod, RunResult, Workflow } from '@superglue/client';
+import { ApiConfig, HttpMethod, RunResult, Tool } from '@superglue/shared';
 import fs from 'fs';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FileStore } from './filestore.js';
-import { WorkflowScheduleInternal } from './types.js';
+import { ToolScheduleInternal } from './types.js';
 
 describe('FileStore', () => {
   let store: FileStore;
@@ -277,7 +277,7 @@ describe('FileStore', () => {
     };
 
     it('should get many workflows by ids, skipping missing ones', async () => {
-      const workflow1: Workflow = {
+      const workflow1: Tool = {
         id: 'workflow1',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -286,7 +286,7 @@ describe('FileStore', () => {
         inputSchema: {}
       };
       
-      const workflow2: Workflow = {
+      const workflow2: Tool = {
         id: 'workflow2',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -306,7 +306,7 @@ describe('FileStore', () => {
   });
 
   describe('Workflow Schedule', () => {
-    const testWorkflow: Workflow = {
+    const testWorkflow: Tool = {
         id: 'test-workflow-id',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -315,7 +315,7 @@ describe('FileStore', () => {
         inputSchema: {}
     };
 
-    const testWorkflowSchedule: WorkflowScheduleInternal = {
+    const testWorkflowSchedule: ToolScheduleInternal = {
         id: '68d51b90-605d-4e85-8c9a-c82bad2c7337',
         orgId: testOrgId,
         workflowId: testWorkflow.id,
@@ -406,7 +406,7 @@ describe('FileStore', () => {
     });
 
     it('should list due workflow schedules only', async () => {
-        const futureSchedule: WorkflowScheduleInternal = {
+        const futureSchedule: ToolScheduleInternal = {
             ...testWorkflowSchedule,
             id: '57f65914-69fa-40ad-a4d1-6d2c372619c4',
             nextRunAt: new Date(Date.now() + 1000 * 60),
@@ -427,7 +427,7 @@ describe('FileStore', () => {
     });
 
     it('should list enabled due workflow schedules only', async () => {
-        const disabledSchedule: WorkflowScheduleInternal = {
+        const disabledSchedule: ToolScheduleInternal = {
             ...testWorkflowSchedule,
             id: '57f65914-69fa-40ad-a4d1-6d2c372619c4',
             enabled: false,

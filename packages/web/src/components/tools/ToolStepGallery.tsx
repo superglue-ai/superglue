@@ -3,9 +3,8 @@ import { Button } from '@/src/components/ui/button';
 import { canExecuteStep } from '@/src/lib/client-utils';
 import { type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, buildPreviousStepResults, cn } from '@/src/lib/general-utils';
-import { type CategorizedSources } from './templates/tiptap/TemplateContext';
 import { buildCategorizedSources } from '@/src/lib/templating-utils';
-import { Integration } from "@superglue/client";
+import { Integration } from "@superglue/shared";
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FinalTransformMiniStepCard } from './cards/FinalTransformCard';
@@ -35,7 +34,7 @@ export interface ToolStepGalleryProps {
     onOpenFixStepDialog?: (stepIndex: number) => void;
     onExecuteAllSteps?: () => Promise<void>;
     onExecuteTransform?: (schema: string, transform: string) => Promise<void>;
-    onFixTransform?: (schema: string, transform: string) => Promise<void>;
+    onOpenFixTransformDialog?: () => void;
     completedSteps?: string[];
     failedSteps?: string[];
     integrations?: Integration[];
@@ -84,7 +83,7 @@ export function ToolStepGallery({
     onOpenFixStepDialog,
     onExecuteAllSteps,
     onExecuteTransform,
-    onFixTransform,
+    onOpenFixTransformDialog,
     completedSteps = [],
     failedSteps = [],
     integrations,
@@ -244,7 +243,6 @@ export function ToolStepGallery({
             data: { payloadText: rawPayloadText, inputSchema },
             stepResult: undefined,
             transformError: undefined,
-            evolvingPayload: workingPayload || {},
             categorizedSources: buildCategorizedSources({ manualPayload, filePayloads: filePayloads || {} })
         },
         ...steps.map((step, index) => ({
@@ -252,7 +250,6 @@ export function ToolStepGallery({
             data: step,
             stepResult: stepResultsMap[step.id],
             transformError: undefined,
-            evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, index - 1),
             categorizedSources: buildCategorizedSources({
                 manualPayload,
                 filePayloads: filePayloads || {},
@@ -264,7 +261,6 @@ export function ToolStepGallery({
             data: { transform: finalTransform, responseSchema },
             stepResult: finalResult,
             transformError: failedSteps.includes('__final_transform__') ? stepResultsMap['__final_transform__'] : null,
-            evolvingPayload: buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length - 1),
             hasTransformCompleted,
             categorizedSources: buildCategorizedSources({
                 manualPayload,
@@ -272,7 +268,7 @@ export function ToolStepGallery({
                 previousStepResults: buildPreviousStepResults(steps, stepResultsMap, steps.length - 1),
             })
         }] : [])
-    ], [rawPayloadText, inputSchema, workingPayload, steps, stepResultsMap, finalTransform, responseSchema, finalResult, hasTransformCompleted, manualPayload, filePayloads]);
+    ], [rawPayloadText, inputSchema, steps, stepResultsMap, finalTransform, responseSchema, finalResult, hasTransformCompleted, manualPayload, filePayloads, failedSteps]);
 
     // Memoize canExecute checks to avoid running steps.every() on every render
     const canExecuteTransform = useMemo(() => 
@@ -282,6 +278,16 @@ export function ToolStepGallery({
 
     const currentItem = toolItems[activeIndex];
     const indicatorIndices = toolItems.map((_, idx) => idx);
+
+    const activeEvolvingPayload = useMemo(() => {
+        if (!currentItem) return workingPayload || {};
+        if (currentItem.type === 'payload') return workingPayload || {};
+        if (currentItem.type === 'transform') {
+            return buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length - 1);
+        }
+        const stepIndex = steps.findIndex(s => s.id === currentItem.data.id);
+        return buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, stepIndex - 1);
+    }, [currentItem, workingPayload, steps, stepResultsMap]);
 
     const handleNavigation = (direction: 'prev' | 'next') => {
         if (isConfiguratorEditing) return;
@@ -713,20 +719,20 @@ export function ToolStepGallery({
                                     onResponseSchemaChange={onResponseSchemaChange}
                                     readOnly={readOnly}
                                     onExecuteTransform={onExecuteTransform}
-                                    onFixTransform={onFixTransform}
+                                    onOpenFixTransformDialog={onOpenFixTransformDialog}
                                     isRunningTransform={isRunningTransform}
                                     isFixingTransform={isFixingTransform}
                                     canExecute={canExecuteTransform}
                                     transformResult={finalResult}
                                     transformError={currentItem.transformError}
-                                    stepInputs={currentItem.evolvingPayload}
+                                    stepInputs={activeEvolvingPayload}
                                     hasTransformCompleted={hasTransformCompleted}
                                 />
                             ) : (
                                 <SpotlightStepCard
                                     step={currentItem.data}
                                     stepIndex={activeIndex - 1} // Adjust for payload card
-                                    evolvingPayload={currentItem.evolvingPayload || {}}
+                                    evolvingPayload={activeEvolvingPayload}
                                     categorizedSources={currentItem.categorizedSources}
                                     stepResult={currentItem.stepResult}
                                     onEdit={!readOnly ? onStepEdit : undefined}

@@ -1,4 +1,4 @@
-import { ApiConfig as StepConfig, RequestOptions } from "@superglue/client";
+import { ApiConfig as StepConfig, RequestOptions } from "@superglue/shared";
 
 
 export interface StepStrategyExecutionResult {

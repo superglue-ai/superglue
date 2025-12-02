@@ -1,4 +1,4 @@
-import { SelfHealingMode } from '@superglue/client';
+import { SelfHealingMode } from '@superglue/shared';
 import { assertValidArrowFunction } from '@superglue/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { applyAuthFormat, composeUrl, isSelfHealingEnabled, replaceVariables, sample, transformData } from './helpers.js';

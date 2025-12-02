@@ -1,4 +1,4 @@
-import type { Integration } from '@superglue/client';
+import type { Integration } from '@superglue/shared';
 import { getOAuthTokenUrl, resolveOAuthCertAndKey } from '@superglue/shared';
 import axios from 'axios';
 import https from 'https';

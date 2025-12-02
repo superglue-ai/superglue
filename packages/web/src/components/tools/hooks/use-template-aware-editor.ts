@@ -29,9 +29,10 @@ export function useTemplateAwareEditor({
         categorizedSources,
         onSelectVariable: (varName, range) => {
             const isValidIdentifier = (s: string) => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(s);
+            const escapeForBracket = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
             const segments = varName.includes('\x00') ? varName.split('\x00') : [varName];
             const accessor = segments.map(seg => 
-                isValidIdentifier(seg) ? `.${seg}` : `["${seg}"]`
+                isValidIdentifier(seg) ? `.${seg}` : `["${escapeForBracket(seg)}"]`
             ).join('');
             const templateExpr = `(sourceData) => sourceData${accessor}`;
             editorRef.current?.chain().focus()

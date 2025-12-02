@@ -1,6 +1,6 @@
 import { useConfig } from "@/src/app/config-context";
 import { cn } from "@/src/lib/general-utils";
-import { Workflow } from "@superglue/client";
+import { Tool } from "@superglue/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bot,
@@ -20,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
 import ToolSchedulesList from "./ToolSchedulesList";
 
 interface ToolDeployModalProps {
-  currentTool: Workflow;
+  currentTool: Tool;
   payload: Record<string, any>;
   isOpen: boolean;
   onClose: () => void;

@@ -1,4 +1,4 @@
-import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions } from "@superglue/client";
+import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { ToolExecutor } from "../../tools/tool-executor.js";
 import { maskCredentials } from '@superglue/shared';

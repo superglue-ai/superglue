@@ -6,7 +6,7 @@ import { Button } from '@/src/components/ui/button';
 import { FileChip } from '@/src/components/ui/FileChip';
 import { Input } from '@/src/components/ui/input';
 import { useToast } from '@/src/hooks/use-toast';
-import { ExtendedSuperglueClient } from '@/src/lib/extended-superglue-client';
+import { SuperglueClient } from '@superglue/shared';
 import { formatBytes, MAX_TOTAL_FILE_SIZE_DOCUMENTATION, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { ALLOWED_FILE_EXTENSIONS } from '@superglue/shared';
 import { cn } from '@/src/lib/general-utils';
@@ -44,7 +44,7 @@ export function DocumentationField({
   const { toast } = useToast()
   const superglueConfig = useConfig()
 
-  const client = useMemo(() => new ExtendedSuperglueClient({
+  const client = useMemo(() => new SuperglueClient({
     endpoint: superglueConfig.superglueEndpoint,
     apiKey: tokenRegistry.getToken(),
   }), [superglueConfig.superglueEndpoint])

@@ -4,7 +4,7 @@
  * Returns raw content as final fallback when no other processor can handle it.
  */
 
-import { ApiConfig } from "@superglue/client";
+import { ApiConfig } from "@superglue/shared";
 import { Metadata } from "@superglue/shared";
 import { logMessage } from "../../utils/logs.js";
 import { DocumentationProcessingStrategy } from '../types.js';

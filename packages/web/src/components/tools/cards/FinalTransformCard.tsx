@@ -36,7 +36,7 @@ export const FinalTransformMiniStepCard = ({
   onResponseSchemaChange,
   readOnly,
   onExecuteTransform,
-  onFixTransform,
+  onOpenFixTransformDialog,
   isRunningTransform,
   isFixingTransform,
   canExecute,
@@ -51,7 +51,7 @@ export const FinalTransformMiniStepCard = ({
   onResponseSchemaChange?: (value: string) => void;
   readOnly?: boolean;
   onExecuteTransform?: (schema: string, transform: string) => void;
-  onFixTransform?: (schema: string, transform: string) => void;
+  onOpenFixTransformDialog?: () => void;
   isRunningTransform?: boolean;
   isFixingTransform?: boolean;
   canExecute?: boolean;
@@ -181,11 +181,11 @@ export const FinalTransformMiniStepCard = ({
       }
     }
 
-    function handleFixTransform(): void {
-      if (onFixTransform) {
+    function handleOpenFixTransformDialog(): void {
+      if (onOpenFixTransformDialog) {
         setIsPendingExecution(true);
         setActiveTab("output");
-        onFixTransform(localSchema, localTransform);
+        onOpenFixTransformDialog();
       }
     }
     
@@ -198,7 +198,7 @@ export const FinalTransformMiniStepCard = ({
               <h3 className="text-lg font-semibold">Tool Result</h3>
             </div>
             <div className="flex items-center gap-2">
-              {!readOnly && (onExecuteTransform || onFixTransform) && (
+              {!readOnly && (onExecuteTransform || onOpenFixTransformDialog) && (
                 <>
                   {onExecuteTransform && (
                     <span
@@ -227,7 +227,7 @@ export const FinalTransformMiniStepCard = ({
                       </Button>
                     </span>
                   )}
-                  {onFixTransform && (
+                  {onOpenFixTransformDialog && (
                     <span
                       title={
                         !canExecute
@@ -239,7 +239,7 @@ export const FinalTransformMiniStepCard = ({
                     >
                       <Button
                         variant="ghost"
-                        onClick={handleFixTransform}
+                        onClick={handleOpenFixTransformDialog}
                         disabled={!canExecute || isRunningTransform || isFixingTransform}
                         className="h-8 px-3 gap-2"
                       >
