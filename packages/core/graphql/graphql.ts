@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { callResolver } from "./resolvers/call.js";
 import { deleteApiResolver } from "./resolvers/delete.js";
 import { extractResolver } from "./resolvers/extract.js";
-import { generateInstructionsResolver, generateStepConfigResolver } from "./resolvers/generate.js";
+import { generateInstructionsResolver, generateStepConfigResolver, generateTransformResolver } from "./resolvers/generate.js";
 import { getApiResolver, getRunResolver } from "./resolvers/get.js";
 import { cacheOauthClientCredentialsResolver, deleteIntegrationResolver, findRelevantIntegrationsResolver, getIntegrationResolver, getOAuthClientCredentialsResolver, listIntegrationsResolver, searchIntegrationDocumentationResolver, upsertIntegrationResolver } from "./resolvers/integrations.js";
 import { listApisResolver, listRunsResolver } from "./resolvers/list.js";
@@ -60,6 +60,7 @@ export const resolvers = {
     upsertWorkflowSchedule: upsertWorkflowScheduleResolver,
     deleteWorkflowSchedule: deleteWorkflowScheduleResolver,
     generateStepConfig: generateStepConfigResolver,
+    generateTransform: generateTransformResolver,
   },
   Subscription: {
     logs: logsResolver,
