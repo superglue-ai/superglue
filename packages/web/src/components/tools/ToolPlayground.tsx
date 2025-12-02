@@ -30,6 +30,7 @@ import { ToolDeployModal } from "./deploy/ToolDeployModal";
 import { DeleteConfigDialog } from "./dialogs/DeleteConfigDialog";
 import { DuplicateToolDialog } from "./dialogs/DuplicateToolDialog";
 import { FixStepDialog } from "./dialogs/FixStepDialog";
+import { FixTransformDialog } from "./dialogs/FixTransformDialog";
 import { ModifyStepConfirmDialog } from "./dialogs/ModifyStepConfirmDialog";
 import { RenameToolDialog } from "./dialogs/RenameToolDialog";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
@@ -165,6 +166,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [isStopping, setIsStopping] = useState(false);
   const [isRunningTransform, setIsRunningTransform] = useState(false);
   const [isFixingTransform, setIsFixingTransform] = useState(false);
+  const [showFixTransformDialog, setShowFixTransformDialog] = useState(false);
   // Computed: any transform execution in progress
   const isExecutingTransform = isRunningTransform || isFixingTransform;
   // Single source of truth for stopping across modes (embedded/standalone)
@@ -1115,8 +1117,18 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
   };
 
-  const handleFixTransform = async (schemaStr: string, transformStr: string) => {
-    await handleExecuteTransform(schemaStr, transformStr, true);
+  const handleOpenFixTransformDialog = () => {
+    setShowFixTransformDialog(true);
+  };
+
+  const handleCloseFixTransformDialog = () => {
+    setShowFixTransformDialog(false);
+  };
+
+  const handleFixTransformSuccess = (newTransform: string) => {
+    setFinalTransform(newTransform);
+    // Execute the new transform to see if it works
+    handleExecuteTransform(responseSchema, newTransform, false);
   };
 
   // Tool action handlers
@@ -1351,7 +1363,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   onExecuteStepWithLimit={handleExecuteStepWithLimit}
                   onOpenFixStepDialog={handleOpenFixStepDialog}
                   onExecuteTransform={handleExecuteTransform}
-                  onFixTransform={handleFixTransform}
+                  onOpenFixTransformDialog={handleOpenFixTransformDialog}
                   onFinalTransformChange={setFinalTransform}
                   onResponseSchemaChange={setResponseSchema}
                   onPayloadChange={setManualPayloadText}
@@ -1477,6 +1489,22 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onDeleted={handleDeleted}
+      />
+
+      <FixTransformDialog
+        open={showFixTransformDialog}
+        onClose={handleCloseFixTransformDialog}
+        currentTransform={finalTransform}
+        responseSchema={responseSchema ? JSON.parse(responseSchema) : undefined}
+        stepData={Object.entries(stepResultsMap)
+          .filter(([key]) => key !== '__final_transform__')
+          .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {})}
+        errorMessage={
+          typeof stepResultsMap['__final_transform__'] === 'string'
+            ? stepResultsMap['__final_transform__']
+            : undefined
+        }
+        onSuccess={handleFixTransformSuccess}
       />
     </div>
   );
