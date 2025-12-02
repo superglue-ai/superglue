@@ -98,7 +98,6 @@ export function TemplateEditPopover({
         try {
           initialCode = normalizeTemplateExpression(templateContent);
         } catch {
-          // Template is malformed - show raw content so user can fix it
           initialCode = templateContent;
         }
       }

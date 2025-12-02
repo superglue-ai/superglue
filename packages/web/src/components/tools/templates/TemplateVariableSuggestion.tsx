@@ -134,8 +134,8 @@ const VariableCommandMenu = forwardRef<VariableCommandMenuRef, VariableCommandMe
                 if (nestedValue && typeof nestedValue === 'object' && !Array.isArray(nestedValue)) {
                     const keys = Object.keys(nestedValue as Record<string, unknown>);
                     const values = keys.map(key => (nestedValue as Record<string, unknown>)[key]);
-                    const canDrill = values.map((val, i) => {
-                        if (getValueType(val) !== 'object' || navState.path.length >= 1) return false;
+                    const canDrill = values.map((val) => {
+                        if (getValueType(val) !== 'object') return false;
                         const nestedKeys = val && typeof val === 'object' ? Object.keys(val) : [];
                         return nestedKeys.length > 0;
                     });
@@ -371,17 +371,17 @@ export function createVariableSuggestionConfig(callbacks: SuggestionCallbacks) {
             };
 
             const makeMenuProps = () => ({
-                categorizedVariables: callbacks.categorizedVariables,
-                categorizedSources: callbacks.categorizedSources,
-                onSelectVariable: (varName: string, categoryKey: keyof CategorizedVariables) => {
-                    if (currentRange) callbacks.onSelectVariable(varName, currentRange, categoryKey);
-                    popup?.[0]?.hide();
-                },
+                            categorizedVariables: callbacks.categorizedVariables,
+                            categorizedSources: callbacks.categorizedSources,
+                            onSelectVariable: (varName: string, categoryKey: keyof CategorizedVariables) => {
+                                if (currentRange) callbacks.onSelectVariable(varName, currentRange, categoryKey);
+                                popup?.[0]?.hide();
+                            },
                 onSelectCode: () => {
                     if (currentRange) callbacks.onSelectCode(currentRange);
-                    popup?.[0]?.hide();
-                },
-                onRequestClose: destroyPopup,
+                                popup?.[0]?.hide();
+                            },
+                            onRequestClose: destroyPopup,
             });
 
             return {

@@ -263,7 +263,7 @@ export const VM_HELPERS_CODE = `
         if (/[A-Za-z0-9@*_+.\-/!~'()]/.test(str[i])) {
           result += str[i];
         } else if (code < 256) {
-          result += '%' + code.toString(16).toUpperCase().padStart(2, '0');
+            result += '%' + code.toString(16).toUpperCase().padStart(2, '0');
         } else {
           result += '%u' + code.toString(16).toUpperCase().padStart(4, '0');
         }

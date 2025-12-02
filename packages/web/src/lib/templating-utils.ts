@@ -93,15 +93,17 @@ export function normalizeTemplateExpression(expr: string): string {
   if (trimmed.startsWith('sourceData.') || trimmed.startsWith('sourceData[') || trimmed === 'sourceData') {
     return `(sourceData) => ${trimmed}`;
   }
-  if (trimmed.includes('[')) {
-    if (/^[a-zA-Z_$]/.test(trimmed)) {
-      return `(sourceData) => sourceData.${trimmed}`;
-    }
+  if (trimmed.includes('[') && /^[a-zA-Z_$]/.test(trimmed)) {
+    return `(sourceData) => sourceData.${trimmed}`;
   }
   if (trimmed.includes('.') && !trimmed.includes(' ')) {
     const segments = trimmed.split('.');
     const accessor = buildAccessor(segments);
     return `(sourceData) => sourceData${accessor}`;
+  }
+  // Single segment - use dot notation if valid identifier, bracket notation otherwise
+  if (VALID_IDENTIFIER.test(trimmed)) {
+    return `(sourceData) => sourceData.${trimmed}`;
   }
   return `(sourceData) => sourceData["${escapeForBracket(trimmed)}"]`;
 }
