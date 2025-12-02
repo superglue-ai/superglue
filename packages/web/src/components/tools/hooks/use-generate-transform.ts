@@ -22,7 +22,7 @@ export function useGenerateTransform() {
         try {
             const client = createSuperglueClient(config.superglueEndpoint);
             
-            const transformCode = await client.generateTransform({
+            const result = await client.generateTransform({
                 currentTransform: params.currentTransform,
                 responseSchema: params.responseSchema,
                 stepData: params.stepData,
@@ -30,7 +30,7 @@ export function useGenerateTransform() {
                 instruction: params.instruction,
             });
 
-            return transformCode;
+            return result;
         } catch (err: any) {
             const errorMessage = err?.message || 'Failed to generate transform code';
             setError(errorMessage);

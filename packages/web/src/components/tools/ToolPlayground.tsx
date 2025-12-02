@@ -6,8 +6,7 @@ import { useTools } from "@/src/app/tools-context";
 import { createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, computeStepOutput, computeToolPayload, removeFileKeysFromPayload, wrapLoopSelectorWithLimit } from "@/src/lib/general-utils";
-import { ExecutionStep, Integration, Tool, ToolResult } from "@superglue/shared";
-import { generateDefaultFromSchema } from "@superglue/shared";
+import { ExecutionStep, generateDefaultFromSchema, Integration, Tool, ToolResult } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import isEqual from "lodash.isequal";
 import { Check, CloudUpload, CopyPlus, Edit2, Hammer, Loader2, Play, Trash2, X } from "lucide-react";
@@ -136,6 +135,16 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     computeToolPayload(manualPayloadText, filePayloads),
     [manualPayloadText, filePayloads]
   );
+  
+  const parsedResponseSchema = useMemo(() => {
+    if (!responseSchema) return undefined;
+    try {
+      return JSON.parse(responseSchema);
+    } catch (error) {
+      console.error('Failed to parse response schema:', error);
+      return undefined;
+    }
+  }, [responseSchema]);
   
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1125,10 +1134,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     setShowFixTransformDialog(false);
   };
 
-  const handleFixTransformSuccess = (newTransform: string) => {
+  const handleFixTransformSuccess = (newTransform: string, transformedData: any) => {
     setFinalTransform(newTransform);
-    // Execute the new transform to see if it works
-    handleExecuteTransform(responseSchema, newTransform, false);
+    setStepResultsMap(prev => ({ ...prev, __final_transform__: transformedData }));
+    setFinalPreviewResult(transformedData);
   };
 
   // Tool action handlers
@@ -1495,7 +1504,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         open={showFixTransformDialog}
         onClose={handleCloseFixTransformDialog}
         currentTransform={finalTransform}
-        responseSchema={responseSchema ? JSON.parse(responseSchema) : undefined}
+        responseSchema={parsedResponseSchema}
         stepData={Object.entries(stepResultsMap)
           .filter(([key]) => key !== '__final_transform__')
           .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {})}

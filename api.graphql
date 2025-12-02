@@ -354,6 +354,7 @@ type GenerateStepConfigResult {
 
 type GenerateTransformResult {
   transformCode: String!
+  data: JSON
 }
 
 type WorkflowResult {

@@ -20,7 +20,7 @@ interface FixTransformDialogProps {
     responseSchema?: any;
     stepData: Record<string, any>;
     errorMessage?: string;
-    onSuccess: (newTransform: string) => void;
+    onSuccess: (newTransform: string, transformedData: any) => void;
 }
 
 export function FixTransformDialog({
@@ -47,7 +47,7 @@ export function FixTransformDialog({
         }
 
         try {
-            const newTransform = await generateTransform({
+            const result = await generateTransform({
                 currentTransform,
                 responseSchema,
                 stepData,
@@ -60,7 +60,7 @@ export function FixTransformDialog({
                 description: 'The transform code has been updated.',
             });
 
-            onSuccess(newTransform);
+            onSuccess(result.transformCode, result.data);
             handleClose();
         } catch (err: any) {
             toast({

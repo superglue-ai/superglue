@@ -1098,7 +1098,7 @@ export class SuperglueClient {
         stepData: Record<string, any>;
         errorMessage?: string;
         instruction?: string;
-    }): Promise<string> {
+    }): Promise<{ transformCode: string; data?: any }> {
         const mutation = `
             mutation GenerateTransform(
                 $currentTransform: String!,
@@ -1115,12 +1115,13 @@ export class SuperglueClient {
                     instruction: $instruction
                 ) {
                     transformCode
+                    data
                 }
             }
         `;
 
-        const response = await this.request<{ generateTransform: { transformCode: string } }>(mutation, args);
-        return response.generateTransform.transformCode;
+        const response = await this.request<{ generateTransform: { transformCode: string; data?: any } }>(mutation, args);
+        return response.generateTransform;
     }
 }
 

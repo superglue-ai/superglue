@@ -175,11 +175,9 @@ export const generateTransformResolver = async (
   { currentTransform, responseSchema, stepData, errorMessage, instruction }: GenerateTransformArgs,
   context: Context,
   info: GraphQLResolveInfo
-): Promise<{ transformCode: string }> => {
+): Promise<{ transformCode: string; data?: any }> => {
   try {
     const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-
-    logMessage('info', 'Generating transform code', metadata);
 
     const prompt = instruction || "Fix the transformation code." +
       (errorMessage ? ` Error: ${errorMessage}` : "") +
@@ -196,7 +194,10 @@ export const generateTransformResolver = async (
       throw new Error('Failed to generate transform code');
     }
 
-    return { transformCode: result.transformCode };
+    return { 
+      transformCode: result.transformCode,
+      data: result.data 
+    };
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
       errorMessage,
