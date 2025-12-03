@@ -47,7 +47,7 @@ export const authMiddleware = async (req: any, res: any, next: any) => {
 
   // If authentication fails, return 401 error
   if (!authResult.success) {
-    logMessage('warn', `Authentication failed for token: ${token}`, { traceId: req.traceId });
+    logMessage('warn', `Authentication failed for token: ${token?.slice(0, 10) ?? 'none'}...`, { traceId: req.traceId });
     return res.status(401).send(getAuthErrorHTML(token));
   }
 

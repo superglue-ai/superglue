@@ -75,7 +75,7 @@ export async function startGraphqlServer(datastore: DataStore) {
       const authResult = await validateToken(token);
 
       if (!authResult.success) {
-        logMessage('warn', `GraphQL Server: Websocket Subscription authentication failed for token: ${token}`, { traceId });
+        logMessage('warn', `GraphQL Server: Websocket Subscription authentication failed for token: ${token?.slice(0, 10) ?? 'none'}...`, { traceId });
         return false;
       }
       

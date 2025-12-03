@@ -55,7 +55,7 @@ export async function startApiServer(datastore: DataStore) {
     
     // If authentication fails, return 401 error
     if (!authResult.success) {
-      logMessage('warn', `Fastify authentication failed for token: ${token}`, { traceId });
+      logMessage('warn', `Fastify authentication failed for token: ${token?.slice(0, 10) ?? 'none'}...`, { traceId });
       return reply.code(401).send({
         success: false,
         error: 'Authentication failed',
