@@ -48,7 +48,6 @@ export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
     if (includePreview) {
         const share = perShare + remainingCarry;
-        // if the full object fits in the budget + samples, add it to the section 
         const previewStr = buildPreviewSection(obj, share, previewDepthLimit, previewArrayLimit, previewObjectKeyLimit);
         sections.push(previewStr.text);
         remainingCarry = Math.max(0, share - previewStr.text.length);
