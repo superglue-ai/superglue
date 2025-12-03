@@ -1,0 +1,167 @@
+---
+title: "Permissioning"
+description: "Control which users and agents can access which tools"
+---
+
+<Info>
+  **Enterprise Feature** — Permissioning and identity provider integration is
+  available on superglue Enterprise plans. [Contact
+  us](https://cal.com/superglue/superglue-demo) to learn more.
+</Info>
+
+superglue Enterprise supports fine-grained access control by connecting to your existing identity systems. Define exactly which users, service accounts, and AI agents can execute which tools—ensuring your automations stay secure and compliant.
+
+## Identity provider integration
+
+Connect superglue to your organization's identity provider for centralized user management and single sign-on:
+
+<CardGroup cols={2}>
+  <Card title="Microsoft Entra ID" icon="microsoft">
+    Sync users and groups from Azure AD/Microsoft Entra ID. Supports SAML and
+    OIDC.
+  </Card>
+  <Card title="Okta" icon="key">
+    Integrate with Okta for SSO and automatic user provisioning via SCIM.
+  </Card>
+  <Card title="Google Workspace" icon="google">
+    Connect Google Workspace for identity federation and group sync.
+  </Card>
+  <Card title="Custom OIDC/SAML" icon="shield-halved">
+    Connect any identity provider that supports OpenID Connect or SAML 2.0.
+  </Card>
+</CardGroup>
+
+### Connecting Microsoft Entra ID
+
+```typescript
+// Example: Configure Microsoft Entra ID integration
+const identityConfig = {
+  provider: "microsoft",
+  tenantId: "your-tenant-id",
+  clientId: "your-client-id",
+  clientSecret: "your-client-secret",
+  scopes: ["User.Read", "GroupMember.Read.All"],
+};
+```
+
+Once connected, superglue automatically syncs:
+
+- User identities and email addresses
+- Group memberships
+- Role assignments
+
+## Access control model
+
+superglue uses a role-based access control (RBAC) model with three layers:
+
+| Layer            | Description                                   |
+| ---------------- | --------------------------------------------- |
+| **Organization** | Top-level access to the superglue instance    |
+| **Tool**         | Which tools a user/agent can view and execute |
+| **Integration**  | Which API credentials a user/agent can use    |
+
+### Defining permissions
+
+Assign permissions to users, groups, or service accounts:
+
+```typescript
+import { SuperglueClient } from "@superglue/client";
+
+const superglue = new SuperglueClient({
+  apiKey: "your_api_key_here",
+});
+
+// Grant a user permission to execute a specific tool
+await superglue.grantPermission({
+  principalId: "user@company.com",
+  principalType: "user",
+  resourceType: "tool",
+  resourceId: "sync-stripe-customers",
+  permission: "execute",
+});
+
+// Grant a group permission to all tools in a namespace
+await superglue.grantPermission({
+  principalId: "sales-team",
+  principalType: "group",
+  resourceType: "tool",
+  resourceId: "sales/*",
+  permission: "execute",
+});
+```
+
+### Permission levels
+
+| Permission | Description                                             |
+| ---------- | ------------------------------------------------------- |
+| `view`     | Can see the tool configuration and execution history    |
+| `execute`  | Can run the tool with any payload                       |
+| `edit`     | Can modify the tool configuration                       |
+| `admin`    | Full control including delete and permission management |
+
+## Controlling agent access
+
+AI agents accessing superglue through the SDK or MCP can be scoped to specific tools and integrations:
+
+### SDK authentication
+
+```typescript
+import { SuperglueClient } from "@superglue/client";
+
+// Create a scoped client for an AI agent
+const agentClient = new SuperglueClient({
+  apiKey: "agent_scoped_api_key",
+  // This key only has access to tools the agent needs
+});
+
+// Agent can only execute tools it has permission for
+const result = await agentClient.executeWorkflow({
+  id: "approved-tool-id",
+  payload: {
+    /* ... */
+  },
+});
+```
+
+### MCP tool filtering
+
+When using superglue as an MCP server, you can filter which tools are exposed to AI agents:
+
+```typescript
+// MCP server configuration with tool filtering
+{
+  "mcpServers": {
+    "superglue": {
+      "command": "npx",
+      "args": ["-y", "superglue-mcp"],
+      "env": {
+        "SUPERGLUE_API_KEY": "agent_scoped_api_key",
+        "SUPERGLUE_API_URL": "https://your-instance.superglue.cloud"
+      }
+    }
+  }
+}
+```
+
+The agent will only see and be able to execute tools that match its API key's permissions.
+
+## Audit logging
+
+All tool executions are logged with identity context:
+
+```typescript
+// Query audit logs
+const logs = await superglue.getAuditLogs({
+  resourceType: "tool",
+  resourceId: "sync-stripe-customers",
+  startDate: "2025-01-01",
+  endDate: "2025-01-31",
+});
+
+// Each log entry includes:
+// - Who executed the tool (user, agent, or service account)
+// - When it was executed
+// - What payload was provided
+// - Whether it succeeded or failed
+// - How long it took
+```
