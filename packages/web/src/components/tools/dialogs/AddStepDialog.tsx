@@ -11,14 +11,14 @@ import {
     DialogTitle,
 } from '@/src/components/ui/dialog';
 import { Input } from '@/src/components/ui/input';
-import { Textarea } from '@/src/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import { Textarea } from '@/src/components/ui/textarea';
 import { cn } from '@/src/lib/general-utils';
 import { ExecutionStep } from '@superglue/shared';
 import { Loader2, WandSparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { IntegrationSelector } from '../shared/IntegrationSelector';
 import { useGenerateStepConfig } from '../hooks/use-generate-step-config';
+import { IntegrationSelector } from '../shared/IntegrationSelector';
 
 interface AddStepDialogProps {
     open: boolean;
@@ -119,8 +119,31 @@ export function AddStepDialog({
             return;
         }
 
+        // Rename imported steps if they collide with existing step IDs
+        const usedIds = new Set(existingStepIds);
+        const renamedSteps = selectedTool.steps.map(step => {
+            let newId = step.id;
+            if (usedIds.has(newId)) {
+                let suffix = 2;
+                while (usedIds.has(`${step.id}${suffix}`)) {
+                    suffix++;
+                }
+                newId = `${step.id}${suffix}`;
+            }
+            usedIds.add(newId);
+            
+            if (newId !== step.id) {
+                return {
+                    ...step,
+                    id: newId,
+                    apiConfig: step.apiConfig ? { ...step.apiConfig, id: newId } : undefined
+                };
+            }
+            return step;
+        });
+
         if (onConfirmTool) {
-            onConfirmTool(selectedTool.steps);
+            onConfirmTool(renamedSteps);
         }
         setError('');
         setSelectedToolId(null);
