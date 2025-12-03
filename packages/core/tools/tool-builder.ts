@@ -56,7 +56,8 @@ export class ToolBuilder {
       integrations: Object.values(this.integrations),
       payload: this.initialPayload,
       userInstruction: this.instruction,
-      responseSchema: this.responseSchema
+      responseSchema: this.responseSchema,
+      metadata: this.metadata
     }, {
       characterBudget: 120000,
       include: { integrationContext: true, availableVariablesContext: true, payloadContext: true, userInstruction: true }

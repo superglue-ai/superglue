@@ -474,7 +474,7 @@ export class ToolExecutor implements Tool {
     });
 
     const evaluationResult = await LanguageModel.generateObject<z.infer<typeof evaluationSchema>>(
-      { messages: messages, schema: zodToJsonSchema(evaluationSchema), temperature: 0 });
+      { messages: messages, schema: zodToJsonSchema(evaluationSchema), temperature: 0, metadata: this.metadata });
     
     if (!evaluationResult.success) {
       throw new Error(`Error evaluating config response: ${evaluationResult.response}`);

@@ -120,7 +120,7 @@ describe('ToolExecutor Self-Healing Config Propagation', () => {
       ],
     };
 
-    const integrationManager = IntegrationManager.fromIntegration(mockIntegration, dataStore, 'test-org');
+    const integrationManager = IntegrationManager.fromIntegration(mockIntegration, dataStore, { orgId: 'test-org' });
     const executor = new ToolExecutor({
       tool,
       metadata: { orgId: 'test-org', userId: 'test-user' },
@@ -230,7 +230,7 @@ describe('ToolExecutor Self-Healing Config Propagation', () => {
       ],
     };
 
-    const integrationManager = IntegrationManager.fromIntegration(mockIntegration, dataStore, 'test-org');
+    const integrationManager = IntegrationManager.fromIntegration(mockIntegration, dataStore, { orgId: 'test-org' });
     const executor = new ToolExecutor({
       tool,
       metadata: { orgId: 'test-org', userId: 'test-user' },

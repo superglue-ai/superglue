@@ -1,4 +1,4 @@
-import { Integration } from '@superglue/shared';
+import { Integration, ServiceMetadata } from '@superglue/shared';
 import { server_defaults } from '../default.js';
 import { DocumentationSearch } from '../documentation/documentation-search.js';
 import { logMessage } from '../utils/logs.js';
@@ -92,7 +92,7 @@ function buildIntegrationContext(integration: Integration, opts: IntegrationCont
     const generalMaxSections = opts.tuning?.documentationMaxSections ?? server_defaults.CONTEXT.INTEGRATIONS.GENERAL_MAX_SECTIONS;
     const generalSectionSize = opts.tuning?.documentationMaxChars ?? server_defaults.CONTEXT.INTEGRATIONS.GENERAL_SECTION_SIZE_CHARS;
 
-    const docSearch = new DocumentationSearch((undefined as any));
+    const docSearch = new DocumentationSearch(opts.metadata);
     const authSection = sanitizeUnpairedSurrogates(docSearch.extractRelevantSections(
         integration.documentation,
         "authentication authorization key token bearer basic oauth credentials",
@@ -165,7 +165,7 @@ export function getToolBuilderContext(input: ToolBuilderContextInput, options: T
 
     const availableVariablesContent = buildAvailableVariableContext(input.payload, input.integrations).slice(0, availableVariablesBudget);
     const integrationContent = hasIntegrations
-        ? input.integrations.map(int => buildIntegrationContext(int, { characterBudget: Math.floor(integrationBudget / input.integrations.length) })).join('\n').slice(0, integrationBudget)
+        ? input.integrations.map(int => buildIntegrationContext(int, { characterBudget: Math.floor(integrationBudget / input.integrations.length), metadata: input.metadata })).join('\n').slice(0, integrationBudget)
         : 'No integrations provided. Build a transform-only workflow using finalTransform to process the payload data.'.slice(0, integrationBudget);
 
     const availableVariablesContext = options.include?.availableVariablesContext ? `<available_variables>${availableVariablesContent}</available_variables>` : '';

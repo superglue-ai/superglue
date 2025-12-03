@@ -28,8 +28,7 @@ export interface searchDocumentationToolContext extends ServiceMetadata {
 
 export const searchDocumentationToolImplementation: LLMToolImplementation<searchDocumentationToolContext> = async (args, context) => {
     const { query } = args;
-    const { integration } = context;
-    const metadata = context as ServiceMetadata;
+    const { integration, ...metadata } = context;
 
     if (!integration) {
         return {

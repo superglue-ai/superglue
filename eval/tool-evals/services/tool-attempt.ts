@@ -123,7 +123,7 @@ export class SuperglueToolAttemptService {
         selfHealingEnabled: boolean
     ): Promise<ToolResult> {
         const executor = new ToolExecutor(
-            { tool: workflow, metadata: this.metadata, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId) }
+            { tool: workflow, metadata: this.metadata, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata) }
         );
 
         const allCredentials = integrations.reduce(

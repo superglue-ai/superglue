@@ -49,7 +49,7 @@ export async function generateStepConfig({ retryCount, messages, integration, me
     const webSearchTool = getWebSearchTool();
     const tools: LLMToolWithContext[] = [{
         toolDefinition: searchDocumentationToolDefinition, 
-        toolContext: { ...metadata, integration }
+        toolContext: { orgId: metadata.orgId, traceId: metadata.traceId, integration }
     }];
     
     if (webSearchTool) {
