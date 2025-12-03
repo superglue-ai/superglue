@@ -128,12 +128,10 @@ export function TemplateEditPopover({
   const [codeEditorHeight, setCodeEditorHeight] = useState(DEFAULT_CODE_HEIGHT_PX);
   const codeEditorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   
-  const hasSourceData = sourceData && typeof sourceData === 'object' && Object.keys(sourceData).length > 0;
-
   const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
     codeContent,
     sourceData,
-    { enabled: open && canExecute && hasSourceData }
+    { enabled: open && canExecute }
   );
 
   const handleEditorMount = useCallback((editor: Monaco.editor.IStandaloneCodeEditor) => {
@@ -189,7 +187,7 @@ export function TemplateEditPopover({
   const currentItemValue = isLoopArray ? previewValue[0] : previewValue;
   const activePreviewValue = (loopMode && previewTab === 'currentItem') ? currentItemValue : previewValue;
   
-  const isLoading = isEvaluating;
+  const isLoading = isEvaluating || !hasResult;
   const previewDisplayRaw = formatValueForDisplay(activePreviewValue);
   const maskedPreview = Object.keys(credentials).length > 0 
     ? maskCredentials(previewDisplayRaw, credentials) 
@@ -230,7 +228,6 @@ export function TemplateEditPopover({
     return () => window.removeEventListener('scroll', handleScroll, true);
   }, [open, anchorRect]);
 
-  const maxCodeHeightVh = isFullscreen ? MODAL_CODE_HEIGHT_VH : MAX_CODE_HEIGHT_VH;
   const maxPreviewHeightVh = isFullscreen ? MODAL_PREVIEW_HEIGHT_VH : MAX_PREVIEW_HEIGHT_VH;
   const maxPreviewHeight = window.innerHeight * maxPreviewHeightVh;
   const previewEditorHeight = calcHeight(previewDisplay, maxPreviewHeight);
@@ -248,6 +245,7 @@ export function TemplateEditPopover({
             {helpText && <HelpTooltip text={helpText} />}
           </div>
           <button
+            type="button"
             onClick={() => setIsFullscreen(!isFullscreen)}
             className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted/80 transition-colors"
             title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
@@ -271,27 +269,6 @@ export function TemplateEditPopover({
           <div className="absolute top-1 right-1 z-10">
             <CopyButton getData={() => codeContent} />
           </div>
-          <div 
-            className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-10" 
-            style={{ background: 'linear-gradient(135deg, transparent 50%, rgba(100,100,100,0.4) 50%)' }} 
-            onMouseDown={(e) => {
-              e.preventDefault();
-              const startY = e.clientY;
-              const startHeight = effectiveCodeHeight;
-              const maxCodeHeight = window.innerHeight * maxCodeHeightVh;
-              const handleMouseMove = (e: MouseEvent) => { 
-                const deltaY = e.clientY - startY; 
-                const newHeight = Math.max(MIN_EDITOR_HEIGHT_PX, Math.min(maxCodeHeight, startHeight + deltaY)); 
-                setCodeEditorHeight(newHeight); 
-              };
-              const handleMouseUp = () => { 
-                document.removeEventListener('mousemove', handleMouseMove); 
-                document.removeEventListener('mouseup', handleMouseUp); 
-              };
-              document.addEventListener('mousemove', handleMouseMove);
-              document.addEventListener('mouseup', handleMouseUp);
-            }} 
-          />
         </div>
         {codeContent && !isArrowFunction(codeContent) && (
           <div className="text-[10px] text-amber-600 dark:text-amber-400 px-1 pt-1 flex items-center gap-1">
@@ -313,7 +290,7 @@ export function TemplateEditPopover({
             </Tabs>
           )}
         </div>
-        {!canExecute || !hasSourceData ? (
+        {!canExecute ? (
           <div className="flex items-center gap-2 p-3 bg-muted/50 border border-muted-foreground/20 rounded-md text-xs text-muted-foreground">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>Preview available when step inputs are provided</span>

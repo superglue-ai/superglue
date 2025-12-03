@@ -57,7 +57,7 @@ export function TemplateChip({
   const hasError = !!error;
   const isUnresolved = !hasError && !canExecute;
   const isResolvedUndefined = !hasError && canExecute && hasResult && evaluatedValue === undefined;
-  const isLoading = !hasResult && evaluatedValue === undefined;
+  const isLoading = canExecute && !hasResult && evaluatedValue === undefined;
   
   const isLoopArray = loopMode && Array.isArray(evaluatedValue) && evaluatedValue.length > 0;
   const displayValue = isLoopArray ? evaluatedValue[0] : evaluatedValue;

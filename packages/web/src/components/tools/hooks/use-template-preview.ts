@@ -29,10 +29,8 @@ export function useTemplatePreview(
   const lastSourceDataRef = useRef<any>(null);
   const evalVersionRef = useRef(0);
 
-  const hasSourceData = sourceData && typeof sourceData === 'object' && Object.keys(sourceData).length > 0;
-
   useEffect(() => {
-    if (!enabled || !hasSourceData) {
+    if (!enabled) {
       setIsEvaluating(false);
       return;
     }
@@ -94,7 +92,7 @@ export function useTemplatePreview(
     }, debounceMs);
 
     return () => clearTimeout(timer);
-  }, [codeContent, sourceData, enabled, hasSourceData, debounceMs]);
+  }, [codeContent, sourceData, enabled, debounceMs]);
 
   return { previewValue, previewError, isEvaluating, hasResult };
 }
