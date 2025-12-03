@@ -83,6 +83,7 @@ export const FinalTransformMiniStepCard = ({
     useEffect(() => {
       if (isRunningTransform || isFixingTransform) {
         setIsPendingExecution(false);
+        setActiveTab("output");
       }
     }, [isRunningTransform, isFixingTransform]);
 
@@ -183,8 +184,6 @@ export const FinalTransformMiniStepCard = ({
 
     function handleOpenFixTransformDialog(): void {
       if (onOpenFixTransformDialog) {
-        setIsPendingExecution(true);
-        setActiveTab("output");
         onOpenFixTransformDialog();
       }
     }

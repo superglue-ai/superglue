@@ -11,14 +11,14 @@ import {
     DialogTitle,
 } from '@/src/components/ui/dialog';
 import { Input } from '@/src/components/ui/input';
-import { Textarea } from '@/src/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import { Textarea } from '@/src/components/ui/textarea';
 import { cn } from '@/src/lib/general-utils';
 import { ExecutionStep } from '@superglue/shared';
-import { Loader2, WandSparkles } from 'lucide-react';
+import { AlertTriangle, Loader2, WandSparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { IntegrationSelector } from '../shared/IntegrationSelector';
 import { useGenerateStepConfig } from '../hooks/use-generate-step-config';
+import { IntegrationSelector } from '../shared/IntegrationSelector';
 
 interface AddStepDialogProps {
     open: boolean;
@@ -28,6 +28,7 @@ interface AddStepDialogProps {
     onConfirmGenerate?: (step: ExecutionStep) => void;
     existingStepIds: string[];
     stepInput?: Record<string, any>;
+    currentToolId?: string;
 }
 
 export function AddStepDialog({
@@ -37,7 +38,8 @@ export function AddStepDialog({
     onConfirmTool,
     onConfirmGenerate,
     existingStepIds,
-    stepInput
+    stepInput,
+    currentToolId
 }: AddStepDialogProps) {
     const [stepId, setStepId] = useState('');
     const [instruction, setInstruction] = useState('');
@@ -75,6 +77,11 @@ export function AddStepDialog({
     };
 
     const filteredTools = tools.filter(tool => {
+        // Exclude tools with no steps
+        if (!tool.steps || tool.steps.length === 0) return false;
+        // Exclude the current tool
+        if (currentToolId && tool.id === currentToolId) return false;
+        
         if (!searchQuery.trim()) return true;
         const query = searchQuery.toLowerCase();
         return (
@@ -96,6 +103,11 @@ export function AddStepDialog({
             return;
         }
 
+        if (!selectedIntegrationId) {
+            setError('Please select an integration');
+            return;
+        }
+
         onConfirm(trimmedId, instruction.trim(), selectedIntegrationId);
         setError('');
     };
@@ -112,8 +124,31 @@ export function AddStepDialog({
             return;
         }
 
+        // Rename imported steps if they collide with existing step IDs
+        const usedIds = new Set(existingStepIds);
+        const renamedSteps = selectedTool.steps.map(step => {
+            let newId = step.id;
+            if (usedIds.has(newId)) {
+                let suffix = 2;
+                while (usedIds.has(`${step.id}${suffix}`)) {
+                    suffix++;
+                }
+                newId = `${step.id}${suffix}`;
+            }
+            usedIds.add(newId);
+            
+            if (newId !== step.id) {
+                return {
+                    ...step,
+                    id: newId,
+                    apiConfig: step.apiConfig ? { ...step.apiConfig, id: newId } : undefined
+                };
+            }
+            return step;
+        });
+
         if (onConfirmTool) {
-            onConfirmTool(selectedTool.steps);
+            onConfirmTool(renamedSteps);
         }
         setError('');
         setSelectedToolId(null);
@@ -234,7 +269,10 @@ export function AddStepDialog({
                             />
                         </div>
                         {error && (
-                            <p className="text-sm text-destructive">{error}</p>
+                            <div className="flex items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+                                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                                <span>{error}</span>
+                            </div>
                         )}
                     </TabsContent>
 
@@ -289,7 +327,10 @@ export function AddStepDialog({
                                     )}
                                 </div>
                                 {error && (
-                                    <p className="text-sm text-destructive">{error}</p>
+                                    <div className="flex items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+                                        <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                                        <span>{error}</span>
+                                    </div>
                                 )}
                             </div>
                         )}
