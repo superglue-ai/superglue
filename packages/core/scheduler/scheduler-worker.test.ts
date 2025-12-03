@@ -82,12 +82,14 @@ describe('WorkflowScheduler', () => {
                 input: { id: 'workflow-1' },
                 payload: { test: 'data' },
                 credentials: {},
-                options: {}
+                options: { selfHealing: undefined }
             },
-            {
+            expect.objectContaining({
                 datastore: mockDatastore,
-                orgId: 'org-1'
-            },
+                orgId: 'org-1',
+                traceId: expect.any(String),
+                toMetadata: expect.any(Function)
+            }),
             {}
         );
         
