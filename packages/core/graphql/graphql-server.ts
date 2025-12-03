@@ -38,14 +38,18 @@ export async function startGraphqlServer(datastore: DataStore) {
 
   // Context Configuration
   const buildContextFromRequest = async ({ req }: { req: any }): Promise<GraphQLRequestContext> => {
-    return {
+    const context: GraphQLRequestContext = {
       datastore: datastore,
       traceId: req.traceId,
       orgId: req.orgId || '',
       userId: req.authInfo?.userId,
       orgName: req.authInfo?.orgName,
-      orgRole: req.authInfo?.orgRole
+      orgRole: req.authInfo?.orgRole,
+      toMetadata: function() {
+        return { traceId: this.traceId, orgId: this.orgId };
+      }
     };
+    return context;
   };
 
   // Express App Setup
@@ -75,14 +79,18 @@ export async function startGraphqlServer(datastore: DataStore) {
         return false;
       }
       
-      return { 
+      const context: GraphQLRequestContext = { 
         datastore,
         traceId, 
         orgId: authResult.orgId,
         userId: authResult.userId,
         orgName: authResult.orgName,
-        orgRole: authResult.orgRole
+        orgRole: authResult.orgRole,
+        toMetadata: function() {
+          return { traceId: this.traceId, orgId: this.orgId };
+        }
       };
+      return context;
     },
     onDisconnect(ctx: any, code, reason) {
       logMessage('debug', `GraphQL Server: Websocket Subscription disconnected. code=${code} reason=${reason}`, { traceId: ctx.traceId });

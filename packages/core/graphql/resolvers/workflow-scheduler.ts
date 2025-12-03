@@ -33,7 +33,7 @@ export const listWorkflowSchedulesResolver = async (
         
         return schedulesInternal.map(toPublicSchedule);
     } catch (error) {
-        logMessage('error', "Error listing workflow schedules: " + String(error), { orgId: context.orgId });
+        logMessage('error', "Error listing workflow schedules: " + String(error), context.toMetadata());
         throw error;
     }
 };
@@ -72,7 +72,7 @@ export const upsertWorkflowScheduleResolver = async (
 
         return toPublicSchedule(workflowSchedule);
     } catch (error) {
-        logMessage('error', "Error upserting workflow schedule: " + String(error), { orgId: context.orgId });
+        logMessage('error', "Error upserting workflow schedule: " + String(error), context.toMetadata());
         throw error;
     }
 };
@@ -87,7 +87,7 @@ export const deleteWorkflowScheduleResolver = async (
         const workflowSchedulerService = new WorkflowScheduler(context.datastore);
         return await workflowSchedulerService.deleteWorkflowSchedule({ id, orgId: context.orgId });
     } catch (error) {
-        logMessage('error', "Error deleting workflow schedule: " + String(error), { orgId: context.orgId });
+        logMessage('error', "Error deleting workflow schedule: " + String(error), context.toMetadata());
         throw error;
     }
 };

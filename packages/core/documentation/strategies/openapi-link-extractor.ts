@@ -1,4 +1,4 @@
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import * as yaml from 'js-yaml';
 
 import { OpenApiFetchingStrategy } from '../types.js';
@@ -6,7 +6,7 @@ import { logMessage } from "../../utils/logs.js";
 import { extractOpenApiUrlsFromObject, fetchMultipleOpenApiSpecs } from '../documentation-utils.js';
 
 export class OpenApiLinkExtractorStrategy implements OpenApiFetchingStrategy {
-  async tryFetch(responseData: any, openApiUrl: string, metadata: Metadata): Promise<string | null> {
+  async tryFetch(responseData: any, openApiUrl: string, metadata: ServiceMetadata): Promise<string | null> {
     try {
       let parsedData: any = null;
 

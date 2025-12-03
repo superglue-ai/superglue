@@ -1,7 +1,7 @@
 import { AxiosRequestConfig } from "axios";
 import { callAxios } from "../tools/strategies/http/http.js";
 import { logMessage } from "./logs.js";
-import { Metadata } from "../graphql/types.js";
+import { ServiceMetadata } from "../graphql/types.js";
 
 interface WebhookPayload {
   runId: string;
@@ -11,7 +11,7 @@ interface WebhookPayload {
 }
 
 // Handle webhook notification
-export async function notifyWebhook(webhookUrl: string, runId: string, success: boolean, data?: any, error?: string, metadata?: Metadata) {
+export async function notifyWebhook(webhookUrl: string, runId: string, success: boolean, data?: any, error?: string, metadata?: ServiceMetadata) {
   try {
     const webhookPayload: WebhookPayload = {
       runId,

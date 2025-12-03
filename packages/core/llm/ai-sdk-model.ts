@@ -283,7 +283,7 @@ export class AiSdkModel implements LLM {
           const toolResult = result.toolResults.find(tr => tr.toolCallId === toolCall.toolCallId);
           
           if (toolResult) {
-            logToolExecution(toolCall.toolName, toolCall.input, toolResult.output);
+            logToolExecution(toolCall.toolName, toolCall.input, toolResult.output, input.metadata);
             
             conversationMessages.push({
               role: 'tool', content: [{

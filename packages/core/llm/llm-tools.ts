@@ -1,12 +1,12 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
+import { Integration, ServiceMetadata } from "@superglue/shared";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
-import { BaseLLMToolContext, LLMToolDefinition, LLMToolImplementation } from "./llm-tool-utils.js";
+import { LLMToolDefinition, LLMToolImplementation } from "./llm-tool-utils.js";
 import { sanitizeInstructionSuggestions } from "../utils/helpers.js";
 import { LanguageModel, LLMMessage } from "./llm-base-model.js";
 import { GENERATE_INSTRUCTIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
-import { Integration } from "@superglue/shared";
 
 export function getWebSearchTool(): any {
     const provider = process.env.LLM_PROVIDER?.toLowerCase();
@@ -22,13 +22,14 @@ export function getWebSearchTool(): any {
     }
 }
 
-export interface searchDocumentationToolContext extends BaseLLMToolContext {
+export interface searchDocumentationToolContext extends ServiceMetadata {
   integration: Integration;
 }
 
 export const searchDocumentationToolImplementation: LLMToolImplementation<searchDocumentationToolContext> = async (args, context) => {
     const { query } = args;
     const { integration } = context;
+    const metadata = context as ServiceMetadata;
 
     if (!integration) {
         return {
@@ -49,7 +50,7 @@ export const searchDocumentationToolImplementation: LLMToolImplementation<search
             };
         }
 
-        const documentationSearch = new DocumentationSearch({ orgId: context.orgId });
+        const documentationSearch = new DocumentationSearch(metadata);
         const searchResults = documentationSearch.extractRelevantSections(
             integration.documentation,
             query,
@@ -91,12 +92,13 @@ export const searchDocumentationToolDefinition: LLMToolDefinition = {
     execute: searchDocumentationToolImplementation
 };
 
-export interface InstructionGenerationContext extends BaseLLMToolContext {
+export interface InstructionGenerationContext extends ServiceMetadata {
     integrations: Integration[];
 }
   
 export const generateInstructionsImplementation: LLMToolImplementation<InstructionGenerationContext> = async (args, context) => {
     const { integrations } = context;
+    const metadata = context as ServiceMetadata;
   
     if (!integrations || integrations.length === 0) {
       return {
@@ -109,7 +111,7 @@ export const generateInstructionsImplementation: LLMToolImplementation<Instructi
     const integrationSummaries = integrations.map(integration => {
       // Use DocumentationSearch to intelligently truncate documentation
       // Focus on getting started, authentication, and basic operations
-      const documentationSearch = new DocumentationSearch({ orgId: context.orgId });
+      const documentationSearch = new DocumentationSearch(metadata);
       const truncatedDocs = integration.documentation
         ? documentationSearch.extractRelevantSections(
           integration.documentation,
@@ -145,7 +147,7 @@ export const generateInstructionsImplementation: LLMToolImplementation<Instructi
       items: { type: "string" }
     };
   
-    const result = await LanguageModel.generateObject<string[]>({messages, schema, temperature: 0.2});
+    const result = await LanguageModel.generateObject<string[]>({messages, schema, temperature: 0.2, metadata});
   
     if (!result.success) {
       throw new Error(`Error generating instructions: ${result.response}`);

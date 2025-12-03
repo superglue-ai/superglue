@@ -1,6 +1,6 @@
 import { Metrics, ToolMetrics } from "../types.js";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import { logMessage } from "../../../packages/core/utils/logs.js";
 import { join, dirname } from "path";
 
@@ -9,7 +9,7 @@ export class CsvReporter {
 
   constructor(
     private baseDir: string,
-    private metadata: Metadata
+    private metadata: ServiceMetadata
   ) {
     this.resultsDir = join(baseDir, "data/results");
   }

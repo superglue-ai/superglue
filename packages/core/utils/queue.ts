@@ -1,4 +1,4 @@
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import { logMessage } from "./logs.js";
 
 interface Process {
@@ -11,9 +11,9 @@ export class Queue {
     private isProcessing = false;
     private jobSet: Set<string> = new Set();
     public type: string;
-    public metadata: Metadata;
+    public metadata: ServiceMetadata;
 
-    constructor(queueType: string = "queue", metadata: Metadata) {
+    constructor(queueType: string = "queue", metadata: ServiceMetadata) {
         this.type = queueType;
         this.metadata = metadata;
     }

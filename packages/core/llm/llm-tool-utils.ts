@@ -1,3 +1,4 @@
+import { ServiceMetadata } from "@superglue/shared";
 import { logMessage } from "../utils/logs.js";
 import { generateInstructionsDefinition, generateInstructionsImplementation } from "./llm-tools.js";
 import { searchDocumentationToolDefinition, searchDocumentationToolImplementation } from "./llm-tools.js";
@@ -26,13 +27,7 @@ export interface LLMToolCallResult {
     data?: any;
 }
 
-// Base context with common metadata
-export interface BaseLLMToolContext {
-    runId: string;
-    orgId: string;
-}
-
-export type LLMToolImplementation<TContext extends BaseLLMToolContext = BaseLLMToolContext> = (
+export type LLMToolImplementation<TContext extends ServiceMetadata = ServiceMetadata> = (
     args: any,
     context: TContext
 ) => Promise<{
@@ -51,7 +46,7 @@ export const allLLMToolDefinitions = [
     searchDocumentationToolDefinition,
 ];
 
-export async function executeLLMTool<TContext extends BaseLLMToolContext>(toolCall: LLMToolCall, context: TContext): Promise<LLMToolCallResult> {
+export async function executeLLMTool<TContext extends ServiceMetadata>(toolCall: LLMToolCall, context: TContext): Promise<LLMToolCallResult> {
     const implementation = toolRegistry[toolCall.name];
 
     if (!implementation) {
@@ -85,7 +80,7 @@ export function getLLMToolDefinitions(toolNames?: string[]): LLMToolDefinition[]
     return allLLMToolDefinitions.filter(def => toolNames.includes(def.name));
 } 
 
-export function logToolExecution(toolName: string, input: any, output: any): void {
+export function logToolExecution(toolName: string, input: any, output: any, metadata?: ServiceMetadata): void {
     switch (toolName) {
         case 'search_documentation': {
             const query = input?.query || 'no query';
@@ -95,7 +90,7 @@ export function logToolExecution(toolName: string, input: any, output: any): voi
             } catch {
             outputStr = '[unstringifiable]';
             }
-            logMessage('info', `search_documentation: query="${query}" → ${outputStr.length} chars`);
+            logMessage('info', `search_documentation: query="${query}" → ${outputStr.length} chars`, metadata);
             break;
         }
     }

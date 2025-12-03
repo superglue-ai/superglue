@@ -1,5 +1,5 @@
 import { ApiConfig, ExecutionStep, Integration, RequestOptions, Tool, ToolResult, ToolStepResult } from "@superglue/shared";
-import { maskCredentials, Metadata } from "@superglue/shared";
+import { maskCredentials, ServiceMetadata } from "@superglue/shared";
 import { flattenAndNamespaceCredentials } from "@superglue/shared/utils";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { z } from "zod";
@@ -21,7 +21,7 @@ import { FTPStepExecutionStrategy } from "./strategies/ftp/ftp.js";
 
 export interface ToolExecutorOptions {
   tool: Tool;
-  metadata: Metadata;
+  metadata: ServiceMetadata;
   integrations: IntegrationManager[];
 }
 
@@ -31,7 +31,7 @@ export class ToolExecutor implements Tool {
   public finalTransform?: string;
   public result: ToolResult;
   public responseSchema?: JSONSchema;
-  public metadata: Metadata;
+  public metadata: ServiceMetadata;
   public instruction?: string;
   public inputSchema?: JSONSchema;
   public integrationIds: string[];
@@ -74,7 +74,6 @@ export class ToolExecutor implements Tool {
   public async execute({ payload = {}, credentials = {}, options = {} }: { payload?: Record<string, any>, credentials?: Record<string, string>, options?: RequestOptions }): Promise<ToolResult & { data?: any }> {
     try {
       this.validate({ payload, credentials });
-      logMessage("debug", `Executing tool ${this.id}`, this.metadata);
 
       for (const step of this.steps) {
         const aggregatedStepData = this.buildAggregatedStepData(payload);
@@ -282,7 +281,8 @@ export class ToolExecutor implements Tool {
             const generateStepConfigResult = await generateStepConfig({
               retryCount,
               messages,
-              integration: currentIntegration
+              integration: currentIntegration,
+              metadata: this.metadata
             });
             
             if (!generateStepConfigResult.success) {

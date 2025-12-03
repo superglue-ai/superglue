@@ -19,7 +19,7 @@ export const renameWorkflowResolver = async (
   try {
     return await context.datastore.renameWorkflow({ oldId, newId, orgId: context.orgId });
   } catch (error) {
-    logMessage('error', `Error renaming workflow: ${String(error)}`, { orgId: context.orgId });
+    logMessage('error', `Error renaming workflow: ${String(error)}`, context.toMetadata());
     throw error;
   }
 };

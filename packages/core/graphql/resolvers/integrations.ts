@@ -1,5 +1,5 @@
 import { Integration } from '@superglue/shared';
-import { Context, findMatchingIntegration, integrations, Metadata } from "@superglue/shared";
+import { findMatchingIntegration, integrations } from "@superglue/shared";
 import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
 import { PostgresService } from '../../datastore/postgres.js';
@@ -9,11 +9,12 @@ import { IntegrationFinder } from '../../integrations/integration-finder.js';
 import { logMessage } from '../../utils/logs.js';
 import { composeUrl } from '../../utils/helpers.js';
 import { DocumentationSearch } from '../../documentation/documentation-search.js';
+import { GraphQLRequestContext, ServiceMetadata } from '../types.js';
 
 export const listIntegrationsResolver = async (
   _: any,
   { limit = 100, offset = 0 }: { limit?: number; offset?: number },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   try {
@@ -23,7 +24,7 @@ export const listIntegrationsResolver = async (
       total: result.total,
     };
   } catch (error) {
-    logMessage('error', `Error listing integrations: ${String(error)}`, { orgId: context.orgId });
+    logMessage('error', `Error listing integrations: ${String(error)}`, context.toMetadata());
     throw error;
   }
 };
@@ -31,7 +32,7 @@ export const listIntegrationsResolver = async (
 export const getIntegrationResolver = async (
   _: any,
   { id }: { id: string },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   if (!id) throw new Error("id is required");
@@ -40,7 +41,7 @@ export const getIntegrationResolver = async (
     if (!integration) throw new Error("Integration not found");
     return integration;
   } catch (error) {
-    logMessage('error', `Error getting integration with id ${id}: ${String(error)}`, { orgId: context.orgId });
+    logMessage('error', `Error getting integration with id ${id}: ${String(error)}`, context.toMetadata());
     throw error;
   }
 };
@@ -48,7 +49,7 @@ export const getIntegrationResolver = async (
 export const upsertIntegrationResolver = async (
   _: any,
   { input, mode = 'UPSERT' }: { input: Integration, mode?: 'CREATE' | 'UPDATE' | 'UPSERT' },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   if (!input.id) {
@@ -105,14 +106,14 @@ export const upsertIntegrationResolver = async (
       // If we are creating the integration, and we are on postgres datastore, and there is a template documentation, we copy it to the users integration
       const [doesTemplateDocumentationExists, templateName] = templateDocumentationExists(input, context);
       if (doesTemplateDocumentationExists) {
-        logMessage('debug', `Copying template documentation for template '${templateName}' to user integration '${input.id}'`, { orgId: context.orgId });
+        logMessage('debug', `Copying template documentation for template '${templateName}' to user integration '${input.id}'`, context.toMetadata());
         const success = await context.datastore.copyTemplateDocumentationToUserIntegration({ templateId: templateName, userIntegrationId: input.id, orgId: context.orgId });
         if (!success) {
-          logMessage('warn', `No Template Documentation found for template ${templateName} to copy to user integration ${input.id}`, { orgId: context.orgId });
+          logMessage('warn', `No Template Documentation found for template ${templateName} to copy to user integration ${input.id}`, context.toMetadata());
           // set shouldFetchDoc to true to trigger a fetch
           shouldFetchDoc = true;
         } else {
-          logMessage('info', `Skipping documentation scrape for integration '${input.id}' - copied from template`, { orgId: context.orgId });
+          logMessage('info', `Skipping documentation scrape for integration '${input.id}' - copied from template`, context.toMetadata());
         }
       }
     }
@@ -123,7 +124,7 @@ export const upsertIntegrationResolver = async (
 
     return savedIntegration;
   } catch (error) {
-    logMessage('error', `Error upserting integration with id ${input.id}: ${String(error)}`, { orgId: context.orgId });
+    logMessage('error', `Error upserting integration with id ${input.id}: ${String(error)}`, context.toMetadata());
     throw error;
   }
 };
@@ -131,14 +132,14 @@ export const upsertIntegrationResolver = async (
 export const deleteIntegrationResolver = async (
   _: any,
   { id }: { id: string },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   if (!id) throw new Error("id is required");
   try {
     return await context.datastore.deleteIntegration({ id, orgId: context.orgId });
   } catch (error) {
-    logMessage('error', `Error deleting integration: ${String(error)}`, { orgId: context.orgId });
+    logMessage('error', `Error deleting integration: ${String(error)}`, context.toMetadata());
     throw error;
   }
 };
@@ -146,20 +147,20 @@ export const deleteIntegrationResolver = async (
 export const findRelevantIntegrationsResolver = async (
   _: any,
   { searchTerms }: { searchTerms?: string },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   const logSearchTerms = searchTerms ? `searchTerms: ${searchTerms}` : 'no searchTerms (returning all integrations)';
-  logMessage('info', `Finding relevant integrations for ${logSearchTerms}`, { orgId: context.orgId });
+  const metadata = context.toMetadata();
+  logMessage('info', `Finding relevant integrations for ${logSearchTerms}`, metadata);
 
   try {
-    const metadata: Metadata = { orgId: context.orgId, traceId: crypto.randomUUID() };
     const allIntegrations = await context.datastore.listIntegrations({ limit: 1000, offset: 0, includeDocs: false, orgId: context.orgId });
 
     const selector = new IntegrationFinder(metadata);
     return await selector.findIntegrations(searchTerms, allIntegrations.items || []);
   } catch (error) {
-    logMessage('error', `Error finding relevant integrations: ${String(error)}`, { orgId: context.orgId });
+    logMessage('error', `Error finding relevant integrations: ${String(error)}`, metadata);
     return [];
   }
 };
@@ -167,7 +168,7 @@ export const findRelevantIntegrationsResolver = async (
 export const cacheOauthClientCredentialsResolver = async (
   _: any,
   { clientCredentialsUid, clientId, clientSecret }: { clientCredentialsUid: string; clientId: string; clientSecret: string },
-  context: Context,
+  context: GraphQLRequestContext,
 ) => {
   if (!clientCredentialsUid || !clientId || !clientSecret) {
     throw new Error('Missing required parameters');
@@ -187,7 +188,7 @@ export const cacheOauthClientCredentialsResolver = async (
 export const getOAuthClientCredentialsResolver = async (
   _: any,
   { templateId, clientCredentialsUid }: { templateId?: string; clientCredentialsUid?: string },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   if (clientCredentialsUid) {
@@ -214,7 +215,7 @@ export const getOAuthClientCredentialsResolver = async (
   }
   return creds;
 };
-function templateDocumentationExists(input: Integration, context: Context): [boolean, string] {
+function templateDocumentationExists(input: Integration, context: GraphQLRequestContext): [boolean, string] {
   if (!(context.datastore instanceof PostgresService)) {
     return [false, ''];
   }
@@ -258,7 +259,7 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
   return defaultValue;
 }
 
-function shouldTriggerDocFetch(input: Integration, context: Context, existingIntegration?: Integration | null): boolean {
+function shouldTriggerDocFetch(input: Integration, context: GraphQLRequestContext, existingIntegration?: Integration | null): boolean {
   // Early exit conditions
   const isManualRefresh = input.documentationPending === true;
   if (isManualRefresh) return true;
@@ -299,10 +300,11 @@ function shouldTriggerDocFetch(input: Integration, context: Context, existingInt
 
 async function triggerAsyncDocumentationFetch(
   input: Integration,
-  context: Context // for orgId and datastore
+  context: GraphQLRequestContext
 ): Promise<void> {
+  const metadata = context.toMetadata();
+
   try {
-    // Re-enrich with template to ensure we have all the fields
     const enrichedInput = enrichWithTemplate(input);
 
     const credentials = Object.entries(input.credentials || {}).reduce((acc, [key, value]) => {
@@ -310,7 +312,7 @@ async function triggerAsyncDocumentationFetch(
       return acc;
     }, {} as Record<string, any>);
 
-    logMessage('info', `Starting async documentation fetch for integration ${input.id}`, { orgId: context.orgId });
+    logMessage('info', `Starting async documentation fetch for integration ${input.id}`, metadata);
 
     const docFetcher = new DocumentationFetcher(
       {
@@ -321,7 +323,7 @@ async function triggerAsyncDocumentationFetch(
         keywords: uniqueKeywords(enrichedInput.documentationKeywords),
       },
       credentials,
-      { orgId: context.orgId }
+      metadata
     );
 
     const docString = await docFetcher.fetchAndProcess();
@@ -331,7 +333,7 @@ async function triggerAsyncDocumentationFetch(
     // This ensures we don't overwrite any changes made since the initial upsert
     const latestIntegration = await context.datastore.getIntegration({ id: input.id, includeDocs: false, orgId: context.orgId });
     if (!latestIntegration) {
-      logMessage('warn', `Integration ${input.id} was deleted while fetching documentation. Skipping upsert.`, { orgId: context.orgId });
+      logMessage('warn', `Integration ${input.id} was deleted while fetching documentation. Skipping upsert.`, metadata);
       return;
     }
 
@@ -347,10 +349,10 @@ async function triggerAsyncDocumentationFetch(
       },
       orgId: context.orgId
     });
-    logMessage('info', `Completed documentation fetch for integration ${input.id}`, { orgId: context.orgId });
+    logMessage('info', `Completed documentation fetch for integration ${input.id}`, metadata);
 
   } catch (err) {
-    logMessage('error', `Documentation fetch failed for integration ${input.id}: ${String(err)}`, { orgId: context.orgId });
+    logMessage('error', `Documentation fetch failed for integration ${input.id}: ${String(err)}`, metadata);
 
     // Reset documentationPending to false on failure
     try {
@@ -365,10 +367,10 @@ async function triggerAsyncDocumentationFetch(
           },
           orgId: context.orgId
         });
-        logMessage('info', `Reset documentationPending to false for integration ${input.id} after fetch failure`, { orgId: context.orgId });
+        logMessage('info', `Reset documentationPending to false for integration ${input.id} after fetch failure`, metadata);
       }
     } catch (resetError) {
-      logMessage('error', `Failed to reset documentationPending for integration ${input.id}: ${String(resetError)}`, { orgId: context.orgId });
+      logMessage('error', `Failed to reset documentationPending for integration ${input.id}: ${String(resetError)}`, metadata);
     }
   }
 }
@@ -381,11 +383,13 @@ function uniqueKeywords(keywords: string[] | undefined): string[] {
 export const searchIntegrationDocumentationResolver = async (
   _: any,
   { integrationId, keywords }: { integrationId: string; keywords: string },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   if (!integrationId) throw new Error("integrationId is required");
   if (!keywords) throw new Error("keywords is required");
+
+  const metadata = context.toMetadata();
 
   try {
     const integration = await context.datastore.getIntegration({ id: integrationId, includeDocs: true, orgId: context.orgId });
@@ -398,7 +402,7 @@ export const searchIntegrationDocumentationResolver = async (
       return ``;
     }
 
-    const documentationSearch = new DocumentationSearch({ orgId: context.orgId });
+    const documentationSearch = new DocumentationSearch(metadata);
     const result = documentationSearch.extractRelevantSections(
       integration.documentation || '',
       keywords,
@@ -413,7 +417,7 @@ export const searchIntegrationDocumentationResolver = async (
 
     return result;
   } catch (error) {
-    logMessage('error', `Error searching integration documentation for ${integrationId}: ${String(error)}`, { orgId: context.orgId });
+    logMessage('error', `Error searching integration documentation for ${integrationId}: ${String(error)}`, metadata);
     throw error;
   }
 };

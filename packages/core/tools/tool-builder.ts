@@ -1,4 +1,4 @@
-import { convertRequiredToArray, HttpMethod, Integration, Metadata, toJsonSchema, Tool } from "@superglue/shared";
+import { convertRequiredToArray, HttpMethod, Integration, ServiceMetadata, toJsonSchema, Tool } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import z from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -12,7 +12,7 @@ export class ToolBuilder {
   private integrations: Record<string, Integration>;
   private instruction: string;
   private initialPayload: Record<string, unknown>;
-  private metadata: Metadata;
+  private metadata: ServiceMetadata;
   private responseSchema: JSONSchema;
   private inputSchema: JSONSchema;
   private toolSchema: any;
@@ -22,7 +22,7 @@ export class ToolBuilder {
     integrations: Integration[],
     initialPayload: Record<string, unknown>,
     responseSchema: JSONSchema,
-    metadata: Metadata
+    metadata: ServiceMetadata
   ) {
     this.integrations = integrations.reduce((acc, int) => {
       acc[int.id] = int;
@@ -130,7 +130,8 @@ export class ToolBuilder {
           messages,
           schema: this.toolSchema,
           temperature: 0.0,
-          tools
+          tools,
+          metadata: this.metadata
         });
 
         messages = generateToolResult.messages;

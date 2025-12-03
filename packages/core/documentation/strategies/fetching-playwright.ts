@@ -8,7 +8,7 @@
  */
 
 import playwright from '@playwright/test';
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import axios from "axios";
 import { server_defaults } from '../../default.js';
 import { logMessage } from "../../utils/logs.js";
@@ -112,7 +112,7 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
     }
   }
 
-  private async fetchPageContentWithPlaywright(urlString: string, config: DocumentationConfig, metadata: Metadata): Promise<{ content: string; textContent: string; links: Record<string, string>; } | null> {
+  private async fetchPageContentWithPlaywright(urlString: string, config: DocumentationConfig, metadata: ServiceMetadata): Promise<{ content: string; textContent: string; links: Record<string, string>; } | null> {
     if (!urlString?.startsWith("http")) {
       return null;
     }
@@ -317,7 +317,7 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
     return { urls, sitemaps };
   }
 
-  private async collectSitemapUrls(config: DocumentationConfig, metadata: Metadata): Promise<string[]> {
+  private async collectSitemapUrls(config: DocumentationConfig, metadata: ServiceMetadata): Promise<string[]> {
     if (!config.documentationUrl) return [];
 
     const sitemapCandidates = await this.discoverSitemapUrls(config.documentationUrl);
@@ -496,7 +496,7 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
   private async fetchPagesInBatches(
     urls: string[],
     config: DocumentationConfig,
-    metadata: Metadata
+    metadata: ServiceMetadata
   ): Promise<string> {
     const BATCH_SIZE = PlaywrightFetchingStrategy.PARALLEL_FETCH_LIMIT;
     const MAX_TOTAL_SIZE = server_defaults.DOCUMENTATION.MAX_TOTAL_CONTENT_SIZE;
@@ -576,7 +576,7 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
     return combinedContent;
   }
 
-  async tryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
+  async tryFetch(config: DocumentationConfig, metadata: ServiceMetadata): Promise<string | null> {
     if (!config?.documentationUrl) return null;
 
     try {
@@ -783,7 +783,7 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
       .map(s => s.item);
   }
 
-  private async crawlWithLinks(startUrl: string, config: DocumentationConfig, metadata: Metadata): Promise<string> {
+  private async crawlWithLinks(startUrl: string, config: DocumentationConfig, metadata: ServiceMetadata): Promise<string> {
     const visitedUrls = new Set<string>();
     const linkQueue: { linkText: string, href: string }[] = [{ linkText: "documentation", href: startUrl }];
     const searchKeywords = this.getMergedKeywords(config.keywords);
@@ -821,7 +821,7 @@ export class PlaywrightFetchingStrategy implements DocumentationFetchingStrategy
     return aggregatedContent;
   }
 
-  async legacyTryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
+  async legacyTryFetch(config: DocumentationConfig, metadata: ServiceMetadata): Promise<string | null> {
     if (!config?.documentationUrl) return null;
     return this.crawlWithLinks(config.documentationUrl, config, metadata);
   }

@@ -1,10 +1,11 @@
-import { DataStore } from "../../datastore/types.js";
+import { GraphQLRequestContext } from "../types.js";
 
 export const getTenantInfoResolver = async (
   _: any,
   __: any,
-  { datastore }: { datastore: DataStore }
+  context: GraphQLRequestContext
 ) => {
+  const { datastore } = context;
   if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
     return {
       email: null,
@@ -26,8 +27,9 @@ export const getTenantInfoResolver = async (
 export const setTenantInfoResolver = async (
   _: any,
   { email, emailEntrySkipped }: { email?: string, emailEntrySkipped?: boolean },
-  { datastore }: { datastore: DataStore }
+  context: GraphQLRequestContext
 ) => {
+  const { datastore } = context;
   if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === 'true') {
     return {
       email: null,

@@ -2,7 +2,7 @@
  * Shared types for documentation fetching and processing strategies
  */
 
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 
 export interface DocumentationConfig {
   urlHost?: string;
@@ -16,14 +16,14 @@ export interface DocumentationConfig {
 }
 
 export interface DocumentationFetchingStrategy {
-  tryFetch(config: DocumentationConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null>;
+  tryFetch(config: DocumentationConfig, metadata: ServiceMetadata, credentials?: Record<string, any>): Promise<string | null>;
 }
 
 export interface DocumentationProcessingStrategy {
-  tryProcess(rawResult: string, config: DocumentationConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null>;
+  tryProcess(rawResult: string, config: DocumentationConfig, metadata: ServiceMetadata, credentials?: Record<string, any>): Promise<string | null>;
 }
 
 export interface OpenApiFetchingStrategy {
-  tryFetch(responseData: any, openApiUrl: string, metadata: Metadata): Promise<string | null>;
+  tryFetch(responseData: any, openApiUrl: string, metadata: ServiceMetadata): Promise<string | null>;
 }
 

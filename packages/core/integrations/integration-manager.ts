@@ -1,4 +1,4 @@
-import { Integration } from "@superglue/shared";
+import { Integration, ServiceMetadata } from "@superglue/shared";
 import { DataStore } from "../datastore/types.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { logMessage } from "../utils/logs.js";
@@ -19,13 +19,15 @@ export class IntegrationManager {
     private _integration: Integration;
     private _documentation: DocumentationData;
     private dataStore: DataStore;
-    private orgId: string;
+    private metadata: ServiceMetadata;
+    private orgId: string; // Keep for backward compat
     private _basicDataPromise?: Promise<Integration>;
     private _documentationPromise?: Promise<DocumentationData>;
 
-    constructor(idOrIntegration: string | Integration, dataStore: DataStore, orgId: string) {
+    constructor(idOrIntegration: string | Integration, dataStore: DataStore, metadata: ServiceMetadata) {
         this.dataStore = dataStore;
-        this.orgId = orgId;
+        this.metadata = metadata;
+        this.orgId = metadata.orgId!; // Keep for backward compat
 
         if (typeof idOrIntegration === 'string') {
             // Initialize with just ID - will lazy load everything else
@@ -91,9 +93,9 @@ export class IntegrationManager {
                 };
                 this._integration = fullIntegration;
             }
-            logMessage('info', `Documentation loaded for integration ${this.id}`, { orgId: this.orgId });
+            logMessage('info', `Documentation loaded for integration ${this.id}`, this.metadata);
         } catch (error) {
-            logMessage('error', `Failed to load documentation for integration ${this.id}: ${error}`, { orgId: this.orgId });
+            logMessage('error', `Failed to load documentation for integration ${this.id}: ${error}`, this.metadata);
         }
 
         return this._documentation;
@@ -108,7 +110,7 @@ export class IntegrationManager {
         if(!documentation.openApiSchema && !documentation.content) {
             return "no documentation provided";
         }
-        const documentationSearch = new DocumentationSearch({ orgId: this.orgId });
+        const documentationSearch = new DocumentationSearch(this.metadata);
         const result = documentationSearch.extractRelevantSections(documentation.content, instruction, 5, 4000, documentation.openApiSchema);
         this.searchCache.set(instruction, result);
         return result;
@@ -143,35 +145,35 @@ export class IntegrationManager {
               integration: this._integration,
               orgId: this.orgId
             });
-            logMessage('info', `OAuth token refreshed and saved for integration ${this.id}`, { orgId: this.orgId });
+            logMessage('info', `OAuth token refreshed and saved for integration ${this.id}`, this.metadata);
         } else {
-            logMessage('warn', `Failed to refresh OAuth token for integration ${this.id}`, { orgId: this.orgId });
+            logMessage('warn', `Failed to refresh OAuth token for integration ${this.id}`, this.metadata);
         }
 
         return refreshResult.success;
     }
 
     // Static factory method to create from Integration
-    static fromIntegration(integration: Integration, dataStore: DataStore, orgId: string): IntegrationManager {
-        return new IntegrationManager(integration, dataStore, orgId);
+    static fromIntegration(integration: Integration, dataStore: DataStore, metadata: ServiceMetadata): IntegrationManager {
+        return new IntegrationManager(integration, dataStore, metadata);
     }
 
     // Static factory method to create from ID only
-    static async fromId(id: string, dataStore: DataStore, orgId: string): Promise<IntegrationManager> {
-        const integration = await dataStore.getIntegration({ id, includeDocs: false, orgId });
+    static async fromId(id: string, dataStore: DataStore, metadata: ServiceMetadata): Promise<IntegrationManager> {
+        const integration = await dataStore.getIntegration({ id, includeDocs: false, orgId: metadata.orgId! });
         if (!integration) {
             throw new Error(`Integration with id ${id} not found`);
         }
-        return new IntegrationManager(integration, dataStore, orgId);
+        return new IntegrationManager(integration, dataStore, metadata);
     }
 
     // Static method to create multiple instances
-    static fromIntegrations(integrations: Integration[], dataStore: DataStore, orgId: string): IntegrationManager[] {
-        return integrations.map(i => IntegrationManager.fromIntegration(i, dataStore, orgId));
+    static fromIntegrations(integrations: Integration[], dataStore: DataStore, metadata: ServiceMetadata): IntegrationManager[] {
+        return integrations.map(i => IntegrationManager.fromIntegration(i, dataStore, metadata));
     }
 
     // Static method to create multiple instances from IDs
-    static async fromIds(ids: string[], dataStore: DataStore, orgId: string): Promise<IntegrationManager[]> {
-        return Promise.all(ids.map(id => IntegrationManager.fromId(id, dataStore, orgId)));
+    static async fromIds(ids: string[], dataStore: DataStore, metadata: ServiceMetadata): Promise<IntegrationManager[]> {
+        return Promise.all(ids.map(id => IntegrationManager.fromId(id, dataStore, metadata)));
     }
 }

@@ -5,7 +5,7 @@ import { maskCredentials } from '@superglue/shared';
 import { TransformConfig } from "../../utils/helpers.legacy.js";
 import { executeTransformLegacy } from "../../utils/helpers.legacy.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { GraphQLRequestContext, Metadata } from '../types.js';
+import { GraphQLRequestContext, ServiceMetadata } from '../types.js';
 
 
 export const callResolver = async (
@@ -20,10 +20,7 @@ export const callResolver = async (
   info: GraphQLResolveInfo
 ) => {
   const startedAt = new Date();
-  const metadata: Metadata = {
-    traceId: context.traceId,
-    orgId: context.orgId
-  };
+  const metadata = context.toMetadata();
   let endpoint: ApiConfig;
   const readCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.READONLY : true;
   const writeCache = options?.cacheMode ? options.cacheMode === CacheMode.ENABLED || options.cacheMode === CacheMode.WRITEONLY : false;

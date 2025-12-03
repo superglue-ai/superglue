@@ -4,7 +4,7 @@ import { executeLLMTool, LLMToolCall } from "../../llm/llm-tool-utils.js";
 import { InstructionGenerationContext } from "../../llm/llm-tools.js";
 import { generateWorkingTransform } from "../../tools/tool-transform.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { GraphQLRequestContext, Metadata } from '../types.js';
+import { GraphQLRequestContext, ServiceMetadata } from '../types.js';
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { getGenerateStepConfigContext } from "../../context/context-builders.js";
 import { LLMMessage } from "../../llm/llm-base-model.js";
@@ -35,8 +35,7 @@ export const generateInstructionsResolver = async (
     };
 
     const toolContext: InstructionGenerationContext = {
-      orgId: context.orgId,
-      runId: crypto.randomUUID(),
+      ...context.toMetadata(),
       integrations: integrations
     };
 
@@ -67,7 +66,7 @@ export const generateStepConfigResolver = async (
   info: GraphQLResolveInfo
 ): Promise<{config: ApiConfig, dataSelector: string}> => {
   try {
-    const metadata: Metadata = { orgId: context.orgId, traceId: context.traceId };
+    const metadata = context.toMetadata();
 
     // Extract instruction from currentStepConfig
     const instruction = currentStepConfig?.instruction;
@@ -87,7 +86,7 @@ export const generateStepConfigResolver = async (
     if (integrationId) {
       try {
         logMessage('info', `Generating step config for integration ${integrationId}`, metadata);
-        const integrationManager = new IntegrationManager(integrationId, context.datastore, context.orgId);
+        const integrationManager = new IntegrationManager(integrationId, context.datastore, context.toMetadata());
         integration = await integrationManager.getIntegration();
         integrationDocs = (await integrationManager.getDocumentation())?.content || '';
         integrationSpecificInstructions = integration.specificInstructions || '';
@@ -139,7 +138,8 @@ export const generateStepConfigResolver = async (
     const generateStepConfigResult = await generateStepConfig({
       retryCount: 0,
       messages,
-      integration
+      integration,
+      metadata
     });
           
     if (!generateStepConfigResult.success || !generateStepConfigResult.config) {
@@ -180,7 +180,7 @@ export const generateTransformResolver = async (
   info: GraphQLResolveInfo
 ): Promise<{ transformCode: string; data?: any }> => {
   try {
-    const metadata: Metadata = { orgId: context.orgId, traceId: context.traceId };
+    const metadata = context.toMetadata();
 
     const prompt = (instruction || "Create transformation code.") +
       (currentTransform ? `\nOriginally, we used the following transformation: ${currentTransform}` : "") +

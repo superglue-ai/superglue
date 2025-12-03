@@ -1,5 +1,5 @@
 import { Integration } from "@superglue/shared";
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import { DataStore } from "../../../packages/core/datastore/types.js";
 import { TestSuiteSettings, ToolAttempt, ToolConfig, ValidationLLMConfig } from "../types.js";
 import { PromiseQueue } from "../utils/promise-queue.js";
@@ -8,7 +8,7 @@ import { SuperglueToolAttemptService } from "./tool-attempt.js";
 export class ToolRunnerService {
     constructor(
         private datastore: DataStore,
-        private metadata: Metadata,
+        private metadata: ServiceMetadata,
         private validationLlmConfig?: ValidationLLMConfig
     ) {
     }

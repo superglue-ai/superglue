@@ -1,4 +1,4 @@
-import { Metadata } from "@playwright/test";
+import { ServiceMetadata } from "@superglue/shared";
 import { Integration, SelfHealingMode, Tool, ToolResult } from "@superglue/shared";
 import { generateUniqueId } from "@superglue/shared/utils";
 import { ToolBuilder } from "../../../packages/core/tools/tool-builder.js";
@@ -12,7 +12,7 @@ export class SuperglueToolAttemptService {
     private validationService: ToolValidationService;
 
     constructor(
-        private metadata: Metadata,
+        private metadata: ServiceMetadata,
         private datastore: DataStore,
         validationLlmConfig?: ValidationLLMConfig
     ) {

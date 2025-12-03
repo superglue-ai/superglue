@@ -1,5 +1,8 @@
 import { DataStore } from "../datastore/types.js";
-import { UserRole } from "@superglue/shared";
+import { UserRole, ServiceMetadata } from "@superglue/shared";
+
+// Re-export for convenience
+export type { ServiceMetadata };
 
 // GraphQL request context - provides request-scoped resources to resolvers
 export type GraphQLRequestContext = {
@@ -9,10 +12,6 @@ export type GraphQLRequestContext = {
   userId?: string;
   orgName?: string;
   orgRole?: UserRole;
-};
-
-// Execution metadata - tracks a specific operation for logging and tracing
-export type Metadata = {
-  traceId?: string;
-  orgId?: string;
+  
+  toMetadata: () => ServiceMetadata;
 };

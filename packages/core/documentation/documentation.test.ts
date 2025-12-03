@@ -1,5 +1,5 @@
 import playwright from '@playwright/test';
-import { Metadata } from '@superglue/shared';
+import { ServiceMetadata } from '@superglue/shared';
 import axios from 'axios';
 import { afterEach, beforeEach, describe, expect, it, Mocked, vi } from 'vitest';
 import { server_defaults } from '../default.js';
@@ -55,7 +55,7 @@ describe('Documentation Class', () => {
     let mockContext: any;
     let mockBrowser: any;
     let mockedAxios: Mocked<typeof axios>; // Use Mocked type
-    let metadata: Metadata = { orgId: '' };
+    let metadata: ServiceMetadata = { orgId: '' };
     beforeEach(() => {
         // Reset all mocks
         vi.clearAllMocks();

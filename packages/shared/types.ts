@@ -1,3 +1,9 @@
+// Service metadata - lightweight context for logging and tracing in service classes
+export type ServiceMetadata = {
+  traceId?: string;
+  orgId?: string;
+};
+
 export interface Log {
   id: string;
   message: string;
