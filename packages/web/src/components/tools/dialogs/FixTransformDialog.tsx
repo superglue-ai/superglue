@@ -73,7 +73,7 @@ export function FixTransformDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl z-[110]">
                 <Button
                     variant="ghost"
                     size="icon"
