@@ -32,9 +32,10 @@ export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
     let remainingCarry = 0;
     const sections: string[] = [];
 
-    // if the full object fits in the budget, return it directly (no need for lossy schema/preview/samples)
+    // if the full object fits in the budget (including wrapper tags), return it directly
     const fullJson = stringifyWithLimits(obj, Infinity, Infinity, Infinity, false);
-    if(fullJson.length <= budget) {
+    const fullObjectWrapperOverhead = '<full_object>\n'.length + '</full_object>'.length; // 28 chars
+    if(fullJson.length + fullObjectWrapperOverhead <= budget) {
         return buildFullObjectSection(fullJson);
     }
 

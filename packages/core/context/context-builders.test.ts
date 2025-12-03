@@ -112,21 +112,41 @@ describe('getObjectContext edge cases for include combinations and strict budget
         expect(out).toBe('');
     });
 
-    it('schema only', () => {
+    it('schema only - returns full_object when it fits in budget', () => {
         const out = getObjectContext({ a: 1, b: 2 }, { characterBudget: 200, include: { schema: true, preview: false, samples: false } });
+        // When full object fits, we return it instead of lossy schema
+        expect(out).toMatch(/<full_object>/);
+        expect(out.length).toBeLessThanOrEqual(200);
+    });
+
+    it('schema only - returns schema when full object exceeds budget', () => {
+        const largeObj = { a: 'x'.repeat(500), b: 'y'.repeat(500) };
+        const out = getObjectContext(largeObj, { characterBudget: 200, include: { schema: true, preview: false, samples: false } });
         expect(out).toMatch(/<schema>/);
-        expect(out).not.toMatch(/<object_preview>|<full_object>/);
+        expect(out).not.toMatch(/<full_object>/);
+        expect(out).not.toMatch(/<object_preview>/);
         expect(out).not.toMatch(/<samples>/);
         expect(out.length).toBeLessThanOrEqual(200);
     });
 
-    it('samples only prefers samples, but may fall back to Full Object if small and within budget', () => {
+    it('samples only - returns full_object when it fits in budget', () => {
         const small = { arr: [1, 2, 3, 4, 5] };
         const out = getObjectContext(small, { characterBudget: 200, include: { schema: false, preview: false, samples: true } });
-        expect(out).toMatch(/<samples>|<full_object>/);
+        expect(out).toMatch(/<full_object>/);
         expect(out).not.toMatch(/<schema>/);
         expect(out).not.toMatch(/<object_preview>/);
+        expect(out).not.toMatch(/<samples>/);
         expect(out.length).toBeLessThanOrEqual(200);
+    });
+
+    it('samples only - returns samples when full object exceeds budget', () => {
+        const largeObj = { arr: Array.from({ length: 100 }, (_, i) => ({ id: i, name: `item_${i}`, value: 'x'.repeat(50) })) };
+        const out = getObjectContext(largeObj, { characterBudget: 500, include: { schema: false, preview: false, samples: true } });
+        expect(out).toMatch(/Samples/);
+        expect(out).not.toMatch(/<full_object>/);
+        expect(out).not.toMatch(/<schema>/);
+        expect(out).not.toMatch(/<object_preview>/);
+        expect(out.length).toBeLessThanOrEqual(500);
     });
 
     it('preview only may return Full Object if it fits', () => {
@@ -243,6 +263,89 @@ describe('getEvaluateTransformContext budgets and content', () => {
         const out = getEvaluateTransformContext({ ...base, instruction: '' }, { characterBudget: 600 });
         expect(out.length).toBeLessThanOrEqual(600);
         expect(out.length).toBeGreaterThan(0);
+    });
+});
+
+describe('getObjectContext full_object optimization', () => {
+    it('returns full_object when object fits exactly at budget boundary', () => {
+        const obj = { a: 1 };
+        const fullJson = JSON.stringify(obj);
+        const fullObjectWrapper = '<full_object>\n' + fullJson + '</full_object>';
+        // Budget exactly at full_object size
+        const out = getObjectContext(obj, { characterBudget: fullObjectWrapper.length, include: { schema: true, preview: true, samples: true } });
+        expect(out).toMatch(/<full_object>/);
+        expect(out).toContain(fullJson);
+    });
+
+    it('falls back to sections when full object with wrapper exceeds budget', () => {
+        // Use an object large enough that sections can still be generated
+        const obj = { a: 'x'.repeat(100), b: 'y'.repeat(100) };
+        const fullJson = JSON.stringify(obj);
+        const fullObjectWrapperOverhead = '<full_object>\n'.length + '</full_object>'.length;
+        // Budget exactly 1 char short of wrapped full_object
+        const budget = fullJson.length + fullObjectWrapperOverhead - 1;
+        const out = getObjectContext(obj, { characterBudget: budget, include: { schema: true, preview: true, samples: true } });
+        // Should NOT be full_object, should be sections
+        expect(out).not.toMatch(/<full_object>/);
+        expect(out).toMatch(/<schema>|<object_preview>|Samples/);
+        expect(out.length).toBeLessThanOrEqual(budget);
+    });
+
+    it('full_object contains actual data, not empty', () => {
+        const obj = { foo: 'bar', nums: [1, 2, 3] };
+        const out = getObjectContext(obj, { characterBudget: 500, include: { schema: true, preview: true, samples: true } });
+        expect(out).toMatch(/<full_object>/);
+        expect(out).toContain('foo');
+        expect(out).toContain('bar');
+        expect(out).toContain('[1,2,3]');
+    });
+
+    it('preview only - returns full_object when it fits', () => {
+        const obj = { x: 1, y: 2 };
+        const out = getObjectContext(obj, { characterBudget: 200, include: { schema: false, preview: true, samples: false } });
+        expect(out).toMatch(/<full_object>/);
+        expect(out.length).toBeLessThanOrEqual(200);
+    });
+
+    it('preview only - returns preview when full object exceeds budget', () => {
+        const largeObj = { data: 'x'.repeat(500) };
+        const out = getObjectContext(largeObj, { characterBudget: 200, include: { schema: false, preview: true, samples: false } });
+        expect(out).toMatch(/<object_preview>/);
+        expect(out).not.toMatch(/<full_object>/);
+        expect(out.length).toBeLessThanOrEqual(200);
+    });
+
+    it('all sections enabled - budget carry-over works when schema is small', () => {
+        // Large object that won't fit as full_object
+        const largeObj = { 
+            data: Array.from({ length: 50 }, (_, i) => ({ id: i, name: `item_${i}`, desc: 'x'.repeat(100) }))
+        };
+        const out = getObjectContext(largeObj, { characterBudget: 2000, include: { schema: true, preview: true, samples: true } });
+        expect(out).not.toMatch(/<full_object>/);
+        // Should have all three sections
+        expect(out).toMatch(/<schema>/);
+        expect(out).toMatch(/<object_preview>/);
+        expect(out).toMatch(/Samples/);
+        expect(out.length).toBeLessThanOrEqual(2000);
+    });
+
+    it('handles empty object gracefully', () => {
+        const out = getObjectContext({}, { characterBudget: 100, include: { schema: true, preview: true, samples: true } });
+        expect(out).toMatch(/<full_object>/);
+        expect(out).toContain('{}');
+    });
+
+    it('handles null input gracefully', () => {
+        const out = getObjectContext(null, { characterBudget: 100, include: { schema: true, preview: true, samples: true } });
+        expect(out).toMatch(/<full_object>/);
+        expect(out).toContain('null');
+    });
+
+    it('handles array as root object', () => {
+        const arr = [1, 2, 3, 4, 5];
+        const out = getObjectContext(arr, { characterBudget: 100, include: { schema: true, preview: true, samples: true } });
+        expect(out).toMatch(/<full_object>/);
+        expect(out).toContain('[1,2,3,4,5]');
     });
 });
 
