@@ -18,7 +18,7 @@ function TemplateNodeView(props: NodeViewProps) {
         : rawTemplate.trim();
 
     const sourceData = useMemo(() => prepareSourceData(stepData, loopData), [stepData, loopData]);
-    const { previewValue, previewError, isEvaluating } = useTemplatePreview(
+    const { previewValue, previewError, hasResult } = useTemplatePreview(
         expression,
         sourceData,
         { enabled: canExecute, debounceMs: 100 }
@@ -68,7 +68,7 @@ function TemplateNodeView(props: NodeViewProps) {
                 error={previewError ?? undefined}
                 stepData={stepData}
                 loopData={loopData}
-                isEvaluating={isEvaluating}
+                hasResult={hasResult}
                 canExecute={canExecute}
                 onUpdate={(newTemplate) => updateAttributes({ rawTemplate: newTemplate })}
                 onDelete={deleteNode}

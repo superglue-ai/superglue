@@ -37,7 +37,7 @@ const getStatusInfo = (isRunning: boolean, isFailed: boolean, isCompleted: boole
     };
 };
 
-export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId, isPayload = false, isTransform = false, isRunningAll = false, isTesting = false, completedSteps = [], failedSteps = [], isFirstCard = false, isLastCard = false, integrations = [], hasTransformCompleted = false, isPayloadValid = true, payloadData }: { step: any; index: number; isActive: boolean; onClick: () => void; stepId?: string | null; isPayload?: boolean; isTransform?: boolean; isRunningAll?: boolean; isTesting?: boolean; completedSteps?: string[]; failedSteps?: string[]; isFirstCard?: boolean; isLastCard?: boolean; integrations?: Integration[]; hasTransformCompleted?: boolean; isPayloadValid?: boolean; payloadData?: any; }) => {
+export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId, isPayload = false, isTransform = false, isRunningAll = false, isTesting = false, completedSteps = [], failedSteps = [], isFirstCard = false, isLastCard = false, integrations = [], hasTransformCompleted = false, isPayloadValid = true, payloadData, isLoopStep = false }: { step: any; index: number; isActive: boolean; onClick: () => void; stepId?: string | null; isPayload?: boolean; isTransform?: boolean; isRunningAll?: boolean; isTesting?: boolean; completedSteps?: string[]; failedSteps?: string[]; isFirstCard?: boolean; isLastCard?: boolean; integrations?: Integration[]; hasTransformCompleted?: boolean; isPayloadValid?: boolean; payloadData?: any; isLoopStep?: boolean; }) => {
     if (isPayload) {
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
@@ -163,8 +163,8 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
                         {(step?.modify === true) && (
                             <OctagonAlert className="h-4 w-4 text-amber-500 dark:text-amber-400" aria-label="Modifies data" />
                         )}
-                        {step?.executionMode === 'LOOP' && (
-                            <RotateCw className="h-3 w-3 text-muted-foreground" aria-label="Loop step" />
+                        {isLoopStep && !(step?.modify === true) && (
+                            <RotateCw className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" aria-label="Loop step" />
                         )}
                     </div>
                     <div className="flex-1 flex flex-col items-center justify-between leading-tight">

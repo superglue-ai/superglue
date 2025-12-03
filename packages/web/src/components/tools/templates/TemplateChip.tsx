@@ -11,7 +11,7 @@ interface TemplateChipProps {
   error?: string;
   stepData: any;
   loopData?: any;
-  isEvaluating?: boolean;
+  hasResult?: boolean;
   canExecute?: boolean;
   onUpdate: (newTemplate: string) => void;
   onDelete: () => void;
@@ -20,6 +20,10 @@ interface TemplateChipProps {
   selected?: boolean;
   forcePopoverOpen?: boolean;
   onPopoverOpenChange?: (open: boolean) => void;
+  loopMode?: boolean;
+  hideDelete?: boolean;
+  popoverTitle?: string;
+  popoverHelpText?: string;
 }
 
 export function TemplateChip({
@@ -28,7 +32,7 @@ export function TemplateChip({
   error,
   stepData,
   loopData,
-  isEvaluating = false,
+  hasResult = true,
   canExecute = true,
   onUpdate,
   onDelete,
@@ -36,7 +40,11 @@ export function TemplateChip({
   inline = false,
   selected = false,
   forcePopoverOpen = false,
-  onPopoverOpenChange
+  onPopoverOpenChange,
+  loopMode = false,
+  hideDelete = false,
+  popoverTitle,
+  popoverHelpText,
 }: TemplateChipProps) {
   const sourceData = useMemo(() => prepareSourceData(stepData, loopData), [stepData, loopData]);
   const [isHovered, setIsHovered] = useState(false);
@@ -48,7 +56,11 @@ export function TemplateChip({
 
   const hasError = !!error;
   const isUnresolved = !hasError && !canExecute;
-  const isResolvedUndefined = !hasError && canExecute && !isEvaluating && evaluatedValue === undefined;
+  const isResolvedUndefined = !hasError && canExecute && hasResult && evaluatedValue === undefined;
+  const isLoading = canExecute && !hasResult && evaluatedValue === undefined;
+  
+  const isLoopArray = loopMode && Array.isArray(evaluatedValue) && evaluatedValue.length > 0;
+  const displayValue = isLoopArray ? evaluatedValue[0] : evaluatedValue;
 
   const credentials = useMemo(() => extractCredentials(sourceData), [sourceData]);
 
@@ -60,30 +72,32 @@ export function TemplateChip({
     displayText = `Error: ${error.slice(0, 50)}${error.length > 50 ? '...' : ''}`;
   } else if (isUnresolved) {
     displayText = `unresolved: ${templateExpr.slice(0, 30)}${templateExpr.length > 30 ? '...' : ''}`;
+  } else if (isLoading) {
+    displayText = '';
   } else if (isResolvedUndefined) {
     displayText = 'undefined';
   } else {
     let fullDisplayText: string;
-    if (evaluatedValue === null) {
+    if (displayValue === null) {
       fullDisplayText = 'null';
-    } else if (typeof evaluatedValue === 'string') {
-      fullDisplayText = evaluatedValue === '' ? '""' : evaluatedValue;
-    } else if (typeof evaluatedValue === 'object') {
+    } else if (typeof displayValue === 'string') {
+      fullDisplayText = displayValue === '' ? '""' : displayValue;
+    } else if (typeof displayValue === 'object') {
       try {
-        fullDisplayText = JSON.stringify(evaluatedValue);
+        fullDisplayText = JSON.stringify(displayValue);
       } catch {
         fullDisplayText = '[Complex Object]';
       }
     } else {
-      fullDisplayText = String(evaluatedValue);
+      fullDisplayText = String(displayValue);
     }
 
     originalSize = fullDisplayText.length;
     const masked = maskCredentials(fullDisplayText, credentials);
     const truncated = truncateTemplateValue(masked, 150);
-    displayText = truncated.display;
-    isTruncated = truncated.truncated;
-    originalSize = truncated.originalSize;
+      displayText = truncated.display;
+      isTruncated = truncated.truncated;
+      originalSize = truncated.originalSize;
   }
 
   const isActive = selected || effectiveOpen;
@@ -97,7 +111,7 @@ export function TemplateChip({
       };
     }
     
-    if (isUnresolved || isResolvedUndefined) {
+    if (isUnresolved) {
       return {
         bg: 'bg-gray-500/15 dark:bg-gray-400/20',
         border: isActive ? 'border-gray-400/50 dark:border-gray-500/50' : 'border-transparent',
@@ -132,9 +146,9 @@ export function TemplateChip({
       title={isTruncated ? `${originalSize} chars (click to view)` : undefined}
     >
       <span className="w-3 h-3 flex items-center justify-center shrink-0">
-        {isEvaluating ? (
+        {isLoading ? (
           <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-        ) : !readOnly && isHovered ? (
+        ) : !readOnly && !hideDelete && isHovered ? (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -174,6 +188,9 @@ export function TemplateChip({
       canExecute={canExecute}
       externalOpen={effectiveOpen}
       onExternalOpenChange={handleOpenChange}
+      loopMode={loopMode}
+      title={popoverTitle}
+      helpText={popoverHelpText}
     >
       {chipContent}
     </TemplateEditPopover>
