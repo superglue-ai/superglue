@@ -1,10 +1,10 @@
-import { Integration, ServiceMetadata } from '@superglue/shared';
+import { Integration } from '@superglue/shared';
 import { server_defaults } from '../default.js';
 import { DocumentationSearch } from '../documentation/documentation-search.js';
-import { logMessage } from '../utils/logs.js';
 import { composeUrl, sanitizeUnpairedSurrogates } from '../utils/helpers.js';
+import { logMessage } from '../utils/logs.js';
 import { buildFullObjectSection, buildPreviewSection, buildSamplesSection, buildSchemaSection, stringifyWithLimits } from './context-helpers.js';
-import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, IntegrationContextOptions, ObjectContextOptions, TransformContextInput, TransformContextOptions, ToolBuilderContextInput, ToolBuilderContextOptions, GenerateStepConfigContextInput, GenerateStepConfigContextOptions } from './context-types.js';
+import { EvaluateStepResponseContextInput, EvaluateStepResponseContextOptions, EvaluateTransformContextInput, EvaluateTransformContextOptions, GenerateStepConfigContextInput, GenerateStepConfigContextOptions, IntegrationContextOptions, ObjectContextOptions, ToolBuilderContextInput, ToolBuilderContextOptions, TransformContextInput, TransformContextOptions } from './context-types.js';
 
 export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
@@ -32,28 +32,10 @@ export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
     let remainingCarry = 0;
     const sections: string[] = [];
 
-    const nonSchemaEnabled = includePreview || includeSamples;
-    const fullJson = nonSchemaEnabled ? stringifyWithLimits(obj, Infinity, Infinity, Infinity, false) : '';
-    if (nonSchemaEnabled) {
-        if (includeSchema) {
-            // 1/3 schema, 2/3 full JSON
-            const schemaShare = Math.floor(budget / 3);
-            const fullShare = budget - schemaShare; // 2/3
-            // Schema first
-            const schemaStr = buildSchemaSection(obj, schemaShare);
-            sections.push(schemaStr.text);
-            // Full object block
-            if (fullJson.length <= fullShare) {
-                sections.push(buildFullObjectSection(fullJson));
-                const combined = sections.filter(Boolean).join('\n\n');
-                return combined.slice(0, budget);
-            }
-        } else {
-            if (fullJson.length <= budget) {
-                sections.push(buildFullObjectSection(fullJson));
-                return sections[0].slice(0, budget);
-            }
-        }
+    // if the full object fits in the budget, return it directly (no need for lossy schema/preview/samples)
+    const fullJson = stringifyWithLimits(obj, Infinity, Infinity, Infinity, false);
+    if(fullJson.length <= budget) {
+        return buildFullObjectSection(fullJson);
     }
 
     if (includeSchema) {
@@ -65,6 +47,7 @@ export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
 
     if (includePreview) {
         const share = perShare + remainingCarry;
+        // if the full object fits in the budget + samples, add it to the section 
         const previewStr = buildPreviewSection(obj, share, previewDepthLimit, previewArrayLimit, previewObjectKeyLimit);
         sections.push(previewStr.text);
         remainingCarry = Math.max(0, share - previewStr.text.length);
@@ -74,7 +57,6 @@ export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
         const share = perShare + remainingCarry;
         const samplesStr = buildSamplesSection(obj, share, previewDepthLimit, previewArrayLimit, previewObjectKeyLimit, samplesMaxArrayPaths, samplesItemsPerArray, sampleObjectMaxDepth);
         sections.push(samplesStr.text);
-        remainingCarry = Math.max(0, share - samplesStr.text.length);
     }
 
     const combined = sections.filter(Boolean).join('\n\n');
