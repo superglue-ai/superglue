@@ -28,6 +28,7 @@ interface AddStepDialogProps {
     onConfirmGenerate?: (step: ExecutionStep) => void;
     existingStepIds: string[];
     stepInput?: Record<string, any>;
+    currentToolId?: string;
 }
 
 export function AddStepDialog({
@@ -37,7 +38,8 @@ export function AddStepDialog({
     onConfirmTool,
     onConfirmGenerate,
     existingStepIds,
-    stepInput
+    stepInput,
+    currentToolId
 }: AddStepDialogProps) {
     const [stepId, setStepId] = useState('');
     const [instruction, setInstruction] = useState('');
@@ -75,6 +77,11 @@ export function AddStepDialog({
     };
 
     const filteredTools = tools.filter(tool => {
+        // Exclude tools with no steps
+        if (!tool.steps || tool.steps.length === 0) return false;
+        // Exclude the current tool
+        if (currentToolId && tool.id === currentToolId) return false;
+        
         if (!searchQuery.trim()) return true;
         const query = searchQuery.toLowerCase();
         return (

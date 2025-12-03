@@ -766,6 +766,7 @@ export function ToolStepGallery({
                 onConfirmGenerate={handleConfirmGenerateStep}
                 existingStepIds={steps.map((s: any) => s.id)}
                 stepInput={pendingInsertIndex !== null ? buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, pendingInsertIndex - 1) : undefined}
+                currentToolId={toolId}
             />
         </div>
     );

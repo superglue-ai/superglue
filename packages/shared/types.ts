@@ -348,6 +348,15 @@ export interface ToolArgs {
   verbose?: boolean;
 }
 
+export interface GenerateTransformArgs {
+  currentTransform?: string;
+  responseSchema?: JSONSchema;
+  stepData: Record<string, any>;
+  errorMessage?: string;
+  instruction?: string;  
+}
+
+
 // Legacy alias  
 export type WorkflowArgs = ToolArgs;
 
@@ -400,6 +409,9 @@ export type ToolSchedule = {
   createdAt: Date;
   updatedAt: Date;
 }
+
+
+
 
 // Legacy aliases
 export type WorkflowScheduleInput = ToolScheduleInput;

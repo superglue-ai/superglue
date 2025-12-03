@@ -1508,9 +1508,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         onClose={handleCloseFixTransformDialog}
         currentTransform={finalTransform}
         responseSchema={parsedResponseSchema}
-        stepData={Object.entries(stepResultsMap)
-          .filter(([key]) => key !== '__final_transform__')
-          .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {})}
+        stepData={buildEvolvingPayload(computedPayload || {}, steps, stepResultsMap, steps.length - 1)}
         errorMessage={
           typeof stepResultsMap['__final_transform__'] === 'string'
             ? stepResultsMap['__final_transform__']
