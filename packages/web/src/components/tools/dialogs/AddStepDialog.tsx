@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/ta
 import { Textarea } from '@/src/components/ui/textarea';
 import { cn } from '@/src/lib/general-utils';
 import { ExecutionStep } from '@superglue/shared';
-import { Loader2, WandSparkles } from 'lucide-react';
+import { AlertTriangle, Loader2, WandSparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useGenerateStepConfig } from '../hooks/use-generate-step-config';
 import { IntegrationSelector } from '../shared/IntegrationSelector';
@@ -100,6 +100,11 @@ export function AddStepDialog({
 
         if (existingStepIds.includes(trimmedId)) {
             setError(`Step with ID "${trimmedId}" already exists`);
+            return;
+        }
+
+        if (!selectedIntegrationId) {
+            setError('Please select an integration');
             return;
         }
 
@@ -264,7 +269,10 @@ export function AddStepDialog({
                             />
                         </div>
                         {error && (
-                            <p className="text-sm text-destructive">{error}</p>
+                            <div className="flex items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+                                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                                <span>{error}</span>
+                            </div>
                         )}
                     </TabsContent>
 
@@ -319,7 +327,10 @@ export function AddStepDialog({
                                     )}
                                 </div>
                                 {error && (
-                                    <p className="text-sm text-destructive">{error}</p>
+                                    <div className="flex items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+                                        <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                                        <span>{error}</span>
+                                    </div>
                                 )}
                             </div>
                         )}
