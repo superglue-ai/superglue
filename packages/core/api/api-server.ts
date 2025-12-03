@@ -63,8 +63,10 @@ export async function startApiServer(datastore: DataStore) {
       });
     }
 
+    const authenticatedRequest = request as AuthenticatedFastifyRequest;
+    
     // Add auth info including orgId to request context
-    (request as AuthenticatedFastifyRequest).authInfo = { 
+    authenticatedRequest.authInfo = { 
       orgId: authResult.orgId,
       userId: authResult.userId,
       orgName: authResult.orgName,
@@ -72,8 +74,13 @@ export async function startApiServer(datastore: DataStore) {
     };
 
     // Add datastore and traceId to request context
-    (request as AuthenticatedFastifyRequest).datastore = datastore;
-    (request as AuthenticatedFastifyRequest).traceId = traceId;
+    authenticatedRequest.datastore = datastore;
+    authenticatedRequest.traceId = traceId;
+    
+    // Add helper method to extract metadata
+    authenticatedRequest.toMetadata = function() {
+      return { orgId: this.authInfo.orgId, traceId: this.traceId };
+    };
   });
 
   // Register all API routes from modules

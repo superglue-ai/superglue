@@ -1,5 +1,5 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { UserRole } from '@superglue/shared';
+import { UserRole, ServiceMetadata } from '@superglue/shared';
 
 export interface AuthenticatedFastifyRequest extends FastifyRequest {
   traceId?: string;
@@ -10,6 +10,8 @@ export interface AuthenticatedFastifyRequest extends FastifyRequest {
     orgRole?: UserRole;
   };
   datastore: any;
+  
+  toMetadata: () => ServiceMetadata;
 }
 
 export interface RouteHandler {
