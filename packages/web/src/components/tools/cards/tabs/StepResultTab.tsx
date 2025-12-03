@@ -51,14 +51,9 @@ export function StepResultTab({
     if (!isPending) {
         if (errorResult) {
             if (stepResult) {
-                if (typeof stepResult === 'string') {
-                    outputString = stepResult.length > 50000 ?
-                        stepResult.substring(0, 50000) + '\n... [Error message truncated]' :
-                        stepResult;
-                } else {
-                    outputString = outputProcessor.preview?.displayString || '';
-                    isTruncated = outputProcessor.preview?.truncated || false;
-                }
+                outputString = stepResult.length > 50000 ?
+                    stepResult.substring(0, 50000) + '\n... [Error message truncated]' :
+                    stepResult;
             } else {
                 outputString = '{\n  "error": "Step execution failed"\n}';
             }
