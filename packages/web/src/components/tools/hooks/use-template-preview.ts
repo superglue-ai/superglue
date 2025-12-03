@@ -10,6 +10,7 @@ interface UseTemplatePreviewResult {
   previewValue: any;
   previewError: string | null;
   isEvaluating: boolean;
+  hasResult: boolean;
 }
 
 export function useTemplatePreview(
@@ -22,6 +23,8 @@ export function useTemplatePreview(
   const [previewValue, setPreviewValue] = useState<any>(undefined);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [hasResult, setHasResult] = useState(false);
+  
   const lastCodeRef = useRef<string>('');
   const lastSourceDataRef = useRef<any>(null);
   const evalVersionRef = useRef(0);
@@ -30,8 +33,6 @@ export function useTemplatePreview(
 
   useEffect(() => {
     if (!enabled || !hasSourceData) {
-      setPreviewValue(undefined);
-      setPreviewError(null);
       setIsEvaluating(false);
       return;
     }
@@ -40,26 +41,38 @@ export function useTemplatePreview(
       setPreviewValue(undefined);
       setPreviewError(null);
       setIsEvaluating(false);
+      setHasResult(false);
       lastCodeRef.current = codeContent;
       lastSourceDataRef.current = sourceData;
       return;
     }
 
-    if (codeContent === lastCodeRef.current && sourceData === lastSourceDataRef.current) {
+    const isCacheHit = codeContent === lastCodeRef.current && sourceData === lastSourceDataRef.current;
+    
+    if (isCacheHit) {
+      setHasResult(true);
+      setIsEvaluating(false);
+      lastCodeRef.current = codeContent;
+      lastSourceDataRef.current = sourceData;
       return;
     }
-
+    
     evalVersionRef.current += 1;
     const thisVersion = evalVersionRef.current;
 
     const timer = setTimeout(async () => {
       if (thisVersion !== evalVersionRef.current) return;
+      
+      setHasResult(false);
       setIsEvaluating(true);
+      
       try {
         const result = await evaluateTemplate(codeContent, sourceData);
         if (thisVersion !== evalVersionRef.current) return;
+        
         lastCodeRef.current = codeContent;
         lastSourceDataRef.current = sourceData;
+        
         if (result.success) {
           setPreviewValue(result.value);
           setPreviewError(null);
@@ -67,10 +80,12 @@ export function useTemplatePreview(
           setPreviewValue(undefined);
           setPreviewError(result.error || 'Evaluation failed');
         }
+        setHasResult(true);
       } catch (error) {
         if (thisVersion !== evalVersionRef.current) return;
         setPreviewValue(undefined);
         setPreviewError(error instanceof Error ? error.message : String(error));
+        setHasResult(true);
       } finally {
         if (thisVersion === evalVersionRef.current) {
           setIsEvaluating(false);
@@ -81,10 +96,5 @@ export function useTemplatePreview(
     return () => clearTimeout(timer);
   }, [codeContent, sourceData, enabled, hasSourceData, debounceMs]);
 
-  useEffect(() => {
-    lastCodeRef.current = '';
-    lastSourceDataRef.current = null;
-  }, [enabled]);
-
-  return { previewValue, previewError, isEvaluating };
+  return { previewValue, previewError, isEvaluating, hasResult };
 }

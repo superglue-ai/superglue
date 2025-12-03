@@ -19,14 +19,13 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { downloadJson } from '@/src/lib/download-utils';
-import { formatJavaScriptCode, isEmptyData, truncateForDisplay, getIntegrationIcon as getIntegrationIconName, getSimpleIcon } from '@/src/lib/general-utils';
+import { isEmptyData } from '@/src/lib/general-utils';
 import { Integration } from '@superglue/shared';
 import { assertValidArrowFunction } from '@superglue/shared';
-import { BugPlay, ChevronDown, Download, FileBraces, FileInput, FileOutput, Loader2, Play, Route, Trash2, Wand2, Globe, X } from 'lucide-react';
-import { Badge } from '@/src/components/ui/badge';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { JavaScriptCodeEditor } from '../../editors/JavaScriptCodeEditor';
+import { Bug, ChevronDown, Download, FileBraces, FileInput, FileOutput, Loader2, Play, RotateCw, Route, Trash2, Wand2, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
+import { TemplateAwareJsonDisplay } from '../../editors/TemplateAwareJsonDisplay';
 import { Label } from '../../ui/label';
 import { ToolStepConfigurator } from '../ToolStepConfigurator';
 import { useDataProcessor } from '../hooks/use-data-processor';
@@ -53,6 +52,7 @@ export const SpotlightStepCard = React.memo(({
     failedSteps = [],
     showOutputSignal,
     onConfigEditingChange,
+    onLoopInfoChange,
     isFirstStep = false,
     isPayloadValid = true,
 }: {
@@ -76,48 +76,24 @@ export const SpotlightStepCard = React.memo(({
     stepResultsMap?: Record<string, any>;
     showOutputSignal?: number;
     onConfigEditingChange?: (editing: boolean) => void;
+    onLoopInfoChange?: (loopCount: number | null) => void;
     isFirstStep?: boolean;
     isPayloadValid?: boolean;
 }) => {
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
-    const [inputViewMode, setInputViewMode] = useState<'preview' | 'schema'>('preview');
     const [outputViewMode, setOutputViewMode] = useState<'preview' | 'schema'>('preview');
     const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
-    const [pendingAction, setPendingAction] = useState<'execute' | 'executeWithLimit' | null>(null);
-    const [didFormatLoopSelector, setDidFormatLoopSelector] = useState(false);
+    const [pendingAction, setPendingAction] = useState<'execute' | null>(null);
     
     const DATA_SELECTOR_DEBOUNCE_MS = 400;
     const [loopItems, setLoopItems] = useState<any | null>(null);
     const [loopItemsError, setLoopItemsError] = useState<string | null>(null);
-    const [isLoopItemsEvaluating, setIsLoopItemsEvaluating] = useState<boolean>(false);
     const lastEvalTimerRef = useRef<number | null>(null);
-
-    const inputProcessor = useDataProcessor(
-        evolvingPayload,
-        activePanel === 'input'
-    );
 
     const outputProcessor = useDataProcessor(
         stepResult,
         activePanel === 'output'
     );
-
-    const loopItemsDisplayValue = useMemo(() => {
-        if (loopItemsError) return '{}';
-        const displayData = truncateForDisplay(loopItems);
-        return displayData.value;
-    }, [loopItems, loopItemsError]);
-
-    const loopItemsCopyValue = useMemo(() => {
-        return JSON.stringify(loopItems, null, 2);
-    }, [loopItems]);
-
-    const handleInputViewModeChange = (mode: 'preview' | 'schema') => {
-        setInputViewMode(mode);
-        if (mode === 'schema') {
-            inputProcessor.computeSchema();
-        }
-    };
 
     const handleOutputViewModeChange = (mode: 'preview' | 'schema') => {
         setOutputViewMode(mode);
@@ -133,30 +109,11 @@ export const SpotlightStepCard = React.memo(({
         }
     }, [showOutputSignal, stepResult]);
 
-    // Re-trigger schema computation when data changes and we're viewing schema
-    useEffect(() => {
-        if (activePanel === 'input' && inputViewMode === 'schema' && evolvingPayload) {
-            inputProcessor.computeSchema();
-        }
-    }, [evolvingPayload, inputViewMode, activePanel, inputProcessor]);
-
     useEffect(() => {
         if (activePanel === 'output' && outputViewMode === 'schema' && stepResult) {
             outputProcessor.computeSchema();
         }
     }, [stepResult, outputViewMode, activePanel, outputProcessor]);
-
-    useEffect(() => {
-        if (!didFormatLoopSelector && step.loopSelector) {
-            formatJavaScriptCode(step.loopSelector).then(formatted => {
-                if (formatted !== step.loopSelector && onEdit) {
-                    const updated = { ...step, loopSelector: formatted } as any;
-                    onEdit(step.id, updated, false);
-                }
-                setDidFormatLoopSelector(true);
-            });
-        }
-    }, [step.loopSelector, didFormatLoopSelector, step, onEdit]);
 
     useEffect(() => {
         if (lastEvalTimerRef.current) {
@@ -165,7 +122,6 @@ export const SpotlightStepCard = React.memo(({
         }
         setLoopItemsError(null);
         const t = window.setTimeout(() => {
-            setIsLoopItemsEvaluating(true);
             try {
                 let sel = step?.loopSelector;
                 const raw = assertValidArrowFunction(sel).trim();
@@ -174,11 +130,9 @@ export const SpotlightStepCard = React.memo(({
                 // eslint-disable-next-line no-new-func
                 const fn = new Function('sourceData', body);
                 const out = fn(evolvingPayload || {});
-                // Normalize the result - if it's a function, that's likely an error (user returned a function reference)
                 if (typeof out === 'function') {
                     throw new Error('Data selector returned a function. Did you forget to call it?');
                 }
-                // Normalize undefined to null for consistency
                 const normalizedOut = out === undefined ? null : out;
                 setLoopItems(normalizedOut);
                 setLoopItemsError(null);
@@ -197,8 +151,6 @@ export const SpotlightStepCard = React.memo(({
                     }
                 }
                 setLoopItemsError(errorMessage);
-            } finally {
-                setIsLoopItemsEvaluating(false);
             }
         }, DATA_SELECTOR_DEBOUNCE_MS);
         lastEvalTimerRef.current = t as unknown as number;
@@ -208,7 +160,15 @@ export const SpotlightStepCard = React.memo(({
                 lastEvalTimerRef.current = null; 
             } 
         };
-    }, [step.executionMode, step.loopSelector, evolvingPayload, activePanel]);
+    }, [step.executionMode, step.loopSelector, evolvingPayload]);
+
+    useEffect(() => {
+        if (!loopItemsError && loopItems && Array.isArray(loopItems)) {
+            onLoopInfoChange?.(loopItems.length);
+        } else {
+            onLoopInfoChange?.(null);
+        }
+    }, [loopItems, loopItemsError, onLoopInfoChange]);
 
     const handleRunStepClick = () => {
         if (isFirstStep && !isPayloadValid) {
@@ -216,15 +176,6 @@ export const SpotlightStepCard = React.memo(({
             setShowInvalidPayloadDialog(true);
         } else if (onExecuteStep) {
             onExecuteStep();
-        }
-    };
-
-    const handleTryWithOneIterationClick = () => {
-        if (isFirstStep && !isPayloadValid) {
-            setPendingAction('executeWithLimit');
-            setShowInvalidPayloadDialog(true);
-        } else if (onExecuteStepWithLimit) {
-            onExecuteStepWithLimit(1);
         }
     };
 
@@ -237,91 +188,67 @@ export const SpotlightStepCard = React.memo(({
                         <h3 className="text-lg font-semibold truncate">
                             {step.id || `Step ${stepIndex + 1}`}
                         </h3>
-                        {step.name && step.name !== step.id && (
-                            <span className="text-sm text-muted-foreground truncate">({step.name})</span>
-                        )}
-                        {integrations && step.integrationId && (() => {
-                            const linkedIntegration = integrations.find(integration => integration.id === step.integrationId);
-                            if (!linkedIntegration) return null;
-                            const iconName = getIntegrationIconName(linkedIntegration);
-                            const icon = iconName ? getSimpleIcon(iconName) : null;
-                            return (
-                                <Badge variant="outline" className="text-xs flex-shrink-0">
-                                    <div className="text-xs flex items-center gap-1">
-                                        {icon ? (
-                                            <svg width="10" height="10" viewBox="0 0 24 24" fill={`#${icon.hex}`} className="flex-shrink-0">
-                                                <path d={icon.path || ''} />
-                                            </svg>
-                                        ) : (
-                                            <Globe className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
-                                        )}
-                                        <span className="truncate">{linkedIntegration.id}</span>
-                                    </div>
-                                </Badge>
-                            );
-                        })()}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                         {!readOnly && onExecuteStep && (
                             <div className="flex items-center">
-                                <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Run this single step"}>
-                                    <Button
-                                        variant="default"
-                                        onClick={handleRunStepClick}
-                                        disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                        className={`h-8 pl-3 pr-3 gap-2 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90 ${
-                                            loopItems && Array.isArray(loopItems) && loopItems.length > 0 
-                                                ? 'rounded-r-none border-r border-white/20 dark:border-black/20' 
-                                                : ''
-                                        }`}
-                                    >
-                                        {isExecuting ? (
-                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                        ) : (
-                                            <Play className="h-3 w-3" />
-                                        )}
-                                        <span className="font-medium text-[13px]">Run Step</span>
-                                    </Button>
-                                </span>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
+                                <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Run this step"}>
+                                    <div className={`relative flex rounded-md border border-input bg-background ${loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit ? '' : ''}`}>
                                         <Button
-                                            variant="default"
+                                            variant="ghost"
+                                            onClick={handleRunStepClick}
                                             disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                            className={`h-8 px-1 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90 rounded-l-none ${
-                                                !(loopItems && Array.isArray(loopItems) && loopItems.length > 0) ? 'opacity-0 pointer-events-none' : ''
-                                            }`}
+                                            className={`h-8 pl-3 gap-2 border-0 ${loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit ? 'pr-2 rounded-r-none' : 'pr-3'}`}
                                         >
-                                            <ChevronDown className="h-3 w-3" />
+                                            {isExecuting ? (
+                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                            ) : loopItems && Array.isArray(loopItems) && loopItems.length > 1 ? (
+                                                <RotateCw className="h-3.5 w-3.5" />
+                                            ) : (
+                                                <Play className="h-3 w-3" />
+                                            )}
+                                            <span className="font-medium text-[13px]">Run Step</span>
                                         </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-fit">
-                                        <DropdownMenuItem
-                                            onClick={handleTryWithOneIterationClick}
-                                            disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                            className="cursor-pointer"
-                                        >
-                                            <BugPlay className="h-4 w-4 mr-1" />
-                                            <span>Run single iteration</span>
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                        {loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit && (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        disabled={!canExecute || isExecuting || isGlobalExecuting}
+                                                        className="h-8 px-1.5 rounded-l-none border-0"
+                                                    >
+                                                        <ChevronDown className="h-3 w-3" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => onExecuteStepWithLimit(1)}>
+                                                        <Bug className="h-3.5 w-3.5 mr-2" />
+                                                        Run single iteration
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        )}
+                                        {loopItems && Array.isArray(loopItems) && loopItems.length > 1 && (
+                                            <span className="absolute -top-2 -left-2 min-w-[16px] h-[16px] px-1 text-[10px] font-bold bg-primary text-primary-foreground rounded flex items-center justify-center">
+                                                {loopItems.length >= 1000 ? `${Math.floor(loopItems.length / 1000)}k` : loopItems.length}
+                                            </span>
+                                        )}
+                                    </div>
+                                </span>
                             </div>
                         )}
                         {!readOnly && onOpenFixStepDialog && (
-                            <>
-                                <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Fix this step with AI"}>
-                                    <Button
-                                        variant="ghost"
-                                        onClick={onOpenFixStepDialog}
-                                        disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                        className="h-8 px-3 gap-2"
-                                    >
-                                        <Wand2 className="h-3 w-3" />
-                                        <span className="font-medium text-[13px]">Fix Step</span>
-                                    </Button>
-                                </span>
-                            </>
+                            <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Fix this step with AI"}>
+                                <Button
+                                    variant="ghost"
+                                    onClick={onOpenFixStepDialog}
+                                    disabled={!canExecute || isExecuting || isGlobalExecuting}
+                                    className="h-8 px-3 gap-2"
+                                >
+                                    <Wand2 className="h-3 w-3" />
+                                    <span className="font-medium text-[13px]">Fix Step</span>
+                                </Button>
+                            </span>
                         )}
                         {!readOnly && onRemove && (
                             <Button
@@ -358,150 +285,37 @@ export const SpotlightStepCard = React.memo(({
                         {activePanel === 'input' && (
                             <div>
                                 {(() => {
-                                    // Check if we can't execute this step yet to show placeholder text
                                     const cannotExecuteYet = stepIndex > 0 && !canExecute;
 
-                                    const inputData = {
-                                        displayString: inputViewMode === 'schema'
-                                            ? inputProcessor.schema?.displayString || ''
-                                            : inputProcessor.preview?.displayString || '',
-                                        truncated: inputViewMode === 'schema'
-                                            ? inputProcessor.schema?.truncated || false
-                                            : inputProcessor.preview?.truncated || false,
-                                    };
+                                    if (cannotExecuteYet) {
+                                        return (
+                                            <div className="flex flex-col items-center justify-center border rounded-md bg-muted/5 text-muted-foreground" style={{ height: '400px' }}>
+                                                <div className="text-xs mb-1">No input yet</div>
+                                                <p className="text-[10px]">Run previous step to see inputs</p>
+                                            </div>
+                                        );
+                                    }
 
                                     return (
-                                        <>
-                                            <p className="text-xs text-muted-foreground mb-2">
-                                                Step data selector extracts step data from the aggregated tool data.
-                                            </p>
-                                            <div className="flex gap-3">
-                                                <div className="flex-1">
-                                                    <Label className="text-xs flex items-center gap-1 mb-1">
-                                                        Aggregated Step Data
-                                                        <HelpTooltip text="This is an object combined from the tool payload and the previous step results." />
-                                                    </Label>
-                                                    {cannotExecuteYet ? (
-                                                        <div className="flex flex-col items-center justify-center border rounded-md bg-muted/5 text-muted-foreground" style={{ height: '610px' }}>
-                                                            <div className="text-xs mb-1">No input yet</div>
-                                                            <p className="text-[10px]">Run previous step to see inputs</p>
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            <JsonCodeEditor
-                                                                value={inputData.displayString}
-                                                                readOnly={true}
-                                                                minHeight="580px"
-                                                                maxHeight="740px"
-                                                                resizable={true}
-                                                                overlay={
-                                                                    <div className="flex items-center gap-1">
-                                                                        {(inputProcessor.isComputingPreview || inputProcessor.isComputingSchema) && (
-                                                                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                                                        )}
-                                                                        <Tabs value={inputViewMode} onValueChange={(v) => handleInputViewModeChange(v as 'preview' | 'schema')} className="w-auto">
-                                                                            <TabsList className="h-6 p-0.5 rounded-md">
-                                                                                <TabsTrigger value="preview" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Preview</TabsTrigger>
-                                                                                <TabsTrigger value="schema" className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm">Schema</TabsTrigger>
-                                                                            </TabsList>
-                                                                        </Tabs>
-                                                                        <CopyButton text={inputData.displayString} />
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-6 w-6"
-                                                                            onClick={() => downloadJson(evolvingPayload, `step_${step.id}_input.json`)}
-                                                                            title="Download step input as JSON"
-                                                                        >
-                                                                            <Download className="h-3 w-3" />
-                                                                        </Button>
-                                                                    </div>
-                                                                }
-                                                            />
-                                                            {inputData.truncated && inputViewMode === 'preview' && (
-                                                                <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
-                                                                    Preview truncated for display performance
-                                                                </div>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex-1 flex flex-col gap-3">
-                                                    <div className="flex-1">
-                                                        <Label className="text-xs flex items-center gap-1 mb-1">
-                                                            Current Step Data Selector (JavaScript)
-                                                            <HelpTooltip text="JavaScript arrow function that receives the aggregatedstep input as sourceData. It should return the part of the data this step needs. If it returns an object, the step runs once. If it returns an array, the step runs once for each item and sourceData.currentItem is set for every iteration." />
-                                                        </Label>
-                                                        <JavaScriptCodeEditor
-                                                            value={step.loopSelector || '(sourceData) => { }'}
-                                                            onChange={(val) => {
-                                                                if (onEdit && !readOnly) {
-                                                                    onEdit(step.id, { ...step, loopSelector: val }, true);
-                                                                }
-                                                            }}
-                                                            readOnly={readOnly}
-                                                            minHeight="220px"
-                                                            maxHeight="350px"
-                                                            resizable={true}
-                                                            isTransformEditor={false}
-                                                            autoFormatOnMount={false}
-                                                        />
-                                                    </div>
-
-                                                    <div className="flex-1">
-                                                        <Label className="text-xs flex items-center gap-1 mb-1">
-                                                            Current Step Data
-                                                            <HelpTooltip text="Preview of the step data. Evaluates the step data selector against the aggregated step input." />
-                                                            {isLoopItemsEvaluating && (
-                                                                <div className="ml-1 h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/70 border-t-transparent" />
-                                                            )}
-                                                        </Label>
-                                                        {cannotExecuteYet ? (
-                                                            <div className="flex flex-col items-center justify-center border rounded-md bg-muted/5 text-muted-foreground" style={{ minHeight: '220px' }}>
-                                                                <div className="text-xs mb-1">No input yet</div>
-                                                                <p className="text-[10px]">Run previous step to see inputs</p>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="relative">
-                                                                <JsonCodeEditor
-                                                                    value={loopItemsDisplayValue}
-                                                                    readOnly={true}
-                                                                    minHeight="220px"
-                                                                    maxHeight="350px"
-                                                                    resizable={true}
-                                                                    placeholder=""
-                                                                    overlay={
-                                                                        <div className="flex items-center gap-2">
-                                                                            {!loopItemsError && (
-                                                                                <CopyButton text={loopItemsCopyValue} />
-                                                                            )}
-                                                                            {!loopItemsError && (
-                                                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => downloadJson(loopItems, `step_${step.id}_loop_items.json`)} title="Download loop items as JSON">
-                                                                                    <Download className="h-3 w-3" />
-                                                                                </Button>
-                                                                            )}
-                                                                        </div>
-                                                                    }
-                                                                    bottomRightOverlay={(!loopItemsError && loopItems) ?  ((Array.isArray(loopItems) && loopItems.length > 0) ? (
-                                                                        <div className="px-2 py-1 rounded-md bg-secondary text-muted-foreground text-[11px] font-medium shadow-md">
-                                                                            Step config will run {loopItems.length} times. Loop items can be accessed in config as sourceData.currentItem.
-                                                                        </div>
-                                                                    ) : <div className="px-2 py-1 rounded-md bg-secondary text-muted-foreground text-[11px] font-medium shadow-md">
-                                                                    Step data is available in config as sourceData.currentItem.
-                                                                </div>) : undefined}
-                                                                />
-                                                                {loopItemsError && (
-                                                                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-destructive/10 text-destructive text-xs max-h-32 overflow-y-auto overflow-x-hidden">
-                                                                        Error: {loopItemsError}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </>
+                                        <div>
+                                            <Label className="text-xs flex items-center gap-1 mb-1">
+                                                Step Input Data
+                                                <HelpTooltip text="Aggregated data from the tool payload and previous step results. Edit the currentItem expression to control what data this step receives for each iteration." />
+                                            </Label>
+                                            <TemplateAwareJsonDisplay
+                                                data={evolvingPayload}
+                                                currentItemExpression={step.loopSelector || '(sourceData) => sourceData'}
+                                                onExpressionChange={(newExpression) => {
+                                                    if (onEdit && !readOnly) {
+                                                        onEdit(step.id, { ...step, loopSelector: newExpression }, true);
+                                                    }
+                                                }}
+                                                readOnly={readOnly}
+                                                canExecute={canExecute}
+                                                minHeight="400px"
+                                                maxHeight="600px"
+                                            />
+                                        </div>
                                     );
                                 })()}
                             </div>
@@ -664,9 +478,7 @@ export const SpotlightStepCard = React.memo(({
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={() => {
                             setShowInvalidPayloadDialog(false);
-                            if (pendingAction === 'executeWithLimit' && onExecuteStepWithLimit) {
-                                onExecuteStepWithLimit(1);
-                            } else if (pendingAction === 'execute' && onExecuteStep) {
+                            if (pendingAction === 'execute' && onExecuteStep) {
                                 onExecuteStep();
                             }
                             setPendingAction(null);

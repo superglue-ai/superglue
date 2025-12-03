@@ -123,6 +123,7 @@ export function ToolStepGallery({
     const isConfiguratorEditingRef = useRef<boolean>(false);
     const [hiddenLeftCount, setHiddenLeftCount] = useState(0);
     const [hiddenRightCount, setHiddenRightCount] = useState(0);
+    const [activeStepLoopCount, setActiveStepLoopCount] = useState<number | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     
     useEffect(() => {
@@ -618,6 +619,7 @@ export function ToolStepGallery({
                                                                     hasTransformCompleted={hasTransformCompleted}
                                                                     isPayloadValid={isPayloadValid}
                                                                     payloadData={item.type === 'payload' ? workingPayload : undefined}
+                                                                    isLoopStep={globalIdx === activeIndex && activeStepLoopCount !== null && activeStepLoopCount > 0}
                                                                 />
                                                             </div>
                                                             {showArrow && (
@@ -749,6 +751,7 @@ export function ToolStepGallery({
                                     failedSteps={failedSteps}
                                     showOutputSignal={showStepOutputSignal}
                                     onConfigEditingChange={setIsConfiguratorEditing}
+                                    onLoopInfoChange={setActiveStepLoopCount}
                                     isFirstStep={activeIndex === 1}
                                     isPayloadValid={isPayloadValid}
                                 />

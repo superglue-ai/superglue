@@ -156,7 +156,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                         </Label>
                                         
                                         <div className="relative mt-1 rounded-lg border shadow-sm bg-muted/30">
-                                            <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
+                                            <div className="absolute top-0 right-0 bottom-0 z-10 flex items-center gap-1 pl-8 pr-2 bg-gradient-to-l from-muted/30 via-muted/30 to-muted/30">
                                                 {onOpenFixStepDialog && (
                                                     <button
                                                         type="button"
@@ -170,7 +170,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 )}
                                                 <CopyButton text={step.apiConfig.instruction || ''} />
                                             </div>
-                                            <div className="text-xs text-muted-foreground whitespace-pre-wrap p-3 pr-16" style={{ minHeight: '5rem' }}>
+                                            <div className="h-9 flex items-center text-xs text-muted-foreground px-3 pr-16 truncate">
                                                 {step.apiConfig.instruction || (
                                                     <span className="text-muted-foreground italic">Describe what this step should do...</span>
                                                 )}
