@@ -5,14 +5,14 @@
  */
 
 import { ApiConfig } from "@superglue/shared";
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import { callPostgres } from '../../tools/strategies/postgres/postgres.js';
 import { logMessage } from "../../utils/logs.js";
 import { composeUrl } from "../../utils/helpers.js";
 import { DocumentationProcessingStrategy } from '../types.js';
 
 export class PostgreSqlStrategy implements DocumentationProcessingStrategy {
-  async tryProcess(content: string, config: ApiConfig, metadata: Metadata, credentials?: Record<string, any>): Promise<string | null> {
+  async tryProcess(content: string, config: ApiConfig, metadata: ServiceMetadata, credentials?: Record<string, any>): Promise<string | null> {
     if (config.urlHost?.startsWith("postgres://") || config.urlHost?.startsWith("postgresql://")) {
       const url = composeUrl(config.urlHost, config.urlPath);
 

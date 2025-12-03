@@ -1,12 +1,12 @@
 import { Tool } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { logMessage } from "../../utils/logs.js";
-import { Context } from '../types.js';
+import { GraphQLRequestContext } from '../types.js';
 
 export const renameWorkflowResolver = async (
   _: any,
   { oldId, newId }: { oldId: string; newId: string },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ): Promise<Tool> => {
   if (!oldId) {
@@ -19,7 +19,7 @@ export const renameWorkflowResolver = async (
   try {
     return await context.datastore.renameWorkflow({ oldId, newId, orgId: context.orgId });
   } catch (error) {
-    logMessage('error', `Error renaming workflow: ${String(error)}`, { orgId: context.orgId });
+    logMessage('error', `Error renaming workflow: ${String(error)}`, context.toMetadata());
     throw error;
   }
 };

@@ -1,6 +1,6 @@
 import axios from "axios";
 import { chromium } from "playwright";
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import { logMessage } from "../../utils/logs.js";
 import { OpenApiFetchingStrategy } from "../types.js";
 import { fetchMultipleOpenApiSpecs } from '../documentation-utils.js';
@@ -18,7 +18,7 @@ import { fetchMultipleOpenApiSpecs } from '../documentation-utils.js';
  * 3. Returns the discovered OpenAPI spec URLs
  */
 export class SwaggerUIStrategy implements OpenApiFetchingStrategy {
-  async tryFetch(data: any, sourceUrl: string, metadata: Metadata): Promise<string | null> {
+  async tryFetch(data: any, sourceUrl: string, metadata: ServiceMetadata): Promise<string | null> {
     try {
       // Check if this is a SwaggerUI page
       const html = typeof data === 'string' ? data : JSON.stringify(data);

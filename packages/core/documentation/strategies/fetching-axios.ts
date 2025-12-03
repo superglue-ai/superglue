@@ -4,14 +4,14 @@
  * Simple HTTP GET requests for direct documentation URLs.
  */
 
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import axios from "axios";
 import { server_defaults } from '../../default.js';
 import { logMessage } from "../../utils/logs.js";
 import { DocumentationConfig, DocumentationFetchingStrategy } from '../types.js';
 
 export class AxiosFetchingStrategy implements DocumentationFetchingStrategy {
-  async tryFetch(config: DocumentationConfig, metadata: Metadata): Promise<string | null> {
+  async tryFetch(config: DocumentationConfig, metadata: ServiceMetadata): Promise<string | null> {
     if (!config.documentationUrl?.startsWith("http")) return null;
 
     try {

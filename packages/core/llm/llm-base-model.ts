@@ -1,4 +1,5 @@
 import type { AssistantModelMessage, SystemModelMessage, Tool, ToolModelMessage, UserModelMessage } from "ai";
+import { ServiceMetadata } from "@superglue/shared";
 import { LLMToolCall, LLMToolCallResult, LLMToolDefinition } from "./llm-tool-utils.js";
 import { AiSdkModel } from "./ai-sdk-model.js";
 
@@ -56,6 +57,7 @@ export interface LLMObjectGeneratorInput {
     temperature?: number;
     tools?: LLMToolWithContext[];
     toolChoice?: 'auto' | 'required' | 'none' | { type: 'tool'; toolName: string };
+    metadata?: ServiceMetadata;
 }
 
 // Lazy initialization to ensure environment variables are loaded

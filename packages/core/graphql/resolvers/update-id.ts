@@ -1,11 +1,11 @@
 import { ApiConfig, ApiResult } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { Context } from '../types.js';
+import { GraphQLRequestContext } from '../types.js';
 
 export const updateApiConfigIdResolver = async (
   _: any,
   { oldId, newId }: { oldId: string; newId: string },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   if (!oldId) {

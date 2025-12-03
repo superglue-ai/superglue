@@ -5,7 +5,7 @@ export interface LogSubscriptionOptions {
   onLog?: (log: Log) => void;
   onError?: (error: Error) => void;
   onComplete?: () => void;
-  runId?: string;
+  traceId?: string;
   includeDebug?: boolean;
 }
 
@@ -54,7 +54,7 @@ export class WebSocketManager {
               message
               level
               timestamp
-              runId
+              traceId
             }
           }
         `
@@ -67,7 +67,7 @@ export class WebSocketManager {
               timestamp: new Date(data.data.logs.timestamp)
             };
 
-            if (!options.runId || log.runId === options.runId) {
+            if (!options.traceId || log.traceId === options.traceId) {
               if (options.includeDebug || log.level !== LogLevel.DEBUG) {
                 options.onLog?.(log);
               }

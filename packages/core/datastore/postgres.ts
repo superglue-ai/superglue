@@ -22,7 +22,7 @@ export class PostgresService implements DataStore {
         });
 
         this.pool.on('connect', () => {
-            logMessage('debug', '🐘 postgres connected');
+            logMessage('debug', 'Datastore: 🐘 postgres connected');
         });
 
         this.pool.connect().catch((err) => {

@@ -2,7 +2,7 @@
  * Utility functions for documentation processing
  */
 
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import axios from "axios";
 import * as yaml from 'js-yaml';
 import { server_defaults } from '../default.js';
@@ -44,7 +44,7 @@ export function isValidOpenApiSpec(obj: any): boolean {
  * Fetches multiple OpenAPI specifications concurrently with limits.
  * Returns either null if no valid specs are fetched, or a json string of a single spec, or a json string of all specs with metadata.
  */
-export async function fetchMultipleOpenApiSpecs(urls: string[], metadata: Metadata): Promise<string> {
+export async function fetchMultipleOpenApiSpecs(urls: string[], metadata: ServiceMetadata): Promise<string> {
   let filteredUrls = urls.filter(url =>
     !url.includes('.png') && !url.includes('.jpg') && !url.includes('.jpeg') &&
     !url.includes('.gif') && !url.includes('.svg') && !url.includes('.webp') &&

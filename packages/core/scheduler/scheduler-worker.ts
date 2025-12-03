@@ -3,6 +3,7 @@ import { calculateNextRun } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { DataStore } from "../datastore/types.js";
 import { executeWorkflowResolver } from "../graphql/resolvers/workflow.js";
+import { GraphQLRequestContext } from "../graphql/types.js";
 import { logMessage } from "../utils/logs.js";
 
 export class WorkflowSchedulerWorker {
@@ -47,15 +48,20 @@ export class WorkflowSchedulerWorker {
 
         for (const schedule of schedules) {
             try {
-                logMessage('info', `WORKFLOW SCHEDULER: Running scheduled workflow ${schedule.workflowId}`);
+                const traceId = crypto.randomUUID();
+                logMessage('info', `WORKFLOW SCHEDULER: Running scheduled workflow ${schedule.workflowId}`, { orgId: schedule.orgId, traceId });
 
                 const now = new Date(Date.now());
                 const nextRun = calculateNextRun(schedule.cronExpression, schedule.timezone, now);
                 await this.datastore.updateScheduleNextRun({ id: schedule.id, nextRunAt: nextRun, lastRunAt: now });
 
-                const context = {
+                const context: GraphQLRequestContext = {
                     datastore: this.datastore,
-                    orgId: schedule.orgId
+                    traceId,
+                    orgId: schedule.orgId,
+                    toMetadata: function() {
+                        return { orgId: this.orgId, traceId: this.traceId };
+                    }
                 };
 
                 const options = schedule.options ? {
@@ -75,7 +81,7 @@ export class WorkflowSchedulerWorker {
                     {} as GraphQLResolveInfo
                 );
             } catch (error) {
-                logMessage('error', `WORKFLOW SCHEDULER: Failed to run scheduled workflow ${schedule.workflowId}: ${error}`);
+                logMessage('error', `WORKFLOW SCHEDULER: Failed to run scheduled workflow ${schedule.workflowId}: ${error}`, { orgId: schedule.orgId });
             }
         }
     }

@@ -1,4 +1,4 @@
-import { Integration, JSONSchema, ApiConfig } from "@superglue/shared";
+import { Integration, JSONSchema, ApiConfig, ServiceMetadata } from "@superglue/shared";
 
 export type ObjectContextOptions = {
     characterBudget: number;
@@ -20,6 +20,7 @@ export type IntegrationContextOptions = {
         documentationMaxSections?: number;
         documentationMaxChars?: number;
     };
+    metadata: ServiceMetadata;
 };
 
 export type ToolBuilderContextOptions = {
@@ -32,6 +33,7 @@ export type ToolBuilderContextInput = {
     payload: any;
     userInstruction: string;
     responseSchema?: JSONSchema;
+    metadata: ServiceMetadata;
 };
 
 export type EvaluateStepResponseContextInput = {

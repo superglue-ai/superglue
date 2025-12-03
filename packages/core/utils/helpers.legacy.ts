@@ -1,5 +1,5 @@
 import { BaseConfig, JSONata, JSONSchema, RequestOptions } from "@superglue/shared";
-import type { DataStore, Metadata } from "@superglue/shared";
+import type { DataStore, ServiceMetadata } from "@superglue/shared";
 import { generateWorkingTransform } from "../tools/tool-transform.js";
 import { isSelfHealingEnabled, transformData, validateSchema } from "./helpers.js";
 
@@ -68,7 +68,7 @@ export async function executeTransformLegacy(args: {
   input: TransformInputRequest,
   data: any,
   options?: RequestOptions,
-  metadata: Metadata
+  metadata: ServiceMetadata
 }): Promise<{ data?: any; config?: TransformConfig }> {
   const { datastore, fromCache, input, data, metadata, options } = args;
   let currentConfig: TransformConfig | undefined = input.endpoint;

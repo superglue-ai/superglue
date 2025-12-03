@@ -1,5 +1,5 @@
 import { JSONSchema, RequestOptions } from "@superglue/shared";
-import type { Metadata } from "@superglue/shared";
+import type { ServiceMetadata } from "@superglue/shared";
 import prettier from "prettier";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -16,7 +16,7 @@ export interface ExecuteAndEvaluateFinalTransformInput {
   aggregatedStepData: Record<string, unknown>;
   instruction: string;
   options: RequestOptions;
-  metadata: Metadata;
+  metadata: ServiceMetadata;
 }
 
 export interface ExecuteAndEvaluateFinalTransformOutput {
@@ -110,7 +110,7 @@ export async function generateWorkingTransform({
   targetSchema: any,
   inputData: any,
   instruction: string,
-  metadata: Metadata,
+  metadata: ServiceMetadata,
   retry?: number,
   messages?: LLMMessage[]
 }): Promise<{ transformCode: string; data?: any } | null> {
@@ -130,7 +130,7 @@ export async function generateWorkingTransform({
       transformCode: z.string().describe("JS function as string")
     });
 
-    const result = await LanguageModel.generateObject<z.infer<typeof transformSchema>>({messages, schema: zodToJsonSchema(transformSchema), temperature: temperature});
+    const result = await LanguageModel.generateObject<z.infer<typeof transformSchema>>({messages, schema: zodToJsonSchema(transformSchema), temperature: temperature, metadata});
     messages = result.messages;
     
     if (!result.success) {
@@ -191,7 +191,7 @@ export async function evaluateTransform(
   sourcePayload: any,
   targetSchema: any,
   instruction: string,
-  metadata: Metadata
+  metadata: ServiceMetadata
 ) {
   try {
     logMessage('info', "Evaluating final transform", metadata);
@@ -207,7 +207,7 @@ export async function evaluateTransform(
       reason: z.string().describe("Reasoning for the success status. If success is false, explain what is wrong with the transform. If success is true, confirm correct transformation.")
     });
     
-    const result = await LanguageModel.generateObject<z.infer<typeof llmResponseSchema>>({messages, schema: zodToJsonSchema(llmResponseSchema), temperature: 0});
+    const result = await LanguageModel.generateObject<z.infer<typeof llmResponseSchema>>({messages, schema: zodToJsonSchema(llmResponseSchema), temperature: 0, metadata});
     
     if (!result.success) {
       throw new Error(`Error evaluating transform: ${result.response}`);

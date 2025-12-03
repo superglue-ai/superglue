@@ -270,7 +270,7 @@ export class WorkflowRunner {
                 };
 
                 const executor = new ToolExecutor(
-                    { tool: workflow, metadata: metadataWithWorkflowId, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId) }
+                    { tool: workflow, metadata: metadataWithWorkflowId, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata) }
                 );
 
                 // Combine all credentials from integrations

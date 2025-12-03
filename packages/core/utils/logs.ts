@@ -1,4 +1,4 @@
-import { Log, Metadata } from "@superglue/shared";
+import { Log, ServiceMetadata } from "@superglue/shared";
 import EventEmitter from "events";
 import pino from "pino";
 
@@ -46,7 +46,7 @@ export const logger = pino({
         message: message,
         level: String(levelMap[level]).toUpperCase(),
         timestamp: new Date(),
-        runId: metadata.runId || '',
+        traceId: metadata.traceId || '',
         orgId: metadata.orgId || ''
       };
 
@@ -60,7 +60,7 @@ export const logger = pino({
 });
 
 // Helper function for easier logging with metadata
-export function logMessage(level: 'info' | 'error' | 'warn' | 'debug', message: string, metadata: Metadata = { orgId: '' }) {
+export function logMessage(level: 'info' | 'error' | 'warn' | 'debug', message: string, metadata: ServiceMetadata = { orgId: '' }) {
   // In pino v9, metadata should be passed as the first argument when logging
   logger[level](metadata, message);
 }

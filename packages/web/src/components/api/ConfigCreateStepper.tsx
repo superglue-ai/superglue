@@ -2,16 +2,12 @@
 
 import { useConfig } from '@/src/app/config-context';
 import { useToast } from '@/src/hooks/use-toast';
-import { useToken } from '@/src/hooks/use-token';
 import { parseCredentialsHelper, splitUrl } from '@/src/lib/client-utils';
 import { cn, composeUrl, inputErrorStyles } from '@/src/lib/general-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
-import { ApolloClient, gql, InMemoryCache, useSubscription } from '@apollo/client';
-import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { Label } from '@radix-ui/react-label';
 import { ApiConfig, AuthType, CacheMode, SuperglueClient } from '@superglue/shared';
 import { integrations } from '@superglue/shared';
-import { createClient } from 'graphql-ws';
 import { Loader2, Terminal, Upload, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -60,18 +56,6 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
     },
     responseSchema: '{}'
   })
-  const LOGS_SUBSCRIPTION = gql`
-  subscription OnNewLog {
-    logs {
-      id
-      message
-      level
-      timestamp
-      runId
-    }
-  }
-`
-  const config = useConfig();
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
 
@@ -79,60 +63,30 @@ export function ConfigCreateStepper({ configId: initialConfigId, mode = 'create'
   const [isDraggingDoc, setIsDraggingDoc] = useState(false)
 
   const [latestLog, setLatestLog] = useState<string>('')
-  const token = useToken();
 
   const client = useMemo(() => {
-    const wsLink = new GraphQLWsLink(
-      createClient({
-        url:
-          config.superglueEndpoint
-            ?.replace("https", "wss")
-            ?.replace("http", "ws") || "ws://localhost:3000/graphql",
-        connectionParams: {
-          Authorization: `Bearer ${tokenRegistry.getToken()}`,
-        },
-        retryAttempts: Infinity,
-        shouldRetry: () => true,
-        retryWait: (retries) =>
-          new Promise((resolve) =>
-            setTimeout(resolve, Math.min(retries * 1000, 5000))
-          ),
-        keepAlive: 10000, // Send keep-alive every 10 seconds
-      })
-    );
-
-    return new ApolloClient({
-      link: wsLink,
-      cache: new InMemoryCache(),
-      defaultOptions: {
-        watchQuery: {
-          fetchPolicy: 'no-cache',
-        },
-        query: {
-          fetchPolicy: 'no-cache',
-        },
-      },
+    return new SuperglueClient({
+      endpoint: superglueConfig.superglueEndpoint,
+      apiKey: tokenRegistry.getToken()
     })
-  }, [config.superglueEndpoint, token])
+  }, [superglueConfig.superglueEndpoint])
 
   useEffect(() => {
+    const subscription = client.subscribeToLogs({
+      onLog: (log) => {
+        setLatestLog(log.message)
+      },
+      onError: (error) => {
+        console.error('Log subscription error:', error)
+      },
+      includeDebug: true
+    })
+
     return () => {
-      client.stop()
+      subscription.then(sub => sub.unsubscribe())
+      client.disconnect()
     }
   }, [client])
-
-  useSubscription(LOGS_SUBSCRIPTION, {
-    client,
-    shouldResubscribe: true,
-    onError: (error) => {
-      console.error('Subscription error:', error)
-    },
-    onData: ({ data }) => {
-      if (data.data?.logs) {
-        setLatestLog(data.data.logs.message)
-      }
-    }
-  })
 
   const handleChange = (field: string) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string
@@ -495,19 +449,6 @@ const result = await superglue.call({
       }));
     }
   }, [prefillData]);
-
-  useSubscription(LOGS_SUBSCRIPTION, {
-    client,
-    shouldResubscribe: true,
-    onError: (error) => {
-      console.error('Subscription error:', error)
-    },
-    onData: ({ data }) => {
-      if (data.data?.logs) {
-        setLatestLog(data.data.logs.message)
-      }
-    }
-  })
 
   // Add a new function to handle URL changes from URLField
   const handleUrlChange = (urlHost: string, urlPath: string, queryParams: Record<string, string>) => {

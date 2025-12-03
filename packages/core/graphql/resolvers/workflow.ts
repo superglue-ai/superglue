@@ -9,7 +9,7 @@ import { ToolExecutor } from "../../tools/tool-executor.js";
 import { ToolFinder } from "../../tools/tool-finder.js";
 import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { Context, Metadata } from '../types.js';
+import { GraphQLRequestContext } from '../types.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -37,14 +37,16 @@ type GraphQLWorkflowResult = Omit<ToolResult, 'stepResults'> & { data?: any, ste
 export const executeWorkflowResolver = async (
   _: unknown,
   args: ExecuteWorkflowArgs,
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ): Promise<GraphQLWorkflowResult> => {
-  let runId = crypto.randomUUID();
-  let startedAt = new Date();
-  let metadata: Metadata = { orgId: context.orgId, runId };
-  let workflow: Tool | undefined;
+  // NOTE: Consider making run_id an input argument to create a DB entry at the start
+  // and only update the status at the end, rather than creating it after execution
+  const runId = crypto.randomUUID();
+  const startedAt = new Date();
+  const metadata = context.toMetadata();
 
+  let workflow: Tool | undefined;
   try {
     if (args.input.id) {
       workflow = await context.datastore.getWorkflow({ id: args.input.id, orgId: context.orgId });
@@ -59,6 +61,8 @@ export const executeWorkflowResolver = async (
     } else {
       throw new Error("Must provide either workflow ID or workflow object");
     }
+
+    logMessage('debug', `Executing tool with id: ${workflow.id}, run_id: ${runId}`, metadata);
 
     // Parse schemas if they're strings
     if (workflow.inputSchema && typeof workflow.inputSchema === 'string') {
@@ -89,7 +93,7 @@ export const executeWorkflowResolver = async (
 
     if (allIntegrationIds.size > 0) {
       const requestedIds = Array.from(allIntegrationIds);
-      integrationManagers = await IntegrationManager.fromIds(requestedIds, context.datastore, context.orgId);
+      integrationManagers = await IntegrationManager.fromIds(requestedIds, context.datastore, metadata);
 
       const foundIds = new Set(integrationManagers.map(i => i.id));
       requestedIds.forEach(id => {
@@ -127,9 +131,8 @@ export const executeWorkflowResolver = async (
 
     // Notify webhook if configured (fire-and-forget)
     if (args.options?.webhookUrl?.startsWith('http')) {
-      notifyWebhook(args.options.webhookUrl, runId, graphqlResult.success, graphqlResult.data, graphqlResult.error);
-    }
-    else if(args.options?.webhookUrl?.startsWith('tool:')) {
+      notifyWebhook(args.options.webhookUrl, runId, graphqlResult.success, graphqlResult.data, graphqlResult.error, metadata);
+    } else if(args.options?.webhookUrl?.startsWith('tool:')) {
       const toolId = args.options.webhookUrl.split(':')[1];
       if(toolId == args.input.id) {
         logMessage('warn', "Tool cannot trigger itself", metadata);
@@ -141,7 +144,7 @@ export const executeWorkflowResolver = async (
     return graphqlResult;
 
   } catch (error) {
-    logMessage('error', "Workflow execution error: " + String(error), metadata || { orgId: context.orgId, runId });
+    logMessage('error', "Workflow execution error: " + String(error), metadata);
     const result = {
       id: runId,
       success: false,
@@ -181,7 +184,7 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
 
     return await context.datastore.upsertWorkflow({ id, workflow, orgId: context.orgId });
   } catch (error) {
-    logMessage('error', "Error upserting workflow: " + String(error), { orgId: context.orgId });
+    logMessage('error', "Error upserting workflow: " + String(error), context.toMetadata());
     throw error;
   }
 };
@@ -194,7 +197,7 @@ export const deleteWorkflowResolver = async (_: unknown, { id }: { id: string },
   try {
     return await context.datastore.deleteWorkflow({ id, orgId: context.orgId });
   } catch (error) {
-    logMessage('error', "Error deleting workflow: " + String(error), { orgId: context.orgId });
+    logMessage('error', "Error deleting workflow: " + String(error), context.toMetadata());
     throw error;
   }
 };
@@ -217,7 +220,7 @@ export const getWorkflowResolver = async (_: unknown, { id }: { id: string }, co
     });
     return workflow;
   } catch (error) {
-    logMessage('error', "Error getting workflow: " + String(error), { orgId: context.orgId });
+    logMessage('error', "Error getting workflow: " + String(error), context.toMetadata());
     throw error;
   }
 };
@@ -234,7 +237,7 @@ export const listWorkflowsResolver = async (
       total: result.total,
     };
   } catch (error) {
-    logMessage('error', "Error listing workflows: " + String(error), { orgId: context.orgId });
+    logMessage('error', "Error listing workflows: " + String(error), context.toMetadata());
     throw error;
   }
 };
@@ -242,11 +245,11 @@ export const listWorkflowsResolver = async (
 export const findRelevantToolsResolver = async (
   _: unknown,
   { searchTerms }: { searchTerms?: string },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ) => {
   try {
-    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
+    const metadata = context.toMetadata();
     const allTools = await context.datastore.listWorkflows({ limit: 1000, offset: 0, orgId: context.orgId });
     const tools = (allTools.items || []).map(tool => {
       if (tool.inputSchema && typeof tool.inputSchema === 'string') {
@@ -261,7 +264,7 @@ export const findRelevantToolsResolver = async (
     const selector = new ToolFinder(metadata);
     return await selector.findTools(searchTerms, tools);
   } catch (error) {
-    logMessage('error', `Error finding relevant tools: ${String(error)}`, { orgId: context.orgId });
+    logMessage('error', `Error finding relevant tools: ${String(error)}`, context.toMetadata());
     return [];
   }
 };
@@ -269,12 +272,12 @@ export const findRelevantToolsResolver = async (
 export const buildWorkflowResolver = async (
   _: unknown,
   args: BuildWorkflowArgs,
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ): Promise<Tool> => {
+  const metadata = context.toMetadata();
 
   try {
-    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
     const { instruction, payload = {}, integrationIds, responseSchema } = args;
 
     if (!instruction || instruction.trim() === "") {
@@ -307,7 +310,7 @@ export const buildWorkflowResolver = async (
 
     return workflow;
   } catch (error) {
-    logMessage('error', `Failed to build workflow: ${error}`, { orgId: context.orgId });
+    logMessage('error', `Failed to build workflow: ${error}`, metadata);
     throw error;
   }
 };

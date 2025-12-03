@@ -1,8 +1,5 @@
 "use client"
-import { ApolloClient, gql, InMemoryCache, useSubscription } from "@apollo/client";
-import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { motion } from "framer-motion";
-import { createClient } from 'graphql-ws';
 import { ChevronRight, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConfig } from "../../app/config-context";
@@ -10,20 +7,7 @@ import { tokenRegistry } from "../../lib/token-registry";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Switch } from "../ui/switch";
-import { useToken } from "@/src/hooks/use-token";
-import { Log } from "@superglue/shared";
-
-const LOGS_SUBSCRIPTION = gql`
-  subscription OnNewLog {
-    logs {
-      id
-      message   
-      level
-      timestamp
-      runId
-    }
-  }
-`
+import { Log, SuperglueClient } from "@superglue/shared";
 
 const LOG_MIN_WIDTH = 300
 const LOG_MAX_WIDTH = 1500
@@ -40,33 +24,13 @@ export function LogSidebar() {
   const [showDebug, setShowDebug] = useState(false)
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
   const config = useConfig();
-  const token = useToken();
 
   const client = useMemo(() => {
-    const wsLink = new GraphQLWsLink(createClient({
-      url: config.superglueEndpoint?.replace('https', 'wss')?.replace('http', 'ws') || 'ws://localhost:3000/graphql',
-      connectionParams: {
-        Authorization: `Bearer ${tokenRegistry.getToken()}`
-      },
-      retryAttempts: Infinity,
-      shouldRetry: () => true,
-      retryWait: (retries) => new Promise((resolve) => setTimeout(resolve, Math.min(retries * 1000, 5000))),
-      keepAlive: 10000, // Send keep-alive every 10 seconds
-    }))
-
-    return new ApolloClient({
-      link: wsLink,
-      cache: new InMemoryCache(),
-      defaultOptions: {
-        watchQuery: {
-          fetchPolicy: 'no-cache',
-        },
-        query: {
-          fetchPolicy: 'no-cache',
-        },
-      },
+    return new SuperglueClient({
+      endpoint: config.superglueEndpoint,
+      apiKey: tokenRegistry.getToken()
     })
-  }, [config.superglueEndpoint, token])
+  }, [config.superglueEndpoint])
 
   const filteredLogs = useMemo(
     () => showDebug ? logs : logs.filter(log => log.level !== "DEBUG"),
@@ -74,26 +38,24 @@ export function LogSidebar() {
   )
 
   useEffect(() => {
-    return () => {
-      client.stop()
-    }
-  }, [client])
-
-  useSubscription(LOGS_SUBSCRIPTION, {
-    client,
-    shouldResubscribe: true,
-    onError: (error) => {
-      console.warn('Subscription error:', error)
-    },
-    onData: ({ data }) => {
-      if (data.data?.logs) {
-        setLogs(prev => [...prev, data.data.logs].slice(-100))
+    const subscription = client.subscribeToLogs({
+      onLog: (log) => {
+        setLogs(prev => [...prev, log].slice(-100))
         if (!isExpanded) {
           setHasNewLogs(true)
         }
-      }
+      },
+      onError: (error) => {
+        console.warn('Log subscription error:', error)
+      },
+      includeDebug: true
+    })
+
+    return () => {
+      subscription.then(sub => sub.unsubscribe())
+      client.disconnect()
     }
-  })
+  }, [client, isExpanded])
 
   // Add auto-scroll effect
   useEffect(() => {

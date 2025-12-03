@@ -1,4 +1,4 @@
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import { OpenApiFetchingStrategy } from "../types.js";
 import { logMessage } from "../../utils/logs.js";
 import { extractOpenApiUrlFromHtml, fetchMultipleOpenApiSpecs } from '../documentation-utils.js';
@@ -17,7 +17,7 @@ export class HtmlLinkExtractorStrategy implements OpenApiFetchingStrategy {
     this.rawHtmlContent = rawHtmlContent;
   }
 
-  async tryFetch(data: any, sourceUrl: string, metadata: Metadata): Promise<string | null> {
+  async tryFetch(data: any, sourceUrl: string, metadata: ServiceMetadata): Promise<string | null> {
     const content = this.rawHtmlContent;
     
     if (!content) {

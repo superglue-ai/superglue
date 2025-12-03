@@ -5,16 +5,16 @@
  * It uses keyword matching and scoring algorithms to identify the most relevant content.
  */
 
-import { Metadata } from '@superglue/shared';
+import { ServiceMetadata } from '@superglue/shared';
 import { server_defaults } from '../default.js';
 import { LanguageModel } from '../llm/llm-base-model.js';
 import { sanitizeUnpairedSurrogates } from '../utils/helpers.js';
 import { logMessage } from '../utils/logs.js';
 
 export class DocumentationSearch {
-  private readonly metadata: Metadata;
+  private readonly metadata: ServiceMetadata;
 
-  constructor(metadata: Metadata) {
+  constructor(metadata: ServiceMetadata) {
     this.metadata = metadata;
   }
 

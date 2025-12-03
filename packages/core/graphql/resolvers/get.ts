@@ -1,11 +1,11 @@
 import { GraphQLResolveInfo } from 'graphql';
 import { telemetryClient } from '../../utils/telemetry.js';
-import { Context } from '../types.js';
+import { GraphQLRequestContext } from '../types.js';
 
 export const getApiResolver = async (
   _: any,
   { id }: { id: string; },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   if (!id) {
@@ -25,7 +25,7 @@ export const getApiResolver = async (
 export const getRunResolver = async (
   _: any,
   { id }: { id: string; },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   if (!id) {

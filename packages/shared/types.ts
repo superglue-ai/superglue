@@ -1,11 +1,16 @@
+// Service metadata - lightweight context for logging and tracing in service classes
+export type ServiceMetadata = {
+  traceId?: string;
+  orgId?: string;
+};
+
 export interface Log {
   id: string;
   message: string;
   level: string | LogLevel;
   timestamp: Date;
-  runId?: string;
-  orgId?: string;
   traceId?: string;
+  orgId?: string;
 }
 
 export interface MessagePart {
@@ -46,7 +51,7 @@ export interface ToolCall {
       message: string;
       level: string;
       timestamp: Date;
-      runId?: string;
+      traceId?: string;
       orgId?: string;
   }>;
   buildResult?: any;

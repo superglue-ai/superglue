@@ -1,4 +1,4 @@
-import { Metadata } from "@playwright/test";
+import { ServiceMetadata } from "@superglue/shared";
 import { Integration, SelfHealingMode, Tool, ToolResult } from "@superglue/shared";
 import { generateUniqueId } from "@superglue/shared/utils";
 import { ToolBuilder } from "../../../packages/core/tools/tool-builder.js";
@@ -12,7 +12,7 @@ export class SuperglueToolAttemptService {
     private validationService: ToolValidationService;
 
     constructor(
-        private metadata: Metadata,
+        private metadata: ServiceMetadata,
         private datastore: DataStore,
         validationLlmConfig?: ValidationLLMConfig
     ) {
@@ -123,7 +123,7 @@ export class SuperglueToolAttemptService {
         selfHealingEnabled: boolean
     ): Promise<ToolResult> {
         const executor = new ToolExecutor(
-            { tool: workflow, metadata: this.metadata, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata.orgId) }
+            { tool: workflow, metadata: this.metadata, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata) }
         );
 
         const allCredentials = integrations.reduce(

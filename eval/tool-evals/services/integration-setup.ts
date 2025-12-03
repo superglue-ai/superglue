@@ -1,4 +1,4 @@
-import { Metadata } from "@playwright/test";
+import { ServiceMetadata } from "@superglue/shared";
 import { Integration } from "@superglue/shared";
 import { DataStore } from "../../../packages/core/datastore/types.js";
 import { DocumentationFetcher } from "../../../packages/core/documentation/index.js";
@@ -10,7 +10,7 @@ export class IntegrationSetupService {
   constructor(
     private datastore: DataStore,
     private config: AgentEvalConfig,
-    private metadata: Metadata
+    private metadata: ServiceMetadata
   ) {}
 
   async setupIntegrations(): Promise<Integration[]> {

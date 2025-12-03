@@ -1,5 +1,5 @@
 import { Tool } from "@superglue/shared";
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import { logMessage } from "../utils/logs.js";
 
 export interface FoundTool {
@@ -15,9 +15,9 @@ export interface FoundTool {
 }
 
 export class ToolFinder {
-    private metadata: Metadata;
+    private metadata: ServiceMetadata;
 
-    constructor(metadata: Metadata) {
+    constructor(metadata: ServiceMetadata) {
         this.metadata = metadata;
     }
 

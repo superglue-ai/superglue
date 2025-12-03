@@ -1,10 +1,10 @@
 import { Log } from "@superglue/shared";
 import { EventEmitter } from 'events';
 import { logEmitter } from '../../utils/logs.js';
-import { Context } from '../types.js';
+import { GraphQLRequestContext } from '../types.js';
 // Export resolver
 export const logsResolver = {
-    subscribe: (_, { }, context: Context) => {
+    subscribe: (_, { }, context: GraphQLRequestContext) => {
         const orgId = context.orgId;
         return {
             [Symbol.asyncIterator]() {
@@ -27,9 +27,7 @@ export const logsResolver = {
                     next() {
                         return new Promise((resolve) => {
                             emitter.once('data', (value) => {
-                                if (value?.logs?.orgId === orgId) {
-                                    resolve({ value, done: false });
-                                }
+                                resolve({ value, done: false });
                             });
                         });
                     },

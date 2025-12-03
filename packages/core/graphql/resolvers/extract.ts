@@ -5,7 +5,7 @@ import { parseFile } from "../../files/index.js";
 import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { maskCredentials } from '@superglue/shared';
-import { Context, Metadata } from '../types.js';
+import { GraphQLRequestContext, ServiceMetadata } from '../types.js';
 
 export const extractResolver = async (
   _: any,
@@ -15,15 +15,12 @@ export const extractResolver = async (
     credentials: Record<string, string>;
     options: RequestOptions;
   },
-  context: Context,
+  context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
   const callId = crypto.randomUUID();
   const startedAt = new Date();
-  const metadata: Metadata = {
-    runId: input.id || callId,
-    orgId: context.orgId
-  };
+  const metadata = context.toMetadata();
 
   try {
     if (!input.file) {

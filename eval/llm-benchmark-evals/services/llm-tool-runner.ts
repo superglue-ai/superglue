@@ -1,4 +1,4 @@
-import type { Metadata } from "@superglue/shared";
+import type { ServiceMetadata } from "@superglue/shared";
 import { logMessage } from "../../../packages/core/utils/logs.js";
 import { ToolValidationService } from "../../tool-evals/services/tool-validation.js";
 import { AttemptStatus, type IntegrationConfig, type ToolAttempt, type ToolConfig, ToolFailureReason } from "../../tool-evals/types.js";
@@ -10,7 +10,7 @@ export class LlmToolRunner {
   private validationService: ToolValidationService;
 
   constructor(
-    private metadata: Metadata,
+    private metadata: ServiceMetadata,
     validationLlmConfig?: { provider: string; model: string }
   ) {
     this.codeExecutor = new CodeExecutor();

@@ -5,7 +5,7 @@
  */
 
 import { ApiConfig } from "@superglue/shared";
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
 import { server_defaults } from '../../default.js';
@@ -14,7 +14,7 @@ import { composeUrl } from "../../utils/helpers.js";
 import { DocumentationFetchingStrategy } from '../types.js';
 
 export class GraphQLStrategy implements DocumentationFetchingStrategy {
-  private async fetchGraphQLSchema(url: string, config: ApiConfig, metadata: Metadata): Promise<any | null> {
+  private async fetchGraphQLSchema(url: string, config: ApiConfig, metadata: ServiceMetadata): Promise<any | null> {
     const introspectionQuery = getIntrospectionQuery();
 
     try {
@@ -43,7 +43,7 @@ export class GraphQLStrategy implements DocumentationFetchingStrategy {
         .some(val => typeof val === 'string' && val.includes('IntrospectionQuery'));
   }
 
-  async tryFetch(config: ApiConfig, metadata: Metadata): Promise<string | null> {
+  async tryFetch(config: ApiConfig, metadata: ServiceMetadata): Promise<string | null> {
     if (!config.urlHost?.startsWith("http")) return null;
     const endpointUrl = composeUrl(config.urlHost, config.urlPath);
 

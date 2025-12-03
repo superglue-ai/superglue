@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Metadata } from "@superglue/shared";
+import type { ServiceMetadata } from "@superglue/shared";
 import { initializeAIModel } from "@superglue/shared/utils";
 import { config } from "dotenv";
 import { PlaywrightFetchingStrategy } from "../../packages/core/documentation/strategies/fetching-playwright.js";
@@ -34,7 +34,7 @@ const PROVIDERS = [
 
 function applyEnvironmentVariablesToCredentials(
   integrations: IntegrationConfig[],
-  metadata: Metadata
+  metadata: ServiceMetadata
 ): void {
   for (const integration of integrations) {
     if (!integration.credentials || !integration.id) {

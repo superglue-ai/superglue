@@ -39,7 +39,7 @@
  * - OpenApiLinkExtractorStrategy: Extracts OpenAPI URLs from JSON/YAML objects containing spec links
  */
 
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import axios from "axios";
 
 import { server_defaults } from '../default.js';
@@ -61,12 +61,12 @@ import { DocumentationConfig, DocumentationFetchingStrategy, DocumentationProces
 export class DocumentationFetcher {
   public config: DocumentationConfig;
   private readonly credentials?: Record<string, any>;
-  private readonly metadata: Metadata;
+  private readonly metadata: ServiceMetadata;
 
   private lastFetchAndProcessResult: string | null = null;
   private lastFetchAndProcessRawResult: string | null = null;
 
-  constructor(config: DocumentationConfig, credentials: Record<string, any>, metadata: Metadata) {
+  constructor(config: DocumentationConfig, credentials: Record<string, any>, metadata: ServiceMetadata) {
     this.config = config;
     this.credentials = credentials;
     this.metadata = metadata;

@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, Integration, Pagination } from "@superglue/shared";
+import { ApiConfig, HttpMethod, Integration, Pagination, ServiceMetadata } from "@superglue/shared";
 import { LLMMessage, LLMToolWithContext } from "../llm/llm-base-model.js";
 import { LanguageModel } from "../llm/llm-base-model.js";
 import { getWebSearchTool, searchDocumentationToolDefinition } from "../llm/llm-tools.js";
@@ -9,6 +9,7 @@ type GenerateStepConfigInput = {
     retryCount: number;
     messages: LLMMessage[];
     integration: Integration;
+    metadata: ServiceMetadata;
 }
 
 export interface GenerateStepConfigResult {
@@ -43,10 +44,13 @@ const stepConfigSchema = z.object({
     }).describe("Complete API configuration to execute")
   });
 
-export async function generateStepConfig({ retryCount, messages, integration }: GenerateStepConfigInput): Promise<GenerateStepConfigResult> {
+export async function generateStepConfig({ retryCount, messages, integration, metadata }: GenerateStepConfigInput): Promise<GenerateStepConfigResult> {
     const temperature = Math.min(retryCount * 0.1, 1);
     const webSearchTool = getWebSearchTool();
-    const tools: LLMToolWithContext[] = [{toolDefinition: searchDocumentationToolDefinition, toolContext: { integration }}];
+    const tools: LLMToolWithContext[] = [{
+        toolDefinition: searchDocumentationToolDefinition, 
+        toolContext: { orgId: metadata.orgId, traceId: metadata.traceId, integration }
+    }];
     
     if (webSearchTool) {
         tools.push({ 
@@ -59,7 +63,8 @@ export async function generateStepConfig({ retryCount, messages, integration }: 
         messages,
         schema: zodToJsonSchema(stepConfigSchema),
         temperature,
-        tools
+        tools,
+        metadata
     });
 
     

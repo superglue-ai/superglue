@@ -1,4 +1,4 @@
-import type { Metadata } from "@superglue/shared";
+import type { ServiceMetadata } from "@superglue/shared";
 import { generateText } from 'ai';
 import { logMessage } from "../../../packages/core/utils/logs.js";
 import type { IntegrationConfig, ToolConfig } from "../../tool-evals/types.js";
@@ -8,7 +8,7 @@ const MAX_CODE_SIZE = 10000;
 export class LlmCodeGenerator {
   constructor(
     private model: any,
-    private metadata: Metadata
+    private metadata: ServiceMetadata
   ) {}
 
   async generate(tool: ToolConfig, integrations: IntegrationConfig[]): Promise<string> {

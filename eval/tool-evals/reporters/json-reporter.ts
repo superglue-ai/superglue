@@ -2,7 +2,7 @@ import { ToolAttempt } from "../types.js";
 import { writeFileSync } from "fs";
 import { join } from "path";
 import { logMessage } from "../../../packages/core/utils/logs.js";
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import { AgentEvalConfig } from "../types.js";
 
 export class JsonReporter {
@@ -11,7 +11,7 @@ export class JsonReporter {
 
   constructor(
     private baseDir: string,
-    private metadata: Metadata,
+    private metadata: ServiceMetadata,
     private attemptsPerMode: number
   ) {
   }
