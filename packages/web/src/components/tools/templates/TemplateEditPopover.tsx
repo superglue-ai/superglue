@@ -16,6 +16,7 @@ import { formatValueForDisplay, normalizeTemplateExpression, extractCredentials,
 import { isArrowFunction, maskCredentials } from '@superglue/shared';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Download, AlertCircle, Loader2, Eye, EyeOff, Maximize2, Minimize2 } from 'lucide-react';
+import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Editor from '@monaco-editor/react';
 import { useMonacoTheme } from '@/src/hooks/useMonacoTheme';
@@ -83,6 +84,8 @@ interface TemplateEditPopoverProps {
   onOpenChange?: (open: boolean) => void;
   anchorRect?: { left: number; top: number } | (() => { left: number; top: number } | null) | null;
   loopMode?: boolean;
+  title?: string;
+  helpText?: string;
 }
 
 export function TemplateEditPopover({
@@ -96,6 +99,8 @@ export function TemplateEditPopover({
   onOpenChange,
   anchorRect,
   loopMode = false,
+  title = 'Template Expression',
+  helpText,
 }: TemplateEditPopoverProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -236,9 +241,12 @@ export function TemplateEditPopover({
     <div className="space-y-4">
       <div>
         <div className="flex items-center justify-between mb-1">
-          <Label className="text-xs text-muted-foreground">
-            Template Expression
-          </Label>
+          <div className="flex items-center gap-1">
+            <Label className="text-xs text-muted-foreground">
+              {title}
+            </Label>
+            {helpText && <HelpTooltip text={helpText} />}
+          </div>
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
             className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted/80 transition-colors"

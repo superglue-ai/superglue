@@ -256,7 +256,7 @@ export const SpotlightStepCard = React.memo(({
                     </div>
 
                     <div className="mt-1">
-                        {activePanel === 'input' && (
+                        <div className={activePanel === 'input' ? 'block' : 'hidden'}>
                             <StepInputTab
                                 step={step}
                                 stepIndex={stepIndex}
@@ -264,10 +264,11 @@ export const SpotlightStepCard = React.memo(({
                                 canExecute={canExecute}
                                 readOnly={readOnly}
                                 onEdit={onEdit}
+                                isActive={activePanel === 'input'}
                             />
-                        )}
+                        </div>
 
-                        {activePanel === 'config' && (
+                        <div className={activePanel === 'config' ? 'block' : 'hidden'}>
                             <StepConfigTab
                                 step={step}
                                 evolvingPayload={evolvingPayload}
@@ -279,9 +280,9 @@ export const SpotlightStepCard = React.memo(({
                                 onEditingChange={onConfigEditingChange}
                                 onOpenFixStepDialog={onOpenFixStepDialog}
                             />
-                        )}
+                        </div>
 
-                        {activePanel === 'output' && (
+                        <div className={activePanel === 'output' ? 'block' : 'hidden'}>
                             <StepResultTab
                                 step={step}
                                 stepIndex={stepIndex}
@@ -290,8 +291,9 @@ export const SpotlightStepCard = React.memo(({
                                 isExecuting={isExecuting}
                                 isGlobalExecuting={isGlobalExecuting}
                                 currentExecutingStepIndex={currentExecutingStepIndex}
+                                isActive={activePanel === 'output'}
                             />
-                        )}
+                        </div>
                     </div>
                 </div>
             </div>

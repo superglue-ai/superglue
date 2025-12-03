@@ -2,9 +2,10 @@ import { useMonacoTheme } from '@/src/hooks/useMonacoTheme';
 import { cn } from '@/src/lib/general-utils';
 import Editor from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { TemplateChip } from '../../templates/TemplateChip';
 import { useTemplatePreview } from '../../hooks/use-template-preview';
+import { useDataProcessor } from '../../hooks/use-data-processor';
 import { CopyButton } from '../../shared/CopyButton';
 import { Download, Loader2 } from 'lucide-react';
 import { Button } from '../../../ui/button';
@@ -22,6 +23,7 @@ interface StepInputTabProps {
     canExecute: boolean;
     readOnly?: boolean;
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
+    isActive?: boolean;
 }
 
 export function StepInputTab({
@@ -31,6 +33,7 @@ export function StepInputTab({
     canExecute,
     readOnly = false,
     onEdit,
+    isActive = true,
 }: StepInputTabProps) {
     const { theme, onMount } = useMonacoTheme();
     const [currentHeight, setCurrentHeight] = useState('400px');
@@ -48,31 +51,23 @@ export function StepInputTab({
     const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
         currentItemExpression,
         evolvingPayload,
-        { enabled: canExecute && !!evolvingPayload, debounceMs: 300 }
+        { enabled: isActive && canExecute && !!evolvingPayload, debounceMs: 300 }
     );
 
-    const dataWithCurrentItem = useMemo(() => {
-        const currentItem = previewError 
-            ? `[Error: ${previewError}]` 
-            : previewValue;
-        return { currentItem, ...evolvingPayload };
-    }, [evolvingPayload, previewValue, previewError]);
+    const inputProcessor = useDataProcessor(evolvingPayload, isActive);
 
     const displayData = useMemo(() => {
-        try {
-            const dataStr = JSON.stringify(evolvingPayload, null, 2);
-            if (dataStr.startsWith('{')) {
-                const inner = dataStr.slice(1).trimStart();
-                if (inner.length <= 1) {
-                    return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE}\n}`;
-                }
-                return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE},\n  ${inner.slice(0, -1)}\n}`;
+        if (!isActive) return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE}\n}`;
+        const previewStr = inputProcessor.preview?.displayString || '{}';
+        if (previewStr.startsWith('{')) {
+            const inner = previewStr.slice(1).trimStart();
+            if (inner.length <= 1) {
+                return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE}\n}`;
             }
-            return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE},\n  "sourceData": ${dataStr}\n}`;
-        } catch {
-            return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE}\n}`;
+            return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE},\n  ${inner.slice(0, -1)}\n}`;
         }
-    }, [evolvingPayload]);
+        return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE},\n  "sourceData": ${previewStr}\n}`;
+    }, [isActive, inputProcessor.preview?.displayString]);
 
     const updateChipPosition = useCallback(() => {
         const editor = editorRef.current;
@@ -131,15 +126,15 @@ export function StepInputTab({
             </Label>
             <div className={cn("relative rounded-lg border shadow-sm bg-muted/30")} ref={containerRef}>
                 <div className="absolute top-1 right-1 z-10 mr-5 flex items-center gap-1">
-                    {isEvaluating && (
+                    {(isEvaluating || inputProcessor.isComputingPreview) && (
                         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     )}
-                    <CopyButton text={JSON.stringify(dataWithCurrentItem, null, 2)} />
+                    <CopyButton text={displayData} />
                     <Button
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
-                        onClick={() => downloadJson(dataWithCurrentItem, 'step_input.json')}
+                        onClick={() => downloadJson(evolvingPayload, 'step_input.json')}
                         title="Download step input as JSON"
                     >
                         <Download className="h-3 w-3" />
@@ -177,20 +172,22 @@ export function StepInputTab({
                                 pointerEvents: 'auto'
                             }}
                         >
-                            <TemplateChip
-                                template={templateString}
-                                evaluatedValue={previewValue}
-                                error={previewError ?? undefined}
-                                stepData={evolvingPayload}
-                                hasResult={hasResult}
-                                canExecute={canExecute}
-                                onUpdate={handleUpdate}
-                                onDelete={() => {}}
-                                readOnly={readOnly}
-                                loopMode={true}
-                                hideDelete={true}
-                                inline={true}
-                            />
+                        <TemplateChip
+                            template={templateString}
+                            evaluatedValue={previewValue}
+                            error={previewError ?? undefined}
+                            stepData={evolvingPayload}
+                            hasResult={hasResult}
+                            canExecute={canExecute}
+                            onUpdate={handleUpdate}
+                            onDelete={() => {}}
+                            readOnly={readOnly}
+                            loopMode={true}
+                            hideDelete={true}
+                            inline={true}
+                            popoverTitle="Data Selector"
+                            popoverHelpText="Returns an array → step loops over items. Returns an object → step runs once. currentItem is either the object returned or the current array item."
+                        />
                         </div>
                     )}
                     <Editor

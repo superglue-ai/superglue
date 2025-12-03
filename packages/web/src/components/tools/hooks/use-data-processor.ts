@@ -60,7 +60,7 @@ export function useDataProcessor(
     }, [schemaCompute.isComputing]);
 
     const lastDataHashRef = useRef<string>('');
-    const currentHash = useMemo(() => data ? getDataHash(data) : '', [data]);
+    const currentHash = useMemo(() => (data && isActive) ? getDataHash(data) : '', [data, isActive]);
     if (lastDataHashRef.current !== currentHash) {
         lastDataHashRef.current = currentHash;
         setSchemaTriggered(false);

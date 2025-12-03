@@ -16,6 +16,7 @@ interface StepResultTabProps {
     isExecuting?: boolean;
     isGlobalExecuting?: boolean;
     currentExecutingStepIndex?: number;
+    isActive?: boolean;
 }
 
 export function StepResultTab({
@@ -26,10 +27,11 @@ export function StepResultTab({
     isExecuting,
     isGlobalExecuting,
     currentExecutingStepIndex,
+    isActive = true,
 }: StepResultTabProps) {
     const [outputViewMode, setOutputViewMode] = useState<'preview' | 'schema'>('preview');
 
-    const outputProcessor = useDataProcessor(stepResult, true);
+    const outputProcessor = useDataProcessor(stepResult, isActive);
 
     const handleOutputViewModeChange = (mode: 'preview' | 'schema') => {
         setOutputViewMode(mode);

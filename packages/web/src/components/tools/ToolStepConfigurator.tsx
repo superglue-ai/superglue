@@ -156,7 +156,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                         </Label>
                                         
                                         <div className="relative mt-1 rounded-lg border shadow-sm bg-muted/30">
-                                            <div className="absolute top-0 right-0 bottom-0 z-10 flex items-center gap-1 pl-8 pr-2 bg-gradient-to-l from-muted/30 via-muted/30 to-muted/30">
+                                            <div className="absolute top-0 right-0 bottom-0 z-10 flex items-center gap-1 pl-2 pr-1 bg-gradient-to-l from-muted via-muted/90 to-muted/60">
                                                 {onOpenFixStepDialog && (
                                                     <button
                                                         type="button"

@@ -22,6 +22,8 @@ interface TemplateChipProps {
   onPopoverOpenChange?: (open: boolean) => void;
   loopMode?: boolean;
   hideDelete?: boolean;
+  popoverTitle?: string;
+  popoverHelpText?: string;
 }
 
 export function TemplateChip({
@@ -40,7 +42,9 @@ export function TemplateChip({
   forcePopoverOpen = false,
   onPopoverOpenChange,
   loopMode = false,
-  hideDelete = false
+  hideDelete = false,
+  popoverTitle,
+  popoverHelpText,
 }: TemplateChipProps) {
   const sourceData = useMemo(() => prepareSourceData(stepData, loopData), [stepData, loopData]);
   const [isHovered, setIsHovered] = useState(false);
@@ -185,6 +189,8 @@ export function TemplateChip({
       externalOpen={effectiveOpen}
       onExternalOpenChange={handleOpenChange}
       loopMode={loopMode}
+      title={popoverTitle}
+      helpText={popoverHelpText}
     >
       {chipContent}
     </TemplateEditPopover>
