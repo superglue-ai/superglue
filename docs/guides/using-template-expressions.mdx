@@ -119,7 +119,8 @@ The `sourceData` might look like this:
 ```
 
 <Note>
-  Integration templates are only resolved at tool execution time and get merged with tool-specific credentials.
+  Integration templates are only resolved at tool execution time and get merged
+  with tool-specific credentials.
 </Note>
 
 ### Tool step context
@@ -138,11 +139,110 @@ The `sourceData` object might look like this:
   "payload": { "userId": "12345", "startDate": "2024-01-01" },
   "credentials": { "apiKey": "sk_test_..." },
   "getCustomers": {
-    "data": [
-      { "id": "cus_123", "email": "user@example.com" }
-    ]
+    "data": [{ "id": "cus_123", "email": "user@example.com" }]
   }
 }
+```
+
+### Pagination variables
+
+When pagination is configured on a step, the following variables are available in the request configuration (`urlPath`, `queryParams`, `headers`, `body`):
+
+| Variable   | Description                                          |
+| ---------- | ---------------------------------------------------- |
+| `page`     | Current page number (starts at 1)                    |
+| `offset`   | Current offset (starts at 0, increments by pageSize) |
+| `cursor`   | Cursor value extracted from the previous response    |
+| `limit`    | Same as pageSize                                     |
+| `pageSize` | The configured page size                             |
+
+**Examples:**
+
+Page-based pagination:
+
+```typescript
+queryParams: {
+  "page": "<<page>>",
+  "per_page": "<<limit>>"
+}
+```
+
+Offset-based pagination:
+
+```typescript
+queryParams: {
+  "offset": "<<offset>>",
+  "limit": "<<limit>>"
+}
+```
+
+Cursor-based pagination:
+
+```typescript
+queryParams: {
+  "cursor": "<<cursor>>",
+  "limit": "<<pageSize>>"
+}
+```
+
+### Stop condition
+
+The stop condition is a JavaScript function that determines when to stop fetching pages. It receives two arguments:
+
+1. **`response`** – object containing:
+   - `data` – the parsed response body
+   - `headers` – response headers
+
+2. **`pageInfo`** – object containing:
+   - `page` – current page number
+   - `offset` – current offset
+   - `cursor` – current cursor value
+   - `totalFetched` – total number of items fetched so far
+
+The function should return `true` to **stop** pagination, or `false` to continue.
+
+**Examples:**
+
+Stop when no more pages (using response metadata):
+
+```javascript
+(response, pageInfo) => !response.data.has_more;
+```
+
+Stop when data array is empty:
+
+```javascript
+(response, pageInfo) => response.data.items.length === 0;
+```
+
+Stop when cursor is null or missing:
+
+```javascript
+(response, pageInfo) => !response.data.next_cursor;
+```
+
+Stop after fetching a specific number of items:
+
+```javascript
+(response, pageInfo) => pageInfo.totalFetched >= 1000;
+```
+
+Stop when on last page (from total pages header):
+
+```javascript
+(response, pageInfo) =>
+  pageInfo.page >= parseInt(response.headers["x-total-pages"] || "1");
+```
+
+Combine multiple conditions:
+
+```javascript
+(response, pageInfo) => {
+  const items = response.data.results || [];
+  return (
+    items.length === 0 || !response.data.next || pageInfo.totalFetched >= 5000
+  );
+};
 ```
 
 ### Final transform context
@@ -158,9 +258,7 @@ The `sourceData` object might look like this:
 {
   "payload": { "userId": "12345" },
   "getCustomers": {
-    "data": [
-      { "id": "cus_123", "email": "user@example.com" }
-    ]
+    "data": [{ "id": "cus_123", "email": "user@example.com" }]
   },
   "createPaymentIntent": {
     "data": { "id": "pi_456", "status": "succeeded" }
