@@ -1,5 +1,4 @@
-import { ApiConfig, ExecutionStep, Integration, RequestOptions, Tool, ToolResult, ToolStepResult } from "@superglue/shared";
-import { maskCredentials, ServiceMetadata } from "@superglue/shared";
+import { ApiConfig, ExecutionStep, Integration, maskCredentials, RequestOptions, ServiceMetadata, Tool, ToolResult, ToolStepResult } from "@superglue/shared";
 import { flattenAndNamespaceCredentials } from "@superglue/shared/utils";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { z } from "zod";
@@ -12,12 +11,12 @@ import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { isSelfHealingEnabled, transformData } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
-import { executeAndEvaluateFinalTransform, generateWorkingTransform } from "./tool-transform.js";
-import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
-import { generateStepConfig } from "./tool-step-builder.js";
-import { StepExecutionStrategyRegistry } from "./strategies/strategy.js";
-import { PostgresStepExecutionStrategy } from "./strategies/postgres/postgres.js";
 import { FTPStepExecutionStrategy } from "./strategies/ftp/ftp.js";
+import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
+import { PostgresStepExecutionStrategy } from "./strategies/postgres/postgres.js";
+import { StepExecutionStrategyRegistry } from "./strategies/strategy.js";
+import { generateStepConfig } from "./tool-step-builder.js";
+import { executeAndEvaluateFinalTransform } from "./tool-transform.js";
 
 export interface ToolExecutorOptions {
   tool: Tool;
@@ -217,7 +216,8 @@ export class ToolExecutor implements Tool {
               stepConfig: currentConfig,
               stepInputData: loopPayload,
               credentials: stepCredentials,
-              requestOptions: { ...options, testMode: false }
+              requestOptions: { ...options, testMode: false },
+              metadata: this.metadata
             });
 
             if (!itemExecutionResult.success || itemExecutionResult.strategyExecutionData === undefined) {

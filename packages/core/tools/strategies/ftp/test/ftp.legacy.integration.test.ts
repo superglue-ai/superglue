@@ -122,7 +122,7 @@ describe('FTP File Extraction', () => {
       const result = await callFTP({
         endpoint: config,
         credentials: {},
-        options: requestOptions
+        options: requestOptions, metadata: {}
       });
 
       expect(result).toBeDefined();
@@ -156,7 +156,7 @@ describe('FTP File Extraction', () => {
       const result = await callFTP({
         endpoint: config,
         credentials: {},
-        options: requestOptions
+        options: requestOptions, metadata: {}
       });
 
       expect(result).toBeDefined();
@@ -195,7 +195,7 @@ describe('FTP File Extraction', () => {
       const result = await callFTP({
         endpoint: config,
         credentials: {},
-        options: requestOptions
+        options: requestOptions, metadata: {}
       });
 
       expect(result).toBeDefined();
@@ -248,7 +248,7 @@ describe('FTP File Extraction', () => {
       const result = await callFTP({
         endpoint: config,
         credentials: {},
-        options: requestOptions
+        options: requestOptions, metadata: {}
       });
 
       expect(result).toBeDefined();
@@ -305,7 +305,7 @@ describe('FTP File Extraction', () => {
       const result = await callFTP({
         endpoint: config,
         credentials: {},
-        options: requestOptions
+        options: requestOptions, metadata: {}
       });
 
       expect(result).toBeDefined();
@@ -328,7 +328,7 @@ describe('FTP File Extraction', () => {
       const result = await callFTP({
         endpoint: config,
         credentials: {},
-        options: requestOptions
+        options: requestOptions, metadata: {}
       });
 
       expect(result).toBeDefined();
@@ -348,7 +348,7 @@ describe('FTP File Extraction', () => {
       const result = await callFTP({
         endpoint: config,
         credentials: {},
-        options: requestOptions
+        options: requestOptions, metadata: {}
       });
 
       expect(result).toBeDefined();
@@ -370,7 +370,7 @@ describe('FTP File Extraction', () => {
       const result = await callFTP({
         endpoint: config,
         credentials: {},
-        options: requestOptions
+        options: requestOptions, metadata: {}
       });
 
       expect(result).toBeDefined();
@@ -396,7 +396,7 @@ describe('FTP File Extraction', () => {
       const result = await callFTP({
         endpoint: config,
         credentials: {},
-        options: requestOptions
+        options: requestOptions, metadata: {}
       });
 
       expect(result).toBeDefined();
@@ -426,7 +426,7 @@ describe('FTP File Extraction', () => {
       const result = await callFTP({
         endpoint: config,
         credentials: {},
-        options: requestOptions
+        options: requestOptions, metadata: {}
       });
 
       expect(result).toBeDefined();
@@ -454,7 +454,7 @@ describe('FTP File Extraction', () => {
       const result = await callFTP({
         endpoint: config,
         credentials: {},
-        options: requestOptions
+        options: requestOptions, metadata: {}
       });
 
       expect(result).toBeDefined();
@@ -480,7 +480,7 @@ describe('FTP File Extraction', () => {
       const result = await callFTP({
         endpoint: config,
         credentials: {},
-        options: requestOptions
+        options: requestOptions, metadata: {}
       });
 
       expect(result).toBeDefined();
@@ -502,7 +502,7 @@ describe('FTP File Extraction', () => {
         callFTP({
           endpoint: config,
           credentials: {},
-          options: requestOptions
+          options: requestOptions, metadata: {}
         })
       ).rejects.toThrow('Unsupported operation');
     });
@@ -520,7 +520,7 @@ describe('FTP File Extraction', () => {
         callFTP({
           endpoint: config,
           credentials: {},
-          options: requestOptions
+          options: requestOptions, metadata: {}
         })
       ).rejects.toThrow('path required for get operation');
     });
@@ -540,7 +540,7 @@ describe('FTP File Extraction', () => {
         callFTP({
           endpoint: config,
           credentials: {},
-          options: requestOptions
+          options: requestOptions, metadata: {}
         })
       ).rejects.toThrow();
     });
@@ -557,7 +557,7 @@ describe('FTP File Extraction', () => {
         callFTP({
           endpoint: config,
           credentials: {},
-          options: requestOptions
+          options: requestOptions, metadata: {}
         })
       ).rejects.toThrow('path required for get operation');
     });
@@ -575,7 +575,7 @@ describe('FTP File Extraction', () => {
         callFTP({
           endpoint: config,
           credentials: {},
-          options: requestOptions
+          options: requestOptions, metadata: {}
         })
       ).rejects.toThrow();
     });

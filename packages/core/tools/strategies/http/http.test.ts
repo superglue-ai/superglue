@@ -1,11 +1,9 @@
+import { ApiConfig, HttpMethod, PaginationType, SelfHealingMode } from '@superglue/shared';
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server_defaults } from "../../../default.js";
+import { convertBasicAuthToBase64, isSelfHealingEnabled } from '../../../utils/helpers.js';
 import * as httpModule from "./http.js";
-import { ApiConfig, HttpMethod, PaginationType } from '@superglue/shared';
-import { convertBasicAuthToBase64 } from '../../../utils/helpers.js';
-import { isSelfHealingEnabled } from '../../../utils/helpers.js';
-import { SelfHealingMode } from '@superglue/shared';
 
 vi.mock('axios');
 vi.mock('openai');
@@ -75,7 +73,7 @@ describe('API Utilities', () => {
       };
       (axios as any).mockResolvedValueOnce(mockResponse);
 
-      const result = await runStepConfig({ config: testEndpoint, payload: testPayload, credentials: testCredentials, options: testOptions });
+      const result = await runStepConfig({ config: testEndpoint, payload: testPayload, credentials: testCredentials, options: testOptions, metadata: {} });
 
       expect(result).toEqual({ data: { result: 'success' }, statusCode: 200, headers: {} });
     });
@@ -98,7 +96,7 @@ describe('API Utilities', () => {
         .mockResolvedValueOnce(mockResponses[0])
         .mockResolvedValueOnce(mockResponses[1]);
 
-      const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {} });
+      const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {}, metadata: {} });
 
       expect(result.data).toHaveLength(3);
       expect(result.data).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
@@ -127,7 +125,7 @@ describe('API Utilities', () => {
         .mockResolvedValueOnce(mockResponses[0])
         .mockResolvedValueOnce(mockResponses[1]);
 
-      const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {} });
+      const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {}, metadata: {} });
 
       expect(result.data).toHaveLength(3);
       expect(axios).toHaveBeenNthCalledWith(
@@ -182,7 +180,7 @@ describe('API Utilities', () => {
         .mockResolvedValueOnce(mockResponses[0])
         .mockResolvedValueOnce(mockResponses[1]);
 
-      const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {} });
+      const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {}, metadata: {} });
 
       expect(result.data).toEqual({
         data: [{ id: 1 }, { id: 2 }, { id: 3 }],
@@ -211,7 +209,7 @@ describe('API Utilities', () => {
         .mockResolvedValueOnce(sameResponse)
         .mockResolvedValueOnce(sameResponse);
 
-      const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {} });
+      const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {}, metadata: {} });
 
       expect(result.data).toHaveLength(2);
       expect(axios).toHaveBeenCalledTimes(2);
@@ -238,7 +236,7 @@ describe('API Utilities', () => {
           config: {} as any 
         });
       }
-      const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {} });
+      const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {}, metadata: {} });
       expect(axios).toHaveBeenCalledTimes(500);
     });
 
@@ -264,7 +262,7 @@ describe('API Utilities', () => {
 
       (axios as any).mockResolvedValue(mockResponse);
 
-      const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {} });
+      const result = await runStepConfig({ config: config, payload: {}, credentials: {}, options: {}, metadata: {} });
 
       expect(axios).toHaveBeenCalledTimes(2);
     });
@@ -279,7 +277,7 @@ describe('API Utilities', () => {
       };
       (axios as any).mockResolvedValue(errorResponse);
 
-      await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: { retries: 0 } }))
+      await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: { retries: 0 }, metadata: {} }))
         .rejects.toThrow(/API call failed/);
     });
 
@@ -293,7 +291,7 @@ describe('API Utilities', () => {
       };
       (axios as any).mockResolvedValueOnce(htmlResponse);
 
-      await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {} }))
+      await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {}, metadata: {} }))
         .rejects.toThrow(/Received HTML response/);
     });
 
@@ -322,7 +320,7 @@ describe('API Utilities', () => {
       };
       (axios as any).mockResolvedValueOnce(graphqlErrorResponse);
 
-      await expect(runStepConfig({ config: config, payload: {}, credentials: {}, options: {} }))
+      await expect(runStepConfig({ config: config, payload: {}, credentials: {}, options: {}, metadata: {} }))
         .rejects.toThrow(/appears to be an error/i);
     });
 
@@ -343,7 +341,7 @@ describe('API Utilities', () => {
       };
       (axios as any).mockResolvedValueOnce(mockResponse);
 
-      const result = await runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {} });
+      const result = await runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {}, metadata: {} });
       expect(result.statusCode).toBe(200);
       expect(result.data).toEqual(mockData);
     });
@@ -361,7 +359,7 @@ describe('API Utilities', () => {
       };
       (axios as any).mockResolvedValueOnce(mockResponse);
 
-      await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {} }))
+      await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {}, metadata: {} }))
         .rejects.toThrow(/appears to be an error/i);
     });
 
@@ -378,7 +376,7 @@ describe('API Utilities', () => {
       };
       (axios as any).mockResolvedValueOnce(mockResponse);
 
-      await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {} }))
+      await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {}, metadata: {} }))
         .rejects.toThrow(/appears to be an error/i);
     });
 
@@ -395,7 +393,7 @@ describe('API Utilities', () => {
       };
       (axios as any).mockResolvedValueOnce(mockResponse);
 
-      await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {} }))
+      await expect(runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {}, metadata: {} }))
         .rejects.toThrow(/appears to be an error/i);
     });
 
@@ -413,7 +411,7 @@ describe('API Utilities', () => {
       };
       (axios as any).mockResolvedValueOnce(mockResponse);
 
-      const result = await runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {} });
+      const result = await runStepConfig({ config: testEndpoint, payload: {}, credentials: {}, options: {}, metadata: {} });
       expect(result.statusCode).toBe(200);
       expect(result.data).toEqual(mockData);
     });
