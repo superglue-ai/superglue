@@ -37,16 +37,24 @@ jobs:
           BRANCH_NAME="sync-from-main-$(date +%s)"
           git checkout -b "${BRANCH_NAME}"
 
-          git cherry-pick ${{ github.event.pull_request.merge_commit_sha }}
-
-          if [ $? -ne 0 ]; then
-            echo "Cherry-pick had conflicts, committing them for manual resolution"
-            git add -A
-            git -c core.editor=true cherry-pick --continue || true
-            if [ $? -ne 0 ]; then
-              git commit -m "Sync from main (with conflicts to resolve)"
+          git cherry-pick ${{ github.event.pull_request.merge_commit_sha }} -X ours --strategy-option=ignore-space-change || {
+            echo "Cherry-pick had conflicts, handling them..."
+            
+            # Auto-resolve package-lock.json conflicts by using ours version
+            if [ -f package-lock.json ]; then
+              echo "Resetting package-lock.json to avoid merge conflicts"
+              git checkout --ours package-lock.json 2>/dev/null || true
             fi
-          fi
+            
+            # Stage all resolved files
+            git add -A
+            
+            # Continue cherry-pick
+            git cherry-pick --continue --no-edit || {
+              # If continue fails, just commit what we have
+              git commit --no-edit -m "Sync from main (auto-resolved conflicts)" || true
+            }
+          }
 
           git push origin "${BRANCH_NAME}"
 
