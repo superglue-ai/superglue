@@ -566,11 +566,11 @@ export async function callHttp({ config, payload, credentials, options, metadata
       }
     }
 
-    if (config.pagination?.type === PaginationType.PAGE_BASED) {
-      page++;
-    } else if (config.pagination?.type === PaginationType.OFFSET_BASED) {
-      offset += parseInt(config.pagination?.pageSize || "50");
-    } else if (config.pagination?.type === PaginationType.CURSOR_BASED) {
+    // increment the pagination variables regardless of the pagination type
+    page++;
+    offset += parseInt(config.pagination?.pageSize) || 50;
+
+    if (config.pagination?.type === PaginationType.CURSOR_BASED) {
       const cursorPath = config.pagination?.cursorPath || 'next_cursor';
       const jsonPath = cursorPath.startsWith('$') ? cursorPath : `$.${cursorPath}`;
       const result = JSONPath({ path: jsonPath, json: parsedResponseData, wrap: false });
