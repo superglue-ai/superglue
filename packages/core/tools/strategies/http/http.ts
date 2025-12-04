@@ -427,7 +427,7 @@ export async function callHttp({ config, payload, credentials, options, metadata
       params: processedQueryParams,
       timeout: options?.timeout || server_defaults.HTTP.DEFAULT_TIMEOUT,
     };
-    logMessage("debug", `Calling HTTP endpoint: ${processedUrl}`, metadata);
+    logMessage("debug", `Calling HTTP endpoint: ${maskCredentials(processedUrl, credentials)}`, metadata);
     const axiosResult = await callAxios(axiosConfig, options);
     lastResponse = axiosResult.response;
 
