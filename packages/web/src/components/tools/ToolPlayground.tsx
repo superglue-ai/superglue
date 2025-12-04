@@ -883,6 +883,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         loopSelector: s.loopSelector,
         integrationId: s.integrationId,
         apiConfig: s.apiConfig,
+        modify: s.modify,
+        failureBehavior: s.failureBehavior,
       };
       return JSON.stringify(exec);
     } catch {
