@@ -232,13 +232,9 @@ export const buildEvolvingPayload = (initialPayload: any, steps: any[], stepResu
     const step = steps[i];
     const result = stepResults[step.id];
     if (result !== undefined && result !== null) {
-      const dataToMerge = (typeof result === 'object' && 'data' in result && 'success' in result)
-        ? result.data
-        : result;
-
       evolvingPayload = {
         ...evolvingPayload,
-        [`${step.id}`]: dataToMerge
+        [`${step.id}`]: result
       };
     }
   }
@@ -246,22 +242,6 @@ export const buildEvolvingPayload = (initialPayload: any, steps: any[], stepResu
   return evolvingPayload;
 };
 
-export const buildPreviousStepResults = (steps: any[], stepResults: Record<string, any>, upToIndex: number): Record<string, any> => {
-  const results: Record<string, any> = {};
-
-  for (let i = 0; i <= upToIndex && i < steps.length; i++) {
-    const step = steps[i];
-    const result = stepResults[step.id];
-    if (result !== undefined && result !== null) {
-      const dataToMerge = (typeof result === 'object' && 'data' in result && 'success' in result)
-        ? result.data
-        : result;
-      results[step.id] = dataToMerge;
-    }
-  }
-
-  return results;
-};
 
 const PRETTIER_PLUGINS = [
   (prettierPluginBabel as any).default ?? (prettierPluginBabel as any),
