@@ -146,6 +146,11 @@ enum FileType {
   AUTO
 }
 
+enum FailureBehavior {
+  FAIL
+  CONTINUE
+}
+
 enum LogLevel {
   DEBUG
   INFO
@@ -308,6 +313,7 @@ type ExecutionStep {
   loopMaxIters: Int
   inputMapping: JSONata
   responseMapping: JSONata
+  failureBehavior: FailureBehavior
 }
 
 input ExecutionStepInput {
@@ -320,6 +326,7 @@ input ExecutionStepInput {
   loopMaxIters: Int
   inputMapping: JSONata
   responseMapping: JSONata
+  failureBehavior: FailureBehavior
 }
 
 type Workflow implements BaseConfig {
