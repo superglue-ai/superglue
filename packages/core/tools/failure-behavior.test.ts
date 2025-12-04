@@ -401,7 +401,7 @@ describe('ToolExecutor - Failure Behavior', () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain('Step 2 failed');
       
-      // Only step 2 should have executed
+      // Both steps should have executed
       expect(stepExecuted).toBe(2);
       expect(result.stepResults).toHaveLength(2);
     });
