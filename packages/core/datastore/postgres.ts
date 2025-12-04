@@ -18,7 +18,7 @@ export class PostgresService implements DataStore {
             ssl: config.ssl === false || config.host.includes('localhost') || config.host.includes('127.0.0.1') ? false : { rejectUnauthorized: false }
         });
         this.pool.on('error', (err) => {
-            logMessage('error', 'postgres pool error', { error: err });
+            logMessage('error', 'postgres pool error: ' + (err instanceof Error ? err.message : String(err)));
         });
 
         this.pool.on('connect', () => {
@@ -26,7 +26,7 @@ export class PostgresService implements DataStore {
         });
 
         this.pool.connect().catch((err) => {
-            logMessage('error', '[CRITICAL] Postgres connection failed', { error: err });
+            logMessage('error', '[CRITICAL] Postgres connection failed: ' + (err instanceof Error ? err.message : String(err)));
             process.exit(1);
         }).then((client) => {
             client?.release();
@@ -1006,7 +1006,7 @@ export class PostgresService implements DataStore {
                 client_secret: decrypted?.secret || ''
             };
         } catch (error) {
-            logMessage('debug', `No template OAuth credentials found for ${params.templateId}`, { error });
+            logMessage('debug', `No template OAuth credentials found for ${params.templateId}: ` + (error instanceof Error ? error.message : String(error)));
             return null;
         } finally {
             client.release();

@@ -134,7 +134,7 @@ export class IntegrationManager {
         }
 
         // Attempt to refresh the token
-        const refreshResult = await refreshOAuthToken(this._integration);
+        const refreshResult = await refreshOAuthToken(this._integration, this.metadata);
         
         if (refreshResult.success) {
             // update the credentials in the integration manager

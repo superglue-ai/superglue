@@ -1,4 +1,4 @@
-import type { Integration } from '@superglue/shared';
+import type { Integration, ServiceMetadata } from '@superglue/shared';
 import { getOAuthTokenUrl, resolveOAuthCertAndKey } from '@superglue/shared';
 import axios from 'axios';
 import https from 'https';
@@ -25,34 +25,25 @@ export function isTokenExpired(integration: Integration): boolean {
 
 export async function refreshOAuthToken(
     integration: Integration,
+    metadata: ServiceMetadata
 ): Promise<{ success: boolean, newCredentials: Record<string, any> }> {
     const { client_id, client_secret, refresh_token, access_token, grant_type, oauth_cert, oauth_key, scopes } = integration.credentials || {};
     const isClientCredentials = grant_type === 'client_credentials';
 
     if (!client_id) {
-        logMessage('error', 'Missing client_id for token refresh', {
-            integrationId: integration.id
-        });
+        logMessage('error', 'Missing client_id for token refresh', metadata);
         return { success: false, newCredentials: {} };
     }
 
     if (isClientCredentials) {
         const hasCertAndKey = !!(oauth_cert && oauth_key);
         if (!hasCertAndKey && !client_secret) {
-            logMessage('error', 'Missing credentials for client_credentials token refresh', {
-                integrationId: integration.id,
-                hasClientSecret: !!client_secret,
-                hasCertAndKey
-            });
+            logMessage('error', 'Missing credentials for client_credentials token refresh', metadata);
             return { success: false, newCredentials: {} };
         }
     } else {
         if (!client_secret || !refresh_token) {
-            logMessage('error', 'Missing required credentials for authorization_code token refresh', {
-                integrationId: integration.id,
-                hasClientSecret: !!client_secret,
-                hasRefreshToken: !!refresh_token
-            });
+            logMessage('error', 'Missing required credentials for authorization_code token refresh', metadata);
             return { success: false, newCredentials: {} };
         }
     }
@@ -121,16 +112,11 @@ export async function refreshOAuthToken(
                 : undefined),
         };
 
-        logMessage('info', `Successfully ${isClientCredentials ? 'renewed' : 'refreshed'} OAuth token`, {
-            integrationId: integration.id
-        });
+        logMessage('info', `Successfully ${isClientCredentials ? 'renewed' : 'refreshed'} OAuth token`, metadata);
 
         return { success: true, newCredentials: integration.credentials };
     } catch (error) {
-        logMessage('error', 'Error refreshing OAuth token', {
-            integrationId: integration.id,
-            error: error instanceof Error ? error.message : String(error)
-        });
+        logMessage('error', 'Error refreshing OAuth token: ' + (error instanceof Error ? error.message : String(error)), metadata);
         return { success: false, newCredentials: {} };
     }
 }

@@ -131,7 +131,7 @@ describe('OAuth Utilities', () => {
                 },
             };
 
-            const result = await refreshOAuthToken(integration);
+            const result = await refreshOAuthToken(integration, { orgId: 'test-org', traceId: 'test-trace-id' });
             expect(result.success).toBe(false);
             expect(logs.logMessage).toHaveBeenCalledWith(
                 'error',
@@ -168,7 +168,7 @@ describe('OAuth Utilities', () => {
                 data: mockTokenResponse,
             });
 
-            const result = await refreshOAuthToken(integration);
+            const result = await refreshOAuthToken(integration, { orgId: 'test-org', traceId: 'test-trace-id' });
             
             expect(result.success).toBe(true);
             expect(integration.credentials.access_token).toBe('new-access-token');
@@ -194,7 +194,7 @@ describe('OAuth Utilities', () => {
                 data: 'Unauthorized',
             });
 
-            const result = await refreshOAuthToken(integration);
+            const result = await refreshOAuthToken(integration, { orgId: 'test-org', traceId: 'test-trace-id' });
             
             expect(result.success).toBe(false);
             expect(logs.logMessage).toHaveBeenCalledWith(
