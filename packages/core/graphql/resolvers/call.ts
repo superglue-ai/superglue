@@ -84,6 +84,9 @@ export const callResolver = async (
       startedAt,
       completedAt: new Date(),
     };
+    if (!transformResult.success) {
+      throw new Error(transformResult.error || 'Transform failed');
+    }
     return { ...result, data: transformResult.transformedData };
   } catch (error) {
     const maskedError = maskCredentials(error.message, credentials);
