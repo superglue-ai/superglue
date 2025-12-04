@@ -137,9 +137,8 @@ describe('OAuth Utilities', () => {
                 'error',
                 'Missing required credentials for authorization_code token refresh',
                 expect.objectContaining({
-                    integrationId: 'test',
-                    hasClientSecret: false,
-                    hasRefreshToken: false
+                    orgId: "test-org",
+                    traceId: "test-trace-id"
                 })
             );
         });
@@ -199,10 +198,10 @@ describe('OAuth Utilities', () => {
             expect(result.success).toBe(false);
             expect(logs.logMessage).toHaveBeenCalledWith(
                 'error',
-                'Error refreshing OAuth token',
+                'Error refreshing OAuth token: Token refresh failed: 401 - Unauthorized',
                 expect.objectContaining({
-                    integrationId: 'test',
-                    error: expect.stringContaining('Token refresh failed'),
+                    orgId: 'test-org',
+                    traceId: 'test-trace-id'
                 })
             );
         });
