@@ -1684,7 +1684,7 @@ export function getOAuthTokenUrl(integration: Integration): string {
 
   // Second priority: Known integration template token URL
   const knownIntegration = Object.entries(integrations).find(([key]) =>
-    integration.id === key || integration.urlHost.includes(key)
+    integration.id === key || integration.urlHost?.includes(key)
   );
 
   if (knownIntegration) {
@@ -1695,6 +1695,9 @@ export function getOAuthTokenUrl(integration: Integration): string {
   }
 
   // Fallback: Default OAuth token endpoint
+  if (!integration.urlHost) {
+    throw new Error(`Cannot determine OAuth token URL for integration ${integration.id}: no urlHost or token_url provided`);
+  }
   return `${integration.urlHost}/oauth/token`;
 } 
 

@@ -12,7 +12,14 @@ describe("Tenant Info Basic Tests", () => {
     describe(`${name} Tenant Info Tests`, () => {
       // Reset before each test to ensure clean state
       beforeEach(async () => {
-        await instance.setTenantInfo({ emailEntrySkipped: false });
+        // Clear tenant info by recreating it with defaults
+        if (name === "MemoryStore") {
+          (instance as any).tenant = { email: null, emailEntrySkipped: false };
+        } else if (name === "FileStore") {
+          await (instance as any).ensureInitialized();
+          (instance as any).storage.tenant = { email: null, emailEntrySkipped: false };
+          await (instance as any).persist();
+        }
       });
 
       it("should return default tenant info when not set", async () => {
@@ -77,7 +84,7 @@ describe("Tenant Info Basic Tests", () => {
 
         // Update only the email
         const updatedEmail = "updated@example.com";
-        await instance.setTenantInfo({ email: updatedEmail, emailEntrySkipped: true });
+        await instance.setTenantInfo({ email: updatedEmail });
 
         let tenantInfo = await instance.getTenantInfo();
         expect(tenantInfo).toEqual({
