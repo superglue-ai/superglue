@@ -64,6 +64,7 @@ export class SuperglueClient {
           loopMaxIters
           inputMapping
           responseMapping
+          failureBehavior
         }
         integrationIds
         responseSchema
@@ -241,6 +242,7 @@ export class SuperglueClient {
               loopMaxIters: step.loopMaxIters,
               inputMapping: step.inputMapping,
               responseMapping: step.responseMapping,
+              failureBehavior: step.failureBehavior,
             };
             Object.keys(executionStepInput).forEach(key => (executionStepInput as any)[key] === undefined && delete (executionStepInput as any)[key]);
             return executionStepInput;
@@ -723,6 +725,7 @@ export class SuperglueClient {
               loopMaxIters
               inputMapping
               responseMapping
+              failureBehavior
             }
             integrationIds
             finalTransform

@@ -218,6 +218,7 @@ export interface ExecutionStep {
   loopMaxIters?: number;
   inputMapping?: JSONata;
   responseMapping?: JSONata;
+  failureBehavior?: 'FAIL' | 'CONTINUE';
 }
 
 export interface Tool extends BaseConfig {
