@@ -1,19 +1,13 @@
-import { ApiConfig as StepConfig, HttpMethod, PaginationType, RequestOptions } from "@superglue/shared";
-import { maskCredentials, SupportedFileType } from "@superglue/shared";
+import { HttpMethod, maskCredentials, PaginationType, RequestOptions, ServiceMetadata, ApiConfig as StepConfig, SupportedFileType } from "@superglue/shared";
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import https from 'https';
 import ivm from "isolated-vm";
 import { JSONPath } from "jsonpath-plus";
 import { server_defaults } from "../../../default.js";
-import { parseJSON } from "../../../files/index.js";
+import { parseFile, parseJSON } from "../../../files/index.js";
+import { composeUrl, convertBasicAuthToBase64, replaceVariables, smartMergeResponses } from "../../../utils/helpers.js";
 import { logMessage } from "../../../utils/logs.js";
-import { convertBasicAuthToBase64, replaceVariables } from "../../../utils/helpers.js";
-import { callPostgres } from "../postgres/postgres.js";
-import { callFTP } from "../ftp/ftp.js";
-import { composeUrl } from "../../../utils/helpers.js";
-import { parseFile } from "../../../files/index.js";
-import { smartMergeResponses } from "../../../utils/helpers.js";
-import { StepExecutionInput, StepStrategyExecutionResult, StepExecutionStrategy } from "../strategy.js";
+import { StepExecutionInput, StepExecutionStrategy, StepStrategyExecutionResult } from "../strategy.js";
 
 export class HttpStepExecutionStrategy implements StepExecutionStrategy {
   readonly version = '1.0.0';
@@ -23,8 +17,8 @@ export class HttpStepExecutionStrategy implements StepExecutionStrategy {
   }
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
-    const { stepConfig, stepInputData, credentials, requestOptions } = input;
-    const httpResult = await callHttp({ config: stepConfig, payload: stepInputData, credentials, options: requestOptions });
+    const { stepConfig, stepInputData, credentials, requestOptions, metadata } = input;
+    const httpResult = await callHttp({ config: stepConfig, payload: stepInputData, credentials, options: requestOptions, metadata });
     return {
       success: true,
       strategyExecutionData: httpResult.data,
@@ -323,9 +317,8 @@ export function handleErrorStatus(
   return { shouldFail: true, message: full };
 }
 
-export async function callHttp({ config, payload, credentials, options }: { config: StepConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<{ data: any; statusCode: number; headers: Record<string, any>; }> {
+export async function callHttp({ config, payload, credentials, options, metadata }: { config: StepConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata: ServiceMetadata }): Promise<{ data: any; statusCode: number; headers: Record<string, any>; }> {
   const allVariables = { ...payload, ...credentials };
-
   let allResults = [];
   let page = 1;
   let offset = 0;
@@ -424,27 +417,6 @@ export async function callHttp({ config, payload, credentials, options }: { conf
 
     const processedUrlHost = await replaceVariables(config.urlHost, requestVars);
     const processedUrlPath = await replaceVariables(config.urlPath, requestVars);
-
-    if (processedUrlHost.startsWith("postgres://") || processedUrlHost.startsWith("postgresql://")) {
-      const postgresEndpoint = {
-        ...config,
-        urlHost: processedUrlHost,
-        urlPath: processedUrlPath,
-        body: processedBody
-      };
-      return { data: await callPostgres({ endpoint: postgresEndpoint, payload, credentials, options }), statusCode: 200, headers: {} };
-    }
-
-    if (processedUrlHost.startsWith("ftp://") || processedUrlHost.startsWith("ftps://") || processedUrlHost.startsWith("sftp://")) {
-      const ftpEndpoint = {
-        ...config,
-        urlHost: processedUrlHost,
-        urlPath: processedUrlPath,
-        body: processedBody
-      };
-      return { data: await callFTP({ endpoint: ftpEndpoint, credentials, options }), statusCode: 200, headers: {} };
-    }
-
     const processedUrl = composeUrl(processedUrlHost, processedUrlPath);
 
     const axiosConfig: AxiosRequestConfig = {
@@ -455,7 +427,7 @@ export async function callHttp({ config, payload, credentials, options }: { conf
       params: processedQueryParams,
       timeout: options?.timeout || server_defaults.HTTP.DEFAULT_TIMEOUT,
     };
-
+    logMessage("debug", `Calling HTTP endpoint: ${processedUrl}`, metadata);
     const axiosResult = await callAxios(axiosConfig, options);
     lastResponse = axiosResult.response;
 

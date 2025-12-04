@@ -1,9 +1,10 @@
-import { ApiConfig as StepConfig, RequestOptions, HttpMethod } from "@superglue/shared";
+import { HttpMethod, RequestOptions, ServiceMetadata, ApiConfig as StepConfig } from "@superglue/shared";
 import { Pool, PoolConfig } from 'pg';
 import { server_defaults } from "../../../default.js";
 import { parseJSON } from "../../../files/index.js";
 import { composeUrl, replaceVariables } from "../../../utils/helpers.js";
-import { StepExecutionInput, StepStrategyExecutionResult, StepExecutionStrategy } from "../strategy.js";
+import { logMessage } from "../../../utils/logs.js";
+import { StepExecutionInput, StepExecutionStrategy, StepStrategyExecutionResult } from "../strategy.js";
 
 export class PostgresStepExecutionStrategy implements StepExecutionStrategy {
   readonly version = '1.0.0';
@@ -13,8 +14,8 @@ export class PostgresStepExecutionStrategy implements StepExecutionStrategy {
   }
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
-    const { stepConfig, stepInputData, credentials, requestOptions } = input;
-    const rows = await callPostgres({ endpoint: stepConfig, payload: stepInputData, credentials, options: requestOptions });
+    const { stepConfig, stepInputData, credentials, requestOptions, metadata } = input;
+    const rows = await callPostgres({ endpoint: stepConfig, payload: stepInputData, credentials, options: requestOptions, metadata });
     return {
       success: true,
       strategyExecutionData: rows,
@@ -96,7 +97,7 @@ export async function closeAllPools(): Promise<void> {
   poolCache.clear();
 }
 
-export async function callPostgres({ endpoint, payload, credentials, options }: { endpoint: StepConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
+export async function callPostgres({ endpoint, payload, credentials, options, metadata }: { endpoint: StepConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata: ServiceMetadata }): Promise<any> {
   const requestVars = { ...payload, ...credentials };
   let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
   connectionString = connectionString.replace(/\/+(\?)/, '$1').replace(/\/+$/, '');
@@ -124,6 +125,7 @@ export async function callPostgres({ endpoint, payload, credentials, options }: 
 
   do {
     try {
+      logMessage("debug", `Executing PostgreSQL query: ${queryText?.split(' ')?.[0]}`, metadata);
       const result = queryParams
         ? await pool.query(queryText, queryParams)
         : await pool.query(queryText);
