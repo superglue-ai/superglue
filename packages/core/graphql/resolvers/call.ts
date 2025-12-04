@@ -1,11 +1,10 @@
-import { ApiConfig, ApiInputRequest, CacheMode, RequestOptions } from "@superglue/shared";
+import { ApiConfig, ApiInputRequest, CacheMode, maskCredentials, RequestOptions } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { ToolExecutor } from "../../tools/tool-executor.js";
-import { maskCredentials } from '@superglue/shared';
+import { executeAndEvaluateFinalTransform } from "../../tools/tool-transform.js";
 import { TransformConfig } from "../../utils/helpers.legacy.js";
-import { executeTransformLegacy } from "../../utils/helpers.legacy.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { GraphQLRequestContext, ServiceMetadata } from '../types.js';
+import { GraphQLRequestContext } from '../types.js';
 
 
 export const callResolver = async (
@@ -65,43 +64,30 @@ export const callResolver = async (
     });
     const data = callResult.data;
 
-    // Transform response with built-in retry logic
-    const transformResult = await executeTransformLegacy(
+    const transformConfig = endpoint as TransformConfig;
+    const transformResult = await executeAndEvaluateFinalTransform(
       {
-        datastore: context.datastore,
-        fromCache: readCache,
-        input: { endpoint: endpoint as TransformConfig },
-        data: data,
-        metadata,
-        options: options
+        finalTransform: transformConfig.responseMapping || "$",
+        responseSchema: endpoint.responseSchema,
+        aggregatedStepData: data,
+        instruction: endpoint.instruction,
+        options: options,
+        metadata: metadata
       }
     );
-
-    // Save configuration if requested
-    const config = { ...endpoint, ...transformResult?.config };
-
-    if (writeCache) {
-      context.datastore.upsertApiConfig({ id: input.id || endpoint.id, config, orgId: context.orgId });
-    }
-
-    const runId = crypto.randomUUID();
-
-    // Notify webhook if configured
-    if (options?.webhookUrl) {
-      notifyWebhook(options.webhookUrl, runId, true, transformResult.data, undefined, metadata);
-    }
-
     const result = {
-      id: runId,
+      id: context.traceId || crypto.randomUUID(),
       success: true,
-      config: config,
+      config: endpoint,
       statusCode: callResult?.statusCode,
       headers: callResult?.headers,
       startedAt,
       completedAt: new Date(),
     };
-    context.datastore.createRun({ result, orgId: context.orgId });
-    return { ...result, data: transformResult.data };
+    if (!transformResult.success) {
+      throw new Error(transformResult.error || 'Transform failed');
+    }
+    return { ...result, data: transformResult.transformedData };
   } catch (error) {
     const maskedError = maskCredentials(error.message, credentials);
     const runId = crypto.randomUUID();

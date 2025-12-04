@@ -13,7 +13,7 @@ describe('ToolFinder', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    toolFinder = new ToolFinder({ orgId: 'test-org', runId: 'test-run' });
+    toolFinder = new ToolFinder({ orgId: 'test-org', traceId: 'test-trace-id' });
 
     mockTools = [
       {
