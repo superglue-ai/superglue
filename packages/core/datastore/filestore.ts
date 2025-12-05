@@ -1,4 +1,4 @@
-import type { ApiConfig, Integration, RunResult, Tool } from "@superglue/shared";
+import type { ApiConfig, Integration, RunResult, Tool, DiscoveryRun, FileReference, FileStatus } from "@superglue/shared";
 import fs from 'node:fs';
 import path from 'node:path';
 import { credentialEncryption } from "../utils/encryption.js";
@@ -12,6 +12,8 @@ export class FileStore implements DataStore {
     workflows: Map<string, Tool>;
     workflowSchedules: Map<string, ToolScheduleInternal>;
     integrations: Map<string, Integration>;
+    discoveryRuns: Map<string, DiscoveryRun>;
+    fileReferences: Map<string, FileReference>;
     tenant: {
       email: string | null;
       emailEntrySkipped: boolean;
@@ -29,6 +31,8 @@ export class FileStore implements DataStore {
       workflows: new Map(),
       workflowSchedules: new Map(),
       integrations: new Map(),
+      discoveryRuns: new Map(),
+      fileReferences: new Map(),
       tenant: {
         email: null,
         emailEntrySkipped: false
@@ -83,6 +87,8 @@ export class FileStore implements DataStore {
           workflows: new Map(Object.entries(parsed.workflows || {})),
           workflowSchedules: new Map(Object.entries(parsed.workflowSchedules || {})),
           integrations: new Map(Object.entries(parsed.integrations || {})),
+          discoveryRuns: new Map(Object.entries(parsed.discoveryRuns || {})),
+          fileReferences: new Map(Object.entries(parsed.fileReferences || {})),
           tenant: {
             email: parsed.tenant?.email || null,
             emailEntrySkipped: parsed.tenant?.emailEntrySkipped || false
@@ -129,6 +135,8 @@ export class FileStore implements DataStore {
         workflows: Object.fromEntries(this.storage.workflows),
         workflowSchedules: Object.fromEntries(this.storage.workflowSchedules),
         integrations: Object.fromEntries(this.storage.integrations),
+        discoveryRuns: Object.fromEntries(this.storage.discoveryRuns),
+        fileReferences: Object.fromEntries(this.storage.fileReferences),
         tenant: this.storage.tenant
       };
       await fs.promises.writeFile(this.filePath, JSON.stringify(serialized, null, 2), { mode: 0o644 });
@@ -755,5 +763,117 @@ export class FileStore implements DataStore {
 
   async deleteOAuthSecret(params: { uid: string }): Promise<void> {
     this.oauthSecrets.delete(params.uid);
+  }
+
+  async createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string }): Promise<DiscoveryRun> {
+    await this.ensureInitialized();
+    const { run, orgId } = params;
+    const key = this.getKey('discovery-run', run.id, orgId);
+    this.storage.discoveryRuns.set(key, run);
+    await this.persist();
+    return run;
+  }
+
+  async getDiscoveryRun(params: { id: string; orgId?: string }): Promise<DiscoveryRun | null> {
+    await this.ensureInitialized();
+    const { id, orgId } = params;
+    const key = this.getKey('discovery-run', id, orgId);
+    return this.storage.discoveryRuns.get(key) || null;
+  }
+
+  async updateDiscoveryRun(params: { id: string; updates: Partial<DiscoveryRun>; orgId?: string }): Promise<DiscoveryRun> {
+    await this.ensureInitialized();
+    const { id, updates, orgId } = params;
+    const key = this.getKey('discovery-run', id, orgId);
+    const existing = this.storage.discoveryRuns.get(key);
+    if (!existing) {
+      throw new Error(`Discovery run not found: ${id}`);
+    }
+    const updated = { ...existing, ...updates };
+    this.storage.discoveryRuns.set(key, updated);
+    await this.persist();
+    return updated;
+  }
+
+  async listDiscoveryRuns(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: DiscoveryRun[], total: number }> {
+    await this.ensureInitialized();
+    const { limit = 10, offset = 0, orgId } = params || {};
+    const items = this.getOrgItems(this.storage.discoveryRuns, 'discovery-run', orgId);
+    const total = items.length;
+    const paginatedItems = items
+      .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
+      .slice(offset, offset + limit);
+    return { items: paginatedItems, total };
+  }
+
+  async deleteDiscoveryRun(params: { id: string; orgId?: string }): Promise<boolean> {
+    await this.ensureInitialized();
+    const { id, orgId } = params;
+    const key = this.getKey('discovery-run', id, orgId);
+    const deleted = this.storage.discoveryRuns.delete(key);
+    if (deleted) {
+      await this.persist();
+    }
+    return deleted;
+  }
+
+  async createFileReference(params: { file: FileReference; orgId?: string }): Promise<FileReference> {
+    await this.ensureInitialized();
+    const { file, orgId } = params;
+    const key = this.getKey('file-reference', file.id, orgId);
+    this.storage.fileReferences.set(key, file);
+    await this.persist();
+    return file;
+  }
+
+  async getFileReference(params: { id: string; orgId?: string }): Promise<FileReference | null> {
+    await this.ensureInitialized();
+    const { id, orgId } = params;
+    const key = this.getKey('file-reference', id, orgId);
+    return this.storage.fileReferences.get(key) || null;
+  }
+
+  async updateFileReference(params: { id: string; updates: Partial<FileReference>; orgId?: string }): Promise<FileReference> {
+    await this.ensureInitialized();
+    const { id, updates, orgId } = params;
+    const key = this.getKey('file-reference', id, orgId);
+    const existing = this.storage.fileReferences.get(key);
+    if (!existing) {
+      throw new Error(`File reference not found: ${id}`);
+    }
+    const updated = { ...existing, ...updates };
+    this.storage.fileReferences.set(key, updated);
+    await this.persist();
+    return updated;
+  }
+
+  async listFileReferences(params?: { fileIds?: string[]; status?: FileStatus; limit?: number; offset?: number; orgId?: string }): Promise<{ items: FileReference[], total: number }> {
+    await this.ensureInitialized();
+    const { fileIds, status, limit = 10, offset = 0, orgId } = params || {};
+    let items = this.getOrgItems(this.storage.fileReferences, 'file-reference', orgId);
+    
+    if (fileIds && fileIds.length > 0) {
+      items = items.filter(file => fileIds.includes(file.id));
+    }
+    
+    if (status) {
+      items = items.filter(file => file.status === status);
+    }
+    
+    const total = items.length;
+    const paginatedItems = items.slice(offset, offset + limit);
+    return { items: paginatedItems, total };
+  }
+
+
+  async deleteFileReference(params: { id: string; orgId?: string }): Promise<boolean> {
+    await this.ensureInitialized();
+    const { id, orgId } = params;
+    const key = this.getKey('file-reference', id, orgId);
+    const deleted = this.storage.fileReferences.delete(key);
+    if (deleted) {
+      await this.persist();
+    }
+    return deleted;
   }
 } 

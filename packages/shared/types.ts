@@ -417,3 +417,37 @@ export type ToolSchedule = {
 // Legacy aliases
 export type WorkflowScheduleInput = ToolScheduleInput;
 export type WorkflowSchedule = ToolSchedule;
+
+export enum DiscoveryRunStatus {
+  PENDING = "PENDING",
+  PROCESSING = "PROCESSING",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
+  ABORTED = "ABORTED"
+}
+
+export interface DiscoveryRun {
+  id: string;
+  fileIds: string[];
+  data?: any;
+  status: DiscoveryRunStatus;
+  startedAt: Date;
+  completedAt?: Date;
+}
+
+export enum FileStatus {
+  PENDING = "PENDING",
+  UPLOADING = "UPLOADING",
+  PROCESSING = "PROCESSING",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED"
+}
+
+export interface FileReference {
+  id: string;
+  storageUri: string;
+  processedStorageUri?: string;
+  metadata: any;
+  status: FileStatus;
+  error?: string;
+}
