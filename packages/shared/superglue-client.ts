@@ -11,7 +11,7 @@ import {
   GenerateStepConfigArgs,
   Integration,
   Log,
-  RunResult,
+  Run,
   SuggestedTool,
   Tool,
   ToolArgs,
@@ -176,11 +176,12 @@ export class SuperglueClient {
       payload,
       credentials,
       options,
-      verbose = true
+      verbose = true,
+      runId
     }: ToolArgs): Promise<ToolResult & { data?: T }> {
       const mutation = `
-        mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON, $credentials: JSON, $options: RequestOptions) {
-          executeWorkflow(input: $input, payload: $payload, credentials: $credentials, options: $options) {
+        mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON, $credentials: JSON, $options: RequestOptions, $runId: ID) {
+          executeWorkflow(input: $input, payload: $payload, credentials: $credentials, options: $options, runId: $runId) {
             id
             success
             data
@@ -284,7 +285,8 @@ export class SuperglueClient {
           input: gqlInput,
           payload,
           credentials,
-          options
+          options,
+          runId
         }).then(data => data.executeWorkflow);
 
         if (result.error) {
@@ -303,6 +305,19 @@ export class SuperglueClient {
           }, 1000);
         }
       }
+    }
+
+    async abortToolExecution(runId: string): Promise<{ success: boolean; runId: string }> {
+      const mutation = `
+        mutation AbortToolExecution($runId: ID!) {
+          abortToolExecution(runId: $runId) {
+            success
+            runId
+          }
+        }
+      `;
+      const response = await this.request<{ abortToolExecution: { success: boolean; runId: string } }>(mutation, { runId });
+      return response.abortToolExecution;
     }
 
     async buildWorkflow({instruction, payload, integrationIds, responseSchema, save = true, verbose = true}: BuildToolArgs): Promise<Tool> {
@@ -570,46 +585,63 @@ export class SuperglueClient {
       }).then(data => data.extract);
     }
 
-    async listRuns(limit: number = 100, offset: number = 0, configId?: string): Promise<{ items: RunResult[], total: number }> {
+    async listRuns(limit: number = 100, offset: number = 0, configId?: string): Promise<{ items: Run[], total: number }> {
       const query = `
         query ListRuns($limit: Int!, $offset: Int!, $configId: ID) {
           listRuns(limit: $limit, offset: $offset, configId: $configId) {
             items {
               id
-              success
-              data
+              toolId
+              orgId
+              status
+              toolResult
+              stepResults {
+                stepId
+                success
+                error
+              }
               error
-              headers
-              statusCode
               startedAt
               completedAt
-              ${SuperglueClient.configQL}
+              toolConfig {
+                ${SuperglueClient.workflowQL}
+              }
             }
             total
           }
         }
       `;
-      const response = await this.request<{ listRuns: { items: RunResult[], total: number } }>(query, { limit, offset, configId }); 
+      const response = await this.request<{ listRuns: { items: Run[], total: number } }>(query, { limit, offset, configId }); 
       return response.listRuns;
     }
 
-    async getRun(id: string): Promise<RunResult> {
+    async getRun(id: string): Promise<Run> {
       const query = `
         query GetRun($id: ID!) {
           getRun(id: $id) {
             id
-            success
-            data
+            toolId
+            orgId
+            status
+            toolResult
+            toolPayload
+            stepResults {
+              stepId
+              success
+              transformedData
+              error
+            }
+            options
             error
-            headers
-            statusCode
             startedAt
             completedAt
-            ${SuperglueClient.configQL}
+            toolConfig {
+              ${SuperglueClient.workflowQL}
+            }
           }
         }
       `;
-      const response = await this.request<{ getRun: RunResult }>(query, { id });
+      const response = await this.request<{ getRun: Run }>(query, { id });
       return response.getRun;
     }
     

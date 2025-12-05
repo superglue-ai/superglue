@@ -2,7 +2,9 @@ export function executeWithVMHelpers(code: string, sourceData: any): any {
   const wrappedCode = `
     ${VM_HELPERS_CODE}
     
-    const fn = ${code};
+    const fn = (
+      ${code}
+    );
     return fn(sourceData);
   `;
   

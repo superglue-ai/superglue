@@ -1,6 +1,6 @@
 import { ApiConfig, HttpMethod, Integration, SelfHealingMode } from '@superglue/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MemoryStore } from '../datastore/memory.js';
+import { FileStore } from '../datastore/filestore.js';
 import { IntegrationManager } from '../integrations/integration-manager.js';
 import { LanguageModel } from '../llm/llm-base-model.js';
 import { isSelfHealingEnabled } from '../utils/helpers.js';
@@ -70,12 +70,12 @@ describe('WorkflowExecutor Self-Healing Logic', () => {
 });
 
 describe('ToolExecutor Self-Healing Config Propagation', () => {
-  let dataStore: MemoryStore;
+  let dataStore: FileStore;
   let mockIntegration: Integration;
   
   beforeEach(() => {
     vi.clearAllMocks();
-    dataStore = new MemoryStore();
+    dataStore = new FileStore('/tmp/superglue-test');
     
     mockIntegration = {
       id: 'test-integration',

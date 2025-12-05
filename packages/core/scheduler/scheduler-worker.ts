@@ -3,17 +3,19 @@ import { calculateNextRun } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { DataStore } from "../datastore/types.js";
 import { executeWorkflowResolver } from "../graphql/resolvers/workflow.js";
-import { GraphQLRequestContext } from "../graphql/types.js";
+import { GraphQLRequestContext, WorkerPools } from "../graphql/types.js";
 import { logMessage } from "../utils/logs.js";
 
 export class WorkflowSchedulerWorker {
     private datastore: DataStore;
+    private workerPools: WorkerPools;
     private intervalId: NodeJS.Timeout;
     private intervalMs: number;
     private isRunning: boolean = false;
 
-    constructor(datastore: DataStore, intervalMs: number = 1000 * 30) {
+    constructor(datastore: DataStore, workerPools: WorkerPools, intervalMs: number = 1000 * 30) {
         this.datastore = datastore;
+        this.workerPools = workerPools;
         this.intervalMs = intervalMs;
     }
 
@@ -57,6 +59,7 @@ export class WorkflowSchedulerWorker {
 
                 const context: GraphQLRequestContext = {
                     datastore: this.datastore,
+                    workerPools: this.workerPools,
                     traceId,
                     orgId: schedule.orgId,
                     toMetadata: function() {

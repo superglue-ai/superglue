@@ -12,7 +12,7 @@ import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { isSelfHealingEnabled, transformData } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
-import { executeAndEvaluateFinalTransform, generateWorkingTransform } from "./tool-transform.js";
+import { executeAndEvaluateFinalTransform } from "./tool-transform.js";
 import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
 import { generateStepConfig } from "./tool-step-builder.js";
 import { StepExecutionStrategyRegistry } from "./strategies/strategy.js";

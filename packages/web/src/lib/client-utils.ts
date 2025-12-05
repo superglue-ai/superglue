@@ -1,4 +1,5 @@
 import { ExecutionStep, Integration, SelfHealingMode, SuperglueClient, Tool } from "@superglue/shared";
+import { isAbortError } from "./general-utils";
 import { tokenRegistry } from "./token-registry";
 
 const BASE62_REGEX = /^[a-zA-Z0-9_-]*$/;
@@ -43,9 +44,22 @@ export interface ToolExecutionState {
   stepResults: Record<string, StepExecutionResult>;
   completedSteps: string[];
   failedSteps: string[];
+  abortedSteps: string[];
   isExecuting: boolean;
   currentStepIndex: number;
   interrupted?: boolean;
+}
+
+export async function abortExecution(client: SuperglueClient, runId: string | null): Promise<boolean> {
+  if (!runId) return false;
+  
+  try {
+    const result = await client.abortToolExecution(runId);
+    return result.success;
+  } catch (error) {
+    console.error('Failed to abort execution:', error);
+    return false;
+  }
 }
 
 export async function executeSingleStep({
@@ -54,7 +68,8 @@ export async function executeSingleStep({
   toolId,
   payload,
   previousResults,
-  selfHealing
+  selfHealing,
+  runId
 }: {
   client: SuperglueClient;
   step: ExecutionStep;
@@ -62,6 +77,7 @@ export async function executeSingleStep({
   payload: any;
   previousResults: Record<string, any>;
   selfHealing: boolean;
+  runId?: string;
 }): Promise<StepExecutionResult> {
   try {
     const singleStepTool: Tool = {
@@ -80,9 +96,9 @@ export async function executeSingleStep({
       payload: executionPayload,
       options: {
         testMode: selfHealing,
-        selfHealing: selfHealing ? SelfHealingMode.REQUEST_ONLY : SelfHealingMode.DISABLED,
-        timeout: 3_600_000 // 1 hour
-      }
+        selfHealing: selfHealing ? SelfHealingMode.REQUEST_ONLY : SelfHealingMode.DISABLED
+      },
+      runId
     });
 
     const stepResult = result.stepResults[0];
@@ -109,8 +125,8 @@ export async function executeToolStepByStep(
   payload: any,
   onStepComplete?: (stepIndex: number, result: StepExecutionResult) => void,
   selfHealing: boolean = false,
-  shouldStop?: () => boolean,
-  onBeforeStep?: (stepIndex: number, step: any) => Promise<boolean>
+  onBeforeStep?: (stepIndex: number, step: any) => Promise<boolean>,
+  runId?: string
 ): Promise<ToolExecutionState> {
   const state: ToolExecutionState = {
     originalTool: tool,
@@ -118,6 +134,7 @@ export async function executeToolStepByStep(
     stepResults: {},
     completedSteps: [],
     failedSteps: [],
+    abortedSteps: [],
     isExecuting: true,
     currentStepIndex: 0,
     interrupted: false
@@ -126,16 +143,9 @@ export async function executeToolStepByStep(
   const previousResults: Record<string, any> = {};
 
   for (let i = 0; i < tool.steps.length; i++) {
-    if (shouldStop && shouldStop()) {
-      state.isExecuting = false;
-      state.interrupted = true;
-      return state;
-    }
-
     state.currentStepIndex = i;
     const step = tool.steps[i];
 
-    // Check if we should pause before executing this step
     if (onBeforeStep) {
       const shouldContinue = await onBeforeStep(i, step);
       if (!shouldContinue) {
@@ -152,7 +162,8 @@ export async function executeToolStepByStep(
         toolId: state.currentTool.id,
         payload,
         previousResults,
-        selfHealing
+        selfHealing,
+        runId
       }
     );
 
@@ -172,10 +183,13 @@ export async function executeToolStepByStep(
         };
       }
     } else {
-      state.failedSteps.push(step.id);
+      if (result.error && isAbortError(result.error)) {
+        state.abortedSteps.push(step.id);
+      } else {
+        state.failedSteps.push(step.id);
+      }
       state.isExecuting = false;
 
-      // Stop execution on failure
       if (onStepComplete) {
         onStepComplete(i, result);
       }
@@ -185,20 +199,9 @@ export async function executeToolStepByStep(
     if (onStepComplete) {
       onStepComplete(i, result);
     }
-    if (shouldStop && shouldStop()) {
-      state.isExecuting = false;
-      state.interrupted = true;
-      return state;
-    }
   }
 
   if (tool.finalTransform && state.failedSteps.length === 0) {
-    // Final guard before executing transform
-    if (shouldStop && shouldStop()) {
-      state.isExecuting = false;
-      state.interrupted = true;
-      return state;
-    }
     const finalResult = await executeFinalTransform(
       client,
       tool.id || 'tool',
@@ -207,7 +210,8 @@ export async function executeToolStepByStep(
       tool.inputSchema,
       payload,
       previousResults,
-      selfHealing
+      selfHealing,
+      runId
     );
 
     state.stepResults['__final_transform__'] = {
@@ -227,7 +231,11 @@ export async function executeToolStepByStep(
         };
       }
     } else {
-      state.failedSteps.push('__final_transform__');
+      if (isAbortError(finalResult.error)) {
+        state.abortedSteps.push('__final_transform__');
+      } else {
+        state.failedSteps.push('__final_transform__');
+      }
     }
   }
 
@@ -243,7 +251,8 @@ export async function executeFinalTransform(
   inputSchema: any,
   payload: any,
   previousResults: Record<string, any>,
-  selfHealing: boolean = false
+  selfHealing: boolean = false,
+  runId?: string
 ): Promise<FinalTransformExecutionResult> {
   try {
     const finalPayload = {
@@ -261,9 +270,9 @@ export async function executeFinalTransform(
       payload: finalPayload,
       options: {
         testMode: selfHealing,
-        selfHealing: selfHealing ? SelfHealingMode.TRANSFORM_ONLY : SelfHealingMode.DISABLED,
-        timeout: 600_000 // 10 minutes
-      }
+        selfHealing: selfHealing ? SelfHealingMode.TRANSFORM_ONLY : SelfHealingMode.DISABLED
+      },
+      runId
     });
     return {
       success: result.success,

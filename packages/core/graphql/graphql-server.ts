@@ -15,7 +15,7 @@ import { mcpHandler } from '../mcp/mcp-server.js';
 import { logMessage } from "../utils/logs.js";
 import { createTelemetryPlugin, telemetryMiddleware } from '../utils/telemetry.js';
 import { resolvers, typeDefs } from './graphql.js';
-import { GraphQLRequestContext } from './types.js';
+import { GraphQLRequestContext, WorkerPools } from './types.js';
 import { generateTraceId, traceIdMiddleware } from '../utils/trace-id.js';
 
 export const DEFAULT_QUERY = `
@@ -30,7 +30,7 @@ query Query {
   }
 }`;
 
-export async function startGraphqlServer(datastore: DataStore) {
+export async function startGraphqlServer(datastore: DataStore, workerPools: WorkerPools) {
   const PORT = process.env.GRAPHQL_PORT ? parseInt(process.env.GRAPHQL_PORT) : 3000;
 
   // Create the schema
@@ -40,6 +40,7 @@ export async function startGraphqlServer(datastore: DataStore) {
   const buildContextFromRequest = async ({ req }: { req: any }): Promise<GraphQLRequestContext> => {
     const context: GraphQLRequestContext = {
       datastore: datastore,
+      workerPools: workerPools,
       traceId: req.traceId,
       orgId: req.orgId || '',
       userId: req.authInfo?.userId,
@@ -81,6 +82,7 @@ export async function startGraphqlServer(datastore: DataStore) {
       
       const context: GraphQLRequestContext = { 
         datastore,
+        workerPools,
         traceId, 
         orgId: authResult.orgId,
         userId: authResult.userId,

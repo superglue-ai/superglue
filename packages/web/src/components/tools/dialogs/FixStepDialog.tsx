@@ -11,7 +11,7 @@ import { Label } from '@/src/components/ui/label';
 import { Textarea } from '@/src/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/src/components/ui/tooltip';
 import { useToast } from '@/src/hooks/use-toast';
-import { HelpCircle, Loader2, RefreshCw, WandSparkles, X } from 'lucide-react';
+import { HelpCircle, Loader2, RefreshCw, Square, WandSparkles, X } from 'lucide-react';
 import { useState } from 'react';
 import { useGenerateStepConfig } from '../hooks/use-generate-step-config';
 
@@ -24,6 +24,7 @@ interface FixStepDialogProps {
     errorMessage?: string;
     onSuccess: (newConfig: any) => void;
     onAutoHeal?: (updatedInstruction: string) => Promise<void>;
+    onAbort?: () => void;
 }
 
 export function FixStepDialog({
@@ -35,6 +36,7 @@ export function FixStepDialog({
     errorMessage,
     onSuccess,
     onAutoHeal,
+    onAbort,
 }: FixStepDialogProps) {
     const [instruction, setInstruction] = useState(step?.apiConfig?.instruction || '');
     const [isAutoHealing, setIsAutoHealing] = useState(false);
@@ -200,18 +202,21 @@ export function FixStepDialog({
 
                 <DialogFooter>
                     {onAutoHeal && (
+                        isAutoHealing && onAbort ? (
+                            <Button onClick={onAbort} variant="outline">
+                                <Square className="mr-2 h-4 w-4" />
+                                Stop
+                            </Button>
+                        ) : (
                         <Button
                             onClick={handleAutoHeal}
                             disabled={isProcessing || !instruction.trim()}
                             variant="outline"
                         >
-                            {isAutoHealing ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
                                 <RefreshCw className="mr-2 h-4 w-4" />
-                            )}
-                            {isAutoHealing ? 'Fixing...' : 'Fix Step & Execute'}
+                                Fix Step & Execute
                         </Button>
+                        )
                     )}
                     
                     <Button

@@ -1,9 +1,36 @@
-import type { ApiConfig, Integration, RunResult, Tool } from "@superglue/shared";
+import type { ApiConfig, Integration, Run, RunStatus, Tool } from "@superglue/shared";
 import fs from 'node:fs';
 import path from 'node:path';
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
 import type { DataStore, ToolScheduleInternal } from "./types.js";
+
+function isLegacyRunData(data: any): boolean {
+  return !data.status || !['running', 'success', 'failed', 'aborted'].includes(data.status);
+}
+
+function migrateFileStoreRun(data: any): Run {
+  if (isLegacyRunData(data)) {
+    return {
+      id: data.id,
+      toolId: data.config?.id || '',
+      orgId: data.orgId || '',
+      status: data.success === true ? 'success' as RunStatus : 'failed' as RunStatus,
+      toolConfig: data.config,
+      toolPayload: undefined,
+      toolResult: data.data,
+      options: undefined,
+      error: data.error,
+      startedAt: data.startedAt ? new Date(data.startedAt) : new Date(),
+      completedAt: data.completedAt ? new Date(data.completedAt) : undefined
+    };
+  }
+  return {
+    ...data,
+    startedAt: data.startedAt ? new Date(data.startedAt) : new Date(),
+    completedAt: data.completedAt ? new Date(data.completedAt) : undefined
+  };
+}
 
 export class FileStore implements DataStore {
 
@@ -211,31 +238,24 @@ export class FileStore implements DataStore {
     }
   }
 
-  // Helper function to read runs from logs file
-  private async readRunsFromLogs(orgId?: string, configId?: string, maxRuns?: number): Promise<RunResult[]> {
+  private async readRunsFromLogs(orgId?: string, configId?: string, maxRuns?: number): Promise<Run[]> {
     try {
-      // Read more lines than needed to account for filtering
       const linesToRead = maxRuns ? maxRuns * 3 : 1000;
       const lines = await this.readLastLines(this.logsFilePath, linesToRead);
 
-      const runs: RunResult[] = [];
+      const runs: Run[] = [];
 
       for (const line of lines) {
         try {
-          const run = JSON.parse(line, (key, value) => {
-            if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
-              return new Date(value);
-            }
-            return value;
-          }) as RunResult & { orgId: string };
+          const rawData = JSON.parse(line);
+          const run = migrateFileStoreRun(rawData);
 
-          // Filter by orgId and configId if specified
           if (orgId && run.orgId && run.orgId !== orgId) continue;
-          if (configId && run.config?.id !== configId) continue;
+          const toolId = run.toolId || run.toolConfig?.id;
+          if (configId && toolId !== configId) continue;
 
           runs.push(run);
 
-          // Stop early if we have enough
           if (maxRuns && runs.length >= maxRuns) break;
         } catch (parseError) {
           logMessage('warn', `Failed to parse log line: ${line}`);
@@ -248,11 +268,9 @@ export class FileStore implements DataStore {
     }
   }
 
-  // Helper function to write run to logs file
-  private async appendRunToLogs(run: RunResult, orgId: string): Promise<void> {
+  private async appendRunToLogs(run: Run): Promise<void> {
     try {
-      const runWithOrgId = { ...run, orgId };
-      const logLine = JSON.stringify(runWithOrgId) + '\n';
+      const logLine = JSON.stringify(run) + '\n';
       await fs.promises.appendFile(this.logsFilePath, logLine, { mode: 0o644 });
     } catch (error) {
       logMessage('error', 'Failed to append run to logs: ' + error);
@@ -260,7 +278,6 @@ export class FileStore implements DataStore {
     }
   }
 
-  // Helper function to remove run from logs file
   private async removeRunFromLogs(id: string, orgId?: string): Promise<boolean> {
     try {
       try {
@@ -280,14 +297,14 @@ export class FileStore implements DataStore {
 
       for (const line of lines) {
         try {
-          const run = JSON.parse(line) as RunResult & { orgId: string };
+          const rawData = JSON.parse(line);
+          const run = migrateFileStoreRun(rawData);
           if (run.id === id && (!orgId || run.orgId === orgId)) {
             found = true;
-            continue; // Skip this line
+            continue;
           }
           filteredLines.push(line);
         } catch (parseError) {
-          // Keep unparseable lines
           filteredLines.push(line);
         }
       }
@@ -344,48 +361,62 @@ export class FileStore implements DataStore {
     return deleted;
   }
 
-  // Run Result Methods
-  async getRun(params: { id: string; orgId?: string }): Promise<RunResult | null> {
+  // Run Methods
+  async getRun(params: { id: string; orgId?: string }): Promise<Run | null> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return null;
 
     const runs = await this.readRunsFromLogs(orgId);
-    const run = runs.find(r => r.id === id);
-    if (!run) return null;
-    if ((run as any).orgId) delete (run as any).orgId;
-    return run || null;
+    return runs.find(r => r.id === id) || null;
   }
 
-  async createRun(params: { result: RunResult; orgId?: string }): Promise<RunResult> {
+  async createRun(params: { run: Run }): Promise<Run> {
     await this.ensureInitialized();
-    const { result: run, orgId } = params;
+    const { run } = params;
     if (!run) return null;
-    if ((run as any).stepResults) delete (run as any).stepResults;
 
-    // Only log runs if disable_logs environment variable is not set
     if (String(process.env.DISABLE_LOGS).toLowerCase() !== 'true') {
-      await this.appendRunToLogs(run, orgId);
+      await this.appendRunToLogs(run);
     }
 
     return run;
   }
 
-  async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: RunResult[], total: number }> {
+  async updateRun(params: { id: string; orgId: string; updates: Partial<Run> }): Promise<Run> {
+    await this.ensureInitialized();
+    const { id, orgId, updates } = params;
+    
+    const runs = await this.readRunsFromLogs(orgId);
+    const existingRun = runs.find(r => r.id === id);
+    
+    if (!existingRun) {
+      throw new Error(`Run with id ${id} not found`);
+    }
+
+    const updatedRun: Run = {
+      ...existingRun,
+      ...updates,
+      id,
+      orgId
+    };
+
+    await this.removeRunFromLogs(id, orgId);
+    await this.appendRunToLogs(updatedRun);
+
+    return updatedRun;
+  }
+
+  async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: Run[], total: number }> {
     await this.ensureInitialized();
     const { limit = 10, offset = 0, configId, orgId } = params || {};
     const allRuns = await this.readRunsFromLogs(orgId, configId);
 
-    // Filter out invalid runs
-    const validRuns = allRuns.filter((run): run is RunResult =>
+    const validRuns = allRuns.filter((run): run is Run =>
       run !== null &&
-      run.config &&
-      run.config.id &&
+      run.id &&
       run.startedAt instanceof Date
-    ).map(run => {
-      if ((run as any).orgId) delete (run as any).orgId;
-      return run;
-    });
+    );
 
     const items = validRuns.slice(offset, offset + limit);
     return { items, total: validRuns.length };

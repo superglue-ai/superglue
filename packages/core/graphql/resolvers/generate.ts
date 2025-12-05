@@ -79,10 +79,6 @@ export const generateStepConfigResolver = async (
     let integrationSpecificInstructions = '';
     let integrationCredentials: Record<string, string> = {};
 
-    if (errorMessage && errorMessage.length < 100) {
-      throw new Error('Error message must be at least 100 characters long');
-    }
-
     if (integrationId) {
       try {
         logMessage('info', `Generating step config for integration ${integrationId}`, metadata);

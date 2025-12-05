@@ -141,7 +141,7 @@ docker run -d \
 | Variable                 | Required  | Description                                                    |
 | ------------------------ | --------- | -------------------------------------------------------------- |
 | `AUTH_TOKEN`             | Yes       | Secret for API authentication                                  |
-| `DATASTORE_TYPE`         | Yes       | `memory` or `postgres` (`postgres` requires additional config) |
+| `DATASTORE_TYPE`         | Yes       | `file` or `postgres` (`postgres` requires additional config) |
 | `LLM_PROVIDER`           | Yes       | `OPENAI`, `ANTHROPIC`, or `GEMINI` (default: `OPENAI`)         |
 | `LLM_FALLBACK_PROVIDER`  | No        | Optional fallback provider (`OPENAI`, `ANTHROPIC`, `GEMINI`)   |
 | `OPENAI_API_KEY`         | If active | OpenAI API key                                                 |

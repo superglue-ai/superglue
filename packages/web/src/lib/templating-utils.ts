@@ -62,9 +62,41 @@ export function parseTemplateString(input: string): TemplatePart[] {
   return parts;
 }
 
-export function executeTemplateCode(code: string, data: any): any {
+const EXECUTION_TIMEOUT_MS = 30000; // 30 seconds
+
+function sanitizeEvaluationResult(value: any): any {
+  if (typeof value === 'function') return '[Function]';
+  if (typeof value === 'symbol') return '[Symbol]';
+  if (typeof value === 'bigint') return value.toString();
+  
   try {
-    return executeWithVMHelpers(code, data);
+    JSON.stringify(value);
+    return value;
+  } catch {
+    return '[Non-serializable Object]';
+  }
+}
+
+async function executeWithTimeout(code: string, data: any, timeoutMs: number): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Execution timeout: template took too long to evaluate'));
+    }, timeoutMs);
+    
+    try {
+      const result = executeWithVMHelpers(code, data);
+      clearTimeout(timeoutId);
+      resolve(result);
+    } catch (error) {
+      clearTimeout(timeoutId);
+      reject(error);
+    }
+  });
+}
+
+export async function executeTemplateCode(code: string, data: any): Promise<any> {
+  try {
+    return await executeWithTimeout(code, data, EXECUTION_TIMEOUT_MS);
   } catch (error) {
     throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -108,14 +140,24 @@ export function normalizeTemplateExpression(expr: string): string {
   return `(sourceData) => sourceData["${escapeForBracket(trimmed)}"]`;
 }
 
+function detectDangerousPatterns(code: string): void {
+  if (/while\s*\(\s*true\s*\)/.test(code)) throw new Error('Dangerous pattern: while(true) may cause infinite loop');
+  if (/while\s*\(\s*1\s*\)/.test(code)) throw new Error('Dangerous pattern: while(1) may cause infinite loop');
+  if (/while\s*\(\s*!\s*false\s*\)/.test(code)) throw new Error('Dangerous pattern: while(!false) may cause infinite loop');
+  if (/for\s*\(\s*;\s*;\s*\)/.test(code)) throw new Error('Dangerous pattern: for(;;) may cause infinite loop');
+  if (/for\s*\(\s*;;\s*\)/.test(code)) throw new Error('Dangerous pattern: for(;;) may cause infinite loop');
+}
+
 export async function evaluateTemplate(
   expr: string,
   sourceData: any
 ): Promise<EvaluationResult> {
   try {
     const normalizedExpr = normalizeTemplateExpression(expr);
-    const result = executeTemplateCode(normalizedExpr, sourceData);
-    return { success: true, value: result };
+    detectDangerousPatterns(normalizedExpr);
+    const result = await executeTemplateCode(normalizedExpr, sourceData);
+    const sanitized = sanitizeEvaluationResult(result);
+    return { success: true, value: sanitized };
   } catch (error) {
     return {
       success: false,
@@ -230,13 +272,12 @@ export function buildPaginationData(config?: PaginationConfig): Record<string, u
 export function buildCategorizedVariables(
   credentialKeys: string[],
   sources?: Partial<CategorizedSources>,
-  hasCurrentItem?: boolean
 ): CategorizedVariables {
   return {
     credentials: credentialKeys,
     toolInputs: Object.keys(sources?.manualPayload || {}),
     fileInputs: Object.keys(sources?.filePayloads || {}),
-    currentStepData: hasCurrentItem ? ['currentItem'] : [],
+    currentStepData: ['currentItem'],
     previousStepData: Object.keys(sources?.previousStepResults || {}),
     paginationVariables: ['page', 'offset', 'cursor', 'limit', 'pageSize'],
   };

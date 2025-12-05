@@ -1,6 +1,7 @@
 import type { DataStore } from "@superglue/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { DataStoreFactory, EnvVarManager, MockServerFactory } from "./test-utils.js";
+import { FileStore } from "../datastore/filestore.js";
 
 describe("Tenant Info Basic Tests", () => {
   // Create data store factory
@@ -101,7 +102,7 @@ describe("Tenant Info Basic Tests", () => {
     let datastore: DataStore;
 
     beforeEach(async () => {
-      datastore = DataStoreFactory.createMemoryStore();
+      datastore = new FileStore('/tmp/superglue-test-tenant');
       await datastore.setTenantInfo(null, false);
     });
 
@@ -224,7 +225,7 @@ describe("Tenant Info Basic Tests", () => {
     let datastore: DataStore;
 
     beforeEach(async () => {
-      datastore = DataStoreFactory.createMemoryStore();
+      datastore = new FileStore('/tmp/superglue-test-tenant');
       await datastore.setTenantInfo(null, false);
       mockServer.getApp()._router.stack = mockServer
         .getApp()

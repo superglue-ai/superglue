@@ -1,8 +1,9 @@
-import type { ApiConfig, Integration, RunResult, Tool } from "@superglue/shared";
+import type { ApiConfig, Integration, Run, Tool } from "@superglue/shared";
 import { Pool, PoolConfig } from 'pg';
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
 import type { DataStore, ToolScheduleInternal } from "./types.js";
+import { extractRun } from "./migrations/run-migration.js";
 
 type ConfigType = 'api' | 'workflow';
 type ConfigData = ApiConfig | Tool;
@@ -350,59 +351,60 @@ export class PostgresService implements DataStore {
         return this.deleteConfig(id, 'api', orgId);
     }
 
-    // Run Result Methods
-    async getRun(params: { id: string; orgId?: string }): Promise<RunResult | null> {
+    // Run Methods
+    async getRun(params: { id: string; orgId?: string }): Promise<Run | null> {
         const { id, orgId } = params;
         if (!id) return null;
         const client = await this.pool.connect();
         try {
             const result = await client.query(
-                'SELECT data FROM runs WHERE id = $1 AND org_id = $2',
+                'SELECT id, config_id, org_id, data, started_at, completed_at FROM runs WHERE id = $1 AND org_id = $2',
                 [id, orgId || '']
             );
             if (!result.rows[0]) return null;
 
-            const run = this.parseDates(result.rows[0].data);
-            return {
-                ...run,
-                id
-            };
+            const row = result.rows[0];
+            return extractRun(row.data, {
+                id: row.id,
+                config_id: row.config_id,
+                org_id: row.org_id,
+                started_at: row.started_at,
+                completed_at: row.completed_at
+            });
         } finally {
             client.release();
         }
     }
 
-    async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: RunResult[], total: number }> {
+    async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: Run[], total: number }> {
         const { limit = 10, offset = 0, configId, orgId } = params || {};
         const client = await this.pool.connect();
         try {
             let countQuery = 'SELECT COUNT(*) FROM runs WHERE org_id = $1';
-            let selectQuery = 'SELECT id, data, started_at FROM runs WHERE org_id = $1';
-            let params = [orgId || ''];
+            let selectQuery = 'SELECT id, config_id, org_id, data, started_at, completed_at FROM runs WHERE org_id = $1';
+            const queryParams: string[] = [orgId || ''];
 
             if (configId) {
                 countQuery += ' AND config_id = $2';
                 selectQuery += ' AND config_id = $2';
-                params.push(configId);
+                queryParams.push(configId);
             }
 
-            const countResult = await client.query(countQuery, params);
+            const countResult = await client.query(countQuery, queryParams);
             const total = parseInt(countResult.rows[0].count);
 
-            selectQuery += ' ORDER BY started_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
-            params.push(String(limit), String(offset));
+            selectQuery += ' ORDER BY started_at DESC LIMIT $' + (queryParams.length + 1) + ' OFFSET $' + (queryParams.length + 2);
+            queryParams.push(String(limit), String(offset));
 
-            const result = await client.query(selectQuery, params);
+            const result = await client.query(selectQuery, queryParams);
 
-            const items = result.rows.map(row => {
-                const run = row.data;
-                return {
-                    ...run,
-                    id: row.id,
-                    startedAt: run.startedAt ? new Date(run.startedAt) : undefined,
-                    completedAt: run.completedAt ? new Date(run.completedAt) : undefined
-                };
-            });
+            const items = result.rows.map(row => extractRun(row.data, {
+                id: row.id,
+                config_id: row.config_id,
+                org_id: row.org_id,
+                started_at: row.started_at,
+                completed_at: row.completed_at
+            }));
 
             return { items, total };
         } finally {
@@ -410,27 +412,72 @@ export class PostgresService implements DataStore {
         }
     }
 
-    async createRun(params: { result: RunResult; orgId?: string }): Promise<RunResult> {
-        const { result: run, orgId } = params;
+    async createRun(params: { run: Run }): Promise<Run> {
+        const { run } = params;
         if (!run) return null;
-        if ((run as any).stepResults) delete (run as any).stepResults;
         const client = await this.pool.connect();
         try {
             await client.query(`
-        INSERT INTO runs (id, config_id, org_id, data, started_at, completed_at) 
-        VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (id, org_id) 
-        DO UPDATE SET data = $4, started_at = $5, completed_at = $6
-      `, [
+                INSERT INTO runs (id, config_id, org_id, data, started_at, completed_at) 
+                VALUES ($1, $2, $3, $4, $5, $6)
+                ON CONFLICT (id, org_id) 
+                DO UPDATE SET data = $4, started_at = $5, completed_at = $6
+            `, [
                 run.id,
-                run.config?.id,
-                orgId || '',
+                run.toolId,
+                run.orgId || '',
                 JSON.stringify(run),
                 run.startedAt ? run.startedAt.toISOString() : null,
                 run.completedAt ? run.completedAt.toISOString() : null
             ]);
 
             return run;
+        } finally {
+            client.release();
+        }
+    }
+
+    async updateRun(params: { id: string; orgId: string; updates: Partial<Run> }): Promise<Run> {
+        const { id, orgId, updates } = params;
+        const client = await this.pool.connect();
+        try {
+            const existingResult = await client.query(
+                'SELECT id, config_id, org_id, data, started_at, completed_at FROM runs WHERE id = $1 AND org_id = $2',
+                [id, orgId]
+            );
+            
+            if (!existingResult.rows[0]) {
+                throw new Error(`Run with id ${id} not found`);
+            }
+
+            const row = existingResult.rows[0];
+            const existingRun = extractRun(row.data, {
+                id: row.id,
+                config_id: row.config_id,
+                org_id: row.org_id,
+                started_at: row.started_at,
+                completed_at: row.completed_at
+            });
+
+            const updatedRun: Run = {
+                ...existingRun,
+                ...updates,
+                id,
+                orgId
+            };
+
+            await client.query(`
+                UPDATE runs 
+                SET data = $1, completed_at = $2
+                WHERE id = $3 AND org_id = $4
+            `, [
+                JSON.stringify(updatedRun),
+                updatedRun.completedAt ? updatedRun.completedAt.toISOString() : null,
+                id,
+                orgId
+            ]);
+
+            return updatedRun;
         } finally {
             client.release();
         }

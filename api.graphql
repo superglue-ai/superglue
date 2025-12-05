@@ -72,6 +72,22 @@ type RunResult {
   config: ConfigType
 }
 
+type Run {
+  id: ID!
+  toolId: String!
+  orgId: String!
+  status: RunStatus!
+  toolConfig: Workflow
+  toolPayload: JSON
+  toolResult: JSON
+  stepResults: [WorkflowStepResult!]
+  options: JSON
+  requestSource: String
+  error: String
+  startedAt: DateTime!
+  completedAt: DateTime
+}
+
 type Pagination {
   type: PaginationType!
   pageSize: String
@@ -80,7 +96,7 @@ type Pagination {
 }
 
 type RunList {
-  items: [RunResult!]!
+  items: [Run!]!
   total: Int!
 }
 
@@ -218,6 +234,13 @@ enum SelfHealingMode {
   DISABLED
 }
 
+enum RunStatus {
+  running
+  success
+  failed
+  aborted
+}
+
 input ApiInputRequest @oneOf {
   endpoint: ApiInput
   id: ID
@@ -282,7 +305,7 @@ type Query {
   findRelevantIntegrations(searchTerms: String): [SuggestedIntegration!]
   findRelevantTools(searchTerms: String): [SuggestedTool!]
 
-  getRun(id: ID!): RunResult
+  getRun(id: ID!): Run
   getApi(id: ID!): ApiConfig
   getWorkflow(id: ID!): Workflow
   getIntegration(id: ID!): Integration
@@ -368,6 +391,11 @@ type WorkflowResult {
   stepResults: [WorkflowStepResult!]
 }
 
+type AbortToolExecutionResult {
+  success: Boolean!
+  runId: ID!
+}
+
 type WorkflowSchedule {
   id: ID!
   workflowId: String!
@@ -425,7 +453,10 @@ type Mutation {
     payload: JSON
     credentials: JSON
     options: RequestOptions
+    runId: ID
   ): WorkflowResult!
+
+  abortToolExecution(runId: ID!): AbortToolExecutionResult!
 
   buildWorkflow(
     instruction: String!

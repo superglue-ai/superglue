@@ -2,17 +2,19 @@ import { Button } from '@/src/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { downloadJson } from '@/src/lib/download-utils';
 import { isEmptyData } from '@/src/lib/general-utils';
-import { Download, Loader2, X } from 'lucide-react';
+import { Download, Loader2, OctagonX, X } from 'lucide-react';
 import { useState } from 'react';
 import { JsonCodeEditor } from '../../../editors/JsonCodeEditor';
 import { useDataProcessor } from '../../hooks/use-data-processor';
 import { CopyButton } from '../../shared/CopyButton';
+import { isAbortError } from '@/src/lib/general-utils';
 
 interface StepResultTabProps {
     step: any;
     stepIndex: number;
     stepResult?: any;
     failedSteps?: string[];
+    abortedSteps?: string[];
     isExecuting?: boolean;
     isGlobalExecuting?: boolean;
     currentExecutingStepIndex?: number;
@@ -24,6 +26,7 @@ export function StepResultTab({
     stepIndex,
     stepResult,
     failedSteps = [],
+    abortedSteps = [],
     isExecuting,
     isGlobalExecuting,
     currentExecutingStepIndex,
@@ -41,8 +44,9 @@ export function StepResultTab({
     };
 
     const stepFailed = failedSteps?.includes(step.id);
-    const errorResult = stepFailed && (!stepResult || typeof stepResult === 'string');
-    const isPending = !stepFailed && stepResult === undefined;
+    const stepAborted = abortedSteps?.includes(step.id);
+    const errorResult = (stepFailed || stepAborted) && (!stepResult || typeof stepResult === 'string');
+    const isPending = !stepFailed && !stepAborted && stepResult === undefined;
     const isActivelyRunning = !!(isExecuting || (isGlobalExecuting && currentExecutingStepIndex === stepIndex));
 
     let outputString = '';
@@ -67,23 +71,37 @@ export function StepResultTab({
         }
     }
 
-    const showEmptyWarning = !stepFailed && !isPending && !errorResult && outputViewMode === 'preview' && isEmptyData(outputString || '');
+    const showEmptyWarning = !stepFailed && !stepAborted && !isPending && !errorResult && outputViewMode === 'preview' && isEmptyData(outputString || '');
+
+    const aborted = stepAborted || (errorResult && isAbortError(stepResult));
 
     return (
         <div>
             {errorResult ? (
-                <div className="flex flex-col items-start justify-start p-4 border rounded-lg bg-muted/30 border-border">
-                    <div className="flex items-center gap-2 mb-2">
-                        <X className="h-4 w-4 text-red-500 dark:text-red-400" />
-                        <p className="text-sm font-semibold text-red-500 dark:text-red-400">Step Error</p>
+                aborted ? (
+                    <div className="flex flex-col items-start justify-start p-4 border rounded-lg bg-muted/30 border-border">
+                        <div className="flex items-center gap-2 mb-2">
+                            <OctagonX className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                            <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Execution Aborted</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Step execution was manually stopped. Run the step again to get results.
+                        </p>
                     </div>
-                    <pre className="text-xs whitespace-pre-wrap font-mono w-full overflow-x-auto">
-                        {outputString || 'Step execution failed'}
-                    </pre>
-                    <p className="text-xs text-muted-foreground mt-2">
-                        Use the "Fix Step" button above to automatically repair the step configuration.
-                    </p>
-                </div>
+                ) : (
+                    <div className="flex flex-col items-start justify-start p-4 border rounded-lg bg-muted/30 border-border">
+                        <div className="flex items-center gap-2 mb-2">
+                            <X className="h-4 w-4 text-red-500 dark:text-red-400" />
+                            <p className="text-sm font-semibold text-red-500 dark:text-red-400">Step Error</p>
+                        </div>
+                        <pre className="text-xs whitespace-pre-wrap font-mono w-full overflow-x-auto">
+                            {outputString || 'Step execution failed'}
+                        </pre>
+                        <p className="text-xs text-muted-foreground mt-2">
+                            Use the "Fix Step" button above to automatically repair the step configuration.
+                        </p>
+                    </div>
+                )
             ) : isPending ? (
                 isActivelyRunning ? (
                     <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">

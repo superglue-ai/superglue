@@ -19,7 +19,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Integration } from '@superglue/shared';
 import { assertValidArrowFunction } from '@superglue/shared';
-import { Bug, ChevronDown, FileBraces, FileInput, FileOutput, Play, RotateCw, Route, Trash2, Wand2 } from 'lucide-react';
+import { Bug, ChevronDown, FileBraces, FileInput, FileOutput, Play, RotateCw, Route, Square, Trash2, Wand2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { type CategorizedSources } from '../templates/tiptap/TemplateContext';
 import { StepInputTab } from './tabs/StepInputTab';
@@ -37,6 +37,7 @@ export const SpotlightStepCard = React.memo(({
     onExecuteStep,
     onExecuteStepWithLimit,
     onOpenFixStepDialog,
+    onAbort,
     canExecute,
     isExecuting,
     isGlobalExecuting,
@@ -44,11 +45,13 @@ export const SpotlightStepCard = React.memo(({
     integrations,
     readOnly,
     failedSteps = [],
+    abortedSteps = [],
     showOutputSignal,
     onConfigEditingChange,
     onLoopInfoChange,
     isFirstStep = false,
     isPayloadValid = true,
+    sourceDataVersion,
 }: {
     step: any;
     stepIndex: number;
@@ -60,6 +63,7 @@ export const SpotlightStepCard = React.memo(({
     onExecuteStep?: () => Promise<void>;
     onExecuteStepWithLimit?: (limit: number) => Promise<void>;
     onOpenFixStepDialog?: () => void;
+    onAbort?: () => void;
     canExecute?: boolean;
     isExecuting?: boolean;
     isGlobalExecuting?: boolean;
@@ -67,12 +71,14 @@ export const SpotlightStepCard = React.memo(({
     integrations?: Integration[];
     readOnly?: boolean;
     failedSteps?: string[];
+    abortedSteps?: string[];
     stepResultsMap?: Record<string, any>;
     showOutputSignal?: number;
     onConfigEditingChange?: (editing: boolean) => void;
     onLoopInfoChange?: (loopCount: number | null) => void;
     isFirstStep?: boolean;
     isPayloadValid?: boolean;
+    sourceDataVersion?: number;
 }) => {
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
     const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
@@ -166,49 +172,58 @@ export const SpotlightStepCard = React.memo(({
                     <div className="flex items-center gap-1.5">
                         {!readOnly && onExecuteStep && (
                             <div className="flex items-center">
-                                <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Run this step"}>
-                                    <div className={`relative flex rounded-md border border-input bg-background ${loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit ? '' : ''}`}>
-                                        <Button
-                                            variant="ghost"
-                                            onClick={handleRunStepClick}
-                                            disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                            className={`h-8 pl-3 gap-2 border-0 ${loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit ? 'pr-2 rounded-r-none' : 'pr-3'}`}
-                                        >
-                                            {isExecuting ? (
-                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                            ) : loopItems && Array.isArray(loopItems) && loopItems.length > 1 ? (
-                                                <RotateCw className="h-3.5 w-3.5" />
-                                            ) : (
-                                                <Play className="h-3 w-3" />
+                                {isExecuting && onAbort ? (
+                                    <Button
+                                        variant="ghost"
+                                        onClick={onAbort}
+                                        className="h-8 px-3 gap-2 border border-input bg-background hover:bg-muted"
+                                    >
+                                        <Square className="h-3 w-3" />
+                                        <span className="font-medium text-[13px]">Stop</span>
+                                    </Button>
+                                ) : (
+                                    <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Run this step"}>
+                                        <div className={`relative flex rounded-md border border-input bg-background ${loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit ? '' : ''}`}>
+                                            <Button
+                                                variant="ghost"
+                                                onClick={handleRunStepClick}
+                                                disabled={!canExecute || isExecuting || isGlobalExecuting}
+                                                className={`h-8 pl-3 gap-2 border-0 ${loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit ? 'pr-2 rounded-r-none' : 'pr-3'}`}
+                                            >
+                                                {loopItems && Array.isArray(loopItems) && loopItems.length > 1 ? (
+                                                    <RotateCw className="h-3.5 w-3.5" />
+                                                ) : (
+                                                    <Play className="h-3 w-3" />
+                                                )}
+                                                <span className="font-medium text-[13px]">Run Step</span>
+                                            </Button>
+                                            {loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit && (
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button
+                                                            variant="ghost"
+                                                            disabled={!canExecute || isExecuting || isGlobalExecuting}
+                                                            className="h-8 px-1.5 rounded-l-none border-0"
+                                                        >
+                                                            <ChevronDown className="h-3 w-3" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={() => onExecuteStepWithLimit(1)}>
+                                                            <Bug className="h-3.5 w-3.5 mr-2" />
+                                                            Run single iteration
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             )}
-                                            <span className="font-medium text-[13px]">Run Step</span>
-                                        </Button>
-                                        {loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit && (
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button
-                                                        variant="ghost"
-                                                        disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                                        className="h-8 px-1.5 rounded-l-none border-0"
-                                                    >
-                                                        <ChevronDown className="h-3 w-3" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem onClick={() => onExecuteStepWithLimit(1)}>
-                                                        <Bug className="h-3.5 w-3.5 mr-2" />
-                                                        Run single iteration
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        )}
-                                        {loopItems && Array.isArray(loopItems) && loopItems.length > 1 && (
-                                            <span className="absolute -top-2 -left-2 min-w-[16px] h-[16px] px-1 text-[10px] font-bold bg-primary text-primary-foreground rounded flex items-center justify-center">
-                                                {loopItems.length >= 1000 ? `${Math.floor(loopItems.length / 1000)}k` : loopItems.length}
-                                            </span>
-                                        )}
-                                    </div>
-                                </span>
+                                            {loopItems && Array.isArray(loopItems) && loopItems.length > 1 && (
+                                                <span className="absolute -top-2 -left-2 min-w-[16px] h-[16px] px-1 text-[10px] font-bold bg-primary text-primary-foreground rounded flex items-center justify-center">
+                                                    {loopItems.length >= 1000 ? `${Math.floor(loopItems.length / 1000)}k` : loopItems.length}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </span>
+                                )}
                             </div>
                         )}
                         {!readOnly && onOpenFixStepDialog && (
@@ -237,7 +252,7 @@ export const SpotlightStepCard = React.memo(({
                     </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className={activePanel === 'config' ? 'space-y-1' : 'space-y-2'}>
                     <div className="flex items-center justify-between">
                         <Tabs value={activePanel} onValueChange={(v) => setActivePanel(v as 'input' | 'config' | 'output')}>
                             <TabsList className="h-9 p-1 rounded-md">
@@ -255,8 +270,8 @@ export const SpotlightStepCard = React.memo(({
                         </Tabs>
                     </div>
 
-                    <div className="mt-1">
-                        <div className={activePanel === 'input' ? 'block' : 'hidden'}>
+                    <div>
+                        {activePanel === 'input' && (
                             <StepInputTab
                                 step={step}
                                 stepIndex={stepIndex}
@@ -264,11 +279,11 @@ export const SpotlightStepCard = React.memo(({
                                 canExecute={canExecute}
                                 readOnly={readOnly}
                                 onEdit={onEdit}
-                                isActive={activePanel === 'input'}
+                                isActive={true}
+                                sourceDataVersion={sourceDataVersion}
                             />
-                        </div>
-
-                        <div className={activePanel === 'config' ? 'block' : 'hidden'}>
+                        )}
+                        {activePanel === 'config' && (
                             <StepConfigTab
                                 step={step}
                                 evolvingPayload={evolvingPayload}
@@ -279,21 +294,22 @@ export const SpotlightStepCard = React.memo(({
                                 onEdit={onEdit}
                                 onEditingChange={onConfigEditingChange}
                                 onOpenFixStepDialog={onOpenFixStepDialog}
+                                sourceDataVersion={sourceDataVersion}
                             />
-                        </div>
-
-                        <div className={activePanel === 'output' ? 'block' : 'hidden'}>
+                        )}
+                        {activePanel === 'output' && (
                             <StepResultTab
                                 step={step}
                                 stepIndex={stepIndex}
                                 stepResult={stepResult}
                                 failedSteps={failedSteps}
+                                abortedSteps={abortedSteps}
                                 isExecuting={isExecuting}
                                 isGlobalExecuting={isGlobalExecuting}
                                 currentExecutingStepIndex={currentExecutingStepIndex}
-                                isActive={activePanel === 'output'}
+                                isActive={true}
                             />
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>
