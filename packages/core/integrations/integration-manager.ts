@@ -19,13 +19,13 @@ export class IntegrationManager {
     id: string;
     private _integration: Integration;
     private _documentation: DocumentationData;
-    private dataStore: DataStore;
+    private dataStore: DataStore | null;
     private metadata: ServiceMetadata;
     private orgId: string; // Keep for backward compat
     private _basicDataPromise?: Promise<Integration>;
     private _documentationPromise?: Promise<DocumentationData>;
 
-    constructor(idOrIntegration: string | Integration, dataStore: DataStore, metadata: ServiceMetadata) {
+    constructor(idOrIntegration: string | Integration, dataStore: DataStore | null, metadata: ServiceMetadata) {
         this.dataStore = dataStore;
         this.metadata = metadata;
         this.orgId = metadata.orgId!; // Keep for backward compat

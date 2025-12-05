@@ -99,7 +99,7 @@ export const executeWorkflowResolver = async (
       payload: args.payload,
       credentials: args.credentials,
       options: args.options,
-      integrationManagers,
+      integrations: integrationManagers.map(m => m.toIntegrationSync()),
       orgId: context.orgId,
       traceId: metadata.traceId
     };

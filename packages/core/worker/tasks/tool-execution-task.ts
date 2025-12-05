@@ -1,4 +1,5 @@
 import { ToolResult } from "@superglue/shared";
+import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { ToolExecutor } from "../../tools/tool-executor.js";
 import { ToolExecutionPayload, ToolExecutionResult } from "../types.js";
 
@@ -7,10 +8,14 @@ export async function run(payload: ToolExecutionPayload): Promise<ToolExecutionR
   const metadata = { orgId: payload.orgId, traceId: payload.traceId };
   
   try {
+    const integrationManagers = payload.integrations.map(
+      integration => new IntegrationManager(integration, null, metadata)
+    );
+
     const executor = new ToolExecutor({ 
       tool: payload.workflow, 
       metadata, 
-      integrations: payload.integrationManagers 
+      integrations: integrationManagers 
     });
     
     const result: ToolResult = await executor.execute({ 

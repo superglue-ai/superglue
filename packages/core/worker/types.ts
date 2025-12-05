@@ -1,5 +1,5 @@
 import { WorkerPool } from './worker-pool.js';
-import { Tool, RequestOptions, ToolStepResult, IntegrationManager } from '@superglue/shared';
+import { Tool, RequestOptions, ToolStepResult, Integration } from '@superglue/shared';
 
 export interface WorkerPools {
     toolExecution: WorkerPool<ToolExecutionPayload, ToolExecutionResult>;
@@ -21,7 +21,7 @@ export interface ToolExecutionPayload {
     payload?: Record<string, any>;
     credentials?: Record<string, string>;
     options?: RequestOptions;
-    integrationManagers: IntegrationManager[];
+    integrations: Integration[];
     orgId: string;
     traceId?: string;
 }
