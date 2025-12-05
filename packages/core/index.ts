@@ -13,7 +13,7 @@ async function startServer() {
     type: String(process.env.DATASTORE_TYPE).toLowerCase() as 'file' | 'postgres' 
   });
 
-  const workerPools = initializeWorkerPools();
+  const workerPools = initializeWorkerPools(datastore);
 
   if (process.env.START_SCHEDULER_SERVER === 'true') {
     const workflowScheduler = new WorkflowSchedulerWorker(datastore, workerPools);

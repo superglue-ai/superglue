@@ -137,8 +137,8 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
     }, [stepInput, credentialsMap, currentItemObj, paginationData]);
 
     const categorizedVariables = useMemo<CategorizedVariables>(
-        () => buildCategorizedVariables(Object.keys(credentialsMap), categorizedSources, !!currentItemObj),
-        [credentialsMap, categorizedSources, currentItemObj]
+        () => buildCategorizedVariables(Object.keys(credentialsMap), categorizedSources),
+        [credentialsMap, categorizedSources]
     );
 
     const completeCategorizedSources = useMemo<CategorizedSources>(

@@ -1,6 +1,6 @@
 import { DataStore } from "../datastore/types.js";
 import { UserRole, ServiceMetadata } from "@superglue/shared";
-import type { WorkerPools } from "../worker/worker-pool-registry.js";
+import type { WorkerPools } from "../worker/types.js";
 
 // Re-export for convenience
 export type { ServiceMetadata, WorkerPools };

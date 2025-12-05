@@ -1,14 +1,15 @@
-import { Integration, RequestOptions, RunStatus, Tool, ToolResult, ToolStepResult } from "@superglue/shared";
+import { Integration, RequestOptions, RunStatus, SelfHealingMode, Tool, ToolResult, ToolStepResult } from "@superglue/shared";
 import { generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { parseJSON } from "../../files/index.js";
+import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { ToolBuilder } from "../../tools/tool-builder.js";
 import { ToolFinder } from "../../tools/tool-finder.js";
 import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { GraphQLRequestContext } from '../types.js';
-import type { ToolExecutionPayload } from "../../worker/tasks/toolExecutionTask.js";
+import type { ToolExecutionPayload } from "../../worker/types.js";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -70,18 +71,15 @@ export const executeWorkflowResolver = async (
       workflow.responseSchema = parseJSON(workflow.responseSchema);
     }
 
-    const allIntegrationIds = new Set<string>();
-    if (Array.isArray(workflow.integrationIds)) {
-      workflow.integrationIds.forEach(id => allIntegrationIds.add(id));
-    }
-    // Add integration IDs from each step
-    if (Array.isArray(workflow.steps)) {
-      workflow.steps.forEach(step => {
-        if (step.integrationId) {
-          allIntegrationIds.add(step.integrationId);
-        }
-      });
-    }
+    const selfHealingEnabled = args.options?.selfHealing && 
+      args.options.selfHealing !== SelfHealingMode.DISABLED;
+
+    const integrationManagers = await IntegrationManager.forToolExecution(
+      workflow,
+      context.datastore,
+      metadata,
+      { includeDocs: selfHealingEnabled }
+    );
 
     await context.datastore.createRun({
       run: {
@@ -101,7 +99,7 @@ export const executeWorkflowResolver = async (
       payload: args.payload,
       credentials: args.credentials,
       options: args.options,
-      integrationIds: Array.from(allIntegrationIds),
+      integrationManagers,
       orgId: context.orgId,
       traceId: metadata.traceId
     };
