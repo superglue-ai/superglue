@@ -102,7 +102,7 @@ describe("Tenant Info Basic Tests", () => {
     let datastore: DataStore;
 
     beforeEach(async () => {
-      datastore = new FileStore('/tmp/superglue-test-tenant');
+      datastore = DataStoreFactory.createMemoryStore();
       await datastore.setTenantInfo(null, false);
     });
 
@@ -225,7 +225,7 @@ describe("Tenant Info Basic Tests", () => {
     let datastore: DataStore;
 
     beforeEach(async () => {
-      datastore = new FileStore('/tmp/superglue-test-tenant');
+      DataStoreFactory.createMemoryStore();
       await datastore.setTenantInfo(null, false);
       mockServer.getApp()._router.stack = mockServer
         .getApp()

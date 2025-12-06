@@ -5,6 +5,7 @@ import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { afterAll, beforeAll } from "vitest";
 import { FileStore } from "../datastore/filestore.js";
+import { MemoryStore } from "../datastore/memory.js";
 
 /**
  * Creates and manages a mock HTTP server for integration tests
@@ -99,12 +100,13 @@ export class DataStoreFactory {
 
     this.dataStores = [
       { name: "FileStore", instance: new FileStore(this.testDir) },
+      { name: "MemoryStore", instance: new MemoryStore() },
     ];
 
     return this.dataStores;
   }
 
-  getInstance(name: "FileStore"): DataStore {
+  getInstance(name: "FileStore" | "MemoryStore"): DataStore {
     const store = this.dataStores.find((ds) => ds.name === name);
     if (!store) {
       throw new Error(`Data store "${name}" not found`);
@@ -149,6 +151,10 @@ export class DataStoreFactory {
     afterAll(async () => {
       await this.cleanup();
     });
+  }
+
+  static createMemoryStore(): DataStore {
+    return new MemoryStore();
   }
 
 }

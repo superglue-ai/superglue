@@ -17,7 +17,6 @@ export function initializeWorkerPools(datastore: DataStore): WorkerPools {
   return { toolExecution: toolExecutionPool };
 }
 
-
 function initializeToolExecutionPool(datastore: DataStore): WorkerPool<ToolExecutionPayload, ToolExecutionResult> {
   const config = server_defaults.WORKER_POOLS.EXECUTE_TOOL_WORKER_POOL;
   

@@ -10,7 +10,7 @@ async function startServer() {
 
   // Initialize shared components
   const datastore = createDataStore({ 
-    type: String(process.env.DATASTORE_TYPE).toLowerCase() as 'file' | 'postgres' 
+    type: String(process.env.DATASTORE_TYPE).toLowerCase() as 'memory' | 'file' | 'postgres' 
   });
 
   const workerPools = initializeWorkerPools(datastore);

@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, Edit, Loader2, Play, Plus, Trash2, X } from "lucide-react";
+import { Check, Edit, Loader2, Play, Plus, Square, Trash2, X } from "lucide-react";
 import React from 'react';
 
 import { useConfig } from '@/src/app/config-context';
@@ -300,9 +300,9 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
                           onClick={(e) => executingSchedules[schedule.id] === 'loading' ? handleAbortSchedule(e, schedule.id) : handleRunNow(e, schedule.id)}
                           disabled={executingSchedules[schedule.id] === 'success' || executingSchedules[schedule.id] === 'error'}
                         >
-                          {executingSchedules[schedule.id] === 'loading' && <X className="h-4 w-4 text-red-500" />}
+                          {executingSchedules[schedule.id] === 'loading' && <Square className="h-4 w-4" />}
                           {executingSchedules[schedule.id] === 'success' && <Check className="h-4 w-4 text-green-500" />}
-                          {executingSchedules[schedule.id] === 'error' && <X className="h-4 w-4 text-red-500" />}
+                          {executingSchedules[schedule.id] === 'error' && <X className="h-4 w-4 text-amber-600" />}
                           {!executingSchedules[schedule.id] && <Play className="h-4 w-4" />}
                         </Button>
                       </span>
