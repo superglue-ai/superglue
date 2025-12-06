@@ -1,4 +1,5 @@
 import { FileStore } from './filestore.js';
+import { MemoryStore } from './memory.js';
 import { PostgresService } from './postgres.js';
 import { DataStore } from './types.js';
 
@@ -13,7 +14,10 @@ export function createDataStore(config: {
     const postgresConfig = getPostgresConfig();
     return new PostgresService(postgresConfig);
   }
-  throw new Error(`Unsupported datastore type: ${config.type}. Use 'file' or 'postgres'.`);
+  if (config.type === 'memory') {
+    return new MemoryStore();
+  }
+  throw new Error(`Unsupported datastore type: ${config.type}. Use 'file', 'postgres', or 'memory'.`);
 }
 
 export function getFileStoreConfig() {
