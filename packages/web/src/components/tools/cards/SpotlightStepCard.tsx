@@ -174,9 +174,9 @@ export const SpotlightStepCard = React.memo(({
                             <div className="flex items-center">
                                 {isExecuting && onAbort ? (
                                     <Button
-                                        variant="ghost"
+                                        variant="outline"
                                         onClick={onAbort}
-                                        className="h-8 px-3 gap-2 border border-input bg-background hover:bg-muted"
+                                        className="h-8 px-3 gap-2"
                                     >
                                         <Square className="h-3 w-3" />
                                         <span className="font-medium text-[13px]">Stop</span>

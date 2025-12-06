@@ -203,60 +203,60 @@ export const FinalTransformMiniStepCard = ({
             <div className="flex items-center gap-2">
               {!readOnly && (onExecuteTransform || onOpenFixTransformDialog) && (
                 <>
-                  {(isRunningTransform || isFixingTransform) && onAbort ? (
-                    <Button
-                      variant="ghost"
-                      onClick={onAbort}
-                      className="h-8 px-3 gap-2 border border-input bg-background hover:bg-muted"
+                  {onExecuteTransform && (
+                    <span
+                      title={
+                        !canExecute
+                          ? "Execute all steps first"
+                          : isRunningTransform
+                            ? "Stop transform"
+                            : "Test final transform"
+                      }
                     >
-                      <Square className="h-3 w-3" />
-                      <span className="font-medium text-[13px]">Stop</span>
-                    </Button>
-                  ) : (
-                    <>
-                      {onExecuteTransform && (
-                        <span
-                          title={
-                            !canExecute
-                              ? "Execute all steps first"
-                              : "Test final transform"
-                          }
+                      {isRunningTransform && onAbort ? (
+                        <Button
+                          variant="outline"
+                          onClick={onAbort}
+                          className="h-8 px-3 gap-2"
                         >
-                          <Button
-                            variant="ghost"
-                            onClick={handleExecuteTransform}
-                            disabled={!canExecute || isRunningTransform || isFixingTransform}
-                            className="h-8 px-3 gap-2"
-                          >
-                            <Play className="h-3 w-3" />
-                            <span className="font-medium text-[13px]">
-                              Run Transform
-                            </span>
-                          </Button>
-                        </span>
-                      )}
-                      {onOpenFixTransformDialog && (
-                        <span
-                          title={
-                            !canExecute
-                              ? "Execute all steps first"
-                              : "Fix transform with auto-repair"
-                          }
+                          <Square className="h-3 w-3" />
+                          <span className="font-medium text-[13px]">Stop</span>
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          onClick={handleExecuteTransform}
+                          disabled={!canExecute || isRunningTransform || isFixingTransform}
+                          className="h-8 px-3 gap-2"
                         >
-                          <Button
-                            variant="ghost"
-                            onClick={handleOpenFixTransformDialog}
-                            disabled={!canExecute || isRunningTransform || isFixingTransform}
-                            className="h-8 px-3 gap-2"
-                          >
-                            <Wand2 className="h-3 w-3" />
-                            <span className="font-medium text-[13px]">
-                              Fix Transform
-                            </span>
-                          </Button>
-                        </span>
+                          <Play className="h-3 w-3" />
+                          <span className="font-medium text-[13px]">
+                            Run Transform
+                          </span>
+                        </Button>
                       )}
-                    </>
+                    </span>
+                  )}
+                  {onOpenFixTransformDialog && (
+                    <span
+                      title={
+                        !canExecute
+                          ? "Execute all steps first"
+                          : "Fix transform with auto-repair"
+                      }
+                    >
+                      <Button
+                        variant="ghost"
+                        onClick={handleOpenFixTransformDialog}
+                        disabled={!canExecute || isRunningTransform || isFixingTransform}
+                        className="h-8 px-3 gap-2"
+                      >
+                        <Wand2 className="h-3 w-3" />
+                        <span className="font-medium text-[13px]">
+                          Fix Transform
+                        </span>
+                      </Button>
+                    </span>
                   )}
                   <HelpTooltip text="Run Transform: executes the transform code with step results. Fix Transform: uses auto-repair to automatically fix transform errors and update the code." />
                 </>

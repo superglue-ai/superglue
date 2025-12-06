@@ -77,14 +77,11 @@ export function useTemplatePreview(
     evalVersionRef.current += 1;
     const thisVersion = evalVersionRef.current;
 
-    setHasResult(false);
-    setPreviewValue(undefined);
-    setPreviewError(null);
-
     const timer = setTimeout(async () => {
       if (thisVersion !== evalVersionRef.current) return;
       
       setIsEvaluating(true);
+      setHasResult(false);
       
       try {
         const result = await evaluateTemplate(codeContent, sourceDataRef.current);

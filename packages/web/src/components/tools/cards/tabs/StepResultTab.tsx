@@ -117,6 +117,10 @@ export function StepResultTab({
                         <p className="text-[10px]">Run this step to see results</p>
                     </div>
                 )
+            ) : outputProcessor.isComputingPreview && !outputProcessor.preview?.displayString ? (
+                <div className="flex items-center justify-center py-8 border rounded-md bg-muted/5">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
             ) : (
                 <>
                     <JsonCodeEditor
