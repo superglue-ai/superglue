@@ -4,7 +4,7 @@ import { PostgresService } from './postgres.js';
 import { DataStore } from './types.js';
 
 export function createDataStore(config: {
-  type: 'redis' | 'memory' | 'file' | 'postgres';
+  type: 'memory' | 'file' | 'postgres';
 }): DataStore {
   if (config.type === 'file') {
     const fileStoreConfig = getFileStoreConfig();

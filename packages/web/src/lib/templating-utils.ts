@@ -62,8 +62,6 @@ export function parseTemplateString(input: string): TemplatePart[] {
   return parts;
 }
 
-const EXECUTION_TIMEOUT_MS = 30000; // 30 seconds
-
 function sanitizeEvaluationResult(value: any): any {
   if (typeof value === 'function') return '[Function]';
   if (typeof value === 'symbol') return '[Symbol]';
@@ -77,26 +75,9 @@ function sanitizeEvaluationResult(value: any): any {
   }
 }
 
-async function executeWithTimeout(code: string, data: any, timeoutMs: number): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      reject(new Error('Execution timeout: template took too long to evaluate'));
-    }, timeoutMs);
-    
-    try {
-      const result = executeWithVMHelpers(code, data);
-      clearTimeout(timeoutId);
-      resolve(result);
-    } catch (error) {
-      clearTimeout(timeoutId);
-      reject(error);
-    }
-  });
-}
-
 export async function executeTemplateCode(code: string, data: any): Promise<any> {
   try {
-    return await executeWithTimeout(code, data, EXECUTION_TIMEOUT_MS);
+    return executeWithVMHelpers(code, data);
   } catch (error) {
     throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -141,11 +122,20 @@ export function normalizeTemplateExpression(expr: string): string {
 }
 
 function detectDangerousPatterns(code: string): void {
-  if (/while\s*\(\s*true\s*\)/.test(code)) throw new Error('Dangerous pattern: while(true) may cause infinite loop');
-  if (/while\s*\(\s*1\s*\)/.test(code)) throw new Error('Dangerous pattern: while(1) may cause infinite loop');
-  if (/while\s*\(\s*!\s*false\s*\)/.test(code)) throw new Error('Dangerous pattern: while(!false) may cause infinite loop');
-  if (/for\s*\(\s*;\s*;\s*\)/.test(code)) throw new Error('Dangerous pattern: for(;;) may cause infinite loop');
-  if (/for\s*\(\s*;;\s*\)/.test(code)) throw new Error('Dangerous pattern: for(;;) may cause infinite loop');
+  const patterns = [
+    { regex: /while\s*\(\s*true\s*\)/, msg: 'while(true)' },
+    { regex: /while\s*\(\s*1\s*\)/, msg: 'while(1)' },
+    { regex: /while\s*\(\s*!\s*false\s*\)/, msg: 'while(!false)' },
+    { regex: /for\s*\(\s*[^;]*;\s*;\s*[^)]*\)/, msg: 'for(;;) or for(i=0;;i++)' },
+    { regex: /while\s*\(\s*!\s*0\s*\)/, msg: 'while(!0)' },
+    { regex: /do\s*\{[^}]*\}\s*while\s*\(\s*true\s*\)/, msg: 'do...while(true)' },
+  ];
+
+  for (const { regex, msg } of patterns) {
+    if (regex.test(code)) {
+      throw new Error(`Dangerous pattern: ${msg} may cause infinite loop`);
+    }
+  }
 }
 
 export async function evaluateTemplate(

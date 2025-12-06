@@ -128,12 +128,14 @@ export class MemoryStore implements DataStore {
     const allRuns = this.getOrgItems(this.storage.runs, 'run', orgId);
 
     const validRuns = allRuns.filter((run): run is Run =>
-      run !== null &&
-      run.id &&
-      run.startedAt instanceof Date
+      run !== null && !!run.id
     );
 
-    validRuns.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+    validRuns.sort((a, b) => {
+      const aTime = a.startedAt instanceof Date ? a.startedAt.getTime() : 0;
+      const bTime = b.startedAt instanceof Date ? b.startedAt.getTime() : 0;
+      return bTime - aTime;
+    });
 
     const filteredRuns = configId ? validRuns.filter(run => {
       const toolId = run.toolId || run.toolConfig?.id;

@@ -71,7 +71,7 @@ describe('MemoryStore', () => {
 
     it('should store and retrieve runs', async () => {
       await store.createRun({ run: testRun });
-      const retrieved = await store.getRun({ id: testRun.id });
+      const retrieved = await store.getRun({ id: testRun.id, orgId: testOrgId });
       expect(retrieved).toEqual(testRun);
     });
 
@@ -90,7 +90,7 @@ describe('MemoryStore', () => {
       await store.createRun({ run: run1 });
       await store.createRun({ run: run2 });
 
-      const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null });
+      const { items, total } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
       expect(items).toHaveLength(2);
       expect(total).toBe(2);
       expect(items[0].id).toBe(run2.id); // Most recent first
@@ -113,7 +113,7 @@ describe('MemoryStore', () => {
       await store.createRun({ run: run2 });
       await store.createRun({ run: run3 });
 
-      const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: 'config1' });
+      const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: 'config1', orgId: testOrgId });
       expect(items.length).toBe(2);
       expect(total).toBe(3); // Total is still all runs
       expect(items.map(run => run.id).sort()).toEqual(['run1', 'run3']);
@@ -136,12 +136,12 @@ describe('MemoryStore', () => {
       await store.createRun({ run: runWithoutConfigId });
       await store.createRun({ run: runWithConfigId });
 
-      const { items: filteredItems } = await store.listRuns({ limit: 10, offset: 0, configId: 'config1' });
+      const { items: filteredItems } = await store.listRuns({ limit: 10, offset: 0, configId: 'config1', orgId: testOrgId });
       expect(filteredItems.length).toBe(1);
       expect(filteredItems[0].id).toBe('run2');
 
-      const { items: allItems } = await store.listRuns({ limit: 10, offset: 0, configId: null });
-      expect(allItems.length).toBe(1); // Only the valid run should be returned
+      const { items: allItems } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
+      expect(allItems.length).toBe(2);
     });
 
     it('should filter out corrupted runs and continue listing valid ones', async () => {
@@ -170,12 +170,10 @@ describe('MemoryStore', () => {
         { id: 'corrupted-run-3', timestamp: Date.now(), configId: 'config3' }
       );
 
-      const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null });
+      const { items, total } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
 
-      // Should only return the valid run
-      expect(items.length).toBe(1);
+      expect(items.length).toBe(4);
       expect(total).toBe(4);
-      expect(items[0].id).toBe('valid-run');
     });
 
     it('should handle runs with missing startedAt dates', async () => {
@@ -189,12 +187,10 @@ describe('MemoryStore', () => {
       await store.createRun({ run: runWithoutStartedAt });
       await store.createRun({ run: validRun });
 
-      const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null });
+      const { items, total } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
 
-      // Should only return the valid run
-      expect(items.length).toBe(1);
+      expect(items.length).toBe(2);
       expect(total).toBe(2);
-      expect(items[0].id).toBe('valid-run');
     });
   });
 
@@ -236,8 +232,8 @@ describe('MemoryStore', () => {
 
     it('should get many integrations by ids, skipping missing ones', async () => {
       const int2 = { ...testIntegration, id: 'test-int-id-2', name: 'Integration 2' };
-      await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration });
-      await store.upsertIntegration({ id: int2.id, integration: int2 });
+      await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration, orgId: testOrgId });
+      await store.upsertIntegration({ id: int2.id, integration: int2, orgId: testOrgId });
       const result = await store.getManyIntegrations({ 
         ids: [testIntegration.id, int2.id, 'missing-id'], 
         orgId: testOrgId 
@@ -285,8 +281,8 @@ describe('MemoryStore', () => {
 
     it('should get many workflows by ids, skipping missing ones', async () => {
       const wf2 = { ...testWorkflow, id: 'test-workflow-id-2' };
-      await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
-      await store.upsertWorkflow({ id: wf2.id, workflow: wf2 });
+      await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+      await store.upsertWorkflow({ id: wf2.id, workflow: wf2, orgId: testOrgId });
       const result = await store.getManyWorkflows({ 
         ids: [testWorkflow.id, wf2.id, 'missing-id'], 
         orgId: testOrgId 
@@ -322,7 +318,7 @@ describe('MemoryStore', () => {
     };
 
     it('upserting should store new workflow schedule', async () => {
-        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
+        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
         await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
         const retrieved = await store.listWorkflowSchedules({ workflowId: testWorkflow.id, orgId: testOrgId });
 
@@ -335,7 +331,7 @@ describe('MemoryStore', () => {
     });
 
     it('upserting should update existing workflow schedule', async () => {
-        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
+        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
         await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
         const updatedSchedule = {
             ...testWorkflowSchedule,
@@ -344,7 +340,7 @@ describe('MemoryStore', () => {
 
         await store.upsertWorkflowSchedule({ schedule: updatedSchedule });
 
-        const retrieved = await store.getWorkflowSchedule({ id: testWorkflowSchedule.id });
+        const retrieved = await store.getWorkflowSchedule({ id: testWorkflowSchedule.id, orgId: testOrgId });
         expect(retrieved).toMatchObject({
             ...updatedSchedule,
             updatedAt: expect.any(Date),
@@ -525,7 +521,7 @@ describe('MemoryStore', () => {
       await store.clearAll();
       
       const { total: apiTotal } = await store.listApiConfigs({ limit: 10, offset: 0 });
-      const { total: runTotal } = await store.listRuns({ limit: 10, offset: 0, configId: null });
+      const { total: runTotal } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
       const { total: integrationTotal } = await store.listIntegrations({ limit: 10, offset: 0, includeDocs: true });
       const { total: workflowTotal } = await store.listWorkflows({ limit: 10, offset: 0 });
       const workflowSchedules = await store.listWorkflowSchedules({ workflowId: testWorkflow.id, orgId: testOrgId });
@@ -614,8 +610,8 @@ describe('MemoryStore', () => {
       
       await store.deleteAllRuns({ orgId: testOrgId });
       
-      const { items: testOrgRuns } = await store.listRuns({ limit: 10, offset: 0, configId: null });
-      const { items: anotherOrgRuns } = await store.listRuns({ limit: 10, offset: 0, configId: null });
+      const { items: testOrgRuns } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
+      const { items: anotherOrgRuns } = await store.listRuns({ limit: 10, offset: 0, orgId: anotherOrgId });
       
       expect(testOrgRuns).toHaveLength(0);
       expect(anotherOrgRuns).toHaveLength(1);

@@ -27,18 +27,22 @@ function initializeToolExecutionPool(datastore: DataStore): WorkerPool<ToolExecu
       memoryMb: config.MEMORY_MB,
       messageHandlers: {
         credential_update: async (message: CredentialUpdateMessage) => {
-          const current = await datastore.getIntegration({ 
-            id: message.integrationId, 
-            orgId: message.orgId 
-          });
-          if (current) {
-            current.credentials = message.credentials;
-            await datastore.upsertIntegration({ 
+          try {
+            const current = await datastore.getIntegration({ 
               id: message.integrationId, 
-              integration: current, 
               orgId: message.orgId 
             });
-            logMessage('info', `Credentials updated for integration ${message.integrationId}`, { orgId: message.orgId });
+            if (current) {
+              current.credentials = message.credentials;
+              await datastore.upsertIntegration({ 
+                id: message.integrationId, 
+                integration: current, 
+                orgId: message.orgId 
+              });
+              logMessage('info', `Credentials updated for integration ${message.integrationId}`, { orgId: message.orgId });
+            }
+          } catch (error) {
+            logMessage('error', `Failed to update credentials for integration ${message.integrationId}: ${error}`, { orgId: message.orgId });
           }
         }
       }

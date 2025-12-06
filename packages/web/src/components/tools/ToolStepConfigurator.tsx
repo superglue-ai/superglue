@@ -232,7 +232,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                     categorizedSources={completeCategorizedSources}
                                                     className="flex-1" 
                                                     placeholder="https://api.example.com/endpoint" 
-                                                    disabled={disabled}
+                                                    disabled={disabled} 
                                                     sourceDataVersion={sourceDataVersion}
                                                 />
                                             </div>
@@ -331,7 +331,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                     step.apiConfig.pagination?.type === 'CURSOR_BASED' ? 'Cursor-based Pagination' :
                         'No Pagination'}
         </span>
-        <HelpTooltip text="Configure pagination if the API returns data in pages. Only set this if you're using pagination variables like {'<<offset>>'}, {'<<page>>'}, or {'<<cursor>>'} in your request." />
+                                            <HelpTooltip text="Configure pagination if the API returns data in pages. Only set this if you're using pagination variables like {'<<offset>>'}, {'<<page>>'}, or {'<<cursor>>'} in your request." />
     </div>
 </div>
 <div className={`overflow-hidden transition-all duration-200 ease-in-out ${paginationOpen ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
@@ -367,60 +367,60 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                 }}
             >
                 <SelectTrigger className="h-9" disabled={disabled}>
-                    <SelectValue placeholder="No pagination" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="none">No pagination</SelectItem>
-                    <SelectItem value="OFFSET_BASED">Offset-based (uses {'<<offset>>'})</SelectItem>
-                    <SelectItem value="PAGE_BASED">Page-based (uses {'<<page>>'})</SelectItem>
-                    <SelectItem value="CURSOR_BASED">Cursor-based (uses {'<<cursor>>'})</SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
-        {step.apiConfig.pagination && (
+                                                        <SelectValue placeholder="No pagination" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">No pagination</SelectItem>
+                                                        <SelectItem value="OFFSET_BASED">Offset-based (uses {'<<offset>>'})</SelectItem>
+                                                        <SelectItem value="PAGE_BASED">Page-based (uses {'<<page>>'})</SelectItem>
+                                                        <SelectItem value="CURSOR_BASED">Cursor-based (uses {'<<cursor>>'})</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            {step.apiConfig.pagination && (
             <div className="mt-2 gap-2 pl-2">
                 <div className="flex gap-2">
-                    <div className="flex-1">
-                        <Label className="text-xs">Page Size</Label>
-                        <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
-                            <Input value={step.apiConfig.pagination.pageSize || '50'} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), pageSize: e.target.value } } }))} className="text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0" placeholder="50" disabled={disabled} />
-                        </div>
-                    </div>
-                    {step.apiConfig.pagination.type === 'CURSOR_BASED' && (
-                        <div className="flex-1">
-                            <Label className="text-xs">Cursor Path</Label>
-                            <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
-                                <Input value={step.apiConfig.pagination.cursorPath || ''} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), cursorPath: e.target.value } } }))} className="text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0" placeholder="e.g., response.nextCursor" disabled={disabled} />
-                            </div>
-                        </div>
-                    )}
-                </div>
+                                                        <div className="flex-1">
+                                                            <Label className="text-xs">Page Size</Label>
+                                                            <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
+                                                                <Input value={step.apiConfig.pagination.pageSize || '50'} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), pageSize: e.target.value } } }))} className="text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0" placeholder="50" disabled={disabled} />
+                                                            </div>
+                                                        </div>
+                                                        {step.apiConfig.pagination.type === 'CURSOR_BASED' && (
+                                                            <div className="flex-1">
+                                                                <Label className="text-xs">Cursor Path</Label>
+                                                                <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
+                                                                    <Input value={step.apiConfig.pagination.cursorPath || ''} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), cursorPath: e.target.value } } }))} className="text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0" placeholder="e.g., response.nextCursor" disabled={disabled} />
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
                 <div className="mt-2 gap-2">
-                    <Label className="text-xs flex items-center gap-1">
-                        Stop Condition (JavaScript)
-                        <HelpTooltip text="JavaScript function that returns true when pagination should stop. Receives (response, pageInfo) where pageInfo has: page, offset, cursor, total fetched." />
-                    </Label>
-                    <div className="mt-1">
-                        <JavaScriptCodeEditor
-                            value={step.apiConfig.pagination.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'}
-                            onChange={(val) => handleImmediateEdit((s) => ({
-                                ...s,
-                                apiConfig: {
-                                    ...s.apiConfig,
-                                    pagination: { ...(s.apiConfig.pagination || {}), stopCondition: val }
-                                }
-                            }))}
-                            readOnly={disabled}
+                                                        <Label className="text-xs flex items-center gap-1">
+                                                            Stop Condition (JavaScript)
+                                                            <HelpTooltip text="JavaScript function that returns true when pagination should stop. Receives (response, pageInfo) where pageInfo has: page, offset, cursor, total fetched." />
+                                                        </Label>
+                                                        <div className="mt-1">
+                                                            <JavaScriptCodeEditor
+                                                                value={step.apiConfig.pagination.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'}
+                                                                onChange={(val) => handleImmediateEdit((s) => ({
+                                                                    ...s,
+                                                                    apiConfig: {
+                                                                        ...s.apiConfig,
+                                                                        pagination: { ...(s.apiConfig.pagination || {}), stopCondition: val }
+                                                                    }
+                                                                }))}
+                                                                readOnly={disabled}
                             minHeight="50px"
-                            maxHeight="250px"
-                            resizable={true}
-                            isTransformEditor={false}
-                            autoFormatOnMount={true}
-                        />
-                    </div>
-                </div>
+                                                                maxHeight="250px"
+                                                                resizable={true}
+                                                                isTransformEditor={false}
+                                                                autoFormatOnMount={true}
+                                                            />
+                                                        </div>
+                                                    </div>
             </div>
-        )}
+                                            )}
     </div>
 </div>
                                     </div>
@@ -493,9 +493,9 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                     />
                                                 </div>
                                             </div>
-                                        </div>
                                     </div>
-                                </CardContent>
+                    </div>
+                </CardContent>
             </Card>
             {!isLast && (<div className="my-2 text-muted-foreground"><ArrowDown className="h-4 w-4" /></div>)}
         </div>

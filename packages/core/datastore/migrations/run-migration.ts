@@ -36,7 +36,7 @@ export function extractRun(data: any, row: LegacyRunRow): Run {
     ...data,
     id: row.id,
     orgId: row.org_id || data.orgId || '',
-    startedAt: row.started_at ? new Date(row.started_at) : new Date(data.startedAt),
+    startedAt: row.started_at ? new Date(row.started_at) : (data.startedAt ? new Date(data.startedAt) : new Date()),
     completedAt: row.completed_at ? new Date(row.completed_at) : (data.completedAt ? new Date(data.completedAt) : undefined)
   };
 }

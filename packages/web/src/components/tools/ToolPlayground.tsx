@@ -927,6 +927,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
         setCompletedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
         setFailedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
+        setAbortedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
         
         const hasKeysToDelete = stepsToReset.some(id => id in stepResultsMap) || '__final_transform__' in stepResultsMap;
         if (hasKeysToDelete) {

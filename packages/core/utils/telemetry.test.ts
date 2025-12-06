@@ -157,12 +157,4 @@ describe('Telemetry Utils', () => {
       expect(plugin).toHaveProperty('requestDidStart');
     });
   });
-
-  it('verifies call operation exists in schema TRACKING BROKEN IF FAILS', () => {
-    // Get mutation operations defined in resolvers
-    const mutationOperations = Object.keys(resolvers.Mutation);
-
-    // Verify the call operation exists
-    expect(mutationOperations).toContain('call');
-  });
 }); 

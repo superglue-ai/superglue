@@ -213,8 +213,12 @@ export function FixStepDialog({
                             disabled={isProcessing || !instruction.trim()}
                             variant="outline"
                         >
+                            {isAutoHealing ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
                                 <RefreshCw className="mr-2 h-4 w-4" />
-                                Fix Step & Execute
+                            )}
+                            {isAutoHealing ? 'Fixing...' : 'Fix Step & Execute'}
                         </Button>
                         )
                     )}

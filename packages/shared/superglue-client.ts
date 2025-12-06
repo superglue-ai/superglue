@@ -644,7 +644,15 @@ export class SuperglueClient {
         }
       `;
       const response = await this.request<{ getRun: Run }>(query, { id });
-      return response.getRun;
+      const run = response.getRun;
+      
+      if (run.stepResults) {
+        run.stepResults.forEach((stepResult: any) => {
+          stepResult.data = stepResult.transformedData;
+        });
+      }
+      
+      return run;
     }
     
     async listApis(limit: number = 10, offset: number = 0): Promise<{ items: ApiConfig[], total: number }> {
