@@ -113,8 +113,8 @@ function TemplateAwareJsonEditorInner({
         if (!editor || value === lastValueRef.current) return;
         isUpdatingRef.current = true;
         lastValueRef.current = value;
-        editor.commands.setContent(templateStringToTiptap(value));
-        isUpdatingRef.current = false;
+            editor.commands.setContent(templateStringToTiptap(value));
+            isUpdatingRef.current = false;
     }, [editor, value]);
 
     useEffect(() => { editor?.setEditable(!readOnly); }, [editor, readOnly]);
@@ -221,7 +221,7 @@ function TemplateAwareJsonEditorInner({
             </div>
             {showValidation && jsonError && (
                 <div className="absolute bottom-0 left-0 right-0 px-3 py-2 bg-destructive/10 text-destructive text-xs max-h-24 overflow-y-auto border-t z-10">
-                    Error: {Object.keys(credentials).length > 0 ? maskCredentials(jsonError, credentials) : jsonError}
+                        Error: {Object.keys(credentials).length > 0 ? maskCredentials(jsonError, credentials) : jsonError}
                 </div>
             )}
             <TemplateEditPopover

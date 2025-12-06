@@ -11,22 +11,22 @@ export class WorkerPool<Payload, Result> {
     private controllers = new Map<string, AbortController>();
     private pendingFlushes = new Map<string, () => void>();
     private messageHandlers: Record<string, WorkerMessageHandler>;
-    
+
     constructor(taskModuleJsPath: string, options: WorkerPoolOptions) {
         const { concurrency = 1, memoryMb = 4096, messageHandlers = {} } = options;
         this.messageHandlers = messageHandlers;
 
         this.pool = new Piscina({
-            filename: resolve(__dirname, "worker-host.js"), // path to the common worker entry file that handles task loading and execution
-            minThreads: concurrency + 1, // active workers + warm spare
-            maxThreads: concurrency + 1, // active workers + warm spare
-            concurrentTasksPerWorker: 1, // ensures spare stays unused unless needed
-            idleTimeout: 0, // we want long-lived workers that pre-load heavy dependencies
-            maxQueue: "auto", // this is a feature in piscina that rejects tasks immediately if job throughput decreases and queue grows too quickly
-            workerData: { taskModule: taskModuleJsPath }, // path to the JS task module that contains the actual task logic
-            resourceLimits: {
-                maxOldGenerationSizeMb: memoryMb, // max worker RAM budget, should depend on server resources (RAM and CPU cores)
-            }, 
+        filename: resolve(__dirname, "worker-host.js"), // path to the common worker entry file that handles task loading and execution
+        minThreads: concurrency + 1, // active workers + warm spare
+        maxThreads: concurrency + 1, // active workers + warm spare
+        concurrentTasksPerWorker: 1, // ensures spare stays unused unless needed
+        idleTimeout: 0, // we want long-lived workers that pre-load heavy dependencies
+        maxQueue: "auto", // this is a feature in piscina that rejects tasks immediately if job throughput decreases and queue grows too quickly
+        workerData: { taskModule: taskModuleJsPath }, // path to the JS task module that contains the actual task logic
+        resourceLimits: {
+            maxOldGenerationSizeMb: memoryMb, // max worker RAM budget, should depend on server resources (RAM and CPU cores)
+          }, 
         });
         
         this.pool.on('message', (msg) => {
@@ -99,3 +99,4 @@ export class WorkerPool<Payload, Result> {
         }
     }
 }
+  

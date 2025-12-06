@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, Integration, Run, Tool } from '@superglue/shared';
+import { ApiConfig, HttpMethod, Integration, Run, RunStatus, Tool } from '@superglue/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MemoryStore } from './memory.js';
 import { ToolScheduleInternal } from './types.js';
@@ -62,7 +62,7 @@ describe('MemoryStore', () => {
       id: 'test-run-id',
       toolId: 'test-api-id',
       orgId: testOrgId,
-      status: 'success',
+      status: RunStatus.SUCCESS,
       startedAt: new Date(),
       completedAt: new Date(),
       toolConfig: testApiConfig as any,
@@ -476,7 +476,7 @@ describe('MemoryStore', () => {
         id: 'test-run',
         toolId: 'test-api-id',
         orgId: testOrgId,
-        status: 'success',
+        status: RunStatus.SUCCESS,
         startedAt: new Date(),
         completedAt: new Date(),
         toolConfig: testApiConfig as any,
@@ -579,7 +579,7 @@ describe('MemoryStore', () => {
         id: 'run1',
         toolId: 'test-api-id',
         orgId: testOrgId,
-        status: 'success',
+        status: RunStatus.SUCCESS,
         startedAt: new Date(),
         completedAt: new Date(),
         toolConfig: testApiConfig as any,
@@ -589,7 +589,7 @@ describe('MemoryStore', () => {
         id: 'run2',
         toolId: 'test-api-id',
         orgId: testOrgId,
-        status: 'success',
+        status: RunStatus.SUCCESS,
         startedAt: new Date(),
         completedAt: new Date(),
         toolConfig: testApiConfig as any,
@@ -601,7 +601,7 @@ describe('MemoryStore', () => {
         id: 'run3',
         toolId: 'test-api-id',
         orgId: anotherOrgId,
-        status: 'success',
+        status: RunStatus.SUCCESS,
         startedAt: new Date(),
         completedAt: new Date(),
         toolConfig: testApiConfig as any,

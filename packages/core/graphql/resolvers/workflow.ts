@@ -146,15 +146,14 @@ export const executeWorkflowResolver = async (
       }))
     };
 
+    // NOTE: Not persisting toolResult/stepResults and payload to avoid PostgreSQL JSONB size limits (256MB)
+    // Large workflow results can exceed this, tbd
     await context.datastore.updateRun({
       id: runId,
       orgId: context.orgId,
       updates: {
         status: graphqlResult.success ? RunStatus.SUCCESS : RunStatus.FAILED,
         toolConfig: graphqlResult.config || workflow,
-        toolPayload: args.payload,
-        toolResult: graphqlResult.data,
-        stepResults: graphqlResult.stepResults,
         error: graphqlResult.error || undefined,
         completedAt: new Date()
       }

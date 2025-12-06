@@ -15,7 +15,7 @@ export function createDataStore(config: {
     return new PostgresService(postgresConfig);
   }
   if (config.type === 'memory') {
-    return new MemoryStore();
+  return new MemoryStore();
   }
   throw new Error(`Unsupported datastore type: ${config.type}. Use 'file', 'postgres', or 'memory'.`);
 }

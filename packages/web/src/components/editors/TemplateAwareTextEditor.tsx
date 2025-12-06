@@ -92,8 +92,8 @@ function TemplateAwareTextEditorInner({
         if (!editor || value === lastValueRef.current) return;
         isUpdatingRef.current = true;
         lastValueRef.current = value;
-        editor.commands.setContent(templateStringToTiptap(value));
-        isUpdatingRef.current = false;
+            editor.commands.setContent(templateStringToTiptap(value));
+            isUpdatingRef.current = false;
     }, [editor, value]);
 
     useEffect(() => { editor?.setEditable(!disabled); }, [editor, disabled]);
