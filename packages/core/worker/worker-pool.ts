@@ -50,12 +50,16 @@ export class WorkerPool<Payload, Result> {
     }
 
     async runTask(taskId: string, payload: Payload & { runId: string }): Promise<Result> {
+        if (taskId !== payload.runId) {
+            throw new Error(`taskId (${taskId}) must match payload.runId (${payload.runId})`);
+        }
+
         const controller = new AbortController();
         this.controllers.set(taskId, controller);
 
         try {
             const flushPromise = new Promise<void>((resolve) => {
-                this.pendingFlushes.set(payload.runId, resolve);
+                this.pendingFlushes.set(taskId, resolve);
             });
             
             const timeoutPromise = new Promise<void>((resolve) => {
@@ -67,7 +71,7 @@ export class WorkerPool<Payload, Result> {
             return result;
         } finally {
             this.controllers.delete(taskId);
-            this.pendingFlushes.delete(payload.runId);
+            this.pendingFlushes.delete(taskId);
         }
     }
 
