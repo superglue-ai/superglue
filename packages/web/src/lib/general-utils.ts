@@ -232,13 +232,9 @@ export const buildEvolvingPayload = (initialPayload: any, steps: any[], stepResu
     const step = steps[i];
     const result = stepResults[step.id];
     if (result !== undefined && result !== null) {
-      const dataToMerge = (typeof result === 'object' && 'data' in result && 'success' in result)
-        ? result.data
-        : result;
-
       evolvingPayload = {
         ...evolvingPayload,
-        [`${step.id}`]: dataToMerge
+        [`${step.id}`]: result
       };
     }
   }
@@ -253,10 +249,7 @@ export const buildPreviousStepResults = (steps: any[], stepResults: Record<strin
     const step = steps[i];
     const result = stepResults[step.id];
     if (result !== undefined && result !== null) {
-      const dataToMerge = (typeof result === 'object' && 'data' in result && 'success' in result)
-        ? result.data
-        : result;
-      results[step.id] = dataToMerge;
+      results[step.id] = result;
     }
   }
 

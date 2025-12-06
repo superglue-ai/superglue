@@ -1,3 +1,5 @@
+import { Integration } from "./types";
+
 export interface IntegrationConfig {
   name: string;
   apiUrl: string;
@@ -5,6 +7,7 @@ export interface IntegrationConfig {
   icon: string;
   docsUrl: string;
   openApiUrl?: string;
+  openApiSchema?: string;
   preferredAuthType?: 'oauth' | 'apikey' | 'none';
   oauth?: {
     authUrl?: string;
@@ -1673,7 +1676,7 @@ export function getOAuthConfig(integrationKey: string): IntegrationConfig['oauth
  * @param integration - The integration object with credentials and URL info
  * @returns The token URL for OAuth token exchange
  */
-export function getOAuthTokenUrl(integration: { id: string; urlHost: string; credentials?: any }): string {
+export function getOAuthTokenUrl(integration: Integration): string {
   // First priority: User-provided token URL in credentials
   if (integration.credentials?.token_url) {
     return integration.credentials.token_url;
@@ -1681,7 +1684,7 @@ export function getOAuthTokenUrl(integration: { id: string; urlHost: string; cre
 
   // Second priority: Known integration template token URL
   const knownIntegration = Object.entries(integrations).find(([key]) =>
-    integration.id === key || integration.urlHost.includes(key)
+    integration.id === key || integration.urlHost?.includes(key)
   );
 
   if (knownIntegration) {
@@ -1692,6 +1695,9 @@ export function getOAuthTokenUrl(integration: { id: string; urlHost: string; cre
   }
 
   // Fallback: Default OAuth token endpoint
+  if (!integration.urlHost) {
+    throw new Error(`Cannot determine OAuth token URL for integration ${integration.id}: no urlHost or token_url provided`);
+  }
   return `${integration.urlHost}/oauth/token`;
 } 
 

@@ -4,11 +4,10 @@
  * Generates database schema documentation for PostgreSQL connections.
  */
 
-import { ApiConfig } from "@superglue/shared";
-import { ServiceMetadata } from "@superglue/shared";
+import { ApiConfig, ServiceMetadata } from "@superglue/shared";
 import { callPostgres } from '../../tools/strategies/postgres/postgres.js';
-import { logMessage } from "../../utils/logs.js";
 import { composeUrl } from "../../utils/helpers.js";
+import { logMessage } from "../../utils/logs.js";
 import { DocumentationProcessingStrategy } from '../types.js';
 
 export class PostgreSqlStrategy implements DocumentationProcessingStrategy {
@@ -28,10 +27,10 @@ WHERE table_schema = 'public'
 ORDER BY table_name, ordinal_position;`
       };
 
-      const schemaResponse = await callPostgres({endpoint: { ...config, body: JSON.stringify(schemaQuery) }, payload: {}, credentials, options: null});
+      const schemaResponse = await callPostgres({endpoint: { ...config, body: JSON.stringify(schemaQuery) }, payload: {}, credentials, options: null, metadata: metadata});
       logMessage('info', `PostgreSQL Documentation Fetch: Schema retrieved ${schemaResponse.length} rows`, metadata);
       if (!schemaResponse) return null;
       return `${content ? `<DOCUMENTATION>\n${content}\n</DOCUMENTATION>\n` : ""}<DB_SCHEMA>\n${JSON.stringify(schemaResponse, null, 2)}\n</DB_SCHEMA>`;
     }
   }
-}
+} 

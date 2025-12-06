@@ -1,5 +1,4 @@
-import { Integration, RequestOptions, RunStatus, SelfHealingMode, Tool, ToolResult, ToolStepResult } from "@superglue/shared";
-import { generateUniqueId, waitForIntegrationProcessing } from "@superglue/shared";
+import { generateUniqueId, waitForIntegrationProcessing, Integration, RequestOptions, RunStatus, SelfHealingMode, Tool, ToolResult, ToolStepResult } from "@superglue/shared";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { parseJSON } from "../../files/index.js";
@@ -367,6 +366,10 @@ export const buildWorkflowResolver = async (
     let resolvedIntegrations: Integration[] = [];
     if (integrationIds && integrationIds.length > 0) {
       const datastoreAdapter = {
+        getIntegration: async (id: string): Promise<Integration | null> => {
+          const result = await context.datastore.getIntegration({ id, includeDocs: true, orgId: context.orgId });
+          return result || null;
+        },
         getManyIntegrations: async (ids: string[]): Promise<Integration[]> => {
           return await context.datastore.getManyIntegrations({ ids, includeDocs: true, orgId: context.orgId });
         }

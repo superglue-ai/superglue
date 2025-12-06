@@ -1,5 +1,5 @@
-import { JSONSchema, RequestOptions } from "@superglue/shared";
 import type { ServiceMetadata } from "@superglue/shared";
+import { JSONSchema, RequestOptions } from "@superglue/shared";
 import prettier from "prettier";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -118,7 +118,7 @@ export async function generateWorkingTransform({
     logMessage('info', "Generating Transform Code" + (retry > 0 ? ` (retry ${retry})` : ''), metadata);
 
     if (!messages || messages?.length === 0) {
-      const userPrompt = getTransformContext({ instruction, targetSchema: targetSchema, sourceData: inputData }, { characterBudget: 20000 });
+      const userPrompt = getTransformContext({ instruction, targetSchema: targetSchema, sourceData: inputData }, { characterBudget: 50000 });
       messages = [
         { role: "system", content: GENERATE_TRANSFORM_SYSTEM_PROMPT },
         { role: "user", content: userPrompt }

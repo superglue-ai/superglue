@@ -225,6 +225,7 @@ export interface ExecutionStep {
   loopMaxIters?: number;
   inputMapping?: JSONata;
   responseMapping?: JSONata;
+  failureBehavior?: 'FAIL' | 'CONTINUE';
 }
 
 export interface Tool extends BaseConfig {
@@ -373,6 +374,15 @@ export interface ToolArgs {
   runId?: string;
 }
 
+export interface GenerateTransformArgs {
+  currentTransform?: string;
+  responseSchema?: JSONSchema;
+  stepData: Record<string, any>;
+  errorMessage?: string;
+  instruction?: string;  
+}
+
+
 // Legacy alias  
 export type WorkflowArgs = ToolArgs;
 
@@ -425,6 +435,9 @@ export type ToolSchedule = {
   createdAt: Date;
   updatedAt: Date;
 }
+
+
+
 
 // Legacy aliases
 export type WorkflowScheduleInput = ToolScheduleInput;

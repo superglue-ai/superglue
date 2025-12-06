@@ -1,15 +1,14 @@
-import { Integration } from '@superglue/shared';
-import { findMatchingIntegration, integrations } from "@superglue/shared";
+import { findMatchingIntegration, Integration, integrations } from '@superglue/shared';
 import { generateUniqueId } from '@superglue/shared/utils';
 import { GraphQLResolveInfo } from "graphql";
 import { PostgresService } from '../../datastore/postgres.js';
 import { server_defaults } from '../../default.js';
 import { DocumentationFetcher } from '../../documentation/documentation-fetching.js';
-import { IntegrationFinder } from '../../integrations/integration-finder.js';
-import { logMessage } from '../../utils/logs.js';
-import { composeUrl } from '../../utils/helpers.js';
 import { DocumentationSearch } from '../../documentation/documentation-search.js';
-import { GraphQLRequestContext, ServiceMetadata } from '../types.js';
+import { IntegrationFinder } from '../../integrations/integration-finder.js';
+import { composeUrl } from '../../utils/helpers.js';
+import { logMessage } from '../../utils/logs.js';
+import { GraphQLRequestContext } from '../types.js';
 
 export const listIntegrationsResolver = async (
   _: any,
@@ -197,7 +196,6 @@ export const getOAuthClientCredentialsResolver = async (
     if (!entry) {
       logMessage('debug', 'getOAuthClientCredentials: cache miss/expired', {
         orgId: context.orgId,
-        clientCredentialsUid,
       });
       throw new Error('Cached OAuth client credentials not found or expired');
     }

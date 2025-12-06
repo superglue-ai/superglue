@@ -1,25 +1,16 @@
-import { ApiConfig, Integration } from "@superglue/shared";
+import { ApiConfig, GenerateStepConfigArgs, GenerateTransformArgs, Integration } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
+import { getGenerateStepConfigContext } from "../../context/context-builders.js";
+import { GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../../context/context-prompts.js";
+import { IntegrationManager } from "../../integrations/integration-manager.js";
+import { LLMMessage } from "../../llm/llm-base-model.js";
 import { executeLLMTool, LLMToolCall } from "../../llm/llm-tool-utils.js";
 import { InstructionGenerationContext } from "../../llm/llm-tools.js";
-import { generateWorkingTransform } from "../../tools/tool-transform.js";
-import { telemetryClient } from "../../utils/telemetry.js";
-import { GraphQLRequestContext, ServiceMetadata } from '../types.js';
-import { IntegrationManager } from "../../integrations/integration-manager.js";
-import { getGenerateStepConfigContext } from "../../context/context-builders.js";
-import { LLMMessage } from "../../llm/llm-base-model.js";
-import { GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../../context/context-prompts.js";
-import { logMessage } from "../../utils/logs.js";
 import { generateStepConfig } from "../../tools/tool-step-builder.js";
-
-interface GenerateStepConfigArgs {
-  integrationId?: string;
-  currentStepConfig?: Partial<ApiConfig>;
-  currentDataSelector?: string;
-  stepInput?: Record<string, any>;
-  credentials?: Record<string, string>;
-  errorMessage?: string;
-}
+import { generateWorkingTransform } from "../../tools/tool-transform.js";
+import { logMessage } from "../../utils/logs.js";
+import { telemetryClient } from "../../utils/telemetry.js";
+import { GraphQLRequestContext } from '../types.js';
 
 export const generateInstructionsResolver = async (
   _: any,
@@ -160,14 +151,6 @@ export const generateStepConfigResolver = async (
     throw error;
   }
 };
-
-interface GenerateTransformArgs {
-  currentTransform: string;
-  responseSchema?: any;
-  stepData: Record<string, any>;
-  errorMessage?: string;
-  instruction?: string;
-}
 
 export const generateTransformResolver = async (
   _: any,

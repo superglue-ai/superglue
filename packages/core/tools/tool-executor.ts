@@ -1,5 +1,4 @@
-import { ApiConfig, ExecutionStep, Integration, RequestOptions, Tool, ToolResult, ToolStepResult } from "@superglue/shared";
-import { maskCredentials, ServiceMetadata } from "@superglue/shared";
+import { ApiConfig, ExecutionStep, Integration, maskCredentials, RequestOptions, ServiceMetadata, Tool, ToolResult, ToolStepResult } from "@superglue/shared";
 import { flattenAndNamespaceCredentials } from "@superglue/shared/utils";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { z } from "zod";
@@ -12,12 +11,12 @@ import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { isSelfHealingEnabled, transformData } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
-import { executeAndEvaluateFinalTransform, generateWorkingTransform } from "./tool-transform.js";
-import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
-import { generateStepConfig } from "./tool-step-builder.js";
-import { StepExecutionStrategyRegistry } from "./strategies/strategy.js";
-import { PostgresStepExecutionStrategy } from "./strategies/postgres/postgres.js";
 import { FTPStepExecutionStrategy } from "./strategies/ftp/ftp.js";
+import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
+import { PostgresStepExecutionStrategy } from "./strategies/postgres/postgres.js";
+import { StepExecutionStrategyRegistry } from "./strategies/strategy.js";
+import { generateStepConfig } from "./tool-step-builder.js";
+import { executeAndEvaluateFinalTransform } from "./tool-transform.js";
 
 export interface ToolExecutorOptions {
   tool: Tool;
@@ -83,7 +82,7 @@ export class ToolExecutor implements Tool {
         step.apiConfig = stepResult.updatedStep.apiConfig;
         step.loopSelector = stepResult.updatedStep.loopSelector;
 
-        if (!stepResult.result.success) {
+        if (!stepResult.result.success && step.failureBehavior !== 'CONTINUE') {
           return this.completeWithFailure(stepResult.result.error || 'Step execution failed');
         }
       }
@@ -154,11 +153,11 @@ export class ToolExecutor implements Tool {
       let isLoopStep = false;
       let stepResults: any[] = [];
       
-      const integrationManager = this.integrations[step.integrationId];
+      const integrationManager = step.integrationId ? this.integrations[step.integrationId] : undefined;
       let currentIntegration: Integration | null = null;
       let loopPayload: any = null;
       
-      if (!integrationManager) {
+      if (step.integrationId && !integrationManager) {
         throw new Error(`Integration '${step.integrationId}' not found. Available integrations: ${Object.keys(this.integrations).join(', ')}`);
       }
 
@@ -212,35 +211,50 @@ export class ToolExecutor implements Tool {
               } as Record<string, string>;
             }
             
+            try {
+              const itemExecutionResult = await this.strategyRegistry.routeAndExecute({
+                stepConfig: currentConfig,
+                stepInputData: loopPayload,
+                credentials: stepCredentials,
+                requestOptions: { ...options, testMode: false },
+                metadata: this.metadata
+              });
 
-            const itemExecutionResult = await this.strategyRegistry.routeAndExecute({
-              stepConfig: currentConfig,
-              stepInputData: loopPayload,
-              credentials: stepCredentials,
-              requestOptions: { ...options, testMode: false }
-            });
+              if (!itemExecutionResult.success || itemExecutionResult.strategyExecutionData === undefined) {
+                throw new Error(itemExecutionResult.error || `No data returned from iteration: ${i + 1} in step: ${step.id}`);
+              }
 
-            if (!itemExecutionResult.success || itemExecutionResult.strategyExecutionData === undefined) {
-              throw new Error(itemExecutionResult.error || `No data returned from iteration: ${i + 1} in step: ${step.id}`);
+              const stepResponseData = { 
+                currentItem, 
+                data: itemExecutionResult.strategyExecutionData,
+                success: true
+              };
+              
+              stepResults.push(stepResponseData);
+            } catch (error) {
+              if (step.failureBehavior === 'CONTINUE') {
+                const errorMessage = maskCredentials(error?.message || String(error), stepCredentials);
+                logMessage('warn', `Iteration ${i + 1} failed but continuing due to failureBehavior=CONTINUE: ${errorMessage}`, this.metadata);
+                
+                const stepResponseData = {
+                  currentItem,
+                  data: null,
+                  success: false,
+                  error: errorMessage
+                };
+                
+                stepResults.push(stepResponseData);
+              } else {
+                throw error;
+              }
             }
-
-            const stepResponseData = { 
-              currentItem, 
-              data: itemExecutionResult.strategyExecutionData 
-            };
-            
-            stepResults.push({
-              stepId: step.id,
-              success: true,
-              stepResponseData,
-            });
           }
           // llm as a judge validation on the output data, this function throws an error if the data does not align with the instruction
           if (options.testMode || isSelfHealing) {
             await this.validateStepResponse(
               isLoopStep 
-                ? stepResults.map(r => r.stepResponseData)
-                : stepResults[0]?.stepResponseData || null,
+                ? stepResults
+                : stepResults[0] || null,
               currentConfig,
               integrationManager
             );
@@ -297,20 +311,24 @@ export class ToolExecutor implements Tool {
 
       logMessage("info", `Step '${step.id}' Complete`, this.metadata);
       
-      const toolStepResult = {
+      const stepSuccess = step.failureBehavior === 'CONTINUE' 
+        ? true
+        : stepResults.some(r => r.success);
+      
+      const toolStepResult: ToolStepResult = {
         stepId: step.id,
-        success: true,
+        success: stepSuccess,
         data: isLoopStep 
-          ? stepResults.map(r => r.stepResponseData)
-          : stepResults[0]?.stepResponseData || null,
-        error: undefined
-      } as ToolStepResult;
+          ? stepResults
+          : stepResults[0] || null,
+        error: this.getStepErrorMessage(stepSuccess, stepResults, isLoopStep)
+      };
 
-      const updatedStep = {
+      const updatedStep: ExecutionStep = {
         ...step,
         apiConfig: currentConfig,
         loopSelector: currentDataSelector
-      } as ExecutionStep;
+      };
 
       return {
         result: toolStepResult,
@@ -429,6 +447,24 @@ export class ToolExecutor implements Tool {
       ...originalPayload,
       ...stepResults,
     };
+  }
+
+  private getStepErrorMessage(stepSuccess: boolean, stepResults: any[], isLoopStep: boolean): string | undefined {
+    if (stepSuccess) {
+      return undefined;
+    }
+
+    const failedCount = stepResults.filter(r => !r.success).length;
+    const totalCount = stepResults.length;
+    const failedIndices = stepResults
+      .map((r, idx) => (!r.success ? idx + 1 : null))
+      .filter(idx => idx !== null);
+    
+    if (isLoopStep) {
+      return `${failedCount}/${totalCount} iteration(s) failed (iterations: ${failedIndices.join(', ')})`;
+    }
+    
+    return stepResults[0]?.error || 'Step execution failed';
   }
 
   private completeWithSuccess(): ToolResult {

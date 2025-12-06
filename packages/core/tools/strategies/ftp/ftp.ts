@@ -1,5 +1,4 @@
-import { ApiConfig as StepConfig, HttpMethod, RequestOptions } from "@superglue/shared";
-import { SupportedFileType } from "@superglue/shared";
+import { HttpMethod, RequestOptions, ServiceMetadata, ApiConfig as StepConfig, SupportedFileType } from "@superglue/shared";
 import { Client as FTPClient } from "basic-ftp";
 import * as path from "path";
 import SFTPClient from "ssh2-sftp-client";
@@ -7,7 +6,8 @@ import { URL } from "url";
 import { server_defaults } from "../../../default.js";
 import { parseFile, parseJSON } from "../../../files/index.js";
 import { composeUrl, replaceVariables } from "../../../utils/helpers.js";
-import { StepExecutionInput, StepStrategyExecutionResult, StepExecutionStrategy } from "../strategy.js";
+import { logMessage } from "../../../utils/logs.js";
+import { StepExecutionInput, StepExecutionStrategy, StepStrategyExecutionResult } from "../strategy.js";
 
 export class FTPStepExecutionStrategy implements StepExecutionStrategy {
   readonly version = '1.0.0';
@@ -17,8 +17,8 @@ export class FTPStepExecutionStrategy implements StepExecutionStrategy {
   }
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
-    const { stepConfig, stepInputData, credentials, requestOptions } = input;
-    const ftpResult = await callFTP({ endpoint: stepConfig, stepInputData, credentials, options: requestOptions }); 
+    const { stepConfig, stepInputData, credentials, requestOptions, metadata } = input;
+    const ftpResult = await callFTP({ endpoint: stepConfig, stepInputData, credentials, options: requestOptions, metadata }); 
     return {
       success: true,
       strategyExecutionData: ftpResult,
@@ -342,7 +342,7 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
   }
 }
 
-export async function callFTP({ endpoint, stepInputData, credentials, options }: { endpoint: StepConfig, stepInputData?: Record<string, any>, credentials: Record<string, any>, options: RequestOptions }): Promise<any> {
+export async function callFTP({ endpoint, stepInputData, credentials, options, metadata }: { endpoint: StepConfig, stepInputData?: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata: ServiceMetadata }): Promise<any> {
   const allVars = { ...stepInputData, ...credentials };
   
   const resolvedUrlHost = await replaceVariables(endpoint.urlHost, allVars);
@@ -398,6 +398,7 @@ export async function callFTP({ endpoint, stepInputData, credentials, options }:
           });
 
           for(const operation of operations) {
+            logMessage("debug", `Executing SFTP operation: ${operation.operation}`, metadata);
             const result = await executeSFTPOperation(sftp, operation);
             results.push(result);
           }
@@ -427,6 +428,7 @@ export async function callFTP({ endpoint, stepInputData, credentials, options }:
           }
 
           for(const operation of operations) {
+            logMessage("debug", `Executing FTP operation: ${operation.operation}`, metadata);
             const result = await executeFTPOperation(ftp, operation);
             results.push(result);
           }

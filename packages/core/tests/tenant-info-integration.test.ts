@@ -1,5 +1,5 @@
-import type { DataStore } from "@superglue/shared";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { DataStore } from "../datastore/types.js";
 import { DataStoreFactory, EnvVarManager, MockServerFactory } from "./test-utils.js";
 import { FileStore } from "../datastore/filestore.js";
 
@@ -13,7 +13,14 @@ describe("Tenant Info Basic Tests", () => {
     describe(`${name} Tenant Info Tests`, () => {
       // Reset before each test to ensure clean state
       beforeEach(async () => {
-        await instance.setTenantInfo(null, false);
+        // Clear tenant info by recreating it with defaults
+        if (name === "MemoryStore") {
+          (instance as any).tenant = { email: null, emailEntrySkipped: false };
+        } else if (name === "FileStore") {
+          await (instance as any).ensureInitialized();
+          (instance as any).storage.tenant = { email: null, emailEntrySkipped: false };
+          await (instance as any).persist();
+        }
       });
 
       it("should return default tenant info when not set", async () => {
@@ -26,7 +33,7 @@ describe("Tenant Info Basic Tests", () => {
 
       it("should properly set email address", async () => {
         const testEmail = "test@example.com";
-        await instance.setTenantInfo(testEmail, undefined);
+        await instance.setTenantInfo({ email: testEmail, emailEntrySkipped: false });
 
         const tenantInfo = await instance.getTenantInfo();
         expect(tenantInfo).toEqual({
@@ -36,7 +43,7 @@ describe("Tenant Info Basic Tests", () => {
       });
 
       it("should properly set emailEntrySkipped to true", async () => {
-        await instance.setTenantInfo(undefined, true);
+        await instance.setTenantInfo({ emailEntrySkipped: true });
 
         const tenantInfo = await instance.getTenantInfo();
         expect(tenantInfo).toEqual({
@@ -47,12 +54,12 @@ describe("Tenant Info Basic Tests", () => {
 
       it("should properly set emailEntrySkipped to false", async () => {
         // First set it to true
-        await instance.setTenantInfo(undefined, true);
+        await instance.setTenantInfo({ emailEntrySkipped: true });
         let tenantInfo = await instance.getTenantInfo();
         expect(tenantInfo.emailEntrySkipped).toBe(true);
 
         // Then explicitly set to false
-        await instance.setTenantInfo(undefined, false);
+        await instance.setTenantInfo({ emailEntrySkipped: false });
         tenantInfo = await instance.getTenantInfo();
         expect(tenantInfo).toEqual({
           email: null,
@@ -62,7 +69,7 @@ describe("Tenant Info Basic Tests", () => {
 
       it("should handle both email and emailEntrySkipped being set simultaneously", async () => {
         const testEmail = "both@example.com";
-        await instance.setTenantInfo(testEmail, true);
+        await instance.setTenantInfo({ email: testEmail, emailEntrySkipped: true });
 
         const tenantInfo = await instance.getTenantInfo();
         expect(tenantInfo).toEqual({
@@ -74,11 +81,11 @@ describe("Tenant Info Basic Tests", () => {
       it("should preserve values that aren't explicitly set", async () => {
         // Set initial values
         const initialEmail = "preserve@example.com";
-        await instance.setTenantInfo(initialEmail, true);
+        await instance.setTenantInfo({ email: initialEmail, emailEntrySkipped: true });
 
         // Update only the email
         const updatedEmail = "updated@example.com";
-        await instance.setTenantInfo(updatedEmail, undefined);
+        await instance.setTenantInfo({ email: updatedEmail });
 
         let tenantInfo = await instance.getTenantInfo();
         expect(tenantInfo).toEqual({
@@ -87,7 +94,7 @@ describe("Tenant Info Basic Tests", () => {
         });
 
         // Update only emailEntrySkipped
-        await instance.setTenantInfo(undefined, false);
+        await instance.setTenantInfo({ emailEntrySkipped: false });
 
         tenantInfo = await instance.getTenantInfo();
         expect(tenantInfo).toEqual({
@@ -103,12 +110,12 @@ describe("Tenant Info Basic Tests", () => {
 
     beforeEach(async () => {
       datastore = DataStoreFactory.createMemoryStore();
-      await datastore.setTenantInfo(null, false);
+      await datastore.setTenantInfo({ emailEntrySkipped: false });
     });
 
     it("mocked getTenantInfoResolver should return tenant info from datastore", async () => {
       const testEmail = "resolver@example.com";
-      await datastore.setTenantInfo(testEmail, true);
+      await datastore.setTenantInfo({ email: testEmail, emailEntrySkipped: true });
 
       // Create a mock resolver that mimics the actual getTenantInfoResolver
       const mockGetTenantInfoResolver = async (_: any, __: any, { datastore }: { datastore: DataStore }) => {
@@ -129,7 +136,7 @@ describe("Tenant Info Basic Tests", () => {
         { email, emailEntrySkipped }: { email?: string; emailEntrySkipped?: boolean },
         { datastore }: { datastore: DataStore },
       ) => {
-        await datastore.setTenantInfo(email, emailEntrySkipped);
+        await datastore.setTenantInfo({ email, emailEntrySkipped });
         return await datastore.getTenantInfo();
       };
 
@@ -145,7 +152,7 @@ describe("Tenant Info Basic Tests", () => {
 
     it("mocked setTenantInfoResolver should preserve unset values", async () => {
       const initialEmail = "initial@example.com";
-      await datastore.setTenantInfo(initialEmail, false);
+      await datastore.setTenantInfo({ email: initialEmail, emailEntrySkipped: false });
 
       // Create a mock resolver that mimics the actual setTenantInfoResolver
       const mockSetTenantInfoResolver = async (
@@ -153,7 +160,7 @@ describe("Tenant Info Basic Tests", () => {
         { email, emailEntrySkipped }: { email?: string; emailEntrySkipped?: boolean },
         { datastore }: { datastore: DataStore },
       ) => {
-        await datastore.setTenantInfo(email, emailEntrySkipped);
+        await datastore.setTenantInfo({ email, emailEntrySkipped });
         return await datastore.getTenantInfo();
       };
 
@@ -196,7 +203,7 @@ describe("Tenant Info Basic Tests", () => {
             emailEntrySkipped: true,
           };
         }
-        await datastore.setTenantInfo(email, emailEntrySkipped);
+        await datastore.setTenantInfo({ email, emailEntrySkipped });
         return await datastore.getTenantInfo();
       };
 
@@ -246,7 +253,7 @@ describe("Tenant Info Basic Tests", () => {
 
         // Handle setTenantInfo mutation
         if (query.includes("setTenantInfo")) {
-          await datastore.setTenantInfo(variables?.email, variables?.emailEntrySkipped);
+          await datastore.setTenantInfo({ email: variables?.email, emailEntrySkipped: variables?.emailEntrySkipped });
           const updatedInfo = await datastore.getTenantInfo();
           return res.json({
             data: {
@@ -338,7 +345,7 @@ describe("Tenant Info Basic Tests", () => {
 
     it("should correctly handle middleware tenant info check", async () => {
       // First set some tenant info
-      await datastore.setTenantInfo("middleware@example.com", true);
+      await datastore.setTenantInfo({ email: "middleware@example.com", emailEntrySkipped: true });
 
       // Simulate the middleware check
       const response = await fetch(`${mockServer.getBaseUrl()}/graphql`, {
