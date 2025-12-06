@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { DataStore } from "../datastore/types.js";
 import { DataStoreFactory, EnvVarManager, MockServerFactory } from "./test-utils.js";
+import { FileStore } from "../datastore/filestore.js";
 
 describe("Tenant Info Basic Tests", () => {
   // Create data store factory

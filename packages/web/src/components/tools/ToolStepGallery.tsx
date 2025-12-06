@@ -37,6 +37,7 @@ export interface ToolStepGalleryProps {
     onOpenFixTransformDialog?: () => void;
     completedSteps?: string[];
     failedSteps?: string[];
+    abortedSteps?: string[];
     integrations?: Integration[];
     isExecuting?: boolean;
     isExecutingStep?: number;
@@ -61,6 +62,8 @@ export interface ToolStepGalleryProps {
     isPayloadValid?: boolean;
     onPayloadUserEdit?: () => void;
     embedded?: boolean;
+    onAbort?: () => void;
+    sourceDataVersion?: number;
 }
 
 export function ToolStepGallery({
@@ -86,6 +89,7 @@ export function ToolStepGallery({
     onOpenFixTransformDialog,
     completedSteps = [],
     failedSteps = [],
+    abortedSteps = [],
     integrations,
     isExecuting,
     isExecutingStep,
@@ -109,7 +113,9 @@ export function ToolStepGallery({
     filePayloads,
     isPayloadValid = true,
     onPayloadUserEdit,
-    embedded = false
+    embedded = false,
+    onAbort,
+    sourceDataVersion
 }: ToolStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
     const [windowWidth, setWindowWidth] = useState(1200);
@@ -613,6 +619,7 @@ export function ToolStepGallery({
                                                                     }
                                                                     completedSteps={completedSteps}
                                                                     failedSteps={failedSteps}
+                                                                    abortedSteps={abortedSteps}
                                                                     isFirstCard={globalIdx === 0}
                                                                     isLastCard={globalIdx === totalCards - 1}
                                                                     integrations={integrations}
@@ -722,6 +729,7 @@ export function ToolStepGallery({
                                     readOnly={readOnly}
                                     onExecuteTransform={onExecuteTransform}
                                     onOpenFixTransformDialog={onOpenFixTransformDialog}
+                                    onAbort={(isRunningTransform || isFixingTransform) ? onAbort : undefined}
                                     isRunningTransform={isRunningTransform}
                                     isFixingTransform={isFixingTransform}
                                     canExecute={canExecuteTransform}
@@ -742,6 +750,7 @@ export function ToolStepGallery({
                                     onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
                                     onExecuteStepWithLimit={onExecuteStepWithLimit ? (limit) => onExecuteStepWithLimit(activeIndex - 1, limit) : undefined}
                                     onOpenFixStepDialog={onOpenFixStepDialog ? () => onOpenFixStepDialog(activeIndex - 1) : undefined}
+                                    onAbort={isExecutingStep === activeIndex - 1 ? onAbort : undefined}
                                     canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
                                     isExecuting={isExecutingStep === activeIndex - 1}
                                     isGlobalExecuting={!!(isExecuting || isRunningTransform || isFixingTransform)}
@@ -749,11 +758,13 @@ export function ToolStepGallery({
                                     integrations={integrations}
                                     readOnly={readOnly}
                                     failedSteps={failedSteps}
+                                    abortedSteps={abortedSteps}
                                     showOutputSignal={showStepOutputSignal}
                                     onConfigEditingChange={setIsConfiguratorEditing}
                                     onLoopInfoChange={setActiveStepLoopCount}
                                     isFirstStep={activeIndex === 1}
                                     isPayloadValid={isPayloadValid}
+                                    sourceDataVersion={sourceDataVersion}
                                 />
                             )
                         )}

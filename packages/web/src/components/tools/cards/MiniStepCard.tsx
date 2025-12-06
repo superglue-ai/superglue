@@ -10,12 +10,18 @@ const ACTIVE_CARD_INLINE_STYLE = {
     boxShadow: '0 10px 15px -3px rgba(255, 165, 0, 0.1), 0 4px 6px -4px rgba(255, 165, 0, 0.1), 0 0 0 1px #FFA500'
 };
 
-const getStatusInfo = (isRunning: boolean, isFailed: boolean, isCompleted: boolean) => {
+const getStatusInfo = (isRunning: boolean, isFailed: boolean, isCompleted: boolean, isAborted: boolean) => {
     if (isRunning) return {
         text: "Running",
         color: "text-amber-600 dark:text-amber-400",
         dotColor: "bg-amber-600 dark:bg-amber-400",
         animate: true
+    };
+    if (isAborted) return {
+        text: "Pending",
+        color: "text-gray-500 dark:text-gray-400",
+        dotColor: "bg-gray-500 dark:bg-gray-400",
+        animate: false
     };
     if (isFailed) return {
         text: "Failed",
@@ -37,7 +43,7 @@ const getStatusInfo = (isRunning: boolean, isFailed: boolean, isCompleted: boole
     };
 };
 
-export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId, isPayload = false, isTransform = false, isRunningAll = false, isTesting = false, completedSteps = [], failedSteps = [], isFirstCard = false, isLastCard = false, integrations = [], hasTransformCompleted = false, isPayloadValid = true, payloadData, isLoopStep = false }: { step: any; index: number; isActive: boolean; onClick: () => void; stepId?: string | null; isPayload?: boolean; isTransform?: boolean; isRunningAll?: boolean; isTesting?: boolean; completedSteps?: string[]; failedSteps?: string[]; isFirstCard?: boolean; isLastCard?: boolean; integrations?: Integration[]; hasTransformCompleted?: boolean; isPayloadValid?: boolean; payloadData?: any; isLoopStep?: boolean; }) => {
+export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId, isPayload = false, isTransform = false, isRunningAll = false, isTesting = false, completedSteps = [], failedSteps = [], abortedSteps = [], isFirstCard = false, isLastCard = false, integrations = [], hasTransformCompleted = false, isPayloadValid = true, payloadData, isLoopStep = false }: { step: any; index: number; isActive: boolean; onClick: () => void; stepId?: string | null; isPayload?: boolean; isTransform?: boolean; isRunningAll?: boolean; isTesting?: boolean; completedSteps?: string[]; failedSteps?: string[]; abortedSteps?: string[]; isFirstCard?: boolean; isLastCard?: boolean; integrations?: Integration[]; hasTransformCompleted?: boolean; isPayloadValid?: boolean; payloadData?: any; isLoopStep?: boolean; }) => {
     if (isPayload) {
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
@@ -95,8 +101,9 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
     if (isTransform) {
         const isCompleted = completedSteps.includes('__final_transform__');
         const isFailed = failedSteps.includes('__final_transform__');
+        const isAborted = abortedSteps.includes('__final_transform__');
         const isRunning = isTesting || isRunningAll;
-        const statusInfo = getStatusInfo(isRunning, isFailed, isCompleted);
+        const statusInfo = getStatusInfo(isRunning, isFailed, isCompleted, isAborted);
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
                 <Card 
@@ -133,8 +140,9 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
     }
     const isCompleted = stepId ? completedSteps.includes(stepId) : false;
     const isFailed = stepId ? failedSteps.includes(stepId) : false;
+    const isAborted = stepId ? abortedSteps.includes(stepId) : false;
     const isRunning = isTesting || (isRunningAll && !!stepId);
-    const statusInfo = getStatusInfo(isRunning, isFailed, isCompleted);
+    const statusInfo = getStatusInfo(isRunning, isFailed, isCompleted, isAborted);
 
     const linkedIntegration = step.integrationId && integrations
         ? integrations.find(integration => integration.id === step.integrationId)

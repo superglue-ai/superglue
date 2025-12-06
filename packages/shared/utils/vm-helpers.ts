@@ -1,8 +1,12 @@
 export function executeWithVMHelpers(code: string, sourceData: any): any {
+  const trimmedCode = code.replace(/;\s*$/, '');
+  
   const wrappedCode = `
     ${VM_HELPERS_CODE}
     
-    const fn = ${code};
+    const fn = (
+      ${trimmedCode}
+    );
     return fn(sourceData);
   `;
   

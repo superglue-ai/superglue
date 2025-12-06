@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, Integration, RunResult, Tool } from '@superglue/shared';
+import { ApiConfig, HttpMethod, Integration, Run, RunStatus, Tool } from '@superglue/shared';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PostgresService } from './postgres.js';
 import { ToolScheduleInternal } from './types.js';
@@ -105,59 +105,60 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
                 instruction: 'Test API',
             };
 
-            const testRun: RunResult = {
+            const testRun: Run = {
                 id: 'test-run-id',
+                toolId: 'test-api-id',
+                orgId: testOrgId,
+                status: RunStatus.SUCCESS,
+                toolConfig: { id: 'test-api-id', steps: [{ id: 'step1', apiConfig: testApiConfig }] },
                 startedAt: new Date(),
                 completedAt: new Date(),
-                success: true,
-                config: testApiConfig,
-                error: null,
             };
 
             it('should store and retrieve runs', async () => {
-                await store.createRun({ result: testRun, orgId: testOrgId });
+                await store.createRun({ run: testRun });
                 const retrieved = await store.getRun({ id: testRun.id, orgId: testOrgId });
                 expect(retrieved?.id).toEqual(testRun.id);
-                expect(retrieved?.success).toEqual(testRun.success);
+                expect(retrieved?.status).toEqual(testRun.status);
             });
 
             it('should list runs in chronological order', async () => {
-                const run1: RunResult = {
+                const run1: Run = {
                     ...testRun,
                     id: 'run1',
                     startedAt: new Date(Date.now() - 1000),
                 };
-                const run2: RunResult = {
+                const run2: Run = {
                     ...testRun,
                     id: 'run2',
                     startedAt: new Date(),
                 };
 
-                await store.createRun({ result: run1, orgId: testOrgId });
-                await store.createRun({ result: run2, orgId: testOrgId });
+                await store.createRun({ run: run1 });
+                await store.createRun({ run: run2 });
 
                 const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
                 expect(items).toHaveLength(2);
                 expect(total).toBe(2);
-                expect(items[0].id).toBe(run2.id); // Most recent first
+                expect(items[0].id).toBe(run2.id);
                 expect(items[1].id).toBe(run1.id);
             });
 
             it('should delete runs', async () => {
-                await store.createRun({ result: testRun, orgId: testOrgId });
+                await store.createRun({ run: testRun });
                 await store.deleteRun({ id: testRun.id, orgId: testOrgId });
                 const retrieved = await store.getRun({ id: testRun.id, orgId: testOrgId });
                 expect(retrieved).toBeNull();
             });
 
             it('should list runs filtered by config ID', async () => {
-                const run1 = { ...testRun, id: 'run1', config: { ...testRun.config, id: 'config1' } };
-                const run2 = { ...testRun, id: 'run2', config: { ...testRun.config, id: 'config2' } };
-                const run3 = { ...testRun, id: 'run3', config: { ...testRun.config, id: 'config1' } };
+                const run1: Run = { ...testRun, id: 'run1', toolId: 'config1' };
+                const run2: Run = { ...testRun, id: 'run2', toolId: 'config2' };
+                const run3: Run = { ...testRun, id: 'run3', toolId: 'config1' };
 
-                await store.createRun({ result: run1, orgId: testOrgId });
-                await store.createRun({ result: run2, orgId: testOrgId });
-                await store.createRun({ result: run3, orgId: testOrgId });
+                await store.createRun({ run: run1 });
+                await store.createRun({ run: run2 });
+                await store.createRun({ run: run3 });
 
                 const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: 'config1', orgId: testOrgId });
                 expect(items.length).toBe(2);

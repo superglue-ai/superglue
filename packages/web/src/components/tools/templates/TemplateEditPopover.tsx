@@ -17,12 +17,23 @@ import { isArrowFunction, maskCredentials } from '@superglue/shared';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Download, AlertCircle, Loader2, Eye, EyeOff, Maximize2, Minimize2 } from 'lucide-react';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useId } from 'react';
 import Editor from '@monaco-editor/react';
 import { useMonacoTheme } from '@/src/hooks/useMonacoTheme';
 import type * as Monaco from 'monaco-editor';
 import { useTemplatePreview } from '../hooks/use-template-preview';
 import { CopyButton } from '../shared/CopyButton';
+
+const TEMPLATE_POPOVER_OPEN_EVENT = 'template-popover-open';
+const TEMPLATE_POPOVER_CLOSE_ALL_EVENT = 'template-popover-close-all';
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      window.dispatchEvent(new CustomEvent(TEMPLATE_POPOVER_CLOSE_ALL_EVENT));
+    }
+  });
+}
 
 const POPOVER_WIDTH_PX = 700;
 const MODAL_WIDTH_PX = 900;
@@ -86,6 +97,7 @@ interface TemplateEditPopoverProps {
   loopMode?: boolean;
   title?: string;
   helpText?: string;
+  sourceDataVersion?: number;
 }
 
 export function TemplateEditPopover({
@@ -101,11 +113,13 @@ export function TemplateEditPopover({
   loopMode = false,
   title = 'Template Expression',
   helpText,
+  sourceDataVersion,
 }: TemplateEditPopoverProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const isControlled = externalOpen !== undefined;
   const open = isControlled ? externalOpen : internalOpen;
+  const popoverId = useId();
   
   const setOpen = useCallback((newOpen: boolean) => {
     if (isControlled) {
@@ -117,7 +131,23 @@ export function TemplateEditPopover({
     if (!newOpen) {
       setIsFullscreen(false);
     }
-  }, [isControlled, onExternalOpenChange, onOpenChange]);
+    if (newOpen) {
+      window.dispatchEvent(new CustomEvent(TEMPLATE_POPOVER_OPEN_EVENT, { detail: popoverId }));
+    }
+  }, [isControlled, onExternalOpenChange, onOpenChange, popoverId]);
+
+  useEffect(() => {
+    const handleOtherOpen = (e: Event) => {
+      if ((e as CustomEvent).detail !== popoverId) setOpen(false);
+    };
+    const handleCloseAll = () => setOpen(false);
+    window.addEventListener(TEMPLATE_POPOVER_OPEN_EVENT, handleOtherOpen);
+    window.addEventListener(TEMPLATE_POPOVER_CLOSE_ALL_EVENT, handleCloseAll);
+    return () => {
+      window.removeEventListener(TEMPLATE_POPOVER_OPEN_EVENT, handleOtherOpen);
+      window.removeEventListener(TEMPLATE_POPOVER_CLOSE_ALL_EVENT, handleCloseAll);
+    };
+  }, [setOpen, popoverId]);
 
   const templateContent = template.replace(/^<<|>>$/g, '');
   const { theme, onMount } = useMonacoTheme();
@@ -131,7 +161,7 @@ export function TemplateEditPopover({
   const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
     codeContent,
     sourceData,
-    { enabled: open && canExecute }
+    { enabled: open && canExecute, sourceDataVersion }
   );
 
   const handleEditorMount = useCallback((editor: Monaco.editor.IStandaloneCodeEditor) => {
@@ -188,7 +218,7 @@ export function TemplateEditPopover({
   const activePreviewValue = (loopMode && previewTab === 'currentItem') ? currentItemValue : previewValue;
   
   const isLoading = isEvaluating || !hasResult;
-  const previewDisplayRaw = formatValueForDisplay(activePreviewValue);
+  const previewDisplayRaw = isLoading ? '' : formatValueForDisplay(activePreviewValue);
   const maskedPreview = Object.keys(credentials).length > 0 
     ? maskCredentials(previewDisplayRaw, credentials) 
     : previewDisplayRaw;
@@ -391,6 +421,10 @@ export function TemplateEditPopover({
   }
 
   if (resolvedAnchorRect) {
+    if (resolvedAnchorRect.left <= 0 && resolvedAnchorRect.top <= 0) {
+      if (open) setTimeout(() => setOpen(false), 0);
+      return null;
+    }
     return (
       <Popover open={open} onOpenChange={setOpen} modal={false}>
         <PopoverAnchor asChild>

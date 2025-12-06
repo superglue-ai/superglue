@@ -12,6 +12,7 @@ interface StepConfigTabProps {
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onEditingChange?: (editing: boolean) => void;
     onOpenFixStepDialog?: () => void;
+    sourceDataVersion?: number;
 }
 
 export function StepConfigTab({
@@ -24,9 +25,10 @@ export function StepConfigTab({
     onEdit,
     onEditingChange,
     onOpenFixStepDialog,
+    sourceDataVersion,
 }: StepConfigTabProps) {
     return (
-        <div className="mt-1">
+        <div>
             <ToolStepConfigurator
                 step={step}
                 isLast={true}
@@ -39,6 +41,7 @@ export function StepConfigTab({
                 categorizedSources={categorizedSources}
                 onOpenFixStepDialog={onOpenFixStepDialog}
                 canExecute={canExecute}
+                sourceDataVersion={sourceDataVersion}
             />
         </div>
     );

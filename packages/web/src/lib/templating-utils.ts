@@ -62,7 +62,20 @@ export function parseTemplateString(input: string): TemplatePart[] {
   return parts;
 }
 
-export function executeTemplateCode(code: string, data: any): any {
+function sanitizeEvaluationResult(value: any): any {
+  if (typeof value === 'function') return '[Function]';
+  if (typeof value === 'symbol') return '[Symbol]';
+  if (typeof value === 'bigint') return value.toString();
+  
+  try {
+    JSON.stringify(value);
+    return value;
+  } catch {
+    return '[Non-serializable Object]';
+  }
+}
+
+export async function executeTemplateCode(code: string, data: any): Promise<any> {
   try {
     return executeWithVMHelpers(code, data);
   } catch (error) {
@@ -108,14 +121,33 @@ export function normalizeTemplateExpression(expr: string): string {
   return `(sourceData) => sourceData["${escapeForBracket(trimmed)}"]`;
 }
 
+function detectDangerousPatterns(code: string): void {
+  const patterns = [
+    { regex: /while\s*\(\s*true\s*\)/, msg: 'while(true)' },
+    { regex: /while\s*\(\s*1\s*\)/, msg: 'while(1)' },
+    { regex: /while\s*\(\s*!\s*false\s*\)/, msg: 'while(!false)' },
+    { regex: /for\s*\(\s*[^;]*;\s*;\s*[^)]*\)/, msg: 'for(;;) or for(i=0;;i++)' },
+    { regex: /while\s*\(\s*!\s*0\s*\)/, msg: 'while(!0)' },
+    { regex: /do\s*\{[^}]*\}\s*while\s*\(\s*true\s*\)/, msg: 'do...while(true)' },
+  ];
+
+  for (const { regex, msg } of patterns) {
+    if (regex.test(code)) {
+      throw new Error(`Dangerous pattern: ${msg} may cause infinite loop`);
+    }
+  }
+}
+
 export async function evaluateTemplate(
   expr: string,
   sourceData: any
 ): Promise<EvaluationResult> {
   try {
     const normalizedExpr = normalizeTemplateExpression(expr);
-    const result = executeTemplateCode(normalizedExpr, sourceData);
-    return { success: true, value: result };
+    detectDangerousPatterns(normalizedExpr);
+    const result = await executeTemplateCode(normalizedExpr, sourceData);
+    const sanitized = sanitizeEvaluationResult(result);
+    return { success: true, value: sanitized };
   } catch (error) {
     return {
       success: false,
@@ -230,13 +262,12 @@ export function buildPaginationData(config?: PaginationConfig): Record<string, u
 export function buildCategorizedVariables(
   credentialKeys: string[],
   sources?: Partial<CategorizedSources>,
-  hasCurrentItem?: boolean
 ): CategorizedVariables {
   return {
     credentials: credentialKeys,
     toolInputs: Object.keys(sources?.manualPayload || {}),
     fileInputs: Object.keys(sources?.filePayloads || {}),
-    currentStepData: hasCurrentItem ? ['currentItem'] : [],
+    currentStepData: ['currentItem'],
     previousStepData: Object.keys(sources?.previousStepResults || {}),
     paginationVariables: ['page', 'offset', 'cursor', 'limit', 'pageSize'],
   };

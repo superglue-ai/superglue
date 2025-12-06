@@ -1,6 +1,5 @@
 import { GraphQLUpload } from 'graphql-upload-ts';
 import fs from "node:fs";
-import { callResolver } from "./resolvers/call.js";
 import { deleteApiResolver } from "./resolvers/delete.js";
 import { extractResolver } from "./resolvers/extract.js";
 import { generateInstructionsResolver, generateStepConfigResolver, generateTransformResolver } from "./resolvers/generate.js";
@@ -11,10 +10,10 @@ import { logsResolver } from "./resolvers/logs.js";
 import { renameWorkflowResolver } from "./resolvers/rename-workflow.js";
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
 import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant.js";
-import { updateApiConfigIdResolver } from "./resolvers/update-id.js";
 import { upsertApiResolver } from "./resolvers/upsert.js";
 import { deleteWorkflowScheduleResolver, listWorkflowSchedulesResolver, upsertWorkflowScheduleResolver } from "./resolvers/workflow-scheduler.js";
 import {
+  abortToolExecutionResolver,
   buildWorkflowResolver,
   deleteWorkflowResolver,
   executeWorkflowResolver,
@@ -43,16 +42,15 @@ export const resolvers = {
   },
   Mutation: {
     setTenantInfo: setTenantInfoResolver,
-    call: callResolver,
     extract: extractResolver,
     executeWorkflow: executeWorkflowResolver,
+    abortToolExecution: abortToolExecutionResolver,
     buildWorkflow: buildWorkflowResolver,
     upsertWorkflow: upsertWorkflowResolver,
     deleteWorkflow: deleteWorkflowResolver,
     renameWorkflow: renameWorkflowResolver,
     upsertApi: upsertApiResolver,
     deleteApi: deleteApiResolver,
-    updateApiConfigId: updateApiConfigIdResolver,
     upsertIntegration: upsertIntegrationResolver,
     cacheOauthClientCredentials: cacheOauthClientCredentialsResolver,
     getOAuthClientCredentials: getOAuthClientCredentialsResolver,

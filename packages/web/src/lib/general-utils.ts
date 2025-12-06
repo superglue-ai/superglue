@@ -321,3 +321,9 @@ export function wrapLoopSelectorWithLimit(loopSelectorCode: string | undefined |
   return Array.isArray(out) ? out.slice(0, ${limit}) : out;
 }`;
 }
+
+export function isAbortError(errorMessage: string | undefined): boolean {
+  if (!errorMessage) return false;
+  const lower = errorMessage.toLowerCase();
+  return lower.includes('abort') || lower.includes('terminated') || lower.includes('cancelled');
+}

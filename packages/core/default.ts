@@ -10,6 +10,12 @@ export const server_defaults = {
     MAX_TRANSFORMATION_RETRIES: 10,
     DEFAULT_LOOP_MAX_ITERS: 10_000,
     MAX_PAGINATION_REQUESTS: 1_000,
+    WORKER_POOLS: {
+        EXECUTE_TOOL_WORKER_POOL: {
+            SIZE: 6,
+            MEMORY_MB: 4096,
+        }
+    },
     AXIOS: {
         MAX_QUICK_RETRIES: 1,
         QUICK_RETRY_THRESHOLD_MS: 10000,

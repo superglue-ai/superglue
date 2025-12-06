@@ -1,4 +1,4 @@
-import type { ApiConfig, Integration, RunResult, Tool, ToolSchedule } from "@superglue/shared";
+import type { ApiConfig, Integration, Run, Tool, ToolSchedule } from "@superglue/shared";
 
 export interface DataStore {
   // API Config Methods
@@ -7,10 +7,11 @@ export interface DataStore {
   upsertApiConfig(params: { id: string; config: ApiConfig; orgId?: string }): Promise<ApiConfig>;
   deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean>;
 
-  // Run Result Methods
-  getRun(params: { id: string; orgId?: string }): Promise<RunResult | null>;
-  listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: RunResult[], total: number }>;
-  createRun(params: { result: RunResult; orgId?: string }): Promise<RunResult>;
+  // Run Methods
+  getRun(params: { id: string; orgId?: string }): Promise<Run | null>;
+  listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: Run[], total: number }>;
+  createRun(params: { run: Run }): Promise<Run>;
+  updateRun(params: { id: string; orgId: string; updates: Partial<Run> }): Promise<Run>;
   deleteRun(params: { id: string; orgId?: string }): Promise<boolean>;
   deleteAllRuns(params?: { orgId?: string }): Promise<boolean>;
 

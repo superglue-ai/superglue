@@ -4,14 +4,13 @@ import Editor from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { TemplateChip } from '../../templates/TemplateChip';
+import { TemplateContextProvider } from '../../templates/tiptap/TemplateContext';
 import { useTemplatePreview } from '../../hooks/use-template-preview';
 import { useDataProcessor } from '../../hooks/use-data-processor';
 import { CopyButton } from '../../shared/CopyButton';
 import { Download, Loader2 } from 'lucide-react';
 import { Button } from '../../../ui/button';
 import { downloadJson } from '@/src/lib/download-utils';
-import { Label } from '../../../ui/label';
-import { HelpTooltip } from '../../../utils/HelpTooltip';
 
 const PLACEHOLDER_VALUE = '';
 const CURRENT_ITEM_KEY = '"currentItem"';
@@ -24,6 +23,7 @@ interface StepInputTabProps {
     readOnly?: boolean;
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     isActive?: boolean;
+    sourceDataVersion?: number;
 }
 
 export function StepInputTab({
@@ -34,6 +34,7 @@ export function StepInputTab({
     readOnly = false,
     onEdit,
     isActive = true,
+    sourceDataVersion,
 }: StepInputTabProps) {
     const { theme, onMount } = useMonacoTheme();
     const [currentHeight, setCurrentHeight] = useState('400px');
@@ -51,7 +52,7 @@ export function StepInputTab({
     const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
         currentItemExpression,
         evolvingPayload,
-        { enabled: isActive && canExecute && !!evolvingPayload, debounceMs: 300 }
+        { enabled: isActive && canExecute && !!evolvingPayload, debounceMs: 300, sourceDataVersion }
     );
 
     const inputProcessor = useDataProcessor(evolvingPayload, isActive);
@@ -98,8 +99,8 @@ export function StepInputTab({
         editorRef.current = editor;
         onMount(editor);
         setTimeout(updateChipPosition, 50);
-        editor.onDidScrollChange(updateChipPosition);
-        editor.onDidLayoutChange(updateChipPosition);
+        editor.onDidScrollChange(() => requestAnimationFrame(updateChipPosition));
+        editor.onDidLayoutChange(() => requestAnimationFrame(updateChipPosition));
     }, [onMount, updateChipPosition]);
 
     const handleUpdate = (newTemplate: string) => {
@@ -120,10 +121,6 @@ export function StepInputTab({
 
     return (
         <div>
-            <Label className="text-xs flex items-center gap-1 mb-1">
-                Step Input Data
-                <HelpTooltip text="Aggregated data from the tool payload and previous step results. Edit the currentItem expression to control what data this step receives for each iteration." />
-            </Label>
             <div className={cn("relative rounded-lg border shadow-sm bg-muted/30")} ref={containerRef}>
                 <div className="absolute top-1 right-1 z-10 mr-5 flex items-center gap-1">
                     {(isEvaluating || inputProcessor.isComputingPreview) && (
@@ -172,6 +169,7 @@ export function StepInputTab({
                                 pointerEvents: 'auto'
                             }}
                         >
+                        <TemplateContextProvider stepData={evolvingPayload} canExecute={canExecute} sourceDataVersion={sourceDataVersion}>
                         <TemplateChip
                             template={templateString}
                             evaluatedValue={previewValue}
@@ -188,6 +186,7 @@ export function StepInputTab({
                             popoverTitle="Data Selector"
                             popoverHelpText="Returns an array → step loops over items. Returns an object → step runs once. currentItem is either the object returned or the current array item."
                         />
+                        </TemplateContextProvider>
                         </div>
                     )}
                     <Editor
@@ -226,7 +225,8 @@ export function StepInputTab({
                             colorDecorators: false,
                             occurrencesHighlight: 'off',
                             renderValidationDecorations: 'off',
-                            stickyScroll: { enabled: false }
+                            stickyScroll: { enabled: false },
+                            automaticLayout: true
                         }}
                         theme={theme}
                         className="bg-transparent"

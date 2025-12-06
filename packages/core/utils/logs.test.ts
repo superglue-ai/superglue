@@ -74,13 +74,13 @@ describe('Logging Module', () => {
     })
   })
 
-  describe('levelMap', () => {
-    it('maps pino levels to correct log levels', () => {
+  describe('log levels', () => {
+    it('calls correct pino level method for each log level', () => {
       const levelTests = [
-        { message: 'debug message', level: 'debug', pinoLevel: 20 },
-        { message: 'info message', level: 'info', pinoLevel: 30 },
-        { message: 'warn message', level: 'warn', pinoLevel: 40 },
-        { message: 'error message', level: 'error', pinoLevel: 50 }
+        { message: 'debug message', level: 'debug' },
+        { message: 'info message', level: 'info' },
+        { message: 'warn message', level: 'warn' },
+        { message: 'error message', level: 'error' }
       ]
 
       levelTests.forEach(test => {

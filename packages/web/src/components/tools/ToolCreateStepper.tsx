@@ -68,8 +68,8 @@ export function ToolCreateStepper({
     setShouldStopExecution(true);
     setIsStopping(true);
     toast({
-      title: "Stopping tool",
-      description: "Tool will stop after the current step completes",
+      title: "Execution aborted",
+      description: "Tool execution has been aborted",
     });
   };
 

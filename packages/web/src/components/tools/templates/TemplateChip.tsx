@@ -2,8 +2,9 @@ import { cn } from '@/src/lib/general-utils';
 import { truncateTemplateValue, prepareSourceData, extractCredentials } from '@/src/lib/templating-utils';
 import { maskCredentials } from '@superglue/shared';
 import { Code2, X } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { TemplateEditPopover } from './TemplateEditPopover';
+import { useTemplateContext } from './tiptap/TemplateContext';
 
 interface TemplateChipProps {
   template: string;
@@ -46,6 +47,7 @@ export function TemplateChip({
   popoverTitle,
   popoverHelpText,
 }: TemplateChipProps) {
+  const { sourceDataVersion } = useTemplateContext();
   const sourceData = useMemo(() => prepareSourceData(stepData, loopData), [stepData, loopData]);
   const [isHovered, setIsHovered] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -127,9 +129,27 @@ export function TemplateChip({
   };
 
   const chipClasses = getChipClasses();
+  const chipRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!effectiveOpen || !chipRef.current) return;
+    
+    const chip = chipRef.current;
+    const scrollParent = chip.closest('[style*="overflow"]') as HTMLElement | null;
+    if (!scrollParent) return;
+    
+    const handleScroll = () => {
+      setIsPopoverOpen(false);
+      onPopoverOpenChange?.(false);
+    };
+    
+    scrollParent.addEventListener('scroll', handleScroll);
+    return () => scrollParent.removeEventListener('scroll', handleScroll);
+  }, [effectiveOpen, onPopoverOpenChange]);
 
   const chipContent = (
     <span
+      ref={chipRef}
       className={cn(
         "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono select-none border",
         "transition-all duration-150",
@@ -191,6 +211,7 @@ export function TemplateChip({
       loopMode={loopMode}
       title={popoverTitle}
       helpText={popoverHelpText}
+      sourceDataVersion={sourceDataVersion}
     >
       {chipContent}
     </TemplateEditPopover>
