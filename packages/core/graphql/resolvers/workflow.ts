@@ -117,6 +117,7 @@ export const executeWorkflowResolver = async (
           orgId: context.orgId,
           updates: {
             status: RunStatus.ABORTED,
+            toolPayload: args.payload,
             error: `User manually aborted run with runId ${runId}`,
             completedAt: new Date()
           }
@@ -152,6 +153,9 @@ export const executeWorkflowResolver = async (
       updates: {
         status: graphqlResult.success ? RunStatus.SUCCESS : RunStatus.FAILED,
         toolConfig: graphqlResult.config || workflow,
+        toolPayload: args.payload,
+        toolResult: graphqlResult.data,
+        stepResults: graphqlResult.stepResults,
         error: graphqlResult.error || undefined,
         completedAt: new Date()
       }
@@ -179,6 +183,7 @@ export const executeWorkflowResolver = async (
       orgId: context.orgId,
       updates: {
         status: RunStatus.FAILED,
+        toolPayload: args.payload,
         error: String(error),
         completedAt: new Date()
       }

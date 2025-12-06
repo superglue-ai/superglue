@@ -225,8 +225,8 @@ describe("Tenant Info Basic Tests", () => {
     let datastore: DataStore;
 
     beforeEach(async () => {
-      DataStoreFactory.createMemoryStore();
-      await datastore.setTenantInfo(null, false);
+      datastore = DataStoreFactory.createMemoryStore();
+      await datastore.setTenantInfo({ emailEntrySkipped: false });
       mockServer.getApp()._router.stack = mockServer
         .getApp()
         ._router.stack.filter((layer: any) => layer.route === undefined);
