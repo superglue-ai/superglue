@@ -9,14 +9,15 @@ interface EvaluationCacheEntry {
 let lastSeenVersion: number | undefined = undefined;
 const evaluationCache = new Map<string, EvaluationCacheEntry>();
 
-function getCacheKey(codeContent: string, sourceDataVersion?: number): string {
-  return `${sourceDataVersion ?? 'none'}:${codeContent}`;
+function getCacheKey(codeContent: string, sourceDataVersion?: number, stepId?: string): string {
+  return `${stepId ?? 'global'}:${sourceDataVersion ?? 'none'}:${codeContent}`;
 }
 
 interface UseTemplatePreviewOptions {
   enabled?: boolean;
   debounceMs?: number;
   sourceDataVersion?: number;
+  stepId?: string;
 }
 
 interface UseTemplatePreviewResult {
@@ -31,14 +32,14 @@ export function useTemplatePreview(
   sourceData: any,
   options: UseTemplatePreviewOptions = {}
 ): UseTemplatePreviewResult {
-  const { enabled = true, debounceMs = 500, sourceDataVersion } = options;
+  const { enabled = true, debounceMs = 500, sourceDataVersion, stepId } = options;
   
   if (sourceDataVersion !== lastSeenVersion) {
     evaluationCache.clear();
     lastSeenVersion = sourceDataVersion;
   }
   
-  const cacheKey = getCacheKey(codeContent, sourceDataVersion);
+  const cacheKey = getCacheKey(codeContent, sourceDataVersion, stepId);
   const cached = evaluationCache.get(cacheKey);
   
   const [previewValue, setPreviewValue] = useState<any>(cached?.value);
@@ -74,14 +75,16 @@ export function useTemplatePreview(
       return;
     }
     
+    setHasResult(false);
+    setPreviewValue('');
+    setPreviewError(null);
+    setIsEvaluating(true);
+    
     evalVersionRef.current += 1;
     const thisVersion = evalVersionRef.current;
 
     const timer = setTimeout(async () => {
       if (thisVersion !== evalVersionRef.current) return;
-      
-      setIsEvaluating(true);
-      setHasResult(false);
       
       try {
         const result = await evaluateTemplate(codeContent, sourceDataRef.current);

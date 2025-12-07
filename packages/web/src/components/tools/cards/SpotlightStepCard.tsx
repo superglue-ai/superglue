@@ -26,6 +26,8 @@ import { StepInputTab } from './tabs/StepInputTab';
 import { StepConfigTab } from './tabs/StepConfigTab';
 import { StepResultTab } from './tabs/StepResultTab';
 
+const loopItemsCache = new Map<string, { items: any; error: string | null }>();
+
 export const SpotlightStepCard = React.memo(({
     step,
     stepIndex,
@@ -85,14 +87,27 @@ export const SpotlightStepCard = React.memo(({
     const [pendingAction, setPendingAction] = useState<'execute' | null>(null);
     
     const DATA_SELECTOR_DEBOUNCE_MS = 400;
-    const [loopItems, setLoopItems] = useState<any | null>(null);
-    const [loopItemsError, setLoopItemsError] = useState<string | null>(null);
+    const loopItemsCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
+    const cachedLoopItems = loopItemsCache.get(loopItemsCacheKey);
+    
+    const [loopItems, setLoopItems] = useState<any | null>(() => cachedLoopItems?.items ?? null);
+    const [loopItemsError, setLoopItemsError] = useState<string | null>(() => cachedLoopItems?.error ?? null);
     const lastEvalTimerRef = useRef<number | null>(null);
+    const prevShowOutputSignalRef = useRef(showOutputSignal);
 
     useEffect(() => {
-        if (showOutputSignal && stepResult != null) {
+        const cached = loopItemsCache.get(loopItemsCacheKey);
+        if (cached) {
+            setLoopItems(cached.items);
+            setLoopItemsError(cached.error);
+        }
+    }, [loopItemsCacheKey]);
+
+    useEffect(() => {
+        if (showOutputSignal && showOutputSignal !== prevShowOutputSignalRef.current && stepResult != null) {
             setActivePanel('output');
         }
+        prevShowOutputSignalRef.current = showOutputSignal;
     }, [showOutputSignal, stepResult]);
 
     useEffect(() => {
@@ -101,6 +116,9 @@ export const SpotlightStepCard = React.memo(({
             lastEvalTimerRef.current = null;
         }
         setLoopItemsError(null);
+        
+        const currentCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
+        
         const t = window.setTimeout(() => {
             try {
                 let sel = step?.loopSelector;
@@ -114,6 +132,7 @@ export const SpotlightStepCard = React.memo(({
                     throw new Error('Data selector returned a function. Did you forget to call it?');
                 }
                 const normalizedOut = out === undefined ? null : out;
+                loopItemsCache.set(currentCacheKey, { items: normalizedOut, error: null });
                 setLoopItems(normalizedOut);
                 setLoopItemsError(null);
             } catch (err: any) {
@@ -130,6 +149,7 @@ export const SpotlightStepCard = React.memo(({
                         errorMessage = String(err);
                     }
                 }
+                loopItemsCache.set(currentCacheKey, { items: null, error: errorMessage });
                 setLoopItemsError(errorMessage);
             }
         }, DATA_SELECTOR_DEBOUNCE_MS);
@@ -140,7 +160,7 @@ export const SpotlightStepCard = React.memo(({
                 lastEvalTimerRef.current = null; 
             } 
         };
-    }, [step.executionMode, step.loopSelector, evolvingPayload]);
+    }, [step.id, step.executionMode, step.loopSelector, evolvingPayload, sourceDataVersion]);
 
     useEffect(() => {
         if (!loopItemsError && loopItems && Array.isArray(loopItems)) {

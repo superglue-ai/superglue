@@ -30,6 +30,7 @@ interface TemplateAwareJsonEditorProps {
     resizable?: boolean;
     showValidation?: boolean;
     sourceDataVersion?: number;
+    stepId?: string;
 }
 
 function TemplateAwareJsonEditorInner({
@@ -113,8 +114,11 @@ function TemplateAwareJsonEditorInner({
         if (!editor || value === lastValueRef.current) return;
         isUpdatingRef.current = true;
         lastValueRef.current = value;
+        // Defer to microtask to avoid flushSync during React render
+        queueMicrotask(() => {
             editor.commands.setContent(templateStringToTiptap(value));
             isUpdatingRef.current = false;
+        });
     }, [editor, value]);
 
     useEffect(() => { editor?.setEditable(!readOnly); }, [editor, readOnly]);
@@ -248,6 +252,7 @@ export function TemplateAwareJsonEditor(props: TemplateAwareJsonEditorProps) {
             categorizedVariables={props.categorizedVariables}
             categorizedSources={props.categorizedSources}
             sourceDataVersion={props.sourceDataVersion}
+            stepId={props.stepId}
         >
             <TemplateAwareJsonEditorInner {...props} />
         </TemplateContextProvider>

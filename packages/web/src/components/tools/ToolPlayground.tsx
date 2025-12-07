@@ -11,7 +11,7 @@ import { Validator } from "jsonschema";
 import isEqual from "lodash.isequal";
 import { Check, CloudUpload, CopyPlus, Edit2, Hammer, Loader2, Play, Square, Trash2, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
 import {
   AlertDialog,
@@ -168,6 +168,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   useEffect(() => {
     setSourceDataVersion(v => v + 1);
   }, [stepResultsMap, computedPayload]);
+
+  const handleLoopDataChange = useCallback(() => {
+    setSourceDataVersion(v => v + 1);
+  }, []);
 
   useEffect(() => {
     if (embedded && initialInstruction !== undefined) {
@@ -1478,6 +1482,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   embedded={embedded}
                   onAbort={currentRunId ? handleStopExecution : undefined}
                   sourceDataVersion={sourceDataVersion}
+                  onLoopDataChange={handleLoopDataChange}
                 />
               )}
             </div>

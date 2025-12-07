@@ -107,24 +107,36 @@ export function TemplateChip({
   const getChipClasses = () => {
     if (hasError) {
       return {
-        bg: 'bg-red-500/20 dark:bg-red-500/20',
-        border: isActive ? 'border-red-500/50 dark:border-red-400/50' : 'border-transparent',
-        text: 'text-red-700 dark:text-red-300'
+        bg: 'border-red-400/20 dark:border-red-400/25',
+        border: 'border-b-red-600/30 dark:border-b-red-600/35',
+        text: 'text-red-700 dark:text-red-300',
+        gradient: 'linear-gradient(180deg, rgba(248, 113, 113, 0.18) 0%, rgba(239, 68, 68, 0.22) 100%)',
+        shadow: isActive
+          ? '0 1px 0 rgba(185, 28, 28, 0.22), 0 0 11px rgba(239, 68, 68, 0.4)'
+          : '0 1px 0 rgba(185, 28, 28, 0.18), 0 0 7px rgba(239, 68, 68, 0.27)'
       };
     }
     
     if (isUnresolved) {
       return {
-        bg: 'bg-gray-500/15 dark:bg-gray-400/20',
-        border: isActive ? 'border-gray-400/50 dark:border-gray-500/50' : 'border-transparent',
-        text: 'text-gray-600 dark:text-gray-300'
+        bg: 'border-gray-400/20 dark:border-gray-500/25',
+        border: 'border-b-gray-500/30 dark:border-b-gray-600/35',
+        text: 'text-gray-600 dark:text-gray-300',
+        gradient: 'linear-gradient(180deg, rgba(156, 163, 175, 0.15) 0%, rgba(107, 114, 128, 0.18) 100%)',
+        shadow: isActive
+          ? '0 1px 0 rgba(55, 65, 81, 0.22), 0 0 9px rgba(156, 163, 175, 0.32)'
+          : '0 1px 0 rgba(55, 65, 81, 0.18), 0 0 5px rgba(156, 163, 175, 0.2)'
       };
     }
     
     return {
-      bg: 'bg-green-600/15 dark:bg-green-400/20',
-      border: isActive ? 'border-green-600/50 dark:border-green-400/50' : 'border-transparent',
-      text: 'text-green-700 dark:text-green-400'
+      bg: 'border-green-400/20 dark:border-green-400/25',
+      border: 'border-b-green-600/30 dark:border-b-green-600/35',
+      text: 'text-green-700 dark:text-green-400',
+      gradient: 'linear-gradient(180deg, rgba(34, 197, 94, 0.18) 0%, rgba(22, 163, 74, 0.22) 100%)',
+        shadow: isActive
+        ? '0 1px 0 rgba(21, 128, 61, 0.22), 0 0 11px rgba(74, 222, 128, 0.4)'
+        : '0 1px 0 rgba(21, 128, 61, 0.18), 0 0 7px rgba(74, 222, 128, 0.27)'
     };
   };
 
@@ -156,11 +168,15 @@ export function TemplateChip({
         chipClasses.bg,
         chipClasses.border,
         chipClasses.text,
-        !readOnly && "cursor-pointer",
+        !readOnly && "cursor-pointer hover:-translate-y-px active:translate-y-0.5",
         readOnly && "cursor-default",
         inline && "align-middle"
       )}
-      style={{ lineHeight: '1.3' }}
+      style={{ 
+        lineHeight: '1.3', 
+        background: chipClasses.gradient,
+        boxShadow: chipClasses.shadow 
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       title={isTruncated ? `${originalSize} chars (click to view)` : undefined}

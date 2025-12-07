@@ -26,6 +26,7 @@ interface TemplateContextValue {
     categorizedVariables: CategorizedVariables;
     categorizedSources?: CategorizedSources;
     sourceDataVersion?: number;
+    stepId?: string;
 }
 
 const emptyCategorizedVariables: CategorizedVariables = {
@@ -54,6 +55,7 @@ const TemplateContext = createContext<TemplateContextValue>({
     categorizedVariables: emptyCategorizedVariables,
     categorizedSources: emptyCategorizedSources,
     sourceDataVersion: undefined,
+    stepId: undefined,
 });
 
 export function TemplateContextProvider({
@@ -65,6 +67,7 @@ export function TemplateContextProvider({
     categorizedVariables = emptyCategorizedVariables,
     categorizedSources = emptyCategorizedSources,
     sourceDataVersion,
+    stepId,
 }: {
     children: ReactNode;
     stepData: any;
@@ -74,6 +77,7 @@ export function TemplateContextProvider({
     categorizedVariables?: CategorizedVariables;
     categorizedSources?: CategorizedSources;
     sourceDataVersion?: number;
+    stepId?: string;
 }) {
     const credentialKeys = useMemo(() => {
         if (!stepData || typeof stepData !== 'object') return undefined;
@@ -90,8 +94,8 @@ export function TemplateContextProvider({
     }, [stepData]);
 
     const value = useMemo(() => ({
-        stepData, loopData, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources, sourceDataVersion
-    }), [stepData, loopData, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources, sourceDataVersion]);
+        stepData, loopData, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources, sourceDataVersion, stepId
+    }), [stepData, loopData, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources, sourceDataVersion, stepId]);
 
     return (
         <TemplateContext.Provider value={value}>

@@ -52,13 +52,16 @@ export function StepInputTab({
     const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
         currentItemExpression,
         evolvingPayload,
-        { enabled: isActive && canExecute && !!evolvingPayload, debounceMs: 300, sourceDataVersion }
+        { enabled: isActive && canExecute && !!evolvingPayload, debounceMs: 300, sourceDataVersion, stepId: step.id }
     );
 
     const inputProcessor = useDataProcessor(evolvingPayload, isActive);
 
     const displayData = useMemo(() => {
         if (!isActive) return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE}\n}`;
+        if (cannotExecuteYet) {
+            return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE}\n}`;
+        }
         const previewStr = inputProcessor.preview?.displayString || '{}';
         if (previewStr.startsWith('{')) {
             const inner = previewStr.slice(1).trimStart();
@@ -68,7 +71,7 @@ export function StepInputTab({
             return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE},\n  ${inner.slice(0, -1)}\n}`;
         }
         return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE},\n  "sourceData": ${previewStr}\n}`;
-    }, [isActive, inputProcessor.preview?.displayString]);
+    }, [isActive, cannotExecuteYet, inputProcessor.preview?.displayString]);
 
     const updateChipPosition = useCallback(() => {
         const editor = editorRef.current;
@@ -110,18 +113,17 @@ export function StepInputTab({
         }
     };
 
-    if (cannotExecuteYet) {
-        return (
-            <div className="flex flex-col items-center justify-center border rounded-md bg-muted/5 text-muted-foreground" style={{ height: '400px' }}>
-                <div className="text-xs mb-1">No input yet</div>
-                <p className="text-[10px]">Run previous step to see inputs</p>
-            </div>
-        );
-    }
-
     return (
         <div>
             <div className={cn("relative rounded-lg border shadow-sm bg-muted/30")} ref={containerRef}>
+                {cannotExecuteYet && (
+                    <div className="absolute inset-0 flex items-center justify-center z-[5] pointer-events-none bg-muted/5 backdrop-blur-[2px]">
+                        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                            <div className="text-xs mb-1">No data yet</div>
+                            <p className="text-[10px]">Data selector will evaluate after previous step runs</p>
+                        </div>
+                    </div>
+                )}
                 <div className="absolute top-1 right-1 z-10 mr-5 flex items-center gap-1">
                     {(isEvaluating || inputProcessor.isComputingPreview) && (
                         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -169,7 +171,7 @@ export function StepInputTab({
                                 pointerEvents: 'auto'
                             }}
                         >
-                        <TemplateContextProvider stepData={evolvingPayload} canExecute={canExecute} sourceDataVersion={sourceDataVersion}>
+                        <TemplateContextProvider stepData={evolvingPayload} canExecute={canExecute} sourceDataVersion={sourceDataVersion} stepId={step.id}>
                         <TemplateChip
                             template={templateString}
                             evaluatedValue={previewValue}

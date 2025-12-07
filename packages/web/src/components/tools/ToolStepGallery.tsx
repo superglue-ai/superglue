@@ -6,7 +6,7 @@ import { buildEvolvingPayload, buildPreviousStepResults, cn } from '@/src/lib/ge
 import { buildCategorizedSources } from '@/src/lib/templating-utils';
 import { Integration } from "@superglue/shared";
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FinalTransformMiniStepCard } from './cards/FinalTransformCard';
 import { MiniStepCard } from './cards/MiniStepCard';
 import { PayloadMiniStepCard } from './cards/PayloadCard';
@@ -64,6 +64,7 @@ export interface ToolStepGalleryProps {
     embedded?: boolean;
     onAbort?: () => void;
     sourceDataVersion?: number;
+    onLoopDataChange?: () => void;
 }
 
 export function ToolStepGallery({
@@ -115,7 +116,8 @@ export function ToolStepGallery({
     onPayloadUserEdit,
     embedded = false,
     onAbort,
-    sourceDataVersion
+    sourceDataVersion,
+    onLoopDataChange
 }: ToolStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
     const [windowWidth, setWindowWidth] = useState(1200);
@@ -131,6 +133,15 @@ export function ToolStepGallery({
     const [hiddenRightCount, setHiddenRightCount] = useState(0);
     const [activeStepLoopCount, setActiveStepLoopCount] = useState<number | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    const prevLoopCountRef = useRef<number | null>(null);
+    
+    const handleLoopInfoChange = useCallback((count: number | null) => {
+        setActiveStepLoopCount(count);
+        if (prevLoopCountRef.current !== count) {
+            prevLoopCountRef.current = count;
+            onLoopDataChange?.();
+        }
+    }, [onLoopDataChange]);
     
     useEffect(() => {
         isConfiguratorEditingRef.current = isConfiguratorEditing;
@@ -740,6 +751,7 @@ export function ToolStepGallery({
                                 />
                             ) : (
                                 <SpotlightStepCard
+                                    key={currentItem.data.id}
                                     step={currentItem.data}
                                     stepIndex={activeIndex - 1} // Adjust for payload card
                                     evolvingPayload={activeEvolvingPayload}
@@ -761,7 +773,7 @@ export function ToolStepGallery({
                                     abortedSteps={abortedSteps}
                                     showOutputSignal={showStepOutputSignal}
                                     onConfigEditingChange={setIsConfiguratorEditing}
-                                    onLoopInfoChange={setActiveStepLoopCount}
+                                    onLoopInfoChange={handleLoopInfoChange}
                                     isFirstStep={activeIndex === 1}
                                     isPayloadValid={isPayloadValid}
                                     sourceDataVersion={sourceDataVersion}

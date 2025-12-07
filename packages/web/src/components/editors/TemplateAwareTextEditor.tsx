@@ -23,6 +23,7 @@ interface TemplateAwareTextEditorProps {
     className?: string;
     disabled?: boolean;
     sourceDataVersion?: number;
+    stepId?: string;
 }
 
 const SingleLineDocument = Document.extend({ content: 'paragraph' });
@@ -92,8 +93,11 @@ function TemplateAwareTextEditorInner({
         if (!editor || value === lastValueRef.current) return;
         isUpdatingRef.current = true;
         lastValueRef.current = value;
+        // Defer to microtask to avoid flushSync during React render
+        queueMicrotask(() => {
             editor.commands.setContent(templateStringToTiptap(value));
             isUpdatingRef.current = false;
+        });
     }, [editor, value]);
 
     useEffect(() => { editor?.setEditable(!disabled); }, [editor, disabled]);
@@ -132,6 +136,7 @@ export function TemplateAwareTextEditor({
     className,
     disabled = false,
     sourceDataVersion,
+    stepId,
 }: TemplateAwareTextEditorProps) {
     return (
         <TemplateContextProvider 
@@ -142,6 +147,7 @@ export function TemplateAwareTextEditor({
             categorizedVariables={categorizedVariables}
             categorizedSources={categorizedSources}
             sourceDataVersion={sourceDataVersion}
+            stepId={stepId}
         >
             <TemplateAwareTextEditorInner
                 value={value}
