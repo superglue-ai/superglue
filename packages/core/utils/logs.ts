@@ -21,18 +21,18 @@ export const logger = pino({
 });
 
 export function logMessage(level: 'info' | 'error' | 'warn' | 'debug', message: string, metadata: ServiceMetadata = { orgId: '' }) {
-      const logEntry: Log = {
-        id: crypto.randomUUID(),
+  const logEntry: Log = {
+    id: crypto.randomUUID(),
     message,
     level: level.toUpperCase(),
-        timestamp: new Date(),
-        traceId: metadata.traceId || '',
-        orgId: metadata.orgId || ''
-      };
+    timestamp: new Date(),
+    traceId: metadata.traceId || '',
+    orgId: metadata.orgId || ''
+  };
 
   if (isMainThread) {
-      logEmitter.emit('log', logEntry);
-  logger[level](metadata, message);
+    logEmitter.emit('log', logEntry);
+    logger[level](metadata, message);
   } else {
     parentPort?.postMessage({ type: 'log', payload: logEntry });
   }
