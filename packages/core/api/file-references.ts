@@ -113,6 +113,72 @@ const deleteFileReference: RouteHandler = async (request, reply) => {
   }
 };
 
+const processFileReference: RouteHandler = async (request, reply) => {
+  try {
+    const authReq = request as AuthenticatedFastifyRequest;
+    const body = request.body as {
+      bucket: string;
+      key: string;
+      region?: string;
+    };
+
+    if (!body.bucket || !body.key) {
+      return reply.code(400).send({ 
+        success: false, 
+        error: 'Missing required fields: bucket and key' 
+      });
+    }
+
+    // Extract file ID from the key (filename before extension)
+    const filename = body.key.split('/').pop() || body.key;
+    const fileId = filename.split('.')[0];
+
+    if (!fileId) {
+      return reply.code(400).send({ 
+        success: false, 
+        error: 'Could not extract file ID from key' 
+      });
+    }
+
+    // Check if file reference exists
+    const fileRef = await authReq.datastore.getFileReference({ 
+      id: fileId, 
+      orgId: authReq.authInfo.orgId 
+    });
+
+    if (!fileRef) {
+      return reply.code(404).send({ 
+        success: false, 
+        error: `File reference not found: ${fileId}` 
+      });
+    }
+
+    // Update file status to PROCESSING
+    await authReq.datastore.updateFileReference({
+      id: fileId,
+      updates: { status: 'PROCESSING' as FileStatus },
+      orgId: authReq.authInfo.orgId
+    });
+
+    // TODO: Implement async file processing logic
+    // This would typically:
+    // 1. Download file from S3
+    // 2. Process the file content
+    // 3. Update file reference status to COMPLETED or FAILED
+    // 4. Store processed results
+    
+    return reply.code(202).send({ 
+      success: true, 
+      message: 'File processing started',
+      fileId,
+      bucket: body.bucket,
+      key: body.key
+    });
+  } catch (error) {
+    return reply.code(500).send({ success: false, error: String(error) });
+  }
+};
+
 
 registerApiModule({
   name: 'file-references',
@@ -141,6 +207,11 @@ registerApiModule({
       method: 'DELETE',
       path: '/file-references/:id',
       handler: deleteFileReference
+    },
+    {
+      method: 'POST',
+      path: '/file-references/process',
+      handler: processFileReference
     }
   ]
 });
