@@ -3,15 +3,15 @@
 import { useConfig } from "@/src/app/config-context";
 import { useIntegrations } from "@/src/app/integrations-context";
 import { useTools } from "@/src/app/tools-context";
-import { createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
+import { abortExecution, createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, shouldDebounceAbort, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
-import { buildEvolvingPayload, computeStepOutput, computeToolPayload, removeFileKeysFromPayload, wrapLoopSelectorWithLimit } from "@/src/lib/general-utils";
+import { buildEvolvingPayload, computeStepOutput, computeToolPayload, isAbortError, removeFileKeysFromPayload, wrapLoopSelectorWithLimit } from "@/src/lib/general-utils";
 import { ExecutionStep, generateDefaultFromSchema, Integration, Tool, ToolResult } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import isEqual from "lodash.isequal";
-import { Check, CloudUpload, CopyPlus, Edit2, Hammer, Loader2, Play, Trash2, X } from "lucide-react";
+import { Check, CloudUpload, CopyPlus, Edit2, Hammer, Loader2, Play, Square, Trash2, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
 import {
   AlertDialog,
@@ -151,17 +151,33 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [justSaved, setJustSaved] = useState(false);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [failedSteps, setFailedSteps] = useState<string[]>([]);
+  const [abortedSteps, setAbortedSteps] = useState<string[]>([]);
   const [navigateToFinalSignal, setNavigateToFinalSignal] = useState<number>(0);
   const [showStepOutputSignal, setShowStepOutputSignal] = useState<number>(0);
   const [focusStepId, setFocusStepId] = useState<string | null>(null);
   const [stepResultsMap, setStepResultsMap] = useState<Record<string, any>>({});
   const [finalPreviewResult, setFinalPreviewResult] = useState<any>(null);
+  const [sourceDataVersion, setSourceDataVersion] = useState(0);
   // Track last user-edited step and previous step hashes to drive robust cascades
   const lastUserEditedStepIdRef = useRef<string | null>(null);
   const prevStepHashesRef = useRef<string[]>([]);
 
   const integrations = providedIntegrations || contextIntegrations;
   const [instructions, setInstructions] = useState<string>(initialInstruction || '');
+
+  useEffect(() => {
+    setSourceDataVersion(v => {
+      console.log('[Version] Increment due to stepResultsMap/computedPayload change. Old version:', v, 'New version:', v + 1);
+      return v + 1;
+    });
+  }, [stepResultsMap, computedPayload]);
+
+  const handleDataSelectorOutputChange = useCallback(() => {
+    setSourceDataVersion(v => {
+      console.log('[Version] Increment due to data selector change. Old version:', v, 'New version:', v + 1);
+      return v + 1;
+    });
+  }, []);
 
   useEffect(() => {
     if (embedded && initialInstruction !== undefined) {
@@ -176,14 +192,16 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [isRunningTransform, setIsRunningTransform] = useState(false);
   const [isFixingTransform, setIsFixingTransform] = useState(false);
   const [showFixTransformDialog, setShowFixTransformDialog] = useState(false);
-  // Computed: any transform execution in progress
+  const [currentRunId, setCurrentRunId] = useState<string | null>(null);
+  const currentRunIdRef = useRef<string | null>(null);
   const isExecutingTransform = isRunningTransform || isFixingTransform;
-  // Single source of truth for stopping across modes (embedded/standalone)
-  const stopSignalRef = useRef<boolean>(false);
   const [isPayloadValid, setIsPayloadValid] = useState<boolean>(true);
   const [hasUserEditedPayload, setHasUserEditedPayload] = useState<boolean>(false);
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasGeneratedDefaultPayloadRef = useRef<boolean>(false);
+  const executionCompletedRef = useRef(false);
+  const shouldAbortRef = useRef(false);
+  const lastAbortTimeRef = useRef<number>(0);
   const [showToolBuilder, setShowToolBuilder] = useState(false);
   const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
   const [showDeployModal, setShowDeployModal] = useState(false);
@@ -217,25 +235,36 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     }
   }, [inputSchema, manualPayloadText, hasUserEditedPayload]);
 
-  // Track latest external stop signal (embedded mode) in the single ref
-  useEffect(() => {
-    if (embedded) {
-      stopSignalRef.current = !!externalShouldStop;
-    }
-  }, [externalShouldStop]);
 
-  const handleStopExecution = () => {
-    if (embedded && onStopExecution) {
-      // Set stop signal immediately in embedded mode too
-      stopSignalRef.current = true;
-      onStopExecution();
-    } else {
-      stopSignalRef.current = true;
+  const handleStopExecution = async () => {
+    if (shouldDebounceAbort(lastAbortTimeRef.current)) return;
+    
+    if (!currentRunIdRef.current || executionCompletedRef.current) return;
+    
+    lastAbortTimeRef.current = Date.now();
+    shouldAbortRef.current = true;
+    
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    if (!currentRunIdRef.current || executionCompletedRef.current) return;
+    
+    const client = createSuperglueClient(config.superglueEndpoint);
+    const success = await abortExecution(client, currentRunIdRef.current);
+    
+    if (executionCompletedRef.current) return;
+    
+    if (success) {
       setIsStopping(true);
       toast({
-        title: "Stopping tool",
-        description: "Tool will stop after the current step completes",
+        title: "Execution aborted",
+        description: "Tool execution has been aborted",
       });
+      currentRunIdRef.current = null;
+      setCurrentRunId(null);
+    }
+    
+    if (embedded && onStopExecution) {
+      onStopExecution();
     }
   };
 
@@ -300,6 +329,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     // Clear execution state since tool changed
     setCompletedSteps([]);
     setFailedSteps([]);
+    setAbortedSteps([]);
     setStepResultsMap({});
     setFinalPreviewResult(null);
     
@@ -655,9 +685,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   };
 
   const handleBeforeStepExecution = async (stepIndex: number, step: any): Promise<boolean> => {
-    // Check if this step has the modify flag
+    if (shouldAbortRef.current || externalShouldStop) {
+      return false;
+    }
+    
     if (step.modify === true) {
-      // Show confirmation dialog and wait for user response
       return new Promise((resolve) => {
         modifyStepResolveRef.current = resolve;
         setPendingModifyStepIndex(stepIndex);
@@ -694,12 +726,16 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   };
 
   const executeTool = async () => {
+    const runId = generateUUID();
+    executionCompletedRef.current = false;
+    shouldAbortRef.current = false;
+    currentRunIdRef.current = runId;
+    setCurrentRunId(runId);
     setLoading(true);
-    // Fully clear any stale stop signals from a previous run (both modes)
-    stopSignalRef.current = false;
     setIsStopping(false);
     setCompletedSteps([]);
     setFailedSteps([]);
+    setAbortedSteps([]);
     setFinalPreviewResult(null);
     setStepResultsMap({});
     setFocusStepId(null);
@@ -708,10 +744,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       JSON.parse(responseSchema || '{}');
       JSON.parse(inputSchema || '{}');
 
-      // Always use the current steps for execution
       const executionSteps = steps;
       const currentResponseSchema = responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null;
-      // Auto-repair disabled for "Run All Steps" - individual steps and final transform still support it
       const effectiveSelfHealing = false;
 
       const tool = {
@@ -722,10 +756,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
       } as any;
 
-      // Store original steps to compare against self-healed result
       const originalStepsJson = JSON.stringify(executionSteps);
 
-      // Use computed payload for execution (already merged manual + files)
       setCurrentExecutingStepIndex(0);
 
       const client = createSuperglueClient(config.superglueEndpoint);
@@ -740,19 +772,28 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
             setCurrentExecutingStepIndex(tool.steps.length);
           }
 
-          if (res.success) {
-            setCompletedSteps(prev => Array.from(new Set([...prev, res.stepId])));
-          } else {
-            setFailedSteps(prev => Array.from(new Set([...prev, res.stepId])));
-          }
           try {
             const normalized = computeStepOutput(res);
             setStepResultsMap(prev => ({ ...prev, [res.stepId]: normalized.output }));
           } catch { }
+
+          if (res.success) {
+            setCompletedSteps(prev => Array.from(new Set([...prev, res.stepId])));
+          } else if (isAbortError(res.error)) {
+            setAbortedSteps(prev => Array.from(new Set([...prev, res.stepId])));
+            setFocusStepId(res.stepId);
+            setShowStepOutputSignal(Date.now());
+          } else {
+            setFailedSteps(prev => Array.from(new Set([...prev, res.stepId])));
+            setFocusStepId(res.stepId);
+            setShowStepOutputSignal(Date.now());
+          }
         },
         effectiveSelfHealing,
-        () => stopSignalRef.current,
-        handleBeforeStepExecution
+        handleBeforeStepExecution,
+        (stepRunId: string) => {
+          currentRunIdRef.current = stepRunId;
+        }
       );
 
       // Always update steps with returned configuration (API may normalize/update even without self-healing)
@@ -770,12 +811,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         }
       }
 
-      const stepDataMap: Record<string, any> = {};
-      Object.entries(state.stepResults).forEach(([stepId, res]) => {
-        const normalized = computeStepOutput(res as StepExecutionResult);
-        stepDataMap[stepId] = normalized.output;
-      });
-      setStepResultsMap(stepDataMap);
+      if (state.stepResults['__final_transform__']) {
+        const normalized = computeStepOutput(state.stepResults['__final_transform__'] as StepExecutionResult);
+        setStepResultsMap(prev => ({ ...prev, ['__final_transform__']: normalized.output }));
+      }
 
       const finalData = state.stepResults['__final_transform__']?.data;
       setFinalPreviewResult(finalData);
@@ -808,14 +847,25 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       }
       setCompletedSteps(state.completedSteps);
       setFailedSteps(state.failedSteps);
+      setAbortedSteps(state.abortedSteps);
 
-      if (state.failedSteps.length === 0 && !state.interrupted) {
+      if (state.failedSteps.length === 0 && state.abortedSteps.length === 0 && !state.interrupted) {
         setNavigateToFinalSignal(Date.now());
       } else {
-        const firstFailed = state.failedSteps[0];
-        if (firstFailed) {
-          setFocusStepId(firstFailed);
+        const firstProblematicStep = state.failedSteps[0] || state.abortedSteps[0];
+        if (firstProblematicStep) {
+          if (firstProblematicStep === '__final_transform__') {
+            setNavigateToFinalSignal(Date.now());
+          } else {
+            setFocusStepId(firstProblematicStep);
           setShowStepOutputSignal(Date.now());
+          }
+        } else if (state.interrupted) {
+          const lastExecutedStepId = state.completedSteps[state.completedSteps.length - 1];
+          if (lastExecutedStepId) {
+            setFocusStepId(lastExecutedStepId);
+            setShowStepOutputSignal(Date.now());
+          }
         }
       }
 
@@ -838,11 +888,12 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         variant: "destructive",
       });
     } finally {
+      executionCompletedRef.current = true;
+      currentRunIdRef.current = null;
       setLoading(false);
       setIsStopping(false);
       setCurrentExecutingStepIndex(undefined);
-      // Ensure stop signal is reset after a run finishes/interrupted
-      stopSignalRef.current = false;
+      setCurrentRunId(null);
     }
   };
 
@@ -906,12 +957,18 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
         setCompletedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
         setFailedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
+        setAbortedSteps(prev => prev.filter(id => !stepsToReset.includes(id) && id !== '__final_transform__'));
+        
+        const hasKeysToDelete = stepsToReset.some(id => id in stepResultsMap) || '__final_transform__' in stepResultsMap;
+        if (hasKeysToDelete) {
         setStepResultsMap(prev => {
           const next = { ...prev } as Record<string, any>;
           stepsToReset.forEach(id => delete next[id]);
           delete next['__final_transform__'];
           return next;
         });
+        }
+        
         setFinalPreviewResult(null);
       }
       // Clear marker regardless to avoid stale cascades
@@ -920,14 +977,18 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
     // Update previous hashes after processing
     prevStepHashesRef.current = currentHashes;
-  }, [steps]);
+  }, [steps, stepResultsMap]);
 
   const executeStepByIdx = async (idx: number, limitIterations?: number) => {
+    const runId = generateUUID();
+    executionCompletedRef.current = false;
+    currentRunIdRef.current = runId;
+    setCurrentRunId(runId);
+    
     try {
       setIsExecutingStep(idx);
       const client = createSuperglueClient(config.superglueEndpoint);
       
-      // If limit is specified, wrap loopSelector temporarily for this execution only
       const originalLoopSelector = steps[idx]?.loopSelector;
       const stepToExecute = limitIterations && originalLoopSelector
         ? { ...steps[idx], loopSelector: wrapLoopSelectorWithLimit(originalLoopSelector, limitIterations) }
@@ -940,7 +1001,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           toolId,
           payload: computedPayload,
           previousResults: stepResultsMap,
-          selfHealing: false
+          selfHealing: false,
+          onRunIdGenerated: (runId) => { currentRunIdRef.current = runId; }
         }
       );
       
@@ -965,17 +1027,25 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       }
 
       if (isFailure) {
+        if (isAbortError(single.error)) {
+          setAbortedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+        } else {
         setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+        }
         setCompletedSteps(prev => prev.filter(id => id !== sid));
       } else {
         setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
         setFailedSteps(prev => prev.filter(id => id !== sid));
+        setAbortedSteps(prev => prev.filter(id => id !== sid));
       }
       setStepResultsMap(prev => ({ ...prev, [sid]: normalized.output }));
       setFocusStepId(sid);
       setShowStepOutputSignal(Date.now());
     } finally {
+      executionCompletedRef.current = true;
+      currentRunIdRef.current = null;
       setIsExecutingStep(undefined);
+      setCurrentRunId(null);
     }
   };
 
@@ -1011,6 +1081,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const handleAutoHealStep = async (updatedInstruction: string) => {
     if (fixStepIndex === null) return;
     
+    const runId = generateUUID();
+    executionCompletedRef.current = false;
+    currentRunIdRef.current = runId;
+    setCurrentRunId(runId);
+    
     try {
       setIsExecutingStep(fixStepIndex);
       const client = createSuperglueClient(config.superglueEndpoint);
@@ -1030,7 +1105,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           toolId,
           payload: computedPayload,
           previousResults: stepResultsMap,
-          selfHealing: true
+          selfHealing: true,
+          onRunIdGenerated: (runId) => { currentRunIdRef.current = runId; }
         }
       );
 
@@ -1050,22 +1126,35 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       }
 
       if (isFailure) {
+        if (isAbortError(single.error)) {
+          setAbortedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+        } else {
         setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+        }
         setCompletedSteps(prev => prev.filter(id => id !== sid));
         throw new Error(single.error || 'Failed to fix step');
       } else {
         setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
         setFailedSteps(prev => prev.filter(id => id !== sid));
+        setAbortedSteps(prev => prev.filter(id => id !== sid));
       }
       setStepResultsMap(prev => ({ ...prev, [sid]: normalized.output }));
       setFocusStepId(sid);
       setShowStepOutputSignal(Date.now());
     } finally {
+      executionCompletedRef.current = true;
+      currentRunIdRef.current = null;
       setIsExecutingStep(undefined);
+      setCurrentRunId(null);
     }
   };
 
   const handleExecuteTransform = async (schemaStr: string, transformStr: string, selfHealing: boolean = false) => {
+    const runId = generateUUID();
+    executionCompletedRef.current = false;
+    currentRunIdRef.current = runId;
+    setCurrentRunId(runId);
+    
     try {
       if (selfHealing) {
         setIsFixingTransform(true);
@@ -1090,17 +1179,18 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         inputSchema ? JSON.parse(inputSchema) : null,
         computedPayload,
         stepData,
-        selfHealing
+        selfHealing,
+        (runId) => { currentRunIdRef.current = runId; }
       );
 
       if (result.success) {
         setCompletedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
         setFailedSteps(prev => prev.filter(id => id !== '__final_transform__'));
+        setAbortedSteps(prev => prev.filter(id => id !== '__final_transform__'));
         setStepResultsMap(prev => ({ ...prev, ['__final_transform__']: result.data }));
         setFinalPreviewResult(result.data);
         setNavigateToFinalSignal(Date.now());
 
-        // Update transform if it was wrapped or self-healed by backend
         if (result.updatedTransform && result.updatedTransform !== (transformStr || finalTransform)) {
           setFinalTransform(result.updatedTransform);
           if (selfHealing) {
@@ -1111,20 +1201,26 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           }
         }
       } else {
+        if (isAbortError(result.error)) {
+          setAbortedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
+      } else {
         setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
+        }
         setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
-        // Store error message for display
         setStepResultsMap(prev => ({
           ...prev,
           ['__final_transform__']: result.error || 'Transform execution failed'
         }));
       }
     } finally {
+      executionCompletedRef.current = true;
+      currentRunIdRef.current = null;
       if (selfHealing) {
         setIsFixingTransform(false);
       } else {
         setIsRunningTransform(false);
       }
+      setCurrentRunId(null);
     }
   };
 
@@ -1233,12 +1329,13 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     <div className="flex items-center gap-2">
       {loading ? (
         <Button
-          variant="destructive"
+          variant="outline"
           onClick={handleStopExecution}
-          disabled={saving || (isExecutingStep !== undefined) || isExecutingTransform || isStopping}
+          disabled={saving || (isExecutingStep !== undefined) || isExecutingTransform}
           className="h-9 px-4"
         >
-          {isStopping ? "Stopping..." : "Stop Execution"}
+          <Square className="h-4 w-4" />
+          Stop Execution
         </Button>
       ) : (
         <Button
@@ -1391,6 +1488,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   currentExecutingStepIndex={currentExecutingStepIndex}
                   completedSteps={completedSteps}
                   failedSteps={failedSteps}
+                  abortedSteps={abortedSteps}
                   inputSchema={inputSchema}
                   onInputSchemaChange={(v) => setInputSchema(v)}
                   payloadText={manualPayloadText}
@@ -1408,6 +1506,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   isPayloadValid={isPayloadValid}
                   onPayloadUserEdit={() => setHasUserEditedPayload(true)}
                   embedded={embedded}
+                  onAbort={currentRunId ? handleStopExecution : undefined}
+                  sourceDataVersion={sourceDataVersion}
+                  onDataSelectorOutputChange={handleDataSelectorOutputChange}
                 />
               )}
             </div>
@@ -1443,13 +1544,14 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           step={steps[fixStepIndex]}
           stepInput={buildEvolvingPayload(computedPayload || {}, steps, stepResultsMap, fixStepIndex - 1)}
           integrationId={steps[fixStepIndex]?.integrationId}
-          errorMessage={
-            typeof stepResultsMap[steps[fixStepIndex]?.id] === 'string'
-              ? stepResultsMap[steps[fixStepIndex]?.id]
-              : stepResultsMap[steps[fixStepIndex]?.id]?.error
-          }
+          errorMessage={(() => {
+            const result = stepResultsMap[steps[fixStepIndex]?.id];
+            const msg = typeof result === 'string' ? result : result?.error;
+            return msg && !isAbortError(msg) ? msg : undefined;
+          })()}
           onSuccess={handleFixStepSuccess}
           onAutoHeal={handleAutoHealStep}
+          onAbort={handleStopExecution}
         />
       )}
 

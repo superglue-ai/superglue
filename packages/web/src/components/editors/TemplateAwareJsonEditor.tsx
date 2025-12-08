@@ -19,7 +19,7 @@ interface TemplateAwareJsonEditorProps {
     value: string;
     onChange?: (value: string) => void;
     stepData: any;
-    loopData?: any;
+    dataSelectorOutput?: any;
     canExecute?: boolean;
     categorizedVariables?: CategorizedVariables;
     categorizedSources?: CategorizedSources;
@@ -29,26 +29,28 @@ interface TemplateAwareJsonEditorProps {
     placeholder?: string;
     resizable?: boolean;
     showValidation?: boolean;
+    sourceDataVersion?: number;
+    stepId?: string;
 }
 
 function TemplateAwareJsonEditorInner({
     value,
     onChange,
     readOnly = false,
-    minHeight = '100px',
-    maxHeight = '150px',
+    minHeight = '75px',
+    maxHeight = '300px',
     placeholder = '{}',
     resizable = false,
     showValidation = false,
     stepData,
-    loopData,
+    dataSelectorOutput,
     canExecute = true,
 }: TemplateAwareJsonEditorProps) {
     const isUpdatingRef = useRef(false);
     const lastValueRef = useRef(value);
-    const [currentHeight, setCurrentHeight] = useState(maxHeight);
+    const [currentHeight, setCurrentHeight] = useState(minHeight);
     const [jsonError, setJsonError] = useState<string | null>(null);
-    const { categorizedVariables, categorizedSources } = useTemplateContext();
+    const { categorizedVariables, categorizedSources, sourceDataVersion } = useTemplateContext();
     
     const {
         sourceData,
@@ -59,7 +61,7 @@ function TemplateAwareJsonEditorInner({
         handleCodeSave,
         editorRef,
         cleanupSuggestion,
-    } = useTemplateAwareEditor({ stepData, loopData, categorizedVariables, categorizedSources });
+    } = useTemplateAwareEditor({ stepData, dataSelectorOutput, categorizedVariables, categorizedSources });
     
     const credentials = useMemo(() => {
         if (!sourceData || typeof sourceData !== 'object') return {};
@@ -90,8 +92,8 @@ function TemplateAwareJsonEditorInner({
         editorProps: {
             attributes: {
                 class: cn(
-                    'w-full h-full px-3 py-2 text-xs font-mono bg-transparent',
-                    'focus:outline-none overflow-auto',
+                    'w-full px-3 py-2 text-xs font-mono bg-transparent',
+                    'focus:outline-none',
                     readOnly && 'cursor-not-allowed'
                 ),
             },
@@ -112,10 +114,11 @@ function TemplateAwareJsonEditorInner({
         if (!editor || value === lastValueRef.current) return;
         isUpdatingRef.current = true;
         lastValueRef.current = value;
-        setTimeout(() => {
+        // Defer to microtask to avoid flushSync during React render
+        queueMicrotask(() => {
             editor.commands.setContent(templateStringToTiptap(value));
             isUpdatingRef.current = false;
-        }, 0);
+        });
     }, [editor, value]);
 
     useEffect(() => { editor?.setEditable(!readOnly); }, [editor, readOnly]);
@@ -127,7 +130,7 @@ function TemplateAwareJsonEditorInner({
         }
 
         let cancelled = false;
-        const sourceData = prepareSourceData(stepData, loopData);
+        const sourceData = prepareSourceData(stepData, dataSelectorOutput);
 
         const escapeForJson = (str: string) => 
             str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -172,14 +175,16 @@ function TemplateAwareJsonEditorInner({
 
         const timer = setTimeout(validateJson, 300);
         return () => { cancelled = true; clearTimeout(timer); };
-    }, [showValidation, value, stepData, loopData, canExecute]);
+    }, [showValidation, value, stepData, dataSelectorOutput, canExecute]);
 
     const handleResize = (e: React.MouseEvent) => {
         e.preventDefault();
         const startY = e.clientY;
         const startHeight = parseInt(currentHeight);
+        const minH = parseInt(minHeight);
+        const maxH = parseInt(maxHeight);
         const onMove = (e: MouseEvent) => {
-            const newHeight = Math.max(60, Math.min(600, startHeight + (e.clientY - startY)));
+            const newHeight = Math.max(minH, Math.min(maxH, startHeight + (e.clientY - startY)));
             setCurrentHeight(`${newHeight}px`);
         };
         const onUp = () => {
@@ -204,20 +209,31 @@ function TemplateAwareJsonEditorInner({
             )}
             <div 
                 className={cn('relative', readOnly ? 'cursor-not-allowed' : 'cursor-text')}
-                style={{ height: resizable ? currentHeight : maxHeight, minHeight, overflow: 'hidden' }}
+                style={{ 
+                    height: resizable ? currentHeight : 'auto', 
+                    minHeight, 
+                    maxHeight,
+                    overflow: 'auto' 
+                }}
             >
-                <EditorContent editor={editor} className="h-full" />
-                {editor?.isEmpty && placeholder && (
+                <EditorContent 
+                    editor={editor} 
+                    className={cn(
+                        resizable ? "h-full" : "",
+                        jsonError && "pb-10"
+                    )}
+                />
+                {!value?.trim() && placeholder && (
                     <div className="absolute top-2 left-3 text-xs pointer-events-none font-mono json-placeholder-bracket">
                         {placeholder}
                     </div>
                 )}
+            </div>
             {showValidation && jsonError && (
-                    <div className="absolute bottom-0 left-0 right-0 px-3 py-2 bg-destructive/10 text-destructive text-xs max-h-24 overflow-y-auto border-t">
+                <div className="absolute bottom-0 left-0 right-0 px-3 py-2 bg-destructive/10 text-destructive text-xs max-h-24 overflow-y-auto border-t z-10">
                         Error: {Object.keys(credentials).length > 0 ? maskCredentials(jsonError, credentials) : jsonError}
                 </div>
             )}
-            </div>
             <TemplateEditPopover
                 template=""
                 sourceData={sourceData}
@@ -226,6 +242,7 @@ function TemplateAwareJsonEditorInner({
                 onExternalOpenChange={setCodePopoverOpen}
                 anchorRect={popoverAnchorRect}
                 canExecute={canExecute}
+                sourceDataVersion={sourceDataVersion}
             />
         </div>
     );
@@ -235,11 +252,13 @@ export function TemplateAwareJsonEditor(props: TemplateAwareJsonEditorProps) {
     return (
         <TemplateContextProvider 
             stepData={props.stepData} 
-            loopData={props.loopData} 
+            dataSelectorOutput={props.dataSelectorOutput} 
             readOnly={props.readOnly}
             canExecute={props.canExecute}
             categorizedVariables={props.categorizedVariables}
             categorizedSources={props.categorizedSources}
+            sourceDataVersion={props.sourceDataVersion}
+            stepId={props.stepId}
         >
             <TemplateAwareJsonEditorInner {...props} />
         </TemplateContextProvider>

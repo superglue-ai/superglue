@@ -1,14 +1,15 @@
-import { generateUniqueId, Integration, RequestOptions, Tool, ToolResult, ToolStepResult, waitForIntegrationProcessing } from "@superglue/shared";
+import { generateUniqueId, waitForIntegrationProcessing, Integration, RequestOptions, RunStatus, SelfHealingMode, Tool, ToolResult, ToolStepResult } from "@superglue/shared";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { parseJSON } from "../../files/index.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { ToolBuilder } from "../../tools/tool-builder.js";
-import { ToolExecutor } from "../../tools/tool-executor.js";
 import { ToolFinder } from "../../tools/tool-finder.js";
 import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { GraphQLRequestContext } from '../types.js';
+import type { ToolExecutionPayload } from "../../worker/types.js";
+import { isSelfHealingEnabled } from "../../utils/helpers.js";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -22,6 +23,7 @@ interface ExecuteWorkflowArgs {
   payload?: any;
   credentials?: any;
   options?: RequestOptions;
+  runId?: string;
 }
 
 interface BuildWorkflowArgs {
@@ -39,9 +41,7 @@ export const executeWorkflowResolver = async (
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ): Promise<GraphQLWorkflowResult> => {
-  // NOTE: Consider making run_id an input argument to create a DB entry at the start
-  // and only update the status at the end, rather than creating it after execution
-  const runId = crypto.randomUUID();
+  const runId = args.runId || crypto.randomUUID();
   const startedAt = new Date();
   const metadata = context.toMetadata();
 
@@ -71,42 +71,74 @@ export const executeWorkflowResolver = async (
       workflow.responseSchema = parseJSON(workflow.responseSchema);
     }
 
-    let integrationManagers: IntegrationManager[] = [];
+    const selfHealingEnabled = isSelfHealingEnabled(args.options, "api");
 
-    // Collect integration IDs from workflow level and steps
-    const allIntegrationIds = new Set<string>();
+    const integrationManagers = await IntegrationManager.forToolExecution(
+      workflow,
+      context.datastore,
+      metadata,
+      { includeDocs: selfHealingEnabled }
+    );
 
-    // Add workflow-level integration IDs
-    if (Array.isArray(workflow.integrationIds)) {
-      workflow.integrationIds.forEach(id => allIntegrationIds.add(id));
+    await context.datastore.createRun({
+      run: {
+        id: runId,
+        toolId: workflow.id,
+        orgId: context.orgId,
+        status: RunStatus.RUNNING,
+        toolConfig: workflow,
+        options: args.options,
+        startedAt
+      }
+    });
+
+    const taskPayload: ToolExecutionPayload = {
+      runId,
+      workflow,
+      payload: args.payload,
+      credentials: args.credentials,
+      options: args.options,
+      integrations: integrationManagers.map(m => m.toIntegrationSync()),
+      orgId: context.orgId,
+      traceId: metadata.traceId
+    };
+
+    let result;
+    try {
+      result = await context.workerPools.toolExecution.runTask(runId, taskPayload);
+    } catch (abortError: any) {
+      if (abortError.message?.includes('abort') || abortError.name === 'AbortError') {
+        
+        logMessage('warn', `Aborted run with runId ${runId}`, metadata);
+        
+        await context.datastore.updateRun({
+          id: runId,
+          orgId: context.orgId,
+          updates: {
+            status: RunStatus.ABORTED,
+            toolPayload: args.payload,
+            error: `User manually aborted run with runId ${runId}`,
+            completedAt: new Date()
+          }
+        }).catch(() => {});
+
+        return {
+          id: runId,
+          success: false,
+          error: `User manually aborted run with runId ${runId}`,
+          config: workflow,
+          stepResults: [],
+          startedAt,
+          completedAt: new Date(),
+          data: undefined
+        } as GraphQLWorkflowResult;
+      }
+      throw abortError;
     }
-
-    // Add integration IDs from each step
-    if (Array.isArray(workflow.steps)) {
-      workflow.steps.forEach(step => {
-        if (step.integrationId) {
-          allIntegrationIds.add(step.integrationId);
-        }
-      });
-    }
-
-    if (allIntegrationIds.size > 0) {
-      const requestedIds = Array.from(allIntegrationIds);
-      integrationManagers = await IntegrationManager.fromIds(requestedIds, context.datastore, metadata);
-
-      const foundIds = new Set(integrationManagers.map(i => i.id));
-      requestedIds.forEach(id => {
-        if (!foundIds.has(id)) {
-          logMessage('warn', `Integration with id "${id}" not found, skipping.`, metadata);
-        }
-      });
-    }
-
-    const executor = new ToolExecutor({ tool: workflow, metadata, integrations: integrationManagers });
-    const result = await executor.execute({ payload: args.payload, credentials: args.credentials, options: args.options });
 
     const graphqlResult: GraphQLWorkflowResult = {
       ...result,
+      id: runId,
       stepResults: result.stepResults.map(stepResult => ({
         ...stepResult,
         rawData: undefined,
@@ -114,18 +146,17 @@ export const executeWorkflowResolver = async (
       }))
     };
 
-    // Save run to datastore
-    context.datastore.createRun({
-      result: {
-        id: runId,
-        success: graphqlResult.success,
+    // NOTE: Not persisting toolResult/stepResults and payload to avoid PostgreSQL JSONB size limits (256MB)
+    // Large workflow results can exceed this, tbd
+    await context.datastore.updateRun({
+      id: runId,
+      orgId: context.orgId,
+      updates: {
+        status: graphqlResult.success ? RunStatus.SUCCESS : RunStatus.FAILED,
+        toolConfig: graphqlResult.config || workflow,
         error: graphqlResult.error || undefined,
-        config: graphqlResult.config || workflow,
-        stepResults: [],
-        startedAt,
         completedAt: new Date()
-      },
-      orgId: context.orgId
+      }
     });
 
     // Notify webhook if configured (fire-and-forget)
@@ -133,7 +164,7 @@ export const executeWorkflowResolver = async (
       notifyWebhook(args.options.webhookUrl, runId, graphqlResult.success, graphqlResult.data, graphqlResult.error, metadata);
     } else if(args.options?.webhookUrl?.startsWith('tool:')) {
       const toolId = args.options.webhookUrl.split(':')[1];
-      if(toolId == args.input.id) {
+      if (toolId == args.input.id) {
         logMessage('warn', "Tool cannot trigger itself", metadata);
         return;
       }
@@ -144,6 +175,18 @@ export const executeWorkflowResolver = async (
 
   } catch (error) {
     logMessage('error', "Workflow execution error: " + String(error), metadata);
+    
+    await context.datastore.updateRun({
+      id: runId,
+      orgId: context.orgId,
+      updates: {
+        status: RunStatus.FAILED,
+        toolPayload: args.payload,
+        error: String(error),
+        completedAt: new Date()
+      }
+    }).catch(() => {});
+    
     const result = {
       id: runId,
       success: false,
@@ -153,10 +196,46 @@ export const executeWorkflowResolver = async (
       startedAt,
       completedAt: new Date(),
     };
-    // Save run to datastore
-    // do not trigger webhook on failure
-    context.datastore.createRun({ result, orgId: context.orgId });
     return { ...result, data: undefined, stepResults: [] } as GraphQLWorkflowResult;
+  }
+};
+
+export const abortToolExecutionResolver = async (
+  _: unknown,
+  { runId }: { runId: string },
+  context: GraphQLRequestContext,
+): Promise<{ success: boolean; runId: string }> => {
+  const metadata = context.toMetadata();
+  
+  try {
+    const run = await context.datastore.getRun({ id: runId, orgId: context.orgId });
+    
+    if (!run) {
+      throw new Error(`Run with id ${runId} not found`);
+    }
+    
+    if (run.status !== RunStatus.RUNNING) {
+      throw new Error(`Run ${runId} is not currently running (status: ${run.status})`);
+    }
+
+    logMessage('info', `Aborting tool execution for run ${runId}`, metadata);
+    
+    context.workerPools.toolExecution.abortTask(runId);
+    
+    await context.datastore.updateRun({
+      id: runId,
+      orgId: context.orgId,
+      updates: {
+        status: RunStatus.ABORTED,
+        error: `Aborted run with runId ${runId}`,
+        completedAt: new Date()
+      }
+    });
+
+    return { success: true, runId };
+  } catch (error) {
+    logMessage('error', `Failed to abort tool execution: ${String(error)}`, metadata);
+    throw error;
   }
 };
 

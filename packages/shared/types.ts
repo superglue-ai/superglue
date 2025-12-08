@@ -152,6 +152,13 @@ export enum SelfHealingMode {
   DISABLED = "DISABLED"
 }
 
+export enum RunStatus {
+  RUNNING = "RUNNING",
+  SUCCESS = "SUCCESS",
+  FAILED = "FAILED",
+  ABORTED = "ABORTED"
+}
+
 export interface BaseConfig {
   id: string;
   version?: string;
@@ -323,6 +330,23 @@ export type RequestOptions = {
   testMode?: boolean;
 };
 
+export interface Run {
+  id: string;
+  toolId: string;
+  orgId?: string;
+  status: RunStatus;
+  toolConfig?: Tool;
+  toolPayload?: Record<string, any>;
+  toolResult?: any;
+  stepResults?: ToolStepResult[];
+  options?: RequestOptions;
+  requestSource?: string;
+  error?: string;
+  traceId?: string;
+  startedAt: Date;
+  completedAt?: Date;
+}
+
 export interface ApiCallArgs {
   id?: string;
   endpoint?: ApiConfig;
@@ -347,6 +371,7 @@ export interface ToolArgs {
   credentials?: Record<string, string>;
   options?: RequestOptions;
   verbose?: boolean;
+  runId?: string;
 }
 
 export interface GenerateTransformArgs {

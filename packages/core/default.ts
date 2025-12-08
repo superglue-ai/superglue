@@ -10,16 +10,11 @@ export const server_defaults = {
     MAX_TRANSFORMATION_RETRIES: 10,
     DEFAULT_LOOP_MAX_ITERS: 10_000,
     MAX_PAGINATION_REQUESTS: 1_000,
-    AXIOS: {
-        MAX_QUICK_RETRIES: 1,
-        QUICK_RETRY_THRESHOLD_MS: 10000,
-        DEFAULT_RETRY_DELAY_MS: 1000,
-        MAX_RATE_LIMIT_WAIT_MS: 60 * 60 * 1000 * 24, // 24 hours is the max wait time for rate limit retries, hardcoded
-        REJECT_UNAUTHORIZED: false,
-        KEEP_ALIVE: false,
-        MAX_SOCKETS: 10,
-        MAX_FREE_SOCKETS: 2,
-        TIMEOUT: 30000,
+    WORKER_POOLS: {
+        EXECUTE_TOOL_WORKER_POOL: {
+            SIZE: 6,
+            MEMORY_MB: 4096,
+        }
     },
     CONTEXT: {
         JSON_PREVIEW_DEPTH_LIMIT: 5,
@@ -65,22 +60,28 @@ export const server_defaults = {
         MAX_QUEUE_SIZE: 200
     },
     POSTGRES: {
-        POOL_IDLE_TIMEOUT: 5 * 60 * 1000, // 5 minutes
+        POOL_IDLE_TIMEOUT: 10 * 60 * 1000, // 10 minutes
         POOL_CLEANUP_INTERVAL: 60 * 1000, // 1 minute
-        DEFAULT_TIMEOUT: 60000, // 1 minute
+        DEFAULT_TIMEOUT: 600000, // 10 minutes
         DEFAULT_RETRIES: 0,
         DEFAULT_RETRY_DELAY: 1000, // 1 second
         OAUTH_SECRET_TTL_MS: 5 * 60 * 1000, // 5 minutes
     },
     FTP: {
-        DEFAULT_TIMEOUT: 300000, // 5 minutes
+        DEFAULT_TIMEOUT: 600000, // 10 minutes
         DEFAULT_RETRIES: 0,
         DEFAULT_RETRY_DELAY: 1000, // 1 second
     },
     HTTP: {
-        DEFAULT_TIMEOUT: 300000, // 5 minutes
-        DEFAULT_RETRIES: 0,
-        DEFAULT_RETRY_DELAY: 1000, // 1 second
+        DEFAULT_TIMEOUT: 3600000, // 60 minutes
+        MAX_QUICK_RETRIES: 1,
+        QUICK_RETRY_THRESHOLD_MS: 10000,
+        DEFAULT_RETRY_DELAY_MS: 1000,
+        MAX_RATE_LIMIT_WAIT_MS: 60 * 60 * 1000 * 24, // 24 hours is the max wait time for rate limit retries, hardcoded
+        REJECT_UNAUTHORIZED: false,
+        KEEP_ALIVE: false,
+        MAX_SOCKETS: 10,
+        MAX_FREE_SOCKETS: 2,
     },
     LLM: {
         REQUEST_TIMEOUT_MS: 120000, // 120 seconds per LLM API request

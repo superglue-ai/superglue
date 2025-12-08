@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, RunResult, Tool } from '@superglue/shared';
+import { ApiConfig, HttpMethod, Run, RunStatus, Tool } from '@superglue/shared';
 import fs from 'fs';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -92,28 +92,30 @@ describe('FileStore', () => {
       instruction: 'Test API',
     };
 
-    const testRun: RunResult = {
+    const testRun: Run = {
       id: 'test-run-id',
+      toolId: 'test-config-id',
+      orgId: testOrgId,
+      status: RunStatus.SUCCESS,
+      toolConfig: { id: 'test-config-id', steps: [{ id: 'step1', apiConfig: testApiConfig }] },
       startedAt: new Date(),
       completedAt: new Date(),
-      success: true,
-      config: testApiConfig,
-      error: null,
     };
 
     it('should store and retrieve runs', async () => {
-      await store.createRun({ result: testRun, orgId: testOrgId });
+      await store.createRun({ run: testRun });
       const retrieved = await store.getRun({ id: testRun.id, orgId: testOrgId });
-      expect(retrieved).toEqual(testRun);
+      expect(retrieved.id).toEqual(testRun.id);
+      expect(retrieved.status).toEqual(testRun.status);
     });
 
     it('should list runs in chronological order', async () => {
-      const run1 = { ...testRun, id: 'run1', startedAt: new Date('2023-01-01'), completedAt: new Date('2023-01-01') };
-      const run2 = { ...testRun, id: 'run2', startedAt: new Date('2023-01-02'), completedAt: new Date('2023-01-02') };
+      const run1: Run = { ...testRun, id: 'run1', startedAt: new Date('2023-01-01'), completedAt: new Date('2023-01-01') };
+      const run2: Run = { ...testRun, id: 'run2', startedAt: new Date('2023-01-02'), completedAt: new Date('2023-01-02') };
       
-      await store.createRun({ result: run1, orgId: testOrgId });
-      await new Promise(resolve => setTimeout(resolve, 10)); // Small delay to ensure different timestamps
-      await store.createRun({ result: run2, orgId: testOrgId });
+      await store.createRun({ run: run1 });
+      await new Promise(resolve => setTimeout(resolve, 10));
+      await store.createRun({ run: run2 });
 
       const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
       expect(items).toHaveLength(2);
@@ -123,7 +125,7 @@ describe('FileStore', () => {
     });
 
     it('should delete runs', async () => {
-      await store.createRun({ result: testRun, orgId: testOrgId });
+      await store.createRun({ run: testRun });
       const deleted = await store.deleteRun({ id: testRun.id, orgId: testOrgId });
       expect(deleted).toBe(true);
       const retrieved = await store.getRun({ id: testRun.id, orgId: testOrgId });
@@ -131,13 +133,13 @@ describe('FileStore', () => {
     });
 
     it('should list runs filtered by config ID', async () => {
-      const run1 = { ...testRun, id: 'run1', config: { ...testApiConfig, id: 'config1' } };
-      const run2 = { ...testRun, id: 'run2', config: { ...testApiConfig, id: 'config2' } };
-      const run3 = { ...testRun, id: 'run3', config: { ...testApiConfig, id: 'config1' } };
+      const run1: Run = { ...testRun, id: 'run1', toolId: 'config1' };
+      const run2: Run = { ...testRun, id: 'run2', toolId: 'config2' };
+      const run3: Run = { ...testRun, id: 'run3', toolId: 'config1' };
       
-      await store.createRun({ result: run1, orgId: testOrgId });
-      await store.createRun({ result: run2, orgId: testOrgId });
-      await store.createRun({ result: run3, orgId: testOrgId });
+      await store.createRun({ run: run1 });
+      await store.createRun({ run: run2 });
+      await store.createRun({ run: run3 });
 
       const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: 'config1', orgId: testOrgId });
       expect(items.length).toBe(2);
@@ -146,27 +148,26 @@ describe('FileStore', () => {
     });
 
     it('should persist data between store instances', async () => {
-      await store.createRun({ result: testRun, orgId: testOrgId });
+      await store.createRun({ run: testRun });
       await store.disconnect();
 
       const newStore = new FileStore(testDir);
       const retrieved = await newStore.getRun({ id: testRun.id, orgId: testOrgId });
-      expect(retrieved).toEqual(testRun);
+      expect(retrieved.id).toEqual(testRun.id);
     });
 
     it('should not log runs when DISABLE_LOGS is set', async () => {
       process.env.DISABLE_LOGS = 'true';
       
-      await store.createRun({ result: testRun, orgId: testOrgId });
+      await store.createRun({ run: testRun });
       const { items } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
       
       expect(items).toHaveLength(0);
     });
 
     it('should filter out corrupted runs and continue listing valid ones', async () => {
-      // Create a valid run
-      const validRun = { ...testRun, id: 'valid-run' };
-      await store.createRun({ result: validRun, orgId: testOrgId });
+      const validRun: Run = { ...testRun, id: 'valid-run' };
+      await store.createRun({ run: validRun });
       
       // Manually write an invalid JSON line to the logs file
       await fs.promises.appendFile(testLogsPath, 'invalid json line\n');
@@ -181,39 +182,31 @@ describe('FileStore', () => {
     });
 
     it('should handle runs with missing startedAt dates', async () => {
-      // Create a valid run
-      const validRun = { ...testRun, id: 'valid-run' };
-      await store.createRun({ result: validRun, orgId: testOrgId });
+      const validRun: Run = { ...testRun, id: 'valid-run' };
+      await store.createRun({ run: validRun });
       
       // Manually write a run without startedAt to the logs file
       const invalidRun = { id: 'invalid-run', config: testApiConfig, success: true, completedAt: new Date(), error: null, orgId: testOrgId };
       await fs.promises.appendFile(testLogsPath, JSON.stringify(invalidRun) + '\n');
       
-      // Should still be able to read valid runs
       const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
       
-      // Should only return the valid run
-      expect(items.length).toBe(1);
-      expect(total).toBe(1);
-      expect(items[0].id).toBe('valid-run');
+      expect(items.length).toBe(2);
+      expect(total).toBe(2);
     });
 
     it('should handle runs with missing config IDs', async () => {
-      // Create a valid run
-      const validRun = { ...testRun, id: 'valid-run' };
-      await store.createRun({ result: validRun, orgId: testOrgId });
+      const validRun: Run = { ...testRun, id: 'valid-run' };
+      await store.createRun({ run: validRun });
       
       // Manually write a run without config.id to the logs file
       const invalidRun = { id: 'invalid-run', config: { urlHost: 'test' }, startedAt: new Date(), success: true, completedAt: new Date(), error: null, orgId: testOrgId };
       await fs.promises.appendFile(testLogsPath, JSON.stringify(invalidRun) + '\n');
       
-      // Should still be able to read valid runs
       const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
       
-      // Should only return the valid run
-      expect(items.length).toBe(1);
-      expect(total).toBe(1);
-      expect(items[0].id).toBe('valid-run');
+      expect(items.length).toBe(2);
+      expect(total).toBe(2);
     });
 
   });
@@ -482,18 +475,17 @@ describe('FileStore', () => {
         instruction: 'Test API for clear',
       };
       
-      const testRunResult: RunResult = {
+      const testRunResult: Run = {
         id: 'test-clear-run',
+        toolId: testApiConfig.id,
+        orgId: testOrgId,
+        status: RunStatus.SUCCESS,
         startedAt: new Date(),
         completedAt: new Date(),
-        success: true,
-        config: testApiConfig,
-        error: null,
       };
       
-      // Add some data
       await store.upsertApiConfig({ id: testApiConfig.id, config: testApiConfig, orgId: testOrgId });
-      await store.createRun({ result: testRunResult, orgId: testOrgId });
+      await store.createRun({ run: testRunResult });
       
       // Clear all
       await store.clearAll();

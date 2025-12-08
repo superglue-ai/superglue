@@ -6,14 +6,14 @@ import type { Editor } from '@tiptap/react';
 
 interface UseTemplateAwareEditorOptions {
     stepData: any;
-    loopData?: any;
+    dataSelectorOutput?: any;
     categorizedVariables: CategorizedVariables;
     categorizedSources?: CategorizedSources;
 }
 
 export function useTemplateAwareEditor({
     stepData,
-    loopData,
+    dataSelectorOutput,
     categorizedVariables,
     categorizedSources,
 }: UseTemplateAwareEditorOptions) {
@@ -22,7 +22,7 @@ export function useTemplateAwareEditor({
     const editorRef = useRef<Editor | null>(null);
     const suggestionDestroyRef = useRef<(() => void) | null>(null);
 
-    const sourceData = useMemo(() => prepareSourceData(stepData, loopData), [stepData, loopData]);
+    const sourceData = useMemo(() => prepareSourceData(stepData, dataSelectorOutput), [stepData, dataSelectorOutput]);
 
     const suggestionConfig = useMemo(() => createVariableSuggestionConfig({
         categorizedVariables,

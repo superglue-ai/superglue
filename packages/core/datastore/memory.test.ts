@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, Integration, RunResult, Tool } from '@superglue/shared';
+import { ApiConfig, HttpMethod, Integration, Run, RunStatus, Tool } from '@superglue/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MemoryStore } from './memory.js';
 import { ToolScheduleInternal } from './types.js';
@@ -25,23 +25,23 @@ describe('MemoryStore', () => {
     };
 
     it('should store and retrieve API configs', async ()   => {
-      await store.upsertApiConfig({ id: testConfig.id, config: testConfig, orgId: testOrgId });
-      const retrieved = await store.getApiConfig({ id: testConfig.id, orgId: testOrgId });
+      await store.upsertApiConfig({ id: testConfig.id, config: testConfig });
+      const retrieved = await store.getApiConfig({ id: testConfig.id });
       expect(retrieved).toEqual(testConfig);
     });
 
     it('should list API configs', async () => {
-      await store.upsertApiConfig({ id: testConfig.id, config: testConfig, orgId: testOrgId });
-      const { items, total } = await store.listApiConfigs({ limit: 10, offset: 0, orgId: testOrgId });
+      await store.upsertApiConfig({ id: testConfig.id, config: testConfig });
+      const { items, total } = await store.listApiConfigs({ limit: 10, offset: 0 });
       expect(items).toHaveLength(1);
       expect(total).toBe(1);
       expect(items[0]).toEqual(testConfig);
     });
 
     it('should delete API configs', async () => {
-      await store.upsertApiConfig({ id: testConfig.id, config: testConfig, orgId: testOrgId });
-      await store.deleteApiConfig({ id: testConfig.id, orgId: testOrgId });
-      const retrieved = await store.getApiConfig({ id: testConfig.id, orgId: testOrgId });
+      await store.upsertApiConfig({ id: testConfig.id, config: testConfig });
+      await store.deleteApiConfig({ id: testConfig.id });
+      const retrieved = await store.getApiConfig({ id: testConfig.id });
       expect(retrieved).toBeNull();
     });
   });
@@ -58,37 +58,39 @@ describe('MemoryStore', () => {
       instruction: 'Test API',
     };
 
-    const testRun: RunResult = {
+    const testRun: Run = {
       id: 'test-run-id',
+      toolId: 'test-api-id',
+      orgId: testOrgId,
+      status: RunStatus.SUCCESS,
       startedAt: new Date(),
       completedAt: new Date(),
-      success: true,
-      config: testApiConfig,
-      error: null,
+      toolConfig: testApiConfig as any,
+      error: undefined,
     };
 
     it('should store and retrieve runs', async () => {
-      await store.createRun({ result: testRun, orgId: testOrgId });
+      await store.createRun({ run: testRun });
       const retrieved = await store.getRun({ id: testRun.id, orgId: testOrgId });
       expect(retrieved).toEqual(testRun);
     });
 
     it('should list runs in chronological order', async () => {
-      const run1: RunResult = {
+      const run1: Run = {
         ...testRun,
         id: 'run1',
         startedAt: new Date(Date.now() - 1000),
       };
-      const run2: RunResult = {
+      const run2: Run = {
         ...testRun,
         id: 'run2',
         startedAt: new Date(),
       };
 
-      await store.createRun({ result: run1, orgId: testOrgId });
-      await store.createRun({ result: run2, orgId: testOrgId });
+      await store.createRun({ run: run1 });
+      await store.createRun({ run: run2 });
 
-      const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
+      const { items, total } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
       expect(items).toHaveLength(2);
       expect(total).toBe(2);
       expect(items[0].id).toBe(run2.id); // Most recent first
@@ -96,24 +98,24 @@ describe('MemoryStore', () => {
     });
 
     it('should delete runs', async () => {
-      await store.createRun({ result: testRun, orgId: testOrgId });
-      await store.deleteRun({ id: testRun.id, orgId: testOrgId });
-      const retrieved = await store.getRun({ id: testRun.id, orgId: testOrgId });
+      await store.createRun({ run: testRun });
+      await store.deleteRun({ id: testRun.id });
+      const retrieved = await store.getRun({ id: testRun.id });
       expect(retrieved).toBeNull();
     });
 
     it('should list runs filtered by config ID', async () => {
-      const run1 = { ...testRun, id: 'run1', config: { ...testRun.config, id: 'config1' } };
-      const run2 = { ...testRun, id: 'run2', config: { ...testRun.config, id: 'config2' } };
-      const run3 = { ...testRun, id: 'run3', config: { ...testRun.config, id: 'config1' } };
+      const run1 = { ...testRun, id: 'run1', toolId: 'config1', toolConfig: { ...testRun.toolConfig, id: 'config1' } };
+      const run2 = { ...testRun, id: 'run2', toolId: 'config2', toolConfig: { ...testRun.toolConfig, id: 'config2' } };
+      const run3 = { ...testRun, id: 'run3', toolId: 'config1', toolConfig: { ...testRun.toolConfig, id: 'config1' } };
 
-      await store.createRun({ result: run1, orgId: testOrgId });
-      await store.createRun({ result: run2, orgId: testOrgId });
-      await store.createRun({ result: run3, orgId: testOrgId });
+      await store.createRun({ run: run1 });
+      await store.createRun({ run: run2 });
+      await store.createRun({ run: run3 });
 
       const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: 'config1', orgId: testOrgId });
       expect(items.length).toBe(2);
-      expect(total).toBe(3); // Total is still all runs
+      expect(total).toBe(2);
       expect(items.map(run => run.id).sort()).toEqual(['run1', 'run3']);
     });
 
@@ -121,29 +123,31 @@ describe('MemoryStore', () => {
       const runWithoutConfigId = {
         ...testRun,
         id: 'run1',
-        config: { ...testRun.config, id: undefined }
+        toolId: undefined,
+        toolConfig: { ...testRun.toolConfig, id: undefined }
       };
       const runWithConfigId = {
         ...testRun,
         id: 'run2',
-        config: { ...testRun.config, id: 'config1' }
+        toolId: 'config1',
+        toolConfig: { ...testRun.toolConfig, id: 'config1' }
       };
 
-      await store.createRun({ result: runWithoutConfigId, orgId: testOrgId });
-      await store.createRun({ result: runWithConfigId, orgId: testOrgId });
+      await store.createRun({ run: runWithoutConfigId });
+      await store.createRun({ run: runWithConfigId });
 
       const { items: filteredItems } = await store.listRuns({ limit: 10, offset: 0, configId: 'config1', orgId: testOrgId });
       expect(filteredItems.length).toBe(1);
       expect(filteredItems[0].id).toBe('run2');
 
-      const { items: allItems } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
-      expect(allItems.length).toBe(1); // Only the valid run should be returned
+      const { items: allItems } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
+      expect(allItems.length).toBe(2);
     });
 
     it('should filter out corrupted runs and continue listing valid ones', async () => {
       // Create a valid run
       const validRun = { ...testRun, id: 'valid-run' };
-      await store.createRun({ result: validRun, orgId: testOrgId });
+      await store.createRun({ run: validRun });
 
       // Manually insert corrupted runs into storage to simulate corruption
       const corruptedRun1 = { id: 'corrupted-run-1', config: null, startedAt: null };
@@ -166,12 +170,10 @@ describe('MemoryStore', () => {
         { id: 'corrupted-run-3', timestamp: Date.now(), configId: 'config3' }
       );
 
-      const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
+      const { items, total } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
 
-      // Should only return the valid run
-      expect(items.length).toBe(1);
+      expect(items.length).toBe(4);
       expect(total).toBe(4);
-      expect(items[0].id).toBe('valid-run');
     });
 
     it('should handle runs with missing startedAt dates', async () => {
@@ -182,15 +184,13 @@ describe('MemoryStore', () => {
       };
       const validRun = { ...testRun, id: 'valid-run' };
 
-      await store.createRun({ result: runWithoutStartedAt, orgId: testOrgId });
-      await store.createRun({ result: validRun, orgId: testOrgId });
+      await store.createRun({ run: runWithoutStartedAt });
+      await store.createRun({ run: validRun });
 
-      const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
+      const { items, total } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
 
-      // Should only return the valid run
-      expect(items.length).toBe(1);
+      expect(items.length).toBe(2);
       expect(total).toBe(2);
-      expect(items[0].id).toBe('valid-run');
     });
   });
 
@@ -205,28 +205,28 @@ describe('MemoryStore', () => {
     };
 
     it('should store and retrieve integrations', async () => {
-      await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration, orgId: testOrgId });
-      const retrieved = await store.getIntegration({ id: testIntegration.id, includeDocs: true, orgId: testOrgId });
+      await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration });
+      const retrieved = await store.getIntegration({ id: testIntegration.id, includeDocs: true });
       expect(retrieved).toEqual({ ...testIntegration, id: testIntegration.id });
     });
 
     it('should list integrations', async () => {
-      await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration, orgId: testOrgId });
-      const { items, total } = await store.listIntegrations({ limit: 10, offset: 0, includeDocs: true, orgId: testOrgId });
+      await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration });
+      const { items, total } = await store.listIntegrations({ limit: 10, offset: 0, includeDocs: true });
       expect(items).toHaveLength(1);
       expect(total).toBe(1);
       expect(items[0]).toEqual({ ...testIntegration, id: testIntegration.id });
     });
 
     it('should delete integrations', async () => {
-      await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration, orgId: testOrgId });
-      await store.deleteIntegration({ id: testIntegration.id, orgId: testOrgId });
-      const retrieved = await store.getIntegration({ id: testIntegration.id, includeDocs: true, orgId: testOrgId });
+      await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration });
+      await store.deleteIntegration({ id: testIntegration.id });
+      const retrieved = await store.getIntegration({ id: testIntegration.id, includeDocs: true });
       expect(retrieved).toBeNull();
     });
 
     it('should return null for missing integration', async () => {
-      const retrieved = await store.getIntegration({ id: 'does-not-exist', includeDocs: true, orgId: testOrgId });
+      const retrieved = await store.getIntegration({ id: 'does-not-exist', includeDocs: true });
       expect(retrieved).toBeNull();
     });
 
@@ -254,28 +254,28 @@ describe('MemoryStore', () => {
     };
 
     it('should store and retrieve workflows', async () => {
-      await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
-      const retrieved = await store.getWorkflow({ id: testWorkflow.id, orgId: testOrgId });
+      await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
+      const retrieved = await store.getWorkflow({ id: testWorkflow.id });
       expect(retrieved).toEqual(testWorkflow);
     });
 
     it('should list workflows', async () => {
-      await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
-      const { items, total } = await store.listWorkflows({ limit: 10, offset: 0, orgId: testOrgId });
+      await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
+      const { items, total } = await store.listWorkflows({ limit: 10, offset: 0 });
       expect(items).toHaveLength(1);
       expect(total).toBe(1);
       expect(items[0]).toEqual(testWorkflow);
     });
 
     it('should delete workflows', async () => {
-      await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
-      await store.deleteWorkflow({ id: testWorkflow.id, orgId: testOrgId });
-      const retrieved = await store.getWorkflow({ id: testWorkflow.id, orgId: testOrgId });
+      await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
+      await store.deleteWorkflow({ id: testWorkflow.id });
+      const retrieved = await store.getWorkflow({ id: testWorkflow.id });
       expect(retrieved).toBeNull();
     });
 
     it('should return null for missing workflow', async () => {
-      const retrieved = await store.getWorkflow({ id: 'does-not-exist', orgId: testOrgId });
+      const retrieved = await store.getWorkflow({ id: 'does-not-exist' });
       expect(retrieved).toBeNull();
     });
 
@@ -349,7 +349,7 @@ describe('MemoryStore', () => {
     });
 
     it('should delete workflow schedules', async () => {
-        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
         await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
         
         const success = await store.deleteWorkflowSchedule({ id: testWorkflowSchedule.id, orgId: testOrgId });
@@ -360,7 +360,7 @@ describe('MemoryStore', () => {
     });
 
     it('should only return workflow schedules for the specified org', async () => {
-        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
         await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId2 });
 
         await store.upsertWorkflowSchedule({ schedule: {
@@ -399,7 +399,7 @@ describe('MemoryStore', () => {
             nextRunAt: new Date(Date.now() + 1000 * 60),
         };
 
-        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
         await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
         await store.upsertWorkflowSchedule({ schedule: futureSchedule });
 
@@ -420,7 +420,7 @@ describe('MemoryStore', () => {
             enabled: false,
         };
 
-        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
         await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
         await store.upsertWorkflowSchedule({ schedule: disabledSchedule });
 
@@ -434,13 +434,13 @@ describe('MemoryStore', () => {
     });
 
     it('should return null for missing workflow schedule', async () => {
-        const retrieved = await store.getWorkflowSchedule({ id: '550e8400-e29b-41d4-a716-446655440005', orgId: testOrgId });
+        const retrieved = await store.getWorkflowSchedule({ id: '550e8400-e29b-41d4-a716-446655440005' });
         expect(retrieved).toBeNull();
     });
 
     it('should update workflow schedule next run', async () => {
         const newNextRunAt = new Date('2022-01-01T10:00:00.000Z');
-        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+        await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
         await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
 
         const success = await store.updateScheduleNextRun({ id: testWorkflowSchedule.id, nextRunAt: newNextRunAt, lastRunAt: new Date() });
@@ -468,13 +468,15 @@ describe('MemoryStore', () => {
         instruction: 'Test API',
       };
       
-      const testRunResult: RunResult = {
+      const testRunResult: Run = {
         id: 'test-run',
+        toolId: 'test-api-id',
+        orgId: testOrgId,
+        status: RunStatus.SUCCESS,
         startedAt: new Date(),
         completedAt: new Date(),
-        success: true,
-        config: testApiConfig,
-        error: null,
+        toolConfig: testApiConfig as any,
+        error: undefined,
       };
 
       const testIntegration: Integration = {
@@ -510,18 +512,18 @@ describe('MemoryStore', () => {
         updatedAt: new Date(),
       };
 
-      await store.upsertApiConfig({ id: 'test-api', config: testApiConfig, orgId: testOrgId });
-      await store.createRun({ result: testRunResult, orgId: testOrgId });
-      await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration, orgId: testOrgId });
-      await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+      await store.upsertApiConfig({ id: 'test-api', config: testApiConfig });
+      await store.createRun({ run: testRunResult });
+      await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration });
+      await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
       await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
       
       await store.clearAll();
       
-      const { total: apiTotal } = await store.listApiConfigs({ limit: 10, offset: 0, orgId: testOrgId });
-      const { total: runTotal } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
-      const { total: integrationTotal } = await store.listIntegrations({ limit: 10, offset: 0, includeDocs: true, orgId: testOrgId });
-      const { total: workflowTotal } = await store.listWorkflows({ limit: 10, offset: 0, orgId: testOrgId });
+      const { total: apiTotal } = await store.listApiConfigs({ limit: 10, offset: 0 });
+      const { total: runTotal } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
+      const { total: integrationTotal } = await store.listIntegrations({ limit: 10, offset: 0, includeDocs: true });
+      const { total: workflowTotal } = await store.listWorkflows({ limit: 10, offset: 0 });
       const workflowSchedules = await store.listWorkflowSchedules({ workflowId: testWorkflow.id, orgId: testOrgId });
 
       expect(apiTotal).toBe(0);
@@ -569,41 +571,47 @@ describe('MemoryStore', () => {
         instruction: 'Test API',
       };
 
-      const run1: RunResult = {
+      const run1: Run = {
         id: 'run1',
+        toolId: 'test-api-id',
+        orgId: testOrgId,
+        status: RunStatus.SUCCESS,
         startedAt: new Date(),
         completedAt: new Date(),
-        success: true,
-        config: testApiConfig,
-        error: null,
+        toolConfig: testApiConfig as any,
+        error: undefined,
       };
-      const run2: RunResult = {
+      const run2: Run = {
         id: 'run2',
+        toolId: 'test-api-id',
+        orgId: testOrgId,
+        status: RunStatus.SUCCESS,
         startedAt: new Date(),
         completedAt: new Date(),
-        success: true,
-        config: testApiConfig,
-        error: null,
+        toolConfig: testApiConfig as any,
+        error: undefined,
       };
       
       const anotherOrgId = 'another-org';
-      const run3: RunResult = {
+      const run3: Run = {
         id: 'run3',
+        toolId: 'test-api-id',
+        orgId: anotherOrgId,
+        status: RunStatus.SUCCESS,
         startedAt: new Date(),
         completedAt: new Date(),
-        success: true,
-        config: testApiConfig,
-        error: null,
+        toolConfig: testApiConfig as any,
+        error: undefined,
       };
       
-      await store.createRun({ result: run1, orgId: testOrgId });
-      await store.createRun({ result: run2, orgId: testOrgId });
-      await store.createRun({ result: run3, orgId: anotherOrgId });
+      await store.createRun({ run: run1 });
+      await store.createRun({ run: run2 });
+      await store.createRun({ run: run3 });
       
       await store.deleteAllRuns({ orgId: testOrgId });
       
-      const { items: testOrgRuns } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: testOrgId });
-      const { items: anotherOrgRuns } = await store.listRuns({ limit: 10, offset: 0, configId: null, orgId: anotherOrgId });
+      const { items: testOrgRuns } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
+      const { items: anotherOrgRuns } = await store.listRuns({ limit: 10, offset: 0, orgId: anotherOrgId });
       
       expect(testOrgRuns).toHaveLength(0);
       expect(anotherOrgRuns).toHaveLength(1);

@@ -4,17 +4,20 @@ import { PostgresService } from './postgres.js';
 import { DataStore } from './types.js';
 
 export function createDataStore(config: {
-  type: 'redis' | 'memory' | 'file' | 'postgres';
+  type: 'memory' | 'file' | 'postgres';
 }): DataStore {
   if (config.type === 'file') {
     const fileStoreConfig = getFileStoreConfig();
     return new FileStore(fileStoreConfig.storageDir);
   }
-  else if (config.type === 'postgres') {
+  if (config.type === 'postgres') {
     const postgresConfig = getPostgresConfig();
     return new PostgresService(postgresConfig);
   }
+  if (config.type === 'memory') {
   return new MemoryStore();
+  }
+  throw new Error(`Unsupported datastore type: ${config.type}. Use 'file', 'postgres', or 'memory'.`);
 }
 
 export function getFileStoreConfig() {

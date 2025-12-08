@@ -11,8 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import { RunResult, SuperglueClient } from '@superglue/shared';
-import { AlertCircle, Calendar, CheckCircle, ChevronRight, Clock, Hash, Loader2 } from 'lucide-react';
+import { Run, RunStatus, SuperglueClient } from '@superglue/shared';
+import { AlertTriangle, Calendar, CheckCircle, ChevronDown, ChevronRight, Clock, Loader2, XCircle } from 'lucide-react';
+import { CopyButton } from '@/src/components/tools/shared/CopyButton';
 import React from 'react';
 
 // Helper function to recursively remove null values from objects
@@ -40,7 +41,7 @@ const removeNullFields = (obj: any): any => {
 };
 
 const RunsTable = ({ id }: { id?: string }) => {
-  const [runs, setRuns] = React.useState<RunResult[]>([]);
+  const [runs, setRuns] = React.useState<Run[]>([]);
   const [expandedRunId, setExpandedRunId] = React.useState<string | null>(null);
   const [runDetails, setRunDetails] = React.useState<Record<string, any>>({});
   const [loadingDetails, setLoadingDetails] = React.useState<Record<string, boolean>>({});
@@ -70,7 +71,7 @@ const RunsTable = ({ id }: { id?: string }) => {
     getRuns();
   }, [currentPage]);
 
-  const handleRunClick = async (run: RunResult) => {
+  const handleRunClick = async (run: Run) => {
     // Toggle expansion
     if (expandedRunId === run.id) {
       setExpandedRunId(null);
@@ -122,14 +123,14 @@ const RunsTable = ({ id }: { id?: string }) => {
       </div>
 
       <div className="border rounded-lg">
-        <Table>
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow>
-              <TableHead>Tool Id</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Started At</TableHead>
-              <TableHead>Completed At</TableHead>
-              <TableHead>Duration</TableHead>
+              <TableHead className="w-[400px]">Tool ID</TableHead>
+              <TableHead className="w-[110px]">Status</TableHead>
+              <TableHead className="w-[180px]">Started At</TableHead>
+              <TableHead className="w-[180px]">Completed At</TableHead>
+              <TableHead className="w-[100px]">Duration</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -140,23 +141,42 @@ const RunsTable = ({ id }: { id?: string }) => {
                   onClick={() => handleRunClick(run)}
                 >
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 max-w-[360px]">
                       <ChevronRight 
-                        className={`h-4 w-4 transition-transform ${expandedRunId === run.id ? 'rotate-90' : ''}`}
+                        className={`h-4 w-4 flex-shrink-0 transition-transform ${expandedRunId === run.id ? 'rotate-90' : ''}`}
                       />
-                      {run.config?.id ?? "undefined"}
+                      <span className="truncate" title={run.toolId ?? "undefined"}>
+                      {run.toolId ?? "undefined"}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-sm font-medium ${run.success ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white'
-                      }`}>
-                      {run.success ? 'Success' : 'Failed'}
-                    </span>
+                    {run.status === RunStatus.SUCCESS ? (
+                      <Badge variant="default" className="bg-emerald-500 hover:bg-emerald-500 gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        Success
+                      </Badge>
+                    ) : run.status === RunStatus.RUNNING ? (
+                      <Badge variant="default" className="bg-blue-500 hover:bg-blue-500 gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Running
+                      </Badge>
+                    ) : run.status === RunStatus.ABORTED ? (
+                      <Badge variant="default" className="bg-amber-500 hover:bg-amber-500 gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Aborted
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive" className="hover:bg-destructive gap-1">
+                        <XCircle className="h-3 w-3" />
+                        Failed
+                      </Badge>
+                    )}
                   </TableCell>
-                  <TableCell>{new Date(run.startedAt).toLocaleString()}</TableCell>
-                  <TableCell>{new Date(run.completedAt).toLocaleString()}</TableCell>
-                  <TableCell>
-                    {(new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime())}ms
+                  <TableCell className="whitespace-nowrap">{new Date(run.startedAt).toLocaleString()}</TableCell>
+                  <TableCell className="whitespace-nowrap">{run.completedAt ? new Date(run.completedAt).toLocaleString() : '-'}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {run.completedAt ? (new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()) + 'ms' : '-'}
                   </TableCell>
                 </TableRow>
                 
@@ -203,75 +223,94 @@ const RunsTable = ({ id }: { id?: string }) => {
   );
 };
 
-// Separate component for run details
-const RunDetails = ({ run }: { run: any }) => {
-  if (!run) return null;
+const CollapsibleSection = ({ 
+  title, 
+  children, 
+  defaultOpen = false,
+  isFirst = false,
+  isLast = false
+}: { 
+  title: string; 
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+  isFirst?: boolean;
+  isLast?: boolean;
+}) => {
+  const [isOpen, setIsOpen] = React.useState(defaultOpen);
   
   return (
-    <div className="p-6 space-y-6 max-h-[600px] overflow-y-auto">
-      {/* Header with ID */}
-      <div className="flex items-center gap-2 pb-4 border-b">
-        <Hash className="h-5 w-5 text-muted-foreground" />
-        <h3 className="text-lg font-semibold">Run Details: {run.id}</h3>
-      </div>
-      
-      {/* Status and Timing */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-muted-foreground">Status</h4>
+    <div className={`border-x border-t ${isLast && !isOpen ? 'border-b' : ''} ${isFirst ? 'rounded-t-lg' : ''} ${isLast ? 'rounded-b-lg' : ''}`}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted/30 transition-colors"
+      >
+        {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        {title}
+      </button>
+      {isOpen && (
+        <div className={`px-3 pb-3 ${isLast ? 'border-b rounded-b-lg' : 'border-b'}`}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const RunDetails = ({ run }: { run: any }) => {
+  if (!run) return null;
+
+  const cleanedToolConfig = run.toolConfig ? removeNullFields(run.toolConfig) : null;
+  const cleanedOptions = run.options ? removeNullFields(run.options) : null;
+  const cleanedToolResult = run.toolResult ? removeNullFields(run.toolResult) : null;
+  const cleanedToolPayload = run.toolPayload ? removeNullFields(run.toolPayload) : null;
+  
+  const hasToolConfig = cleanedToolConfig && Object.keys(cleanedToolConfig).length > 0;
+  const hasOptions = cleanedOptions && Object.keys(cleanedOptions).length > 0;
+  const hasToolResult = cleanedToolResult && (Array.isArray(cleanedToolResult) ? cleanedToolResult.length > 0 : Object.keys(cleanedToolResult).length > 0);
+  const hasToolPayload = cleanedToolPayload && Object.keys(cleanedToolPayload).length > 0;
+  const hasStepResults = run.stepResults && run.stepResults.length > 0;
+  const isAborted = run.status === RunStatus.ABORTED;
+  const isFailed = run.status === RunStatus.FAILED;
+  
+  return (
+    <div className="p-6 space-y-4 max-h-[600px] overflow-y-auto [scrollbar-gutter:stable]">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-muted-foreground">Run ID</h4>
           <div className="flex items-center gap-2">
-            {run.success ? (
-              <>
-                <CheckCircle className="h-5 w-5 text-emerald-500" />
-                <Badge variant="default" className="bg-emerald-500">
-                  Success
-                </Badge>
-              </>
-            ) : (
-              <>
-                <AlertCircle className="h-5 w-5 text-red-500" />
-                <Badge variant="destructive">
-                  Failed
-                </Badge>
-              </>
-            )}
+            <span className="text-sm font-mono truncate" title={run.id}>{run.id}</span>
+            <CopyButton text={run.id} />
           </div>
-          {run.statusCode && (
-            <p className="text-sm text-muted-foreground">
-              Status Code: {run.statusCode}
-            </p>
-          )}
+      </div>
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-muted-foreground">Duration</h4>
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm">
+              {run.completedAt ? `${new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()}ms` : '-'}
+            </span>
+          </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           <h4 className="text-sm font-medium text-muted-foreground">Timing</h4>
-          <div className="space-y-2 text-sm">
+          <div className="space-y-1 text-sm">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <span>Started: {new Date(run.startedAt).toLocaleString()}</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
-              <span>Completed: {new Date(run.completedAt).toLocaleString()}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span>
-                Duration: {(new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime())}ms
-              </span>
+              <span>Completed: {run.completedAt ? new Date(run.completedAt).toLocaleString() : '-'}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Error Message */}
-      {run.error && (
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-red-500" />
-            Error Message
-          </h4>
-          <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg">
+      {isFailed && run.error && (
+        <div className="space-y-1">
+          <h4 className="text-sm font-medium text-muted-foreground">Error Message</h4>
+          <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg">
             <pre className="text-sm text-red-700 dark:text-red-400 whitespace-pre-wrap font-mono">
               {run.error}
             </pre>
@@ -279,74 +318,91 @@ const RunDetails = ({ run }: { run: any }) => {
         </div>
       )}
 
-      {/* Step Results (for tools) */}
-      {run?.stepResults && run.stepResults.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium text-muted-foreground">Tool Steps</h4>
+      {(() => {
+        const sections = [
+          hasToolPayload && { key: 'payload', title: 'Tool Payload', content: (
+            <div className="relative">
+              <div className="absolute top-2 right-2">
+                <CopyButton getData={() => JSON.stringify(cleanedToolPayload, null, 2)} />
+              </div>
+              <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md">
+                {JSON.stringify(cleanedToolPayload, null, 2)}
+              </pre>
+            </div>
+          )},
+          hasOptions && { key: 'options', title: 'Execution Options', content: (
+            <div className="relative">
+              <div className="absolute top-2 right-2">
+                <CopyButton getData={() => JSON.stringify(cleanedOptions, null, 2)} />
+              </div>
+              <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md">
+                {JSON.stringify(cleanedOptions, null, 2)}
+              </pre>
+            </div>
+          )},
+          hasToolConfig && { key: 'config', title: 'Tool Configuration', content: (
+            <div className="relative">
+              <div className="absolute top-2 right-2">
+                <CopyButton getData={() => JSON.stringify(cleanedToolConfig, null, 2)} />
+              </div>
+              <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md">
+                {JSON.stringify(cleanedToolConfig, null, 2)}
+              </pre>
+            </div>
+          )},
+          hasStepResults && { key: 'steps', title: `Step Results (${run.stepResults.length})`, content: (
           <div className="space-y-2">
             {run.stepResults.map((step: any, index: number) => (
-              <div 
-                key={step.stepId} 
-                className="p-4 border rounded-lg space-y-2"
-              >
+                <div key={step.stepId} className="p-3 border rounded-lg space-y-2">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">Step {index + 1}: {step.stepId}</span>
-                  </div>
-                  <Badge variant={step.success ? "default" : "destructive"} className={step.success ? "bg-emerald-500" : ""}>
+                    <span className="font-medium text-sm">Step {index + 1}: {step.stepId}</span>
+                    <Badge variant={step.success ? "default" : "destructive"} className={step.success ? "bg-emerald-500 hover:bg-emerald-500" : "hover:bg-destructive"}>
                     {step.success ? "Success" : "Failed"}
                   </Badge>
                 </div>
-                
                 {step.error && (
-                  <div className="mt-2 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded">
-                    <p className="text-sm font-medium text-red-700 dark:text-red-400">Step Error:</p>
-                    <pre className="text-xs text-red-600 dark:text-red-500 mt-1 whitespace-pre-wrap font-mono">
-                      {step.error}
+                    <div className="p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded text-xs">
+                      <pre className="text-red-600 dark:text-red-500 whitespace-pre-wrap font-mono">{step.error}</pre>
+                    </div>
+                  )}
+                  {step.data && (
+                    <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-2 rounded-md max-h-[200px] overflow-y-auto">
+                      {JSON.stringify(removeNullFields(step.data), null, 2)}
                     </pre>
-                  </div>
                 )}
               </div>
             ))}
           </div>
+          )},
+          hasToolResult && { key: 'result', title: 'Tool Result', content: (
+            <div className="relative">
+              <div className="absolute top-2 right-2 z-10">
+                <CopyButton getData={() => JSON.stringify(cleanedToolResult, null, 2)} />
         </div>
-      )}
-
-      {/* Response Headers */}
-      {run.headers && Object.keys(run.headers).length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium text-muted-foreground">Response Headers</h4>
-          <div className="p-4 bg-muted/30 rounded-lg">
-            <pre className="text-xs font-mono whitespace-pre-wrap">
-              {JSON.stringify(run.headers, null, 2)}
+              <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md max-h-[300px] overflow-y-auto">
+                {JSON.stringify(cleanedToolResult, null, 2)}
             </pre>
-          </div>
-        </div>
-      )}
+            </div>
+          )},
+        ].filter(Boolean) as { key: string; title: string; content: React.ReactNode }[];
 
-      {/* Response Data */}
-      {run.data && (
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium text-muted-foreground">Response Data</h4>
-          <div className="p-4 bg-muted/30 rounded-lg">
-            <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto">
-              {JSON.stringify(run.data, null, 2)}
-            </pre>
-          </div>
-        </div>
-      )}
+        if (sections.length === 0) return null;
 
-      {/* Configuration */}
-      {run.config && (
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium text-muted-foreground">Configuration</h4>
-          <div className="p-4 bg-muted/30 rounded-lg">
-            <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto">
-              {JSON.stringify(removeNullFields(run.config), null, 2)}
-            </pre>
+        return (
+          <div>
+            {sections.map((section, idx) => (
+              <CollapsibleSection
+                key={section.key}
+                title={section.title}
+                isFirst={idx === 0}
+                isLast={idx === sections.length - 1}
+              >
+                {section.content}
+              </CollapsibleSection>
+            ))}
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataStore } from '../datastore/types.js';
+import { WorkerPools } from '../graphql/types.js';
 import { WorkflowSchedulerWorker } from './scheduler-worker.js';
 
 vi.mock('../graphql/resolvers/workflow.js', () => ({
@@ -17,12 +18,19 @@ const mockDatastore = {
     updateScheduleNextRun: vi.fn()
 } as unknown as DataStore;
 
+const mockWorkerPools = {
+    toolExecution: {
+        runTask: vi.fn(),
+        abortTask: vi.fn()
+    }
+} as unknown as WorkerPools;
+
 describe('WorkflowScheduler', () => {
     let scheduler: WorkflowSchedulerWorker;
     
     beforeEach(() => {
         vi.clearAllMocks();
-        scheduler = new WorkflowSchedulerWorker(mockDatastore, 100);
+        scheduler = new WorkflowSchedulerWorker(mockDatastore, mockWorkerPools, 100);
     });
 
     it('should start and stop interval correctly', async () => {
@@ -86,6 +94,7 @@ describe('WorkflowScheduler', () => {
             },
             expect.objectContaining({
                 datastore: mockDatastore,
+                workerPools: mockWorkerPools,
                 orgId: 'org-1',
                 traceId: expect.any(String),
                 toMetadata: expect.any(Function)

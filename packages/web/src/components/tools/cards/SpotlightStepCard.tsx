@@ -17,14 +17,16 @@ import {
     DropdownMenuTrigger,
 } from '@/src/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { Integration } from '@superglue/shared';
-import { assertValidArrowFunction } from '@superglue/shared';
-import { Bug, ChevronDown, FileBraces, FileInput, FileOutput, Play, RotateCw, Route, Trash2, Wand2 } from 'lucide-react';
+import { Integration, assertValidArrowFunction, executeWithVMHelpers } from '@superglue/shared';
+import { Bug, ChevronDown, FileBraces, FileInput, FileOutput, Play, RotateCw, Route, Square, Trash2, Wand2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { type CategorizedSources } from '../templates/tiptap/TemplateContext';
 import { StepInputTab } from './tabs/StepInputTab';
 import { StepConfigTab } from './tabs/StepConfigTab';
 import { StepResultTab } from './tabs/StepResultTab';
+
+const dataSelectorOutputCache = new Map<string, { output: any; error: string | null }>();
+let lastSeenDataSelectorVersion: number | undefined = undefined;
 
 export const SpotlightStepCard = React.memo(({
     step,
@@ -37,6 +39,7 @@ export const SpotlightStepCard = React.memo(({
     onExecuteStep,
     onExecuteStepWithLimit,
     onOpenFixStepDialog,
+    onAbort,
     canExecute,
     isExecuting,
     isGlobalExecuting,
@@ -44,11 +47,13 @@ export const SpotlightStepCard = React.memo(({
     integrations,
     readOnly,
     failedSteps = [],
+    abortedSteps = [],
     showOutputSignal,
     onConfigEditingChange,
-    onLoopInfoChange,
+    onDataSelectorChange,
     isFirstStep = false,
     isPayloadValid = true,
+    sourceDataVersion,
 }: {
     step: any;
     stepIndex: number;
@@ -60,6 +65,7 @@ export const SpotlightStepCard = React.memo(({
     onExecuteStep?: () => Promise<void>;
     onExecuteStepWithLimit?: (limit: number) => Promise<void>;
     onOpenFixStepDialog?: () => void;
+    onAbort?: () => void;
     canExecute?: boolean;
     isExecuting?: boolean;
     isGlobalExecuting?: boolean;
@@ -67,26 +73,53 @@ export const SpotlightStepCard = React.memo(({
     integrations?: Integration[];
     readOnly?: boolean;
     failedSteps?: string[];
+    abortedSteps?: string[];
     stepResultsMap?: Record<string, any>;
     showOutputSignal?: number;
     onConfigEditingChange?: (editing: boolean) => void;
-    onLoopInfoChange?: (loopCount: number | null) => void;
+    onDataSelectorChange?: (itemCount: number | null, isInitial: boolean) => void;
     isFirstStep?: boolean;
     isPayloadValid?: boolean;
+    sourceDataVersion?: number;
 }) => {
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
     const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [pendingAction, setPendingAction] = useState<'execute' | null>(null);
     
     const DATA_SELECTOR_DEBOUNCE_MS = 400;
-    const [loopItems, setLoopItems] = useState<any | null>(null);
-    const [loopItemsError, setLoopItemsError] = useState<string | null>(null);
+    
+    if (sourceDataVersion !== lastSeenDataSelectorVersion) {
+        dataSelectorOutputCache.clear();
+        lastSeenDataSelectorVersion = sourceDataVersion;
+    }
+    
+    const dataSelectorCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
+    const cachedOutput = dataSelectorOutputCache.get(dataSelectorCacheKey);
+    
+    const [dataSelectorOutput, setDataSelectorOutput] = useState<any | null>(() => cachedOutput?.output ?? null);
+    const [dataSelectorError, setDataSelectorError] = useState<string | null>(() => cachedOutput?.error ?? null);
     const lastEvalTimerRef = useRef<number | null>(null);
+    const prevShowOutputSignalRef = useRef<number | undefined>(undefined);
+    const lastNotifiedStepIdRef = useRef<string | null>(null);
 
     useEffect(() => {
-        if (showOutputSignal && stepResult != null) {
+        const currentCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
+        const cached = dataSelectorOutputCache.get(currentCacheKey);
+        if (cached) {
+            setDataSelectorOutput(cached.output);
+            setDataSelectorError(cached.error);
+        } else {
+            setDataSelectorOutput(null);
+            setDataSelectorError(null);
+        }
+    }, [step.id]);
+
+    useEffect(() => {
+        if (showOutputSignal && showOutputSignal !== prevShowOutputSignalRef.current && stepResult != null) {
             setActivePanel('output');
         }
+        prevShowOutputSignalRef.current = showOutputSignal;
     }, [showOutputSignal, stepResult]);
 
     useEffect(() => {
@@ -94,25 +127,26 @@ export const SpotlightStepCard = React.memo(({
             window.clearTimeout(lastEvalTimerRef.current);
             lastEvalTimerRef.current = null;
         }
-        setLoopItemsError(null);
+        setDataSelectorError(null);
+        
+        const currentCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
+        
         const t = window.setTimeout(() => {
             try {
-                let sel = step?.loopSelector;
-                const raw = assertValidArrowFunction(sel).trim();
-                const stripped = raw.replace(/;\s*$/, '');
-                const body = `const __selector = (${stripped});\nreturn __selector(sourceData);`;
-                // eslint-disable-next-line no-new-func
-                const fn = new Function('sourceData', body);
-                const out = fn(evolvingPayload || {});
+                const sel = step?.loopSelector;
+                assertValidArrowFunction(sel);
+                const out = executeWithVMHelpers(sel, evolvingPayload || {});
+                
                 if (typeof out === 'function') {
                     throw new Error('Data selector returned a function. Did you forget to call it?');
                 }
                 const normalizedOut = out === undefined ? null : out;
-                setLoopItems(normalizedOut);
-                setLoopItemsError(null);
+                dataSelectorOutputCache.set(currentCacheKey, { output: normalizedOut, error: null });
+                setDataSelectorOutput(normalizedOut);
+                setDataSelectorError(null);
             } catch (err: any) {
-                setLoopItems(null);
-                let errorMessage = 'Error evaluating loop selector';
+                setDataSelectorOutput(null);
+                let errorMessage = 'Error evaluating data selector';
                 if (err) {
                     if (err instanceof Error) {
                         errorMessage = err.message || errorMessage;
@@ -124,7 +158,8 @@ export const SpotlightStepCard = React.memo(({
                         errorMessage = String(err);
                     }
                 }
-                setLoopItemsError(errorMessage);
+                dataSelectorOutputCache.set(currentCacheKey, { output: null, error: errorMessage });
+                setDataSelectorError(errorMessage);
             }
         }, DATA_SELECTOR_DEBOUNCE_MS);
         lastEvalTimerRef.current = t as unknown as number;
@@ -134,15 +169,20 @@ export const SpotlightStepCard = React.memo(({
                 lastEvalTimerRef.current = null; 
             } 
         };
-    }, [step.executionMode, step.loopSelector, evolvingPayload]);
+    }, [step.id, step.executionMode, step.loopSelector, evolvingPayload]);
 
     useEffect(() => {
-        if (!loopItemsError && loopItems && Array.isArray(loopItems)) {
-            onLoopInfoChange?.(loopItems.length);
-        } else {
-            onLoopInfoChange?.(null);
+        const hasValidOutput = !dataSelectorError && dataSelectorOutput != null;
+        const isInitialForThisStep = lastNotifiedStepIdRef.current !== step.id;
+        
+        const itemCount = (hasValidOutput && Array.isArray(dataSelectorOutput)) ? dataSelectorOutput.length : null;
+        console.log('[DataSelector]', step.id, 'isInitial:', isInitialForThisStep, 'itemCount:', itemCount);
+        onDataSelectorChange?.(itemCount, isInitialForThisStep);
+        
+        if (isInitialForThisStep) {
+            lastNotifiedStepIdRef.current = step.id;
         }
-    }, [loopItems, loopItemsError, onLoopInfoChange]);
+    }, [dataSelectorOutput, dataSelectorError, onDataSelectorChange, step.id]);
 
     const handleRunStepClick = () => {
         if (isFirstStep && !isPayloadValid) {
@@ -166,49 +206,58 @@ export const SpotlightStepCard = React.memo(({
                     <div className="flex items-center gap-1.5">
                         {!readOnly && onExecuteStep && (
                             <div className="flex items-center">
-                                <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Run this step"}>
-                                    <div className={`relative flex rounded-md border border-input bg-background ${loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit ? '' : ''}`}>
-                                        <Button
-                                            variant="ghost"
-                                            onClick={handleRunStepClick}
-                                            disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                            className={`h-8 pl-3 gap-2 border-0 ${loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit ? 'pr-2 rounded-r-none' : 'pr-3'}`}
-                                        >
-                                            {isExecuting ? (
-                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                            ) : loopItems && Array.isArray(loopItems) && loopItems.length > 1 ? (
-                                                <RotateCw className="h-3.5 w-3.5" />
-                                            ) : (
-                                                <Play className="h-3 w-3" />
+                                {isExecuting && onAbort ? (
+                                    <Button
+                                        variant="outline"
+                                        onClick={onAbort}
+                                        className="h-8 px-3 gap-2"
+                                    >
+                                        <Square className="h-3 w-3" />
+                                        <span className="font-medium text-[13px]">Stop</span>
+                                    </Button>
+                                ) : (
+                                    <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Run this step"}>
+                                        <div className={`relative flex rounded-md border border-input bg-background ${dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 && onExecuteStepWithLimit ? '' : ''}`}>
+                                            <Button
+                                                variant="ghost"
+                                                onClick={handleRunStepClick}
+                                                disabled={!canExecute || isExecuting || isGlobalExecuting}
+                                                className={`h-8 pl-3 gap-2 border-0 ${dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 && onExecuteStepWithLimit ? 'pr-2 rounded-r-none' : 'pr-3'}`}
+                                            >
+                                                {dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 ? (
+                                                    <RotateCw className="h-3.5 w-3.5" />
+                                                ) : (
+                                                    <Play className="h-3 w-3" />
+                                                )}
+                                                <span className="font-medium text-[13px]">Run Step</span>
+                                            </Button>
+                                            {dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 && onExecuteStepWithLimit && (
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button
+                                                            variant="ghost"
+                                                            disabled={!canExecute || isExecuting || isGlobalExecuting}
+                                                            className="h-8 px-1.5 rounded-l-none border-0"
+                                                        >
+                                                            <ChevronDown className="h-3 w-3" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={() => onExecuteStepWithLimit(1)}>
+                                                            <Bug className="h-3.5 w-3.5 mr-2" />
+                                                            Run single iteration
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             )}
-                                            <span className="font-medium text-[13px]">Run Step</span>
-                                        </Button>
-                                        {loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit && (
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button
-                                                        variant="ghost"
-                                                        disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                                        className="h-8 px-1.5 rounded-l-none border-0"
-                                                    >
-                                                        <ChevronDown className="h-3 w-3" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem onClick={() => onExecuteStepWithLimit(1)}>
-                                                        <Bug className="h-3.5 w-3.5 mr-2" />
-                                                        Run single iteration
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        )}
-                                        {loopItems && Array.isArray(loopItems) && loopItems.length > 1 && (
-                                            <span className="absolute -top-2 -left-2 min-w-[16px] h-[16px] px-1 text-[10px] font-bold bg-primary text-primary-foreground rounded flex items-center justify-center">
-                                                {loopItems.length >= 1000 ? `${Math.floor(loopItems.length / 1000)}k` : loopItems.length}
-                                            </span>
-                                        )}
-                                    </div>
-                                </span>
+                                            {dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 && (
+                                                <span className="absolute -top-2 -left-2 min-w-[16px] h-[16px] px-1 text-[10px] font-bold bg-primary text-primary-foreground rounded flex items-center justify-center">
+                                                    {dataSelectorOutput.length >= 1000 ? `${Math.floor(dataSelectorOutput.length / 1000)}k` : dataSelectorOutput.length}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </span>
+                                )}
                             </div>
                         )}
                         {!readOnly && onOpenFixStepDialog && (
@@ -228,7 +277,7 @@ export const SpotlightStepCard = React.memo(({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => onRemove(step.id)}
+                                onClick={() => setShowDeleteConfirm(true)}
                                 className="h-8 w-8"
                             >
                                 <Trash2 className="h-4 w-4" />
@@ -237,7 +286,7 @@ export const SpotlightStepCard = React.memo(({
                     </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className={activePanel === 'config' ? 'space-y-1' : 'space-y-2'}>
                     <div className="flex items-center justify-between">
                         <Tabs value={activePanel} onValueChange={(v) => setActivePanel(v as 'input' | 'config' | 'output')}>
                             <TabsList className="h-9 p-1 rounded-md">
@@ -255,8 +304,8 @@ export const SpotlightStepCard = React.memo(({
                         </Tabs>
                     </div>
 
-                    <div className="mt-1">
-                        <div className={activePanel === 'input' ? 'block' : 'hidden'}>
+                    <div>
+                        {activePanel === 'input' && (
                             <StepInputTab
                                 step={step}
                                 stepIndex={stepIndex}
@@ -264,36 +313,37 @@ export const SpotlightStepCard = React.memo(({
                                 canExecute={canExecute}
                                 readOnly={readOnly}
                                 onEdit={onEdit}
-                                isActive={activePanel === 'input'}
+                                isActive={true}
+                                sourceDataVersion={sourceDataVersion}
                             />
-                        </div>
-
-                        <div className={activePanel === 'config' ? 'block' : 'hidden'}>
+                        )}
+                        {activePanel === 'config' && (
                             <StepConfigTab
                                 step={step}
                                 evolvingPayload={evolvingPayload}
-                                loopItems={loopItems}
+                                dataSelectorOutput={dataSelectorOutput}
                                 categorizedSources={categorizedSources}
                                 canExecute={canExecute}
                                 integrations={integrations}
                                 onEdit={onEdit}
                                 onEditingChange={onConfigEditingChange}
                                 onOpenFixStepDialog={onOpenFixStepDialog}
+                                sourceDataVersion={sourceDataVersion}
                             />
-                        </div>
-
-                        <div className={activePanel === 'output' ? 'block' : 'hidden'}>
+                        )}
+                        {activePanel === 'output' && (
                             <StepResultTab
                                 step={step}
                                 stepIndex={stepIndex}
                                 stepResult={stepResult}
                                 failedSteps={failedSteps}
+                                abortedSteps={abortedSteps}
                                 isExecuting={isExecuting}
                                 isGlobalExecuting={isGlobalExecuting}
                                 currentExecutingStepIndex={currentExecutingStepIndex}
-                                isActive={activePanel === 'output'}
+                                isActive={true}
                             />
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -322,6 +372,29 @@ export const SpotlightStepCard = React.memo(({
                             setPendingAction(null);
                         }}>
                             Run Anyway
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Step</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete step "{step.id}"? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={() => {
+                                setShowDeleteConfirm(false);
+                                onRemove?.(step.id);
+                            }}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Delete
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

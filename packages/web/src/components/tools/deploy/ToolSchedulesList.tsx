@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, Edit, Loader2, Play, Plus, Trash2, X } from "lucide-react";
+import { Check, Edit, Loader2, Play, Plus, Square, Trash2, X } from "lucide-react";
 import React from 'react';
 
 import { useConfig } from '@/src/app/config-context';
@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
+import { abortExecution, generateUUID, shouldDebounceAbort } from '@/src/lib/client-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
 import { SuperglueClient, ToolSchedule } from '@superglue/shared';
 import cronstrue from 'cronstrue';
@@ -30,6 +31,8 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
   const [editingSchedule, setEditingSchedule] = React.useState<ToolSchedule | null>(null);
   const [executingSchedules, setExecutingSchedules] = React.useState<Record<string, 'loading' | 'success' | 'error'>>({});
   const [scheduleStatus, setScheduleStatus] = React.useState<Record<string, { status: 'success' | 'error', message: string }>>({});
+  const [currentRunIds, setCurrentRunIds] = React.useState<Record<string, string>>({});
+  const lastAbortTimesRef = React.useRef<Record<string, number>>({});
 
   React.useEffect(() => {
     loadSchedules();
@@ -106,6 +109,8 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
     const schedule = toolSchedules.find(s => s.id === scheduleId);
     if (!schedule) return;
 
+    const runId = generateUUID();
+    setCurrentRunIds(prev => ({ ...prev, [scheduleId]: runId }));
     setExecutingSchedules(prev => ({ ...prev, [scheduleId]: 'loading' }));
 
     try {
@@ -122,7 +127,8 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
       const result = await superglueClient.executeWorkflow({
         tool: tool,
         payload: schedule.payload || {},
-        options: schedule.options || {}
+        options: schedule.options || {},
+        runId
       });
 
       if (result.success) {
@@ -137,6 +143,39 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
       const errorMessage = error.message || 'Unknown error';
       setExecutingSchedules(prev => ({ ...prev, [scheduleId]: 'error' }));
       setScheduleStatus(prev => ({ ...prev, [scheduleId]: { status: 'error', message: errorMessage } }));
+    } finally {
+      setCurrentRunIds(prev => {
+        const newState = { ...prev };
+        delete newState[scheduleId];
+        return newState;
+      });
+    }
+  };
+
+  const handleAbortSchedule = async (e: React.MouseEvent, scheduleId: string) => {
+    e.stopPropagation();
+    
+    const lastAbortTime = lastAbortTimesRef.current[scheduleId] || 0;
+    if (shouldDebounceAbort(lastAbortTime)) return;
+    
+    const runId = currentRunIds[scheduleId];
+    if (!runId) return;
+
+    lastAbortTimesRef.current[scheduleId] = Date.now();
+
+    const superglueClient = new SuperglueClient({
+      endpoint: config.superglueEndpoint,
+      apiKey: tokenRegistry.getToken()
+    });
+
+    const success = await abortExecution(superglueClient, runId);
+    if (success) {
+      setExecutingSchedules(prev => {
+        const newState = { ...prev };
+        delete newState[scheduleId];
+        return newState;
+      });
+      setScheduleStatus(prev => ({ ...prev, [scheduleId]: { status: 'error', message: 'Aborted' } }));
     }
   };
 
@@ -264,12 +303,12 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          onClick={(e) => handleRunNow(e, schedule.id)}
-                          disabled={!!executingSchedules[schedule.id]}
+                          onClick={(e) => executingSchedules[schedule.id] === 'loading' ? handleAbortSchedule(e, schedule.id) : handleRunNow(e, schedule.id)}
+                          disabled={executingSchedules[schedule.id] === 'success' || executingSchedules[schedule.id] === 'error'}
                         >
-                          {executingSchedules[schedule.id] === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
+                          {executingSchedules[schedule.id] === 'loading' && <Square className="h-4 w-4" />}
                           {executingSchedules[schedule.id] === 'success' && <Check className="h-4 w-4 text-green-500" />}
-                          {executingSchedules[schedule.id] === 'error' && <X className="h-4 w-4 text-red-500" />}
+                          {executingSchedules[schedule.id] === 'error' && <X className="h-4 w-4 text-amber-600" />}
                           {!executingSchedules[schedule.id] && <Play className="h-4 w-4" />}
                         </Button>
                       </span>

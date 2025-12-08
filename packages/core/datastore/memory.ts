@@ -1,11 +1,11 @@
-import { ApiConfig, Integration, RunResult, Tool, DiscoveryRun, FileReference, FileStatus } from "@superglue/shared";
+import { ApiConfig, Integration, Run, Tool, DiscoveryRun, FileReference, FileStatus } from "@superglue/shared";
 import { createHash } from 'node:crypto';
 import type { DataStore, ToolScheduleInternal } from "./types.js";
 
 export class MemoryStore implements DataStore {
   private storage: {
     apis: Map<string, ApiConfig>;
-    runs: Map<string, RunResult>;
+    runs: Map<string, Run>;
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
     workflows: Map<string, Tool>;
     workflowSchedules: Map<string, ToolScheduleInternal>;
@@ -77,8 +77,8 @@ export class MemoryStore implements DataStore {
     return this.storage.apis.delete(key);
   }
 
-  // Run Result Methods
-  async getRun(params: { id: string; orgId?: string }): Promise<RunResult | null> {
+  // Run Methods
+  async getRun(params: { id: string; orgId?: string }): Promise<Run | null> {
     const { id, orgId } = params;
     if (!id) return null;
     const key = this.getKey('run', id, orgId);
@@ -86,54 +86,73 @@ export class MemoryStore implements DataStore {
     return run ? { ...run, id } : null;
   }
 
-  async createRun(params: { result: RunResult; orgId?: string }): Promise<RunResult> {
-    const { result: run, orgId } = params;
-    if (!run) return null;
-    const key = this.getKey('run', run.id, orgId);
+  async createRun(params: { run: Run }): Promise<Run> {
+    const { run } = params;
+    if (!run) throw new Error('Run is required');
+    const key = this.getKey('run', run.id, run.orgId);
+    
+    if (this.storage.runs.has(key)) {
+      throw new Error(`Run with id ${run.id} already exists`);
+    }
+
     this.storage.runs.set(key, run);
 
-    // Update index for efficient listing
-    const configId = run.config?.id;
-    if (configId) {
-      const indexKey = this.getKey('index', configId, orgId);
+    const toolId = run.toolId || run.toolConfig?.id;
+    if (toolId) {
+      const indexKey = this.getKey('index', toolId, run.orgId);
       const existing = this.storage.runsIndex.get(indexKey) || [];
       existing.push({
         id: run.id,
         timestamp: run.startedAt ? run.startedAt.getTime() : Date.now(),
-        configId
+        configId: toolId
       });
       this.storage.runsIndex.set(indexKey, existing);
     }
 
-    return { ...run, id: run.id };
+    return run;
   }
 
-  async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: RunResult[], total: number }> {
+  async updateRun(params: { id: string; orgId: string; updates: Partial<Run> }): Promise<Run> {
+    const { id, orgId, updates } = params;
+    const key = this.getKey('run', id, orgId);
+    const existingRun = this.storage.runs.get(key);
+    
+    if (!existingRun) {
+      throw new Error(`Run with id ${id} not found`);
+    }
+
+    const updatedRun: Run = {
+      ...existingRun,
+      ...updates,
+      id,
+      orgId
+    };
+
+    this.storage.runs.set(key, updatedRun);
+    return updatedRun;
+  }
+
+  async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: Run[], total: number }> {
     const { limit = 10, offset = 0, configId, orgId } = params || {};
     const allRuns = this.getOrgItems(this.storage.runs, 'run', orgId);
 
-    // Store total count of ALL runs (including corrupted ones)
-    const totalAllRuns = allRuns.length;
-
-    // Filter out runs with corrupted data (missing critical fields)
-    const validRuns = allRuns.filter((run): run is RunResult =>
-      run !== null &&
-      run.config &&
-      run.config.id &&
-      run.startedAt instanceof Date
+    const validRuns = allRuns.filter((run): run is Run =>
+      run !== null && !!run.id
     );
 
-    // Sort by startedAt date (most recent first)
-    validRuns.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+    validRuns.sort((a, b) => {
+      const aTime = a.startedAt instanceof Date ? a.startedAt.getTime() : 0;
+      const bTime = b.startedAt instanceof Date ? b.startedAt.getTime() : 0;
+      return bTime - aTime;
+    });
 
-    // Filter by configId if provided
-    const filteredRuns = configId ? validRuns.filter(run => run.config?.id === configId) : validRuns;
+    const filteredRuns = configId ? validRuns.filter(run => {
+      const toolId = run.toolId || run.toolConfig?.id;
+      return toolId === configId;
+    }) : validRuns;
 
-    // Apply pagination
     const items = filteredRuns.slice(offset, offset + limit);
-
-    // Return total as count of ALL runs (including corrupted ones)
-    return { items, total: totalAllRuns };
+    return { items, total: filteredRuns.length };
   }
 
   async deleteRun(params: { id: string; orgId?: string }): Promise<boolean> {
@@ -143,10 +162,9 @@ export class MemoryStore implements DataStore {
     const run = this.storage.runs.get(key);
 
     if (run) {
-      // Remove from index
-      const configId = run.config?.id;
-      if (configId) {
-        const indexKey = this.getKey('index', configId, orgId);
+      const toolId = run.toolId || run.toolConfig?.id;
+      if (toolId) {
+        const indexKey = this.getKey('index', toolId, orgId);
         const existing = this.storage.runsIndex.get(indexKey) || [];
         const filtered = existing.filter(item => item.id !== id);
         if (filtered.length > 0) {
@@ -249,6 +267,7 @@ export class MemoryStore implements DataStore {
     if (!id || !workflow) return null;
     const key = this.getKey('workflow', id, orgId);
     this.storage.workflows.set(key, workflow);
+    return { ...workflow, id };
   }
 
   async deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean> {
@@ -318,7 +337,7 @@ export class MemoryStore implements DataStore {
     return { items, total };
   }
 
-  async getManyIntegrations(params: { ids: string[]; orgId?: string }): Promise<Integration[]> {
+  async getManyIntegrations(params: { ids: string[]; includeDocs?: boolean; orgId?: string }): Promise<Integration[]> {
     const { ids, orgId } = params;
     return ids
       .map(id => {

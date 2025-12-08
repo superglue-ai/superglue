@@ -27,13 +27,15 @@ interface ToolStepConfiguratorProps {
     onEditingChange?: (editing: boolean) => void;
     disabled?: boolean;
     stepInput?: any;
-    loopItems?: any;
+    dataSelectorOutput?: any;
     categorizedSources?: CategorizedSources;
     onOpenFixStepDialog?: () => void;
     canExecute?: boolean;
+    sourceDataVersion?: number;
 }
 
-export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, loopItems, categorizedSources, onOpenFixStepDialog, canExecute = true }: ToolStepConfiguratorProps) {
+
+export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, dataSelectorOutput, categorizedSources, onOpenFixStepDialog, canExecute = true, sourceDataVersion }: ToolStepConfiguratorProps) {
     const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
     const [paginationOpen, setPaginationOpen] = useState(false);
     const [headersText, setHeadersText] = useState('');
@@ -129,7 +131,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         [linkedIntegration]
     );
 
-    const currentItemObj = useMemo(() => deriveCurrentItem(loopItems), [loopItems]);
+    const currentItemObj = useMemo(() => deriveCurrentItem(dataSelectorOutput), [dataSelectorOutput]);
     const paginationConfig = step.apiConfig?.pagination;
     const paginationData = useMemo(() => buildPaginationData(paginationConfig), [paginationConfig]);
 
@@ -139,8 +141,8 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
     }, [stepInput, credentialsMap, currentItemObj, paginationData]);
 
     const categorizedVariables = useMemo<CategorizedVariables>(
-        () => buildCategorizedVariables(Object.keys(credentialsMap), categorizedSources, !!currentItemObj),
-        [credentialsMap, categorizedSources, currentItemObj]
+        () => buildCategorizedVariables(Object.keys(credentialsMap), categorizedSources),
+        [credentialsMap, categorizedSources]
     );
 
     const completeCategorizedSources = useMemo<CategorizedSources>(
@@ -187,15 +189,17 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 Integration
                                                 <HelpTooltip text="Select an integration to link this step to. This will pre-fill the API configuration with the integration's base URL and credentials." />
                                             </Label>
-                                            <IntegrationSelector
-                                                value={step.integrationId || ''}
-                                                onValueChange={handleIntegrationChange}
-                                                disabled={disabled}
-                                                triggerClassName="h-9 mt-1"
-                                                showCreateNew={!!onCreateIntegration}
-                                                onCreateNew={onCreateIntegration}
-                                                integrations={propIntegrations}
-                                            />
+                                            <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
+                                                <IntegrationSelector
+                                                    value={step.integrationId || ''}
+                                                    onValueChange={handleIntegrationChange}
+                                                    disabled={disabled}
+                                                    triggerClassName="h-9 border-0 bg-transparent shadow-none"
+                                                    showCreateNew={!!onCreateIntegration}
+                                                    onCreateNew={onCreateIntegration}
+                                                    integrations={propIntegrations}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                     <div>
@@ -205,14 +209,16 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                         </Label>
                                         <div className="space-y-2 mt-1">
                                             <div className="flex gap-2">
-                                                <Select value={step.apiConfig.method} onValueChange={(value) => { if (disabled) return; handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, method: value } })); }}>
-                                                    <SelectTrigger className="h-9 w-28" disabled={disabled}>
-                                                        <SelectValue placeholder="Method" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map(method => (<SelectItem key={method} value={method}>{method}</SelectItem>))}
-                                                    </SelectContent>
-                                                </Select>
+                                                <div className="rounded-lg border shadow-sm bg-muted/30">
+                                                    <Select value={step.apiConfig.method} onValueChange={(value) => { if (disabled) return; handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, method: value } })); }}>
+                                                        <SelectTrigger className="h-9 w-28 border-0 bg-transparent shadow-none" disabled={disabled}>
+                                                            <SelectValue placeholder="Method" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map(method => (<SelectItem key={method} value={method}>{method}</SelectItem>))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
                                                 <TemplateAwareTextEditor 
                                                     value={composeUrl(step.apiConfig.urlHost || '', step.apiConfig.urlPath || '')} 
                                                     onChange={(newValue) => {
@@ -220,13 +226,15 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                         handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, urlHost, urlPath } }));
                                                     }}
                                                     stepData={templateStepData}
-                                                    loopData={loopItems}
+                                                    dataSelectorOutput={dataSelectorOutput}
                                                     canExecute={canExecute}
                                                     categorizedVariables={categorizedVariables}
                                                     categorizedSources={completeCategorizedSources}
                                                     className="flex-1" 
                                                     placeholder="https://api.example.com/endpoint" 
                                                     disabled={disabled} 
+                                                    sourceDataVersion={sourceDataVersion}
+                                                    stepId={step.id}
                                                 />
                                             </div>
                                         </div>
@@ -244,16 +252,17 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, headers: val || '' } }));
                                             }}
                                             stepData={templateStepData}
-                                            loopData={loopItems}
+                                            dataSelectorOutput={dataSelectorOutput}
                                             canExecute={canExecute}
                                             categorizedVariables={categorizedVariables}
                                             categorizedSources={completeCategorizedSources}
                                             readOnly={disabled}
-                                            minHeight="100px"
-                                            maxHeight="150px"
-                                            resizable={true}
+                                            minHeight="75px"
+                                            maxHeight="300px"
                                             placeholder="{}"
                                             showValidation={true}
+                                            sourceDataVersion={sourceDataVersion}
+                                            stepId={step.id}
                                         />
                                     </div>
                                     <div>
@@ -269,16 +278,17 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, queryParams: val || '' } }));
                                             }}
                                             stepData={templateStepData}
-                                            loopData={loopItems}
+                                            dataSelectorOutput={dataSelectorOutput}
                                             canExecute={canExecute}
                                             categorizedVariables={categorizedVariables}
                                             categorizedSources={completeCategorizedSources}
                                             readOnly={disabled}
-                                            minHeight="100px"
-                                            maxHeight="150px"
-                                            resizable={true}
+                                            minHeight="75px"
+                                            maxHeight="300px"
                                             placeholder="{}"
                                             showValidation={true}
+                                            sourceDataVersion={sourceDataVersion}
+                                            stepId={step.id}
                                         />
                                     </div>
                                     {['POST', 'PUT', 'PATCH'].includes(step.apiConfig.method) && (
@@ -291,71 +301,105 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 value={step.apiConfig.body || ''}
                                                 onChange={(val) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, body: val || '' } }))}
                                                 stepData={templateStepData}
-                                                loopData={loopItems}
+                                                dataSelectorOutput={dataSelectorOutput}
                                                 canExecute={canExecute}
                                                 categorizedVariables={categorizedVariables}
                                                 categorizedSources={completeCategorizedSources}
                                                 readOnly={disabled}
-                                                minHeight="100px"
-                                                maxHeight="150px"
-                                                resizable={true}
+                                                minHeight="75px"
+                                                maxHeight="300px"
                                                 placeholder=""
+                                                sourceDataVersion={sourceDataVersion}
+                                                stepId={step.id}
                                             />
                                         </div>
                                     )}
                                     <div>
-                                        <div
-                                            onClick={() => !disabled && setPaginationOpen(!paginationOpen)}
-                                            className="w-full flex items-center justify-between text-xs font-medium text-left p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
-                                            role="button"
-                                            tabIndex={0}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' || e.key === ' ') {
-                                                    e.preventDefault();
-                                                    !disabled && setPaginationOpen(!paginationOpen);
-                                                }
-                                            }}
-                                        >
-                                            <div className="flex items-center gap-1">
-                                                {paginationOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                                                <span>
-                                                    {step.apiConfig.pagination?.type === 'OFFSET_BASED' ? 'Offset-based Pagination' : 
-                                                      step.apiConfig.pagination?.type === 'PAGE_BASED' ? 'Page-based Pagination' : 
-                                                      step.apiConfig.pagination?.type === 'CURSOR_BASED' ? 'Cursor-based Pagination' : 
-                                                      'No Pagination'}
-                                                </span>
-                                                <HelpTooltip text="Configure pagination if the API returns data in pages. Only set this if you're using pagination variables like {'<<offset>>'}, {'<<page>>'}, or {'<<cursor>>'} in your request." />
+<div
+    onClick={() => !disabled && setPaginationOpen(!paginationOpen)}
+    className="w-full flex items-center justify-between text-xs font-medium text-left p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+    role="button"
+    tabIndex={0}
+    onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            !disabled && setPaginationOpen(!paginationOpen);
+        }
+    }}
+>
+    <div className="flex items-center gap-1">
+        {paginationOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        <span>
+            {step.apiConfig.pagination?.type === 'OFFSET_BASED' ? 'Offset-based Pagination' :
+                step.apiConfig.pagination?.type === 'PAGE_BASED' ? 'Page-based Pagination' :
+                    step.apiConfig.pagination?.type === 'CURSOR_BASED' ? 'Cursor-based Pagination' :
+                        'No Pagination'}
+        </span>
+                                            <HelpTooltip text="Configure pagination if the API returns data in pages. Only set this if you're using pagination variables like {'<<offset>>'}, {'<<page>>'}, or {'<<cursor>>'} in your request." />
+    </div>
+</div>
+<div className={`overflow-hidden transition-all duration-200 ease-in-out ${paginationOpen ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+    <div className="space-y-2 mt-1 border-muted">
+        <div className="pl-2 mb-1">
+            <Select
+                value={step.apiConfig.pagination?.type || 'none'}
+                onValueChange={(value) => {
+                    if (disabled) return;
+                    if (value === 'none') {
+                        handleImmediateEdit((s) => ({
+                            ...s,
+                            apiConfig: {
+                                ...s.apiConfig,
+                                pagination: undefined,
+                            },
+                        }));
+                    } else {
+                        handleImmediateEdit((s) => ({
+                            ...s,
+                            apiConfig: {
+                                ...s.apiConfig,
+                                pagination: {
+                                    ...(s.apiConfig.pagination || {}),
+                                    type: value,
+                                    pageSize: s.apiConfig.pagination?.pageSize || '50',
+                                    cursorPath: s.apiConfig.pagination?.cursorPath || '',
+                                    stopCondition: s.apiConfig.pagination?.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'
+                                },
+                            },
+                        }));
+                    }
+                }}
+            >
+                <SelectTrigger className="h-9" disabled={disabled}>
+                                                        <SelectValue placeholder="No pagination" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">No pagination</SelectItem>
+                                                        <SelectItem value="OFFSET_BASED">Offset-based (uses {'<<offset>>'})</SelectItem>
+                                                        <SelectItem value="PAGE_BASED">Page-based (uses {'<<page>>'})</SelectItem>
+                                                        <SelectItem value="CURSOR_BASED">Cursor-based (uses {'<<cursor>>'})</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
-                                        </div>
-                                        <div className={`overflow-hidden transition-all duration-200 ease-in-out ${paginationOpen ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                                        <div className="space-y-2 mt-1 border-muted">
-                                        <div className="pl-2 mb-1">
-                                            <Select value={step.apiConfig.pagination?.type || 'none'} onValueChange={(value) => { if (disabled) return; if (value === 'none') { handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: undefined } })); } else { handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), type: value, pageSize: s.apiConfig.pagination?.pageSize || '50', cursorPath: s.apiConfig.pagination?.cursorPath || '', stopCondition: s.apiConfig.pagination?.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0' } } })); } }}>
-                                                <SelectTrigger className="h-9" disabled={disabled}>
-                                                    <SelectValue placeholder="No pagination" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="none">No pagination</SelectItem>
-                                                    <SelectItem value="OFFSET_BASED">Offset-based (uses {'<<offset>>'})</SelectItem>
-                                                    <SelectItem value="PAGE_BASED">Page-based (uses {'<<page>>'})</SelectItem>
-                                                    <SelectItem value="CURSOR_BASED">Cursor-based (uses {'<<cursor>>'})</SelectItem>
-                                                </SelectContent>
-                                            </Select>
                                             {step.apiConfig.pagination && (
-                                                <div className="mt-2 gap-2">
-                                                    <div className="flex gap-2">
+            <div className="mt-2 gap-2 pl-2">
+                <div className="flex gap-2">
                                                         <div className="flex-1">
                                                             <Label className="text-xs">Page Size</Label>
-                                                            <Input value={step.apiConfig.pagination.pageSize || '50'} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), pageSize: e.target.value } } }))} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="50" disabled={disabled} />
+                                                            <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
+                                                                <Input value={step.apiConfig.pagination.pageSize || '50'} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), pageSize: e.target.value } } }))} className="text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0" placeholder="50" disabled={disabled} />
+                                                            </div>
                                                         </div>
                                                         {step.apiConfig.pagination.type === 'CURSOR_BASED' && (
                                                             <div className="flex-1">
                                                                 <Label className="text-xs">Cursor Path</Label>
-                                                                <Input value={step.apiConfig.pagination.cursorPath || ''} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), cursorPath: e.target.value } } }))} className="text-xs mt-1 focus:ring-0 focus:ring-offset-0" placeholder="e.g., response.nextCursor" disabled={disabled} />
+                                                                <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
+                                                                    <Input value={step.apiConfig.pagination.cursorPath || ''} onChange={(e) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, pagination: { ...(s.apiConfig.pagination || {}), cursorPath: e.target.value } } }))} className="text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0" placeholder="e.g., response.nextCursor" disabled={disabled} />
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div className="mt-2 gap-2">
+                <div className="mt-2 gap-2">
                                                         <Label className="text-xs flex items-center gap-1">
                                                             Stop Condition (JavaScript)
                                                             <HelpTooltip text="JavaScript function that returns true when pagination should stop. Receives (response, pageInfo) where pageInfo has: page, offset, cursor, total fetched." />
@@ -371,7 +415,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                                     }
                                                                 }))}
                                                                 readOnly={disabled}
-                                                                minHeight="150px"
+                            minHeight="50px"
                                                                 maxHeight="250px"
                                                                 resizable={true}
                                                                 isTransformEditor={false}
@@ -379,11 +423,10 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                             />
                                                         </div>
                                                     </div>
-                                                </div>
+            </div>
                                             )}
-                                        </div>
-                                        </div>
-                                        </div>
+    </div>
+</div>
                                     </div>
                                     <div>
                                         <div
@@ -454,9 +497,9 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                     />
                                                 </div>
                                             </div>
-                                        </div>
                                     </div>
-                                </CardContent>
+                    </div>
+                </CardContent>
             </Card>
             {!isLast && (<div className="my-2 text-muted-foreground"><ArrowDown className="h-4 w-4" /></div>)}
         </div>

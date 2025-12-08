@@ -4,14 +4,13 @@ import Editor from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { TemplateChip } from '../../templates/TemplateChip';
+import { TemplateContextProvider } from '../../templates/tiptap/TemplateContext';
 import { useTemplatePreview } from '../../hooks/use-template-preview';
 import { useDataProcessor } from '../../hooks/use-data-processor';
 import { CopyButton } from '../../shared/CopyButton';
 import { Download, Loader2 } from 'lucide-react';
 import { Button } from '../../../ui/button';
 import { downloadJson } from '@/src/lib/download-utils';
-import { Label } from '../../../ui/label';
-import { HelpTooltip } from '../../../utils/HelpTooltip';
 
 const PLACEHOLDER_VALUE = '';
 const CURRENT_ITEM_KEY = '"currentItem"';
@@ -24,6 +23,7 @@ interface StepInputTabProps {
     readOnly?: boolean;
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     isActive?: boolean;
+    sourceDataVersion?: number;
 }
 
 export function StepInputTab({
@@ -34,6 +34,7 @@ export function StepInputTab({
     readOnly = false,
     onEdit,
     isActive = true,
+    sourceDataVersion,
 }: StepInputTabProps) {
     const { theme, onMount } = useMonacoTheme();
     const [currentHeight, setCurrentHeight] = useState('400px');
@@ -51,13 +52,16 @@ export function StepInputTab({
     const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
         currentItemExpression,
         evolvingPayload,
-        { enabled: isActive && canExecute && !!evolvingPayload, debounceMs: 300 }
+        { enabled: isActive && canExecute && !!evolvingPayload, debounceMs: 300, sourceDataVersion, stepId: step.id }
     );
 
     const inputProcessor = useDataProcessor(evolvingPayload, isActive);
 
     const displayData = useMemo(() => {
         if (!isActive) return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE}\n}`;
+        if (cannotExecuteYet) {
+            return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE}\n}`;
+        }
         const previewStr = inputProcessor.preview?.displayString || '{}';
         if (previewStr.startsWith('{')) {
             const inner = previewStr.slice(1).trimStart();
@@ -67,7 +71,7 @@ export function StepInputTab({
             return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE},\n  ${inner.slice(0, -1)}\n}`;
         }
         return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE},\n  "sourceData": ${previewStr}\n}`;
-    }, [isActive, inputProcessor.preview?.displayString]);
+    }, [isActive, cannotExecuteYet, inputProcessor.preview?.displayString]);
 
     const updateChipPosition = useCallback(() => {
         const editor = editorRef.current;
@@ -98,8 +102,8 @@ export function StepInputTab({
         editorRef.current = editor;
         onMount(editor);
         setTimeout(updateChipPosition, 50);
-        editor.onDidScrollChange(updateChipPosition);
-        editor.onDidLayoutChange(updateChipPosition);
+        editor.onDidScrollChange(() => requestAnimationFrame(updateChipPosition));
+        editor.onDidLayoutChange(() => requestAnimationFrame(updateChipPosition));
     }, [onMount, updateChipPosition]);
 
     const handleUpdate = (newTemplate: string) => {
@@ -109,22 +113,17 @@ export function StepInputTab({
         }
     };
 
-    if (cannotExecuteYet) {
-        return (
-            <div className="flex flex-col items-center justify-center border rounded-md bg-muted/5 text-muted-foreground" style={{ height: '400px' }}>
-                <div className="text-xs mb-1">No input yet</div>
-                <p className="text-[10px]">Run previous step to see inputs</p>
-            </div>
-        );
-    }
-
     return (
         <div>
-            <Label className="text-xs flex items-center gap-1 mb-1">
-                Step Input Data
-                <HelpTooltip text="Aggregated data from the tool payload and previous step results. Edit the currentItem expression to control what data this step receives for each iteration." />
-            </Label>
             <div className={cn("relative rounded-lg border shadow-sm bg-muted/30")} ref={containerRef}>
+                {cannotExecuteYet && (
+                    <div className="absolute inset-0 flex items-center justify-center z-[5] pointer-events-none bg-muted/5 backdrop-blur-[2px]">
+                        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                            <div className="text-xs mb-1">No data yet</div>
+                            <p className="text-[10px]">Data selector will evaluate after previous step runs</p>
+                        </div>
+                    </div>
+                )}
                 <div className="absolute top-1 right-1 z-10 mr-5 flex items-center gap-1">
                     {(isEvaluating || inputProcessor.isComputingPreview) && (
                         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -172,6 +171,7 @@ export function StepInputTab({
                                 pointerEvents: 'auto'
                             }}
                         >
+                        <TemplateContextProvider stepData={evolvingPayload} canExecute={canExecute} sourceDataVersion={sourceDataVersion} stepId={step.id}>
                         <TemplateChip
                             template={templateString}
                             evaluatedValue={previewValue}
@@ -179,6 +179,7 @@ export function StepInputTab({
                             stepData={evolvingPayload}
                             hasResult={hasResult}
                             canExecute={canExecute}
+                            isEvaluating={isEvaluating}
                             onUpdate={handleUpdate}
                             onDelete={() => {}}
                             readOnly={readOnly}
@@ -188,6 +189,7 @@ export function StepInputTab({
                             popoverTitle="Data Selector"
                             popoverHelpText="Returns an array → step loops over items. Returns an object → step runs once. currentItem is either the object returned or the current array item."
                         />
+                        </TemplateContextProvider>
                         </div>
                     )}
                     <Editor
@@ -226,7 +228,8 @@ export function StepInputTab({
                             colorDecorators: false,
                             occurrencesHighlight: 'off',
                             renderValidationDecorations: 'off',
-                            stickyScroll: { enabled: false }
+                            stickyScroll: { enabled: false },
+                            automaticLayout: true
                         }}
                         theme={theme}
                         className="bg-transparent"

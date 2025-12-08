@@ -2,17 +2,19 @@ import { cn } from '@/src/lib/general-utils';
 import { truncateTemplateValue, prepareSourceData, extractCredentials } from '@/src/lib/templating-utils';
 import { maskCredentials } from '@superglue/shared';
 import { Code2, X } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { TemplateEditPopover } from './TemplateEditPopover';
+import { useTemplateContext } from './tiptap/TemplateContext';
 
 interface TemplateChipProps {
   template: string;
   evaluatedValue: any;
   error?: string;
   stepData: any;
-  loopData?: any;
+  dataSelectorOutput?: any;
   hasResult?: boolean;
   canExecute?: boolean;
+  isEvaluating?: boolean;
   onUpdate: (newTemplate: string) => void;
   onDelete: () => void;
   readOnly?: boolean;
@@ -31,9 +33,10 @@ export function TemplateChip({
   evaluatedValue,
   error,
   stepData,
-  loopData,
+  dataSelectorOutput,
   hasResult = true,
   canExecute = true,
+  isEvaluating = false,
   onUpdate,
   onDelete,
   readOnly = false,
@@ -46,7 +49,8 @@ export function TemplateChip({
   popoverTitle,
   popoverHelpText,
 }: TemplateChipProps) {
-  const sourceData = useMemo(() => prepareSourceData(stepData, loopData), [stepData, loopData]);
+  const { sourceDataVersion } = useTemplateContext();
+  const sourceData = useMemo(() => prepareSourceData(stepData, dataSelectorOutput), [stepData, dataSelectorOutput]);
   const [isHovered, setIsHovered] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   
@@ -57,7 +61,6 @@ export function TemplateChip({
   const hasError = !!error;
   const isUnresolved = !hasError && !canExecute;
   const isResolvedUndefined = !hasError && canExecute && hasResult && evaluatedValue === undefined;
-  const isLoading = canExecute && !hasResult && evaluatedValue === undefined;
   
   const isLoopArray = loopMode && Array.isArray(evaluatedValue) && evaluatedValue.length > 0;
   const displayValue = isLoopArray ? evaluatedValue[0] : evaluatedValue;
@@ -72,8 +75,6 @@ export function TemplateChip({
     displayText = `Error: ${error.slice(0, 50)}${error.length > 50 ? '...' : ''}`;
   } else if (isUnresolved) {
     displayText = `unresolved: ${templateExpr.slice(0, 30)}${templateExpr.length > 30 ? '...' : ''}`;
-  } else if (isLoading) {
-    displayText = '';
   } else if (isResolvedUndefined) {
     displayText = 'undefined';
   } else {
@@ -105,48 +106,82 @@ export function TemplateChip({
   const getChipClasses = () => {
     if (hasError) {
       return {
-        bg: 'bg-red-500/20 dark:bg-red-500/20',
-        border: isActive ? 'border-red-500/50 dark:border-red-400/50' : 'border-transparent',
-        text: 'text-red-700 dark:text-red-300'
+        bg: 'border-red-400/20 dark:border-red-400/25',
+        border: 'border-b-red-600/30 dark:border-b-red-600/35',
+        text: 'text-red-700 dark:text-red-300',
+        gradient: 'linear-gradient(180deg, rgba(248, 113, 113, 0.18) 0%, rgba(239, 68, 68, 0.22) 100%)',
+        shadow: isActive
+          ? '0 1px 0 rgba(185, 28, 28, 0.22), 0 0 11px rgba(239, 68, 68, 0.4)'
+          : '0 1px 0 rgba(185, 28, 28, 0.18), 0 0 7px rgba(239, 68, 68, 0.27)'
       };
     }
     
     if (isUnresolved) {
       return {
-        bg: 'bg-gray-500/15 dark:bg-gray-400/20',
-        border: isActive ? 'border-gray-400/50 dark:border-gray-500/50' : 'border-transparent',
-        text: 'text-gray-600 dark:text-gray-300'
+        bg: 'border-gray-400/20 dark:border-gray-500/25',
+        border: 'border-b-gray-500/30 dark:border-b-gray-600/35',
+        text: 'text-gray-600 dark:text-gray-300',
+        gradient: 'linear-gradient(180deg, rgba(156, 163, 175, 0.15) 0%, rgba(107, 114, 128, 0.18) 100%)',
+        shadow: isActive
+          ? '0 1px 0 rgba(55, 65, 81, 0.22), 0 0 9px rgba(156, 163, 175, 0.32)'
+          : '0 1px 0 rgba(55, 65, 81, 0.18), 0 0 5px rgba(156, 163, 175, 0.2)'
       };
     }
     
     return {
-      bg: 'bg-green-600/15 dark:bg-green-400/20',
-      border: isActive ? 'border-green-600/50 dark:border-green-400/50' : 'border-transparent',
-      text: 'text-green-700 dark:text-green-400'
+      bg: 'border-green-400/20 dark:border-green-400/25',
+      border: 'border-b-green-600/30 dark:border-b-green-600/35',
+      text: 'text-green-700 dark:text-green-400',
+      gradient: 'linear-gradient(180deg, rgba(34, 197, 94, 0.18) 0%, rgba(22, 163, 74, 0.22) 100%)',
+        shadow: isActive
+        ? '0 1px 0 rgba(21, 128, 61, 0.22), 0 0 11px rgba(74, 222, 128, 0.4)'
+        : '0 1px 0 rgba(21, 128, 61, 0.18), 0 0 7px rgba(74, 222, 128, 0.27)'
     };
   };
 
   const chipClasses = getChipClasses();
+  const chipRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!effectiveOpen || !chipRef.current) return;
+    
+    const chip = chipRef.current;
+    const scrollParent = chip.closest('[style*="overflow"]') as HTMLElement | null;
+    if (!scrollParent) return;
+    
+    const handleScroll = () => {
+      setIsPopoverOpen(false);
+      onPopoverOpenChange?.(false);
+    };
+    
+    scrollParent.addEventListener('scroll', handleScroll);
+    return () => scrollParent.removeEventListener('scroll', handleScroll);
+  }, [effectiveOpen, onPopoverOpenChange]);
 
   const chipContent = (
     <span
+      ref={chipRef}
       className={cn(
         "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono select-none border",
         "transition-all duration-150",
         chipClasses.bg,
         chipClasses.border,
         chipClasses.text,
-        !readOnly && "cursor-pointer",
+        !readOnly && "cursor-pointer hover:-translate-y-px active:translate-y-0.5",
         readOnly && "cursor-default",
         inline && "align-middle"
       )}
-      style={{ lineHeight: '1.3' }}
+      style={{ 
+        lineHeight: '1.3', 
+        background: chipClasses.gradient,
+        boxShadow: chipClasses.shadow 
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       title={isTruncated ? `${originalSize} chars (click to view)` : undefined}
     >
       <span className="w-3 h-3 flex items-center justify-center shrink-0">
-        {isLoading ? (
+        {isEvaluating ? (
           <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
         ) : !readOnly && !hideDelete && isHovered ? (
           <button
@@ -191,6 +226,7 @@ export function TemplateChip({
       loopMode={loopMode}
       title={popoverTitle}
       helpText={popoverHelpText}
+      sourceDataVersion={sourceDataVersion}
     >
       {chipContent}
     </TemplateEditPopover>

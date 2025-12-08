@@ -20,6 +20,7 @@ import {
   FilePlay,
   Loader2,
   Play,
+  Square,
   Wand2,
   X
 } from "lucide-react";
@@ -37,6 +38,7 @@ export const FinalTransformMiniStepCard = ({
   readOnly,
   onExecuteTransform,
   onOpenFixTransformDialog,
+  onAbort,
   isRunningTransform,
   isFixingTransform,
   canExecute,
@@ -52,6 +54,7 @@ export const FinalTransformMiniStepCard = ({
   readOnly?: boolean;
   onExecuteTransform?: (schema: string, transform: string) => void;
   onOpenFixTransformDialog?: () => void;
+  onAbort?: () => void;
   isRunningTransform?: boolean;
   isFixingTransform?: boolean;
   canExecute?: boolean;
@@ -205,25 +208,32 @@ export const FinalTransformMiniStepCard = ({
                         !canExecute
                           ? "Execute all steps first"
                           : isRunningTransform
-                            ? "Transform is running..."
+                            ? "Stop transform"
                             : "Test final transform"
                       }
                     >
-                      <Button
-                        variant="ghost"
-                        onClick={handleExecuteTransform}
-                        disabled={!canExecute || isRunningTransform || isFixingTransform}
-                        className="h-8 px-3 gap-2"
-                      >
-                        {isRunningTransform ? (
-                          <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                        ) : (
+                      {isRunningTransform && onAbort ? (
+                        <Button
+                          variant="outline"
+                          onClick={onAbort}
+                          className="h-8 px-3 gap-2"
+                        >
+                          <Square className="h-3 w-3" />
+                          <span className="font-medium text-[13px]">Stop</span>
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          onClick={handleExecuteTransform}
+                          disabled={!canExecute || isRunningTransform || isFixingTransform}
+                          className="h-8 px-3 gap-2"
+                        >
                           <Play className="h-3 w-3" />
-                        )}
-                        <span className="font-medium text-[13px]">
-                          Run Transform
-                        </span>
-                      </Button>
+                          <span className="font-medium text-[13px]">
+                            Run Transform
+                          </span>
+                        </Button>
+                      )}
                     </span>
                   )}
                   {onOpenFixTransformDialog && (
@@ -231,9 +241,7 @@ export const FinalTransformMiniStepCard = ({
                       title={
                         !canExecute
                           ? "Execute all steps first"
-                          : isFixingTransform
-                            ? "Fixing transform..."
-                            : "Fix transform with auto-repair"
+                          : "Fix transform with auto-repair"
                       }
                     >
                       <Button
@@ -242,11 +250,7 @@ export const FinalTransformMiniStepCard = ({
                         disabled={!canExecute || isRunningTransform || isFixingTransform}
                         className="h-8 px-3 gap-2"
                       >
-                        {isFixingTransform ? (
-                          <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                        ) : (
-                          <Wand2 className="h-3 w-3" />
-                        )}
+                        <Wand2 className="h-3 w-3" />
                         <span className="font-medium text-[13px]">
                           Fix Transform
                         </span>

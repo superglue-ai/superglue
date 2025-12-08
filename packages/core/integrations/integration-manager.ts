@@ -1,4 +1,5 @@
-import { Integration, ServiceMetadata } from "@superglue/shared";
+import { Integration, ServiceMetadata, Tool } from "@superglue/shared";
+import { isMainThread, parentPort } from "worker_threads";
 import { DataStore } from "../datastore/types.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { logMessage } from "../utils/logs.js";
@@ -18,13 +19,13 @@ export class IntegrationManager {
     id: string;
     private _integration: Integration;
     private _documentation: DocumentationData;
-    private dataStore: DataStore;
+    private dataStore: DataStore | null;
     private metadata: ServiceMetadata;
     private orgId: string; // Keep for backward compat
     private _basicDataPromise?: Promise<Integration>;
     private _documentationPromise?: Promise<DocumentationData>;
 
-    constructor(idOrIntegration: string | Integration, dataStore: DataStore, metadata: ServiceMetadata) {
+    constructor(idOrIntegration: string | Integration, dataStore: DataStore | null, metadata: ServiceMetadata) {
         this.dataStore = dataStore;
         this.metadata = metadata;
         this.orgId = metadata.orgId!; // Keep for backward compat
@@ -53,6 +54,11 @@ export class IntegrationManager {
     async getIntegration(): Promise<Integration> {
         if (this._integration) return this._integration;
 
+        // If datastore is null (e.g., in worker thread), return current state or throw
+        if (!this.dataStore) {
+            throw new Error(`Integration ${this.id} not initialized and datastore unavailable`);
+        }
+
         // Prevent multiple simultaneous loads
         if (this._basicDataPromise) {
             await this._basicDataPromise;
@@ -61,7 +67,7 @@ export class IntegrationManager {
 
         this._basicDataPromise = (async () => {
             try {
-                const integration = await this.dataStore.getIntegration({ id: this.id, includeDocs: false, orgId: this.orgId });
+                const integration = await this.dataStore!.getIntegration({ id: this.id, includeDocs: false, orgId: this.orgId });
                 this._integration = integration;
                 return integration;
             } finally {
@@ -78,6 +84,11 @@ export class IntegrationManager {
         // If already fetched, return current state
         if (this._documentation?.isFetched) {
             return this._documentation;
+        }
+
+        // If datastore is null (e.g., in worker thread), return current state
+        if (!this.dataStore) {
+            return this._documentation || { isFetched: false };
         }
 
         try {
@@ -139,13 +150,25 @@ export class IntegrationManager {
         if (refreshResult.success) {
             // update the credentials in the integration manager
             this._integration.credentials = refreshResult.newCredentials;
-            // Save the updated credentials to datastore
-            await this.dataStore.upsertIntegration({
-              id: this.id,
-              integration: this._integration,
-              orgId: this.orgId
-            });
-            logMessage('info', `OAuth token refreshed and saved for integration ${this.id}`, this.metadata);
+            
+            if (!isMainThread && parentPort) {
+                parentPort.postMessage({
+                    type: 'credential_update',
+                    payload: {
+                        integrationId: this.id,
+                        orgId: this.orgId,
+                        credentials: refreshResult.newCredentials
+                    }
+                });
+            } else if (this.dataStore) {
+                await this.dataStore.upsertIntegration({
+                    id: this.id,
+                    integration: this._integration,
+                    orgId: this.orgId
+                });
+            }
+            
+            logMessage('info', `OAuth token refreshed for integration ${this.id}`, this.metadata);
         } else {
             logMessage('warn', `Failed to refresh OAuth token for integration ${this.id}`, this.metadata);
         }
@@ -175,5 +198,43 @@ export class IntegrationManager {
     // Static method to create multiple instances from IDs
     static async fromIds(ids: string[], dataStore: DataStore, metadata: ServiceMetadata): Promise<IntegrationManager[]> {
         return Promise.all(ids.map(id => IntegrationManager.fromId(id, dataStore, metadata)));
+    }
+
+    static async forToolExecution(
+        tool: Tool,
+        dataStore: DataStore,
+        metadata: ServiceMetadata,
+        options: { includeDocs?: boolean } = {}
+    ): Promise<IntegrationManager[]> {
+        const allIds = new Set<string>();
+        
+        if (Array.isArray(tool.integrationIds)) {
+            tool.integrationIds.forEach(id => allIds.add(id));
+        }
+        if (Array.isArray(tool.steps)) {
+            tool.steps.forEach(step => {
+                if (step.integrationId) {
+                    allIds.add(step.integrationId);
+                }
+            });
+        }
+
+        if (allIds.size === 0) {
+            return [];
+        }
+
+        const integrations = await dataStore.getManyIntegrations({ 
+            ids: Array.from(allIds), 
+            includeDocs: options.includeDocs ?? false,
+            orgId: metadata.orgId 
+        });
+
+        const managers = integrations.map(i => new IntegrationManager(i, dataStore, metadata));
+
+        for (const manager of managers) {
+            await manager.refreshTokenIfNeeded();
+        }
+
+        return managers;
     }
 }

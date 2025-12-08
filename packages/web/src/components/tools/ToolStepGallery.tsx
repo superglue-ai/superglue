@@ -6,7 +6,7 @@ import { buildEvolvingPayload, buildPreviousStepResults, cn } from '@/src/lib/ge
 import { buildCategorizedSources } from '@/src/lib/templating-utils';
 import { Integration } from "@superglue/shared";
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FinalTransformMiniStepCard } from './cards/FinalTransformCard';
 import { MiniStepCard } from './cards/MiniStepCard';
 import { PayloadMiniStepCard } from './cards/PayloadCard';
@@ -37,6 +37,7 @@ export interface ToolStepGalleryProps {
     onOpenFixTransformDialog?: () => void;
     completedSteps?: string[];
     failedSteps?: string[];
+    abortedSteps?: string[];
     integrations?: Integration[];
     isExecuting?: boolean;
     isExecutingStep?: number;
@@ -61,6 +62,9 @@ export interface ToolStepGalleryProps {
     isPayloadValid?: boolean;
     onPayloadUserEdit?: () => void;
     embedded?: boolean;
+    onAbort?: () => void;
+    sourceDataVersion?: number;
+    onDataSelectorOutputChange?: () => void;
 }
 
 export function ToolStepGallery({
@@ -86,6 +90,7 @@ export function ToolStepGallery({
     onOpenFixTransformDialog,
     completedSteps = [],
     failedSteps = [],
+    abortedSteps = [],
     integrations,
     isExecuting,
     isExecutingStep,
@@ -109,7 +114,10 @@ export function ToolStepGallery({
     filePayloads,
     isPayloadValid = true,
     onPayloadUserEdit,
-    embedded = false
+    embedded = false,
+    onAbort,
+    sourceDataVersion,
+    onDataSelectorOutputChange
 }: ToolStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
     const [windowWidth, setWindowWidth] = useState(1200);
@@ -123,8 +131,15 @@ export function ToolStepGallery({
     const isConfiguratorEditingRef = useRef<boolean>(false);
     const [hiddenLeftCount, setHiddenLeftCount] = useState(0);
     const [hiddenRightCount, setHiddenRightCount] = useState(0);
-    const [activeStepLoopCount, setActiveStepLoopCount] = useState<number | null>(null);
+    const [activeStepItemCount, setActiveStepItemCount] = useState<number | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    
+    const handleDataSelectorChange = useCallback((itemCount: number | null, isInitial: boolean) => {
+        setActiveStepItemCount(itemCount);
+        if (!isInitial) {
+            onDataSelectorOutputChange?.();
+        }
+    }, [onDataSelectorOutputChange]);
     
     useEffect(() => {
         isConfiguratorEditingRef.current = isConfiguratorEditing;
@@ -613,13 +628,14 @@ export function ToolStepGallery({
                                                                     }
                                                                     completedSteps={completedSteps}
                                                                     failedSteps={failedSteps}
+                                                                    abortedSteps={abortedSteps}
                                                                     isFirstCard={globalIdx === 0}
                                                                     isLastCard={globalIdx === totalCards - 1}
                                                                     integrations={integrations}
                                                                     hasTransformCompleted={hasTransformCompleted}
                                                                     isPayloadValid={isPayloadValid}
                                                                     payloadData={item.type === 'payload' ? workingPayload : undefined}
-                                                                    isLoopStep={globalIdx === activeIndex && activeStepLoopCount !== null && activeStepLoopCount > 0}
+                                                                    isLoopStep={globalIdx === activeIndex && activeStepItemCount !== null && activeStepItemCount > 0}
                                                                 />
                                                             </div>
                                                             {showArrow && (
@@ -722,6 +738,7 @@ export function ToolStepGallery({
                                     readOnly={readOnly}
                                     onExecuteTransform={onExecuteTransform}
                                     onOpenFixTransformDialog={onOpenFixTransformDialog}
+                                    onAbort={(isRunningTransform || isFixingTransform) ? onAbort : undefined}
                                     isRunningTransform={isRunningTransform}
                                     isFixingTransform={isFixingTransform}
                                     canExecute={canExecuteTransform}
@@ -732,6 +749,7 @@ export function ToolStepGallery({
                                 />
                             ) : (
                                 <SpotlightStepCard
+                                    key={currentItem.data.id}
                                     step={currentItem.data}
                                     stepIndex={activeIndex - 1} // Adjust for payload card
                                     evolvingPayload={activeEvolvingPayload}
@@ -742,6 +760,7 @@ export function ToolStepGallery({
                                     onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
                                     onExecuteStepWithLimit={onExecuteStepWithLimit ? (limit) => onExecuteStepWithLimit(activeIndex - 1, limit) : undefined}
                                     onOpenFixStepDialog={onOpenFixStepDialog ? () => onOpenFixStepDialog(activeIndex - 1) : undefined}
+                                    onAbort={isExecutingStep === activeIndex - 1 ? onAbort : undefined}
                                     canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
                                     isExecuting={isExecutingStep === activeIndex - 1}
                                     isGlobalExecuting={!!(isExecuting || isRunningTransform || isFixingTransform)}
@@ -749,11 +768,13 @@ export function ToolStepGallery({
                                     integrations={integrations}
                                     readOnly={readOnly}
                                     failedSteps={failedSteps}
-                                    showOutputSignal={showStepOutputSignal}
+                                    abortedSteps={abortedSteps}
+                                    showOutputSignal={focusStepId === currentItem.data.id ? showStepOutputSignal : undefined}
                                     onConfigEditingChange={setIsConfiguratorEditing}
-                                    onLoopInfoChange={setActiveStepLoopCount}
+                                    onDataSelectorChange={handleDataSelectorChange}
                                     isFirstStep={activeIndex === 1}
                                     isPayloadValid={isPayloadValid}
+                                    sourceDataVersion={sourceDataVersion}
                                 />
                             )
                         )}

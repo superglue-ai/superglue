@@ -19,12 +19,14 @@ export interface CategorizedSources {
 
 interface TemplateContextValue {
     stepData: any;
-    loopData?: any;
+    dataSelectorOutput?: any;
     readOnly: boolean;
     credentialKeys?: Set<string>;
     canExecute?: boolean;
     categorizedVariables: CategorizedVariables;
     categorizedSources?: CategorizedSources;
+    sourceDataVersion?: number;
+    stepId?: string;
 }
 
 const emptyCategorizedVariables: CategorizedVariables = {
@@ -46,30 +48,36 @@ const emptyCategorizedSources: CategorizedSources = {
 
 const TemplateContext = createContext<TemplateContextValue>({
     stepData: {},
-    loopData: undefined,
+    dataSelectorOutput: undefined,
     readOnly: false,
     credentialKeys: undefined,
     canExecute: true,
     categorizedVariables: emptyCategorizedVariables,
     categorizedSources: emptyCategorizedSources,
+    sourceDataVersion: undefined,
+    stepId: undefined,
 });
 
 export function TemplateContextProvider({
     children,
     stepData,
-    loopData,
+    dataSelectorOutput,
     readOnly = false,
     canExecute = true,
     categorizedVariables = emptyCategorizedVariables,
     categorizedSources = emptyCategorizedSources,
+    sourceDataVersion,
+    stepId,
 }: {
     children: ReactNode;
     stepData: any;
-    loopData?: any;
+    dataSelectorOutput?: any;
     readOnly?: boolean;
     canExecute?: boolean;
     categorizedVariables?: CategorizedVariables;
     categorizedSources?: CategorizedSources;
+    sourceDataVersion?: number;
+    stepId?: string;
 }) {
     const credentialKeys = useMemo(() => {
         if (!stepData || typeof stepData !== 'object') return undefined;
@@ -86,8 +94,8 @@ export function TemplateContextProvider({
     }, [stepData]);
 
     const value = useMemo(() => ({
-        stepData, loopData, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources
-    }), [stepData, loopData, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources]);
+        stepData, dataSelectorOutput, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources, sourceDataVersion, stepId
+    }), [stepData, dataSelectorOutput, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources, sourceDataVersion, stepId]);
 
     return (
         <TemplateContext.Provider value={value}>

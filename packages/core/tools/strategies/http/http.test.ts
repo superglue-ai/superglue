@@ -29,7 +29,7 @@ describe('callAxios automatic retry', () => {
 
     it('returns immediately for 429 beyond max wait budget without throwing', async () => {
       (axios as any).mockReset();
-      const tooLongSeconds = Math.ceil(server_defaults.AXIOS.MAX_RATE_LIMIT_WAIT_MS / 1000) + 1;
+      const tooLongSeconds = Math.ceil(server_defaults.HTTP.MAX_RATE_LIMIT_WAIT_MS / 1000) + 1;
       (axios as any).mockImplementation(async (_cfg: any) => ({ status: 429, data: Buffer.from('rate'), headers: { 'retry-after': String(tooLongSeconds) }, config: {} }));
 
       const { response, retriesAttempted } = await callAxios({ method: 'GET', url: 'https://example.com' } as any, { retries: 1, retryDelay: 1 } as any);
