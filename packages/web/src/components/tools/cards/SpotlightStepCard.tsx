@@ -17,8 +17,7 @@ import {
     DropdownMenuTrigger,
 } from '@/src/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { Integration } from '@superglue/shared';
-import { assertValidArrowFunction } from '@superglue/shared';
+import { Integration, assertValidArrowFunction, executeWithVMHelpers } from '@superglue/shared';
 import { Bug, ChevronDown, FileBraces, FileInput, FileOutput, Play, RotateCw, Route, Square, Trash2, Wand2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { type CategorizedSources } from '../templates/tiptap/TemplateContext';
@@ -135,13 +134,10 @@ export const SpotlightStepCard = React.memo(({
         
         const t = window.setTimeout(() => {
             try {
-                let sel = step?.loopSelector;
-                const raw = assertValidArrowFunction(sel).trim();
-                const stripped = raw.replace(/;\s*$/, '');
-                const body = `const __selector = (${stripped});\nreturn __selector(sourceData);`;
-                // eslint-disable-next-line no-new-func
-                const fn = new Function('sourceData', body);
-                const out = fn(evolvingPayload || {});
+                const sel = step?.loopSelector;
+                assertValidArrowFunction(sel);
+                const out = executeWithVMHelpers(sel, evolvingPayload || {});
+                
                 if (typeof out === 'function') {
                     throw new Error('Data selector returned a function. Did you forget to call it?');
                 }
