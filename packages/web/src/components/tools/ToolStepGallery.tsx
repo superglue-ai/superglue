@@ -769,7 +769,7 @@ export function ToolStepGallery({
                                     readOnly={readOnly}
                                     failedSteps={failedSteps}
                                     abortedSteps={abortedSteps}
-                                    showOutputSignal={showStepOutputSignal}
+                                    showOutputSignal={focusStepId === currentItem.data.id ? showStepOutputSignal : undefined}
                                     onConfigEditingChange={setIsConfiguratorEditing}
                                     onDataSelectorChange={handleDataSelectorChange}
                                     isFirstStep={activeIndex === 1}

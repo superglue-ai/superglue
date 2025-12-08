@@ -194,6 +194,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasGeneratedDefaultPayloadRef = useRef<boolean>(false);
   const executionCompletedRef = useRef(false);
+  const shouldAbortRef = useRef(false);
   const [showToolBuilder, setShowToolBuilder] = useState(false);
   const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
   const [showDeployModal, setShowDeployModal] = useState(false);
@@ -230,6 +231,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
   const handleStopExecution = async () => {
     if (!currentRunIdRef.current || executionCompletedRef.current) return;
+    
+    shouldAbortRef.current = true;
     
     await new Promise(resolve => setTimeout(resolve, 50));
     
@@ -677,9 +680,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   };
 
   const handleBeforeStepExecution = async (stepIndex: number, step: any): Promise<boolean> => {
-    // Check if this step has the modify flag
+    if (shouldAbortRef.current || externalShouldStop) {
+      return false;
+    }
+    
     if (step.modify === true) {
-      // Show confirmation dialog and wait for user response
       return new Promise((resolve) => {
         modifyStepResolveRef.current = resolve;
         setPendingModifyStepIndex(stepIndex);
@@ -718,6 +723,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const executeTool = async () => {
     const runId = generateUUID();
     executionCompletedRef.current = false;
+    shouldAbortRef.current = false;
     currentRunIdRef.current = runId;
     setCurrentRunId(runId);
     setLoading(true);
@@ -761,21 +767,28 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
             setCurrentExecutingStepIndex(tool.steps.length);
           }
 
-          if (res.success) {
-            setCompletedSteps(prev => Array.from(new Set([...prev, res.stepId])));
-          } else if (isAbortError(res.error)) {
-            setAbortedSteps(prev => Array.from(new Set([...prev, res.stepId])));
-          } else {
-            setFailedSteps(prev => Array.from(new Set([...prev, res.stepId])));
-          }
           try {
             const normalized = computeStepOutput(res);
             setStepResultsMap(prev => ({ ...prev, [res.stepId]: normalized.output }));
           } catch { }
+          
+          if (res.success) {
+            setCompletedSteps(prev => Array.from(new Set([...prev, res.stepId])));
+          } else if (isAbortError(res.error)) {
+            setAbortedSteps(prev => Array.from(new Set([...prev, res.stepId])));
+            setFocusStepId(res.stepId);
+            setShowStepOutputSignal(Date.now());
+          } else {
+            setFailedSteps(prev => Array.from(new Set([...prev, res.stepId])));
+            setFocusStepId(res.stepId);
+            setShowStepOutputSignal(Date.now());
+          }
         },
         effectiveSelfHealing,
         handleBeforeStepExecution,
-        runId
+        (stepRunId: string) => {
+          currentRunIdRef.current = stepRunId;
+        }
       );
 
       // Always update steps with returned configuration (API may normalize/update even without self-healing)
@@ -793,12 +806,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         }
       }
 
-      const stepDataMap: Record<string, any> = {};
-      Object.entries(state.stepResults).forEach(([stepId, res]) => {
-        const normalized = computeStepOutput(res as StepExecutionResult);
-        stepDataMap[stepId] = normalized.output;
-      });
-      setStepResultsMap(stepDataMap);
+      if (state.stepResults['__final_transform__']) {
+        const normalized = computeStepOutput(state.stepResults['__final_transform__'] as StepExecutionResult);
+        setStepResultsMap(prev => ({ ...prev, ['__final_transform__']: normalized.output }));
+      }
 
       const finalData = state.stepResults['__final_transform__']?.data;
       setFinalPreviewResult(finalData);
@@ -836,10 +847,20 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       if (state.failedSteps.length === 0 && state.abortedSteps.length === 0 && !state.interrupted) {
         setNavigateToFinalSignal(Date.now());
       } else {
-        const firstFailed = state.failedSteps[0];
-        if (firstFailed) {
-          setFocusStepId(firstFailed);
+        const firstProblematicStep = state.failedSteps[0] || state.abortedSteps[0];
+        if (firstProblematicStep) {
+          if (firstProblematicStep === '__final_transform__') {
+            setNavigateToFinalSignal(Date.now());
+          } else {
+            setFocusStepId(firstProblematicStep);
           setShowStepOutputSignal(Date.now());
+          }
+        } else if (state.interrupted) {
+          const lastExecutedStepId = state.completedSteps[state.completedSteps.length - 1];
+          if (lastExecutedStepId) {
+            setFocusStepId(lastExecutedStepId);
+            setShowStepOutputSignal(Date.now());
+          }
         }
       }
 
@@ -976,7 +997,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           payload: computedPayload,
           previousResults: stepResultsMap,
           selfHealing: false,
-          runId
+          onRunIdGenerated: (runId) => { currentRunIdRef.current = runId; }
         }
       );
       
@@ -1080,7 +1101,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           payload: computedPayload,
           previousResults: stepResultsMap,
           selfHealing: true,
-          runId
+          onRunIdGenerated: (runId) => { currentRunIdRef.current = runId; }
         }
       );
 
@@ -1154,7 +1175,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         computedPayload,
         stepData,
         selfHealing,
-        runId
+        (runId) => { currentRunIdRef.current = runId; }
       );
 
       if (result.success) {

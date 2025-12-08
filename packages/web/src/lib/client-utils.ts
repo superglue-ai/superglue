@@ -28,6 +28,7 @@ export interface StepExecutionResult {
   data?: any;
   error?: string;
   updatedStep?: any;
+  runId?: string;
 }
 
 export interface FinalTransformExecutionResult {
@@ -36,6 +37,7 @@ export interface FinalTransformExecutionResult {
   error?: string;
   updatedTransform?: string;
   updatedResponseSchema?: any;
+  runId?: string;
 }
 
 export interface ToolExecutionState {
@@ -69,7 +71,7 @@ export async function executeSingleStep({
   payload,
   previousResults,
   selfHealing,
-  runId
+  onRunIdGenerated
 }: {
   client: SuperglueClient;
   step: ExecutionStep;
@@ -77,8 +79,14 @@ export async function executeSingleStep({
   payload: any;
   previousResults: Record<string, any>;
   selfHealing: boolean;
-  runId?: string;
+  onRunIdGenerated?: (runId: string) => void;
 }): Promise<StepExecutionResult> {
+  const stepRunId = generateUUID();
+  
+  if (onRunIdGenerated) {
+    onRunIdGenerated(stepRunId);
+  }
+  
   try {
     const singleStepTool: Tool = {
       id: `${toolId}_step_${step.id}`,
@@ -98,7 +106,7 @@ export async function executeSingleStep({
         testMode: selfHealing,
         selfHealing: selfHealing ? SelfHealingMode.REQUEST_ONLY : SelfHealingMode.DISABLED
       },
-      runId
+      runId: stepRunId
     });
 
     const stepResult = result.stepResults[0];
@@ -108,13 +116,15 @@ export async function executeSingleStep({
       success: result.success,
       data: stepResult.data,
       error: result.error,
-      updatedStep: result.config?.steps?.[0]
+      updatedStep: result.config?.steps?.[0],
+      runId: stepRunId
     };
   } catch (error: any) {
     return {
       stepId: step.id,
       success: false,
-      error: error.message || 'Step execution failed'
+      error: error.message || 'Step execution failed',
+      runId: stepRunId
     };
   }
 }
@@ -126,7 +136,7 @@ export async function executeToolStepByStep(
   onStepComplete?: (stepIndex: number, result: StepExecutionResult) => void,
   selfHealing: boolean = false,
   onBeforeStep?: (stepIndex: number, step: any) => Promise<boolean>,
-  runId?: string
+  onStepRunIdChange?: (stepRunId: string) => void
 ): Promise<ToolExecutionState> {
   const state: ToolExecutionState = {
     originalTool: tool,
@@ -163,7 +173,7 @@ export async function executeToolStepByStep(
         payload,
         previousResults,
         selfHealing,
-        runId
+        onRunIdGenerated: onStepRunIdChange
       }
     );
 
@@ -211,7 +221,7 @@ export async function executeToolStepByStep(
       payload,
       previousResults,
       selfHealing,
-      runId
+      onStepRunIdChange
     );
 
     state.stepResults['__final_transform__'] = {
@@ -252,8 +262,14 @@ export async function executeFinalTransform(
   payload: any,
   previousResults: Record<string, any>,
   selfHealing: boolean = false,
-  runId?: string
+  onRunIdGenerated?: (runId: string) => void
 ): Promise<FinalTransformExecutionResult> {
+  const transformRunId = generateUUID();
+  
+  if (onRunIdGenerated) {
+    onRunIdGenerated(transformRunId);
+  }
+  
   try {
     const finalPayload = {
       ...payload,
@@ -272,19 +288,21 @@ export async function executeFinalTransform(
         testMode: selfHealing,
         selfHealing: selfHealing ? SelfHealingMode.TRANSFORM_ONLY : SelfHealingMode.DISABLED
       },
-      runId
+      runId: transformRunId
     });
     return {
       success: result.success,
       data: result.data,
       error: result.error,
       updatedTransform: result.config?.finalTransform,
-      updatedResponseSchema: result.config?.responseSchema
+      updatedResponseSchema: result.config?.responseSchema,
+      runId: transformRunId
     };
   } catch (error: any) {
     return {
       success: false,
-      error: error.message || 'Final transform execution failed'
+      error: error.message || 'Final transform execution failed',
+      runId: transformRunId
     };
   }
 }

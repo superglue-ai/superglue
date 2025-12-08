@@ -594,7 +594,6 @@ export class SuperglueClient {
             items {
               id
               toolId
-              orgId
               status
               toolResult
               stepResults {
@@ -623,7 +622,6 @@ export class SuperglueClient {
           getRun(id: $id) {
             id
             toolId
-            orgId
             status
             toolResult
             toolPayload
