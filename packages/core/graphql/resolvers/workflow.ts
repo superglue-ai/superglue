@@ -110,17 +110,6 @@ export const executeWorkflowResolver = async (
       if (abortError.message?.includes('abort') || abortError.name === 'AbortError') {
         
         logMessage('warn', `Aborted run with runId ${runId}`, metadata);
-        
-        await context.datastore.updateRun({
-          id: runId,
-          orgId: context.orgId,
-          updates: {
-            status: RunStatus.ABORTED,
-            toolPayload: args.payload,
-            error: `User manually aborted run with runId ${runId}`,
-            completedAt: new Date()
-          }
-        }).catch(() => {});
 
         return {
           id: runId,
