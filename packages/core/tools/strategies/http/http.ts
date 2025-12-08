@@ -44,9 +44,9 @@ function configureHttpsAgent(): https.Agent {
   if (!keepAliveEnabled) {
     return new https.Agent({
       ...baseConfig,
-      maxSockets: server_defaults.AXIOS.MAX_SOCKETS,
-      maxFreeSockets: server_defaults.AXIOS.MAX_FREE_SOCKETS,
-      timeout: server_defaults.AXIOS.TIMEOUT
+      maxSockets: server_defaults.HTTP.MAX_SOCKETS,
+      maxFreeSockets: server_defaults.HTTP.MAX_FREE_SOCKETS,
+      timeout: server_defaults.HTTP.DEFAULT_TIMEOUT
     });
   }
 
@@ -59,8 +59,8 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   let retryCount = 0;
   const defaultRetries = process.env.AXIOS_KEEP_ALIVE === 'false' ? 3 : 1;
   const maxRetries = Math.min(options?.retries ?? defaultRetries, server_defaults.MAX_CALL_RETRIES);
-  const delay = options?.retryDelay || server_defaults.AXIOS.DEFAULT_RETRY_DELAY_MS;
-  const maxRateLimitWaitMs = server_defaults.AXIOS.MAX_RATE_LIMIT_WAIT_MS;
+  const delay = options?.retryDelay || server_defaults.HTTP.DEFAULT_RETRY_DELAY_MS;
+  const maxRateLimitWaitMs = server_defaults.HTTP.MAX_RATE_LIMIT_WAIT_MS;
   let rateLimitRetryCount = 0;
   let totalRateLimitWaitTime = 0;
   let lastFailureStatus: number | undefined;
@@ -135,7 +135,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
         response.data = Buffer.from(response.data);
       }
       if (response.status < 200 || response.status >= 300) {
-        if (response.status !== 429 && retryCount < maxRetries && durationMs < server_defaults.AXIOS.QUICK_RETRY_THRESHOLD_MS) {
+        if (response.status !== 429 && retryCount < maxRetries && durationMs < server_defaults.HTTP.QUICK_RETRY_THRESHOLD_MS) {
           lastFailureStatus = response.status;
           retryCount++;
           await new Promise(resolve => setTimeout(resolve, delay));

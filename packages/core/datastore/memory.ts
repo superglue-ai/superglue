@@ -86,6 +86,11 @@ export class MemoryStore implements DataStore {
     const { run } = params;
     if (!run) return null;
     const key = this.getKey('run', run.id, run.orgId);
+    
+    if (this.storage.runs.has(key)) {
+      throw new Error(`Run with id ${run.id} already exists`);
+    }
+
     this.storage.runs.set(key, run);
 
     const toolId = run.toolId || run.toolConfig?.id;

@@ -75,7 +75,6 @@ type RunResult {
 type Run {
   id: ID!
   toolId: String!
-  orgId: String!
   status: RunStatus!
   toolConfig: Workflow
   toolPayload: JSON

@@ -358,7 +358,7 @@ export class PostgresService implements DataStore {
         const client = await this.pool.connect();
         try {
             const result = await client.query(
-                'SELECT id, config_id, org_id, data, started_at, completed_at FROM runs WHERE id = $1 AND org_id = $2',
+                'SELECT id, config_id, data, started_at, completed_at FROM runs WHERE id = $1 AND org_id = $2',
                 [id, orgId || '']
             );
             if (!result.rows[0]) return null;
@@ -380,7 +380,7 @@ export class PostgresService implements DataStore {
         const client = await this.pool.connect();
         try {
             let countQuery = 'SELECT COUNT(*) FROM runs WHERE org_id = $1';
-            let selectQuery = 'SELECT id, config_id, org_id, data, started_at, completed_at FROM runs WHERE org_id = $1';
+            let selectQuery = 'SELECT id, config_id, data, started_at, completed_at FROM runs WHERE org_id = $1';
             const queryParams: string[] = [orgId || ''];
 
             if (configId) {
@@ -415,11 +415,17 @@ export class PostgresService implements DataStore {
         if (!run) return null;
         const client = await this.pool.connect();
         try {
+            const existingRun = await client.query(
+                'SELECT id FROM runs WHERE id = $1 AND org_id = $2',
+                [run.id, run.orgId || '']
+            );
+            if (existingRun.rows.length > 0) {
+                throw new Error(`Run with id ${run.id} already exists`);
+            }
+
             await client.query(`
                 INSERT INTO runs (id, config_id, org_id, data, started_at, completed_at) 
                 VALUES ($1, $2, $3, $4, $5, $6)
-                ON CONFLICT (id, org_id) 
-                DO UPDATE SET data = $4, started_at = $5, completed_at = $6
             `, [
                 run.id,
                 run.toolId,
@@ -440,7 +446,7 @@ export class PostgresService implements DataStore {
         const client = await this.pool.connect();
         try {
             const existingResult = await client.query(
-                'SELECT id, config_id, org_id, data, started_at, completed_at FROM runs WHERE id = $1 AND org_id = $2',
+                'SELECT id, config_id, data, started_at, completed_at FROM runs WHERE id = $1 AND org_id = $2',
                 [id, orgId]
             );
             

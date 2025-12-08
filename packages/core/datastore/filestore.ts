@@ -360,6 +360,11 @@ export class FileStore implements DataStore {
     const { run } = params;
     if (!run) return null;
 
+    const existingRun = await this.getRun({ id: run.id, orgId: run.orgId });
+    if (existingRun) {
+      throw new Error(`Run with id ${run.id} already exists`);
+    }
+
     if (String(process.env.DISABLE_LOGS).toLowerCase() !== 'true') {
       await this.appendRunToLogs(run);
     }
