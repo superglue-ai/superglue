@@ -84,6 +84,7 @@ export const SpotlightStepCard = React.memo(({
 }) => {
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
     const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [pendingAction, setPendingAction] = useState<'execute' | null>(null);
     
     const DATA_SELECTOR_DEBOUNCE_MS = 400;
@@ -263,7 +264,7 @@ export const SpotlightStepCard = React.memo(({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => onRemove(step.id)}
+                                onClick={() => setShowDeleteConfirm(true)}
                                 className="h-8 w-8"
                             >
                                 <Trash2 className="h-4 w-4" />
@@ -358,6 +359,29 @@ export const SpotlightStepCard = React.memo(({
                             setPendingAction(null);
                         }}>
                             Run Anyway
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Step</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete step "{step.id}"? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={() => {
+                                setShowDeleteConfirm(false);
+                                onRemove?.(step.id);
+                            }}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Delete
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
