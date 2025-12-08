@@ -1,4 +1,4 @@
-import type { ApiConfig, Integration, Run, Tool, ToolSchedule } from "@superglue/shared";
+import type { ApiConfig, Integration, Run, Tool, ToolSchedule, DiscoveryRun, FileReference, FileStatus } from "@superglue/shared";
 
 export interface DataStore {
   // API Config Methods
@@ -48,6 +48,20 @@ export interface DataStore {
   deleteWorkflowSchedule(params: { id: string, orgId: string }): Promise<boolean>;
   listDueWorkflowSchedules(): Promise<ToolScheduleInternal[]>;
   updateScheduleNextRun(params: { id: string; nextRunAt: Date; lastRunAt: Date; }): Promise<boolean>;
+
+  // DiscoveryRun Methods
+  createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string }): Promise<DiscoveryRun>;
+  getDiscoveryRun(params: { id: string; orgId?: string }): Promise<DiscoveryRun | null>;
+  updateDiscoveryRun(params: { id: string; updates: Partial<DiscoveryRun>; orgId?: string }): Promise<DiscoveryRun>;
+  listDiscoveryRuns(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: DiscoveryRun[], total: number }>;
+  deleteDiscoveryRun(params: { id: string; orgId?: string }): Promise<boolean>;
+
+  // FileReference Methods
+  createFileReference(params: { file: FileReference; orgId?: string }): Promise<FileReference>;
+  getFileReference(params: { id: string; orgId?: string }): Promise<FileReference | null>;
+  updateFileReference(params: { id: string; updates: Partial<FileReference>; orgId?: string }): Promise<FileReference>;
+  listFileReferences(params?: { fileIds?: string[]; status?: FileStatus; limit?: number; offset?: number; orgId?: string }): Promise<{ items: FileReference[], total: number }>;
+  deleteFileReference(params: { id: string; orgId?: string }): Promise<boolean>;
 }
 
 export type ToolScheduleInternal = ToolSchedule & {

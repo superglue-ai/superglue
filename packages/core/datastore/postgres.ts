@@ -1,4 +1,4 @@
-import type { ApiConfig, Integration, Run, Tool } from "@superglue/shared";
+import type { ApiConfig, Integration, Run, Tool, DiscoveryRun, FileReference, FileStatus } from "@superglue/shared";
 import { Pool, PoolConfig } from 'pg';
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
@@ -217,6 +217,36 @@ export class PostgresService implements DataStore {
                 )
             `);
 
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS discovery_runs (
+                    id VARCHAR(255) NOT NULL,
+                    org_id VARCHAR(255) NOT NULL,
+                    file_ids TEXT[],
+                    data JSONB,
+                    status VARCHAR(50) NOT NULL,
+                    started_at TIMESTAMP NOT NULL,
+                    completed_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id, org_id)
+                )
+            `);
+
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS file_references (
+                    id VARCHAR(255) NOT NULL,
+                    org_id VARCHAR(255) NOT NULL,
+                    storage_uri TEXT NOT NULL,
+                    processed_storage_uri TEXT,
+                    metadata JSONB NOT NULL,
+                    status VARCHAR(50) NOT NULL,
+                    error TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id, org_id)
+                )
+            `);
+
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_type_org ON configurations(type, org_id)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_version ON configurations(version)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_configurations_integration_ids ON configurations USING GIN(integration_ids)`);
@@ -227,6 +257,9 @@ export class PostgresService implements DataStore {
             await client.query(`CREATE INDEX IF NOT EXISTS idx_integration_details_integration_id ON integration_details(integration_id, org_id)`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_workflow_schedules_due ON workflow_schedules(next_run_at, enabled) WHERE enabled = true`);
             await client.query(`CREATE INDEX IF NOT EXISTS idx_integration_oauth_expires ON integration_oauth(expires_at)`);
+            await client.query(`CREATE INDEX IF NOT EXISTS idx_discovery_runs_org_status ON discovery_runs(org_id, status)`);
+            await client.query(`CREATE INDEX IF NOT EXISTS idx_file_references_org_id ON file_references(org_id, id)`);
+            await client.query(`CREATE INDEX IF NOT EXISTS idx_file_references_org_status ON file_references(org_id, status)`);
 
         } finally {
             client.release();
@@ -1121,6 +1154,281 @@ export class PostgresService implements DataStore {
         const client = await this.pool.connect();
         try {
             await client.query('DELETE FROM integration_oauth WHERE uid = $1', [params.uid]);
+        } finally {
+            client.release();
+        }
+    }
+
+    async createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string }): Promise<DiscoveryRun> {
+        const { run, orgId = '' } = params;
+        const client = await this.pool.connect();
+        try {
+            await client.query(
+                `INSERT INTO discovery_runs (id, org_id, file_ids, data, status, started_at, completed_at, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                [run.id, orgId, run.fileIds, JSON.stringify(run.data), run.status, run.startedAt, run.completedAt || null]
+            );
+            return run;
+        } finally {
+            client.release();
+        }
+    }
+
+    async getDiscoveryRun(params: { id: string; orgId?: string }): Promise<DiscoveryRun | null> {
+        const { id, orgId = '' } = params;
+        const client = await this.pool.connect();
+        try {
+            const result = await client.query(
+                `SELECT id, file_ids, data, status, started_at, completed_at FROM discovery_runs WHERE id = $1 AND org_id = $2`,
+                [id, orgId]
+            );
+            if (result.rows.length === 0) return null;
+
+            const row = result.rows[0];
+            return {
+                id: row.id,
+                fileIds: row.file_ids || [],
+                data: row.data,
+                status: row.status,
+                startedAt: new Date(row.started_at),
+                completedAt: row.completed_at ? new Date(row.completed_at) : undefined
+            };
+        } finally {
+            client.release();
+        }
+    }
+
+    async updateDiscoveryRun(params: { id: string; updates: Partial<DiscoveryRun>; orgId?: string }): Promise<DiscoveryRun> {
+        const { id, updates, orgId = '' } = params;
+        const client = await this.pool.connect();
+        try {
+            const setClauses: string[] = [];
+            const values: any[] = [];
+            let paramCount = 1;
+
+            if (updates.fileIds !== undefined) {
+                setClauses.push(`file_ids = $${paramCount++}`);
+                values.push(updates.fileIds);
+            }
+            if (updates.data !== undefined) {
+                setClauses.push(`data = $${paramCount++}`);
+                values.push(JSON.stringify(updates.data));
+            }
+            if (updates.status !== undefined) {
+                setClauses.push(`status = $${paramCount++}`);
+                values.push(updates.status);
+            }
+            if (updates.startedAt !== undefined) {
+                setClauses.push(`started_at = $${paramCount++}`);
+                values.push(updates.startedAt);
+            }
+            if (updates.completedAt !== undefined) {
+                setClauses.push(`completed_at = $${paramCount++}`);
+                values.push(updates.completedAt);
+            }
+
+            setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
+            values.push(id, orgId);
+
+            await client.query(
+                `UPDATE discovery_runs SET ${setClauses.join(', ')} WHERE id = $${paramCount++} AND org_id = $${paramCount++}`,
+                values
+            );
+
+            const updated = await this.getDiscoveryRun({ id, orgId });
+            if (!updated) throw new Error('Failed to retrieve updated discovery run');
+            return updated;
+        } finally {
+            client.release();
+        }
+    }
+
+    async listDiscoveryRuns(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: DiscoveryRun[], total: number }> {
+        const { limit = 10, offset = 0, orgId = '' } = params || {};
+        const client = await this.pool.connect();
+        try {
+            const countResult = await client.query(
+                `SELECT COUNT(*) FROM discovery_runs WHERE org_id = $1`,
+                [orgId]
+            );
+            const total = parseInt(countResult.rows[0].count);
+
+            const result = await client.query(
+                `SELECT id, org_id, file_ids, data, status, started_at, completed_at 
+                 FROM discovery_runs WHERE org_id = $1 
+                 ORDER BY started_at DESC LIMIT $2 OFFSET $3`,
+                [orgId, limit, offset]
+            );
+
+            const items = result.rows.map(row => ({
+                id: row.id,
+                fileIds: row.file_ids || [],
+                data: row.data,
+                status: row.status,
+                startedAt: new Date(row.started_at),
+                completedAt: row.completed_at ? new Date(row.completed_at) : undefined
+            }));
+
+            return { items, total };
+        } finally {
+            client.release();
+        }
+    }
+
+    async deleteDiscoveryRun(params: { id: string; orgId?: string }): Promise<boolean> {
+        const { id, orgId = '' } = params;
+        const client = await this.pool.connect();
+        try {
+            const result = await client.query(
+                `DELETE FROM discovery_runs WHERE id = $1 AND org_id = $2`,
+                [id, orgId]
+            );
+            return (result.rowCount || 0) > 0;
+        } finally {
+            client.release();
+        }
+    }
+
+    async createFileReference(params: { file: FileReference; orgId?: string }): Promise<FileReference> {
+        const { file, orgId = '' } = params;
+        const client = await this.pool.connect();
+        try {
+            await client.query(
+                `INSERT INTO file_references (id, org_id, storage_uri, processed_storage_uri, metadata, status, error, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                [file.id, orgId, file.storageUri, file.processedStorageUri || null, JSON.stringify(file.metadata), file.status, file.error || null]
+            );
+            return file;
+        } finally {
+            client.release();
+        }
+    }
+
+    async getFileReference(params: { id: string; orgId?: string }): Promise<FileReference | null> {
+        const { id, orgId = '' } = params;
+        const client = await this.pool.connect();
+        try {
+            const result = await client.query(
+                `SELECT id, storage_uri, processed_storage_uri, metadata, status, error FROM file_references WHERE id = $1 AND org_id = $2`,
+                [id, orgId]
+            );
+            if (result.rows.length === 0) return null;
+
+            const row = result.rows[0];
+            return {
+                id: row.id,
+                storageUri: row.storage_uri,
+                processedStorageUri: row.processed_storage_uri || undefined,
+                metadata: row.metadata,
+                status: row.status,
+                error: row.error || undefined
+            };
+        } finally {
+            client.release();
+        }
+    }
+
+    async updateFileReference(params: { id: string; updates: Partial<FileReference>; orgId?: string }): Promise<FileReference> {
+        const { id, updates, orgId = '' } = params;
+        const client = await this.pool.connect();
+        try {
+            const setClauses: string[] = [];
+            const values: any[] = [];
+            let paramCount = 1;
+
+            if (updates.storageUri !== undefined) {
+                setClauses.push(`storage_uri = $${paramCount++}`);
+                values.push(updates.storageUri);
+            }
+            if (updates.processedStorageUri !== undefined) {
+                setClauses.push(`processed_storage_uri = $${paramCount++}`);
+                values.push(updates.processedStorageUri);
+            }
+            if (updates.metadata !== undefined) {
+                setClauses.push(`metadata = $${paramCount++}`);
+                values.push(JSON.stringify(updates.metadata));
+            }
+            if (updates.status !== undefined) {
+                setClauses.push(`status = $${paramCount++}`);
+                values.push(updates.status);
+            }
+            if (updates.error !== undefined) {
+                setClauses.push(`error = $${paramCount++}`);
+                values.push(updates.error);
+            }
+
+            setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
+            values.push(id, orgId);
+
+            await client.query(
+                `UPDATE file_references SET ${setClauses.join(', ')} WHERE id = $${paramCount++} AND org_id = $${paramCount++}`,
+                values
+            );
+
+            const updated = await this.getFileReference({ id, orgId });
+            if (!updated) throw new Error('Failed to retrieve updated file reference');
+            return updated;
+        } finally {
+            client.release();
+        }
+    }
+
+    async listFileReferences(params?: { fileIds?: string[]; status?: FileStatus; limit?: number; offset?: number; orgId?: string }): Promise<{ items: FileReference[], total: number }> {
+        const { fileIds, status, limit = 10, offset = 0, orgId = '' } = params || {};
+        const client = await this.pool.connect();
+        try {
+            let whereClause = 'WHERE org_id = $1';
+            const queryParams: any[] = [orgId];
+            let paramCount = 2;
+
+            if (fileIds && fileIds.length > 0) {
+                whereClause += ` AND id = ANY($${paramCount++})`;
+                queryParams.push(fileIds);
+            }
+            if (status) {
+                whereClause += ` AND status = $${paramCount++}`;
+                queryParams.push(status);
+            }
+
+            const countResult = await client.query(
+                `SELECT COUNT(*) FROM file_references ${whereClause}`,
+                queryParams
+            );
+            const total = parseInt(countResult.rows[0].count);
+
+            queryParams.push(limit, offset);
+            const result = await client.query(
+                `SELECT id, org_id, storage_uri, processed_storage_uri, metadata, status, error 
+                 FROM file_references ${whereClause} 
+                 ORDER BY created_at DESC LIMIT $${paramCount++} OFFSET $${paramCount++}`,
+                queryParams
+            );
+
+            const items = result.rows.map(row => ({
+                id: row.id,
+                storageUri: row.storage_uri,
+                processedStorageUri: row.processed_storage_uri || undefined,
+                metadata: row.metadata,
+                status: row.status,
+                error: row.error || undefined
+            }));
+
+            return { items, total };
+        } finally {
+            client.release();
+        }
+    }
+
+
+    async deleteFileReference(params: { id: string; orgId?: string }): Promise<boolean> {
+        const { id, orgId = '' } = params;
+        const client = await this.pool.connect();
+        try {
+            const result = await client.query(
+                `DELETE FROM file_references WHERE id = $1 AND org_id = $2`,
+                [id, orgId]
+            );
+            return (result.rowCount || 0) > 0;
         } finally {
             client.release();
         }

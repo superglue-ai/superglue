@@ -1,4 +1,4 @@
-import { ApiConfig, Integration, Run, Tool } from "@superglue/shared";
+import { ApiConfig, Integration, Run, Tool, DiscoveryRun, FileReference, FileStatus } from "@superglue/shared";
 import { createHash } from 'node:crypto';
 import type { DataStore, ToolScheduleInternal } from "./types.js";
 
@@ -10,6 +10,8 @@ export class MemoryStore implements DataStore {
     workflows: Map<string, Tool>;
     workflowSchedules: Map<string, ToolScheduleInternal>;
     integrations: Map<string, Integration>;
+    discoveryRuns: Map<string, DiscoveryRun>;
+    fileReferences: Map<string, FileReference>;
   };
 
   private tenant: { email: string | null; emailEntrySkipped: boolean } = {
@@ -24,7 +26,9 @@ export class MemoryStore implements DataStore {
       runsIndex: new Map(),
       workflows: new Map(),
       workflowSchedules: new Map(),
-      integrations: new Map()
+      integrations: new Map(),
+      discoveryRuns: new Map(),
+      fileReferences: new Map()
     };
   }
 
@@ -205,6 +209,8 @@ export class MemoryStore implements DataStore {
     this.storage.workflows.clear();
     this.storage.workflowSchedules.clear();
     this.storage.integrations.clear();
+    this.storage.discoveryRuns.clear();
+    this.storage.fileReferences.clear();
   }
 
   async disconnect(): Promise<void> {
@@ -451,5 +457,95 @@ export class MemoryStore implements DataStore {
 
   async deleteOAuthSecret(params: { uid: string }): Promise<void> {
     this.oauthSecrets.delete(params.uid);
+  }
+
+  async createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string }): Promise<DiscoveryRun> {
+    const { run, orgId } = params;
+    const key = this.getKey('discovery-run', run.id, orgId);
+    this.storage.discoveryRuns.set(key, run);
+    return run;
+  }
+
+  async getDiscoveryRun(params: { id: string; orgId?: string }): Promise<DiscoveryRun | null> {
+    const { id, orgId } = params;
+    const key = this.getKey('discovery-run', id, orgId);
+    return this.storage.discoveryRuns.get(key) || null;
+  }
+
+  async updateDiscoveryRun(params: { id: string; updates: Partial<DiscoveryRun>; orgId?: string }): Promise<DiscoveryRun> {
+    const { id, updates, orgId } = params;
+    const key = this.getKey('discovery-run', id, orgId);
+    const existing = this.storage.discoveryRuns.get(key);
+    if (!existing) {
+      throw new Error(`Discovery run not found: ${id}`);
+    }
+    const updated = { ...existing, ...updates };
+    this.storage.discoveryRuns.set(key, updated);
+    return updated;
+  }
+
+  async listDiscoveryRuns(params?: { limit?: number; offset?: number; orgId?: string }): Promise<{ items: DiscoveryRun[], total: number }> {
+    const { limit = 10, offset = 0, orgId } = params || {};
+    const items = this.getOrgItems(this.storage.discoveryRuns, 'discovery-run', orgId);
+    const total = items.length;
+    const paginatedItems = items
+      .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
+      .slice(offset, offset + limit);
+    return { items: paginatedItems, total };
+  }
+
+  async deleteDiscoveryRun(params: { id: string; orgId?: string }): Promise<boolean> {
+    const { id, orgId } = params;
+    const key = this.getKey('discovery-run', id, orgId);
+    return this.storage.discoveryRuns.delete(key);
+  }
+
+  async createFileReference(params: { file: FileReference; orgId?: string }): Promise<FileReference> {
+    const { file, orgId } = params;
+    const key = this.getKey('file-reference', file.id, orgId);
+    this.storage.fileReferences.set(key, file);
+    return file;
+  }
+
+  async getFileReference(params: { id: string; orgId?: string }): Promise<FileReference | null> {
+    const { id, orgId } = params;
+    const key = this.getKey('file-reference', id, orgId);
+    return this.storage.fileReferences.get(key) || null;
+  }
+
+  async updateFileReference(params: { id: string; updates: Partial<FileReference>; orgId?: string }): Promise<FileReference> {
+    const { id, updates, orgId } = params;
+    const key = this.getKey('file-reference', id, orgId);
+    const existing = this.storage.fileReferences.get(key);
+    if (!existing) {
+      throw new Error(`File reference not found: ${id}`);
+    }
+    const updated = { ...existing, ...updates };
+    this.storage.fileReferences.set(key, updated);
+    return updated;
+  }
+
+  async listFileReferences(params?: { fileIds?: string[]; status?: FileStatus; limit?: number; offset?: number; orgId?: string }): Promise<{ items: FileReference[], total: number }> {
+    const { fileIds, status, limit = 10, offset = 0, orgId } = params || {};
+    let items = this.getOrgItems(this.storage.fileReferences, 'file-reference', orgId);
+    
+    if (fileIds && fileIds.length > 0) {
+      items = items.filter(file => fileIds.includes(file.id));
+    }
+    
+    if (status) {
+      items = items.filter(file => file.status === status);
+    }
+    
+    const total = items.length;
+    const paginatedItems = items.slice(offset, offset + limit);
+    return { items: paginatedItems, total };
+  }
+
+
+  async deleteFileReference(params: { id: string; orgId?: string }): Promise<boolean> {
+    const { id, orgId } = params;
+    const key = this.getKey('file-reference', id, orgId);
+    return this.storage.fileReferences.delete(key);
   }
 } 
