@@ -5,6 +5,7 @@ import { DataStore } from '../datastore/types.js';
 import { logMessage } from "../utils/logs.js";
 import { AuthenticatedFastifyRequest } from './types.js';
 import { generateTraceId } from '../utils/trace-id.js';
+import { ServiceMetadata } from '@superglue/shared';
 
 export async function startApiServer(datastore: DataStore) {
   // Get REST API port
@@ -18,21 +19,8 @@ export async function startApiServer(datastore: DataStore) {
   }
   const PORT = port;
 
-  // Configure Fastify logging to match the centralized logging format from utils/logs.ts
   const fastify = Fastify({
-    logger: {
-      level: 'info',
-      transport: {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          singleLine: true,
-          ignore: 'pid,hostname,reqId',
-          translateTime: 'SYS:yyyy-mm-dd HH:MM:ss.l o',
-          messageFormat: '(REST API) {req.method} {req.url} {res.statusCode} - {responseTime}ms'
-        }
-      }
-    }
+    logger: false
   });
 
   // Register CORS
@@ -40,22 +28,37 @@ export async function startApiServer(datastore: DataStore) {
     origin: true
   });
 
+  // Error handler to log errors with traceId
+  fastify.setErrorHandler(async (error: any, request, reply) => {
+    const authReq = request as AuthenticatedFastifyRequest;
+    const metadata = authReq.toMetadata?.() || { traceId: generateTraceId(), orgId: authReq.authInfo?.orgId || '' };
+    
+    logMessage('error', `(REST API) ${request.method} ${request.url} - Error: ${error?.message || String(error)}`, metadata);
+    
+    return reply.code(error?.statusCode || 500).send({
+      success: false,
+      error: error?.message || 'Internal server error'
+    });
+  });
+
   fastify.addHook('preHandler', async (request, reply) => {
+    const traceId = generateTraceId();
+
     // Skip authentication for health check and public endpoints
     if (request.url === '/v1/health') {
+      const metadata: ServiceMetadata = { traceId };
+      logMessage('info', `(REST API) ${request.method} ${request.url}`, metadata);
       return;
     }
-
-    const traceId = generateTraceId();
 
     // Authentication logic
     const token = extractTokenFromFastifyRequest(request);
     const authResult = await validateToken(token);
-    logMessage('info', `Fastify authentication result: ${JSON.stringify(authResult)}`, { traceId });
     
     // If authentication fails, return 401 error
     if (!authResult.success) {
-      logMessage('warn', `Fastify authentication failed for token: ${token?.slice(0, 10) ?? 'none'}...`, { traceId });
+      const metadata: ServiceMetadata = { traceId };
+      logMessage('warn', `(REST API) ${request.method} ${request.url} - Authentication failed`, metadata);
       return reply.code(401).send({
         success: false,
         error: 'Authentication failed',
@@ -81,6 +84,10 @@ export async function startApiServer(datastore: DataStore) {
     authenticatedRequest.toMetadata = function() {
       return { orgId: this.authInfo.orgId, traceId: this.traceId };
     };
+
+    // Single log per request with method, endpoint, using ServiceMetadata
+    const metadata = authenticatedRequest.toMetadata();
+    logMessage('info', `(REST API) ${request.method} ${request.url}`, metadata);
   });
 
   // Register all API routes from modules
@@ -96,8 +103,8 @@ export async function startApiServer(datastore: DataStore) {
     const host = process.env.HOST || '0.0.0.0';
     await fastify.listen({ port: PORT, host });
     logMessage('info', `🚀 Fastify API server ready at http://${host}:${PORT}`);
-  } catch (err) {
-    fastify.log.error(err);
+  } catch (err: any) {
+    logMessage('error', `Failed to start Fastify API server: ${err?.message || String(err)}`);
     process.exit(1);
   }
 
