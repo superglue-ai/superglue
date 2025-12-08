@@ -150,7 +150,7 @@ export const createMcpServer = async (apiKey: string) => {
 
   // Register tools individually for proper type inference
   mcpServer.registerTool(
-    'superglue_execute_tool',
+    'execute_tool',
     {
       description: toolDefinitions.superglue_execute_tool.description,
       inputSchema: ExecuteToolInputSchema,
@@ -178,7 +178,7 @@ export const createMcpServer = async (apiKey: string) => {
   );
 
   mcpServer.registerTool(
-    'superglue_find_relevant_tools',
+    'find_relevant_tools',
     {
       description: toolDefinitions.superglue_find_relevant_tools.description,
       inputSchema: FindRelevantToolsInputSchema,
