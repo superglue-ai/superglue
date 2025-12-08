@@ -54,6 +54,11 @@ export class IntegrationManager {
     async getIntegration(): Promise<Integration> {
         if (this._integration) return this._integration;
 
+        // If datastore is null (e.g., in worker thread), return current state or throw
+        if (!this.dataStore) {
+            throw new Error(`Integration ${this.id} not initialized and datastore unavailable`);
+        }
+
         // Prevent multiple simultaneous loads
         if (this._basicDataPromise) {
             await this._basicDataPromise;
@@ -62,7 +67,7 @@ export class IntegrationManager {
 
         this._basicDataPromise = (async () => {
             try {
-                const integration = await this.dataStore.getIntegration({ id: this.id, includeDocs: false, orgId: this.orgId });
+                const integration = await this.dataStore!.getIntegration({ id: this.id, includeDocs: false, orgId: this.orgId });
                 this._integration = integration;
                 return integration;
             } finally {
@@ -79,6 +84,11 @@ export class IntegrationManager {
         // If already fetched, return current state
         if (this._documentation?.isFetched) {
             return this._documentation;
+        }
+
+        // If datastore is null (e.g., in worker thread), return current state
+        if (!this.dataStore) {
+            return this._documentation || { isFetched: false };
         }
 
         try {

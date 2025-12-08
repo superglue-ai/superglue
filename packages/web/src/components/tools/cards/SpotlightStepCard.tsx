@@ -100,11 +100,10 @@ export const SpotlightStepCard = React.memo(({
     const [dataSelectorOutput, setDataSelectorOutput] = useState<any | null>(() => cachedOutput?.output ?? null);
     const [dataSelectorError, setDataSelectorError] = useState<string | null>(() => cachedOutput?.error ?? null);
     const lastEvalTimerRef = useRef<number | null>(null);
-    const prevShowOutputSignalRef = useRef(showOutputSignal);
-    const hasReceivedComputedValueRef = useRef(false);
+    const prevShowOutputSignalRef = useRef<number | undefined>(undefined);
+    const lastNotifiedStepIdRef = useRef<string | null>(null);
 
     useEffect(() => {
-        hasReceivedComputedValueRef.current = false;
         const currentCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
         const cached = dataSelectorOutputCache.get(currentCacheKey);
         if (cached) {
@@ -174,15 +173,16 @@ export const SpotlightStepCard = React.memo(({
 
     useEffect(() => {
         const hasValidOutput = !dataSelectorError && dataSelectorOutput != null;
-        const isInitialComputation = !hasReceivedComputedValueRef.current;
-        
-        if (hasValidOutput) {
-            hasReceivedComputedValueRef.current = true;
-        }
+        const isInitialForThisStep = lastNotifiedStepIdRef.current !== step.id;
         
         const itemCount = (hasValidOutput && Array.isArray(dataSelectorOutput)) ? dataSelectorOutput.length : null;
-        onDataSelectorChange?.(itemCount, isInitialComputation);
-    }, [dataSelectorOutput, dataSelectorError, onDataSelectorChange]);
+        console.log('[DataSelector]', step.id, 'isInitial:', isInitialForThisStep, 'itemCount:', itemCount);
+        onDataSelectorChange?.(itemCount, isInitialForThisStep);
+        
+        if (isInitialForThisStep) {
+            lastNotifiedStepIdRef.current = step.id;
+        }
+    }, [dataSelectorOutput, dataSelectorError, onDataSelectorChange, step.id]);
 
     const handleRunStepClick = () => {
         if (isFirstStep && !isPayloadValid) {

@@ -88,7 +88,7 @@ export class MemoryStore implements DataStore {
 
   async createRun(params: { run: Run }): Promise<Run> {
     const { run } = params;
-    if (!run) return null;
+    if (!run) throw new Error('Run is required');
     const key = this.getKey('run', run.id, run.orgId);
     
     if (this.storage.runs.has(key)) {
@@ -152,7 +152,7 @@ export class MemoryStore implements DataStore {
     }) : validRuns;
 
     const items = filteredRuns.slice(offset, offset + limit);
-    return { items, total: validRuns.length };
+    return { items, total: filteredRuns.length };
   }
 
   async deleteRun(params: { id: string; orgId?: string }): Promise<boolean> {

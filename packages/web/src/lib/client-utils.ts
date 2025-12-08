@@ -4,6 +4,13 @@ import { tokenRegistry } from "./token-registry";
 
 const BASE62_REGEX = /^[a-zA-Z0-9_-]*$/;
 
+export const ABORT_DEBOUNCE_MS = 2000;
+
+export function shouldDebounceAbort(lastAbortTime: number): boolean {
+  const now = Date.now();
+  return now - lastAbortTime < ABORT_DEBOUNCE_MS;
+}
+
 export function isValidToolName(name: string): boolean {
   return BASE62_REGEX.test(name);
 }

@@ -1,6 +1,7 @@
 import { useConfig } from '@/src/app/config-context';
 import { useIntegrations } from '@/src/app/integrations-context';
 import { useToast } from '@/src/hooks/use-toast';
+import { shouldDebounceAbort } from '@/src/lib/client-utils';
 import { Tool } from '@superglue/shared';
 import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -34,6 +35,7 @@ export function ToolCreateStepper({
   const router = useRouter();
   const superglueConfig = useConfig();
   const playgroundRef = useRef<ToolPlaygroundHandle>(null);
+  const lastAbortTimeRef = useRef<number>(0);
 
   const { integrations } = useIntegrations();
 
@@ -65,6 +67,9 @@ export function ToolCreateStepper({
   };
 
   const handleStopExecution = () => {
+    if (shouldDebounceAbort(lastAbortTimeRef.current)) return;
+    
+    lastAbortTimeRef.current = Date.now();
     setShouldStopExecution(true);
     setIsStopping(true);
     toast({

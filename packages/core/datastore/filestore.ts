@@ -366,7 +366,7 @@ export class FileStore implements DataStore {
   async createRun(params: { run: Run }): Promise<Run> {
     await this.ensureInitialized();
     const { run } = params;
-    if (!run) return null;
+    if (!run) throw new Error('Run is required');
 
     const existingRun = await this.getRun({ id: run.id, orgId: run.orgId });
     if (existingRun) {
@@ -398,8 +398,8 @@ export class FileStore implements DataStore {
       orgId
     };
 
-    await this.appendRunToLogs(updatedRun);
     await this.removeRunFromLogs(id, orgId);
+    await this.appendRunToLogs(updatedRun);
 
     return updatedRun;
   }

@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import { abortExecution, generateUUID } from '@/src/lib/client-utils';
+import { abortExecution, generateUUID, shouldDebounceAbort } from '@/src/lib/client-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
 import { SuperglueClient, ToolSchedule } from '@superglue/shared';
 import cronstrue from 'cronstrue';
@@ -32,6 +32,7 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
   const [executingSchedules, setExecutingSchedules] = React.useState<Record<string, 'loading' | 'success' | 'error'>>({});
   const [scheduleStatus, setScheduleStatus] = React.useState<Record<string, { status: 'success' | 'error', message: string }>>({});
   const [currentRunIds, setCurrentRunIds] = React.useState<Record<string, string>>({});
+  const lastAbortTimesRef = React.useRef<Record<string, number>>({});
 
   React.useEffect(() => {
     loadSchedules();
@@ -154,8 +155,13 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
   const handleAbortSchedule = async (e: React.MouseEvent, scheduleId: string) => {
     e.stopPropagation();
     
+    const lastAbortTime = lastAbortTimesRef.current[scheduleId] || 0;
+    if (shouldDebounceAbort(lastAbortTime)) return;
+    
     const runId = currentRunIds[scheduleId];
     if (!runId) return;
+
+    lastAbortTimesRef.current[scheduleId] = Date.now();
 
     const superglueClient = new SuperglueClient({
       endpoint: config.superglueEndpoint,

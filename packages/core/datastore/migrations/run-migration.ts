@@ -23,7 +23,7 @@ function normalizeRunStatus(status: string): RunStatus {
 function migrateLegacyToRun(data: any, row: LegacyRunRow): Run {
   return {
     id: row.id,
-    toolId: row.config_id || data.config?.id || '',
+    toolId: row.config_id,
     status: data.success === true ? RunStatus.SUCCESS : RunStatus.FAILED,
     toolConfig: data.config,
     toolPayload: undefined,

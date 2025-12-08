@@ -14,6 +14,7 @@ interface TemplateChipProps {
   dataSelectorOutput?: any;
   hasResult?: boolean;
   canExecute?: boolean;
+  isEvaluating?: boolean;
   onUpdate: (newTemplate: string) => void;
   onDelete: () => void;
   readOnly?: boolean;
@@ -35,6 +36,7 @@ export function TemplateChip({
   dataSelectorOutput,
   hasResult = true,
   canExecute = true,
+  isEvaluating = false,
   onUpdate,
   onDelete,
   readOnly = false,
@@ -59,7 +61,6 @@ export function TemplateChip({
   const hasError = !!error;
   const isUnresolved = !hasError && !canExecute;
   const isResolvedUndefined = !hasError && canExecute && hasResult && evaluatedValue === undefined;
-  const isLoading = canExecute && !hasResult && evaluatedValue === undefined;
   
   const isLoopArray = loopMode && Array.isArray(evaluatedValue) && evaluatedValue.length > 0;
   const displayValue = isLoopArray ? evaluatedValue[0] : evaluatedValue;
@@ -74,8 +75,6 @@ export function TemplateChip({
     displayText = `Error: ${error.slice(0, 50)}${error.length > 50 ? '...' : ''}`;
   } else if (isUnresolved) {
     displayText = `unresolved: ${templateExpr.slice(0, 30)}${templateExpr.length > 30 ? '...' : ''}`;
-  } else if (isLoading) {
-    displayText = '';
   } else if (isResolvedUndefined) {
     displayText = 'undefined';
   } else {
@@ -182,7 +181,7 @@ export function TemplateChip({
       title={isTruncated ? `${originalSize} chars (click to view)` : undefined}
     >
       <span className="w-3 h-3 flex items-center justify-center shrink-0">
-        {isLoading ? (
+        {isEvaluating ? (
           <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
         ) : !readOnly && !hideDelete && isHovered ? (
           <button

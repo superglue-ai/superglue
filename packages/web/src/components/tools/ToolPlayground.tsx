@@ -3,7 +3,7 @@
 import { useConfig } from "@/src/app/config-context";
 import { useIntegrations } from "@/src/app/integrations-context";
 import { useTools } from "@/src/app/tools-context";
-import { abortExecution, createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, type StepExecutionResult } from "@/src/lib/client-utils";
+import { abortExecution, createSuperglueClient, executeFinalTransform, executeSingleStep, executeToolStepByStep, generateUUID, shouldDebounceAbort, type StepExecutionResult } from "@/src/lib/client-utils";
 import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, computeStepOutput, computeToolPayload, isAbortError, removeFileKeysFromPayload, wrapLoopSelectorWithLimit } from "@/src/lib/general-utils";
 import { ExecutionStep, generateDefaultFromSchema, Integration, Tool, ToolResult } from "@superglue/shared";
@@ -166,11 +166,17 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [instructions, setInstructions] = useState<string>(initialInstruction || '');
 
   useEffect(() => {
-    setSourceDataVersion(v => v + 1);
+    setSourceDataVersion(v => {
+      console.log('[Version] Increment due to stepResultsMap/computedPayload change. Old version:', v, 'New version:', v + 1);
+      return v + 1;
+    });
   }, [stepResultsMap, computedPayload]);
 
   const handleDataSelectorOutputChange = useCallback(() => {
-    setSourceDataVersion(v => v + 1);
+    setSourceDataVersion(v => {
+      console.log('[Version] Increment due to data selector change. Old version:', v, 'New version:', v + 1);
+      return v + 1;
+    });
   }, []);
 
   useEffect(() => {
@@ -195,6 +201,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const hasGeneratedDefaultPayloadRef = useRef<boolean>(false);
   const executionCompletedRef = useRef(false);
   const shouldAbortRef = useRef(false);
+  const lastAbortTimeRef = useRef<number>(0);
   const [showToolBuilder, setShowToolBuilder] = useState(false);
   const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
   const [showDeployModal, setShowDeployModal] = useState(false);
@@ -230,8 +237,11 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
 
   const handleStopExecution = async () => {
+    if (shouldDebounceAbort(lastAbortTimeRef.current)) return;
+    
     if (!currentRunIdRef.current || executionCompletedRef.current) return;
     
+    lastAbortTimeRef.current = Date.now();
     shouldAbortRef.current = true;
     
     await new Promise(resolve => setTimeout(resolve, 50));
@@ -251,11 +261,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       });
       currentRunIdRef.current = null;
       setCurrentRunId(null);
-    } else {
-      toast({
-        title: "Failed to abort",
-        description: "Could not abort the execution"
-      });
     }
     
     if (embedded && onStopExecution) {
@@ -771,7 +776,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
             const normalized = computeStepOutput(res);
             setStepResultsMap(prev => ({ ...prev, [res.stepId]: normalized.output }));
           } catch { }
-          
+
           if (res.success) {
             setCompletedSteps(prev => Array.from(new Set([...prev, res.stepId])));
           } else if (isAbortError(res.error)) {

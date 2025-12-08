@@ -445,7 +445,7 @@ export class PostgresService implements DataStore {
 
     async createRun(params: { run: Run }): Promise<Run> {
         const { run } = params;
-        if (!run) return null;
+        if (!run) throw new Error('Run is required');
         const client = await this.pool.connect();
         try {
             const existingRun = await client.query(

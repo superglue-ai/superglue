@@ -22,7 +22,7 @@ function TemplateNodeView(props: NodeViewProps) {
     const needsDataSelectorOutput = expression.includes('currentItem');
     const shouldEvaluate = canExecute && (!needsDataSelectorOutput || !!dataSelectorOutput);
     
-    const { previewValue, previewError, hasResult } = useTemplatePreview(
+    const { previewValue, previewError, hasResult, isEvaluating } = useTemplatePreview(
         expression,
         sourceData,
         { enabled: shouldEvaluate, debounceMs: 100, sourceDataVersion, stepId }
@@ -74,6 +74,7 @@ function TemplateNodeView(props: NodeViewProps) {
                 dataSelectorOutput={dataSelectorOutput}
                 hasResult={hasResult}
                 canExecute={canExecute}
+                isEvaluating={isEvaluating}
                 onUpdate={(newTemplate) => updateAttributes({ rawTemplate: newTemplate })}
                 onDelete={deleteNode}
                 readOnly={readOnly}

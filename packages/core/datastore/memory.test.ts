@@ -115,7 +115,7 @@ describe('MemoryStore', () => {
 
       const { items, total } = await store.listRuns({ limit: 10, offset: 0, configId: 'config1', orgId: testOrgId });
       expect(items.length).toBe(2);
-      expect(total).toBe(3); // Total is still all runs
+      expect(total).toBe(2);
       expect(items.map(run => run.id).sort()).toEqual(['run1', 'run3']);
     });
 

@@ -179,6 +179,7 @@ export function StepInputTab({
                             stepData={evolvingPayload}
                             hasResult={hasResult}
                             canExecute={canExecute}
+                            isEvaluating={isEvaluating}
                             onUpdate={handleUpdate}
                             onDelete={() => {}}
                             readOnly={readOnly}
