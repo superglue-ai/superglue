@@ -62,7 +62,7 @@ export const server_defaults = {
     POSTGRES: {
         POOL_IDLE_TIMEOUT: 10 * 60 * 1000, // 10 minutes
         POOL_CLEANUP_INTERVAL: 60 * 1000, // 1 minute
-        DEFAULT_TIMEOUT: 60000, // 1 minute
+        DEFAULT_TIMEOUT: 600000, // 10 minutes
         DEFAULT_RETRIES: 0,
         DEFAULT_RETRY_DELAY: 1000, // 1 second
         OAUTH_SECRET_TTL_MS: 5 * 60 * 1000, // 5 minutes
