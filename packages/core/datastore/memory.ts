@@ -191,6 +191,8 @@ export class MemoryStore implements DataStore {
     this.storage.workflows.clear();
     this.storage.workflowSchedules.clear();
     this.storage.integrations.clear();
+    this.storage.discoveryRuns.clear();
+    this.storage.fileReferences.clear();
   }
 
   async disconnect(): Promise<void> {

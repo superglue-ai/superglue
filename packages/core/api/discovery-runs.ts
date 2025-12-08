@@ -72,8 +72,8 @@ const listDiscoveryRuns: RouteHandler = async (request, reply) => {
       offset?: string;
     };
 
-    const limit = query.limit ? parseInt(query.limit) : 10;
-    const offset = query.offset ? parseInt(query.offset) : 0;
+    const limit = query.limit ? parseInt(query.limit, 10) || 10 : 10;
+    const offset = query.offset ? parseInt(query.offset, 10) || 0 : 0;
 
     const result = await authReq.datastore.listDiscoveryRuns({
       limit,

@@ -74,8 +74,8 @@ const listFileReferences: RouteHandler = async (request, reply) => {
       fileIds?: string;
     };
 
-    const limit = query.limit ? parseInt(query.limit) : 10;
-    const offset = query.offset ? parseInt(query.offset) : 0;
+    const limit = query.limit ? parseInt(query.limit, 10) || 10 : 10;
+    const offset = query.offset ? parseInt(query.offset, 10) || 0 : 0;
     const fileIds = query.fileIds ? query.fileIds.split(',') : undefined;
 
     const result = await authReq.datastore.listFileReferences({
