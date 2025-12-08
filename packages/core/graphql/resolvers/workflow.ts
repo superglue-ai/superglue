@@ -9,6 +9,7 @@ import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import { GraphQLRequestContext } from '../types.js';
 import type { ToolExecutionPayload } from "../../worker/types.js";
+import { isSelfHealingEnabled } from "../../utils/helpers.js";
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -70,8 +71,7 @@ export const executeWorkflowResolver = async (
       workflow.responseSchema = parseJSON(workflow.responseSchema);
     }
 
-    const selfHealingEnabled = args.options?.selfHealing && 
-      args.options.selfHealing !== SelfHealingMode.DISABLED;
+    const selfHealingEnabled = isSelfHealingEnabled(args.options, "api");
 
     const integrationManagers = await IntegrationManager.forToolExecution(
       workflow,

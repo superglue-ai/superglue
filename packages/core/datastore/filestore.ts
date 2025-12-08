@@ -1,36 +1,10 @@
-import type { ApiConfig, Integration, Run, RunStatus, Tool } from "@superglue/shared";
+import type { ApiConfig, Integration, Run, Tool } from "@superglue/shared";
 import fs from 'node:fs';
 import path from 'node:path';
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
 import type { DataStore, ToolScheduleInternal } from "./types.js";
-
-function isLegacyRunData(data: any): boolean {
-  return !data.status || !['running', 'success', 'failed', 'aborted'].includes(data.status);
-}
-
-function migrateFileStoreRun(data: any): Run {
-  if (isLegacyRunData(data)) {
-    return {
-      id: data.id,
-      toolId: data.config?.id || '',
-      orgId: data.orgId || '',
-      status: data.success === true ? 'success' as RunStatus : 'failed' as RunStatus,
-      toolConfig: data.config,
-      toolPayload: undefined,
-      toolResult: data.data,
-      options: undefined,
-      error: data.error,
-      startedAt: data.startedAt ? new Date(data.startedAt) : new Date(),
-      completedAt: data.completedAt ? new Date(data.completedAt) : undefined
-    };
-  }
-  return {
-    ...data,
-    startedAt: data.startedAt ? new Date(data.startedAt) : new Date(),
-    completedAt: data.completedAt ? new Date(data.completedAt) : undefined
-  };
-}
+import { extractRun } from "./migrations/run-migration.js";
 
 export class FileStore implements DataStore {
 
@@ -248,7 +222,12 @@ export class FileStore implements DataStore {
       for (const line of lines) {
         try {
           const rawData = JSON.parse(line);
-          const run = migrateFileStoreRun(rawData);
+          const run = extractRun(rawData, {
+            id: rawData.id,
+            config_id: rawData.toolId || rawData.config?.id || '',
+            started_at: rawData.startedAt,
+            completed_at: rawData.completedAt
+          });
 
           if (orgId && run.orgId && run.orgId !== orgId) continue;
           const toolId = run.toolId || run.toolConfig?.id;
@@ -298,7 +277,12 @@ export class FileStore implements DataStore {
       for (const line of lines) {
         try {
           const rawData = JSON.parse(line);
-          const run = migrateFileStoreRun(rawData);
+          const run = extractRun(rawData, {
+            id: rawData.id,
+            config_id: rawData.toolId || rawData.config?.id || '',
+            started_at: rawData.startedAt,
+            completed_at: rawData.completedAt
+          });
           if (run.id === id && (!orgId || run.orgId === orgId)) {
             found = true;
             continue;
@@ -401,8 +385,8 @@ export class FileStore implements DataStore {
       orgId
     };
 
-    await this.removeRunFromLogs(id, orgId);
     await this.appendRunToLogs(updatedRun);
+    await this.removeRunFromLogs(id, orgId);
 
     return updatedRun;
   }

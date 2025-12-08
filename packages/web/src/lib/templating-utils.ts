@@ -193,11 +193,11 @@ export function truncateTemplateValue(value: any, maxLength: number = 200): Trun
   };
 }
 
-export function prepareSourceData(stepData: any, loopData?: any): any {
+export function prepareSourceData(stepData: any, dataSelectorOutput?: any): any {
   const base = { ...(stepData || {}) };
   
-  if (loopData !== undefined) {
-    base.currentItem = Array.isArray(loopData) ? loopData[0] : loopData;
+  if (dataSelectorOutput !== undefined) {
+    base.currentItem = Array.isArray(dataSelectorOutput) ? dataSelectorOutput[0] : dataSelectorOutput;
   }
   
   return base;
@@ -287,12 +287,12 @@ export function buildCategorizedSources(
   };
 }
 
-export function deriveCurrentItem(loopItems: unknown): Record<string, unknown> | null {
-  if (loopItems && typeof loopItems === 'object' && !Array.isArray(loopItems)) {
-    return loopItems as Record<string, unknown>;
+export function deriveCurrentItem(dataSelectorOutput: unknown): Record<string, unknown> | null {
+  if (dataSelectorOutput && typeof dataSelectorOutput === 'object' && !Array.isArray(dataSelectorOutput)) {
+    return dataSelectorOutput as Record<string, unknown>;
   }
-  if (Array.isArray(loopItems) && loopItems.length > 0) {
-    return loopItems[0] as Record<string, unknown>;
+  if (Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 0) {
+    return dataSelectorOutput[0] as Record<string, unknown>;
   }
   return null;
 }

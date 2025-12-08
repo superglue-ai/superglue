@@ -15,7 +15,7 @@ interface TemplateAwareTextEditorProps {
     value: string;
     onChange: (value: string) => void;
     stepData: any;
-    loopData?: any;
+    dataSelectorOutput?: any;
     canExecute?: boolean;
     categorizedVariables?: CategorizedVariables;
     categorizedSources?: CategorizedSources;
@@ -35,7 +35,7 @@ function TemplateAwareTextEditorInner({
     className,
     disabled = false,
     stepData,
-    loopData,
+    dataSelectorOutput,
     canExecute = true,
 }: Omit<TemplateAwareTextEditorProps, 'categorizedVariables' | 'categorizedSources'>) {
     const isUpdatingRef = useRef(false);
@@ -51,7 +51,7 @@ function TemplateAwareTextEditorInner({
         handleCodeSave,
         editorRef,
         cleanupSuggestion,
-    } = useTemplateAwareEditor({ stepData, loopData, categorizedVariables, categorizedSources });
+    } = useTemplateAwareEditor({ stepData, dataSelectorOutput, categorizedVariables, categorizedSources });
 
     useEffect(() => cleanupSuggestion, [cleanupSuggestion]);
 
@@ -128,7 +128,7 @@ export function TemplateAwareTextEditor({
     value,
     onChange,
     stepData,
-    loopData,
+    dataSelectorOutput,
     canExecute = true,
     categorizedVariables,
     categorizedSources,
@@ -141,7 +141,7 @@ export function TemplateAwareTextEditor({
     return (
         <TemplateContextProvider 
             stepData={stepData} 
-            loopData={loopData} 
+            dataSelectorOutput={dataSelectorOutput} 
             readOnly={disabled} 
             canExecute={canExecute} 
             categorizedVariables={categorizedVariables}
@@ -156,7 +156,7 @@ export function TemplateAwareTextEditor({
                 className={className}
                 disabled={disabled}
                 stepData={stepData}
-                loopData={loopData}
+                dataSelectorOutput={dataSelectorOutput}
                 canExecute={canExecute}
             />
         </TemplateContextProvider>

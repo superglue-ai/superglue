@@ -64,7 +64,7 @@ export interface ToolStepGalleryProps {
     embedded?: boolean;
     onAbort?: () => void;
     sourceDataVersion?: number;
-    onLoopDataChange?: () => void;
+    onDataSelectorOutputChange?: () => void;
 }
 
 export function ToolStepGallery({
@@ -117,7 +117,7 @@ export function ToolStepGallery({
     embedded = false,
     onAbort,
     sourceDataVersion,
-    onLoopDataChange
+    onDataSelectorOutputChange
 }: ToolStepGalleryProps) {
     const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
     const [windowWidth, setWindowWidth] = useState(1200);
@@ -131,17 +131,15 @@ export function ToolStepGallery({
     const isConfiguratorEditingRef = useRef<boolean>(false);
     const [hiddenLeftCount, setHiddenLeftCount] = useState(0);
     const [hiddenRightCount, setHiddenRightCount] = useState(0);
-    const [activeStepLoopCount, setActiveStepLoopCount] = useState<number | null>(null);
+    const [activeStepItemCount, setActiveStepItemCount] = useState<number | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-    const prevLoopCountRef = useRef<number | null>(null);
     
-    const handleLoopInfoChange = useCallback((count: number | null) => {
-        setActiveStepLoopCount(count);
-        if (prevLoopCountRef.current !== count) {
-            prevLoopCountRef.current = count;
-            onLoopDataChange?.();
+    const handleDataSelectorChange = useCallback((itemCount: number | null, isInitial: boolean) => {
+        setActiveStepItemCount(itemCount);
+        if (!isInitial) {
+            onDataSelectorOutputChange?.();
         }
-    }, [onLoopDataChange]);
+    }, [onDataSelectorOutputChange]);
     
     useEffect(() => {
         isConfiguratorEditingRef.current = isConfiguratorEditing;
@@ -637,7 +635,7 @@ export function ToolStepGallery({
                                                                     hasTransformCompleted={hasTransformCompleted}
                                                                     isPayloadValid={isPayloadValid}
                                                                     payloadData={item.type === 'payload' ? workingPayload : undefined}
-                                                                    isLoopStep={globalIdx === activeIndex && activeStepLoopCount !== null && activeStepLoopCount > 0}
+                                                                    isLoopStep={globalIdx === activeIndex && activeStepItemCount !== null && activeStepItemCount > 0}
                                                                 />
                                                             </div>
                                                             {showArrow && (
@@ -773,7 +771,7 @@ export function ToolStepGallery({
                                     abortedSteps={abortedSteps}
                                     showOutputSignal={showStepOutputSignal}
                                     onConfigEditingChange={setIsConfiguratorEditing}
-                                    onLoopInfoChange={handleLoopInfoChange}
+                                    onDataSelectorChange={handleDataSelectorChange}
                                     isFirstStep={activeIndex === 1}
                                     isPayloadValid={isPayloadValid}
                                     sourceDataVersion={sourceDataVersion}

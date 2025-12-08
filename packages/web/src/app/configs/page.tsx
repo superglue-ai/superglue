@@ -25,10 +25,9 @@ import { DeleteConfigDialog } from '@/src/components/tools/dialogs/DeleteConfigD
 import { CopyButton } from '@/src/components/tools/shared/CopyButton';
 import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
-import { createSuperglueClient } from '@/src/lib/client-utils';
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
-import { ApiConfig, Integration, Tool } from '@superglue/shared';
-import { CloudUpload, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2 } from "lucide-react";
+import { Integration, Tool } from '@superglue/shared';
+import { CloudUpload, Filter, Globe, Hammer, Loader2, Plus, RotateCw, Search, Trash2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
@@ -41,14 +40,13 @@ const ConfigTable = () => {
   const {tools, isInitiallyLoading, isRefreshing, refreshTools} = useTools();
   const { integrations } = useIntegrations();
 
-  const [allConfigs, setAllConfigs] = useState<(ApiConfig | Tool)[]>([]);
-  const [legacyApiConfigs, setLegacyApiConfigs] = useState<ApiConfig[]>([]);
-  const [currentConfigs, setCurrentConfigs] = useState<(ApiConfig | Tool)[]>([]);
+  const [allConfigs, setAllConfigs] = useState<Tool[]>([]);
+  const [currentConfigs, setCurrentConfigs] = useState<Tool[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [pageSize] = useState(20);
 
-  const [configToDelete, setConfigToDelete] = useState<ApiConfig | Tool | null>(null);
+  const [configToDelete, setConfigToDelete] = useState<Tool | null>(null);
   const [deployToolId, setDeployToolId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIntegration, setSelectedIntegration] = useState<string>("all");
@@ -56,33 +54,24 @@ const ConfigTable = () => {
   const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
 
   useEffect(() => {
-    const combinedConfigs = [
-      ...legacyApiConfigs.map(item => ({ ...item, type: 'api' as const })),
-      ...tools.map((item: any) => ({ ...item, type: 'tool' as const }))
-    ];
-
-    const sortedConfigs = combinedConfigs.sort((a, b) => {
+    const sortedTools = [...tools].sort((a, b) => {
       const dateA = new Date(a.updatedAt || a.createdAt).getTime();
       const dateB = new Date(b.updatedAt || b.createdAt).getTime();
       return dateB - dateA;
     });
 
-    setAllConfigs(sortedConfigs);
-    setTotal(sortedConfigs.length);
+    setAllConfigs(sortedTools);
+    setTotal(sortedTools.length);
     setPage(0);
-  }, [tools, legacyApiConfigs]);
+  }, [tools]);
 
   const refreshConfigs = useCallback(async () => { 
       refreshTools();
-    
-      const client = createSuperglueClient(config.superglueEndpoint);
-      const apiConfigs = await client.listApis(1000, 0);
-      setLegacyApiConfigs(apiConfigs.items);
-  }, [config.superglueEndpoint, refreshTools]);
+  }, [refreshTools]);
 
   useEffect(() => {
     refreshConfigs();
-  }, [config.superglueEndpoint]);
+  }, [refreshConfigs]);
 
   useEffect(() => {
     const filtered = allConfigs.filter(config => {
@@ -97,20 +86,14 @@ const ConfigTable = () => {
 
       // Integration filter
       if (selectedIntegration !== "all") {
-        const configType = (config as any).type;
-        const isTool = configType === 'tool';
-
-        if (!isTool) return false;
-
-        const tool = config as Tool;
         const allIntegrationIds = new Set<string>();
 
-        if (tool.integrationIds) {
-          tool.integrationIds.forEach(id => allIntegrationIds.add(id));
+        if (config.integrationIds) {
+          config.integrationIds.forEach(id => allIntegrationIds.add(id));
         }
 
-        if (tool.steps) {
-          tool.steps.forEach((step: any) => {
+        if (config.steps) {
+          config.steps.forEach((step: any) => {
             if (step.integrationId) {
               allIntegrationIds.add(step.integrationId);
             }
@@ -138,22 +121,6 @@ const ConfigTable = () => {
 
   const handleTool = () => {
     setManuallyOpenedStepper(true);
-  };
-
-  const handleEdit = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    router.push(`/configs/${id}/edit`);
-  };
-
-  const handlePlay = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    router.push(`/configs/${id}/run`);
-  };
-
-
-  const handleViewLogs = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    router.push(`/runs/${id}`);
   };
 
   const handlePlayTool = (e: React.MouseEvent, id: string) => {
@@ -295,184 +262,131 @@ const ConfigTable = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              currentConfigs.map((config) => {
-                const configType = (config as any).type;
-                const isApi = configType === 'api';
-                const isTool = configType === 'tool';
+              currentConfigs.map((tool) => {
+                const allIntegrationIds = new Set<string>();
 
-                const handleRunClick = (e: React.MouseEvent) => {
-                  if (isApi) handlePlay(e, config.id);
-                  else if (isTool) handlePlayTool(e, config.id);
-                };
+                if (tool.integrationIds) {
+                  tool.integrationIds.forEach(id => allIntegrationIds.add(id));
+                }
+
+                if (tool.steps) {
+                  tool.steps.forEach((step: any) => {
+                    if (step.integrationId) {
+                      allIntegrationIds.add(step.integrationId);
+                    }
+                  });
+                }
+
+                const integrationIdsArray = Array.from(allIntegrationIds);
 
                 return (
-                  <React.Fragment key={`${configType}-${config.id}`}>
-                    <TableRow
-                      key={`${configType}-${config.id}`}
-                      className="hover:bg-secondary"
-                    // Consider adding onClick={() => handleRowClick(config)} if needed
-                    >
-                      <TableCell className="w-[60px]">
-                        {isTool && (() => {
-                          const tool = config as Tool;
-                          const allIntegrationIds = new Set<string>();
-
-                          if (tool.integrationIds) {
-                            tool.integrationIds.forEach(id => allIntegrationIds.add(id));
-                          }
-
-                          if (tool.steps) {
-                            tool.steps.forEach((step: any) => {
-                              if (step.integrationId) {
-                                allIntegrationIds.add(step.integrationId);
-                              }
-                            });
-                          }
-
-                          const integrationIdsArray = Array.from(allIntegrationIds);
-
-                          return integrationIdsArray.length > 0 ? (
-                            <div className="flex items-center justify-center gap-1 flex-shrink-0">
-                              {integrationIdsArray.map((integrationId: string) => {
-                                const integration = integrations.find(i => i.id === integrationId);
-                                if (!integration) return null;
-                                const icon = getIntegrationIcon(integration);
-                                return icon ? (
-                                  <TooltipProvider key={integrationId}>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <svg
-                                          width="14"
-                                          height="14"
-                                          viewBox="0 0 24 24"
-                                          fill={`#${icon.hex}`}
-                                          className="flex-shrink-0"
-                                        >
-                                          <path d={icon.path} />
-                                        </svg>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>{integration.id}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                ) : (
-                                  <TooltipProvider key={integrationId}>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>{integration.id}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                );
-                              })}
-                            </div>
-                          ) : null;
-                        })()}
-                      </TableCell>
-                      <TableCell className="font-medium max-w-[200px] truncate relative group">
-                        <div className="flex items-center space-x-1">
-                          <span className="truncate">{config.id}</span>
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            <CopyButton text={config.id} />
-                          </div>
+                  <TableRow
+                    key={tool.id}
+                    className="hover:bg-secondary"
+                  >
+                    <TableCell className="w-[60px]">
+                      {integrationIdsArray.length > 0 ? (
+                        <div className="flex items-center justify-center gap-1 flex-shrink-0">
+                          {integrationIdsArray.map((integrationId: string) => {
+                            const integration = integrations.find(i => i.id === integrationId);
+                            if (!integration) return null;
+                            const icon = getIntegrationIcon(integration);
+                            return icon ? (
+                              <TooltipProvider key={integrationId}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill={`#${icon.hex}`}
+                                      className="flex-shrink-0"
+                                    >
+                                      <path d={icon.path} />
+                                    </svg>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{integration.id}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              <TooltipProvider key={integrationId}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{integration.id}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            );
+                          })}
                         </div>
-                      </TableCell>
-                      <TableCell className="max-w-[300px] truncate relative group">
-                        <div className="flex items-center space-x-1">
-                          <span className="truncate">{config.instruction}</span>
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            <CopyButton text={config.instruction || ''} />
-                          </div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="font-medium max-w-[200px] truncate relative group">
+                      <div className="flex items-center space-x-1">
+                        <span className="truncate">{tool.id}</span>
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <CopyButton text={tool.id} />
                         </div>
-                      </TableCell>
-                      <TableCell className="w-[150px]">
-                        {config.updatedAt ? new Date(config.updatedAt).toLocaleDateString() : (config.createdAt ? new Date(config.createdAt).toLocaleDateString() : '')}
-                      </TableCell>
-                      <TableCell className="w-[100px]">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={handleRunClick}
-                            className="gap-2"
-                          >
-                            {isTool ? <Hammer className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                            View
-                          </Button>
-                          {isTool && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => handleDeployClick(e, config.id)}
-                              className="gap-2"
-                            >
-                              <CloudUpload className="h-4 w-4" />
-                              Deploy
-                            </Button>
-                          )}
-                          <TooltipProvider>
-                            {/* Common Actions */}
-                            {isApi && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={(e) => handleViewLogs(e, config.id)}
-                                  >
-                                    <History className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>View Run History</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-
-                            {isApi && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={(e) => handleEdit(e, config.id)}
-                                  >
-                                    <Settings className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Edit Configuration</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-
-                            {/* Delete Action (Available for all types) */}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setConfigToDelete(config);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Delete {isApi ? 'Configuration' : 'Tool'}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-[300px] truncate relative group">
+                      <div className="flex items-center space-x-1">
+                        <span className="truncate">{tool.instruction}</span>
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <CopyButton text={tool.instruction || ''} />
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  </React.Fragment>
+                      </div>
+                    </TableCell>
+                    <TableCell className="w-[150px]">
+                      {tool.updatedAt ? new Date(tool.updatedAt).toLocaleDateString() : (tool.createdAt ? new Date(tool.createdAt).toLocaleDateString() : '')}
+                    </TableCell>
+                    <TableCell className="w-[100px]">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={(e) => handlePlayTool(e, tool.id)}
+                          className="gap-2"
+                        >
+                          <Hammer className="h-4 w-4" />
+                          View
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => handleDeployClick(e, tool.id)}
+                          className="gap-2"
+                        >
+                          <CloudUpload className="h-4 w-4" />
+                          Deploy
+                        </Button>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConfigToDelete(tool);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Delete Tool</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 );
               })
             )}

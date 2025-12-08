@@ -5,7 +5,7 @@ import { type CategorizedSources } from '../../templates/tiptap/TemplateContext'
 interface StepConfigTabProps {
     step: any;
     evolvingPayload: any;
-    loopItems: any | null;
+    dataSelectorOutput: any | null;
     categorizedSources?: CategorizedSources;
     canExecute: boolean;
     integrations?: Integration[];
@@ -18,7 +18,7 @@ interface StepConfigTabProps {
 export function StepConfigTab({
     step,
     evolvingPayload,
-    loopItems,
+    dataSelectorOutput,
     categorizedSources,
     canExecute,
     integrations,
@@ -37,7 +37,7 @@ export function StepConfigTab({
                 integrations={integrations}
                 onEditingChange={onEditingChange}
                 stepInput={evolvingPayload}
-                loopItems={loopItems}
+                dataSelectorOutput={dataSelectorOutput}
                 categorizedSources={categorizedSources}
                 onOpenFixStepDialog={onOpenFixStepDialog}
                 canExecute={canExecute}

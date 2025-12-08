@@ -240,10 +240,10 @@ enum SelfHealingMode {
 }
 
 enum RunStatus {
-  running
-  success
-  failed
-  aborted
+  RUNNING
+  SUCCESS
+  FAILED
+  ABORTED
 }
 
 input ApiInputRequest @oneOf {
@@ -441,13 +441,6 @@ input WorkflowScheduleInput {
 type Mutation {
   setTenantInfo(email: String, emailEntrySkipped: Boolean): TenantInfo!
 
-  call(
-    input: ApiInputRequest!
-    payload: JSON
-    credentials: JSON
-    options: RequestOptions
-  ): RunResult!
-
   extract(
     input: ExtractInputRequest!
     payload: JSON
@@ -498,8 +491,6 @@ type Mutation {
 
   upsertApi(id: ID!, input: JSON!): ApiConfig!
   deleteApi(id: ID!): Boolean!
-
-  updateApiConfigId(oldId: ID!, newId: ID!): ApiConfig!
 
   upsertIntegration(
     input: IntegrationInput!

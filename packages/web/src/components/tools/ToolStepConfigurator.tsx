@@ -27,7 +27,7 @@ interface ToolStepConfiguratorProps {
     onEditingChange?: (editing: boolean) => void;
     disabled?: boolean;
     stepInput?: any;
-    loopItems?: any;
+    dataSelectorOutput?: any;
     categorizedSources?: CategorizedSources;
     onOpenFixStepDialog?: () => void;
     canExecute?: boolean;
@@ -35,7 +35,7 @@ interface ToolStepConfiguratorProps {
 }
 
 
-export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, loopItems, categorizedSources, onOpenFixStepDialog, canExecute = true, sourceDataVersion }: ToolStepConfiguratorProps) {
+export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, dataSelectorOutput, categorizedSources, onOpenFixStepDialog, canExecute = true, sourceDataVersion }: ToolStepConfiguratorProps) {
     const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
     const [paginationOpen, setPaginationOpen] = useState(false);
     const [headersText, setHeadersText] = useState('');
@@ -131,7 +131,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         [linkedIntegration]
     );
 
-    const currentItemObj = useMemo(() => deriveCurrentItem(loopItems), [loopItems]);
+    const currentItemObj = useMemo(() => deriveCurrentItem(dataSelectorOutput), [dataSelectorOutput]);
     const paginationConfig = step.apiConfig?.pagination;
     const paginationData = useMemo(() => buildPaginationData(paginationConfig), [paginationConfig]);
 
@@ -226,7 +226,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                         handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, urlHost, urlPath } }));
                                                     }}
                                                     stepData={templateStepData}
-                                                    loopData={loopItems}
+                                                    dataSelectorOutput={dataSelectorOutput}
                                                     canExecute={canExecute}
                                                     categorizedVariables={categorizedVariables}
                                                     categorizedSources={completeCategorizedSources}
@@ -252,7 +252,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, headers: val || '' } }));
                                             }}
                                             stepData={templateStepData}
-                                            loopData={loopItems}
+                                            dataSelectorOutput={dataSelectorOutput}
                                             canExecute={canExecute}
                                             categorizedVariables={categorizedVariables}
                                             categorizedSources={completeCategorizedSources}
@@ -278,7 +278,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, queryParams: val || '' } }));
                                             }}
                                             stepData={templateStepData}
-                                            loopData={loopItems}
+                                            dataSelectorOutput={dataSelectorOutput}
                                             canExecute={canExecute}
                                             categorizedVariables={categorizedVariables}
                                             categorizedSources={completeCategorizedSources}
@@ -301,7 +301,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                 value={step.apiConfig.body || ''}
                                                 onChange={(val) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, body: val || '' } }))}
                                                 stepData={templateStepData}
-                                                loopData={loopItems}
+                                                dataSelectorOutput={dataSelectorOutput}
                                                 canExecute={canExecute}
                                                 categorizedVariables={categorizedVariables}
                                                 categorizedSources={completeCategorizedSources}

@@ -153,10 +153,10 @@ export enum SelfHealingMode {
 }
 
 export enum RunStatus {
-  RUNNING = "running",
-  SUCCESS = "success",
-  FAILED = "failed",
-  ABORTED = "aborted"
+  RUNNING = "RUNNING",
+  SUCCESS = "SUCCESS",
+  FAILED = "FAILED",
+  ABORTED = "ABORTED"
 }
 
 export interface BaseConfig {
@@ -333,7 +333,7 @@ export type RequestOptions = {
 export interface Run {
   id: string;
   toolId: string;
-  orgId: string;
+  orgId?: string;
   status: RunStatus;
   toolConfig?: Tool;
   toolPayload?: Record<string, any>;

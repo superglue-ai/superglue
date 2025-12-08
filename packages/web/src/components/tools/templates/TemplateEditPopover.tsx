@@ -252,6 +252,12 @@ export function TemplateEditPopover({
   const resolvedAnchorRect = typeof anchorRect === 'function' ? anchorRect() : anchorRect;
 
   useEffect(() => {
+    if (resolvedAnchorRect && resolvedAnchorRect.left <= 0 && resolvedAnchorRect.top <= 0 && open) {
+      setOpen(false);
+    }
+  }, [resolvedAnchorRect, open, setOpen]);
+
+  useEffect(() => {
     if (!open || typeof anchorRect !== 'function') return;
     const handleScroll = () => forceUpdate(n => n + 1);
     window.addEventListener('scroll', handleScroll, true);
@@ -422,7 +428,6 @@ export function TemplateEditPopover({
 
   if (resolvedAnchorRect) {
     if (resolvedAnchorRect.left <= 0 && resolvedAnchorRect.top <= 0) {
-      if (open) setTimeout(() => setOpen(false), 0);
       return null;
     }
     return (

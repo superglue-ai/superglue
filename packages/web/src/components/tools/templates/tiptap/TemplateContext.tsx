@@ -19,7 +19,7 @@ export interface CategorizedSources {
 
 interface TemplateContextValue {
     stepData: any;
-    loopData?: any;
+    dataSelectorOutput?: any;
     readOnly: boolean;
     credentialKeys?: Set<string>;
     canExecute?: boolean;
@@ -48,7 +48,7 @@ const emptyCategorizedSources: CategorizedSources = {
 
 const TemplateContext = createContext<TemplateContextValue>({
     stepData: {},
-    loopData: undefined,
+    dataSelectorOutput: undefined,
     readOnly: false,
     credentialKeys: undefined,
     canExecute: true,
@@ -61,7 +61,7 @@ const TemplateContext = createContext<TemplateContextValue>({
 export function TemplateContextProvider({
     children,
     stepData,
-    loopData,
+    dataSelectorOutput,
     readOnly = false,
     canExecute = true,
     categorizedVariables = emptyCategorizedVariables,
@@ -71,7 +71,7 @@ export function TemplateContextProvider({
 }: {
     children: ReactNode;
     stepData: any;
-    loopData?: any;
+    dataSelectorOutput?: any;
     readOnly?: boolean;
     canExecute?: boolean;
     categorizedVariables?: CategorizedVariables;
@@ -94,8 +94,8 @@ export function TemplateContextProvider({
     }, [stepData]);
 
     const value = useMemo(() => ({
-        stepData, loopData, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources, sourceDataVersion, stepId
-    }), [stepData, loopData, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources, sourceDataVersion, stepId]);
+        stepData, dataSelectorOutput, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources, sourceDataVersion, stepId
+    }), [stepData, dataSelectorOutput, readOnly, credentialKeys, canExecute, categorizedVariables, categorizedSources, sourceDataVersion, stepId]);
 
     return (
         <TemplateContext.Provider value={value}>

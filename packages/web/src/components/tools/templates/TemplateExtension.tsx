@@ -8,7 +8,7 @@ import { useTemplatePreview } from '../hooks/use-template-preview';
 
 function TemplateNodeView(props: NodeViewProps) {
     const { node, deleteNode, updateAttributes, selected, editor } = props;
-    const { stepData, loopData, readOnly, canExecute = true, sourceDataVersion, stepId } = useTemplateContext();
+    const { stepData, dataSelectorOutput, readOnly, canExecute = true, sourceDataVersion, stepId } = useTemplateContext();
     const [isEditorFocused, setIsEditorFocused] = useState(false);
     const [forcePopoverOpen, setForcePopoverOpen] = useState(false);
     
@@ -17,10 +17,10 @@ function TemplateNodeView(props: NodeViewProps) {
         ? rawTemplate.slice(2, -2).trim()
         : rawTemplate.trim();
 
-    const sourceData = useMemo(() => prepareSourceData(stepData, loopData), [stepData, loopData]);
+    const sourceData = useMemo(() => prepareSourceData(stepData, dataSelectorOutput), [stepData, dataSelectorOutput]);
     
-    const needsLoopData = expression.includes('currentItem');
-    const shouldEvaluate = canExecute && (!needsLoopData || !!loopData);
+    const needsDataSelectorOutput = expression.includes('currentItem');
+    const shouldEvaluate = canExecute && (!needsDataSelectorOutput || !!dataSelectorOutput);
     
     const { previewValue, previewError, hasResult } = useTemplatePreview(
         expression,
@@ -71,7 +71,7 @@ function TemplateNodeView(props: NodeViewProps) {
                 evaluatedValue={previewValue}
                 error={previewError ?? undefined}
                 stepData={stepData}
-                loopData={loopData}
+                dataSelectorOutput={dataSelectorOutput}
                 hasResult={hasResult}
                 canExecute={canExecute}
                 onUpdate={(newTemplate) => updateAttributes({ rawTemplate: newTemplate })}

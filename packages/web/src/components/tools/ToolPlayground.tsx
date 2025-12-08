@@ -169,7 +169,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     setSourceDataVersion(v => v + 1);
   }, [stepResultsMap, computedPayload]);
 
-  const handleLoopDataChange = useCallback(() => {
+  const handleDataSelectorOutputChange = useCallback(() => {
     setSourceDataVersion(v => v + 1);
   }, []);
 
@@ -1482,7 +1482,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   embedded={embedded}
                   onAbort={currentRunId ? handleStopExecution : undefined}
                   sourceDataVersion={sourceDataVersion}
-                  onLoopDataChange={handleLoopDataChange}
+                  onDataSelectorOutputChange={handleDataSelectorOutputChange}
                 />
               )}
             </div>

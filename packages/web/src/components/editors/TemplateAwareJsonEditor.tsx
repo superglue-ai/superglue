@@ -19,7 +19,7 @@ interface TemplateAwareJsonEditorProps {
     value: string;
     onChange?: (value: string) => void;
     stepData: any;
-    loopData?: any;
+    dataSelectorOutput?: any;
     canExecute?: boolean;
     categorizedVariables?: CategorizedVariables;
     categorizedSources?: CategorizedSources;
@@ -43,7 +43,7 @@ function TemplateAwareJsonEditorInner({
     resizable = false,
     showValidation = false,
     stepData,
-    loopData,
+    dataSelectorOutput,
     canExecute = true,
 }: TemplateAwareJsonEditorProps) {
     const isUpdatingRef = useRef(false);
@@ -61,7 +61,7 @@ function TemplateAwareJsonEditorInner({
         handleCodeSave,
         editorRef,
         cleanupSuggestion,
-    } = useTemplateAwareEditor({ stepData, loopData, categorizedVariables, categorizedSources });
+    } = useTemplateAwareEditor({ stepData, dataSelectorOutput, categorizedVariables, categorizedSources });
     
     const credentials = useMemo(() => {
         if (!sourceData || typeof sourceData !== 'object') return {};
@@ -130,7 +130,7 @@ function TemplateAwareJsonEditorInner({
         }
 
         let cancelled = false;
-        const sourceData = prepareSourceData(stepData, loopData);
+        const sourceData = prepareSourceData(stepData, dataSelectorOutput);
 
         const escapeForJson = (str: string) => 
             str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -175,7 +175,7 @@ function TemplateAwareJsonEditorInner({
 
         const timer = setTimeout(validateJson, 300);
         return () => { cancelled = true; clearTimeout(timer); };
-    }, [showValidation, value, stepData, loopData, canExecute]);
+    }, [showValidation, value, stepData, dataSelectorOutput, canExecute]);
 
     const handleResize = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -216,7 +216,13 @@ function TemplateAwareJsonEditorInner({
                     overflow: 'auto' 
                 }}
             >
-                <EditorContent editor={editor} className={resizable ? "h-full" : ""} />
+                <EditorContent 
+                    editor={editor} 
+                    className={cn(
+                        resizable ? "h-full" : "",
+                        jsonError && "pb-10"
+                    )}
+                />
                 {!value?.trim() && placeholder && (
                     <div className="absolute top-2 left-3 text-xs pointer-events-none font-mono json-placeholder-bracket">
                         {placeholder}
@@ -246,7 +252,7 @@ export function TemplateAwareJsonEditor(props: TemplateAwareJsonEditorProps) {
     return (
         <TemplateContextProvider 
             stepData={props.stepData} 
-            loopData={props.loopData} 
+            dataSelectorOutput={props.dataSelectorOutput} 
             readOnly={props.readOnly}
             canExecute={props.canExecute}
             categorizedVariables={props.categorizedVariables}

@@ -114,26 +114,26 @@ describe('Telemetry Utils', () => {
   });
 
   describe('extractOperationName', () => {
-    it('extracts operation name from call mutation with variables', () => {
+    it('extracts operation name from executeWorkflow mutation with variables', () => {
       const query = `
-        mutation CallApi($input: ApiInputRequest!, $payload: JSON, $credentials: JSON, $options: RequestOptions) {
-          call(input: $input, payload: $payload, credentials: $credentials, options: $options) {
+        mutation ExecuteTool($input: WorkflowInputRequest!, $payload: JSON, $credentials: JSON, $options: RequestOptions) {
+          executeWorkflow(input: $input, payload: $payload, credentials: $credentials, options: $options) {
             id
             success
           }
         }
       `;
-      expect(telemetryModule.extractOperationName(query)).toBe('CallApi');
+      expect(telemetryModule.extractOperationName(query)).toBe('ExecuteTool');
     });
   });
 
   describe('telemetry middleware', () => {
-    it('tracks call operation properly', () => {
+    it('tracks executeWorkflow operation properly', () => {
       const mockReq = {
         body: {
           query: `
             mutation {
-              call(input: { id: "123" }, payload: {}) {
+              executeWorkflow(input: { id: "123" }, payload: {}) {
                 id
                 success
               }

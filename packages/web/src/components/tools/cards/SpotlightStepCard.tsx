@@ -26,7 +26,8 @@ import { StepInputTab } from './tabs/StepInputTab';
 import { StepConfigTab } from './tabs/StepConfigTab';
 import { StepResultTab } from './tabs/StepResultTab';
 
-const loopItemsCache = new Map<string, { items: any; error: string | null }>();
+const dataSelectorOutputCache = new Map<string, { output: any; error: string | null }>();
+let lastSeenDataSelectorVersion: number | undefined = undefined;
 
 export const SpotlightStepCard = React.memo(({
     step,
@@ -50,7 +51,7 @@ export const SpotlightStepCard = React.memo(({
     abortedSteps = [],
     showOutputSignal,
     onConfigEditingChange,
-    onLoopInfoChange,
+    onDataSelectorChange,
     isFirstStep = false,
     isPayloadValid = true,
     sourceDataVersion,
@@ -77,7 +78,7 @@ export const SpotlightStepCard = React.memo(({
     stepResultsMap?: Record<string, any>;
     showOutputSignal?: number;
     onConfigEditingChange?: (editing: boolean) => void;
-    onLoopInfoChange?: (loopCount: number | null) => void;
+    onDataSelectorChange?: (itemCount: number | null, isInitial: boolean) => void;
     isFirstStep?: boolean;
     isPayloadValid?: boolean;
     sourceDataVersion?: number;
@@ -88,21 +89,33 @@ export const SpotlightStepCard = React.memo(({
     const [pendingAction, setPendingAction] = useState<'execute' | null>(null);
     
     const DATA_SELECTOR_DEBOUNCE_MS = 400;
-    const loopItemsCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
-    const cachedLoopItems = loopItemsCache.get(loopItemsCacheKey);
     
-    const [loopItems, setLoopItems] = useState<any | null>(() => cachedLoopItems?.items ?? null);
-    const [loopItemsError, setLoopItemsError] = useState<string | null>(() => cachedLoopItems?.error ?? null);
+    if (sourceDataVersion !== lastSeenDataSelectorVersion) {
+        dataSelectorOutputCache.clear();
+        lastSeenDataSelectorVersion = sourceDataVersion;
+    }
+    
+    const dataSelectorCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
+    const cachedOutput = dataSelectorOutputCache.get(dataSelectorCacheKey);
+    
+    const [dataSelectorOutput, setDataSelectorOutput] = useState<any | null>(() => cachedOutput?.output ?? null);
+    const [dataSelectorError, setDataSelectorError] = useState<string | null>(() => cachedOutput?.error ?? null);
     const lastEvalTimerRef = useRef<number | null>(null);
     const prevShowOutputSignalRef = useRef(showOutputSignal);
+    const hasReceivedComputedValueRef = useRef(false);
 
     useEffect(() => {
-        const cached = loopItemsCache.get(loopItemsCacheKey);
+        hasReceivedComputedValueRef.current = false;
+        const currentCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
+        const cached = dataSelectorOutputCache.get(currentCacheKey);
         if (cached) {
-            setLoopItems(cached.items);
-            setLoopItemsError(cached.error);
+            setDataSelectorOutput(cached.output);
+            setDataSelectorError(cached.error);
+        } else {
+            setDataSelectorOutput(null);
+            setDataSelectorError(null);
         }
-    }, [loopItemsCacheKey]);
+    }, [step.id]);
 
     useEffect(() => {
         if (showOutputSignal && showOutputSignal !== prevShowOutputSignalRef.current && stepResult != null) {
@@ -116,7 +129,7 @@ export const SpotlightStepCard = React.memo(({
             window.clearTimeout(lastEvalTimerRef.current);
             lastEvalTimerRef.current = null;
         }
-        setLoopItemsError(null);
+        setDataSelectorError(null);
         
         const currentCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
         
@@ -133,12 +146,12 @@ export const SpotlightStepCard = React.memo(({
                     throw new Error('Data selector returned a function. Did you forget to call it?');
                 }
                 const normalizedOut = out === undefined ? null : out;
-                loopItemsCache.set(currentCacheKey, { items: normalizedOut, error: null });
-                setLoopItems(normalizedOut);
-                setLoopItemsError(null);
+                dataSelectorOutputCache.set(currentCacheKey, { output: normalizedOut, error: null });
+                setDataSelectorOutput(normalizedOut);
+                setDataSelectorError(null);
             } catch (err: any) {
-                setLoopItems(null);
-                let errorMessage = 'Error evaluating loop selector';
+                setDataSelectorOutput(null);
+                let errorMessage = 'Error evaluating data selector';
                 if (err) {
                     if (err instanceof Error) {
                         errorMessage = err.message || errorMessage;
@@ -150,8 +163,8 @@ export const SpotlightStepCard = React.memo(({
                         errorMessage = String(err);
                     }
                 }
-                loopItemsCache.set(currentCacheKey, { items: null, error: errorMessage });
-                setLoopItemsError(errorMessage);
+                dataSelectorOutputCache.set(currentCacheKey, { output: null, error: errorMessage });
+                setDataSelectorError(errorMessage);
             }
         }, DATA_SELECTOR_DEBOUNCE_MS);
         lastEvalTimerRef.current = t as unknown as number;
@@ -161,15 +174,19 @@ export const SpotlightStepCard = React.memo(({
                 lastEvalTimerRef.current = null; 
             } 
         };
-    }, [step.id, step.executionMode, step.loopSelector, evolvingPayload, sourceDataVersion]);
+    }, [step.id, step.executionMode, step.loopSelector, evolvingPayload]);
 
     useEffect(() => {
-        if (!loopItemsError && loopItems && Array.isArray(loopItems)) {
-            onLoopInfoChange?.(loopItems.length);
-        } else {
-            onLoopInfoChange?.(null);
+        const hasValidOutput = !dataSelectorError && dataSelectorOutput != null;
+        const isInitialComputation = !hasReceivedComputedValueRef.current;
+        
+        if (hasValidOutput) {
+            hasReceivedComputedValueRef.current = true;
         }
-    }, [loopItems, loopItemsError, onLoopInfoChange]);
+        
+        const itemCount = (hasValidOutput && Array.isArray(dataSelectorOutput)) ? dataSelectorOutput.length : null;
+        onDataSelectorChange?.(itemCount, isInitialComputation);
+    }, [dataSelectorOutput, dataSelectorError, onDataSelectorChange]);
 
     const handleRunStepClick = () => {
         if (isFirstStep && !isPayloadValid) {
@@ -204,21 +221,21 @@ export const SpotlightStepCard = React.memo(({
                                     </Button>
                                 ) : (
                                     <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Run this step"}>
-                                        <div className={`relative flex rounded-md border border-input bg-background ${loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit ? '' : ''}`}>
+                                        <div className={`relative flex rounded-md border border-input bg-background ${dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 && onExecuteStepWithLimit ? '' : ''}`}>
                                             <Button
                                                 variant="ghost"
                                                 onClick={handleRunStepClick}
                                                 disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                                className={`h-8 pl-3 gap-2 border-0 ${loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit ? 'pr-2 rounded-r-none' : 'pr-3'}`}
+                                                className={`h-8 pl-3 gap-2 border-0 ${dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 && onExecuteStepWithLimit ? 'pr-2 rounded-r-none' : 'pr-3'}`}
                                             >
-                                                {loopItems && Array.isArray(loopItems) && loopItems.length > 1 ? (
+                                                {dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 ? (
                                                     <RotateCw className="h-3.5 w-3.5" />
                                                 ) : (
                                                     <Play className="h-3 w-3" />
                                                 )}
                                                 <span className="font-medium text-[13px]">Run Step</span>
                                             </Button>
-                                            {loopItems && Array.isArray(loopItems) && loopItems.length > 1 && onExecuteStepWithLimit && (
+                                            {dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 && onExecuteStepWithLimit && (
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button
@@ -237,9 +254,9 @@ export const SpotlightStepCard = React.memo(({
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             )}
-                                            {loopItems && Array.isArray(loopItems) && loopItems.length > 1 && (
+                                            {dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 && (
                                                 <span className="absolute -top-2 -left-2 min-w-[16px] h-[16px] px-1 text-[10px] font-bold bg-primary text-primary-foreground rounded flex items-center justify-center">
-                                                    {loopItems.length >= 1000 ? `${Math.floor(loopItems.length / 1000)}k` : loopItems.length}
+                                                    {dataSelectorOutput.length >= 1000 ? `${Math.floor(dataSelectorOutput.length / 1000)}k` : dataSelectorOutput.length}
                                                 </span>
                                             )}
                                         </div>
@@ -308,7 +325,7 @@ export const SpotlightStepCard = React.memo(({
                             <StepConfigTab
                                 step={step}
                                 evolvingPayload={evolvingPayload}
-                                loopItems={loopItems}
+                                dataSelectorOutput={dataSelectorOutput}
                                 categorizedSources={categorizedSources}
                                 canExecute={canExecute}
                                 integrations={integrations}

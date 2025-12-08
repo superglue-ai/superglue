@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { evaluateTemplate, DEFAULT_CODE_TEMPLATE } from '@/src/lib/templating-utils';
 
 interface EvaluationCacheEntry {
@@ -34,10 +34,12 @@ export function useTemplatePreview(
 ): UseTemplatePreviewResult {
   const { enabled = true, debounceMs = 500, sourceDataVersion, stepId } = options;
   
-  if (sourceDataVersion !== lastSeenVersion) {
-    evaluationCache.clear();
-    lastSeenVersion = sourceDataVersion;
-  }
+  useLayoutEffect(() => {
+    if (sourceDataVersion !== lastSeenVersion) {
+      evaluationCache.clear();
+      lastSeenVersion = sourceDataVersion;
+    }
+  }, [sourceDataVersion]);
   
   const cacheKey = getCacheKey(codeContent, sourceDataVersion, stepId);
   const cached = evaluationCache.get(cacheKey);
@@ -117,7 +119,7 @@ export function useTemplatePreview(
     }, debounceMs);
 
     return () => clearTimeout(timer);
-  }, [codeContent, sourceDataVersion, enabled, debounceMs]);
+  }, [codeContent, sourceDataVersion, stepId, enabled, debounceMs]);
 
   return { previewValue, previewError, isEvaluating, hasResult };
 }

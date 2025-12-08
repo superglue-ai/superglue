@@ -367,7 +367,6 @@ export class PostgresService implements DataStore {
             return extractRun(row.data, {
                 id: row.id,
                 config_id: row.config_id,
-                org_id: row.org_id,
                 started_at: row.started_at,
                 completed_at: row.completed_at
             });
@@ -401,7 +400,6 @@ export class PostgresService implements DataStore {
             const items = result.rows.map(row => extractRun(row.data, {
                 id: row.id,
                 config_id: row.config_id,
-                org_id: row.org_id,
                 started_at: row.started_at,
                 completed_at: row.completed_at
             }));
@@ -454,7 +452,6 @@ export class PostgresService implements DataStore {
             const existingRun = extractRun(row.data, {
                 id: row.id,
                 config_id: row.config_id,
-                org_id: row.org_id,
                 started_at: row.started_at,
                 completed_at: row.completed_at
             });

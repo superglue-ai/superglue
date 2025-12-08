@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import { Run, SuperglueClient } from '@superglue/shared';
+import { Run, RunStatus, SuperglueClient } from '@superglue/shared';
 import { AlertTriangle, Calendar, CheckCircle, ChevronDown, ChevronRight, Clock, Loader2, XCircle } from 'lucide-react';
 import { CopyButton } from '@/src/components/tools/shared/CopyButton';
 import React from 'react';
@@ -146,22 +146,22 @@ const RunsTable = ({ id }: { id?: string }) => {
                         className={`h-4 w-4 flex-shrink-0 transition-transform ${expandedRunId === run.id ? 'rotate-90' : ''}`}
                       />
                       <span className="truncate" title={run.toolId ?? "undefined"}>
-                        {run.toolId ?? "undefined"}
+                      {run.toolId ?? "undefined"}
                       </span>
                     </div>
                   </TableCell>
                   <TableCell>
-                    {run.status === 'success' ? (
+                    {run.status === RunStatus.SUCCESS ? (
                       <Badge variant="default" className="bg-emerald-500 hover:bg-emerald-500 gap-1">
                         <CheckCircle className="h-3 w-3" />
                         Success
                       </Badge>
-                    ) : run.status === 'running' ? (
+                    ) : run.status === RunStatus.RUNNING ? (
                       <Badge variant="default" className="bg-blue-500 hover:bg-blue-500 gap-1">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         Running
                       </Badge>
-                    ) : run.status === 'aborted' ? (
+                    ) : run.status === RunStatus.ABORTED ? (
                       <Badge variant="default" className="bg-amber-500 hover:bg-amber-500 gap-1">
                         <AlertTriangle className="h-3 w-3" />
                         Aborted
@@ -269,8 +269,8 @@ const RunDetails = ({ run }: { run: any }) => {
   const hasToolResult = cleanedToolResult && (Array.isArray(cleanedToolResult) ? cleanedToolResult.length > 0 : Object.keys(cleanedToolResult).length > 0);
   const hasToolPayload = cleanedToolPayload && Object.keys(cleanedToolPayload).length > 0;
   const hasStepResults = run.stepResults && run.stepResults.length > 0;
-  const isAborted = run.status === 'aborted';
-  const isFailed = run.status === 'failed';
+  const isAborted = run.status === RunStatus.ABORTED;
+  const isFailed = run.status === RunStatus.FAILED;
   
   return (
     <div className="p-6 space-y-4 max-h-[600px] overflow-y-auto [scrollbar-gutter:stable]">
@@ -281,7 +281,7 @@ const RunDetails = ({ run }: { run: any }) => {
             <span className="text-sm font-mono truncate" title={run.id}>{run.id}</span>
             <CopyButton text={run.id} />
           </div>
-        </div>
+      </div>
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-muted-foreground">Duration</h4>
           <div className="flex items-center gap-2">
@@ -351,16 +351,16 @@ const RunDetails = ({ run }: { run: any }) => {
             </div>
           )},
           hasStepResults && { key: 'steps', title: `Step Results (${run.stepResults.length})`, content: (
-            <div className="space-y-2">
-              {run.stepResults.map((step: any, index: number) => (
+          <div className="space-y-2">
+            {run.stepResults.map((step: any, index: number) => (
                 <div key={step.stepId} className="p-3 border rounded-lg space-y-2">
-                  <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between">
                     <span className="font-medium text-sm">Step {index + 1}: {step.stepId}</span>
                     <Badge variant={step.success ? "default" : "destructive"} className={step.success ? "bg-emerald-500 hover:bg-emerald-500" : "hover:bg-destructive"}>
-                      {step.success ? "Success" : "Failed"}
-                    </Badge>
-                  </div>
-                  {step.error && (
+                    {step.success ? "Success" : "Failed"}
+                  </Badge>
+                </div>
+                {step.error && (
                     <div className="p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded text-xs">
                       <pre className="text-red-600 dark:text-red-500 whitespace-pre-wrap font-mono">{step.error}</pre>
                     </div>
@@ -369,19 +369,19 @@ const RunDetails = ({ run }: { run: any }) => {
                     <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-2 rounded-md max-h-[200px] overflow-y-auto">
                       {JSON.stringify(removeNullFields(step.data), null, 2)}
                     </pre>
-                  )}
-                </div>
-              ))}
-            </div>
+                )}
+              </div>
+            ))}
+          </div>
           )},
           hasToolResult && { key: 'result', title: 'Tool Result', content: (
             <div className="relative">
               <div className="absolute top-2 right-2 z-10">
                 <CopyButton getData={() => JSON.stringify(cleanedToolResult, null, 2)} />
-              </div>
+        </div>
               <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md max-h-[300px] overflow-y-auto">
                 {JSON.stringify(cleanedToolResult, null, 2)}
-              </pre>
+            </pre>
             </div>
           )},
         ].filter(Boolean) as { key: string; title: string; content: React.ReactNode }[];

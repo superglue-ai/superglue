@@ -11,7 +11,7 @@ interface TemplateChipProps {
   evaluatedValue: any;
   error?: string;
   stepData: any;
-  loopData?: any;
+  dataSelectorOutput?: any;
   hasResult?: boolean;
   canExecute?: boolean;
   onUpdate: (newTemplate: string) => void;
@@ -32,7 +32,7 @@ export function TemplateChip({
   evaluatedValue,
   error,
   stepData,
-  loopData,
+  dataSelectorOutput,
   hasResult = true,
   canExecute = true,
   onUpdate,
@@ -48,7 +48,7 @@ export function TemplateChip({
   popoverHelpText,
 }: TemplateChipProps) {
   const { sourceDataVersion } = useTemplateContext();
-  const sourceData = useMemo(() => prepareSourceData(stepData, loopData), [stepData, loopData]);
+  const sourceData = useMemo(() => prepareSourceData(stepData, dataSelectorOutput), [stepData, dataSelectorOutput]);
   const [isHovered, setIsHovered] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   
