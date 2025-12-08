@@ -12,6 +12,11 @@ const files = readdirSync(enterpriseFeaturesDir)
 
 // Dynamically import all files (side-effect imports)
 for (const file of files) {
-  await import(`./${file}`);
+  try {
+    await import(`./${file}`);
+  } catch (error) {
+    console.error(`Failed to load enterprise feature module: ${file}`, error);
+    throw new Error(`Failed to load enterprise feature module: ${file}`);
+  }
 }
 
