@@ -448,17 +448,10 @@ export class PostgresService implements DataStore {
         if (!run) throw new Error('Run is required');
         const client = await this.pool.connect();
         try {
-            const existingRun = await client.query(
-                'SELECT id FROM runs WHERE id = $1 AND org_id = $2',
-                [run.id, run.orgId || '']
-            );
-            if (existingRun.rows.length > 0) {
-                throw new Error(`Run with id ${run.id} already exists`);
-            }
-
-            await client.query(`
+            const result = await client.query(`
                 INSERT INTO runs (id, config_id, org_id, data, started_at, completed_at) 
                 VALUES ($1, $2, $3, $4, $5, $6)
+                ON CONFLICT (id, org_id) DO NOTHING
             `, [
                 run.id,
                 run.toolId,
@@ -467,6 +460,10 @@ export class PostgresService implements DataStore {
                 run.startedAt ? run.startedAt.toISOString() : null,
                 run.completedAt ? run.completedAt.toISOString() : null
             ]);
+
+            if (result.rowCount === 0) {
+                throw new Error(`Run with id ${run.id} already exists`);
+            }
 
             return run;
         } finally {
@@ -499,7 +496,8 @@ export class PostgresService implements DataStore {
                 ...existingRun,
                 ...updates,
                 id,
-                orgId
+                orgId,
+                startedAt: existingRun.startedAt,
             };
 
             await client.query(`
