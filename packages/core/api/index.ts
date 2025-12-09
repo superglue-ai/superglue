@@ -1,5 +1,6 @@
 // Import API endpoint modules
-import './example.js';
+import './runs.js';
+import './tools.js';
 
 // Automatically import all files from ee folder
 import './ee/index.js';

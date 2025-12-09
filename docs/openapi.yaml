@@ -1,0 +1,653 @@
+openapi: 3.0.0
+info:
+  title: superglue AI API
+  version: 1.0.0
+  description: API for running superglue AI tools
+  contact:
+    name: superglue AI Support
+    email: stefan@superglue.ai
+
+servers:
+  - url: https://api.superglue.ai/v1
+    description: Production
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /tools:
+    get:
+      summary: List tools
+      operationId: listTools
+      tags:
+        - Tools
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        "200":
+          description: List of tools (latest versions only)
+          headers:
+            X-Trace-Id:
+              schema:
+                type: string
+              description: Request trace ID for debugging and log correlation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Tool"
+                  page:
+                    type: integer
+                    example: 1
+                  limit:
+                    type: integer
+                    example: 50
+                  total:
+                    type: integer
+                    example: 127
+                  hasMore:
+                    type: boolean
+                    example: true
+
+  /tools/{toolId}:
+    get:
+      summary: Get tool details
+      operationId: getTool
+      tags:
+        - Tools
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 550e8400-e29b-41d4-a716-446655440000
+      responses:
+        "200":
+          description: Tool details
+          headers:
+            X-Trace-Id:
+              schema:
+                type: string
+              description: Request trace ID for debugging and log correlation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tool"
+        "404":
+          description: Tool or version not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /tools/{toolId}/run:
+    post:
+      summary: Run a tool
+      operationId: runTool
+      tags:
+        - Tools
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 550e8400-e29b-41d4-a716-446655440000
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunRequest"
+      responses:
+        "200":
+          description: Tool execution completed (sync)
+          headers:
+            X-Trace-Id:
+              schema:
+                type: string
+              description: Trace ID for this API request (for debugging and log correlation)
+              example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+              description: Maximum number of requests per time window
+              example: 100
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+              description: Number of requests remaining in current window
+              example: 95
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+              description: Unix timestamp when rate limit resets
+              example: 1640000000
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "202":
+          description: Tool execution started (async)
+          headers:
+            X-Trace-Id:
+              schema:
+                type: string
+              description: Trace ID for this API request (for debugging and log correlation)
+              example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+              example: 100
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+              example: 95
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+              example: 1640000000
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Run with provided runId already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Tool version is deprecated and no longer available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /runs/{runId}:
+    get:
+      summary: Get run status
+      operationId: getRun
+      tags:
+        - Runs
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 7f3e9c1a-2b4d-4e8f-9a3b-1c5d7e9f2a4b
+      responses:
+        "200":
+          description: Run details
+          headers:
+            X-Trace-Id:
+              schema:
+                type: string
+              description: Request trace ID for debugging and log correlation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "404":
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /runs/{runId}/cancel:
+    post:
+      summary: Cancel a run
+      operationId: cancelRun
+      tags:
+        - Runs
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Run cancelled
+          headers:
+            X-Trace-Id:
+              schema:
+                type: string
+              description: Request trace ID for debugging and log correlation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "400":
+          description: Cannot cancel run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /runs:
+    get:
+      summary: List runs
+      operationId: listRuns
+      tags:
+        - Runs
+      parameters:
+        - name: toolId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [running, success, failed, aborted]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        "200":
+          description: List of runs
+          headers:
+            X-Trace-Id:
+              schema:
+                type: string
+              description: Request trace ID for debugging and log correlation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Run"
+                  page:
+                    type: integer
+                    example: 1
+                  limit:
+                    type: integer
+                    example: 50
+                  total:
+                    type: integer
+                    example: 327
+                  hasMore:
+                    type: boolean
+                    example: true
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Static API Key
+      description: |
+        Static API key authentication using Bearer token scheme.
+        Include your API key in the Authorization header:
+        `Authorization: Bearer YOUR_API_KEY`
+
+        API keys can be generated in your superglue dashboard.
+
+  schemas:
+    Tool:
+      type: object
+      description: A multi-step workflow tool that executes one or more protocol-specific operations
+      required:
+        - id
+        - steps
+      properties:
+        id:
+          type: string
+          example: 550e8400-e29b-41d4-a716-446655440000
+        name:
+          type: string
+          example: Web Search
+        version:
+          type: string
+          description: Semantic version string (major.minor.patch)
+          example: 2.1.0
+          pattern: '^\d+\.\d+\.\d+$'
+        instruction:
+          type: string
+          description: Human-readable instruction describing what the tool does
+          example: Search the web for the given query and return relevant results
+        inputSchema:
+          type: object
+          description: JSON Schema for tool inputs
+          example:
+            type: object
+            properties:
+              query:
+                type: string
+              maxResults:
+                type: integer
+                default: 10
+            required:
+              - query
+        outputSchema:
+          type: object
+          description: JSON Schema for tool outputs (after transformations applied)
+        steps:
+          type: array
+          description: Ordered execution steps that make up this tool
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ToolStep"
+        outputTransform:
+          type: string
+          description: |
+            JavaScript function for final output transformation.
+            Format: (sourceData) => expression
+          example: "(sourceData) => sourceData.map(item => ({ id: item.id, title: item.name }))"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ToolStep:
+      type: object
+      description: |
+        A single execution step. Protocol is detected from URL scheme:
+        - HTTP/HTTPS: Standard REST API calls with query params, headers, body
+        - Postgres: postgres:// or postgresql:// URLs, body contains SQL query
+        - FTP/SFTP: ftp://, ftps://, or sftp:// URLs, body contains operation details
+      required:
+        - id
+        - url
+        - method
+        - systemId
+      properties:
+        id:
+          type: string
+          description: Unique identifier for this step
+          example: 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+        url:
+          type: string
+          description: |
+            Full URL including protocol. Examples:
+            - HTTP: https://api.example.com/search
+            - Postgres: postgres://user:pass@host:5432/database
+            - FTP: ftp://user:pass@host:21/path
+            - SFTP: sftp://user:pass@host:22/path
+          example: https://api.example.com/search
+        method:
+          type: string
+          enum: [GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS]
+          description: HTTP method. For non-HTTP protocols, use POST.
+          example: GET
+        queryParams:
+          type: object
+          description: URL query parameters (HTTP only). Supports template expressions with <<(sourceData) => ...>> syntax.
+          additionalProperties: true
+          example:
+            q: "<<(sourceData) => sourceData.query>>"
+            limit: 10
+        headers:
+          type: object
+          description: HTTP headers (HTTP only). Supports template expressions with <<(sourceData) => ...>> syntax.
+          additionalProperties: true
+          example:
+            Content-Type: application/json
+            Authorization: "Bearer <<(sourceData) => sourceData.credentials.apiKey>>"
+        body:
+          type: string
+          description: |
+            Request body (protocol-specific). Supports template expressions with <<(sourceData) => ...>> syntax.
+
+            HTTP: Any content (JSON, XML, form data, etc.)
+            Example: '{"query": "<<(sourceData) => sourceData.query>>"}'
+
+            Postgres: JSON with query and optional params
+            Example: '{"query": "SELECT * FROM users WHERE id = $1", "params": ["<<(sourceData) => sourceData.userId>>"]}'
+
+            FTP/SFTP: JSON with operation, path, and optional content
+            Example: '{"operation": "get", "path": "/data/file.csv"}'
+            Example: '{"operation": "list", "path": "/data"}'
+            Example: '{"operation": "put", "path": "/data/file.txt", "content": "<<(sourceData) => sourceData.fileContent>>"}'
+          example: '{"query": "<<(sourceData) => sourceData.query>>"}'
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        systemId:
+          type: string
+          description: System to use for stored credentials and documentation
+          example: 3f7c8d9e-1a2b-4c5d-8e9f-0a1b2c3d4e5f
+        instruction:
+          type: string
+          description: Human-readable instruction describing what this step does
+          example: Fetch user details from the API
+        modify:
+          type: boolean
+          description: Whether this step can be modified by the self-healing system
+          default: false
+        dataSelector:
+          type: string
+          description: |
+            JavaScript function to select data for loop execution.
+            Format: (sourceData) => expression
+          example: "(sourceData) => sourceData.data.items"
+        failureBehavior:
+          type: string
+          enum: [fail, continue]
+          description: How to handle step failures (fail stops execution, continue proceeds to next step)
+          default: fail
+
+    Pagination:
+      type: object
+      description: Pagination configuration (HTTP/HTTPS only, not applicable to Postgres/FTP)
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [offsetBased, pageBased, cursorBased, disabled]
+          example: cursorBased
+        pageSize:
+          type: string
+          description: Number of items per page. Becomes available as <<(sourceData) => sourceData.limit>> in request templates.
+          example: "50"
+        cursorPath:
+          type: string
+          description: JSONPath to extract next page cursor from response body (e.g. "meta.next_cursor" for {meta:{next_cursor:"abc"}})
+          example: "meta.next_cursor"
+        stopCondition:
+          type: string
+          description: |
+            JavaScript function to determine when to stop pagination. Format: (response, pageInfo) => boolean
+            - response: Object with {data: ..., headers: ...} - access response body via response.data
+            - pageInfo: Object with {page: number, offset: number, cursor: any, totalFetched: number}
+            - Return true to STOP pagination, false to continue
+          example: "(response, pageInfo) => !response.data.pagination.has_more"
+
+    RunRequest:
+      type: object
+      properties:
+        runId:
+          type: string
+          description: |
+            Optional pre-generated run ID. If not provided, server generates one.
+            Useful for idempotency and tracking runs before they start.
+          example: 7f3e9c1a-2b4d-4e8f-9a3b-1c5d7e9f2a4b
+        inputs:
+          type: object
+          description: Tool-specific input parameters
+          example:
+            query: latest AI news
+            maxResults: 5
+        credentials:
+          type: object
+          description: |
+            Runtime credentials for systems (overrides stored system credentials if provided).
+            WARNING: These credentials are not persisted. Use systems for stored credentials.
+          additionalProperties: true
+          example:
+            apiKey: sk_live_abc123def456
+            apiSecret: secret_xyz789
+        options:
+          type: object
+          properties:
+            async:
+              type: boolean
+              default: false
+              description: If true, return immediately (202) and execute asynchronously. If false, wait for completion (200).
+            timeout:
+              type: integer
+              description: Request timeout in seconds (only for synchronous execution)
+            webhookUrl:
+              type: string
+              format: uri
+              description: |
+                URL to receive completion webhook when run finishes (for both sync and async executions).
+                Webhook receives POST request with Run object (same schema as getRun response) in body.
+                Alternatively, a tool to run after - run via tool:toolId
+              example: https://your-app.com/webhooks/superglue
+            traceId:
+              type: string
+              description: Custom trace ID for log tracking
+              example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+    Run:
+      type: object
+      required:
+        - runId
+        - toolId
+        - status
+        - metadata
+      properties:
+        runId:
+          type: string
+          description: Unique identifier for this run (maps to 'id' in GraphQL schema)
+          example: 7f3e9c1a-2b4d-4e8f-9a3b-1c5d7e9f2a4b
+        toolId:
+          type: string
+          description: ID of the tool that was executed
+          example: 550e8400-e29b-41d4-a716-446655440000
+        tool:
+          type: object
+          description: Tool metadata (not full configuration, maps to 'toolConfig' in GraphQL)
+          required:
+            - id
+          properties:
+            id:
+              type: string
+            version:
+              type: string
+              example: "2.1.0"
+        status:
+          type: string
+          enum: [running, success, failed, aborted]
+          description: |
+            Execution status:
+            - running: Execution in progress
+            - success: Completed successfully
+            - failed: Failed due to error
+            - aborted: Cancelled by user or system
+          example: success
+        toolPayload:
+          type: object
+          description: The inputs and options provided when running the tool (maps to 'toolPayload' in GraphQL)
+          additionalProperties: true
+        data:
+          type: object
+          description: Tool execution results (only present when status is success, maps to 'toolResult' in GraphQL)
+          additionalProperties: true
+        error:
+          type: string
+          description: Error message (only present when status is failed or aborted)
+          example: Connection timeout after 30 seconds
+        stepResults:
+          type: array
+          description: Results from each execution step (only for multi-step tools)
+          items:
+            type: object
+            required:
+              - stepId
+              - success
+            properties:
+              stepId:
+                type: string
+                description: ID of the step that was executed
+              success:
+                type: boolean
+                description: Whether the step completed successfully
+              data:
+                type: object
+                description: Step execution result data
+                additionalProperties: true
+              error:
+                type: string
+                description: Error message if step failed
+        options:
+          type: object
+          description: Execution options that were used for this run
+          additionalProperties: true
+        requestSource:
+          type: string
+          description: Source identifier for where the run was initiated
+          example: api
+        traceId:
+          type: string
+          description: Trace ID for this run (for debugging and log correlation)
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        metadata:
+          type: object
+          properties:
+            startedAt:
+              type: string
+              format: date-time
+            completedAt:
+              type: string
+              format: date-time
+              description: Only present when run has finished (success, failed, or aborted)
+            durationMs:
+              type: integer
+              example: 5234
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - message
+          properties:
+            message:
+              type: string
+              example: Invalid input parameters
