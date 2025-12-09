@@ -21,7 +21,7 @@ async function startServer() {
   }
 
   await Promise.all([
-    startApiServer(datastore),
+    startApiServer(datastore, workerPools),
     startGraphqlServer(datastore, workerPools)
   ]);
 }

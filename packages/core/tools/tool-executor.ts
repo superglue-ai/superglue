@@ -312,7 +312,7 @@ export class ToolExecutor implements Tool {
 
       logMessage("info", `Step '${step.id}' Complete`, this.metadata);
       
-      const stepSuccess = step.failureBehavior === 'CONTINUE' 
+      const stepSuccess = step.failureBehavior === 'CONTINUE' || stepResults.length === 0
         ? true
         : stepResults.some(r => r.success);
       
@@ -435,8 +435,8 @@ export class ToolExecutor implements Tool {
     }
   }
 
-  private buildAggregatedStepData(originalPayload: Record<string, unknown>): Record<string, unknown> {
-    const stepResults: Record<string, unknown> = {};
+  private buildAggregatedStepData(originalPayload: Record<string, ToolStepResult>): Record<string, ToolStepResult> {
+    const stepResults: Record<string, ToolStepResult> = {};
     
     for (const result of this.result.stepResults) {
       if (result?.data) {
