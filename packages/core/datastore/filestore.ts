@@ -395,7 +395,8 @@ export class FileStore implements DataStore {
       ...existingRun,
       ...updates,
       id,
-      orgId
+      orgId,
+      startedAt: existingRun.startedAt,
     };
 
     await this.removeRunFromLogs(id, orgId);

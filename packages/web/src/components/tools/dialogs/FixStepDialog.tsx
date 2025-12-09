@@ -66,8 +66,6 @@ export function FixStepDialog({
                 errorMessage,
             });
 
-            console.log('[FixStepDialog] generateConfig returned:', result);
-
             // Result now has shape: { config: ApiConfig, dataSelector: string }
             const updatedStep = {
                 ...step,
