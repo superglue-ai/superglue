@@ -10,13 +10,16 @@ import { ToolValidationService } from "./tool-validation.js";
 
 export class SuperglueToolAttemptService {
     private validationService: ToolValidationService;
+    private selfHealingRetries: number;
 
     constructor(
         private metadata: ServiceMetadata,
         private datastore: DataStore,
-        validationLlmConfig?: ValidationLLMConfig
+        validationLlmConfig?: ValidationLLMConfig,
+        selfHealingRetries?: number
     ) {
         this.validationService = new ToolValidationService(validationLlmConfig);
+        this.selfHealingRetries = selfHealingRetries ?? 3;
     }
 
     public async runToolAttempt(
@@ -139,7 +142,7 @@ export class SuperglueToolAttemptService {
         );
 
         const workflowResult = await executor.execute(
-            { payload: toolConfig.payload || {}, credentials: allCredentials, options: { selfHealing: selfHealingEnabled ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED, testMode: selfHealingEnabled ? true : false } }
+            { payload: toolConfig.payload || {}, credentials: allCredentials, options: { selfHealing: selfHealingEnabled ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED, testMode: selfHealingEnabled ? true : false, retries: selfHealingEnabled ? this.selfHealingRetries : 0 } }
         );
 
         return workflowResult;
