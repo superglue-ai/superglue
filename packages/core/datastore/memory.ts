@@ -502,9 +502,13 @@ export class MemoryStore implements DataStore {
 
   async createFileReference(params: { file: FileReference; orgId?: string }): Promise<FileReference> {
     const { file, orgId } = params;
+    const fileWithTimestamp: FileReference = {
+      ...file,
+      createdAt: file.createdAt || new Date()
+    };
     const key = this.getKey('file-reference', file.id, orgId);
-    this.storage.fileReferences.set(key, file);
-    return file;
+    this.storage.fileReferences.set(key, fileWithTimestamp);
+    return fileWithTimestamp;
   }
 
   async getFileReference(params: { id: string; orgId?: string }): Promise<FileReference | null> {

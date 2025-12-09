@@ -1296,7 +1296,10 @@ export class PostgresService implements DataStore {
                  VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
                 [file.id, orgId, file.storageUri, file.processedStorageUri || null, JSON.stringify(file.metadata), file.status, file.error || null]
             );
-            return file;
+            // Fetch and return the complete record with database-generated fields
+            const created = await this.getFileReference({ id: file.id, orgId });
+            if (!created) throw new Error('Failed to retrieve created file reference');
+            return created;
         } finally {
             client.release();
         }
@@ -1307,7 +1310,7 @@ export class PostgresService implements DataStore {
         const client = await this.pool.connect();
         try {
             const result = await client.query(
-                `SELECT id, storage_uri, processed_storage_uri, metadata, status, error FROM file_references WHERE id = $1 AND org_id = $2`,
+                `SELECT id, storage_uri, processed_storage_uri, metadata, status, error, created_at FROM file_references WHERE id = $1 AND org_id = $2`,
                 [id, orgId]
             );
             if (result.rows.length === 0) return null;
@@ -1319,7 +1322,8 @@ export class PostgresService implements DataStore {
                 processedStorageUri: row.processed_storage_uri || undefined,
                 metadata: row.metadata,
                 status: row.status,
-                error: row.error || undefined
+                error: row.error || undefined,
+                createdAt: row.created_at ? new Date(row.created_at) : undefined
             };
         } finally {
             client.release();
@@ -1396,7 +1400,7 @@ export class PostgresService implements DataStore {
 
             queryParams.push(limit, offset);
             const result = await client.query(
-                `SELECT id, org_id, storage_uri, processed_storage_uri, metadata, status, error 
+                `SELECT id, org_id, storage_uri, processed_storage_uri, metadata, status, error, created_at 
                  FROM file_references ${whereClause} 
                  ORDER BY created_at DESC LIMIT $${paramCount++} OFFSET $${paramCount++}`,
                 queryParams
@@ -1408,7 +1412,8 @@ export class PostgresService implements DataStore {
                 processedStorageUri: row.processed_storage_uri || undefined,
                 metadata: row.metadata,
                 status: row.status,
-                error: row.error || undefined
+                error: row.error || undefined,
+                createdAt: row.created_at ? new Date(row.created_at) : undefined
             }));
 
             return { items, total };

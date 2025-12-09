@@ -462,7 +462,6 @@ export interface DiscoveryRun {
 
 export enum FileStatus {
   PENDING = "PENDING",
-  UPLOADING = "UPLOADING",
   PROCESSING = "PROCESSING",
   COMPLETED = "COMPLETED",
   FAILED = "FAILED"
@@ -475,4 +474,26 @@ export interface FileReference {
   metadata: any;
   status: FileStatus;
   error?: string;
+  createdAt?: Date;
+}
+
+export interface BatchFileUploadRequest {
+  files: Array<{
+    fileName: string;
+    metadata?: {
+      contentType?: string;
+      contentLength?: number;
+      [key: string]: any;
+    };
+  }>;
+}
+
+export interface BatchFileUploadResponse {
+  success: boolean;
+  files: Array<{
+    id: string;
+    originalFileName: string;
+    uploadUrl: string;
+    expiresIn: number;
+  }>;
 }
