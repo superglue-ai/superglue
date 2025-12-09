@@ -207,8 +207,8 @@ export const FinalTransformMiniStepCard = ({
                       title={
                         !canExecute
                           ? "Execute all steps first"
-                          : isRunningTransform && onAbort
-                            ? "Stop transform"
+                          : isRunningTransform
+                            ? (onAbort ? "Stop transform" : "Transform is running...")
                             : "Test final transform"
                       }
                     >

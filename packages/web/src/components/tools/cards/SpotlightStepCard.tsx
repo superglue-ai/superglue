@@ -176,7 +176,6 @@ export const SpotlightStepCard = React.memo(({
         const isInitialForThisStep = lastNotifiedStepIdRef.current !== step.id;
         
         const itemCount = (hasValidOutput && Array.isArray(dataSelectorOutput)) ? dataSelectorOutput.length : null;
-        console.log('[DataSelector]', step.id, 'isInitial:', isInitialForThisStep, 'itemCount:', itemCount);
         onDataSelectorChange?.(itemCount, isInitialForThisStep);
         
         if (isInitialForThisStep) {

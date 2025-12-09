@@ -13,16 +13,11 @@ function getCacheKey(codeContent: string, sourceDataVersion?: number, stepId?: s
 }
 
 function cleanupStaleEntries(currentVersion: number | undefined) {
-  const removed: string[] = [];
   for (const key of evaluationCache.keys()) {
     const versionPart = key.split(':')[1];
     if (versionPart !== String(currentVersion ?? 'none')) {
       evaluationCache.delete(key);
-      removed.push(key);
     }
-  }
-  if (removed.length > 0) {
-    console.log('[Cache] Cleanup removed entries:', removed, 'current version:', currentVersion);
   }
 }
 
@@ -50,9 +45,6 @@ export function useTemplatePreview(
   const isDefaultTemplate = codeContent === DEFAULT_CODE_TEMPLATE;
   const cacheKey = getCacheKey(codeContent, sourceDataVersion, stepId);
   const cached = isDefaultTemplate ? undefined : evaluationCache.get(cacheKey);
-  if (!isDefaultTemplate) {
-    console.log('[Cache] Lookup:', cacheKey, cached ? 'HIT' : 'MISS', 'cache size:', evaluationCache.size);
-  }
   
   const [previewValue, setPreviewValue] = useState<any>(cached?.value);
   const [previewError, setPreviewError] = useState<string | null>(cached?.error ?? null);
@@ -105,7 +97,6 @@ export function useTemplatePreview(
           ? { value: result.value, error: null }
           : { value: undefined, error: result.error || 'Evaluation failed' };
         
-        console.log('[Cache] Inserting:', cacheKey, 'value:', cacheEntry.value, 'version:', sourceDataVersion);
         cleanupStaleEntries(sourceDataVersion);
         evaluationCache.set(cacheKey, cacheEntry);
         
@@ -117,7 +108,6 @@ export function useTemplatePreview(
         const errorMsg = error instanceof Error ? error.message : String(error);
         const cacheEntry: EvaluationCacheEntry = { value: undefined, error: errorMsg };
         
-        console.log('[Cache] Inserting (error):', cacheKey, 'error:', errorMsg, 'version:', sourceDataVersion);
         cleanupStaleEntries(sourceDataVersion);
         evaluationCache.set(cacheKey, cacheEntry);
         

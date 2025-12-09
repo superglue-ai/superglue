@@ -167,14 +167,12 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
   useEffect(() => {
     setSourceDataVersion(v => {
-      console.log('[Version] Increment due to stepResultsMap/computedPayload change. Old version:', v, 'New version:', v + 1);
       return v + 1;
     });
   }, [stepResultsMap, computedPayload]);
 
   const handleDataSelectorOutputChange = useCallback(() => {
     setSourceDataVersion(v => {
-      console.log('[Version] Increment due to data selector change. Old version:', v, 'New version:', v + 1);
       return v + 1;
     });
   }, []);
@@ -1071,8 +1069,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     if (fixStepIndex === null) return;
 
     const step = steps[fixStepIndex];
-    
-    console.log('[ToolPlayground] handleFixStepSuccess received:', updatedStep);
     
     // updatedStep now contains the full step with both apiConfig and loopSelector updated
     handleStepEdit(step.id, updatedStep, true);

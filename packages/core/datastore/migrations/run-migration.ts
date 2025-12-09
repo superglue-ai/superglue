@@ -8,7 +8,7 @@ export interface LegacyRunRow {
 }
 
 function isLegacyRun(data: any): boolean {
-  return !data.status;
+  return !data?.status;
 }
 
 function normalizeRunStatus(status: string): RunStatus {
