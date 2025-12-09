@@ -121,30 +121,12 @@ export function normalizeTemplateExpression(expr: string): string {
   return `(sourceData) => sourceData["${escapeForBracket(trimmed)}"]`;
 }
 
-function detectDangerousPatterns(code: string): void {
-  const patterns = [
-    { regex: /while\s*\(\s*true\s*\)/, msg: 'while(true)' },
-    { regex: /while\s*\(\s*1\s*\)/, msg: 'while(1)' },
-    { regex: /while\s*\(\s*!\s*false\s*\)/, msg: 'while(!false)' },
-    { regex: /for\s*\(\s*[^;]*;\s*;\s*[^)]*\)/, msg: 'for(;;) or for(i=0;;i++)' },
-    { regex: /while\s*\(\s*!\s*0\s*\)/, msg: 'while(!0)' },
-    { regex: /do\s*\{[^}]*\}\s*while\s*\(\s*true\s*\)/, msg: 'do...while(true)' },
-  ];
-
-  for (const { regex, msg } of patterns) {
-    if (regex.test(code)) {
-      throw new Error(`Dangerous pattern: ${msg} may cause infinite loop`);
-    }
-  }
-}
-
 export async function evaluateTemplate(
   expr: string,
   sourceData: any
 ): Promise<EvaluationResult> {
   try {
     const normalizedExpr = normalizeTemplateExpression(expr);
-    detectDangerousPatterns(normalizedExpr);
     const result = await executeTemplateCode(normalizedExpr, sourceData);
     const sanitized = sanitizeEvaluationResult(result);
     return { success: true, value: sanitized };

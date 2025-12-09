@@ -59,7 +59,9 @@ async function main(): Promise<void> {
     const duration = new Date().getTime() - startedAt.getTime();
     logMessage("info", `Agent Evaluation Completed in ${(duration / 1000).toFixed(1)}s`, metadata);
 
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise<void>(resolve => process.stdout.write('', () => resolve()));
+    await new Promise<void>(resolve => process.stderr.write('', () => resolve()));
     ConsoleReporter.report(metrics, timestamp, baseDir);
   } catch (error) {
     const message = error instanceof Error ? error.stack || error.message : String(error);

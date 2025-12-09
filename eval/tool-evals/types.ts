@@ -30,6 +30,7 @@ export interface TestSuiteSettings {
     attemptsEachMode: number;
     maxConcurrentWorkers?: number;
     toolAttemptTimeoutMs?: number;
+    selfHealingRetries?: number;
 }
 
 export interface ValidationLLMConfig {

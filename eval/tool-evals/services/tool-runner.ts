@@ -14,7 +14,7 @@ export class ToolRunnerService {
     }
 
     public async runTools(tools: ToolConfig[], integrations: Integration[], settings: TestSuiteSettings): Promise<ToolAttempt[]> {
-        const toolAttemptService = new SuperglueToolAttemptService(this.metadata, this.datastore, this.validationLlmConfig);
+        const toolAttemptService = new SuperglueToolAttemptService(this.metadata, this.datastore, this.validationLlmConfig, settings.selfHealingRetries);
         const queue = settings.maxConcurrentWorkers ? new PromiseQueue(settings.maxConcurrentWorkers) : null;
         const timeoutMs = settings.toolAttemptTimeoutMs ?? 300000;
 
