@@ -89,5 +89,8 @@ export const server_defaults = {
     },
     MCP: {
         TOOL_EXECUTION_RESULT_CHARACTER_LIMIT: 20000,
+    },
+    FILE_PROCESSING: {
+        MAX_FILE_SIZE_BYTES: 100 * 1024 * 1024, // 100MB default max file size for processing
     }
 }

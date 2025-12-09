@@ -843,10 +843,14 @@ export class FileStore implements DataStore {
   async createFileReference(params: { file: FileReference; orgId?: string }): Promise<FileReference> {
     await this.ensureInitialized();
     const { file, orgId } = params;
+    const fileWithTimestamp: FileReference = {
+      ...file,
+      createdAt: file.createdAt || new Date()
+    };
     const key = this.getKey('file-reference', file.id, orgId);
-    this.storage.fileReferences.set(key, file);
+    this.storage.fileReferences.set(key, fileWithTimestamp);
     await this.persist();
-    return file;
+    return fileWithTimestamp;
   }
 
   async getFileReference(params: { id: string; orgId?: string }): Promise<FileReference | null> {
