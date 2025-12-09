@@ -44,7 +44,13 @@ export class WorkerPool<Payload, Result> {
 
             const handler = this.messageHandlers[msg.type];
             if (handler) {
-                handler(msg.payload);
+                try {
+                    Promise.resolve(handler(msg.payload)).catch((err) => {
+                        logMessage('error', `Worker message handler '${msg.type}' rejected: ${err instanceof Error ? err.message : String(err)}`);
+                    });
+                } catch (err) {
+                    logMessage('error', `Worker message handler '${msg.type}' threw: ${err instanceof Error ? err.message : String(err)}`);
+                }
             }
         });
     }

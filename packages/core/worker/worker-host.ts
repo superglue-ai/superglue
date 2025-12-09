@@ -16,7 +16,9 @@ const ready = init();
 // Piscina calls this for each job
 export default async function (payload: any) {
   await ready;
-  const result = await run(payload);
-  parentPort?.postMessage({ type: 'logs_flushed', runId: payload.runId });
-  return result;
+  try {
+    return await run(payload);
+  } finally {
+    parentPort?.postMessage({ type: 'logs_flushed', runId: payload.runId });
+  }
 }
