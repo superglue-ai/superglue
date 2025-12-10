@@ -58,12 +58,10 @@ export class IntegrationFinder {
     ): Promise<FoundIntegration[]> {
 
         if (!integrations || integrations.length === 0) {
-            logMessage('info', 'No integrations available for selection.', this.metadata);
             return [];
         }
 
         if (!instruction || instruction.trim() === "" || instruction.trim() === "*" || instruction.trim() === "all") {
-            logMessage('info', 'No specific instruction provided, returning all available integrations.', this.metadata);
             return integrations.map(int => ({
                 integration: int,
                 reason: "Available integration"
@@ -71,7 +69,6 @@ export class IntegrationFinder {
         }
 
         const results = this.keywordSearch(instruction, integrations);
-        logMessage('info', `Found ${results.length} integrations matching search terms`, this.metadata);
         return results;
     }
 } 

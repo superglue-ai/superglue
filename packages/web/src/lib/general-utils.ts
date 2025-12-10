@@ -10,6 +10,30 @@ import { StepExecutionResult } from './client-utils';
 
 export const inputErrorStyles = "border-red-500 focus:border-red-500 focus:ring-red-500";
 
+export type Theme = "light" | "dark" | "system";
+
+export function getThemeScript(): string {
+  return `
+    (function() {
+      try {
+        const theme = localStorage.getItem('theme') || 'system';
+        let resolved;
+        if (theme === 'system') {
+          resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        } else {
+          resolved = theme;
+        }
+        if (resolved === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } catch (e) {}
+    })();
+  `;
+}
+
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
@@ -327,3 +351,18 @@ export function isAbortError(errorMessage: string | undefined): boolean {
   const lower = errorMessage.toLowerCase();
   return lower.includes('abort') || lower.includes('terminated') || lower.includes('cancelled');
 }
+
+export const handleCopyCode = async (code: string, toast: any) => {
+  try {
+      const decodedCode = code
+          .replace(/&quot;/g, '"')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&amp;/g, '&');
+
+      await navigator.clipboard.writeText(decodedCode);
+      toast({ title: 'Copied!', description: 'Code copied to clipboard', variant: 'destructive' });
+  } catch (err) {
+      toast({ title: 'Failed to copy', variant: 'destructive' });
+  }
+};

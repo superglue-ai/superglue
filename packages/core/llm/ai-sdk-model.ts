@@ -310,15 +310,10 @@ export class AiSdkModel implements LLM {
         }
       }
 
-      const updatedMessages = [...conversationMessages, {
-        role: "assistant" as const,
-        content: JSON.stringify(finalResult)
-      }];
-
       return {
         success: true,
         response: finalResult,
-        messages: updatedMessages
+        messages: conversationMessages
       };
     } catch (error) {
       logMessage('error', `Error generating LLM response: ${error}`);

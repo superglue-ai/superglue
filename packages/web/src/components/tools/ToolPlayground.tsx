@@ -1027,8 +1027,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       if (isFailure) {
         if (isAbortError(single.error)) {
           setAbortedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+          setFailedSteps(prev => prev.filter(id => id !== sid));
         } else {
-        setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+          setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+          setAbortedSteps(prev => prev.filter(id => id !== sid));
         }
         setCompletedSteps(prev => prev.filter(id => id !== sid));
       } else {
@@ -1124,8 +1126,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       if (isFailure) {
         if (isAbortError(single.error)) {
           setAbortedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+          setFailedSteps(prev => prev.filter(id => id !== sid));
         } else {
-        setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+          setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== sid), sid])));
+          setAbortedSteps(prev => prev.filter(id => id !== sid));
         }
         setCompletedSteps(prev => prev.filter(id => id !== sid));
         throw new Error(single.error || 'Failed to fix step');
@@ -1199,8 +1203,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       } else {
         if (isAbortError(result.error)) {
           setAbortedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
-      } else {
-        setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
+          setFailedSteps(prev => prev.filter(id => id !== '__final_transform__'));
+        } else {
+          setFailedSteps(prev => Array.from(new Set([...prev.filter(id => id !== '__final_transform__'), '__final_transform__'])));
+          setAbortedSteps(prev => prev.filter(id => id !== '__final_transform__'));
         }
         setCompletedSteps(prev => prev.filter(id => id !== '__final_transform__'));
         setStepResultsMap(prev => ({
