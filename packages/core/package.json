@@ -40,6 +40,8 @@
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^3.0.61",
     "@apollo/server": "^4.11.3",
+    "@aws-sdk/client-s3": "^3.947.0",
+    "@aws-sdk/s3-request-presigner": "^3.947.0",
     "@fastify/cors": "^10.0.1",
     "@modelcontextprotocol/sdk": "^1.24.3",
     "@superglue/shared": "file:../shared",
