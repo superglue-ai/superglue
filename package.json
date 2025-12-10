@@ -2,7 +2,9 @@
   "name": "superglue",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/core",
+    "packages/shared",
+    "packages/web"
   ],
   "packageManager": "npm@11.0.0",
   "scripts": {

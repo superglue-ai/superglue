@@ -2,15 +2,16 @@
 set -e
 
 # Publish Python SDK to PyPI
-# Usage: ./scripts/publish-sdk-python.sh [version]
-# Example: ./scripts/publish-sdk-python.sh 1.0.1
+# Usage: ./packages/sdk/scripts/publish-sdk-python.sh [version]
+# Example: ./packages/sdk/scripts/publish-sdk-python.sh 1.0.1
 
 # Add pipx bin to PATH
 export PATH="$HOME/.local/bin:$PATH"
 
 VERSION=${1:-}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+SDK_DIR="$(dirname "$SCRIPT_DIR")"
+ROOT_DIR="$(dirname "$(dirname "$SDK_DIR")")"
 
 # Load PYPI_TOKEN from .env
 if [ -f "$ROOT_DIR/.env" ]; then
@@ -28,7 +29,7 @@ export TWINE_PASSWORD="$PYPI_TOKEN"
 
 echo "🐍 Publishing superglue-client (Python)..."
 
-cd "$ROOT_DIR/packages/sdk-python/superglue_sdk"
+cd "$SDK_DIR/python"
 
 # Ensure twine is available
 if ! command -v twine &> /dev/null; then
@@ -75,4 +76,3 @@ echo "📤 Pushing to git..."
 git push origin main --tags
 
 echo "✅ Python SDK v$VERSION published successfully!"
-

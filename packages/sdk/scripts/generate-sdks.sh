@@ -4,14 +4,15 @@ set -e
 # Generate all SDKs from OpenAPI spec
 #
 # Usage:
-#   ./scripts/generate-sdks.sh [ts|python|all]
+#   ./packages/sdk/scripts/generate-sdks.sh [ts|python|all]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+SDK_DIR="$(dirname "$SCRIPT_DIR")"
+ROOT_DIR="$(dirname "$(dirname "$SDK_DIR")")"
 
 generate_typescript() {
     echo "📦 Generating TypeScript SDK..."
-    cd "$PROJECT_ROOT/packages/sdk"
+    cd "$SDK_DIR/js"
     npm run generate
     echo "✅ TypeScript SDK generated"
 }
@@ -42,4 +43,3 @@ esac
 
 echo ""
 echo "🎉 SDK generation complete!"
-
