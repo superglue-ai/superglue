@@ -47,6 +47,7 @@ class Tool:
 </CodeGroup>
 
 **Fields:**
+
 - `id` - Unique identifier
 - `steps` - Ordered execution steps (min: 1)
 - `name` - Display name
@@ -104,6 +105,7 @@ class ToolStep:
 </CodeGroup>
 
 **Fields:**
+
 - `id` - Unique identifier
 - `url` - Full URL with protocol (e.g., `https://api.example.com`, `postgres://host:5432/db`, `ftp://host/path`)
 - `method` - HTTP method (use `POST` for non-HTTP protocols)
@@ -184,6 +186,7 @@ class Run:
 </CodeGroup>
 
 **Fields:**
+
 - `runId` - Unique run identifier
 - `toolId` - ID of executed tool
 - `status` - Execution status: `running`, `success`, `failed`, `aborted`
@@ -225,6 +228,7 @@ class RunMetadata:
 </CodeGroup>
 
 **Fields:**
+
 - `startedAt` - ISO timestamp when run started
 - `completedAt` - ISO timestamp when run finished (only present when status is `success`, `failed`, or `aborted`)
 - `durationMs` - Execution duration in milliseconds
@@ -253,7 +257,7 @@ interface RunRequest {
 
 ```python Python
 from superglue_sdk.models import (
-    RunRequest, 
+    RunRequest,
     RunRequestInputs,
     RunRequestCredentials,
     RunRequestOptions
@@ -270,6 +274,7 @@ class RunRequest:
 </CodeGroup>
 
 **Fields:**
+
 - `runId` - Pre-generated run ID (optional, for idempotency)
 - `inputs` - Tool-specific input parameters
 - `credentials` - Runtime credentials (not persisted, overrides stored credentials)
@@ -309,6 +314,7 @@ class RunStepResultsItem:
 </CodeGroup>
 
 **Fields:**
+
 - `stepId` - Which step this result is for
 - `success` - Whether the step completed successfully
 - `data` - API response data (if successful)
@@ -346,6 +352,7 @@ class Pagination:
 </CodeGroup>
 
 **Fields:**
+
 - `type` - Pagination type: `"offset"` or `"cursor"`
 - `pageSize` - Items per page (available as `<<(sourceData) => sourceData.limit>>`)
 - `cursorPath` - JSONPath to extract next page cursor (e.g., `"meta.next_cursor"`)
@@ -388,6 +395,7 @@ class ListToolsResponse200:
 </CodeGroup>
 
 **Fields:**
+
 - `data` - Array of Tool objects
 - `page` - Current page number
 - `limit` - Items per page
@@ -426,6 +434,7 @@ class ListRunsResponse200:
 </CodeGroup>
 
 **Fields:**
+
 - `data` - Array of Run objects
 - `page` - Current page number
 - `limit` - Items per page
@@ -498,4 +507,3 @@ class ToolStepFailureBehavior(str, Enum):
 ```
 
 </CodeGroup>
-
