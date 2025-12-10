@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SDK_DIR="$(dirname "$SCRIPT_DIR")"
 ROOT_DIR="$(dirname "$(dirname "$SDK_DIR")")"
 OPENAPI_SPEC="$ROOT_DIR/docs/openapi.yaml"
-OUTPUT_DIR="$SDK_DIR/python"
+OUTPUT_DIR="$SDK_DIR/python/superglue_client"
 VENV_DIR="$ROOT_DIR/.venv-sdk-gen"
 
 echo "🐍 Generating Python SDK from OpenAPI spec..."
