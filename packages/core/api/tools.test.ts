@@ -124,7 +124,7 @@ describe('tools API helpers', () => {
 
       expect(result.pagination).toEqual({
         type: 'cursorBased',
-        pageSize: 50,
+        pageSize: '50',
         cursorPath: '$.nextCursor',
         stopCondition: '$.hasMore === false',
       });
