@@ -6,7 +6,7 @@ set -e
 
 VERSION_TYPE=${1:-patch}
 
-echo "📦 Publishing @superglue/sdk..."
+echo "📦 Publishing @superglue/client..."
 
 # Ensure we're logged in to npm
 npm whoami > /dev/null 2>&1 || { echo "❌ Not logged in to npm. Run 'npm login' first."; exit 1; }

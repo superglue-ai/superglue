@@ -5,13 +5,13 @@ Auto-generated TypeScript SDK for the Superglue AI API.
 ## Installation
 
 ```bash
-npm install @superglue/sdk
+npm install @superglue/client
 ```
 
 ## Usage
 
 ```typescript
-import { configure, listTools, runTool, getRun, cancelRun } from '@superglue/sdk';
+import { configure, listTools, runTool, getRun, cancelRun } from '@superglue/client';
 
 // Configure once at startup
 configure({ 
