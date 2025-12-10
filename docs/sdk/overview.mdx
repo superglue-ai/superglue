@@ -14,7 +14,7 @@ npm install @superglue/client
 ```
 
 ```bash pip
-pip install superglue-sdk
+pip install superglue-client
 ```
 
 </CodeGroup>
@@ -24,12 +24,12 @@ pip install superglue-sdk
 <CodeGroup>
 
 ```typescript TypeScript
-import { configure, listTools, runTool, getRun } from '@superglue/client';
+import { configure, listTools, runTool, getRun } from "@superglue/client";
 
 // Configure before making any API calls
 configure({
-  baseUrl: 'http://localhost:4000/api/v1',
-  apiKey: 'your-api-key'
+  baseUrl: "http://localhost:4000/api/v1",
+  apiKey: "your-api-key",
 });
 
 // List available tools
@@ -39,8 +39,8 @@ console.log(response.data.data);
 // Run a tool
 const runResponse = await runTool("my-tool-id", {
   inputs: {
-    userId: "user_123"
-  }
+    userId: "user_123",
+  },
 });
 
 console.log(`Run ID: ${runResponse.data.runId}`);
@@ -112,6 +112,7 @@ if result.status.value == "success":
     )
     ```
     </CodeGroup>
+
   </Tab>
   <Tab title="Self-Hosted">
     Use the `AUTH_TOKEN` environment variable from your `.env` file.
@@ -128,13 +129,14 @@ if result.status.value == "success":
 
     ```python Python
     import os
-    
+
     client = SuperglueClient(
         base_url="https://your-instance.com/api/v1",
         token=os.getenv("AUTH_TOKEN")
     )
     ```
     </CodeGroup>
+
   </Tab>
 </Tabs>
 
@@ -145,8 +147,8 @@ The SDK is fully typed with TypeScript. All types are auto-generated from the Op
 <CodeGroup>
 
 ```typescript TypeScript
-import { getTool } from '@superglue/client';
-import type { Tool, Run, RunRequest } from '@superglue/client';
+import { getTool } from "@superglue/client";
+import type { Tool, Run, RunRequest } from "@superglue/client";
 
 const response = await getTool("my-tool-id");
 const tool: Tool = response.data;

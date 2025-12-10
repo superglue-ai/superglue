@@ -26,7 +26,7 @@ fi
 export TWINE_USERNAME="__token__"
 export TWINE_PASSWORD="$PYPI_TOKEN"
 
-echo "🐍 Publishing superglue-sdk (Python)..."
+echo "🐍 Publishing superglue-client (Python)..."
 
 cd "$ROOT_DIR/packages/sdk-python/superglue_sdk"
 

@@ -1,9 +1,9 @@
 import { getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
-import { AssistantModelMessage, TextPart, ToolCallPart, ToolResultPart, Tool, generateText, jsonSchema, tool } from "ai";
+import { AssistantModelMessage, TextPart, Tool, ToolCallPart, ToolResultPart, generateText, jsonSchema, tool } from "ai";
 import { server_defaults } from "../default.js";
-import { LLMToolDefinition, logToolExecution } from "./llm-tool-utils.js";
 import { logMessage } from "../utils/logs.js";
 import { LLM, LLMMessage, LLMObjectGeneratorInput, LLMObjectResponse, LLMResponse, LLMToolWithContext } from "./llm-base-model.js";
+import { LLMToolDefinition, logToolExecution } from "./llm-tool-utils.js";
 
 function isProviderError(error: any): boolean {
   const statusCode = error?.statusCode || error?.status;
@@ -249,16 +249,10 @@ export class AiSdkModel implements LLM {
             break;
           }
           if (toolCall.toolName === 'abort') {
-
-            const updatedMessages = [...conversationMessages, {
-              role: "assistant" as const,
-              content: JSON.stringify(finalResult)
-            }];
-
             return {
               success: false,
               response: (toolCall.input as any)?.reason,
-              messages: updatedMessages
+              messages: conversationMessages
             };
           }
         }
@@ -310,15 +304,10 @@ export class AiSdkModel implements LLM {
         }
       }
 
-      const updatedMessages = [...conversationMessages, {
-        role: "assistant" as const,
-        content: JSON.stringify(finalResult)
-      }];
-
       return {
         success: true,
         response: finalResult,
-        messages: updatedMessages
+        messages: conversationMessages
       };
     } catch (error) {
       logMessage('error', `Error generating LLM response: ${error}`);

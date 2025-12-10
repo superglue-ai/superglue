@@ -5,7 +5,7 @@ Auto-generated Python SDK for the Superglue AI API.
 ## Installation
 
 ```bash
-pip install superglue-sdk
+pip install superglue-client
 ```
 
 ## Usage
