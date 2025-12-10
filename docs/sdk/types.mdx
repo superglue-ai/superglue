@@ -1,247 +1,501 @@
 ---
 title: "Types"
-description: "TypeScript type definitions for the superglue SDK"
+description: "TypeScript and Python type definitions for the superglue SDK"
 ---
 
-## Workflow types
+All types are auto-generated from the OpenAPI specification. This reference covers the most commonly used types.
 
-### Workflow
+## Tool types
 
-<Note>
-    In some places in the SDK and documentation we may still be referring to **workflows**, which is the now **deprecated** legacy naming for tools. For all intents and purposes, the two phrases **refer to the same** concept.
-</Note>
+### Tool
 
-Represents a tool (called "Workflow" in the SDK, "Tool" in the UI). Contains steps that execute sequentially.
+A multi-step workflow tool that executes protocol-specific operations.
 
-```typescript
-interface Workflow {
+<CodeGroup>
+
+```typescript TypeScript
+interface Tool {
   id: string;
+  name?: string;
   version?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-  steps: ExecutionStep[];
-  integrationIds?: string[];
-  finalTransform?: string;
-  inputSchema?: JSONSchema;
-  responseSchema?: JSONSchema;
   instruction?: string;
-  originalResponseSchema?: JSONSchema;
+  inputSchema?: Record<string, any>;
+  outputSchema?: Record<string, any>;
+  steps: ToolStep[];
+  outputTransform?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 ```
+
+```python Python
+from superglue_sdk.models import Tool
+
+class Tool:
+    id: str
+    steps: list[ToolStep]
+    name: str | None
+    version: str | None
+    instruction: str | None
+    input_schema: dict[str, Any] | None
+    output_schema: dict[str, Any] | None
+    output_transform: str | None
+    created_at: str | None
+    updated_at: str | None
+```
+
+</CodeGroup>
 
 **Fields:**
 - `id` - Unique identifier
-- `steps` - Array of API call steps to execute
-- `integrationIds` - Which integrations this workflow uses
+- `steps` - Ordered execution steps (min: 1)
+- `name` - Display name
+- `version` - Semantic version (major.minor.patch)
 - `instruction` - Human-readable description
-- `finalTransform` - JavaScript function to shape final output
-- `inputSchema` - JSON schema for input validation
-- `responseSchema` - JSON schema for output validation
-- `version` - Auto-versioned on changes
+- `inputSchema` - JSON Schema for tool inputs
+- `outputSchema` - JSON Schema for tool outputs
+- `outputTransform` - JavaScript function for final transformation: `(sourceData) => expression`
 - `createdAt` - Creation timestamp
 - `updatedAt` - Last update timestamp
 
-### ExecutionStep
+---
 
-A single API call within a workflow.
+### ToolStep
 
-```typescript
-interface ExecutionStep {
+A single execution step supporting multiple protocols (HTTP/HTTPS, Postgres, FTP/SFTP).
+
+<CodeGroup>
+
+```typescript TypeScript
+interface ToolStep {
   id: string;
+  url: string;
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  systemId: string;
+  instruction?: string;
+  queryParams?: Record<string, string>;
+  headers?: Record<string, string>;
+  body?: string;
+  dataSelector?: string;
   modify?: boolean;
-  apiConfig: ApiConfig;
-  integrationId?: string;
-  executionMode?: 'DIRECT' | 'LOOP';
-  loopSelector?: string;
-  loopMaxIters?: number;
-  inputMapping?: string;
-  responseMapping?: string;
+  failureBehavior?: "fail" | "continue";
+  pagination?: Pagination;
 }
 ```
 
+```python Python
+from superglue_sdk.models import ToolStep, ToolStepMethod
+
+class ToolStep:
+    id: str
+    url: str
+    method: ToolStepMethod
+    system_id: str
+    instruction: str | None
+    query_params: dict[str, str] | None
+    headers: dict[str, str] | None
+    body: str | None
+    data_selector: str | None
+    modify: bool | None
+    failure_behavior: ToolStepFailureBehavior | None
+    pagination: Pagination | None
+```
+
+</CodeGroup>
+
 **Fields:**
-- `id` - Unique identifier (reference in later steps)
-- `modify` - Whether this operation modifies data on the system (creates, updates, or deletes). Read-only operations should be `false`. Default is `false`.
-- `apiConfig` - The API call configuration
-- `integrationId` - Which integration to use
-- `executionMode` - `'DIRECT'` (run once) or `'LOOP'` (iterate over array)
-- `loopSelector` - JavaScript function returning array to iterate
-- `loopMaxIters` - Safety limit for loops
-- `inputMapping` - Transform input before API call
-- `responseMapping` - Transform response after API call
+- `id` - Unique identifier
+- `url` - Full URL with protocol (e.g., `https://api.example.com`, `postgres://host:5432/db`, `ftp://host/path`)
+- `method` - HTTP method (use `POST` for non-HTTP protocols)
+- `systemId` - System to use for credentials and documentation
+- `instruction` - What this step does
+- `queryParams` - URL query params (HTTP only), supports template expressions
+- `headers` - HTTP headers (HTTP only), supports template expressions
+- `body` - Request body (protocol-specific), supports template expressions
+- `dataSelector` - JavaScript function to select data: `(sourceData) => expression`
+- `modify` - Whether step can be modified by self-healing
+- `failureBehavior` - `"fail"` stops execution, `"continue"` proceeds to next step
+- `pagination` - Pagination configuration (HTTP only)
 
-## Workflow result types
+**Template Expressions:**
 
-### WorkflowResult
+Use `<<(sourceData) => ...>>` syntax to reference previous step outputs:
 
-Returned from `executeWorkflow()`. Contains the final output and step-by-step results.
+```json
+{
+  "query": "<<(sourceData) => sourceData.step1.userId>>",
+  "limit": "<<(sourceData) => sourceData.inputs.limit>>"
+}
+```
 
-```typescript
-interface WorkflowResult {
-  id: string;
-  success: boolean;
+---
+
+## Run types
+
+### Run
+
+Represents a tool execution with status, results, and metadata.
+
+<CodeGroup>
+
+```typescript TypeScript
+interface Run {
+  runId: string;
+  toolId: string;
+  status: "running" | "success" | "failed" | "aborted";
+  tool?: {
+    id: string;
+    name?: string;
+    version?: string;
+  };
+  toolPayload?: {
+    inputs?: Record<string, any>;
+    credentials?: Record<string, string>;
+    options?: Record<string, any>;
+  };
   data?: any;
   error?: string;
-  headers?: Record<string, any>;
-  statusCode?: number;
-  startedAt: Date;
-  completedAt: Date;
-  config: Workflow;
-  stepResults: WorkflowStepResult[];
+  stepResults?: RunStepResult[];
+  options?: Record<string, any>;
+  requestSource?: string;
+  traceId?: string;
+  metadata: RunMetadata;
 }
 ```
 
+```python Python
+from superglue_sdk.models import Run, RunStatus
+
+class Run:
+    run_id: str
+    tool_id: str
+    status: RunStatus
+    metadata: RunMetadata
+    tool: RunTool | None
+    tool_payload: RunToolPayload | None
+    data: Any | None
+    error: str | None
+    step_results: list[RunStepResultsItem] | None
+    options: RunOptions | None
+    request_source: str | None
+    trace_id: str | None
+```
+
+</CodeGroup>
+
 **Fields:**
-- `id` - Run ID
-- `success` - Whether execution succeeded
-- `data` - Final output data
-- `error` - Error message if failed
-- `config` - The workflow that was executed
-- `stepResults` - Results for each step
-- `startedAt` - Execution start time
-- `completedAt` - Execution completion time
+- `runId` - Unique run identifier
+- `toolId` - ID of executed tool
+- `status` - Execution status: `running`, `success`, `failed`, `aborted`
+- `tool` - Tool metadata (not full config)
+- `toolPayload` - Inputs/credentials/options provided at runtime
+- `data` - Tool execution results (only when `status` is `success`)
+- `error` - Error message (only when `status` is `failed` or `aborted`)
+- `stepResults` - Results from each execution step
+- `options` - Execution options used
+- `requestSource` - Where run was initiated
+- `traceId` - Trace ID for debugging
+- `metadata` - Timing and duration info (see `RunMetadata`)
 
-### WorkflowStepResult
+---
 
-Result for a single step execution.
+### RunMetadata
 
-```typescript
-interface WorkflowStepResult {
+Timing information for a run.
+
+<CodeGroup>
+
+```typescript TypeScript
+interface RunMetadata {
+  startedAt?: string;
+  completedAt?: string;
+  durationMs?: number;
+}
+```
+
+```python Python
+from superglue_sdk.models import RunMetadata
+
+class RunMetadata:
+    started_at: str | Unset
+    completed_at: str | Unset
+    duration_ms: int | Unset
+```
+
+</CodeGroup>
+
+**Fields:**
+- `startedAt` - ISO timestamp when run started
+- `completedAt` - ISO timestamp when run finished (only present when status is `success`, `failed`, or `aborted`)
+- `durationMs` - Execution duration in milliseconds
+
+---
+
+### RunRequest
+
+Configuration for executing a tool.
+
+<CodeGroup>
+
+```typescript TypeScript
+interface RunRequest {
+  runId?: string;
+  inputs?: Record<string, any>;
+  credentials?: Record<string, string>;
+  options?: {
+    async?: boolean;
+    timeout?: number;
+    webhookUrl?: string;
+    traceId?: string;
+  };
+}
+```
+
+```python Python
+from superglue_sdk.models import (
+    RunRequest, 
+    RunRequestInputs,
+    RunRequestCredentials,
+    RunRequestOptions
+)
+from superglue_sdk.types import Unset
+
+class RunRequest:
+    run_id: str | Unset
+    inputs: RunRequestInputs | Unset
+    credentials: RunRequestCredentials | Unset
+    options: RunRequestOptions | Unset
+```
+
+</CodeGroup>
+
+**Fields:**
+- `runId` - Pre-generated run ID (optional, for idempotency)
+- `inputs` - Tool-specific input parameters
+- `credentials` - Runtime credentials (not persisted, overrides stored credentials)
+- `options` - Execution options:
+  - `async` - If `true`, return immediately (202) and execute async. If `false`, wait for completion (200)
+  - `timeout` - Request timeout in seconds (sync only)
+  - `webhookUrl` - URL to POST completion notification, or `tool:toolId` to chain tools
+  - `traceId` - Custom trace ID for log tracking
+
+---
+
+### RunStepResult
+
+Result from a single step execution.
+
+<CodeGroup>
+
+```typescript TypeScript
+interface RunStepResultsItem {
   stepId: string;
-  config?: ApiConfig;
   success: boolean;
   data?: any;
   error?: string;
 }
 ```
+
+```python Python
+from superglue_sdk.models import RunStepResultsItem
+
+class RunStepResultsItem:
+    step_id: str
+    success: bool
+    data: RunStepResultsItemData | None
+    error: str | None
+```
+
+</CodeGroup>
 
 **Fields:**
 - `stepId` - Which step this result is for
-- `success` - Whether the step succeeded
-- `data` - API response data
-- `error` - Error message if failed
-- `config` - The actual config used (may differ if self-healing occurred)
+- `success` - Whether the step completed successfully
+- `data` - API response data (if successful)
+- `error` - Error message (if failed)
 
-## Workflow scheduling types
+---
 
-### WorkflowSchedule
+## Pagination
 
-Represents a scheduled/recurring workflow execution.
+### Pagination
 
-```typescript
-interface WorkflowSchedule {
-  id: string;
-  workflowId: string;
-  cronExpression: string;
-  timezone: string;
-  enabled: boolean;
-  payload?: Record<string, any>;
-  options?: RequestOptions;
-  lastRunAt?: Date;
-  nextRunAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
+Pagination configuration for HTTP/HTTPS requests.
+
+<CodeGroup>
+
+```typescript TypeScript
+interface Pagination {
+  type: "offset" | "cursor";
+  pageSize?: string;
+  cursorPath?: string;
+  stopCondition?: string;
 }
 ```
+
+```python Python
+from superglue_sdk.models import Pagination, PaginationType
+
+class Pagination:
+    type: PaginationType
+    page_size: str | None
+    cursor_path: str | None
+    stop_condition: str | None
+```
+
+</CodeGroup>
 
 **Fields:**
-- `workflowId` - Which workflow to run
-- `cronExpression` - Cron expression (e.g., `"0 0 * * *"` for daily at midnight)
-- `timezone` - Timezone (e.g., `"America/New_York"`)
-- `enabled` - Whether the schedule is active
-- `payload` - Input data for each execution
-- `options` - Execution options
-- `nextRunAt` - When the next execution will run
-- `lastRunAt` - When the last execution ran
+- `type` - Pagination type: `"offset"` or `"cursor"`
+- `pageSize` - Items per page (available as `<<(sourceData) => sourceData.limit>>`)
+- `cursorPath` - JSONPath to extract next page cursor (e.g., `"meta.next_cursor"`)
+- `stopCondition` - JavaScript function to determine when to stop: `(response, pageInfo) => boolean`
+  - `response` - Object with `{data: ..., headers: ...}`
+  - `pageInfo` - Object with `{page, offset, cursor, totalFetched}`
+  - Return `true` to STOP, `false` to continue
 
-### WorkflowScheduleInput
+---
 
-Input type for creating or updating a schedule.
+## Response types
 
-```typescript
-type WorkflowScheduleInput = {
-  id?: string;
-  workflowId?: string;
-  cronExpression?: string;
-  timezone?: string;
-  enabled?: boolean;
-  payload?: Record<string, any>;
-  options?: RequestOptions;
+### ListTools200
+
+Response from `listTools()`.
+
+<CodeGroup>
+
+```typescript TypeScript
+interface ListTools200 {
+  data?: Tool[];
+  page?: number;
+  limit?: number;
+  total?: number;
+  hasMore?: boolean;
 }
 ```
 
-## Integration types
+```python Python
+from superglue_sdk.models import ListToolsResponse200
 
-### Integration
-
-Represents an API integration with credentials and configuration.
-
-```typescript
-interface Integration {
-  id: string;
-  version?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-  name?: string;
-  type?: string;
-  urlHost?: string;
-  urlPath?: string;
-  credentials?: Record<string, any>;
-  documentationUrl?: string;
-  documentation?: string;
-  documentationPending?: boolean;
-  openApiSchema?: string;
-  openApiUrl?: string;
-  specificInstructions?: string;
-  documentationKeywords?: string[];
-  icon?: string;
-}
+class ListToolsResponse200:
+    data: list[Tool] | Unset
+    page: int | Unset
+    limit: int | Unset
+    total: int | Unset
+    has_more: bool | Unset
 ```
+
+</CodeGroup>
 
 **Fields:**
-- `id` - Unique identifier
-- `name` - Display name
-- `urlHost` - Base URL for the API
-- `credentials` - API keys, tokens, etc.
-- `documentationUrl` - Link to API documentation
-- `specificInstructions` - Custom guidance for the agent
-- `version` - Auto-versioned on changes
-- `createdAt` - Creation timestamp
-- `updatedAt` - Last update timestamp
+- `data` - Array of Tool objects
+- `page` - Current page number
+- `limit` - Items per page
+- `total` - Total number of items
+- `hasMore` - Whether more pages exist
 
-### UpsertMode
+---
 
-Enum for integration creation/update behavior.
+### ListRuns200
 
-```typescript
-enum UpsertMode {
-  CREATE = "CREATE",   // Only create (fail if exists)
-  UPDATE = "UPDATE",   // Only update (fail if doesn't exist)
-  UPSERT = "UPSERT"    // Create or update (default)
+Response from `listRuns()`.
+
+<CodeGroup>
+
+```typescript TypeScript
+interface ListRuns200 {
+  data?: Run[];
+  page?: number;
+  limit?: number;
+  total?: number;
+  hasMore?: boolean;
 }
 ```
 
+```python Python
+from superglue_sdk.models import ListRunsResponse200
 
-## RequestOptions
-
-Control workflow execution behavior. Passed to `executeWorkflow()`.
-
-```typescript
-interface RequestOptions {
-  selfHealing?: "ENABLED" | "TRANSFORM_ONLY" | "REQUEST_ONLY" | "DISABLED";
-  timeout?: number;
-  retries?: number;
-  retryDelay?: number;
-  webhookUrl?: string;
-  testMode?: boolean;
-}
+class ListRunsResponse200:
+    data: list[Run] | Unset
+    page: int | Unset
+    limit: int | Unset
+    total: int | Unset
+    has_more: bool | Unset
 ```
+
+</CodeGroup>
 
 **Fields:**
-- `selfHealing` - Auto-fix errors: `"ENABLED"` (default), `"TRANSFORM_ONLY"`, `"REQUEST_ONLY"`, or `"DISABLED"`
-- `timeout` - Max execution time in milliseconds (default: `300000`)
-- `retries` - Number of retry attempts (default: `10`)
-- `retryDelay` - Delay between retries in milliseconds (default: `0`)
-- `testMode` - Validate after each step (default: `false`)
-- `webhookUrl` - POST results here when done
+- `data` - Array of Run objects
+- `page` - Current page number
+- `limit` - Items per page
+- `total` - Total number of items
+- `hasMore` - Whether more pages exist
+
+---
+
+## Enums
+
+### RunStatus
+
+<CodeGroup>
+
+```typescript TypeScript
+type RunStatus = "running" | "success" | "failed" | "aborted";
+```
+
+```python Python
+from enum import Enum
+
+class RunStatus(str, Enum):
+    RUNNING = "running"
+    SUCCESS = "success"
+    FAILED = "failed"
+    ABORTED = "aborted"
+```
+
+</CodeGroup>
+
+---
+
+### ToolStepMethod
+
+<CodeGroup>
+
+```typescript TypeScript
+type ToolStepMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+```
+
+```python Python
+from enum import Enum
+
+class ToolStepMethod(str, Enum):
+    GET = "GET"
+    POST = "POST"
+    PUT = "PUT"
+    PATCH = "PATCH"
+    DELETE = "DELETE"
+```
+
+</CodeGroup>
+
+---
+
+### ToolStepFailureBehavior
+
+<CodeGroup>
+
+```typescript TypeScript
+type ToolStepFailureBehavior = "fail" | "continue";
+```
+
+```python Python
+from enum import Enum
+
+class ToolStepFailureBehavior(str, Enum):
+    FAIL = "fail"
+    CONTINUE = "continue"
+```
+
+</CodeGroup>
 

@@ -3,491 +3,438 @@ title: "Methods"
 description: "Complete reference for all SDK methods"
 ---
 
-## Workflow
+## Installation
 
-<Note>
-    In some places in the SDK and documentation we may still be referring to **workflows**, which is the now **deprecated** legacy naming for tools. For all intents and purposes, the two phrases **refer to the same** concept.
-</Note>
+<CodeGroup>
 
-### buildWorkflow
-
-Build a workflow (tool) from natural language. superglue analyzes your instruction and automatically generates API call steps.
-
-```typescript
-buildWorkflow({
-  instruction: string;
-  payload?: Record<string, any>;
-  integrationIds?: string[];
-  responseSchema?: JSONSchema;
-  save?: boolean;
-  verbose?: boolean;
-}): Promise<Workflow>
+```bash npm
+npm install @superglue/client
 ```
 
-**Parameters:**
-- `instruction` - Natural language description of what the tool should do
-- `payload` - Sample input data (optional, helps superglue understand data shape)
-- `integrationIds` - Array of integration IDs to use (optional, superglue can discover them)
-- `responseSchema` - Expected output schema (optional, helps validate responses)
-- `save` - Whether to save the workflow automatically (default: `true`)
-- `verbose` - Enable real-time log streaming (default: `true`)
+```bash pip
+pip install superglue-sdk
+```
 
-**Returns:** `Workflow` object with auto-generated steps
+</CodeGroup>
 
-**Example:**
-```typescript
-const workflow = await superglue.buildWorkflow({
-  integrationIds: ["stripe", "slack"],
-  instruction: "Get all Stripe customers and send a Slack message with the count",
-  save: true
+## Initialization
+
+<CodeGroup>
+
+```typescript TypeScript
+import { configure, listTools, getTool, runTool, getRun, cancelRun, listRuns } from '@superglue/client';
+
+// Configure before making any API calls
+configure({
+  baseUrl: 'http://localhost:4000/api/v1',
+  apiKey: 'your-api-key'
+});
+```
+
+```python Python
+from superglue_sdk import SuperglueClient
+
+client = SuperglueClient(
+    base_url="http://localhost:4000/api/v1",
+    token="your-api-key"
+)
+```
+
+</CodeGroup>
+
+## Tools
+
+### listTools
+
+List all available tools with pagination.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { listTools } from '@superglue/client';
+
+const response = await listTools({ 
+  page: 1, 
+  limit: 50 
 });
 
-console.log(workflow.steps); // Array of ExecutionStep objects
-```
-
-### executeWorkflow
-
-Execute a workflow (tool). Run a saved workflow by ID or pass a workflow object directly.
-
-```typescript
-executeWorkflow<T = any>({
-  id?: string;
-  workflow?: Workflow;
-  payload?: Record<string, any>;
-  credentials?: Record<string, string>;
-  options?: RequestOptions;
-  verbose?: boolean;
-}): Promise<WorkflowResult & { data?: T }>
-```
-
-**Parameters:**
-- `id` - ID of a saved workflow (alternative to `workflow`)
-- `workflow` - Workflow object to execute (alternative to `id`)
-- `payload` - Input data accessible in steps via `<<variableName>>`
-- `credentials` - Runtime credentials to override integration defaults
-- `options` - Execution options (timeout, retries, self-healing, etc.)
-- `verbose` - Enable real-time log streaming (default: `true`)
-
-**Returns:** `WorkflowResult` with execution results and step-by-step details
-
-**Example:**
-```typescript
-// Execute by ID
-const result = await superglue.executeWorkflow({
-  id: "sync-customers",
-  payload: {
-    startDate: "2025-01-01",
-    userId: "user_123"
+if (response.status === 200) {
+  const { data, page, total, hasMore } = response.data;
+  
+  for (const tool of data) {
+    console.log(`${tool.id}: ${tool.name || tool.instruction}`);
   }
-});
-
-// Execute inline workflow
-const result = await superglue.executeWorkflow({
-  workflow: myWorkflow,
-  payload: {},
-  options: {
-    timeout: 60000,
-    retries: 3,
-    selfHealing: "ENABLED"
-  }
-});
-
-if (result.success) {
-  console.log(result.data); // Final output
-  console.log(result.stepResults); // Individual step results
-} else {
-  console.error(result.error);
+  
+  console.log(`Page ${page}, Total: ${total}, Has more: ${hasMore}`);
 }
 ```
 
-### getWorkflow
+```python Python
+from superglue_sdk.api.tools import list_tools
 
-Fetch a saved workflow by ID.
+response = list_tools.sync(
+    client=client,
+    page=1,
+    limit=50
+)
 
-```typescript
-getWorkflow(id: string): Promise<Workflow>
+if response:
+    for tool in response.data:
+        print(f"{tool.id}: {tool.name or tool.instruction}")
+    
+    print(f"Page {response.page}, Total: {response.total}, Has more: {response.has_more}")
 ```
+
+</CodeGroup>
 
 **Parameters:**
-- `id` - The workflow ID
+- `page` - Page number (default: `1`)
+- `limit` - Items per page (default: `50`)
 
-**Returns:** `Workflow` object
+**Returns:** List of `Tool` objects with pagination metadata
 
-**Example:**
-```typescript
-const workflow = await superglue.getWorkflow("sync-customers");
-console.log(workflow.instruction);
-console.log(workflow.steps.length);
-```
+---
 
-### listWorkflows
+### getTool
 
-List all saved workflows.
+Get detailed information about a specific tool.
 
-```typescript
-listWorkflows(limit?: number, offset?: number): Promise<{ items: Workflow[], total: number }>
-```
+<CodeGroup>
 
-**Parameters:**
-- `limit` - Max number of workflows to return (default: `10`)
-- `offset` - Number of workflows to skip (default: `0`)
+```typescript TypeScript
+import { getTool } from '@superglue/client';
 
-**Returns:** Object with `items` array and `total` count
+const response = await getTool("my-tool-id");
 
-**Example:**
-```typescript
-const { items, total } = await superglue.listWorkflows(50, 0);
-
-for (const workflow of items) {
-  console.log(`${workflow.id}: ${workflow.instruction}`);
-}
-
-console.log(`Total: ${total}`);
-```
-
-### upsertWorkflow
-
-Save or update a workflow.
-
-```typescript
-upsertWorkflow(id: string, input: Partial<Workflow>): Promise<Workflow>
-```
-
-**Parameters:**
-- `id` - Unique identifier for the workflow
-- `input` - Partial workflow object to save (only include fields to update)
-
-**Returns:** Saved `Workflow` object
-
-**Example:**
-```typescript
-// Create new workflow
-await superglue.upsertWorkflow("my-tool", {
-  instruction: "Sync data daily",
-  steps: [/* ... */],
-  integrationIds: ["stripe"]
-});
-
-// Update existing workflow
-await superglue.upsertWorkflow("my-tool", {
-  instruction: "Sync data hourly", // Only update this field
-  finalTransform: "(sourceData) => { return { count: sourceData.length }; }"
-});
-```
-
-### deleteWorkflow
-
-Delete a saved workflow.
-
-```typescript
-deleteWorkflow(id: string): Promise<boolean>
-```
-
-**Parameters:**
-- `id` - The workflow ID to delete
-
-**Returns:** `true` if successful
-
-**Example:**
-```typescript
-await superglue.deleteWorkflow("old-tool");
-```
-
-### generateStepConfig
-
-Generate or refine an API configuration for a workflow step using AI. Supports creating configurations from scratch, editing existing ones, or fixing failed configurations.
-
-**Use Cases:**
-- **Create**: Generate a new API config from an instruction
-- **Edit**: Modify an existing config with new requirements
-- **Fix**: Automatically repair a failed config when errors occur
-
-```typescript
-generateStepConfig({
-  integrationId?: string;
-  currentStepConfig: Record<string, any>;
-  currentDataSelector?: string;
-  stepInput?: Record<string, any>;
-  credentials?: Record<string, string>;
-  errorMessage?: string;
-}): Promise<ApiConfig>
-```
-
-**Parameters:**
-- `integrationId` - Integration ID for context/documentation (optional)
-- `currentStepConfig` - API config to edit (must include `instruction` field)
-- `currentDataSelector` - Data Selector to edit
-- `stepInput` - Sample input data for the step (optional)
-- `credentials` - Available credentials for context (optional)
-- `errorMessage` - Error from failed execution (triggers fix mode, min 100 chars)
-
-**Returns:** `ApiConfig` - Generated or updated configuration
-
-**Example:**
-```typescript
-// Create: Generate new config from instruction
-const newConfig = await superglue.generateStepConfig({
-  integrationId: "postgres-db",
-  currentStepConfig: {
-    instruction: "Get all active users from the database"
-  },
-  currentDataSelector: "(sourceData) => {return {}}",
-  stepInput: { limit: 100 }
-});
-
-// Edit: Modify existing config
-const updatedConfig = await superglue.generateStepConfig({
-  integrationId: "postgres-db",
-  currentStepConfig: {
-    ...existingStep.apiConfig,
-    instruction: "Get users with status = 'active' and last_login > 30 days ago"
-  },
-  currentDataSelector: "(sourceData) => {return {}}",
-  stepInput: { limit: 100 }
-});
-
-// Fix: Repair failed config with error context
-const fixedConfig = await superglue.generateStepConfig({
-  integrationId: "stripe-api",
-  currentStepConfig: failedStep.apiConfig,
-  currentDataSelector: "(sourceData) => {return {}}"
-  stepInput: { customerId: "cus_123" },
-  errorMessage: "Request failed with 401: Invalid API key format. Expected 'Bearer sk_live_...' in Authorization header."
-});
-```
-
-## Workflow scheduling
-
-### listWorkflowSchedules
-
-Get all schedules for a workflow.
-
-```typescript
-listWorkflowSchedules(workflowId: string): Promise<WorkflowSchedule[]>
-```
-
-**Parameters:**
-- `workflowId` - The workflow ID
-
-**Returns:** Array of `WorkflowSchedule` objects
-
-**Example:**
-```typescript
-const schedules = await superglue.listWorkflowSchedules("daily-sync");
-
-for (const schedule of schedules) {
-  console.log(`${schedule.cronExpression} - Next run: ${schedule.nextRunAt}`);
+if (response.status === 200) {
+  const tool = response.data;
+  
+  console.log(`Tool: ${tool.name}`);
+  console.log(`Steps: ${tool.steps.length}`);
+  console.log(`Version: ${tool.version}`);
+  console.log(`Instruction: ${tool.instruction}`);
 }
 ```
 
-### upsertWorkflowSchedule
+```python Python
+from superglue_sdk.api.tools import get_tool
 
-Create or update a workflow schedule.
+tool = get_tool.sync(
+    tool_id="my-tool-id",
+    client=client
+)
 
-```typescript
-upsertWorkflowSchedule(schedule: WorkflowScheduleInput): Promise<WorkflowSchedule>
+if tool:
+    print(f"Tool: {tool.name}")
+    print(f"Steps: {len(tool.steps)}")
+    print(f"Version: {tool.version}")
+    print(f"Instruction: {tool.instruction}")
 ```
 
+</CodeGroup>
+
 **Parameters:**
-- `schedule` - Schedule configuration object
-  - `id` - Schedule ID (optional, auto-generated if not provided)
-  - `workflowId` - Which workflow to run
-  - `cronExpression` - Cron expression (e.g., `"0 0 * * *"` for daily at midnight)
-  - `timezone` - Timezone (e.g., `"America/New_York"`)
-  - `enabled` - Whether the schedule is active
-  - `payload` - Input data for each execution
-  - `options` - RequestOptions for executions
+- `toolId` - Unique tool identifier
 
-**Returns:** Saved `WorkflowSchedule` object
+**Returns:** `Tool` object with full configuration
 
-**Example:**
-```typescript
-const schedule = await superglue.upsertWorkflowSchedule({
-  workflowId: "daily-sync",
-  cronExpression: "0 0 * * *", // Daily at midnight
-  timezone: "UTC",
-  enabled: true,
-  payload: {
-    date: "<<(sourceData) => new Date().toISOString()>>"
+---
+
+### runTool
+
+Execute a tool with inputs and options.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { runTool } from '@superglue/client';
+
+const response = await runTool(
+  "my-tool-id",
+  {
+    inputs: {
+      userId: "user_123",
+      startDate: "2025-01-01"
+    },
+    options: {
+      async: false,
+      timeout: 60,
+      webhookUrl: "https://your-app.com/webhook"
+    },
+    credentials: {
+      stripeApiKey: "sk_test_...",
+      slackToken: "xoxb-..."
+    }
   }
-});
+);
 
-console.log(`Next run: ${schedule.nextRunAt}`);
-```
-
-### deleteWorkflowSchedule
-
-Delete a workflow schedule.
-
-```typescript
-deleteWorkflowSchedule(id: string): Promise<boolean>
-```
-
-**Parameters:**
-- `id` - The schedule ID
-
-**Returns:** `true` if successful
-
-**Example:**
-```typescript
-await superglue.deleteWorkflowSchedule("schedule-123");
-```
-
-## Integration
-
-### getIntegration
-
-Get an integration by ID.
-
-```typescript
-getIntegration(id: string): Promise<Integration>
-```
-
-**Parameters:**
-- `id` - The integration ID
-
-**Returns:** `Integration` object
-
-**Example:**
-```typescript
-const integration = await superglue.getIntegration("stripe");
-console.log(integration.name); // "Stripe"
-console.log(integration.urlHost); // "https://api.stripe.com"
-```
-
-### listIntegrations
-
-List all integrations.
-
-```typescript
-listIntegrations(limit?: number, offset?: number): Promise<{ items: Integration[], total: number }>
-```
-
-**Parameters:**
-- `limit` - Max number to return (default: `10`)
-- `offset` - Number to skip (default: `0`)
-
-**Returns:** Object with `items` array and `total` count
-
-**Example:**
-```typescript
-const { items } = await superglue.listIntegrations(50);
-
-for (const integration of items) {
-  console.log(`${integration.id}: ${integration.name}`);
+if (response.status === 200 || response.status === 202) {
+  const run = response.data;
+  
+  console.log(`Run ID: ${run.runId}`);
+  console.log(`Status: ${run.status}`);
+  
+  if (run.status === "success" && run.data) {
+    console.log("Result:", run.data);
+  } else if (run.status === "running") {
+    console.log("Run in progress...");
+  }
 }
 ```
 
-### upsertIntegration
+```python Python
+from superglue_sdk.api.tools import run_tool
+from superglue_sdk.models import (
+    RunRequest, 
+    RunRequestInputs, 
+    RunRequestCredentials,
+    RunRequestOptions
+)
 
-Create or update an integration.
+# Create typed input/credential objects
+inputs = RunRequestInputs.from_dict({
+    "user_id": "user_123",
+    "start_date": "2025-01-01"
+})
+credentials = RunRequestCredentials.from_dict({
+    "stripe_api_key": "sk_test_...",
+    "slack_token": "xoxb-..."
+})
 
-```typescript
-upsertIntegration(
-  id: string,
-  input: Partial<Integration>,
-  mode?: UpsertMode
-): Promise<Integration>
+body = RunRequest(
+    inputs=inputs,
+    options=RunRequestOptions(
+        async_=False,
+        timeout=60,
+        webhook_url="https://your-app.com/webhook"
+    ),
+    credentials=credentials
+)
+
+run = run_tool.sync(
+    tool_id="my-tool-id",
+    client=client,
+    body=body
+)
+
+if run:
+    print(f"Run ID: {run.run_id}")
+    print(f"Status: {run.status.value}")
+    
+    if run.status.value == "success" and run.data:
+        print("Result:", run.data)
+    elif run.status.value == "running":
+        print("Run in progress...")
 ```
+
+</CodeGroup>
 
 **Parameters:**
-- `id` - Unique identifier
-- `input` - Partial `Integration` object
-- `mode` - Upsert mode: `"CREATE"`, `"UPDATE"`, or `"UPSERT"` (default: `"UPSERT"`)
+- `toolId` - Tool to execute
+- `runRequest` - Execution configuration:
+  - `inputs` - Input data accessible in tool steps
+  - `options` - Execution options:
+    - `async` - If `true`, return 202 immediately and execute asynchronously
+    - `timeout` - Request timeout in seconds (sync only)
+    - `webhookUrl` - URL to POST results when complete
+    - `traceId` - Custom trace ID for log tracking
+  - `credentials` - Runtime credentials to override defaults
 
-**Returns:** Saved `Integration` object
+**Returns:** `Run` object with execution status and results
 
-**Example:**
-```typescript
-// Create a new integration
-await superglue.upsertIntegration("my-api", {
-  name: "My Custom API",
-  urlHost: "https://api.example.com",
-  credentials: {
-    apiKey: "secret_key_here"
-  }
-});
+**Status Codes:**
+- `200` - Tool executed synchronously (completed)
+- `202` - Tool executing asynchronously (in progress)
+- `400` - Invalid request
+- `409` - Concurrent execution limit reached
+- `410` - Tool deleted
+- `429` - Rate limit exceeded
 
-// Update credentials only
-await superglue.upsertIntegration("my-api", {
-  credentials: {
-    apiKey: "new_secret_key"
-  }
-}, "UPDATE");
-```
+---
 
-### deleteIntegration
-
-Delete an integration.
-
-```typescript
-deleteIntegration(id: string): Promise<boolean>
-```
-
-**Parameters:**
-- `id` - The integration ID
-
-**Returns:** `true` if successful
-
-**Example:**
-```typescript
-await superglue.deleteIntegration("old-integration");
-```
-
-## Run
+## Runs
 
 ### getRun
 
-Get detailed information about a specific execution run.
+Get the status and results of a tool execution.
 
-```typescript
-getRun(id: string): Promise<RunResult>
+<CodeGroup>
+
+```typescript TypeScript
+import { getRun } from '@superglue/client';
+
+const response = await getRun("run_abc123");
+
+if (response.status === 200) {
+  const run = response.data;
+  
+  console.log(`Status: ${run.status}`);
+  console.log(`Tool: ${run.toolId}`);
+  
+  if (run.status === "success") {
+    console.log("Result:", run.data);
+    console.log("Steps:", run.stepResults);
+  } else if (run.status === "failed") {
+    console.error("Error:", run.error);
+  }
+  
+  console.log(`Duration: ${run.metadata.durationMs}ms`);
+}
 ```
 
+```python Python
+from superglue_sdk.api.runs import get_run
+
+run = get_run.sync(
+    run_id="run_abc123",
+    client=client
+)
+
+if run:
+    print(f"Status: {run.status.value}")
+    print(f"Tool: {run.tool_id}")
+    
+    if run.status.value == "success":
+        print("Result:", run.data)
+        print("Steps:", run.step_results)
+    elif run.status.value == "failed":
+        print("Error:", run.error)
+    
+    print(f"Duration: {run.metadata.duration_ms}ms")
+```
+
+</CodeGroup>
+
 **Parameters:**
-- `id` - The run ID (returned from `executeWorkflow` or `call`)
+- `runId` - Unique run identifier
 
-**Returns:** `RunResult` (either `ApiResult` or `WorkflowResult`)
+**Returns:** `Run` object with status, results, and metadata
 
-**Example:**
-```typescript
-const run = await superglue.getRun("run_abc123");
+**Run Statuses:**
+- `running` - Execution in progress
+- `success` - Completed successfully
+- `failed` - Failed due to error
+- `aborted` - Cancelled by user or system
 
-console.log(`Status: ${run.success ? "Success" : "Failed"}`);
-console.log(`Duration: ${run.completedAt.getTime() - run.startedAt.getTime()}ms`);
+---
 
-if ("stepResults" in run) {
-  // It's a WorkflowResult
-  for (const step of run.stepResults) {
-    console.log(`Step ${step.stepId}: ${step.success}`);
+### cancelRun
+
+Cancel a running tool execution.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { cancelRun } from '@superglue/client';
+
+const response = await cancelRun("run_abc123");
+
+if (response.status === 200) {
+  console.log("Run cancelled successfully");
+  console.log("Status:", response.data.status); // "aborted"
+}
+```
+
+```python Python
+from superglue_sdk.api.runs import cancel_run
+
+run = cancel_run.sync(
+    run_id="run_abc123",
+    client=client
+)
+
+if run:
+    print("Run cancelled successfully")
+    print(f"Status: {run.status.value}")  # "aborted"
+```
+
+</CodeGroup>
+
+**Parameters:**
+- `runId` - Run to cancel
+
+**Returns:** Updated `Run` object with `aborted` status
+
+---
+
+### listRuns
+
+List tool execution runs with filtering and pagination.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { listRuns } from '@superglue/client';
+
+// List all runs
+const response = await listRuns({ 
+  page: 1, 
+  limit: 50 
+});
+
+// Filter by tool
+const toolRuns = await listRuns({ 
+  toolId: "my-tool-id",
+  page: 1,
+  limit: 50
+});
+
+// Filter by status
+const failedRuns = await listRuns({ 
+  status: "failed",
+  page: 1,
+  limit: 50
+});
+
+if (response.status === 200) {
+  const { data, page, total, hasMore } = response.data;
+  
+  for (const run of data) {
+    const status = run.status === "success" ? "✓" : "✗";
+    console.log(`${run.runId}: ${status} - ${run.metadata.startedAt}`);
   }
 }
 ```
 
-### listRuns
+```python Python
+from superglue_sdk.api.runs import list_runs
+from superglue_sdk.models.list_runs_status import ListRunsStatus
 
-List execution runs with optional filtering.
+# List all runs
+response = list_runs.sync(
+    client=client,
+    page=1,
+    limit=50
+)
 
-```typescript
-listRuns(limit?: number, offset?: number, configId?: string): Promise<{ items: RunResult[], total: number }>
+# Filter by tool
+tool_runs = list_runs.sync(
+    client=client,
+    tool_id="my-tool-id",
+    page=1,
+    limit=50
+)
+
+# Filter by status
+failed_runs = list_runs.sync(
+    client=client,
+    status=ListRunsStatus.FAILED,
+    page=1,
+    limit=50
+)
+
+if response:
+    for run in response.data:
+        status = "✓" if run.status.value == "success" else "✗"
+        print(f"{run.run_id}: {status} - {run.metadata.started_at}")
 ```
+
+</CodeGroup>
 
 **Parameters:**
-- `limit` - Max number to return (default: `100`)
-- `offset` - Number to skip (default: `0`)
-- `configId` - Filter by workflow or API config ID (optional)
+- `page` - Page number (default: `1`)
+- `limit` - Items per page (default: `50`)
+- `toolId` - Filter by tool ID (optional)
+- `status` - Filter by status: `running`, `success`, `failed`, `aborted` (optional)
 
-**Returns:** Object with `items` array and `total` count
-
-**Example:**
-```typescript
-// Get all runs
-const { items, total } = await superglue.listRuns(50, 0);
-
-// Get runs for specific workflow
-const workflowRuns = await superglue.listRuns(50, 0, "sync-customers");
-
-for (const run of items) {
-  console.log(`${run.id}: ${run.success ? "✓" : "✗"} - ${run.startedAt}`);
-}
-```
+**Returns:** List of `Run` objects with pagination metadata

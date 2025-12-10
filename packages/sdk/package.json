@@ -1,5 +1,5 @@
 {
-  "name": "@superglue/sdk",
+  "name": "@superglue/client",
   "version": "0.1.0",
   "description": "TypeScript SDK for the Superglue AI API",
   "main": "dist/index.js",
