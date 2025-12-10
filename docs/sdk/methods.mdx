@@ -40,7 +40,7 @@ configure({
 ```
 
 ```python Python
-from superglue_sdk import SuperglueClient
+from superglue_client import SuperglueClient
 
 client = SuperglueClient(
     base_url="http://localhost:4000/api/v1",
@@ -78,7 +78,7 @@ if (response.status === 200) {
 ```
 
 ```python Python
-from superglue_sdk.api.tools import list_tools
+from superglue_client.api.tools import list_tools
 
 response = list_tools.sync(
     client=client,
@@ -126,7 +126,7 @@ if (response.status === 200) {
 ```
 
 ```python Python
-from superglue_sdk.api.tools import get_tool
+from superglue_client.api.tools import get_tool
 
 tool = get_tool.sync(
     tool_id="my-tool-id",
@@ -190,8 +190,8 @@ if (response.status === 200 || response.status === 202) {
 ```
 
 ```python Python
-from superglue_sdk.api.tools import run_tool
-from superglue_sdk.models import (
+from superglue_client.api.tools import run_tool
+from superglue_client.models import (
     RunRequest,
     RunRequestInputs,
     RunRequestCredentials,
@@ -292,7 +292,7 @@ if (response.status === 200) {
 ```
 
 ```python Python
-from superglue_sdk.api.runs import get_run
+from superglue_client.api.runs import get_run
 
 run = get_run.sync(
     run_id="run_abc123",
@@ -347,7 +347,7 @@ if (response.status === 200) {
 ```
 
 ```python Python
-from superglue_sdk.api.runs import cancel_run
+from superglue_client.api.runs import cancel_run
 
 run = cancel_run.sync(
     run_id="run_abc123",
@@ -409,8 +409,8 @@ if (response.status === 200) {
 ```
 
 ```python Python
-from superglue_sdk.api.runs import list_runs
-from superglue_sdk.models.list_runs_status import ListRunsStatus
+from superglue_client.api.runs import list_runs
+from superglue_client.models.list_runs_status import ListRunsStatus
 
 # List all runs
 response = list_runs.sync(

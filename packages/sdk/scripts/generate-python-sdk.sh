@@ -49,12 +49,12 @@ TEMP_DIR=$(mktemp -d)
 cd "$ROOT_DIR"
 openapi-python-client generate \
     --path "$OPENAPI_SPEC" \
-    --output-path "$TEMP_DIR/superglue_sdk" \
+    --output-path "$TEMP_DIR/superglue_client" \
     --config "$SCRIPT_DIR/python-sdk-config.yaml" \
     --meta poetry
 
 # Copy generated source files to output (flatten structure)
-cp -r "$TEMP_DIR/superglue_sdk/superglue_sdk/"* "$OUTPUT_DIR/"
+cp -r "$TEMP_DIR/superglue_client/superglue_client/"* "$OUTPUT_DIR/"
 
 # Restore pyproject.toml if we had a backup (preserve our customizations)
 if [ -n "$PYPROJECT_BACKUP" ]; then
