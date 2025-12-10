@@ -6,33 +6,39 @@ import { logMessage } from '../utils/logs.js';
 import { notifyWebhook } from '../utils/webhook.js';
 import type { ToolExecutionPayload } from '../worker/types.js';
 import { registerApiModule } from './registry.js';
+import {
+  addTraceHeader,
+  mapRunStatusToOpenAPI,
+  parsePaginationParams,
+  sendError,
+} from './response-helpers.js';
 import type {
-    AuthenticatedFastifyRequest,
-    OpenAPIRun,
-    OpenAPITool,
-    OpenAPIToolStep,
-    RouteHandler,
-    RunToolRequestBody,
+  AuthenticatedFastifyRequest,
+  OpenAPIRun,
+  OpenAPITool,
+  OpenAPIToolStep,
+  RouteHandler,
+  RunToolRequestBody,
 } from './types.js';
 
-const PAGINATION_TYPE_MAP: Record<string, string> = {
+export const PAGINATION_TYPE_MAP: Record<string, string> = {
   OFFSET_BASED: 'offsetBased',
   PAGE_BASED: 'pageBased',
   CURSOR_BASED: 'cursorBased',
   DISABLED: 'disabled',
 };
 
-function mapPaginationType(internalType?: string): string {
+export function mapPaginationType(internalType?: string): string {
   if (!internalType) return 'disabled';
   return PAGINATION_TYPE_MAP[internalType] || internalType.toLowerCase();
 }
 
-function mapFailureBehavior(internal?: string): 'fail' | 'continue' | undefined {
+export function mapFailureBehavior(internal?: string): 'fail' | 'continue' | undefined {
   if (!internal) return undefined;
   return internal.toLowerCase() as 'fail' | 'continue';
 }
 
-function mapStepToOpenAPI(step: ExecutionStep): OpenAPIToolStep {
+export function mapStepToOpenAPI(step: ExecutionStep): OpenAPIToolStep {
   const apiConfig = step.apiConfig;
   const url = (apiConfig.urlHost || '') + (apiConfig.urlPath || '');
 
@@ -63,7 +69,7 @@ function mapStepToOpenAPI(step: ExecutionStep): OpenAPIToolStep {
   return result;
 }
 
-function mapToolToOpenAPI(tool: Tool): OpenAPITool {
+export function mapToolToOpenAPI(tool: Tool): OpenAPITool {
   return {
     id: tool.id,
     name: tool.id,
@@ -78,31 +84,8 @@ function mapToolToOpenAPI(tool: Tool): OpenAPITool {
   };
 }
 
-function mapRunStatusToOpenAPI(status: RunStatus): 'running' | 'success' | 'failed' | 'aborted' {
-  const statusMap: Record<RunStatus, 'running' | 'success' | 'failed' | 'aborted'> = {
-    [RunStatus.RUNNING]: 'running',
-    [RunStatus.SUCCESS]: 'success',
-    [RunStatus.FAILED]: 'failed',
-    [RunStatus.ABORTED]: 'aborted',
-  };
-  return statusMap[status] || 'failed';
-}
-
-function sendError(reply: any, statusCode: number, message: string) {
-  return reply.code(statusCode).header('X-Trace-Id', reply.request.traceId).send({
-    error: { message },
-  });
-}
-
-function addTraceHeader(reply: any, traceId?: string) {
-  if (traceId) {
-    reply.header('X-Trace-Id', traceId);
-  }
-  return reply;
-}
-
 // Build OpenAPIRun response object
-function buildRunResponse(params: {
+export function buildRunResponse(params: {
   runId: string;
   tool: Tool;
   status: RunStatus;
@@ -275,9 +258,7 @@ const listTools: RouteHandler = async (request, reply) => {
   const authReq = request as AuthenticatedFastifyRequest;
   const query = request.query as { page?: string; limit?: string };
 
-  const page = Math.max(1, parseInt(query.page || '1', 10));
-  const limit = Math.min(100, Math.max(1, parseInt(query.limit || '50', 10)));
-  const offset = (page - 1) * limit;
+  const { page, limit, offset } = parsePaginationParams(query);
 
   const result = await authReq.datastore.listWorkflows({
     limit,
@@ -393,9 +374,6 @@ const runTool: RouteHandler = async (request, reply) => {
 
   const sendResponse = (statusCode: number, run: OpenAPIRun) => {
     return addTraceHeader(reply, metadata.traceId)
-      .header('X-RateLimit-Limit', 100)
-      .header('X-RateLimit-Remaining', 95)
-      .header('X-RateLimit-Reset', Math.floor(Date.now() / 1000) + 3600)
       .code(statusCode)
       .send(run);
   };
