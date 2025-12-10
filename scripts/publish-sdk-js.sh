@@ -1,12 +1,16 @@
 #!/bin/bash
 set -e
 
-# Publish SDK to npm
-# Usage: ./scripts/publish.sh [patch|minor|major]
+# Publish TypeScript SDK to npm
+# Usage: ./scripts/publish-sdk-js.sh [patch|minor|major]
 
 VERSION_TYPE=${1:-patch}
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
-echo "📦 Publishing @superglue/client..."
+echo "📦 Publishing @superglue/client (TypeScript)..."
+
+cd "$ROOT_DIR/packages/sdk"
 
 # Ensure we're logged in to npm
 npm whoami > /dev/null 2>&1 || { echo "❌ Not logged in to npm. Run 'npm login' first."; exit 1; }
@@ -39,5 +43,5 @@ npm publish --access public
 echo "📤 Pushing to git..."
 git push origin main --tags
 
-echo "✅ Published successfully!"
+echo "✅ TypeScript SDK published successfully!"
 
