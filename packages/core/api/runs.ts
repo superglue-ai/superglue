@@ -2,10 +2,10 @@ import { Run, RunStatus } from '@superglue/shared';
 import { logMessage } from '../utils/logs.js';
 import { registerApiModule } from './registry.js';
 import type {
-    AuthenticatedFastifyRequest,
-    OpenAPIRun,
-    OpenAPIRunMetadata,
-    RouteHandler,
+  AuthenticatedFastifyRequest,
+  OpenAPIRun,
+  OpenAPIRunMetadata,
+  RouteHandler,
 } from './types.js';
 
 function mapRunStatusToOpenAPI(status: RunStatus): 'running' | 'success' | 'failed' | 'aborted' {
@@ -109,24 +109,17 @@ const listRuns: RouteHandler = async (request, reply) => {
   const limit = Math.min(100, Math.max(1, parseInt(query.limit || '50', 10)));
   const offset = (page - 1) * limit;
 
+  const internalStatus = query.status ? mapOpenAPIStatusToInternal(query.status) : undefined;
+
   const result = await authReq.datastore.listRuns({
     limit,
     offset,
     configId: query.toolId,
+    status: internalStatus,
     orgId: authReq.authInfo.orgId,
   });
 
-  let items = result.items;
-  
-  // Filter by status if provided
-  if (query.status) {
-    const internalStatus = mapOpenAPIStatusToInternal(query.status);
-    if (internalStatus) {
-      items = items.filter((run) => run.status === internalStatus);
-    }
-  }
-
-  const data = items.map(mapRunToOpenAPI);
+  const data = result.items.map(mapRunToOpenAPI);
   const hasMore = offset + result.items.length < result.total;
 
   return addTraceHeader(reply, authReq.traceId).code(200).send({

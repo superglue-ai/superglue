@@ -1,9 +1,9 @@
-import type { ApiConfig, Integration, Run, Tool, DiscoveryRun, FileReference, FileStatus } from "@superglue/shared";
+import type { ApiConfig, DiscoveryRun, FileReference, FileStatus, Integration, Run, RunStatus, Tool } from "@superglue/shared";
 import { Pool, PoolConfig } from 'pg';
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
-import type { DataStore, ToolScheduleInternal } from "./types.js";
 import { extractRun } from "./migrations/run-migration.js";
+import type { DataStore, ToolScheduleInternal } from "./types.js";
 
 type ConfigType = 'api' | 'workflow';
 type ConfigData = ApiConfig | Tool;
@@ -408,27 +408,36 @@ export class PostgresService implements DataStore {
         }
     }
 
-    async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: Run[], total: number }> {
-        const { limit = 10, offset = 0, configId, orgId } = params || {};
+    async listRuns(params?: { limit?: number; offset?: number; configId?: string; status?: RunStatus; orgId?: string }): Promise<{ items: Run[], total: number }> {
+        const { limit = 10, offset = 0, configId, status, orgId } = params || {};
         const client = await this.pool.connect();
         try {
-            let countQuery = 'SELECT COUNT(*) FROM runs WHERE org_id = $1';
-            let selectQuery = 'SELECT id, config_id, data, started_at, completed_at FROM runs WHERE org_id = $1';
+            let selectQuery = `
+                SELECT 
+                    id, config_id, data, started_at, completed_at,
+                    COUNT(*) OVER() as total_count
+                FROM runs 
+                WHERE org_id = $1
+            `;
             const queryParams: string[] = [orgId || ''];
 
             if (configId) {
-                countQuery += ' AND config_id = $2';
                 selectQuery += ' AND config_id = $2';
                 queryParams.push(configId);
             }
 
-            const countResult = await client.query(countQuery, queryParams);
-            const total = parseInt(countResult.rows[0].count);
+            if (status !== undefined) {
+                const paramIndex = queryParams.length + 1;
+                selectQuery += ` AND data->>'status' = $${paramIndex}`;
+                queryParams.push(status);
+            }
 
             selectQuery += ' ORDER BY started_at DESC LIMIT $' + (queryParams.length + 1) + ' OFFSET $' + (queryParams.length + 2);
             queryParams.push(String(limit), String(offset));
 
             const result = await client.query(selectQuery, queryParams);
+
+            const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
 
             const items = result.rows.map(row => extractRun(row.data, {
                 id: row.id,

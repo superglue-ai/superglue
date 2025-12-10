@@ -59,5 +59,5 @@ npm run generate
 
 ## License
 
-FSL-1.1-Apache-2.0 - See [../../LICENSE](../../LICENSE) for details.
+MIT - See [LICENSE](./LICENSE) for details.
 
