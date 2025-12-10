@@ -9,7 +9,7 @@ VERSION_TYPE=${1:-patch}
 echo "📦 Publishing @superglue/sdk..."
 
 # Ensure we're logged in to npm
-npm whoami > /dev/null 2>&1 || (echo "❌ Not logged in to npm. Run 'npm login' first." && exit 1)
+npm whoami > /dev/null 2>&1 || { echo "❌ Not logged in to npm. Run 'npm login' first."; exit 1; }
 
 # Generate SDK from OpenAPI spec
 echo "🔄 Generating SDK from OpenAPI spec..."

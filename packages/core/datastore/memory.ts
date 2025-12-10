@@ -1,4 +1,4 @@
-import { ApiConfig, Integration, Run, Tool, DiscoveryRun, FileReference, FileStatus } from "@superglue/shared";
+import { ApiConfig, DiscoveryRun, FileReference, FileStatus, Integration, Run, RunStatus, Tool } from "@superglue/shared";
 import { createHash } from 'node:crypto';
 import type { DataStore, ToolScheduleInternal } from "./types.js";
 
@@ -132,8 +132,8 @@ export class MemoryStore implements DataStore {
     return updatedRun;
   }
 
-  async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: Run[], total: number }> {
-    const { limit = 10, offset = 0, configId, orgId } = params || {};
+  async listRuns(params?: { limit?: number; offset?: number; configId?: string; status?: RunStatus; orgId?: string }): Promise<{ items: Run[], total: number }> {
+    const { limit = 10, offset = 0, configId, status, orgId } = params || {};
     const allRuns = this.getOrgItems(this.storage.runs, 'run', orgId);
 
     const validRuns = allRuns.filter((run): run is Run =>
@@ -146,10 +146,18 @@ export class MemoryStore implements DataStore {
       return bTime - aTime;
     });
 
-    const filteredRuns = configId ? validRuns.filter(run => {
-      const toolId = run.toolId || run.toolConfig?.id;
-      return toolId === configId;
-    }) : validRuns;
+    let filteredRuns = validRuns;
+    
+    if (configId) {
+      filteredRuns = filteredRuns.filter(run => {
+        const toolId = run.toolId || run.toolConfig?.id;
+        return toolId === configId;
+      });
+    }
+    
+    if (status !== undefined) {
+      filteredRuns = filteredRuns.filter(run => run.status === status);
+    }
 
     const items = filteredRuns.slice(offset, offset + limit);
     return { items, total: filteredRuns.length };

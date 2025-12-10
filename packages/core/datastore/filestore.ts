@@ -1,10 +1,10 @@
-import type { ApiConfig, Integration, Run, Tool, DiscoveryRun, FileReference, FileStatus } from "@superglue/shared";
+import type { ApiConfig, DiscoveryRun, FileReference, FileStatus, Integration, Run, RunStatus, Tool } from "@superglue/shared";
 import fs from 'node:fs';
 import path from 'node:path';
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
-import type { DataStore, ToolScheduleInternal } from "./types.js";
 import { extractRun } from "./migrations/run-migration.js";
+import type { DataStore, ToolScheduleInternal } from "./types.js";
 
 export class FileStore implements DataStore {
 
@@ -405,16 +405,20 @@ export class FileStore implements DataStore {
     return updatedRun;
   }
 
-  async listRuns(params?: { limit?: number; offset?: number; configId?: string; orgId?: string }): Promise<{ items: Run[], total: number }> {
+  async listRuns(params?: { limit?: number; offset?: number; configId?: string; status?: RunStatus; orgId?: string }): Promise<{ items: Run[], total: number }> {
     await this.ensureInitialized();
-    const { limit = 10, offset = 0, configId, orgId } = params || {};
+    const { limit = 10, offset = 0, configId, status, orgId } = params || {};
     const allRuns = await this.readRunsFromLogs(orgId, configId);
 
-    const validRuns = allRuns.filter((run): run is Run =>
+    let validRuns = allRuns.filter((run): run is Run =>
       run !== null &&
       run.id &&
       run.startedAt instanceof Date
     );
+
+    if (status !== undefined) {
+      validRuns = validRuns.filter(run => run.status === status);
+    }
 
     const items = validRuns.slice(offset, offset + limit);
     return { items, total: validRuns.length };
