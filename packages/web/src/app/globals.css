@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@source "../../../node_modules/streamdown/dist/index.js";
+
 /* Tippy.js base styles for suggestions dropdown */
 .tippy-box {
   background-color: transparent;
