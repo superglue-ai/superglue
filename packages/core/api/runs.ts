@@ -1,6 +1,13 @@
 import { Run, RunStatus } from '@superglue/shared';
 import { logMessage } from '../utils/logs.js';
 import { registerApiModule } from './registry.js';
+import {
+  addTraceHeader,
+  mapOpenAPIStatusToInternal,
+  mapRunStatusToOpenAPI,
+  parsePaginationParams,
+  sendError,
+} from './response-helpers.js';
 import type {
   AuthenticatedFastifyRequest,
   OpenAPIRun,
@@ -8,27 +15,7 @@ import type {
   RouteHandler,
 } from './types.js';
 
-function mapRunStatusToOpenAPI(status: RunStatus): 'running' | 'success' | 'failed' | 'aborted' {
-  const statusMap: Record<RunStatus, 'running' | 'success' | 'failed' | 'aborted'> = {
-    [RunStatus.RUNNING]: 'running',
-    [RunStatus.SUCCESS]: 'success',
-    [RunStatus.FAILED]: 'failed',
-    [RunStatus.ABORTED]: 'aborted',
-  };
-  return statusMap[status] || 'failed';
-}
-
-function mapOpenAPIStatusToInternal(status: string): RunStatus | undefined {
-  const statusMap: Record<string, RunStatus> = {
-    running: RunStatus.RUNNING,
-    success: RunStatus.SUCCESS,
-    failed: RunStatus.FAILED,
-    aborted: RunStatus.ABORTED,
-  };
-  return statusMap[status.toLowerCase()];
-}
-
-function mapRunToOpenAPI(run: Run): OpenAPIRun {
+export function mapRunToOpenAPI(run: Run): OpenAPIRun {
   const startedAt = run.startedAt instanceof Date ? run.startedAt : new Date(run.startedAt);
   const completedAt = run.completedAt instanceof Date ? run.completedAt : run.completedAt ? new Date(run.completedAt) : undefined;
   
@@ -65,19 +52,6 @@ function mapRunToOpenAPI(run: Run): OpenAPIRun {
   };
 }
 
-function sendError(reply: any, statusCode: number, message: string) {
-  return reply.code(statusCode).header('X-Trace-Id', reply.request.traceId).send({
-    error: { message },
-  });
-}
-
-function addTraceHeader(reply: any, traceId?: string) {
-  if (traceId) {
-    reply.header('X-Trace-Id', traceId);
-  }
-  return reply;
-}
-
 // GET /runs/:runId - Get run status
 const getRun: RouteHandler = async (request, reply) => {
   const authReq = request as AuthenticatedFastifyRequest;
@@ -105,10 +79,7 @@ const listRuns: RouteHandler = async (request, reply) => {
     limit?: string;
   };
 
-  const page = Math.max(1, parseInt(query.page || '1', 10));
-  const limit = Math.min(100, Math.max(1, parseInt(query.limit || '50', 10)));
-  const offset = (page - 1) * limit;
-
+  const { page, limit, offset } = parsePaginationParams(query);
   const internalStatus = query.status ? mapOpenAPIStatusToInternal(query.status) : undefined;
 
   const result = await authReq.datastore.listRuns({
