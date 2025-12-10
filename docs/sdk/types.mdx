@@ -29,7 +29,7 @@ interface Tool {
 ```
 
 ```python Python
-from superglue_sdk.models import Tool
+from superglue_client.models import Tool
 
 class Tool:
     id: str
@@ -85,7 +85,7 @@ interface ToolStep {
 ```
 
 ```python Python
-from superglue_sdk.models import ToolStep, ToolStepMethod
+from superglue_client.models import ToolStep, ToolStepMethod
 
 class ToolStep:
     id: str
@@ -166,7 +166,7 @@ interface Run {
 ```
 
 ```python Python
-from superglue_sdk.models import Run, RunStatus
+from superglue_client.models import Run, RunStatus
 
 class Run:
     run_id: str
@@ -217,7 +217,7 @@ interface RunMetadata {
 ```
 
 ```python Python
-from superglue_sdk.models import RunMetadata
+from superglue_client.models import RunMetadata
 
 class RunMetadata:
     started_at: str | Unset
@@ -256,13 +256,13 @@ interface RunRequest {
 ```
 
 ```python Python
-from superglue_sdk.models import (
+from superglue_client.models import (
     RunRequest,
     RunRequestInputs,
     RunRequestCredentials,
     RunRequestOptions
 )
-from superglue_sdk.types import Unset
+from superglue_client.types import Unset
 
 class RunRequest:
     run_id: str | Unset
@@ -302,7 +302,7 @@ interface RunStepResultsItem {
 ```
 
 ```python Python
-from superglue_sdk.models import RunStepResultsItem
+from superglue_client.models import RunStepResultsItem
 
 class RunStepResultsItem:
     step_id: str
@@ -340,7 +340,7 @@ interface Pagination {
 ```
 
 ```python Python
-from superglue_sdk.models import Pagination, PaginationType
+from superglue_client.models import Pagination, PaginationType
 
 class Pagination:
     type: PaginationType
@@ -382,7 +382,7 @@ interface ListTools200 {
 ```
 
 ```python Python
-from superglue_sdk.models import ListToolsResponse200
+from superglue_client.models import ListToolsResponse200
 
 class ListToolsResponse200:
     data: list[Tool] | Unset
@@ -421,7 +421,7 @@ interface ListRuns200 {
 ```
 
 ```python Python
-from superglue_sdk.models import ListRunsResponse200
+from superglue_client.models import ListRunsResponse200
 
 class ListRunsResponse200:
     data: list[Run] | Unset

@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "superglue-client"
-version = "0.1.2"
+version = "0.1.1"
 description = "Python SDK for superglue - the open-source data integration framework"
 authors = ["superglue <hi@superglue.cloud>"]
 license = "MIT"
 readme = "README.md"
 homepage = "https://superglue.ai"
-repository = "https://github.com/superglue-ai/superglue/tree/main/packages/sdk/python"
+repository = "https://github.com/superglue-ai/superglue"
 documentation = "https://docs.superglue.cloud"
 keywords = ["api", "sdk", "data-integration", "etl", "superglue"]
 classifiers = [

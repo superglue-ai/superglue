@@ -54,10 +54,10 @@ if (resultResponse.data.status === "success") {
 ```
 
 ```python Python
-from superglue_sdk import SuperglueClient
-from superglue_sdk.api.tools import list_tools, run_tool
-from superglue_sdk.api.runs import get_run
-from superglue_sdk.models import RunRequest, RunRequestInputs
+from superglue_client import SuperglueClient
+from superglue_client.api.tools import list_tools, run_tool
+from superglue_client.api.runs import get_run
+from superglue_client.models import RunRequest, RunRequestInputs
 
 # Initialize client
 client = SuperglueClient(
@@ -155,8 +155,8 @@ const tool: Tool = response.data;
 ```
 
 ```python Python
-from superglue_sdk.api.tools import get_tool
-from superglue_sdk.models import Tool, Run, RunRequest
+from superglue_client.api.tools import get_tool
+from superglue_client.models import Tool, Run, RunRequest
 
 tool: Tool = get_tool.sync(tool_id="my-tool-id", client=client)
 ```

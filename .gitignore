@@ -30,6 +30,4 @@ eval/tool-evals/data/results/
 eval/llm-benchmark-evals/data/results/
 
 # SDK Generation
-packages/sdk/js/src/generated/
-packages/sdk/python/superglue_client/
 .venv-sdk-gen/
