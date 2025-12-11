@@ -484,7 +484,7 @@ export class SuperglueClient {
 
     async callEndpoint(args: CallEndpointArgs): Promise<CallEndpointResult> {
       const mutation = `
-        mutation CallEndpoint($integrationId: ID, $method: String!, $url: String!, $headers: JSON, $body: String, $timeout: Int) {
+        mutation CallEndpoint($integrationId: ID, $method: HttpMethod!, $url: String!, $headers: JSON, $body: String, $timeout: Int) {
           callEndpoint(integrationId: $integrationId, method: $method, url: $url, headers: $headers, body: $body, timeout: $timeout) {
             success
             status
