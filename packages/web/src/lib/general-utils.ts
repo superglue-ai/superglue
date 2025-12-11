@@ -352,17 +352,16 @@ export function isAbortError(errorMessage: string | undefined): boolean {
   return lower.includes('abort') || lower.includes('terminated') || lower.includes('cancelled');
 }
 
-export const handleCopyCode = async (code: string, toast: any) => {
+export const handleCopyCode = async (code: string): Promise<boolean> => {
   try {
-      const decodedCode = code
-          .replace(/&quot;/g, '"')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&amp;/g, '&');
-
-      await navigator.clipboard.writeText(decodedCode);
-      toast({ title: 'Copied!', description: 'Code copied to clipboard', variant: 'destructive' });
-  } catch (err) {
-      toast({ title: 'Failed to copy', variant: 'destructive' });
+    const decodedCode = code
+      .replace(/&quot;/g, '"')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&');
+    await navigator.clipboard.writeText(decodedCode);
+    return true;
+  } catch {
+    return false;
   }
 };
