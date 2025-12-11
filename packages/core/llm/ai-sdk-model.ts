@@ -249,10 +249,16 @@ export class AiSdkModel implements LLM {
             break;
           }
           if (toolCall.toolName === 'abort') {
+
+            const updatedMessages = [...conversationMessages, {
+              role: "assistant" as const,
+              content: JSON.stringify(finalResult)
+            }];
+
             return {
               success: false,
               response: (toolCall.input as any)?.reason,
-              messages: conversationMessages
+              messages: updatedMessages
             };
           }
         }
