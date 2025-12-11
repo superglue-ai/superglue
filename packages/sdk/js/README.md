@@ -43,7 +43,11 @@ while (status.status === 'running') {
   const { data } = await getRun(status.runId);
   status = data;
 }
-console.log(status.data);
+if (status.status === 'success') {
+  console.log(status.data);
+} else {
+  console.error(status.error);
+}
 
 // Cancel a run
 await cancelRun('run-id-to-cancel');
