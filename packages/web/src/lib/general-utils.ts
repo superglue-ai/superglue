@@ -361,8 +361,7 @@ export const handleCopyCode = async (code: string, toast: any) => {
           .replace(/&amp;/g, '&');
 
       await navigator.clipboard.writeText(decodedCode);
-      toast({ title: 'Copied!', description: 'Code copied to clipboard', variant: 'destructive' });
   } catch (err) {
-      toast({ title: 'Failed to copy', variant: 'destructive' });
+    
   }
 };

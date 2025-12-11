@@ -252,7 +252,7 @@ export interface ToolResult extends BaseResult {
 
 export interface CallEndpointArgs {
   integrationId?: string;
-  method: string;
+  method: HttpMethod;
   url: string;
   headers?: Record<string, string>;
   body?: string;
