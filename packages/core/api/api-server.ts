@@ -48,7 +48,7 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
     // Skip authentication for health check and public endpoints
     if (request.url === '/v1/health') {
       const metadata: ServiceMetadata = { traceId };
-      logMessage('info', `(REST API) ${request.method} ${request.url}`, metadata);
+      logMessage('debug', `(REST API) ${request.method} ${request.url}`, metadata);
       return;
     }
 

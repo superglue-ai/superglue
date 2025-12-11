@@ -6,15 +6,12 @@ import { tokenRegistry } from '../lib/token-registry'
 interface Config {
   superglueEndpoint: string
   superglueApiKey: string
+  apiEndpoint: string
   postHogKey: string
   postHogHost: string
 }
 
-interface ConfigWithoutKey {
-  superglueEndpoint: string
-  postHogKey: string
-  postHogHost: string
-}
+interface ConfigWithoutKey extends Omit<Config, 'superglueApiKey'> {}
 
 const ConfigContext = createContext<ConfigWithoutKey | null>(null)
 
