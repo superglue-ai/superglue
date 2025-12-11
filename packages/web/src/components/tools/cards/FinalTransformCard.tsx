@@ -222,17 +222,19 @@ export const FinalTransformMiniStepCard = ({
                           <span className="font-medium text-[13px]">Stop</span>
                         </Button>
                       ) : (
-                        <Button
-                          variant="ghost"
-                          onClick={handleExecuteTransform}
-                          disabled={!canExecute || isRunningTransform || isFixingTransform}
-                          className="h-8 px-3 gap-2"
-                        >
-                          <Play className="h-3 w-3" />
-                          <span className="font-medium text-[13px]">
-                            Run Transform
-                          </span>
-                        </Button>
+                        <div className="relative flex rounded-md border border-input bg-background">
+                          <Button
+                            variant="ghost"
+                            onClick={handleExecuteTransform}
+                            disabled={!canExecute || isRunningTransform || isFixingTransform}
+                            className="h-8 px-3 gap-2 border-0"
+                          >
+                            <Play className="h-3 w-3" />
+                            <span className="font-medium text-[13px]">
+                              Run Transform
+                            </span>
+                          </Button>
+                        </div>
                       )}
                     </span>
                   )}
@@ -244,17 +246,19 @@ export const FinalTransformMiniStepCard = ({
                           : "Fix transform with auto-repair"
                       }
                     >
-                      <Button
-                        variant="ghost"
-                        onClick={handleOpenFixTransformDialog}
-                        disabled={!canExecute || isRunningTransform || isFixingTransform}
-                        className="h-8 px-3 gap-2"
-                      >
-                        <Wand2 className="h-3 w-3" />
-                        <span className="font-medium text-[13px]">
-                          Fix Transform
-                        </span>
-                      </Button>
+                      <div className={`relative flex rounded-md border border-input bg-background ${transformError ? 'border-destructive/50' : ''}`}>
+                        <Button
+                          variant="ghost"
+                          onClick={handleOpenFixTransformDialog}
+                          disabled={!canExecute || isRunningTransform || isFixingTransform}
+                          className={`h-8 px-3 gap-2 border-0 ${transformError ? 'bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive animate-pulse' : ''}`}
+                        >
+                          <Wand2 className="h-3 w-3" />
+                          <span className="font-medium text-[13px]">
+                            Fix Transform
+                          </span>
+                        </Button>
+                      </div>
                     </span>
                   )}
                   <HelpTooltip text="Run Transform: executes the transform code with step results. Fix Transform: uses auto-repair to automatically fix transform errors and update the code." />

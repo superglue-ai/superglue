@@ -45,73 +45,60 @@ export function ToolDeployModal({
   }, [isOpen]);
 
   // JavaScript/TypeScript SDK code
-  const typescriptCode = `import { SuperglueClient } from '@superglue/client';
+  const typescriptCode = `import { configure, runTool } from '@superglue/client';
 
-const client = new SuperglueClient({
+configure({
   apiKey: "<YOUR_SUPERGLUE_API_KEY>", // TODO: Replace with your actual superglue API key
-  endpoint: "${superglueConfig.superglueEndpoint}"
+  baseUrl: "${superglueConfig.apiEndpoint}/v1"
 });
 
 async function main() {
-  const result = await client.executeWorkflow({
-      id: "${currentTool.id}",
-      payload: ${JSON.stringify(payload, null, 2)}
+  const result = await runTool("${currentTool.id}", {
+    inputs: ${JSON.stringify(payload, null, 2)}
   });
-  console.log(result?.data);
+  console.log(result.data);
 }
 
 main();`;
 
-  // Python code
-  const pythonCode = `import requests
+  // Python SDK code
+  const pythonCode = `from superglue_client import SuperglueClient
+from superglue_client.api.tools import run_tool
+from superglue_client.models import RunRequest, RunRequestInputs
 
-query = """
-mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON) {
-  executeWorkflow(input: $input, payload: $payload) {
-    data
-    error
-    success
-  }
-}
-"""
-
-response = requests.post(
-  "${superglueConfig.superglueEndpoint}",
-  headers={"Authorization": "Bearer <YOUR_SUPERGLUE_API_KEY>"}, # TODO: Replace with your actual superglue API key
-  json={
-    "query": query,
-    "variables": {
-      "input": {"id": "${currentTool.id}"},
-      "payload": ${JSON.stringify(payload, null, 2)}
-    }
-  }
+client = SuperglueClient(
+    base_url="${superglueConfig.apiEndpoint}/v1",
+    token="<YOUR_SUPERGLUE_API_KEY>"  # TODO: Replace with your actual superglue API key
 )
 
-print(response.json())`;
+inputs = RunRequestInputs.from_dict(${JSON.stringify(payload, null, 2)})
+
+with client as client:
+    result = run_tool.sync(
+        "${currentTool.id}",
+        client=client,
+        body=RunRequest(inputs=inputs)
+    )
+    print(result)`;
 
   // cURL command
-  const curlCommand = `curl -X POST "${superglueConfig.superglueEndpoint}/graphql" \\
+  const curlCommand = `curl -X POST "${superglueConfig.apiEndpoint}/v1/tools/${currentTool.id}/run" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer <YOUR_SUPERGLUE_API_KEY>" \\
   -d '${JSON.stringify({
-    query: `mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON) { executeWorkflow(input: $input, payload: $payload) { data error success } }`,
-    variables: {
-      input: { id: currentTool.id },
-      payload: payload,
-    },
+    inputs: payload,
   })}'`;
 
   // Webhook example
-  const webhookExample = `import { SuperglueClient } from '@superglue/client';
+  const webhookExample = `import { configure, runTool } from '@superglue/client';
 
-const client = new SuperglueClient({
+configure({
   apiKey: "<YOUR_SUPERGLUE_API_KEY>", // TODO: Replace with your actual superglue API key
-  endpoint: "${superglueConfig.superglueEndpoint}"
+  baseUrl: "${superglueConfig.apiEndpoint}/v1"
 });
 
-await client.executeWorkflow({
-  id: "${currentTool.id}",
-  payload: ${JSON.stringify(payload, null, 2)},
+await runTool("${currentTool.id}", {
+  inputs: ${JSON.stringify(payload, null, 2)},
   options: {
     webhookUrl: "https://your-app.com/webhook" // TODO: Replace with your actual webhook
   }
@@ -124,7 +111,7 @@ await client.executeWorkflow({
       "command": "npx",
       "args": [
         "mcp-remote",
-        "${superglueConfig.superglueEndpoint}/mcp",
+        "${superglueConfig.apiEndpoint.includes('https://api.superglue') ? "https://mcp.superglue.ai" : `${superglueConfig.superglueEndpoint}/mcp`}",
         "--header",
         "Authorization:\${AUTH_HEADER}"
       ],
@@ -250,9 +237,9 @@ await client.executeWorkflow({
               >
               <div className="space-y-2 mb-4">
                 <p className="text-muted-foreground">
-                  For programmatic execution, use the JavaScript SDK or directly
-                  access the GraphQL API. You'll find your tool-specific code
-                  snippets below. Simply replace the placeholder with your
+                  For programmatic execution, use our JavaScript or Python SDK,
+                  or access the REST API directly via cURL. You'll find your tool-specific
+                  code snippets below. Simply replace the placeholder with your
                   superglue API key.
                 </p>
               </div>
@@ -335,7 +322,24 @@ await client.executeWorkflow({
                       transition={{ duration: 0.2, ease: "easeInOut" }}
                       className="overflow-x-hidden pb-3"
                     >
-                      <CodeSnippet code={pythonCode} language="python" />
+                      {/* Install */}
+                      <div className="mt-3">
+                        <div className="text-xs text-muted-foreground mb-2">
+                          Install
+                        </div>
+                        <CodeSnippet
+                          code="pip install superglue-client"
+                          language="bash"
+                        />
+                      </div>
+
+                      {/* Code */}
+                      <div className="mt-4">
+                        <div className="text-xs text-muted-foreground mb-2">
+                          Code
+                        </div>
+                        <CodeSnippet code={pythonCode} language="python" />
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
