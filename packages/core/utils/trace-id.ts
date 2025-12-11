@@ -1,5 +1,5 @@
 export function traceIdMiddleware(req: any, res: any, next: any) {
-  const traceId = req.body?.variables?.options?.traceId || generateTraceId();
+  const traceId = req.body?.variables?.traceId || generateTraceId();
   req.traceId = traceId;
   next();
 }
