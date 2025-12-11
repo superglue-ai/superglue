@@ -332,8 +332,8 @@ export function sampleResultObject(value: any, sampleSize = 10, seen = new WeakS
   }
 
   if (value instanceof Date) return value.toISOString();
-  if (value instanceof Map) return Object.fromEntries([...value.entries()].map(([k, v]) => [k, sampleResultObject(v, sampleSize, seen)]));
-  if (value instanceof Set) return sampleResultObject([...value], sampleSize, seen);
+  if (value instanceof Map) return Object.fromEntries(Array.from(value.entries()).map(([k, v]) => [k, sampleResultObject(v, sampleSize, seen)]));
+  if (value instanceof Set) return sampleResultObject(Array.from(value), sampleSize, seen);
   if (value instanceof RegExp) return value.toString();
   if (value instanceof Error) return { name: value.name, message: value.message };
 
