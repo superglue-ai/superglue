@@ -47,7 +47,7 @@ AUTH_TOKEN=your-secret-token
 LLM_PROVIDER=OPENAI
 LLM_FALLBACK_PROVIDER=ANTHROPIC
 OPENAI_API_KEY=sk-proj-xxxxx
-DATASTORE_TYPE=postgres
+DATASTORE_TYPE=file
 ```
 
 For full environment setup instructions, check out the [.env.example](https://github.com/superglue-ai/superglue/blob/main/.env.example).
@@ -61,7 +61,9 @@ For full environment setup instructions, check out the [.env.example](https://gi
 docker run -d \
   --name superglue \
   --env-file .env \
-  -p 3000:3002 \
+  -p 3000:3000 \
+  -p 3001:3001 \
+  -p 3002:3002 \
   -v superglue_data:/data \
   superglueai/superglue:latest
 ```

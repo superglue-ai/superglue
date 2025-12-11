@@ -1,4 +1,4 @@
-# superglue-sdk
+# superglue-client
 A client library for accessing superglue AI API
 
 ## Usage
