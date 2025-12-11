@@ -511,7 +511,7 @@ type Mutation {
 
   callEndpoint(
     integrationId: ID
-    method: String!
+    method: HttpMethod!
     url: String!
     headers: JSON
     body: String

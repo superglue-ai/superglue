@@ -96,17 +96,18 @@ export const callEndpointResolver = async (
       responseHeaders[key] = value;
     });
 
+    const responseText = await response.text();
     let responseBody: any;
     const contentType = response.headers.get('content-type');
     
     if (contentType?.includes('application/json')) {
       try {
-        responseBody = await response.json();
+        responseBody = JSON.parse(responseText);
       } catch {
-        responseBody = await response.text();
+        responseBody = responseText;
       }
     } else {
-      responseBody = await response.text();
+      responseBody = responseText;
     }
 
     return {
