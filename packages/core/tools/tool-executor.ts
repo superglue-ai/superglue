@@ -204,6 +204,7 @@ export class ToolExecutor implements Tool {
             await integrationManager?.refreshTokenIfNeeded();
             currentIntegration = await integrationManager?.getIntegration();
             
+            // Repeated to update the credentials with the latest OAuth token
             if (currentIntegration) {
               stepCredentials = {
                 ...credentials,

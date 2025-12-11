@@ -5,6 +5,8 @@ import {
   ApiInputRequest,
   ApiResult,
   BuildToolArgs,
+  CallEndpointArgs,
+  CallEndpointResult,
   ExtractArgs,
   ExtractInputRequest,
   ExtractResult,
@@ -178,11 +180,12 @@ export class SuperglueClient {
       credentials,
       options,
       verbose = true,
-      runId
+      runId,
+      traceId
     }: ToolArgs): Promise<ToolResult & { data?: T }> {
       const mutation = `
-        mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON, $credentials: JSON, $options: RequestOptions, $runId: ID) {
-          executeWorkflow(input: $input, payload: $payload, credentials: $credentials, options: $options, runId: $runId) {
+        mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON, $credentials: JSON, $options: RequestOptions, $runId: ID, $traceId: ID) {
+          executeWorkflow(input: $input, payload: $payload, credentials: $credentials, options: $options, runId: $runId, traceId: $traceId) {
             id
             success
             data
@@ -288,7 +291,8 @@ export class SuperglueClient {
           payload,
           credentials,
           options,
-          runId
+          runId,
+          traceId
         }).then(data => data.executeWorkflow);
 
         if (result.error) {
@@ -322,10 +326,10 @@ export class SuperglueClient {
       return response.abortToolExecution;
     }
 
-    async buildWorkflow({instruction, payload, integrationIds, responseSchema, save = true, verbose = true}: BuildToolArgs): Promise<Tool> {
+    async buildWorkflow({instruction, payload, integrationIds, responseSchema, save = true, verbose = true, traceId}: BuildToolArgs): Promise<Tool> {
       const mutation = `
-        mutation BuildWorkflow($instruction: String!, $payload: JSON, $integrationIds: [ID!], $responseSchema: JSONSchema) {
-          buildWorkflow(instruction: $instruction, payload: $payload, integrationIds: $integrationIds, responseSchema: $responseSchema) {${SuperglueClient.workflowQL}}
+        mutation BuildWorkflow($instruction: String!, $payload: JSON, $integrationIds: [ID!], $responseSchema: JSONSchema, $traceId: ID) {
+          buildWorkflow(instruction: $instruction, payload: $payload, integrationIds: $integrationIds, responseSchema: $responseSchema, traceId: $traceId) {${SuperglueClient.workflowQL}}
         }
       `;
 
@@ -355,7 +359,8 @@ export class SuperglueClient {
           instruction,
           payload,
           integrationIds,
-          responseSchema: responseSchema ?? {}
+          responseSchema: responseSchema ?? {},
+          traceId
         }).then(data => data.buildWorkflow);
 
         if (save) {
@@ -436,6 +441,25 @@ export class SuperglueClient {
       });
     
       return { config: result.generateStepConfig.config, dataSelector: result.generateStepConfig.dataSelector };
+    }
+
+    async callEndpoint(args: CallEndpointArgs): Promise<CallEndpointResult> {
+      const mutation = `
+        mutation CallEndpoint($integrationId: ID, $method: String!, $url: String!, $headers: JSON, $body: String, $timeout: Int) {
+          callEndpoint(integrationId: $integrationId, method: $method, url: $url, headers: $headers, body: $body, timeout: $timeout) {
+            success
+            status
+            statusText
+            headers
+            body
+            error
+            duration
+          }
+        }
+      `;
+
+      const result = await this.request<{ callEndpoint: CallEndpointResult }>(mutation, args);
+      return result.callEndpoint;
     }
 
     async call<T = unknown>({ id, endpoint, payload, credentials, options }: ApiCallArgs): Promise<ApiResult & { data: T }> {

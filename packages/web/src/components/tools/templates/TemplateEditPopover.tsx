@@ -35,6 +35,7 @@ if (typeof document !== 'undefined') {
   });
 }
 
+const POPOVER_Z_INDEX = 200;
 const POPOVER_WIDTH_PX = 700;
 const MODAL_WIDTH_PX = 900;
 const LINE_HEIGHT_PX = 19;
@@ -229,18 +230,6 @@ export function TemplateEditPopover({
 
   useEffect(() => {
     if (!open) return;
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        setOpen(false);
-      }
-    };
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [open, setOpen]);
-
-  useEffect(() => {
-    if (!open) return;
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
@@ -395,7 +384,7 @@ export function TemplateEditPopover({
     avoidCollisions: true,
     collisionPadding: 24,
     sticky: "always" as const,
-    style: { width: POPOVER_WIDTH_PX, maxWidth: '90vw', maxHeight: '70vh', overflowY: 'auto' as const },
+    style: { width: POPOVER_WIDTH_PX, maxWidth: '90vw', maxHeight: '70vh', overflowY: 'auto' as const, zIndex: POPOVER_Z_INDEX },
     onOpenAutoFocus: (e: Event) => e.preventDefault(),
     onInteractOutside: (e: Event) => e.preventDefault(),
     onPointerDownOutside: (e: Event) => e.preventDefault(),
@@ -414,7 +403,7 @@ export function TemplateEditPopover({
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent 
             className="p-4 max-w-none border border-border/60"
-            style={{ width: MODAL_WIDTH_PX, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}
+            style={{ width: MODAL_WIDTH_PX, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', zIndex: POPOVER_Z_INDEX }}
           >
             <VisuallyHidden>
               <DialogTitle>Edit Template Expression</DialogTitle>

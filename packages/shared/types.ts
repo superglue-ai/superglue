@@ -250,6 +250,25 @@ export interface ToolResult extends BaseResult {
   stepResults: ToolStepResult[];
 }
 
+export interface CallEndpointArgs {
+  integrationId?: string;
+  method: string;
+  url: string;
+  headers?: Record<string, string>;
+  body?: string;
+  timeout?: number;
+}
+
+export interface CallEndpointResult {
+  success: boolean;
+  status?: number;
+  statusText?: string;
+  headers?: Record<string, string>;
+  body?: any;
+  error?: string;
+  duration: number;
+}
+
 export interface Integration extends BaseConfig {
   name?: string;
   type?: string;
@@ -372,6 +391,7 @@ export interface ToolArgs {
   options?: RequestOptions;
   verbose?: boolean;
   runId?: string;
+  traceId?: string;
 }
 
 export interface GenerateTransformArgs {
@@ -393,6 +413,7 @@ export interface BuildToolArgs {
   responseSchema?: JSONSchema;
   save?: boolean;
   verbose?: boolean;
+  traceId?: string;
 }
 
 // Legacy alias
@@ -462,6 +483,7 @@ export interface DiscoveryRun {
 
 export enum FileStatus {
   PENDING = "PENDING",
+  UPLOADING = "UPLOADING",
   PROCESSING = "PROCESSING",
   COMPLETED = "COMPLETED",
   FAILED = "FAILED"

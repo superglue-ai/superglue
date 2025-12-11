@@ -234,5 +234,5 @@ const toolSchema = z.object({
           }).optional().describe("OPTIONAL: Only configure if you are using pagination variables in the URL, headers, or body. For OFFSET_BASED, ALWAYS use <<offset>>. If PAGE_BASED, ALWAYS use <<page>>. If CURSOR_BASED, ALWAYS use <<cursor>>.")
       }).describe("Complete API configuration for this step")
   })).describe("Array of workflow steps. Can be empty ([]) for transform-only workflows that just process the input payload without API calls"),
-  finalTransform: z.string().describe("JavaScript function to transform the final workflow output to match responseSchema. Check if result is object or array: if object use sourceData.stepId.data, if array use sourceData.stepId.map(item => item.data). Example: (sourceData) => {return { result: Array.isArray(sourceData.stepId) ? sourceData.stepId.map(item => item.data) : sourceData.stepId.data }}"),
+  finalTransform: z.string().describe("JavaScript function to transform the final workflow output to match responseSchema. NEVER include newlines or tabs in the code."),
 });

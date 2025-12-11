@@ -1,5 +1,6 @@
 import { GraphQLUpload } from 'graphql-upload-ts';
 import fs from "node:fs";
+import { callEndpointResolver } from "./resolvers/call-endpoint.js";
 import { deleteApiResolver } from "./resolvers/delete.js";
 import { extractResolver } from "./resolvers/extract.js";
 import { generateInstructionsResolver, generateStepConfigResolver, generateTransformResolver } from "./resolvers/generate.js";
@@ -22,6 +23,8 @@ import {
   listWorkflowsResolver,
   upsertWorkflowResolver
 } from "./resolvers/workflow.js";
+
+export const typeDefs = fs.readFileSync("../../api.graphql", "utf8");
 
 export const resolvers = {
   Query: {
@@ -59,6 +62,7 @@ export const resolvers = {
     deleteWorkflowSchedule: deleteWorkflowScheduleResolver,
     generateStepConfig: generateStepConfigResolver,
     generateTransform: generateTransformResolver,
+    callEndpoint: callEndpointResolver,
   },
   Subscription: {
     logs: logsResolver,
@@ -103,4 +107,3 @@ export const resolvers = {
     },
   },
 };
-export const typeDefs = fs.readFileSync("../../api.graphql", "utf8");
