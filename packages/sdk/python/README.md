@@ -10,12 +10,12 @@ from superglue_client import Client
 client = Client(base_url="https://api.example.com")
 ```
 
-If the endpoints you're going to hit require authentication, use `AuthenticatedClient` instead:
+If the endpoints you're going to hit require authentication, use `SuperglueClient` instead:
 
 ```python
-from superglue_client import AuthenticatedClient
+from superglue_client import SuperglueClient
 
-client = AuthenticatedClient(base_url="https://api.example.com", token="SuperSecretToken")
+client = SuperglueClient(base_url="https://api.example.com", token="SuperSecretToken")
 ```
 
 Now call your endpoint and use your models:
@@ -46,7 +46,7 @@ async with client as client:
 By default, when you're calling an HTTPS API it will attempt to verify that SSL is working correctly. Using certificate verification is highly recommended most of the time, but sometimes you may need to authenticate to a server (especially an internal server) using a custom certificate bundle.
 
 ```python
-client = AuthenticatedClient(
+client = SuperglueClient(
     base_url="https://internal_api.example.com", 
     token="SuperSecretToken",
     verify_ssl="/path/to/certificate_bundle.pem",
@@ -56,7 +56,7 @@ client = AuthenticatedClient(
 You can also disable certificate validation altogether, but beware that **this is a security risk**.
 
 ```python
-client = AuthenticatedClient(
+client = SuperglueClient(
     base_url="https://internal_api.example.com", 
     token="SuperSecretToken", 
     verify_ssl=False
