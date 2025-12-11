@@ -12,9 +12,9 @@
   "scripts": {
     "generate": "orval",
     "build": "npm run generate && tsc",
-    "publish:patch": "./scripts/publish.sh patch",
-    "publish:minor": "./scripts/publish.sh minor",
-    "publish:major": "./scripts/publish.sh major"
+    "publish:patch": "../scripts/publish-sdk-js.sh patch",
+    "publish:minor": "../scripts/publish-sdk-js.sh minor",
+    "publish:major": "../scripts/publish-sdk-js.sh major"
   },
   "dependencies": {},
   "devDependencies": {

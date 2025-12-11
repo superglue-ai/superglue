@@ -2,13 +2,14 @@
 set -e
 
 # Publish Python SDK to PyPI
-# Usage: ./packages/sdk/scripts/publish-sdk-python.sh [version]
+# Usage: ./packages/sdk/scripts/publish-sdk-python.sh [patch|minor|major|x.y.z]
+# Example: ./packages/sdk/scripts/publish-sdk-python.sh patch
 # Example: ./packages/sdk/scripts/publish-sdk-python.sh 1.0.1
 
 # Add pipx bin to PATH
 export PATH="$HOME/.local/bin:$PATH"
 
-VERSION=${1:-}
+VERSION_ARG=${1:-patch}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SDK_DIR="$(dirname "$SCRIPT_DIR")"
 ROOT_DIR="$(dirname "$(dirname "$SDK_DIR")")"
@@ -43,13 +44,49 @@ if ! command -v pyproject-build &> /dev/null; then
   exit 1
 fi
 
-# Update version if provided
-if [ -n "$VERSION" ]; then
-  sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
-  echo "📝 Set version to $VERSION"
-else
-  VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-  echo "📝 Using existing version: $VERSION"
+# Get current version from pyproject.toml
+CURRENT_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+
+# Calculate new version based on bump type or use explicit version
+bump_version() {
+  local version=$1
+  local bump_type=$2
+  
+  IFS='.' read -r major minor patch <<< "$version"
+  
+  case $bump_type in
+    major)
+      echo "$((major + 1)).0.0"
+      ;;
+    minor)
+      echo "$major.$((minor + 1)).0"
+      ;;
+    patch)
+      echo "$major.$minor.$((patch + 1))"
+      ;;
+    *)
+      echo "$bump_type"
+      ;;
+  esac
+}
+
+case $VERSION_ARG in
+  patch|minor|major)
+    VERSION=$(bump_version "$CURRENT_VERSION" "$VERSION_ARG")
+    echo "📝 Bumping version ($VERSION_ARG): $CURRENT_VERSION -> $VERSION"
+    ;;
+  *)
+    VERSION=$VERSION_ARG
+    echo "📝 Setting version to $VERSION"
+    ;;
+esac
+
+# Update version in pyproject.toml
+sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
+
+# Update version in package.json if it exists
+if [ -f "package.json" ]; then
+  sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
 fi
 
 # Build
