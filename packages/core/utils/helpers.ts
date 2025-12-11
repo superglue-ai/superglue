@@ -127,29 +127,6 @@ export async function replaceVariables(template: string, payload: Record<string,
   return oldReplaceVariables(result, payload);
 }
 
-
-export function sample(value: any, sampleSize = 10): any {
-  if (Array.isArray(value)) {
-    const arrLength = value.length;
-    if (arrLength <= sampleSize) {
-      return value.map(item => sample(item, sampleSize));
-    }
-    const newArray = value.slice(0, sampleSize).map(item => sample(item, sampleSize));
-    newArray.push("sampled from " + (arrLength) + " items");
-    return newArray;
-  }
-
-  if (value && typeof value === 'object') {
-    return Object.entries(value).reduce((acc, [key, val]) => ({
-      ...acc,
-      [key]: sample(val, sampleSize)
-    }), {});
-  }
-
-  return value;
-}
-
-
 export function addNullableToOptional(schema: any, required: boolean = true): any {
   if (!schema || typeof schema !== 'object') return schema;
 
