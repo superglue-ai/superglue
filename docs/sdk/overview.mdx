@@ -150,6 +150,7 @@ The SDK is fully typed with TypeScript. All types are auto-generated from the Op
 import { getTool } from "@superglue/client";
 import type { Tool, Run, RunRequest } from "@superglue/client";
 
+// Assumes configure() has been called (see Quick start above)
 const response = await getTool("my-tool-id");
 const tool: Tool = response.data;
 ```

@@ -1,6 +1,6 @@
 {
   "name": "@superglue/python-sdk",
-  "version": "0.1.2",
+  "version": "1.0.0",
   "private": true,
   "description": "Build scripts for the Python SDK for the Superglue AI API",
   "scripts": {
