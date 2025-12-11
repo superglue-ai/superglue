@@ -13,8 +13,17 @@ echo "📦 Publishing @superglue/client (TypeScript)..."
 
 cd "$SDK_DIR/js"
 
-# Ensure we're logged in to npm
-npm whoami > /dev/null 2>&1 || { echo "❌ Not logged in to npm. Run 'npm login' first."; exit 1; }
+# Load NPM_TOKEN from .env if not already set
+if [ -z "$NPM_TOKEN" ] && [ -f "$ROOT_DIR/.env" ]; then
+  NPM_TOKEN=$(grep '^NPM_TOKEN=' "$ROOT_DIR/.env" | cut -d'=' -f2)
+fi
+
+if [ -z "$NPM_TOKEN" ]; then
+  echo "❌ NPM_TOKEN not found. Set it in .env or export NPM_TOKEN=..."
+  exit 1
+fi
+
+npm config set //registry.npmjs.org/:_authToken=$NPM_TOKEN
 
 # Generate SDK from OpenAPI spec
 echo "🔄 Generating SDK from OpenAPI spec..."
@@ -24,24 +33,17 @@ npm run generate
 echo "🔨 Building..."
 npm run build
 
-# Stage changes
-git add .
-
-# Commit if there are changes
-if ! git diff --cached --quiet; then
-  git commit -m "chore: update generated SDK"
-fi
-
-# Bump version
+# Bump version (--no-git-tag-version to avoid auto-commit)
 echo "📝 Bumping version ($VERSION_TYPE)..."
-npm version $VERSION_TYPE
+npm version $VERSION_TYPE --no-git-tag-version
 
 # Publish
 echo "🚀 Publishing to npm..."
 npm publish --access public
 
-# Push to git
-echo "📤 Pushing to git..."
-git push origin main --tags
+# Stage changes
+cd "$ROOT_DIR"
+git add .
 
 echo "✅ TypeScript SDK published successfully!"
+echo "📝 Changes staged. Commit and push manually or via PR."

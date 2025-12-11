@@ -157,7 +157,7 @@ interface Run {
   };
   data?: any;
   error?: string;
-  stepResults?: RunStepResult[];
+  stepResults?: RunStepResultsItem[];
   options?: Record<string, any>;
   requestSource?: string;
   traceId?: string;
@@ -286,7 +286,7 @@ class RunRequest:
 
 ---
 
-### RunStepResult
+### RunStepResultsItem
 
 Result from a single step execution.
 

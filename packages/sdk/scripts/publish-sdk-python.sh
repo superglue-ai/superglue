@@ -102,14 +102,5 @@ twine upload dist/*
 cd "$ROOT_DIR"
 git add .
 
-# Commit if there are changes
-if ! git diff --cached --quiet; then
-  git commit -m "chore: release Python SDK v$VERSION"
-fi
-
-# Tag and push
-git tag "python-v$VERSION" 2>/dev/null || echo "⚠️  Tag python-v$VERSION already exists"
-echo "📤 Pushing to git..."
-git push origin main --tags
-
 echo "✅ Python SDK v$VERSION published successfully!"
+echo "📝 Changes staged. Commit and push manually or via PR."
