@@ -1,6 +1,6 @@
 import { parseJSON } from '@core/files/parsers/json.js';
 import { logMessage } from '@core/utils/logs.js';
-import { sample } from '@/packages/core/utils/helpers.js';
+import { sampleResultObject } from '@/packages/shared/utils.js';
 import { LLMMessage } from '@core/llm/llm-base-model.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
@@ -23,7 +23,7 @@ export async function validateWorkflowResult(
         let actualContent = JSON.stringify(actualResult, null, 2);
         if (actualContent.length > 10000) {
             // Sample if too large
-            actualContent = JSON.stringify(sample(actualResult, 10), null, 2) + "\n\n...truncated...";
+            actualContent = JSON.stringify(sampleResultObject(actualResult, 10), null, 2) + "\n\n...truncated...";
         }
 
         let expectedContent = expectedResult;

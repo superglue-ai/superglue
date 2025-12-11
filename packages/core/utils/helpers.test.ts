@@ -1,8 +1,9 @@
 import { SelfHealingMode } from '@superglue/shared';
-import { assertValidArrowFunction } from '@superglue/shared';
+import { assertValidArrowFunction, sampleResultObject } from '@superglue/shared';
 import { describe, expect, it, vi } from 'vitest';
-import { applyAuthFormat, composeUrl, isSelfHealingEnabled, replaceVariables, sample, transformData } from './helpers.js';
+import { applyAuthFormat, composeUrl, isSelfHealingEnabled, replaceVariables, transformData } from './helpers.js';
 import { maskCredentials } from '@superglue/shared';
+
 
 vi.mock('axios');
 
@@ -65,13 +66,13 @@ describe('tools utility functions', () => {
   describe('sample function', () => {
     it('should return array as is if length is less than sample size', () => {
       const arr = [1, 2, 3];
-      const result = sample(arr);
+      const result = sampleResultObject(arr);
       expect(result).toEqual([1, 2, 3]);
     });
 
     it('should return sampled array if length is greater than sample size', () => {
       const arr = Array.from({ length: 100 }, (_, i) => i);
-      const result = sample(arr);
+      const result = sampleResultObject(arr);
       expect(result).toHaveLength(11);
       expect(result[0]).toBe(0);
       expect(result[9]).toBe(9);
@@ -80,13 +81,13 @@ describe('tools utility functions', () => {
 
     it('should handle non-array input', () => {
       const obj = { test: 'value' };
-      const result = sample(obj);
+      const result = sampleResultObject(obj);
       expect(result).toEqual(obj);
     });
 
     it('should respect custom sample size', () => {
       const arr = Array.from({ length: 100 }, (_, i) => i);
-      const result = sample(arr, 5);
+      const result = sampleResultObject(arr, 5);
       expect(result).toHaveLength(6);
       expect(result[0]).toBe(0);
       expect(result[5]).toBe("sampled from " + (arr.length) + " items");

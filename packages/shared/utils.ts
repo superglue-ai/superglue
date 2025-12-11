@@ -313,3 +313,35 @@ export function maskCredentials(message: string, credentials?: Record<string, st
   return maskedMessage;
 }
 
+export function sampleResultObject(value: any, sampleSize = 10, seen = new WeakSet()): any {
+  if (value === null || value === undefined) return value;
+
+  if (typeof value !== 'object') return value;
+
+  if (seen.has(value)) return '[Circular]';
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    const arrLength = value.length;
+    if (arrLength <= sampleSize) {
+      return value.map(item => sampleResultObject(item, sampleSize, seen));
+    }
+    const newArray = value.slice(0, sampleSize).map(item => sampleResultObject(item, sampleSize, seen));
+    newArray.push(`sampled from ${arrLength} items`);
+    return newArray;
+  }
+
+  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Map) return Object.fromEntries([...value.entries()].map(([k, v]) => [k, sampleResultObject(v, sampleSize, seen)]));
+  if (value instanceof Set) return sampleResultObject([...value], sampleSize, seen);
+  if (value instanceof RegExp) return value.toString();
+  if (value instanceof Error) return { name: value.name, message: value.message };
+
+  if (!isPlainObject(value)) return String(value);
+
+  return Object.entries(value).reduce((acc, [key, val]) => ({
+    ...acc,
+    [key]: sampleResultObject(val, sampleSize, seen)
+  }), {});
+}
+
