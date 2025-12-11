@@ -30,6 +30,7 @@ export class SuperglueClient {
     private endpoint: string;
     private apiKey: string;
     private wsManager: WebSocketManager;
+    private apiEndpoint: string;
     
     private static workflowQL = `
         id
@@ -122,10 +123,48 @@ export class SuperglueClient {
     }
     `;
 
-    constructor({endpoint, apiKey}: {endpoint?: string, apiKey: string}) {
+    constructor({endpoint, apiKey, apiEndpoint}: {endpoint?: string, apiKey: string, apiEndpoint?: string}) {
       this.endpoint = endpoint ?? 'https://graphql.superglue.cloud';
       this.apiKey = apiKey;
+      this.apiEndpoint = apiEndpoint ?? 'https://api.superglue.cloud';
       this.wsManager = new WebSocketManager(this.endpoint, this.apiKey);
+    }
+
+    protected async restRequest<T>(
+      method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+      path: string,
+      body?: any
+    ): Promise<T> {
+      const url = `${this.apiEndpoint.replace(/\/$/, '')}${path}`;
+
+      const headers: Record<string, string> = {
+        'Authorization': `Bearer ${this.apiKey}`,
+      };
+
+      if (body && method !== 'GET') {
+        headers['Content-Type'] = 'application/json';
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `HTTP ${response.status}: ${errorText}`;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = (errorJson as any).error || errorMessage;
+        } catch {
+          // ignore
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      return data as T;
     }
 
     private async request<T>(query: string, variables?: Record<string, any>): Promise<T> {
@@ -1189,4 +1228,3 @@ export class SuperglueClient {
         return response.generateTransform;
     }
 }
-

@@ -14,6 +14,7 @@ export default function RootLayout({
   const config = {
     superglueEndpoint: process.env.GRAPHQL_ENDPOINT || ("http://localhost:" + process.env.GRAPHQL_PORT),
     superglueApiKey: process.env.NEXT_PUBLIC_SUPERGLUE_API_KEY || process.env.AUTH_TOKEN,
+    apiEndpoint: process.env.API_ENDPOINT || ("http://localhost:" + (process.env.API_PORT || 3002)),
     postHogKey: nextConfig.env?.NEXT_PUBLIC_POSTHOG_KEY,
     postHogHost: nextConfig.env?.NEXT_PUBLIC_POSTHOG_HOST,
   }
