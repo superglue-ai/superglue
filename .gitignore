@@ -28,3 +28,6 @@ packages/web/public/files
 eval/tool-evals/.data
 eval/tool-evals/data/results/
 eval/llm-benchmark-evals/data/results/
+
+# SDK Generation
+.venv-sdk-gen/

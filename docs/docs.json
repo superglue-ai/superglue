@@ -35,7 +35,7 @@
             ]
           },
           {
-            "group": "JavaScript SDK",
+            "group": "SDK Reference",
             "pages": [
               "sdk/overview",
               "sdk/methods",
@@ -44,13 +44,7 @@
           },
           {
             "group": "API Reference",
-            "pages": [
-              "api/overview",
-              "api/types",
-              "api/queries",
-              "api/mutations",
-              "api/subscriptions"
-            ]
+            "openapi": "openapi.yaml"
           }
         ]
       }

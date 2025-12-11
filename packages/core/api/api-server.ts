@@ -1,13 +1,14 @@
+import { ServiceMetadata } from '@superglue/shared';
 import Fastify from 'fastify';
 import { registerAllRoutes } from '../api/index.js';
 import { extractTokenFromFastifyRequest, validateToken } from '../auth/auth.js';
 import { DataStore } from '../datastore/types.js';
 import { logMessage } from "../utils/logs.js";
-import { AuthenticatedFastifyRequest } from './types.js';
 import { generateTraceId } from '../utils/trace-id.js';
-import { ServiceMetadata } from '@superglue/shared';
+import type { WorkerPools } from '../worker/types.js';
+import { AuthenticatedFastifyRequest } from './types.js';
 
-export async function startApiServer(datastore: DataStore) {
+export async function startApiServer(datastore: DataStore, workerPools: WorkerPools) {
   // Get REST API port
   const DEFAULT_API_PORT = 3002;
   let port = process.env.API_PORT ? parseInt(process.env.API_PORT) : DEFAULT_API_PORT;
@@ -76,8 +77,9 @@ export async function startApiServer(datastore: DataStore) {
       orgRole: authResult.orgRole
     };
 
-    // Add datastore and traceId to request context
+    // Add datastore, workerPools and traceId to request context
     authenticatedRequest.datastore = datastore;
+    authenticatedRequest.workerPools = workerPools;
     authenticatedRequest.traceId = traceId;
     
     // Add helper method to extract metadata

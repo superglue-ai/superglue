@@ -1,0 +1,26 @@
+{
+  "name": "@superglue/python-sdk",
+  "version": "0.1.2",
+  "private": true,
+  "description": "Build scripts for the Python SDK for the Superglue AI API",
+  "scripts": {
+    "generate": "../scripts/generate-python-sdk.sh",
+    "build": "npm run generate && pyproject-build",
+    "publish:patch": "../scripts/publish-sdk-python.sh patch",
+    "publish:minor": "../scripts/publish-sdk-python.sh minor",
+    "publish:major": "../scripts/publish-sdk-python.sh major"
+  },
+  "keywords": [
+    "superglue",
+    "api",
+    "sdk",
+    "python"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/superglue-ai/superglue.git",
+    "directory": "packages/sdk/python"
+  }
+}
+
