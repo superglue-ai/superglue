@@ -1,26 +1,26 @@
 import { Button } from '@/src/components/ui/button';
-import { Label } from '@/src/components/ui/label';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  PopoverAnchor,
-} from '@/src/components/ui/popover';
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from '@/src/components/ui/dialog';
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import { formatValueForDisplay, normalizeTemplateExpression, extractCredentials, DEFAULT_CODE_TEMPLATE } from '@/src/lib/templating-utils';
-import { isArrowFunction, maskCredentials } from '@superglue/shared';
+import { Label } from '@/src/components/ui/label';
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/src/components/ui/popover';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { Download, AlertCircle, Loader2, Eye, EyeOff, Maximize2, Minimize2 } from 'lucide-react';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { useEffect, useState, useRef, useCallback, useId } from 'react';
-import Editor from '@monaco-editor/react';
 import { useMonacoTheme } from '@/src/hooks/useMonacoTheme';
+import { DEFAULT_CODE_TEMPLATE, extractCredentials, formatValueForDisplay, normalizeTemplateExpression } from '@/src/lib/templating-utils';
+import Editor from '@monaco-editor/react';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
+import { isArrowFunction, maskCredentials } from '@superglue/shared';
+import { AlertCircle, Download, Eye, EyeOff, Loader2, Maximize2, Minimize2 } from 'lucide-react';
 import type * as Monaco from 'monaco-editor';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTemplatePreview } from '../hooks/use-template-preview';
 import { CopyButton } from '../shared/CopyButton';
 
@@ -321,7 +321,7 @@ export function TemplateEditPopover({
             <span>Preview available when step inputs are provided</span>
           </div>
         ) : previewError ? (
-          <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-xs text-destructive max-h-24 overflow-auto">
+          <div className="p-3 bg-destructive/10 rounded-md text-xs text-destructive overflow-auto" style={{ height: effectivePreviewHeight }}>
             {previewError}
           </div>
         ) : (
@@ -388,6 +388,7 @@ export function TemplateEditPopover({
     onOpenAutoFocus: (e: Event) => e.preventDefault(),
     onInteractOutside: (e: Event) => e.preventDefault(),
     onPointerDownOutside: (e: Event) => e.preventDefault(),
+    onEscapeKeyDown: (e: Event) => e.preventDefault(),
   };
 
   if (isFullscreen && open) {
@@ -404,6 +405,7 @@ export function TemplateEditPopover({
           <DialogContent 
             className="p-4 max-w-none border border-border/60"
             style={{ width: MODAL_WIDTH_PX, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', zIndex: POPOVER_Z_INDEX }}
+            onEscapeKeyDown={(e) => e.preventDefault()}
           >
             <VisuallyHidden>
               <DialogTitle>Edit Template Expression</DialogTitle>

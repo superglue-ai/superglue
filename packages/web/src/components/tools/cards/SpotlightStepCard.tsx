@@ -21,8 +21,8 @@ import { Integration, assertValidArrowFunction, executeWithVMHelpers } from '@su
 import { Bug, ChevronDown, FileBraces, FileInput, FileOutput, Play, RotateCw, Route, Square, Trash2, Wand2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { type CategorizedSources } from '../templates/tiptap/TemplateContext';
-import { StepInputTab } from './tabs/StepInputTab';
 import { StepConfigTab } from './tabs/StepConfigTab';
+import { StepInputTab } from './tabs/StepInputTab';
 import { StepResultTab } from './tabs/StepResultTab';
 
 const dataSelectorOutputCache = new Map<string, { output: any; error: string | null }>();
@@ -261,15 +261,17 @@ export const SpotlightStepCard = React.memo(({
                         )}
                         {!readOnly && onOpenFixStepDialog && (
                             <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Fix this step with AI"}>
-                                <Button
-                                    variant="ghost"
-                                    onClick={onOpenFixStepDialog}
-                                    disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                    className="h-8 px-3 gap-2"
-                                >
-                                    <Wand2 className="h-3 w-3" />
-                                    <span className="font-medium text-[13px]">Fix Step</span>
-                                </Button>
+                                <div className={`relative flex rounded-md border border-input bg-background ${failedSteps.includes(step.id) ? 'border-destructive/50' : ''}`}>
+                                    <Button
+                                        variant="ghost"
+                                        onClick={onOpenFixStepDialog}
+                                        disabled={!canExecute || isExecuting || isGlobalExecuting}
+                                        className={`h-8 px-3 gap-2 border-0 ${failedSteps.includes(step.id) ? 'bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive animate-pulse' : ''}`}
+                                    >
+                                        <Wand2 className="h-3 w-3" />
+                                        <span className="font-medium text-[13px]">Fix Step</span>
+                                    </Button>
+                                </div>
                             </span>
                         )}
                         {!readOnly && onRemove && (

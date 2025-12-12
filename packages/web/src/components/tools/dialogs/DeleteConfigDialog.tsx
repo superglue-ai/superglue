@@ -32,17 +32,13 @@ export function DeleteConfigDialog({ config, isOpen, onClose, onDeleted }: Delet
       });
 
       let deletePromise;
+      const configType = (config as any)?.type;
 
-      switch ((config as any)?.type) {
-        case 'api':
-          deletePromise = superglueClient.deleteApi(config.id);
-          break;
-        case 'tool':
-          deletePromise = superglueClient.deleteWorkflow(config.id);
-          break;
-        default:
-          console.error('Unknown config type for deletion:', (config as any)?.type);
-          return;
+      if (configType === 'api') {
+        deletePromise = superglueClient.deleteApi(config.id);
+      } else {
+        // Default to tool/workflow deletion
+        deletePromise = superglueClient.deleteWorkflow(config.id);
       }
 
       await deletePromise;
