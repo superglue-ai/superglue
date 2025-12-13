@@ -162,7 +162,7 @@ export class DocumentationSearch {
     const documentationResult = result.length > maxExpectedLength
       ? result.slice(0, maxExpectedLength)
       : result;
-    logMessage('debug', `Found ${documentationResult.length} characters of documentation for query: "${searchQuery}"`, this.metadata);
+    //logMessage('debug', `Found ${documentationResult.length} characters of documentation for query: "${searchQuery}"`, this.metadata);
     return sanitizeUnpairedSurrogates(documentationResult);
   }
 

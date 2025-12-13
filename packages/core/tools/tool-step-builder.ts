@@ -1,13 +1,14 @@
 import { ApiConfig, HttpMethod, Integration, Pagination, ServiceMetadata } from "@superglue/shared";
 import { LLMMessage, LLMToolWithContext } from "../llm/llm-base-model.js";
 import { LanguageModel } from "../llm/llm-base-model.js";
-import { getWebSearchTool, searchDocumentationToolDefinition } from "../llm/llm-tools.js";
+import { getWebSearchTool, inspectSourceDataToolDefinition, searchDocumentationToolDefinition } from "../llm/llm-tools.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
 type GenerateStepConfigInput = {
     retryCount: number;
     messages: LLMMessage[];
+    sourceData: any;
     integration: Integration;
     metadata: ServiceMetadata;
 }
@@ -44,13 +45,17 @@ const stepConfigSchema = z.object({
     }).describe("Complete API configuration to execute")
   });
 
-export async function generateStepConfig({ retryCount, messages, integration, metadata }: GenerateStepConfigInput): Promise<GenerateStepConfigResult> {
+export async function generateStepConfig({ retryCount, messages, sourceData, integration, metadata }: GenerateStepConfigInput): Promise<GenerateStepConfigResult> {
     const temperature = Math.min(retryCount * 0.1, 1);
     const webSearchTool = getWebSearchTool();
-    const tools: LLMToolWithContext[] = [{
-        toolDefinition: searchDocumentationToolDefinition, 
-        toolContext: { orgId: metadata.orgId, traceId: metadata.traceId, integration }
-    }];
+    const tools: LLMToolWithContext[] = [
+        { toolDefinition: searchDocumentationToolDefinition, 
+          toolContext: { orgId: metadata.orgId, traceId: metadata.traceId, integration },
+          maxUses: 1 },
+        { toolDefinition: inspectSourceDataToolDefinition,
+          toolContext: { sourceData },
+          maxUses: 1 }
+    ];
     
     if (webSearchTool) {
         tools.push({ 

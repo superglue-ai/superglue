@@ -296,6 +296,7 @@ export class ToolExecutor implements Tool {
             const generateStepConfigResult = await generateStepConfig({
               retryCount,
               messages,
+              sourceData: { loopPayload, ...stepCredentials},
               integration: currentIntegration,
               metadata: this.metadata
             });

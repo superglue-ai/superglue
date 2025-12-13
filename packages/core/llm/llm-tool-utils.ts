@@ -1,6 +1,6 @@
 import { ServiceMetadata } from "@superglue/shared";
 import { logMessage } from "../utils/logs.js";
-import { generateInstructionsDefinition, generateInstructionsImplementation } from "./llm-tools.js";
+import { generateInstructionsToolDefinition, generateInstructionsToolImplementation } from "./llm-tools.js";
 import { searchDocumentationToolDefinition, searchDocumentationToolImplementation } from "./llm-tools.js";
 
 export interface LLMToolDefinition {
@@ -37,12 +37,12 @@ export type LLMToolImplementation<TContext extends ServiceMetadata = ServiceMeta
 }>;
 
 const toolRegistry: Record<string, LLMToolImplementation<any>> = {
-    generate_instructions: generateInstructionsImplementation,
+    generate_instructions: generateInstructionsToolImplementation,
     search_documentation: searchDocumentationToolImplementation,
 };
 
 export const allLLMToolDefinitions = [
-    generateInstructionsDefinition,
+    generateInstructionsToolDefinition,
     searchDocumentationToolDefinition,
 ];
 
@@ -81,17 +81,28 @@ export function getLLMToolDefinitions(toolNames?: string[]): LLMToolDefinition[]
 } 
 
 export function logToolExecution(toolName: string, input: any, output: any, metadata?: ServiceMetadata): void {
+    let outputStr: string;
+    try {
+        outputStr = typeof output === 'string' ? output : JSON.stringify(output);
+    } catch {
+        outputStr = '[unstringifiable]';
+    }
+
     switch (toolName) {
         case 'search_documentation': {
             const query = input?.query || 'no query';
-            let outputStr: string;
-            try {
-            outputStr = typeof output === 'string' ? output : JSON.stringify(output);
-            } catch {
-            outputStr = '[unstringifiable]';
-            }
-            logMessage('info', `search_documentation: query="${query}" → ${outputStr.length} chars`, metadata);
+            logMessage('debug', `search_documentation: query="${query}" → ${outputStr.length} chars`, metadata);
+            break;
+        }
+        case 'inspect_source_data': {
+            const expression = input?.expression || 'no expression';
+            logMessage('debug', `inspect_source_data: expr="${expression}" → ${outputStr.length} chars`, metadata);
+            break;
+        }
+        case 'web_search': {
+            const query = input?.query || 'no query';
+            logMessage('debug', `web_search: query="${query}" → ${outputStr.length} chars`, metadata);
             break;
         }
     }
-  }
+}

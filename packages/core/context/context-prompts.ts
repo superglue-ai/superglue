@@ -479,9 +479,10 @@ Your primary output is the API configuration. The dataSelector determines what d
 
 Generate tool calls and their arguments only, do not include any other text unless explicitly instructed to.
 
-You have access to two tools:
+You have access to three tools:
 1. submit_tool - Submit an API configuration to execute the call and validate the response
 2. search_documentation - Search for specific information in the integration documentation. This is keyword based so pick relevant keywords and synonyms.
+3. inspect_source_data - Execute a JS arrow function (e.g. sourceData => sourceData.currentItem.id) on the current step config input data (sourceData) to understand it's structure and debug issues.
 
 <FILE_HANDLING>
 IMPORTANT: superglue automatically parses files returned by workflow steps irrespective of their source.

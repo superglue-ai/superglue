@@ -49,6 +49,7 @@ export type LLMObjectResponse<T> =
 export interface LLMToolWithContext<TContext = any> {
     toolDefinition: LLMToolDefinition | Record<string, Tool>;
     toolContext: TContext;
+    maxUses?: number;
 }
 
 export interface LLMObjectGeneratorInput {

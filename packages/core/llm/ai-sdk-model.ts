@@ -59,7 +59,8 @@ export class AiSdkModel implements LLM {
 
   private buildTools(
     schemaObj: any,
-    tools?: LLMToolWithContext[]
+    tools?: LLMToolWithContext[],
+    toolUsageCounts?: Map<string, number>
   ): Record<string, Tool> {
     const defaultTools: Record<string, Tool> = {
       submit: tool({
@@ -80,12 +81,17 @@ export class AiSdkModel implements LLM {
 
     if (tools && tools.length > 0) {
       for (const item of tools) {
-        const { toolDefinition: toolDef, toolContext: toolContext } = item;
+        const { toolDefinition: toolDef, toolContext: toolContext, maxUses } = item;
         
         const isCustomTool = 'name' in toolDef && 'arguments' in toolDef && 'description' in toolDef;
         
         if (isCustomTool) {
           const toolDef = item.toolDefinition as LLMToolDefinition;
+          const currentUsage = toolUsageCounts?.get(toolDef.name) ?? 0;
+          
+          if (maxUses !== undefined && currentUsage >= maxUses) {
+            continue;
+          }
           defaultTools[toolDef.name] = tool({
             description: toolDef.description,
             inputSchema: jsonSchema(toolDef.arguments),
@@ -220,7 +226,7 @@ export class AiSdkModel implements LLM {
     }
 
     const schemaObj = jsonSchema(schema);
-    const availableTools = this.buildTools(schemaObj, input.tools);
+    const toolUsageCounts = new Map<string, number>();
 
     let conversationMessages: LLMMessage[] = String(input.messages[0]?.content)?.startsWith("The current date and time is")
       ? input.messages
@@ -229,6 +235,7 @@ export class AiSdkModel implements LLM {
     try {
       let finalResult: any = null;
       while (finalResult === null) {
+        const availableTools = this.buildTools(schemaObj, input.tools, toolUsageCounts);
 
         const result = await this.generateTextWithFallback({
           model: this.model,
@@ -271,6 +278,8 @@ export class AiSdkModel implements LLM {
         }
 
         for (const toolCall of result.toolCalls) {
+          toolUsageCounts.set(toolCall.toolName, (toolUsageCounts.get(toolCall.toolName) ?? 0) + 1);
+
           conversationMessages.push({
             role: 'assistant', content: [{
               type: 'tool-call',

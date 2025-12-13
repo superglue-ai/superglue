@@ -125,6 +125,7 @@ export const generateStepConfigResolver = async (
     const generateStepConfigResult = await generateStepConfig({
       retryCount: 0,
       messages,
+      sourceData: {stepInput, ...mergedCredentials},
       integration,
       metadata
     });
