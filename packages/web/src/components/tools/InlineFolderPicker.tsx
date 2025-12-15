@@ -3,6 +3,7 @@
 import { useConfig } from "@/src/app/config-context";
 import { useTools } from "@/src/app/tools-context";
 import { FolderPicker, UNCATEGORIZED } from "@/src/components/tools/FolderPicker";
+import { Button } from "@/src/components/ui/button";
 import { createSuperglueClient } from "@/src/lib/client-utils";
 import { Tool } from "@superglue/shared";
 import { Folder } from "lucide-react";
@@ -30,10 +31,14 @@ export function InlineFolderPicker({ tool }: InlineFolderPickerProps) {
       value={tool.folder}
       onChange={handleFolderChange}
       trigger={
-        <button className="flex items-center gap-1.5 text-muted-foreground px-2 py-1 rounded-md hover:text-foreground transition-colors cursor-pointer max-w-full">
-          <Folder className="h-3.5 w-3.5 flex-shrink-0" />
-          <span className="truncate text-sm max-w-[150px]">{tool.folder || UNCATEGORIZED}</span>
-        </button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1.5 text-muted-foreground hover:text-foreground max-w-full"
+        >
+          <Folder className="h-3.5 w-3.5" />
+          <span className="truncate text-xs max-w-[150px]">{tool.folder || UNCATEGORIZED}</span>
+        </Button>
       }
     />
   );

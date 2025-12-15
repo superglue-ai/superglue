@@ -834,6 +834,7 @@ export class SuperglueClient {
             inputSchema
             responseSchema
             instruction
+            folder
           }
         }
       `;

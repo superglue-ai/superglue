@@ -9,7 +9,7 @@ import { buildEvolvingPayload, computeStepOutput, computeToolPayload, isAbortErr
 import { ExecutionStep, generateDefaultFromSchema, Integration, Tool, ToolResult } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import isEqual from "lodash.isequal";
-import { Check, CloudUpload, CopyPlus, Edit2, Folder, Hammer, Loader2, Play, Square, Trash2, X } from "lucide-react";
+import { Check, CloudUpload, CopyPlus, Edit2, Folder, Hammer, Loader2, MoreVertical, Play, Square, Trash2, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { ToolDeployModal } from "./deploy/ToolDeployModal";
 import { DeleteConfigDialog } from "./dialogs/DeleteConfigDialog";
 import { DuplicateToolDialog } from "./dialogs/DuplicateToolDialog";
@@ -646,7 +646,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
         finalTransform,
         instruction: instructions,
-        folder
+        folder: folder ?? null
       } as any;
 
       // In embedded mode, use the provided onSave callback
@@ -1280,66 +1280,47 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   // Tool action buttons next to the name
   const toolActionButtons = !embedded ? (
     <div className="flex items-center gap-1">
-      <FolderPicker
+            <FolderPicker
         value={folder}
         onChange={(f) => setFolder(f ?? undefined)}
         trigger={
-          <button className="flex items-center gap-1.5 text-muted-foreground px-2 py-1 rounded-md hover:text-foreground transition-colors cursor-pointer">
-            <Folder className="h-3.5 w-3.5 flex-shrink-0" />
-            <span className="truncate text-sm max-w-[120px]">{folder || UNCATEGORIZED}</span>
-          </button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+          >
+            <Folder className="h-3.5 w-3.5" />
+            <span className="truncate text-xs max-w-[120px]">{folder || UNCATEGORIZED}</span>
+          </Button>
         }
       />
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setShowRenameDialog(true)}
-              disabled={!toolId.trim()}
-            >
-              <Edit2 className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Rename Tool</p>
-          </TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setShowDuplicateDialog(true)}
-              disabled={!toolId.trim()}
-            >
-              <CopyPlus className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Duplicate Tool</p>
-          </TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setShowDeleteDialog(true)}
-              disabled={!toolId.trim()}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Delete Tool</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+            disabled={!toolId.trim()}
+          >
+            <MoreVertical className="h-3.5 w-3.5" />
+            <span className="text-xs">More</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => setShowRenameDialog(true)}>
+            <Edit2 className="h-4 w-4 mr-2" />
+            Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setShowDuplicateDialog(true)}>
+            <CopyPlus className="h-4 w-4 mr-2" />
+            Duplicate
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-destructive focus:text-destructive">
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   ) : null;
 
