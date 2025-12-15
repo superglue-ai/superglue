@@ -1,15 +1,15 @@
-import { generateUniqueId, waitForIntegrationProcessing, Integration, RequestOptions, RunStatus, SelfHealingMode, Tool, ToolResult, ToolStepResult } from "@superglue/shared";
+import { generateUniqueId, Integration, RequestOptions, RunStatus, Tool, ToolResult, ToolStepResult, waitForIntegrationProcessing } from "@superglue/shared";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { parseJSON } from "../../files/index.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { ToolBuilder } from "../../tools/tool-builder.js";
 import { ToolFinder } from "../../tools/tool-finder.js";
+import { isSelfHealingEnabled } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { GraphQLRequestContext } from '../types.js';
 import type { ToolExecutionPayload } from "../../worker/types.js";
-import { isSelfHealingEnabled } from "../../utils/helpers.js";
+import { GraphQLRequestContext } from '../types.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -245,6 +245,7 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
       finalTransform: resolveField(input.finalTransform, oldWorkflow?.finalTransform, "$"),
       responseSchema: resolveField(input.responseSchema, oldWorkflow?.responseSchema),
       instruction: resolveField(input.instruction, oldWorkflow?.instruction),
+      folder: resolveField(input.folder, oldWorkflow?.folder),
       createdAt: oldWorkflow?.createdAt || now,
       updatedAt: now
     };

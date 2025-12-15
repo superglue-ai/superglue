@@ -1,13 +1,14 @@
 import { useConfig } from "@/src/app/config-context";
 import { useTools } from "@/src/app/tools-context";
+import { FolderPicker, UNCATEGORIZED } from "@/src/components/tools/FolderPicker";
 import { Button } from "@/src/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { createSuperglueClient, isValidToolName, validateToolName } from "@/src/lib/client-utils";
 import { Tool } from "@superglue/shared";
-import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ChevronDown, Folder, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 interface SaveToolDialogProps {
   tool: Tool | null;
@@ -20,18 +21,29 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
   const config = useConfig();
   const { tools } = useTools();
   const [toolName, setToolName] = useState("");
+  const [selectedFolder, setSelectedFolder] = useState<string | undefined>(undefined);
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  const existingFolders = useMemo(() => {
+    const folders = new Set<string>();
+    tools.forEach(t => {
+      if (t.folder) folders.add(t.folder);
+    });
+    return Array.from(folders).sort();
+  }, [tools]);
 
   useEffect(() => {
     if (isOpen && tool) {
       setToolName(tool.id);
+      setSelectedFolder(tool.folder);
       setError("");
     }
   }, [isOpen, tool]);
 
   const handleClose = () => {
     setToolName("");
+    setSelectedFolder(undefined);
     setError("");
     onClose();
   };
@@ -57,7 +69,7 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
       setIsSaving(true);
       const client = createSuperglueClient(config.superglueEndpoint);
 
-      const toolToSave = { ...tool, id: trimmedName };
+      const toolToSave = { ...tool, id: trimmedName, folder: selectedFolder || undefined };
       const saved = await client.upsertWorkflow(trimmedName, toolToSave as any);
       if (!saved) throw new Error('Failed to save tool');
 
@@ -105,10 +117,34 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
               disabled={isSaving}
               autoFocus
             />
-            {error && (
-              <p className="text-sm text-red-500">{error}</p>
-            )}
           </div>
+          <div className="space-y-2">
+            <Label>Folder (optional)</Label>
+            <FolderPicker
+              value={selectedFolder}
+              onChange={(folder) => setSelectedFolder(folder ?? undefined)}
+              folders={existingFolders}
+              disabled={isSaving}
+              width="w-[300px]"
+              trigger={
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  className="w-full justify-between"
+                  disabled={isSaving}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <Folder className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">{selectedFolder || UNCATEGORIZED}</span>
+                  </div>
+                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              }
+            />
+          </div>
+          {error && (
+            <p className="text-sm text-red-500">{error}</p>
+          )}
         </div>
         <DialogFooter>
           <Button
@@ -136,4 +172,3 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
     </Dialog>
   );
 }
-

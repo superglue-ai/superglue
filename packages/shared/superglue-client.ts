@@ -75,6 +75,7 @@ export class SuperglueClient {
         finalTransform
         inputSchema
         instruction
+        folder
     `;
 
     private static workflowScheduleQL = `
