@@ -9,10 +9,9 @@ import { Folder } from "lucide-react";
 
 interface InlineFolderPickerProps {
   tool: Tool;
-  allFolderPaths: string[];
 }
 
-export function InlineFolderPicker({ tool, allFolderPaths }: InlineFolderPickerProps) {
+export function InlineFolderPicker({ tool }: InlineFolderPickerProps) {
   const config = useConfig();
   const { refreshTools } = useTools();
 
@@ -30,7 +29,6 @@ export function InlineFolderPicker({ tool, allFolderPaths }: InlineFolderPickerP
     <FolderPicker
       value={tool.folder}
       onChange={handleFolderChange}
-      folders={allFolderPaths}
       trigger={
         <button className="flex items-center gap-1.5 text-muted-foreground px-2 py-1 rounded-md hover:text-foreground transition-colors cursor-pointer max-w-full">
           <Folder className="h-3.5 w-3.5 flex-shrink-0" />

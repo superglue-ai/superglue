@@ -1,5 +1,6 @@
 "use client"
 
+import { useTools } from "@/src/app/tools-context";
 import {
     Command,
     CommandEmpty,
@@ -22,7 +23,6 @@ export const UNCATEGORIZED = "Uncategorized";
 interface FolderPickerProps {
   value: string | undefined;
   onChange: (folder: string | null) => void;
-  folders: string[];
   trigger: React.ReactNode;
   disabled?: boolean;
   align?: "start" | "center" | "end";
@@ -32,14 +32,18 @@ interface FolderPickerProps {
 export function FolderPicker({ 
   value, 
   onChange, 
-  folders, 
   trigger,
   disabled,
   align = "start",
   width = "w-[250px]"
 }: FolderPickerProps) {
+  const { tools } = useTools();
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+
+  const folders = useMemo(() => 
+    Array.from(new Set(tools.map(t => t.folder).filter(Boolean) as string[])).sort()
+  , [tools]);
 
   const filteredFolders = useMemo(() => {
     if (!searchValue) return folders;

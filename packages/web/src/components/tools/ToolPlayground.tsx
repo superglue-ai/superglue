@@ -9,7 +9,7 @@ import { buildEvolvingPayload, computeStepOutput, computeToolPayload, isAbortErr
 import { ExecutionStep, generateDefaultFromSchema, Integration, Tool, ToolResult } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import isEqual from "lodash.isequal";
-import { Check, CloudUpload, CopyPlus, Edit2, Hammer, Loader2, Play, Square, Trash2, X } from "lucide-react";
+import { Check, CloudUpload, CopyPlus, Edit2, Folder, Hammer, Loader2, Play, Square, Trash2, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -32,6 +32,7 @@ import { FixStepDialog } from "./dialogs/FixStepDialog";
 import { FixTransformDialog } from "./dialogs/FixTransformDialog";
 import { ModifyStepConfirmDialog } from "./dialogs/ModifyStepConfirmDialog";
 import { RenameToolDialog } from "./dialogs/RenameToolDialog";
+import { FolderPicker, UNCATEGORIZED } from "./FolderPicker";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 import { ToolStepGallery } from "./ToolStepGallery";
 
@@ -101,7 +102,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const { toast } = useToast();
   const config = useConfig();
   const { integrations: contextIntegrations } = useIntegrations();
+  const { refreshTools } = useTools();
   const [toolId, setToolId] = useState(initialTool?.id || "");
+  const [folder, setFolder] = useState<string | undefined>(initialTool?.folder);
   const [steps, setSteps] = useState<any[]>(initialTool?.steps || []);
   const [finalTransform, setFinalTransform] = useState(initialTool?.finalTransform || `(sourceData) => {
   return sourceData;
@@ -211,7 +214,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const { refreshTools } = useTools();
 
   // Generate default payload once when schema is available if payload is empty
   useEffect(() => {
@@ -282,13 +284,14 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
       inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
       finalTransform,
-      instruction: instructions
+      instruction: instructions,
+      folder
     }),
     closeRebuild: () => {
       setShowToolBuilder(false);
       onRebuildEnd?.();
     }
-  }), [toolId, steps, responseSchema, inputSchema, finalTransform, instructions, onRebuildEnd]);
+  }), [toolId, steps, responseSchema, inputSchema, finalTransform, instructions, folder, onRebuildEnd]);
   
   const extractIntegrationIds = (steps: ExecutionStep[]): string[] => {
     return Array.from(new Set(
@@ -304,6 +307,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
   const handleToolRebuilt = (tool: Tool, context: BuildContext) => {
     setToolId(tool.id);
+    setFolder(tool.folder);
     setSteps(tool.steps?.map(step => ({
       ...step,
       apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id }
@@ -537,6 +541,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         throw new Error(`Tool with ID "${idToLoad}" not found.`);
       }
       setToolId(tool.id || '');
+      setFolder(tool.folder);
       setSteps(tool?.steps?.map(step => ({ ...step, apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } })) || []);
       setFinalTransform(tool.finalTransform || `(sourceData) => {
         return {
@@ -566,6 +571,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   useEffect(() => {
     if (initialTool && initialTool.id !== lastToolId) {
       setToolId(initialTool.id || '');
+      setFolder(initialTool.folder);
       setSteps(initialTool.steps?.map(step => ({
         ...step,
         apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id }
@@ -639,7 +645,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
         finalTransform,
-        instruction: instructions
+        instruction: instructions,
+        folder
       } as any;
 
       // In embedded mode, use the provided onSave callback
@@ -1273,6 +1280,16 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   // Tool action buttons next to the name
   const toolActionButtons = !embedded ? (
     <div className="flex items-center gap-1">
+      <FolderPicker
+        value={folder}
+        onChange={(f) => setFolder(f ?? undefined)}
+        trigger={
+          <button className="flex items-center gap-1.5 text-muted-foreground px-2 py-1 rounded-md hover:text-foreground transition-colors cursor-pointer">
+            <Folder className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="truncate text-sm max-w-[120px]">{folder || UNCATEGORIZED}</span>
+          </button>
+        }
+      />
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>

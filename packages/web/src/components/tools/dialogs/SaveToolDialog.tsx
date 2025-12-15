@@ -8,7 +8,7 @@ import { Label } from "@/src/components/ui/label";
 import { createSuperglueClient, isValidToolName, validateToolName } from "@/src/lib/client-utils";
 import { Tool } from "@superglue/shared";
 import { ChevronDown, Folder, Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 interface SaveToolDialogProps {
   tool: Tool | null;
@@ -24,14 +24,6 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
   const [selectedFolder, setSelectedFolder] = useState<string | undefined>(undefined);
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-
-  const existingFolders = useMemo(() => {
-    const folders = new Set<string>();
-    tools.forEach(t => {
-      if (t.folder) folders.add(t.folder);
-    });
-    return Array.from(folders).sort();
-  }, [tools]);
 
   useEffect(() => {
     if (isOpen && tool) {
@@ -123,7 +115,6 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
             <FolderPicker
               value={selectedFolder}
               onChange={(folder) => setSelectedFolder(folder ?? undefined)}
-              folders={existingFolders}
               disabled={isSaving}
               width="w-[300px]"
               trigger={

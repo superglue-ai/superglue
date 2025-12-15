@@ -52,13 +52,6 @@ const ConfigTable = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [manuallyOpenedStepper, setManuallyOpenedStepper] = useState(false);
 
-  const allFolderPaths = React.useMemo(() => {
-    const paths = new Set<string>();
-    tools.forEach(t => {
-      if (t.folder) paths.add(t.folder);
-    });
-    return Array.from(paths).sort();
-  }, [tools]);
   const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('newest');
 
@@ -254,8 +247,19 @@ const ConfigTable = () => {
               </TableRow>
             ) : currentConfigs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                  No results found
+                <TableCell colSpan={6} className="h-24 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <span>{selectedFolder !== 'all' ? 'No tools in this folder' : 'No results found'}</span>
+                    {selectedFolder !== 'all' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedFolder('all')}
+                      >
+                        Show all tools
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -332,7 +336,7 @@ const ConfigTable = () => {
                       </div>
                     </TableCell>
                     <TableCell className="w-[200px] min-w-[200px] max-w-[200px]">
-                      <InlineFolderPicker tool={tool} allFolderPaths={allFolderPaths} />
+                      <InlineFolderPicker tool={tool} />
                     </TableCell>
                     <TableCell className="max-w-[300px] truncate relative group">
                       <div className="flex items-center space-x-1">
