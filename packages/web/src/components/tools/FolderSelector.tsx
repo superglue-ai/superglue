@@ -17,7 +17,7 @@ import {
 } from "@/src/components/ui/popover";
 import { cn } from "@/src/lib/general-utils";
 import { Tool } from '@superglue/shared';
-import { Check, ChevronRight, Folder, FolderOpen } from "lucide-react";
+import { Archive, Check, ChevronRight, Folder, FolderOpen } from "lucide-react";
 import { useMemo, useState } from 'react';
 
 const FOLDER_STORAGE_KEY = 'superglue-selected-folder';
@@ -41,11 +41,16 @@ export function FolderSelector({ tools, selectedFolder, onFolderChange }: Folder
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  const { flatFolders, totalCount } = useMemo(() => {
+  const { flatFolders, totalCount, archivedCount } = useMemo(() => {
     const folderCounts = new Map<string, number>();
     let total = 0;
+    let archived = 0;
     
     tools.forEach(tool => {
+      if (tool.archived) {
+        archived++;
+        return;
+      }
       const folder = tool.folder || UNCATEGORIZED;
       folderCounts.set(folder, (folderCounts.get(folder) || 0) + 1);
       total++;
@@ -77,15 +82,16 @@ export function FolderSelector({ tools, selectedFolder, onFolderChange }: Folder
       });
     });
 
-    return { flatFolders: flatList, totalCount: total };
+    return { flatFolders: flatList, totalCount: total, archivedCount: archived };
   }, [tools]);
 
   const displayLabel = useMemo(() => {
     if (selectedFolder === 'all') return `All (${totalCount})`;
+    if (selectedFolder === 'archived') return `Archived (${archivedCount})`;
     const folder = flatFolders.find(f => f.fullPath === selectedFolder);
     if (folder) return `${folder.fullPath} (${folder.count})`;
     return selectedFolder;
-  }, [selectedFolder, flatFolders, totalCount]);
+  }, [selectedFolder, flatFolders, totalCount, archivedCount]);
 
   const handleSelect = (folder: string) => {
     onFolderChange(folder);
@@ -171,6 +177,28 @@ export function FolderSelector({ tools, selectedFolder, onFolderChange }: Folder
                 );
               })}
             </CommandGroup>
+            {archivedCount > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup className="p-1">
+                  <CommandItem
+                    value="archived"
+                    onSelect={() => handleSelect('archived')}
+                    className="cursor-pointer px-2 py-1.5"
+                  >
+                    {selectedFolder === 'archived' ? (
+                      <Check className="mr-2 h-4 w-4 flex-shrink-0" />
+                    ) : (
+                      <Archive className="mr-2 h-4 w-4 flex-shrink-0" />
+                    )}
+                    <span className={selectedFolder === 'archived' ? 'font-medium' : ''}>Archived</span>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {archivedCount}
+                    </span>
+                  </CommandItem>
+                </CommandGroup>
+              </>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
@@ -194,9 +222,14 @@ export function useFolderFilter(tools: Tool[]) {
   };
 
   const filteredByFolder = useMemo(() => {
-    if (selectedFolder === 'all') return tools;
+    if (selectedFolder === 'archived') {
+      return tools.filter(tool => tool.archived);
+    }
     
-    return tools.filter(tool => {
+    const nonArchived = tools.filter(tool => !tool.archived);
+    if (selectedFolder === 'all') return nonArchived;
+    
+    return nonArchived.filter(tool => {
       const toolFolder = tool.folder || UNCATEGORIZED;
       return toolFolder === selectedFolder || toolFolder.startsWith(`${selectedFolder}/`);
     });

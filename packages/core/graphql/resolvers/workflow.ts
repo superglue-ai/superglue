@@ -246,6 +246,7 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
       responseSchema: resolveField(input.responseSchema, oldWorkflow?.responseSchema),
       instruction: resolveField(input.instruction, oldWorkflow?.instruction),
       folder: resolveField(input.folder, oldWorkflow?.folder),
+      archived: resolveField(input.archived, oldWorkflow?.archived, false),
       createdAt: oldWorkflow?.createdAt || now,
       updatedAt: now
     };

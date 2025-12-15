@@ -367,6 +367,7 @@ type Workflow implements BaseConfig {
   inputSchema: JSONSchema
   originalResponseSchema: JSONSchema
   folder: String
+  archived: Boolean
 }
 
 type WorkflowStepResult {
@@ -427,6 +428,7 @@ input WorkflowInput {
   version: String
   instruction: String
   folder: String
+  archived: Boolean
 }
 
 input WorkflowScheduleInput {

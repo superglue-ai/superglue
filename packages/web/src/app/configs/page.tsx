@@ -20,15 +20,15 @@ import {
 } from "@/src/components/ui/table";
 
 import { ToolDeployModal } from '@/src/components/tools/deploy/ToolDeployModal';
-import { DeleteConfigDialog } from '@/src/components/tools/dialogs/DeleteConfigDialog';
 import { FolderSelector, useFolderFilter } from '@/src/components/tools/FolderSelector';
 import { InlineFolderPicker } from '@/src/components/tools/InlineFolderPicker';
 import { CopyButton } from '@/src/components/tools/shared/CopyButton';
+import { ToolActionsMenu } from '@/src/components/tools/ToolActionsMenu';
 import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
 import { Integration, Tool } from '@superglue/shared';
-import { ArrowUpDown, CloudUpload, Globe, Hammer, Loader2, Plus, RotateCw, Search, Trash2 } from "lucide-react";
+import { ArrowUpDown, CloudUpload, Globe, Hammer, Loader2, Plus, RotateCw, Search } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
@@ -47,7 +47,6 @@ const ConfigTable = () => {
   const [page, setPage] = useState(0);
   const [pageSize] = useState(20);
 
-  const [configToDelete, setConfigToDelete] = useState<Tool | null>(null);
   const [deployToolId, setDeployToolId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [manuallyOpenedStepper, setManuallyOpenedStepper] = useState(false);
@@ -114,10 +113,6 @@ const ConfigTable = () => {
     e.stopPropagation();
     // Navigate to the tool page, passing the ID. The user can then run it.
     router.push(`/tools/${encodeURIComponent(id)}`);
-  };
-
-  const handleDeleted = (deletedId: string) => {
-    refreshTools();
   };
 
   const handleDeployClick = (e: React.MouseEvent, toolId: string) => {
@@ -349,7 +344,7 @@ const ConfigTable = () => {
                     <TableCell className="w-[150px]">
                       {tool.updatedAt ? new Date(tool.updatedAt).toLocaleDateString() : (tool.createdAt ? new Date(tool.createdAt).toLocaleDateString() : '')}
                     </TableCell>
-                    <TableCell className="w-[100px]">
+                    <TableCell className="w-[140px]">
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="default"
@@ -369,25 +364,7 @@ const ConfigTable = () => {
                           <CloudUpload className="h-4 w-4" />
                           Deploy
                         </Button>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setConfigToDelete(tool);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Delete Tool</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <ToolActionsMenu tool={tool} />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -416,13 +393,6 @@ const ConfigTable = () => {
           Next
         </Button>
       </div>
-
-      <DeleteConfigDialog
-        config={configToDelete}
-        isOpen={!!configToDelete}
-        onClose={() => setConfigToDelete(null)}
-        onDeleted={handleDeleted}
-      />
 
       {deployToolId && (
         <ToolDeployModal
