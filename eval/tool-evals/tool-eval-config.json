@@ -617,26 +617,6 @@
         "research",
         "papers"
       ]
-    },
-    {
-      "id": "punkapi",
-      "name": "PunkAPI",
-      "urlHost": "https://punkapi.online",
-      "urlPath": "/v3",
-      "documentationUrl": "https://publicapis.io/punk-api",
-      "credentials": {},
-      "description": "BrewDog's DIY Dog beer catalogue API with detailed recipes and information",
-      "keywords": [
-        "beer",
-        "brewery",
-        "brewdog",
-        "recipe",
-        "hops",
-        "malt",
-        "ingredients",
-        "abv",
-        "ibu"
-      ]
     }
   ],
   "tools": [
@@ -1037,32 +1017,6 @@
       "payload": {},
       "validationFunction": "validators/037-brewery-db-california-count.ts",
       "expectedResultDescription": "Should count all breweries in California state. Expected total of 919 breweries."
-    },
-    {
-      "id": "040-punkapi-fetch-all-beers",
-      "name": "PunkAPI - Fetch All Beers",
-      "description": "Fetch all BrewDog beers from the catalogue",
-      "type": "retrieval",
-      "instruction": "Fetch all beers from the BrewDog PunkAPI catalogue. Return a JSON object with this structure: { total_count: number, first_beer_name: string, last_beer_name: string }.",
-      "integrationIds": [
-        "punkapi"
-      ],
-      "payload": {},
-      "validationFunction": "validators/040-punkapi-fetch-all-beers.ts",
-      "expectedResultDescription": "Should fetch all 415 BrewDog beers from PunkAPI catalogue. Expected first beer 'Punk IPA 2007 - 2010' and last beer 'Aplomb Bomb'."
-    },
-    {
-      "id": "041-punkapi-fetch-all-beers-with-pagination-reminder",
-      "name": "PunkAPI - Fetch All Beers With Pagination Reminder",
-      "description": "Fetch all BrewDog beers from the catalogue with a reminder to use pagination",
-      "type": "retrieval",
-      "instruction": "Fetch all beers from the BrewDog PunkAPI catalogue. Remember to use pagination. Return a JSON object with this structure: { total_count: number, first_beer_name: string, last_beer_name: string }.",
-      "integrationIds": [
-        "punkapi"
-      ],
-      "payload": {},
-      "validationFunction": "validators/041-punkapi-fetch-all-beers-with-pagination-reminder.ts",
-      "expectedResultDescription": "Should fetch all 415 BrewDog beers with explicit pagination reminder. Expected first beer 'Punk IPA 2007 - 2010' and last beer 'Aplomb Bomb'."
     },
     {
       "id": "042-slack-post-eval-message",
