@@ -2,6 +2,7 @@ import { ApiConfig, HttpMethod, Integration, Pagination, ServiceMetadata } from 
 import { LLMMessage, LLMToolWithContext } from "../llm/llm-base-model.js";
 import { LanguageModel } from "../llm/llm-base-model.js";
 import { getWebSearchTool, inspectSourceDataToolDefinition, searchDocumentationToolDefinition } from "../llm/llm-tools.js";
+import { transformData } from "../utils/helpers.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
@@ -19,6 +20,15 @@ export interface GenerateStepConfigResult {
     config?: Partial<ApiConfig>;
     dataSelector?: string;
     messages?: LLMMessage[];
+}
+
+export interface BuildSourceDataInput {
+    stepInput: Record<string, any>;
+    credentials: Record<string, any>;
+    dataSelector?: string;
+    currentItem?: any;
+    integrationUrlHost: string;
+    paginationPageSize?: string | number;
 }
 
 const stepConfigSchema = z.object({
@@ -113,3 +123,34 @@ export async function generateStepConfig({ retryCount, messages, sourceData, int
         messages: generateStepConfigResult.messages
     };
 };
+
+export async function buildSourceData(input: BuildSourceDataInput): Promise<Record<string, any>> {
+    const { stepInput, credentials, dataSelector, currentItem: providedCurrentItem, integrationUrlHost, paginationPageSize } = input;
+
+    let currentItem: any = providedCurrentItem ?? null;
+    if (currentItem === null && dataSelector && stepInput) {
+        const result = await transformData(stepInput, dataSelector);
+        if (result.success && result.data !== undefined) {
+            currentItem = Array.isArray(result.data) ? result.data[0] : result.data;
+        }
+    }
+
+    const sourceData: Record<string, any> = {
+        ...stepInput,
+        ...credentials,
+        currentItem,
+    };
+
+    const isHttp = integrationUrlHost?.startsWith('http');
+
+    if (isHttp) {
+        const pageSize = String(paginationPageSize ?? 50);
+        sourceData.page = 1;
+        sourceData.offset = 0;
+        sourceData.cursor = null;
+        sourceData.limit = pageSize;
+        sourceData.pageSize = pageSize;
+    }
+
+    return sourceData;
+}

@@ -15,7 +15,7 @@ import { FTPStepExecutionStrategy } from "./strategies/ftp/ftp.js";
 import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
 import { PostgresStepExecutionStrategy } from "./strategies/postgres/postgres.js";
 import { StepExecutionStrategyRegistry } from "./strategies/strategy.js";
-import { generateStepConfig } from "./tool-step-builder.js";
+import { buildSourceData, generateStepConfig } from "./tool-step-builder.js";
 import { executeAndEvaluateFinalTransform } from "./tool-transform.js";
 
 export interface ToolExecutorOptions {
@@ -293,10 +293,18 @@ export class ToolExecutor implements Tool {
               );
             }
 
+            const sourceData = await buildSourceData({
+              stepInput,
+              credentials: stepCredentials,
+              currentItem: loopPayload?.currentItem,
+              integrationUrlHost: currentIntegration.urlHost,
+              paginationPageSize: currentConfig?.pagination?.pageSize
+            });
+
             const generateStepConfigResult = await generateStepConfig({
               retryCount,
               messages,
-              sourceData: { loopPayload, ...stepCredentials},
+              sourceData,
               integration: currentIntegration,
               metadata: this.metadata
             });
