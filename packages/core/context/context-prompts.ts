@@ -482,7 +482,7 @@ Generate tool calls and their arguments only, do not include any other text unle
 You have access to three tools:
 1. submit_tool - Submit an API configuration to execute the call and validate the response
 2. search_documentation - Search for specific information in the integration documentation. This is keyword based so pick relevant keywords and synonyms.
-3. inspect_source_data - Execute a JS arrow function (e.g. sourceData => sourceData.currentItem.id) on the current step config input data (sourceData) to understand it's structure and debug issues.
+3. inspect_source_data - Execute a JS arrow function (e.g. sourceData => sourceData.currentItem.id) on the input data (sourceData). Use this to debug and understand the input data structure and data selector output.
 
 <FILE_HANDLING>
 IMPORTANT: superglue automatically parses files returned by workflow steps irrespective of their source.
@@ -561,7 +561,7 @@ Requirements:
 
 EXECUTION FLOW:
 1. Analyze the initial error and context to understand what went wrong
-2. Generate a corrected API configuration AND dataSelector based on the error and available information
+2. Generate a corrected API configuration AND dataSelector based on the error and available information. You can 
 3. Submit the configuration using submit_tool
 4. If unsuccessful, analyze the new error:
    - Look at previous attempts and their error messages to find the root cause of the error and fix it

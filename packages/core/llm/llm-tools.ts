@@ -216,7 +216,7 @@ export const inspectSourceDataToolImplementation: LLMToolImplementation<inspectS
 
 export const inspectSourceDataToolDefinition: LLMToolDefinition = {
   name: "inspect_source_data",
-  description: "Runs a code expression on the current sourceData object and returns the first 10000 chars as result string. Useful to inspect step inputs and debug.",
+  description: "Inspect specific parts of sourceData by running a JS expression. Results are truncated to 10000 chars, so be TARGETED - don't return the entire object. You can start by exploring structure (Object.keys), then drill into specific paths. Examples: 'sourceData => Object.keys(sourceData)' to see top-level keys, 'sourceData => sourceData.users?.length' to check array size, 'sourceData => sourceData.users?.[0]' to see first item structure.",
   arguments: {
     type: "object",
     properties: {

@@ -54,7 +54,7 @@ export async function generateStepConfig({ retryCount, messages, sourceData, int
           maxUses: 1 },
         { toolDefinition: inspectSourceDataToolDefinition,
           toolContext: { sourceData },
-          maxUses: 1 }
+          maxUses: 3 }
     ];
     
     if (webSearchTool) {
