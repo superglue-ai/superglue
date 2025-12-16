@@ -59,7 +59,7 @@ export class CsvReporter {
     const avgBuildTime = tool.averageBuildTimeMs;
     const avgExecTime = isOneShot ? tool.oneShotAverageExecutionTimeMs : tool.selfHealingAverageExecutionTimeMs;
 
-    const escapeCsv = (str: string) => `"${str.replace(/"/g, '""')}"`;
+    const escapeCsv = (str: string | undefined | null) => `"${(str ?? '').replace(/"/g, '""')}"`;
 
     return [
       escapeCsv(tool.toolId),

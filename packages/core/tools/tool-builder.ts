@@ -116,7 +116,7 @@ export class ToolBuilder {
     const tools: LLMToolWithContext[] = [
       { toolDefinition: searchDocumentationToolDefinition,
         toolContext: { orgId: this.metadata.orgId, traceId: this.metadata.traceId, integration: firstIntegration },
-        maxUses: 1 },
+        maxUses: 3 },
     ];
     if (webSearchTool) {
       tools.push({ toolDefinition: { web_search: webSearchTool }, toolContext: {} });
