@@ -1,7 +1,7 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
-import { Integration, ServiceMetadata, safeStringify } from "@superglue/shared";
+import { Integration, ServiceMetadata } from "@superglue/shared";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { LLMToolDefinition, LLMToolImplementation } from "./llm-tool-utils.js";
 import { sanitizeInstructionSuggestions, runCodeInIVM } from "../utils/helpers.js";
@@ -179,39 +179,30 @@ export const inspectSourceDataToolImplementation: LLMToolImplementation<inspectS
   const MAX_RESULT_CHARACTERS = 10000
 
   if (!sourceData || typeof sourceData !== 'object') {
-    return {
-      success: false,
-      error: "No sourceData provided in context or it's not an object"
-    };
+    return "Error: No sourceData provided in context or it's not an object";
   }
 
   if (!expression || !expression.startsWith('sourceData =>')) {
-    return {
-      success: false,
-      error: "Expression arg must be valid sourceData arrow function"
-    }
+    return "Error: Expression must be a sourceData arrow function, e.g. sourceData => sourceData.key";
   }
-
-  let stringifiedResult = ''
 
   try {
     const result = await runCodeInIVM(sourceData, expression)
-    stringifiedResult = safeStringify(result?.data)
-
-    if (stringifiedResult.length > MAX_RESULT_CHARACTERS) {
-      stringifiedResult = stringifiedResult.slice(0, MAX_RESULT_CHARACTERS) + '\n... [truncated]'
+    
+    if (!result.success) {
+      return `Error: ${result.error || 'Failed to run expression'}`;
     }
+    
+    let output = JSON.stringify(result.data);
+
+    if (output.length > MAX_RESULT_CHARACTERS) {
+      output = output.slice(0, MAX_RESULT_CHARACTERS) + '... [truncated]';
+    }
+    
+    return output;
   } catch (error) {
-    return {
-      success: false,
-      error: `Failed to run expression: ${error instanceof Error ? error.message : String(error)}`
-    }
+    return `Error: ${error instanceof Error ? error.message : String(error)}`;
   }
-
-  return {
-    success: true,
-    data: stringifiedResult
-  };
 };
 
 export const inspectSourceDataToolDefinition: LLMToolDefinition = {

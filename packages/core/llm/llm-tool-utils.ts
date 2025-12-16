@@ -30,11 +30,7 @@ export interface LLMToolCallResult {
 export type LLMToolImplementation<TContext extends ServiceMetadata = ServiceMetadata> = (
     args: any,
     context: TContext
-) => Promise<{
-    success: boolean;
-    error?: string;
-    data?: any;
-}>;
+) => Promise<any>;
 
 const toolRegistry: Record<string, LLMToolImplementation<any>> = {
     generate_instructions: generateInstructionsToolImplementation,
@@ -59,11 +55,18 @@ export async function executeLLMTool<TContext extends ServiceMetadata>(toolCall:
 
     try {
         const result = await implementation(toolCall.arguments, context);
+        if (typeof result === 'object' && result !== null && 'success' in result) {
+            return {
+                toolCallId: toolCall.id,
+                success: result.success,
+                data: result.data,
+                error: result.error
+            };
+        }
         return {
             toolCallId: toolCall.id,
-            success: result.success,
-            data: result.data,
-            error: result.error
+            success: true,
+            data: result
         };
     } catch (error) {
         return {
@@ -96,7 +99,7 @@ export function logToolExecution(toolName: string, input: any, output: any, meta
         }
         case 'inspect_source_data': {
             const expression = input?.expression || 'no expression';
-            logMessage('debug', `inspect_source_data: expr="${expression}" → ${outputStr.length} chars`, metadata);
+            logMessage('debug', `inspect_source_data: expr="${expression}" → ${outputStr.length} chars: ${outputStr}`, metadata);
             break;
         }
         case 'web_search': {

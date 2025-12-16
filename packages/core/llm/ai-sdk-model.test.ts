@@ -349,7 +349,8 @@ describe('AiSdkModel', () => {
           }],
           toolResults: [{
             toolCallId: 'call_web',
-            result: 'search results'
+            toolName: 'web_search',
+            output: 'search results'
           }]
         } as any)
         .mockResolvedValueOnce({
