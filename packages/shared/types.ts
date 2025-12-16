@@ -519,3 +519,15 @@ export interface BatchFileUploadResponse {
     expiresIn: number;
   }>;
 }
+
+export interface ExtendedIntegration extends Integration {
+  capabilities: string[];
+  confidence: 'high' | 'medium' | 'low';
+  evidence: string;
+}
+
+export interface DiscoveryResult {
+  title: string;
+  description: string;
+  systems: ExtendedIntegration[];
+}
