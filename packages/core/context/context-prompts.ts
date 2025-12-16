@@ -561,7 +561,7 @@ Requirements:
 
 EXECUTION FLOW:
 1. Analyze the initial error and context to understand what went wrong
-2. Generate a corrected API configuration AND dataSelector based on the error and available information. You can 
+2. Generate a corrected API configuration AND dataSelector based on the error and available information.
 3. Submit the configuration using submit_tool
 4. If unsuccessful, analyze the new error:
    - Look at previous attempts and their error messages to find the root cause of the error and fix it
