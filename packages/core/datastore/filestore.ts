@@ -424,47 +424,6 @@ export class FileStore implements DataStore {
     return { items, total: validRuns.length };
   }
 
-  async deleteRun(params: { id: string; orgId?: string }): Promise<boolean> {
-    await this.ensureInitialized();
-    const { id, orgId } = params;
-    if (!id) return false;
-    return this.removeRunFromLogs(id, orgId);
-  }
-
-  async deleteAllRuns(params?: { orgId?: string }): Promise<boolean> {
-    await this.ensureInitialized();
-    const { orgId } = params || {};
-    try {
-      try {
-        await fs.promises.access(this.logsFilePath);
-      } catch {
-        // Logs file doesn't exist, nothing to delete
-        return true;
-      }
-
-      // Read all existing logs
-      const logs = await fs.promises.readFile(this.logsFilePath, 'utf-8');
-      const lines = logs.split('\n').filter(line => line.trim());
-
-      // Filter out logs for the specified org
-      const remainingLines = lines.filter(line => {
-        try {
-          const logEntry = JSON.parse(line);
-          return logEntry.orgId !== orgId;
-        } catch {
-          return true; // Keep malformed lines
-        }
-      });
-
-      // Write back the filtered logs
-      await fs.promises.writeFile(this.logsFilePath, remainingLines.join('\n') + '\n');
-      return true;
-    } catch (error) {
-      logMessage('error', 'Failed to delete all runs: ' + error);
-      return false;
-    }
-  }
-
   async clearAll(): Promise<void> {
     await this.ensureInitialized();
     this.storage.apis.clear();
@@ -526,18 +485,6 @@ export class FileStore implements DataStore {
       .slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.workflows, 'workflow', orgId).length;
     return { items, total };
-  }
-
-  async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Tool[]> {
-    await this.ensureInitialized();
-    const { ids, orgId } = params;
-    return ids
-      .map(id => {
-        const key = this.getKey('workflow', id, orgId);
-        const workflow = this.storage.workflows.get(key);
-        return workflow ? { ...workflow, id } : null;
-      })
-      .filter((w): w is Tool => w !== null);
   }
 
   async upsertWorkflow(params: { id: string; workflow: Tool; orgId?: string }): Promise<Tool> {
@@ -786,10 +733,6 @@ export class FileStore implements DataStore {
       clientId: entry.clientId,
       clientSecret: entry.clientSecret
     };
-  }
-
-  async deleteOAuthSecret(params: { uid: string }): Promise<void> {
-    this.oauthSecrets.delete(params.uid);
   }
 
   async createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string }): Promise<DiscoveryRun> {

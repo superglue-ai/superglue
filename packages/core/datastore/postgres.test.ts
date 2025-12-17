@@ -144,13 +144,6 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
                 expect(items[1].id).toBe(run1.id);
             });
 
-            it('should delete runs', async () => {
-                await store.createRun({ run: testRun });
-                await store.deleteRun({ id: testRun.id, orgId: testOrgId });
-                const retrieved = await store.getRun({ id: testRun.id, orgId: testOrgId });
-                expect(retrieved).toBeNull();
-            });
-
             it('should list runs filtered by config ID', async () => {
                 const run1: Run = { ...testRun, id: 'run1', toolId: 'config1' };
                 const run2: Run = { ...testRun, id: 'run2', toolId: 'config2' };
@@ -264,18 +257,6 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
             it('should return null for missing workflow', async () => {
                 const retrieved = await store.getWorkflow({ id: 'does-not-exist', orgId: testOrgId });
                 expect(retrieved).toBeNull();
-            });
-
-            it('should get many workflows by ids, skipping missing ones', async () => {
-                const wf2 = { ...testWorkflow, id: 'test-workflow-id-2' };
-                await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
-                await store.upsertWorkflow({ id: wf2.id, workflow: wf2, orgId: testOrgId });
-                const result = await store.getManyWorkflows({
-                    ids: [testWorkflow.id, wf2.id, 'missing-id'],
-                    orgId: testOrgId
-                });
-                expect(result).toHaveLength(2);
-                expect(result.map(w => w.id).sort()).toEqual([testWorkflow.id, wf2.id].sort());
             });
         });
 

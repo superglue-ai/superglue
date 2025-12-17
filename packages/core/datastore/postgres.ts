@@ -35,19 +35,6 @@ export class PostgresService implements DataStore {
 
         this.initializeTables();
     }
-    async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Tool[]> {
-        const { ids, orgId } = params;
-        const client = await this.pool.connect();
-        try {
-            const result = await client.query(
-                'SELECT id, data FROM configurations WHERE id = ANY($1) AND type = $2 AND org_id = $3',
-                [ids, 'workflow', orgId || '']
-            );
-            return result.rows.map(row => ({ ...row.data, id: row.id }));
-        } finally {
-            client.release();
-        }
-    }
     async getManyIntegrations(params: { ids: string[]; includeDocs?: boolean; orgId?: string }): Promise<Integration[]> {
         const { ids, includeDocs = true, orgId } = params;
         const client = await this.pool.connect();
@@ -521,35 +508,6 @@ export class PostgresService implements DataStore {
             ]);
 
             return updatedRun;
-        } finally {
-            client.release();
-        }
-    }
-
-    async deleteRun(params: { id: string; orgId?: string }): Promise<boolean> {
-        const { id, orgId } = params;
-        if (!id) return false;
-        const client = await this.pool.connect();
-        try {
-            const result = await client.query(
-                'DELETE FROM runs WHERE id = $1 AND org_id = $2',
-                [id, orgId || '']
-            );
-            return result.rowCount > 0;
-        } finally {
-            client.release();
-        }
-    }
-
-    async deleteAllRuns(params?: { orgId?: string }): Promise<boolean> {
-        const { orgId } = params || {};
-        const client = await this.pool.connect();
-        try {
-            const result = await client.query(
-                'DELETE FROM runs WHERE org_id = $1',
-                [orgId || '']
-            );
-            return result.rowCount > 0;
         } finally {
             client.release();
         }
@@ -1152,15 +1110,6 @@ export class PostgresService implements DataStore {
                 clientId: row.client_id,
                 clientSecret: decrypted?.secret || ''
             };
-        } finally {
-            client.release();
-        }
-    }
-
-    async deleteOAuthSecret(params: { uid: string }): Promise<void> {
-        const client = await this.pool.connect();
-        try {
-            await client.query('DELETE FROM integration_oauth WHERE uid = $1', [params.uid]);
         } finally {
             client.release();
         }
