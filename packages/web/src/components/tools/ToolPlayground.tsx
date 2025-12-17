@@ -602,6 +602,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setInputSchema(null);
       setManualPayloadText('{}');
       setFinalPreviewResult(null);
+      setFolder(undefined);
     }
   }, [id, embedded, initialTool]);
 

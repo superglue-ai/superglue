@@ -68,7 +68,7 @@ export function ArchiveConfigDialog({ config, isOpen, onClose, onArchived }: Arc
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && activeSchedules.length === 0 && !isLoading) {
+    if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'BUTTON' && activeSchedules.length === 0 && !isLoading) {
       e.preventDefault();
       handleArchive();
     }
