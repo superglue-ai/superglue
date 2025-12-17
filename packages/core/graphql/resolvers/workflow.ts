@@ -324,15 +324,17 @@ export const findRelevantToolsResolver = async (
   try {
     const metadata = context.toMetadata();
     const allTools = await context.datastore.listWorkflows({ limit: 1000, offset: 0, orgId: context.orgId });
-    const tools = (allTools.items || []).map(tool => {
-      if (tool.inputSchema && typeof tool.inputSchema === 'string') {
-        tool.inputSchema = parseJSON(tool.inputSchema);
-      }
-      if (tool.responseSchema && typeof tool.responseSchema === 'string') {
-        tool.responseSchema = parseJSON(tool.responseSchema);
-      }
-      return tool;
-    });
+    const tools = (allTools.items || [])
+      .filter(tool => !tool.archived)
+      .map(tool => {
+        if (tool.inputSchema && typeof tool.inputSchema === 'string') {
+          tool.inputSchema = parseJSON(tool.inputSchema);
+        }
+        if (tool.responseSchema && typeof tool.responseSchema === 'string') {
+          tool.responseSchema = parseJSON(tool.responseSchema);
+        }
+        return tool;
+      });
 
     const selector = new ToolFinder(metadata);
     return await selector.findTools(searchTerms, tools);
