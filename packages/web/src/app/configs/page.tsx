@@ -385,15 +385,17 @@ const ConfigTable = () => {
                           <Hammer className="h-4 w-4" />
                           View
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => handleDeployClick(e, tool.id)}
-                          className="gap-2"
-                        >
-                          <CloudUpload className="h-4 w-4" />
-                          Deploy
-                        </Button>
+                        {!tool.archived && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => handleDeployClick(e, tool.id)}
+                            className="gap-2"
+                          >
+                            <CloudUpload className="h-4 w-4" />
+                            Deploy
+                          </Button>
+                        )}
                         <ToolActionsMenu tool={tool} />
                       </div>
                     </TableCell>

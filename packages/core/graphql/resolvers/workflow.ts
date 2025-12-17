@@ -61,6 +61,10 @@ export const executeWorkflowResolver = async (
       throw new Error("Must provide either workflow ID or workflow object");
     }
 
+    if (workflow.archived) {
+      throw new Error("Cannot execute archived workflow");
+    }
+
     logMessage('debug', `Executing tool with id: ${workflow.id}, run_id: ${runId}`, metadata);
 
     // Parse schemas if they're strings
