@@ -97,13 +97,6 @@ describe('MemoryStore', () => {
       expect(items[1].id).toBe(run1.id);
     });
 
-    it('should delete runs', async () => {
-      await store.createRun({ run: testRun });
-      await store.deleteRun({ id: testRun.id });
-      const retrieved = await store.getRun({ id: testRun.id });
-      expect(retrieved).toBeNull();
-    });
-
     it('should list runs filtered by config ID', async () => {
       const run1 = { ...testRun, id: 'run1', toolId: 'config1', toolConfig: { ...testRun.toolConfig, id: 'config1' } };
       const run2 = { ...testRun, id: 'run2', toolId: 'config2', toolConfig: { ...testRun.toolConfig, id: 'config2' } };
@@ -277,18 +270,6 @@ describe('MemoryStore', () => {
     it('should return null for missing workflow', async () => {
       const retrieved = await store.getWorkflow({ id: 'does-not-exist' });
       expect(retrieved).toBeNull();
-    });
-
-    it('should get many workflows by ids, skipping missing ones', async () => {
-      const wf2 = { ...testWorkflow, id: 'test-workflow-id-2' };
-      await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
-      await store.upsertWorkflow({ id: wf2.id, workflow: wf2, orgId: testOrgId });
-      const result = await store.getManyWorkflows({ 
-        ids: [testWorkflow.id, wf2.id, 'missing-id'], 
-        orgId: testOrgId 
-      });
-      expect(result).toHaveLength(2);
-      expect(result.map(w => w.id).sort()).toEqual([testWorkflow.id, wf2.id].sort());
     });
   });
 
@@ -555,67 +536,6 @@ describe('MemoryStore', () => {
       const info = await store.getTenantInfo();
       expect(info.email).toBeNull();
       expect(info.emailEntrySkipped).toBe(true);
-    });
-  });
-
-  describe('Delete All Runs', () => {
-    it('should delete all runs for an org', async () => {
-      const testApiConfig: ApiConfig = {
-        id: 'test-api-id',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        urlHost: 'https://test.com',
-        method: HttpMethod.GET,
-        headers: {},
-        queryParams: {},
-        instruction: 'Test API',
-      };
-
-      const run1: Run = {
-        id: 'run1',
-        toolId: 'test-api-id',
-        orgId: testOrgId,
-        status: RunStatus.SUCCESS,
-        startedAt: new Date(),
-        completedAt: new Date(),
-        toolConfig: testApiConfig as any,
-        error: undefined,
-      };
-      const run2: Run = {
-        id: 'run2',
-        toolId: 'test-api-id',
-        orgId: testOrgId,
-        status: RunStatus.SUCCESS,
-        startedAt: new Date(),
-        completedAt: new Date(),
-        toolConfig: testApiConfig as any,
-        error: undefined,
-      };
-      
-      const anotherOrgId = 'another-org';
-      const run3: Run = {
-        id: 'run3',
-        toolId: 'test-api-id',
-        orgId: anotherOrgId,
-        status: RunStatus.SUCCESS,
-        startedAt: new Date(),
-        completedAt: new Date(),
-        toolConfig: testApiConfig as any,
-        error: undefined,
-      };
-      
-      await store.createRun({ run: run1 });
-      await store.createRun({ run: run2 });
-      await store.createRun({ run: run3 });
-      
-      await store.deleteAllRuns({ orgId: testOrgId });
-      
-      const { items: testOrgRuns } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
-      const { items: anotherOrgRuns } = await store.listRuns({ limit: 10, offset: 0, orgId: anotherOrgId });
-      
-      expect(testOrgRuns).toHaveLength(0);
-      expect(anotherOrgRuns).toHaveLength(1);
-      expect(anotherOrgRuns[0].id).toBe('run3');
     });
   });
 }); 

@@ -9,7 +9,7 @@ import { buildEvolvingPayload, computeStepOutput, computeToolPayload, isAbortErr
 import { ExecutionStep, generateDefaultFromSchema, Integration, Tool, ToolResult } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import isEqual from "lodash.isequal";
-import { Check, CloudUpload, CopyPlus, Edit2, Hammer, Loader2, Play, Square, Trash2, X } from "lucide-react";
+import { ArchiveRestore, Check, CloudUpload, Hammer, Loader2, Play, Square, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -24,14 +24,12 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { ToolDeployModal } from "./deploy/ToolDeployModal";
-import { DeleteConfigDialog } from "./dialogs/DeleteConfigDialog";
-import { DuplicateToolDialog } from "./dialogs/DuplicateToolDialog";
 import { FixStepDialog } from "./dialogs/FixStepDialog";
 import { FixTransformDialog } from "./dialogs/FixTransformDialog";
 import { ModifyStepConfirmDialog } from "./dialogs/ModifyStepConfirmDialog";
-import { RenameToolDialog } from "./dialogs/RenameToolDialog";
+import { FolderPicker } from "./FolderPicker";
+import { ToolActionsMenu } from "./ToolActionsMenu";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 import { ToolStepGallery } from "./ToolStepGallery";
 
@@ -101,7 +99,10 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const { toast } = useToast();
   const config = useConfig();
   const { integrations: contextIntegrations } = useIntegrations();
+  const { refreshTools } = useTools();
   const [toolId, setToolId] = useState(initialTool?.id || "");
+  const [folder, setFolder] = useState<string | undefined>(initialTool?.folder);
+  const [isArchived, setIsArchived] = useState<boolean>(initialTool?.archived || false);
   const [steps, setSteps] = useState<any[]>(initialTool?.steps || []);
   const [finalTransform, setFinalTransform] = useState(initialTool?.finalTransform || `(sourceData) => {
   return sourceData;
@@ -207,11 +208,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const [pendingModifyStepIndex, setPendingModifyStepIndex] = useState<number | null>(null);
   const modifyStepResolveRef = useRef<((shouldContinue: boolean) => void) | null>(null);
   
-  // Tool action dialogs (rename, duplicate, delete)
-  const [showRenameDialog, setShowRenameDialog] = useState(false);
-  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const { refreshTools } = useTools();
 
   // Generate default payload once when schema is available if payload is empty
   useEffect(() => {
@@ -282,13 +278,14 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
       inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
       finalTransform,
-      instruction: instructions
+      instruction: instructions,
+      folder
     }),
     closeRebuild: () => {
       setShowToolBuilder(false);
       onRebuildEnd?.();
     }
-  }), [toolId, steps, responseSchema, inputSchema, finalTransform, instructions, onRebuildEnd]);
+  }), [toolId, steps, responseSchema, inputSchema, finalTransform, instructions, folder, onRebuildEnd]);
   
   const extractIntegrationIds = (steps: ExecutionStep[]): string[] => {
     return Array.from(new Set(
@@ -304,6 +301,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
   const handleToolRebuilt = (tool: Tool, context: BuildContext) => {
     setToolId(tool.id);
+    setFolder(tool.folder);
     setSteps(tool.steps?.map(step => ({
       ...step,
       apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id }
@@ -537,6 +535,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         throw new Error(`Tool with ID "${idToLoad}" not found.`);
       }
       setToolId(tool.id || '');
+      setFolder(tool.folder);
+      setIsArchived(tool.archived || false);
       setSteps(tool?.steps?.map(step => ({ ...step, apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } })) || []);
       setFinalTransform(tool.finalTransform || `(sourceData) => {
         return {
@@ -566,6 +566,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   useEffect(() => {
     if (initialTool && initialTool.id !== lastToolId) {
       setToolId(initialTool.id || '');
+      setFolder(initialTool.folder);
+      setIsArchived(initialTool.archived || false);
       setSteps(initialTool.steps?.map(step => ({
         ...step,
         apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id }
@@ -588,6 +590,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       loadTool(id);
     } else if (!embedded && !id && !initialTool) {
       setToolId("");
+      setIsArchived(false);
       setSteps([]);
       setInstructions("");
       setFinalTransform(`(sourceData) => {
@@ -599,6 +602,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       setInputSchema(null);
       setManualPayloadText('{}');
       setFinalPreviewResult(null);
+      setFolder(undefined);
     }
   }, [id, embedded, initialTool]);
 
@@ -639,7 +643,8 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
         finalTransform,
-        instruction: instructions
+        instruction: instructions,
+        folder: folder ?? null
       } as any;
 
       // In embedded mode, use the provided onSave callback
@@ -1243,22 +1248,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
     setNavigateToFinalSignal(Date.now());
   };
 
-  // Tool action handlers
-  const handleRenamed = (newId: string) => {
-    setToolId(newId);
-    refreshTools();
-    router.push(`/tools/${encodeURIComponent(newId)}`);
-  };
-
-  const handleDuplicated = (newId: string) => {
-    refreshTools();
-    router.push(`/tools/${encodeURIComponent(newId)}`);
-  };
-
-  const handleDeleted = () => {
-    router.push('/configs');
-  };
-
   const currentTool = useMemo(() => ({
     id: toolId,
     steps,
@@ -1273,123 +1262,117 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   // Tool action buttons next to the name
   const toolActionButtons = !embedded ? (
     <div className="flex items-center gap-1">
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setShowRenameDialog(true)}
-              disabled={!toolId.trim()}
-            >
-              <Edit2 className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Rename Tool</p>
-          </TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setShowDuplicateDialog(true)}
-              disabled={!toolId.trim()}
-            >
-              <CopyPlus className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Duplicate Tool</p>
-          </TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setShowDeleteDialog(true)}
-              disabled={!toolId.trim()}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Delete Tool</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <FolderPicker
+        value={folder}
+        onChange={(f) => setFolder(f ?? undefined)}
+      />
+      <ToolActionsMenu
+        tool={currentTool}
+        disabled={!toolId.trim()}
+        showLabel
+        onRenamed={(newId) => {
+          setToolId(newId);
+          router.push(`/tools/${encodeURIComponent(newId)}`);
+        }}
+        onArchived={() => router.push('/configs')}
+        onUnarchived={() => setIsArchived(false)}
+      />
     </div>
   ) : null;
 
   // Default header actions for standalone mode
+  const handleUnarchive = async () => {
+    try {
+      const client = createSuperglueClient(config.superglueEndpoint);
+      await client.archiveWorkflow(toolId, false);
+      setIsArchived(false);
+      refreshTools();
+    } catch (error: any) {
+      console.error("Error unarchiving tool:", error);
+      toast({
+        title: "Error unarchiving tool",
+        description: error.message || "An unexpected error occurred",
+        variant: "destructive",
+      });
+    }
+  };
+
   const defaultHeaderActions = (
     <div className="flex items-center gap-2">
-      {loading ? (
+      {isArchived ? (
         <Button
           variant="outline"
-          onClick={handleStopExecution}
-          disabled={saving || (isExecutingStep !== undefined) || isExecutingTransform}
+          onClick={handleUnarchive}
           className="h-9 px-4"
         >
-          <Square className="h-4 w-4" />
-          Stop Execution
+          <ArchiveRestore className="h-4 w-4" />
+          Unarchive
         </Button>
       ) : (
-        <Button
-          variant="outline"
-          onClick={handleRunAllSteps}
-          disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
-          className="h-9 px-4"
-        >
-          <Play className="h-4 w-4" />
-          Run all Steps
+        <>
+          {loading ? (
+            <Button
+              variant="outline"
+              onClick={handleStopExecution}
+              disabled={saving || (isExecutingStep !== undefined) || isExecutingTransform}
+              className="h-9 px-4"
+            >
+              <Square className="h-4 w-4" />
+              Stop Execution
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={handleRunAllSteps}
+              disabled={loading || saving || (isExecutingStep !== undefined) || isExecutingTransform}
+              className="h-9 px-4"
+            >
+              <Play className="h-4 w-4" />
+              Run all Steps
+            </Button>
+          )}
+          {!hideRebuildButton && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                onRebuildStart?.();
+                setShowToolBuilder(true);
+              }}
+              className="h-9 px-5"
+            >
+              <Hammer className="h-4 w-4" />
+              Rebuild
+            </Button>
+          )}
+          {!embedded && (
+            <Button
+              variant="outline"
+              onClick={async () => {
+                await saveTool();
+                setShowDeployModal(true);
+              }}
+              className="h-9 px-5"
+              disabled={saving || loading}
+            >
+              <CloudUpload className="h-4 w-4" />
+              Deploy
+            </Button>
+          )}
+          <Button
+            variant="default"
+            onClick={saveTool}
+            disabled={saving || loading}
+            className="h-9 px-5 w-[108px] shadow-md border border-primary/40"
+          >
+            {saving ? "Saving..." : justSaved ? (
+              <>
+                <Check className="mr-1 h-3.5 w-3.5" />
+                Saved
+              </>
+            ) : saveButtonText}
           </Button>
+        </>
       )}
-      {!hideRebuildButton && (
-        <Button
-          variant="outline"
-          onClick={() => {
-            onRebuildStart?.();
-            setShowToolBuilder(true);
-          }}
-          className="h-9 px-5"
-        >
-          <Hammer className="h-4 w-4" />
-          Rebuild
-        </Button>
-      )}
-      {!embedded && (
-        <Button
-          variant="outline"
-          onClick={async () => {
-            await saveTool();
-            setShowDeployModal(true);
-          }}
-          className="h-9 px-5"
-          disabled={saving || loading}
-        >
-          <CloudUpload className="h-4 w-4" />
-          Deploy
-        </Button>
-      )}
-      <Button
-        variant="default"
-        onClick={saveTool}
-        disabled={saving || loading}
-        className="h-9 px-5 w-[108px] shadow-md border border-primary/40"
-      >
-        {saving ? "Saving..." : justSaved ? (
-          <>
-            <Check className="mr-1 h-3.5 w-3.5" />
-            Saved
-          </>
-        ) : saveButtonText}
-      </Button>
     </div>
   );
 
@@ -1511,6 +1494,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
                   onAbort={currentRunId ? handleStopExecution : undefined}
                   sourceDataVersion={sourceDataVersion}
                   onDataSelectorOutputChange={handleDataSelectorOutputChange}
+                  readOnly={isArchived}
                 />
               )}
             </div>
@@ -1586,27 +1570,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
         payload={computedPayload}
         isOpen={showDeployModal}
         onClose={() => setShowDeployModal(false)}
-      />
-
-      <RenameToolDialog
-        tool={currentTool}
-        isOpen={showRenameDialog}
-        onClose={() => setShowRenameDialog(false)}
-        onRenamed={handleRenamed}
-      />
-
-      <DuplicateToolDialog
-        tool={currentTool}
-        isOpen={showDuplicateDialog}
-        onClose={() => setShowDuplicateDialog(false)}
-        onDuplicated={handleDuplicated}
-      />
-
-      <DeleteConfigDialog
-        config={{ ...currentTool, type: 'tool' } as any}
-        isOpen={showDeleteDialog}
-        onClose={() => setShowDeleteDialog(false)}
-        onDeleted={handleDeleted}
       />
 
       <FixTransformDialog

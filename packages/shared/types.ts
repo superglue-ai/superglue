@@ -236,6 +236,8 @@ export interface Tool extends BaseConfig {
   responseSchema?: JSONSchema;
   instruction?: string;
   originalResponseSchema?: JSONSchema;
+  folder?: string;
+  archived?: boolean;
 }
 
 export interface ToolStepResult {

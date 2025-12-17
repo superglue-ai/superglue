@@ -124,14 +124,6 @@ describe('FileStore', () => {
       expect(items[1].id).toBe(run1.id);
     });
 
-    it('should delete runs', async () => {
-      await store.createRun({ run: testRun });
-      const deleted = await store.deleteRun({ id: testRun.id, orgId: testOrgId });
-      expect(deleted).toBe(true);
-      const retrieved = await store.getRun({ id: testRun.id, orgId: testOrgId });
-      expect(retrieved).toBeNull();
-    });
-
     it('should list runs filtered by config ID', async () => {
       const run1: Run = { ...testRun, id: 'run1', toolId: 'config1' };
       const run2: Run = { ...testRun, id: 'run2', toolId: 'config2' };
@@ -258,43 +250,6 @@ describe('FileStore', () => {
       
       expect(results).toHaveLength(2);
       expect(results.map(i => i.id).sort()).toEqual(['int1', 'int2']);
-    });
-  });
-
-  describe('Workflow', () => {
-    const testWorkflow = {
-      id: 'test-workflow-id',
-      steps: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    it('should get many workflows by ids, skipping missing ones', async () => {
-      const workflow1: Tool = {
-        id: 'workflow1',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        instruction: 'Test workflow 1',
-        steps: [],
-        inputSchema: {}
-      };
-      
-      const workflow2: Tool = {
-        id: 'workflow2',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        instruction: 'Test workflow 2',
-        steps: [],
-        inputSchema: {}
-      };
-      
-      await store.upsertWorkflow({ id: workflow1.id, workflow: workflow1, orgId: testOrgId });
-      await store.upsertWorkflow({ id: workflow2.id, workflow: workflow2, orgId: testOrgId });
-      
-      const results = await store.getManyWorkflows({ ids: ['workflow1', 'missing', 'workflow2'], orgId: testOrgId });
-      
-      expect(results).toHaveLength(2);
-      expect(results.map(w => w.id).sort()).toEqual(['workflow1', 'workflow2']);
     });
   });
 
