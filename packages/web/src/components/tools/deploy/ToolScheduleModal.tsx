@@ -3,8 +3,7 @@ import { useTools } from '@/src/app/tools-context';
 import { useToast } from '@/src/hooks/use-toast';
 import { cn, getGroupedTimezones } from '@/src/lib/general-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
-import { SuperglueClient, ToolSchedule } from '@superglue/shared';
-import { validateCronExpression } from '@superglue/shared';
+import { SuperglueClient, ToolSchedule, validateCronExpression } from '@superglue/shared';
 import { Check, ChevronRight, ChevronsUpDown, Loader2 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
@@ -408,7 +407,7 @@ const ToolScheduleModal = ({ toolId, isOpen, schedule, onClose, onSave }: ToolSc
                               <>
                                 <CommandEmpty>No tools found.</CommandEmpty>
                                 <CommandGroup>
-                                  {tools.filter(tool => tool.id !== toolId && tool.steps?.length > 0).map((tool) => (
+                                  {tools.filter(tool => tool.id !== toolId && tool.steps?.length > 0 && !tool.archived).map((tool) => (
                                     <CommandItem
                                       key={tool.id}
                                       value={tool.id}
