@@ -1,6 +1,6 @@
 import { useConfig } from "@/src/app/config-context";
 import { useTools } from "@/src/app/tools-context";
-import { FolderPicker, UNCATEGORIZED } from "@/src/components/tools/FolderPicker";
+import { FolderPicker, UNCATEGORIZED } from "@/src/components/tools/folders/FolderPicker";
 import { Button } from "@/src/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
 import { Input } from "@/src/components/ui/input";

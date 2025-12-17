@@ -12,21 +12,21 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 
+import { DeployButton } from '@/src/components/tools/deploy/DeployButton';
 import { ToolDeployModal } from '@/src/components/tools/deploy/ToolDeployModal';
-import { FolderSelector, useFolderFilter } from '@/src/components/tools/FolderSelector';
-import { InlineFolderPicker } from '@/src/components/tools/InlineFolderPicker';
+import { FolderSelector, useFolderFilter } from '@/src/components/tools/folders/FolderSelector';
+import { InlineFolderPicker } from '@/src/components/tools/folders/InlineFolderPicker';
 import { CopyButton } from '@/src/components/tools/shared/CopyButton';
 import { ToolActionsMenu } from '@/src/components/tools/ToolActionsMenu';
 import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
 import { Integration, Tool } from '@superglue/shared';
-import { ArrowDown, ArrowUp, ArrowUpDown, CloudUpload, Globe, Hammer, Loader2, Plus, RotateCw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Globe, Hammer, Loader2, Plus, RotateCw, Search } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
-import { useSchedules } from '../schedules-context';
 import { useTools } from '../tools-context';
 
 type SortColumn = 'id' | 'folder' | 'instruction' | 'updatedAt';
@@ -36,7 +36,6 @@ const ConfigTable = () => {
   const router = useRouter();
   const {tools, isInitiallyLoading, isRefreshing, refreshTools} = useTools();
   const { integrations } = useIntegrations();
-  const { getSchedulesForTool } = useSchedules();
 
   const [currentConfigs, setCurrentConfigs] = useState<Tool[]>([]);
   const [total, setTotal] = useState(0);
@@ -387,27 +386,13 @@ const ConfigTable = () => {
                           <Hammer className="h-4 w-4" />
                           View
                         </Button>
-                        {!tool.archived && (() => {
-                          const activeCount = getSchedulesForTool(tool.id).filter(s => s.enabled).length;
-                          return (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => handleDeployClick(e, tool.id)}
-                              className="gap-2"
-                            >
-                              <span className="relative">
-                                <CloudUpload className="h-4 w-4" />
-                                {activeCount > 0 && (
-                                  <span className="absolute -top-1.5 -right-1.5 text-[10px] font-medium bg-primary text-primary-foreground rounded-full h-3.5 min-w-[0.875rem] px-1 flex items-center justify-center border-2 border-background">
-                                    {activeCount}
-                                  </span>
-                                )}
-                              </span>
-                              Deploy
-                            </Button>
-                          );
-                        })()}
+                        {!tool.archived && (
+                          <DeployButton
+                            toolId={tool.id}
+                            onClick={(e) => handleDeployClick(e, tool.id)}
+                            className="gap-2"
+                          />
+                        )}
                         <ToolActionsMenu tool={tool} />
                       </div>
                     </TableCell>

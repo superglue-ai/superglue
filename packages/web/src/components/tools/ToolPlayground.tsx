@@ -9,7 +9,7 @@ import { buildEvolvingPayload, computeStepOutput, computeToolPayload, isAbortErr
 import { ExecutionStep, generateDefaultFromSchema, Integration, Tool, ToolResult } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import isEqual from "lodash.isequal";
-import { ArchiveRestore, Check, CloudUpload, Hammer, Loader2, Play, Square, X } from "lucide-react";
+import { ArchiveRestore, Check, Hammer, Loader2, Play, Square, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -24,11 +24,12 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
+import { DeployButton } from "./deploy/DeployButton";
 import { ToolDeployModal } from "./deploy/ToolDeployModal";
 import { FixStepDialog } from "./dialogs/FixStepDialog";
 import { FixTransformDialog } from "./dialogs/FixTransformDialog";
 import { ModifyStepConfirmDialog } from "./dialogs/ModifyStepConfirmDialog";
-import { FolderPicker } from "./FolderPicker";
+import { FolderPicker } from "./folders/FolderPicker";
 import { ToolActionsMenu } from "./ToolActionsMenu";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 import { ToolStepGallery } from "./ToolStepGallery";
@@ -1344,19 +1345,17 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
               Rebuild
             </Button>
           )}
-          {!embedded && (
-            <Button
-              variant="outline"
+          {!embedded && toolId && (
+            <DeployButton
+              toolId={toolId}
               onClick={async () => {
                 await saveTool();
                 setShowDeployModal(true);
               }}
+              size="default"
               className="h-9 px-5"
               disabled={saving || loading}
-            >
-              <CloudUpload className="h-4 w-4" />
-              Deploy
-            </Button>
+            />
           )}
           <Button
             variant="default"
