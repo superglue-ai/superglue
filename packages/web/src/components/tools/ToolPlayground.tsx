@@ -25,7 +25,6 @@ import {
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { DeployButton } from "./deploy/DeployButton";
-import { ToolDeployModal } from "./deploy/ToolDeployModal";
 import { FixStepDialog } from "./dialogs/FixStepDialog";
 import { FixTransformDialog } from "./dialogs/FixTransformDialog";
 import { ModifyStepConfirmDialog } from "./dialogs/ModifyStepConfirmDialog";
@@ -204,7 +203,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
   const lastAbortTimeRef = useRef<number>(0);
   const [showToolBuilder, setShowToolBuilder] = useState(false);
   const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
-  const [showDeployModal, setShowDeployModal] = useState(false);
   const [showModifyStepConfirm, setShowModifyStepConfirm] = useState(false);
   const [pendingModifyStepIndex, setPendingModifyStepIndex] = useState<number | null>(null);
   const modifyStepResolveRef = useRef<((shouldContinue: boolean) => void) | null>(null);
@@ -1347,11 +1345,9 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           )}
           {!embedded && toolId && (
             <DeployButton
-              toolId={toolId}
-              onClick={async () => {
-                await saveTool();
-                setShowDeployModal(true);
-              }}
+              tool={currentTool}
+              payload={computedPayload}
+              onBeforeOpen={saveTool}
               size="default"
               className="h-9 px-5"
               disabled={saving || loading}
@@ -1549,27 +1545,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
           onCancel={handleModifyStepCancel}
         />
       )}
-
-      <ToolDeployModal
-        currentTool={{
-          id: toolId,
-          steps: steps.map((step: ExecutionStep) => ({
-            ...step,
-            apiConfig: {
-              id: step.apiConfig.id || step.id,
-              ...step.apiConfig,
-              pagination: step.apiConfig.pagination || null
-            }
-          })),
-          responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
-          inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
-          finalTransform,
-          instruction: instructions
-        }}
-        payload={computedPayload}
-        isOpen={showDeployModal}
-        onClose={() => setShowDeployModal(false)}
-      />
 
       <FixTransformDialog
         open={showFixTransformDialog}
