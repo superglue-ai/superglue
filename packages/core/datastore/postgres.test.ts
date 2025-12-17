@@ -364,6 +364,27 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
                 });
             });
 
+            it('should list all workflow schedules for org when workflowId is not provided', async () => {
+                const testWorkflow2 = { ...testWorkflow, id: 'test-workflow-2' };
+                const testSchedule2: ToolScheduleInternal = {
+                    ...testWorkflowSchedule,
+                    id: 'schedule-2',
+                    workflowId: testWorkflow2.id,
+                };
+
+                await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+                await store.upsertWorkflow({ id: testWorkflow2.id, workflow: testWorkflow2, orgId: testOrgId });
+                await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
+                await store.upsertWorkflowSchedule({ schedule: testSchedule2 });
+
+                const allSchedules = await store.listWorkflowSchedules({ orgId: testOrgId });
+                expect(allSchedules).toHaveLength(2);
+                
+                const scheduleIds = allSchedules.map(s => s.id);
+                expect(scheduleIds).toContain(testWorkflowSchedule.id);
+                expect(scheduleIds).toContain(testSchedule2.id);
+            });
+
             it('should list due workflow schedules only', async () => {
                 const futureSchedule: ToolScheduleInternal = {
                     ...testWorkflowSchedule,

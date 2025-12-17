@@ -12,16 +12,17 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 
+import { DeployButton } from '@/src/components/tools/deploy/DeployButton';
 import { ToolDeployModal } from '@/src/components/tools/deploy/ToolDeployModal';
-import { FolderSelector, useFolderFilter } from '@/src/components/tools/FolderSelector';
-import { InlineFolderPicker } from '@/src/components/tools/InlineFolderPicker';
+import { FolderSelector, useFolderFilter } from '@/src/components/tools/folders/FolderSelector';
+import { InlineFolderPicker } from '@/src/components/tools/folders/InlineFolderPicker';
 import { CopyButton } from '@/src/components/tools/shared/CopyButton';
 import { ToolActionsMenu } from '@/src/components/tools/ToolActionsMenu';
 import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
 import { Integration, Tool } from '@superglue/shared';
-import { ArrowDown, ArrowUp, ArrowUpDown, CloudUpload, Globe, Hammer, Loader2, Plus, RotateCw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Globe, Hammer, Loader2, Plus, RotateCw, Search } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
@@ -386,15 +387,11 @@ const ConfigTable = () => {
                           View
                         </Button>
                         {!tool.archived && (
-                          <Button
-                            variant="outline"
-                            size="sm"
+                          <DeployButton
+                            toolId={tool.id}
                             onClick={(e) => handleDeployClick(e, tool.id)}
                             className="gap-2"
-                          >
-                            <CloudUpload className="h-4 w-4" />
-                            Deploy
-                          </Button>
+                          />
                         )}
                         <ToolActionsMenu tool={tool} />
                       </div>

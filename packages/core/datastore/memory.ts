@@ -319,10 +319,13 @@ export class MemoryStore implements DataStore {
   }
 
   // Workflow Schedule Methods
-  async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<ToolScheduleInternal[]> {
+  async listWorkflowSchedules(params: { workflowId?: string, orgId: string }): Promise<ToolScheduleInternal[]> {
     const { workflowId, orgId } = params;
-    return this.getOrgItems(this.storage.workflowSchedules, 'workflow-schedule', orgId)
-      .filter(schedule => schedule.workflowId === workflowId);
+    const schedules = this.getOrgItems(this.storage.workflowSchedules, 'workflow-schedule', orgId);
+    if (workflowId) {
+      return schedules.filter(schedule => schedule.workflowId === workflowId);
+    }
+    return schedules;
   }
 
   async getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<ToolScheduleInternal | null> {

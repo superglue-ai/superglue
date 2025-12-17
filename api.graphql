@@ -317,7 +317,7 @@ type Query {
   generateInstructions(integrations: [IntegrationInput!]!): [String!]!
   getTenantInfo: TenantInfo
 
-  listWorkflowSchedules(workflowId: String!): [WorkflowSchedule!]!
+  listWorkflowSchedules(workflowId: String): [WorkflowSchedule!]!
 }
 
 type TenantInfo {

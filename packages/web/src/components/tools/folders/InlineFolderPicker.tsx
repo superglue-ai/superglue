@@ -2,10 +2,10 @@
 
 import { useConfig } from "@/src/app/config-context";
 import { useTools } from "@/src/app/tools-context";
-import { FolderPicker } from "@/src/components/tools/FolderPicker";
+import { FolderPicker } from "@/src/components/tools/folders/FolderPicker";
 import { createSuperglueClient } from "@/src/lib/client-utils";
 import { Tool } from "@superglue/shared";
-import { useToast } from "../../hooks/use-toast";
+import { useToast } from "@/src/hooks/use-toast";
 
 interface InlineFolderPickerProps {
   tool: Tool;

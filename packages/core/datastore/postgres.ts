@@ -612,13 +612,22 @@ export class PostgresService implements DataStore {
     }
 
     // Workflow Schedule Methods
-    async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<ToolScheduleInternal[]> {
+    async listWorkflowSchedules(params: { workflowId?: string, orgId: string }): Promise<ToolScheduleInternal[]> {
         const client = await this.pool.connect();
 
         try {
-            const query = 'SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE workflow_id = $1 AND org_id = $2';
-            const queryResult = await client.query(query, [params.workflowId, params.orgId]);
+            let query: string;
+            let queryParams: string[];
 
+            if (params.workflowId) {
+                query = 'SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE workflow_id = $1 AND org_id = $2';
+                queryParams = [params.workflowId, params.orgId];
+            } else {
+                query = 'SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE org_id = $1';
+                queryParams = [params.orgId];
+            }
+
+            const queryResult = await client.query(query, queryParams);
             return queryResult.rows.map(this.mapWorkflowSchedule);
         } finally {
             client.release();

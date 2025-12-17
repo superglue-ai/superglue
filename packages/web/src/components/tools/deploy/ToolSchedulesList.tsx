@@ -4,6 +4,7 @@ import { Check, Edit, Loader2, Play, Plus, Square, Trash2, X } from "lucide-reac
 import React from 'react';
 
 import { useConfig } from '@/src/app/config-context';
+import { useSchedules } from '@/src/app/schedules-context';
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { StatusTooltip } from "@/src/components/ui/status-tooltip";
@@ -25,8 +26,9 @@ import ToolScheduleModal from './ToolScheduleModal';
 
 const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refreshTrigger?: number }) => {
   const config = useConfig();
-  const [toolSchedules, setToolSchedules] = React.useState<ToolSchedule[]>([]);
-  const [loadingSchedules, setLoadingSchedules] = React.useState(false);
+  const { getSchedulesForTool, isInitiallyLoading, refreshSchedules } = useSchedules();
+  const toolSchedules = getSchedulesForTool(toolId);
+  
   const [showForm, setShowForm] = React.useState(false);
   const [editingSchedule, setEditingSchedule] = React.useState<ToolSchedule | null>(null);
   const [executingSchedules, setExecutingSchedules] = React.useState<Record<string, 'loading' | 'success' | 'error'>>({});
@@ -35,38 +37,13 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
   const lastAbortTimesRef = React.useRef<Record<string, number>>({});
 
   React.useEffect(() => {
-    loadSchedules();
-  }, [toolId]);
-
-  React.useEffect(() => {
     if (refreshTrigger !== undefined && refreshTrigger > 0) {
-      loadSchedules(false);
+      refreshSchedules();
     }
   }, [refreshTrigger]);
 
-  const loadSchedules = async (showLoading = true) => {
-    if (showLoading) {
-      setLoadingSchedules(true);
-    }
-
-    const superglueClient = new SuperglueClient({
-      endpoint: config.superglueEndpoint,
-      apiKey: tokenRegistry.getToken()
-    });
-
-    const schedules = await superglueClient.listWorkflowSchedules(toolId);
-
-    setToolSchedules(schedules);
-    setLoadingSchedules(false);
-  };
-
   const handleScheduleDelete = async (e: React.MouseEvent, scheduleId: string) => {
     e.stopPropagation();
-
-    // optimistic update
-    setToolSchedules(prevSchedules =>
-      prevSchedules.filter(schedule => schedule.id !== scheduleId)
-    );
 
     const superglueClient = new SuperglueClient({
       endpoint: config.superglueEndpoint,
@@ -74,21 +51,10 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
     });
 
     await superglueClient.deleteWorkflowSchedule(scheduleId);
-
-    // make sure server and client state are in sync
-    loadSchedules(false);
+    refreshSchedules();
   };
 
   const handleScheduleStateToggle = async (newState: boolean, scheduleId: string) => {
-    // optimistic update
-    setToolSchedules(prevSchedules =>
-      prevSchedules.map(schedule =>
-        schedule.id === scheduleId
-          ? { ...schedule, enabled: newState }
-          : schedule
-      )
-    );
-
     const superglueClient = new SuperglueClient({
       endpoint: config.superglueEndpoint,
       apiKey: tokenRegistry.getToken()
@@ -99,8 +65,7 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
       enabled: newState
     });
 
-    // make sure server and client state are in sync (e.g. for nextRunAt)
-    loadSchedules(false);
+    refreshSchedules();
   };
 
   const handleRunNow = async (e: React.MouseEvent, scheduleId: string) => {
@@ -138,7 +103,7 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
         throw new Error(result.error || 'Execution failed');
       }
 
-      loadSchedules(false);
+      refreshSchedules();
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       setExecutingSchedules(prev => ({ ...prev, [scheduleId]: 'error' }));
@@ -191,10 +156,10 @@ const ToolSchedulesList = ({ toolId, refreshTrigger }: { toolId: string, refresh
 
   const handleFormSave = () => {
     handleFormClose();
-    loadSchedules();
+    refreshSchedules();
   };
 
-  if (loadingSchedules) {
+  if (isInitiallyLoading) {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
