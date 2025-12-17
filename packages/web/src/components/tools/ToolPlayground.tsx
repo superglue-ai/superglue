@@ -1282,10 +1282,19 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
 
   // Default header actions for standalone mode
   const handleUnarchive = async () => {
-    const client = createSuperglueClient(config.superglueEndpoint);
-    await client.archiveWorkflow(toolId, false);
-    setIsArchived(false);
-    refreshTools();
+    try {
+      const client = createSuperglueClient(config.superglueEndpoint);
+      await client.archiveWorkflow(toolId, false);
+      setIsArchived(false);
+      refreshTools();
+    } catch (error: any) {
+      console.error("Error unarchiving tool:", error);
+      toast({
+        title: "Error unarchiving tool",
+        description: error.message || "An unexpected error occurred",
+        variant: "destructive",
+      });
+    }
   };
 
   const defaultHeaderActions = (
