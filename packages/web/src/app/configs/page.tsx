@@ -13,7 +13,6 @@ import {
 } from "@/src/components/ui/table";
 
 import { DeployButton } from '@/src/components/tools/deploy/DeployButton';
-import { ToolDeployModal } from '@/src/components/tools/deploy/ToolDeployModal';
 import { FolderSelector, useFolderFilter } from '@/src/components/tools/folders/FolderSelector';
 import { InlineFolderPicker } from '@/src/components/tools/folders/InlineFolderPicker';
 import { CopyButton } from '@/src/components/tools/shared/CopyButton';
@@ -42,7 +41,6 @@ const ConfigTable = () => {
   const [page, setPage] = useState(0);
   const [pageSize] = useState(20);
 
-  const [deployToolId, setDeployToolId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [manuallyOpenedStepper, setManuallyOpenedStepper] = useState(false);
 
@@ -108,11 +106,6 @@ const ConfigTable = () => {
     e.stopPropagation();
     // Navigate to the tool page, passing the ID. The user can then run it.
     router.push(`/tools/${encodeURIComponent(id)}`);
-  };
-
-  const handleDeployClick = (e: React.MouseEvent, toolId: string) => {
-    e.stopPropagation();
-    setDeployToolId(toolId);
   };
 
   const handleSort = (column: SortColumn) => {
@@ -388,8 +381,7 @@ const ConfigTable = () => {
                         </Button>
                         {!tool.archived && (
                           <DeployButton
-                            toolId={tool.id}
-                            onClick={(e) => handleDeployClick(e, tool.id)}
+                            tool={tool}
                             className="gap-2"
                           />
                         )}
@@ -423,14 +415,6 @@ const ConfigTable = () => {
         </Button>
       </div>
 
-      {deployToolId && (
-        <ToolDeployModal
-          currentTool={tools.find(c => c.id === deployToolId) as Tool}
-          payload={{}}
-          isOpen={!!deployToolId}
-          onClose={() => setDeployToolId(null)}
-        />
-      )}
     </div>
   );
 };
