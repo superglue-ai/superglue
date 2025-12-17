@@ -2,11 +2,10 @@
 
 import { useConfig } from "@/src/app/config-context";
 import { useTools } from "@/src/app/tools-context";
-import { FolderPicker, UNCATEGORIZED } from "@/src/components/tools/FolderPicker";
-import { Button } from "@/src/components/ui/button";
+import { FolderPicker } from "@/src/components/tools/FolderPicker";
 import { createSuperglueClient } from "@/src/lib/client-utils";
 import { Tool } from "@superglue/shared";
-import { Folder } from "lucide-react";
+import { useToast } from "../../hooks/use-toast";
 
 interface InlineFolderPickerProps {
   tool: Tool;
@@ -15,6 +14,7 @@ interface InlineFolderPickerProps {
 export function InlineFolderPicker({ tool }: InlineFolderPickerProps) {
   const config = useConfig();
   const { refreshTools } = useTools();
+  const { toast } = useToast();
 
   const handleFolderChange = async (newFolder: string | null) => {
     try {
@@ -22,7 +22,12 @@ export function InlineFolderPicker({ tool }: InlineFolderPickerProps) {
       await client.upsertWorkflow(tool.id, { ...tool, folder: newFolder });
       refreshTools();
     } catch (error) {
-      console.error("Failed to update folder:", error);
+      toast({
+        title: "Error updating folder",
+        description: error instanceof Error ? error.message : "Failed to update folder",
+        variant: "destructive",
+      });
+      refreshTools();
     }
   };
 
@@ -30,16 +35,6 @@ export function InlineFolderPicker({ tool }: InlineFolderPickerProps) {
     <FolderPicker
       value={tool.folder}
       onChange={handleFolderChange}
-      trigger={
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 gap-1.5 text-muted-foreground hover:text-foreground max-w-full"
-        >
-          <Folder className="h-3.5 w-3.5" />
-          <span className="truncate text-xs max-w-[150px]">{tool.folder || UNCATEGORIZED}</span>
-        </Button>
-      }
     />
   );
 }

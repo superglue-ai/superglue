@@ -9,7 +9,7 @@ import { buildEvolvingPayload, computeStepOutput, computeToolPayload, isAbortErr
 import { ExecutionStep, generateDefaultFromSchema, Integration, Tool, ToolResult } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import isEqual from "lodash.isequal";
-import { ArchiveRestore, Check, CloudUpload, Folder, Hammer, Loader2, Play, Square, X } from "lucide-react";
+import { ArchiveRestore, Check, CloudUpload, Hammer, Loader2, Play, Square, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useToast } from "../../hooks/use-toast";
@@ -28,7 +28,7 @@ import { ToolDeployModal } from "./deploy/ToolDeployModal";
 import { FixStepDialog } from "./dialogs/FixStepDialog";
 import { FixTransformDialog } from "./dialogs/FixTransformDialog";
 import { ModifyStepConfirmDialog } from "./dialogs/ModifyStepConfirmDialog";
-import { FolderPicker, UNCATEGORIZED } from "./FolderPicker";
+import { FolderPicker } from "./FolderPicker";
 import { ToolActionsMenu } from "./ToolActionsMenu";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 import { ToolStepGallery } from "./ToolStepGallery";
@@ -1264,16 +1264,6 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(({
       <FolderPicker
         value={folder}
         onChange={(f) => setFolder(f ?? undefined)}
-        trigger={
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5"
-          >
-            <Folder className="h-3.5 w-3.5" />
-            <span className="truncate text-xs max-w-[200px]">{folder || UNCATEGORIZED}</span>
-          </Button>
-        }
       />
       <ToolActionsMenu
         tool={currentTool}

@@ -2,18 +2,18 @@
 
 import { Button } from "@/src/components/ui/button";
 import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-    CommandSeparator,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
 } from "@/src/components/ui/command";
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
 } from "@/src/components/ui/popover";
 import { cn } from "@/src/lib/general-utils";
 import { Tool } from '@superglue/shared';
@@ -21,7 +21,7 @@ import { Archive, Check, ChevronRight, Folder, FolderOpen } from "lucide-react";
 import { useMemo, useState } from 'react';
 
 const FOLDER_STORAGE_KEY = 'superglue-selected-folder';
-const UNCATEGORIZED = 'Uncategorized';
+const UNCATEGORIZED = '';
 
 interface FolderNode {
   name: string;
@@ -167,7 +167,7 @@ export function FolderSelector({ tools, selectedFolder, onFolderChange }: Folder
                     ) : (
                       <Folder className="mr-2 h-4 w-4 flex-shrink-0" />
                     )}
-                    <span className={cn("truncate", isSelected && "font-medium")}>{folder.name}</span>
+                    <span className={cn("truncate", isSelected && "font-medium")}>{folder.name || "No Folder"}</span>
                     {folder.count > 0 && (
                       <span className="ml-auto text-xs text-muted-foreground">
                         {folder.count}

@@ -4,13 +4,6 @@ import { useIntegrations } from '@/src/app/integrations-context';
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/src/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -28,14 +21,15 @@ import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
 import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
 import { Integration, Tool } from '@superglue/shared';
-import { ArrowUpDown, CloudUpload, Globe, Hammer, Loader2, Plus, RotateCw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, CloudUpload, Globe, Hammer, Loader2, Plus, RotateCw, Search } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 import { useTools } from '../tools-context';
 
-type SortOption = 'newest' | 'oldest' | 'name-asc' | 'name-desc';
+type SortColumn = 'id' | 'folder' | 'instruction' | 'updatedAt';
+type SortDirection = 'asc' | 'desc';
 
 const ConfigTable = () => {
   const router = useRouter();
@@ -52,7 +46,8 @@ const ConfigTable = () => {
   const [manuallyOpenedStepper, setManuallyOpenedStepper] = useState(false);
 
   const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [sortColumn, setSortColumn] = useState<SortColumn>('updatedAt');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const { selectedFolder, setSelectedFolder, filteredByFolder } = useFolderFilter(tools);
 
@@ -78,15 +73,16 @@ const ConfigTable = () => {
     });
 
     filtered = [...filtered].sort((a, b) => {
-      switch (sortBy) {
-        case 'newest':
-          return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
-        case 'oldest':
-          return new Date(a.updatedAt || a.createdAt).getTime() - new Date(b.updatedAt || b.createdAt).getTime();
-        case 'name-asc':
-          return a.id.localeCompare(b.id);
-        case 'name-desc':
-          return b.id.localeCompare(a.id);
+      const dir = sortDirection === 'asc' ? 1 : -1;
+      switch (sortColumn) {
+        case 'id':
+          return dir * a.id.localeCompare(b.id);
+        case 'folder':
+          return dir * (a.folder || '').localeCompare(b.folder || '');
+        case 'instruction':
+          return dir * (a.instruction || '').localeCompare(b.instruction || '');
+        case 'updatedAt':
+          return dir * (new Date(a.updatedAt || a.createdAt).getTime() - new Date(b.updatedAt || b.createdAt).getTime());
         default:
           return 0;
       }
@@ -97,12 +93,10 @@ const ConfigTable = () => {
     const start = page * pageSize;
     const end = start + pageSize;
     setCurrentConfigs(filtered.slice(start, end));
-  }, [page, filteredByFolder, searchTerm, sortBy, pageSize]);
+  }, [page, filteredByFolder, searchTerm, sortColumn, sortDirection, pageSize]);
 
   useEffect(() => {
-    if (searchTerm) {
-      setPage(0);
-    }
+    setPage(0);
   }, [searchTerm, selectedFolder]);
 
   const handleTool = () => {
@@ -118,6 +112,22 @@ const ConfigTable = () => {
   const handleDeployClick = (e: React.MouseEvent, toolId: string) => {
     e.stopPropagation();
     setDeployToolId(toolId);
+  };
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection(column === 'updatedAt' ? 'desc' : 'asc');
+    }
+  };
+
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="ml-1 h-3 w-3" /> 
+      : <ArrowDown className="ml-1 h-3 w-3" />;
   };
 
   const getSimpleIcon = (name: string): SimpleIcon | null => {
@@ -189,18 +199,6 @@ const ConfigTable = () => {
             className="pl-10"
           />
         </div>
-        <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-          <SelectTrigger className="w-[150px]">
-            <ArrowUpDown className="mr-2 h-4 w-4 text-muted-foreground" />
-            <SelectValue placeholder="Sort" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="newest">Newest</SelectItem>
-            <SelectItem value="oldest">Oldest</SelectItem>
-            <SelectItem value="name-asc">Name A-Z</SelectItem>
-            <SelectItem value="name-desc">Name Z-A</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="border rounded-lg">
@@ -208,10 +206,42 @@ const ConfigTable = () => {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[60px]"></TableHead>
-              <TableHead>ID</TableHead>
-              <TableHead>Folder</TableHead>
-              <TableHead>Instructions</TableHead>
-              <TableHead>Updated At</TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-muted/50 select-none"
+                onClick={() => handleSort('id')}
+              >
+                <div className="flex items-center">
+                  ID
+                  <SortIcon column="id" />
+                </div>
+              </TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-muted/50 select-none"
+                onClick={() => handleSort('folder')}
+              >
+                <div className="flex items-center">
+                  Folder
+                  <SortIcon column="folder" />
+                </div>
+              </TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-muted/50 select-none"
+                onClick={() => handleSort('instruction')}
+              >
+                <div className="flex items-center">
+                  Instructions
+                  <SortIcon column="instruction" />
+                </div>
+              </TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-muted/50 select-none"
+                onClick={() => handleSort('updatedAt')}
+              >
+                <div className="flex items-center">
+                  Updated At
+                  <SortIcon column="updatedAt" />
+                </div>
+              </TableHead>
               <TableHead className="text-right">
                 <TooltipProvider>
                   <Tooltip>
@@ -330,7 +360,7 @@ const ConfigTable = () => {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="w-[200px] min-w-[200px] max-w-[200px]">
+                    <TableCell className="w-[200px] min-w-[200px] max-w-[400px]">
                       <InlineFolderPicker tool={tool} />
                     </TableCell>
                     <TableCell className="max-w-[300px] truncate relative group">
