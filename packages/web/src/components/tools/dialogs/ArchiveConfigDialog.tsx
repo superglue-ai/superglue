@@ -1,4 +1,5 @@
 import { useConfig } from "@/src/app/config-context";
+import { useSchedules } from "@/src/app/schedules-context";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -10,9 +11,8 @@ import {
     AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog";
 import { createSuperglueClient } from "@/src/lib/client-utils";
-import { ApiConfig, Tool, ToolSchedule } from "@superglue/shared";
-import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { ApiConfig, Tool } from "@superglue/shared";
+import { useMemo } from "react";
 
 interface ArchiveConfigDialogProps {
   config: ApiConfig | Tool | null;
@@ -23,31 +23,12 @@ interface ArchiveConfigDialogProps {
 
 export function ArchiveConfigDialog({ config, isOpen, onClose, onArchived }: ArchiveConfigDialogProps) {
   const superglueConfig = useConfig();
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeSchedules, setActiveSchedules] = useState<ToolSchedule[]>([]);
+  const { getSchedulesForTool, isInitiallyLoading } = useSchedules();
 
-  useEffect(() => {
-    const checkSchedules = async () => {
-      if (!config || !isOpen) {
-        setActiveSchedules([]);
-        return;
-      }
-
-      setIsLoading(true);
-      try {
-        const client = createSuperglueClient(superglueConfig.superglueEndpoint);
-        const schedules = await client.listWorkflowSchedules(config.id);
-        setActiveSchedules(schedules.filter(s => s.enabled));
-      } catch (error) {
-        console.error('Error checking schedules:', error);
-        setActiveSchedules([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkSchedules();
-  }, [config, isOpen, superglueConfig.superglueEndpoint]);
+  const activeSchedules = useMemo(() => {
+    if (!config) return [];
+    return getSchedulesForTool(config.id).filter(s => s.enabled);
+  }, [config, getSchedulesForTool]);
 
   const handleArchive = async () => {
     if (!config || activeSchedules.length > 0) return;
@@ -68,7 +49,7 @@ export function ArchiveConfigDialog({ config, isOpen, onClose, onArchived }: Arc
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'BUTTON' && activeSchedules.length === 0 && !isLoading) {
+    if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'BUTTON' && activeSchedules.length === 0 && !isInitiallyLoading) {
       e.preventDefault();
       handleArchive();
     }
@@ -82,12 +63,7 @@ export function ArchiveConfigDialog({ config, isOpen, onClose, onArchived }: Arc
         <AlertDialogHeader>
           <AlertDialogTitle>Archive this tool?</AlertDialogTitle>
           <AlertDialogDescription>
-            {isLoading ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Checking for active schedules...
-              </span>
-            ) : hasActiveSchedules ? (
+            {hasActiveSchedules ? (
               <span className="text-destructive">
                 This tool has {activeSchedules.length} active schedule{activeSchedules.length > 1 ? 's' : ''}. 
                 Please disable all schedules before archiving.
@@ -101,7 +77,7 @@ export function ArchiveConfigDialog({ config, isOpen, onClose, onArchived }: Arc
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction 
             onClick={handleArchive} 
-            disabled={isLoading || hasActiveSchedules}
+            disabled={hasActiveSchedules}
           >
             Archive
           </AlertDialogAction>

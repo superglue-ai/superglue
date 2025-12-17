@@ -861,9 +861,9 @@ export class SuperglueClient {
       return response.listWorkflows;
     }
 
-    async listWorkflowSchedules(workflowId: string): Promise<ToolSchedule[]> {
+    async listWorkflowSchedules(workflowId?: string): Promise<ToolSchedule[]> {
       const query = `
-        query ListWorkflowSchedules ($workflowId: String!) {
+        query ListWorkflowSchedules ($workflowId: String) {
           listWorkflowSchedules(workflowId: $workflowId) {
             ${SuperglueClient.workflowScheduleQL}
           }

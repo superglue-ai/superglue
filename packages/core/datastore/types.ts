@@ -38,7 +38,7 @@ export interface DataStore {
   copyTemplateDocumentationToUserIntegration(params: { templateId: string; userIntegrationId: string; orgId?: string }): Promise<boolean>;
 
   // Workflow Schedule
-  listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<ToolScheduleInternal[]>;
+  listWorkflowSchedules(params: { workflowId?: string, orgId: string }): Promise<ToolScheduleInternal[]>;
   getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<ToolScheduleInternal | null>;
   upsertWorkflowSchedule(params: { schedule: ToolScheduleInternal })
   deleteWorkflowSchedule(params: { id: string, orgId: string }): Promise<boolean>;

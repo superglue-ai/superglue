@@ -26,6 +26,7 @@ import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
+import { useSchedules } from '../schedules-context';
 import { useTools } from '../tools-context';
 
 type SortColumn = 'id' | 'folder' | 'instruction' | 'updatedAt';
@@ -35,6 +36,7 @@ const ConfigTable = () => {
   const router = useRouter();
   const {tools, isInitiallyLoading, isRefreshing, refreshTools} = useTools();
   const { integrations } = useIntegrations();
+  const { getSchedulesForTool } = useSchedules();
 
   const [currentConfigs, setCurrentConfigs] = useState<Tool[]>([]);
   const [total, setTotal] = useState(0);
@@ -385,17 +387,27 @@ const ConfigTable = () => {
                           <Hammer className="h-4 w-4" />
                           View
                         </Button>
-                        {!tool.archived && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => handleDeployClick(e, tool.id)}
-                            className="gap-2"
-                          >
-                            <CloudUpload className="h-4 w-4" />
-                            Deploy
-                          </Button>
-                        )}
+                        {!tool.archived && (() => {
+                          const activeCount = getSchedulesForTool(tool.id).filter(s => s.enabled).length;
+                          return (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => handleDeployClick(e, tool.id)}
+                              className="gap-2"
+                            >
+                              <span className="relative">
+                                <CloudUpload className="h-4 w-4" />
+                                {activeCount > 0 && (
+                                  <span className="absolute -top-1.5 -right-1.5 text-[10px] font-medium bg-primary text-primary-foreground rounded-full h-3.5 min-w-[0.875rem] px-1 flex items-center justify-center border-2 border-background">
+                                    {activeCount}
+                                  </span>
+                                )}
+                              </span>
+                              Deploy
+                            </Button>
+                          );
+                        })()}
                         <ToolActionsMenu tool={tool} />
                       </div>
                     </TableCell>
