@@ -57,8 +57,7 @@ RUN apt-get update && \
         libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libjpeg62-turbo libgif7 librsvg2-2 libpixman-1-0
 
 # Install production dependencies and Playwright
-RUN npm ci --production=false && \
-    npm prune --production && \
+RUN npm ci --omit=dev && \
     npm install --save-optional @napi-rs/canvas-linux-x64-gnu && \
     npx playwright install --with-deps chromium
 
