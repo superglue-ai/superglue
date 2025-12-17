@@ -9,41 +9,39 @@ import { ALLOWED_FILE_EXTENSIONS } from '@superglue/shared';
 import { FileBraces, FileBracesCorner, FileJson, Upload } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { JsonCodeEditor } from '../../editors/JsonCodeEditor';
+import { useToolConfig } from '../context';
 
-export const PayloadSpotlight = ({
-    payloadText,
-    inputSchema,
-    onChange,
-    onInputSchemaChange,
-    readOnly,
-    onFilesUpload,
-    uploadedFiles = [],
-    onFileRemove,
-    isProcessingFiles = false,
-    totalFileSize = 0,
-    onUserEdit,
-    isPayloadValid
-}: {
-    payloadText: string;
-    inputSchema?: string | null;
-    onChange?: (value: string) => void;
-    onInputSchemaChange?: (value: string | null) => void;
-    readOnly?: boolean;
+interface PayloadSpotlightProps {
     onFilesUpload?: (files: File[]) => Promise<void>;
-    uploadedFiles?: UploadedFileInfo[];
     onFileRemove?: (fileName: string) => void;
     isProcessingFiles?: boolean;
     totalFileSize?: number;
-    onUserEdit?: () => void;
     isPayloadValid?: boolean;
-}) => {
+}
+
+export const PayloadSpotlight = ({
+    onFilesUpload,
+    onFileRemove,
+    isProcessingFiles = false,
+    totalFileSize = 0,
+    isPayloadValid
+}: PayloadSpotlightProps) => {
+    const { 
+        payload, 
+        inputSchema, 
+        setPayloadText, 
+        setInputSchema, 
+        markPayloadEdited 
+    } = useToolConfig();
+    
+    const payloadText = payload.manualPayloadText;
+    const uploadedFiles = payload.uploadedFiles;
     const [activeTab, setActiveTab] = useState('payload');
     const [localPayload, setLocalPayload] = useState<string>(payloadText || '');
     const [localInputSchema, setLocalInputSchema] = useState(inputSchema || null);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Simple sync with parent payload (parent is source of truth)
     useEffect(() => {
         setLocalPayload(payloadText || '');
     }, [payloadText]);
@@ -54,22 +52,19 @@ export const PayloadSpotlight = ({
 
     const handlePayloadChange = (value: string) => {
         setLocalPayload(value);
-        
-        if (onUserEdit) {
-            onUserEdit();
-        }
+        markPayloadEdited();
         
         const trimmed = (value || '').trim();
         if (trimmed === '') {
             setError(null);
-            if (onChange) onChange(value);
+            setPayloadText(value);
             return;
         }
         
         try {
             JSON.parse(value);
             setError(null);
-            if (onChange) onChange(value);
+            setPayloadText(value);
         } catch {
             setError('Invalid JSON - will not be saved. Navigating away will revert to last valid JSON.');
         }
@@ -77,7 +72,7 @@ export const PayloadSpotlight = ({
 
     const handleSchemaChange = (value: string | null) => {
         setLocalInputSchema(value);
-        if (onInputSchemaChange) onInputSchemaChange(value);
+        setInputSchema(value);
     };
 
     // Extract payload schema from full input schema for display in schema tab
@@ -142,7 +137,7 @@ export const PayloadSpotlight = ({
                     )}
                 </TabsList>
                 <TabsContent value="payload" className="mt-1 space-y-3">
-                    {!readOnly && onFilesUpload && uploadedFiles.length > 0 && (
+                    {onFilesUpload && uploadedFiles.length > 0 && (
                         <div className="space-y-1.5">
                             {uploadedFiles.map(file => (
                                 <FileChip
@@ -164,13 +159,13 @@ export const PayloadSpotlight = ({
                         <JsonCodeEditor
                             value={localPayload}
                             onChange={(val) => handlePayloadChange(val || '')}
-                            readOnly={!!readOnly}
+                            readOnly={false}
                             maxHeight="300px"
                             resizable={true}
                             showValidation={true}
                         />
                     </div>
-                    {!readOnly && onFilesUpload && (
+                    {onFilesUpload && (
                         <div className="pt-3 border-t border-border/50 space-y-3">
                             <div className="flex flex-col items-center gap-2">
                                 <Button
@@ -233,33 +228,21 @@ export const PayloadSpotlight = ({
     );
 };
 
-export const PayloadMiniStepCard = React.memo(({
-    payloadText,
-    inputSchema,
-    onChange,
-    onInputSchemaChange,
-    readOnly,
-    onFilesUpload,
-    uploadedFiles,
-    onFileRemove,
-    isProcessingFiles,
-    totalFileSize,
-    onUserEdit,
-    isPayloadValid
-}: {
-    payloadText: string;
-    inputSchema?: string | null;
-    onChange?: (value: string) => void;
-    onInputSchemaChange?: (value: string | null) => void;
-    readOnly?: boolean;
+interface PayloadMiniStepCardProps {
     onFilesUpload?: (files: File[]) => Promise<void>;
-    uploadedFiles?: UploadedFileInfo[];
     onFileRemove?: (key: string) => void;
     isProcessingFiles?: boolean;
     totalFileSize?: number;
-    onUserEdit?: () => void;
     isPayloadValid?: boolean;
-}) => {
+}
+
+export const PayloadMiniStepCard = React.memo(({
+    onFilesUpload,
+    onFileRemove,
+    isProcessingFiles,
+    totalFileSize,
+    isPayloadValid
+}: PayloadMiniStepCardProps) => {
     return (
         <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
             <div className="p-3">
@@ -271,17 +254,10 @@ export const PayloadMiniStepCard = React.memo(({
                     <HelpTooltip text="Payload is the JSON input to tool execution. Editing here does NOT save values to the tool; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
                 </div>
                 <PayloadSpotlight
-                    payloadText={payloadText}
-                    inputSchema={inputSchema}
-                    onChange={onChange}
-                    onInputSchemaChange={onInputSchemaChange}
-                    readOnly={readOnly}
                     onFilesUpload={onFilesUpload}
-                    uploadedFiles={uploadedFiles}
                     onFileRemove={onFileRemove}
                     isProcessingFiles={isProcessingFiles}
                     totalFileSize={totalFileSize}
-                    onUserEdit={onUserEdit}
                     isPayloadValid={isPayloadValid}
                 />
             </div>

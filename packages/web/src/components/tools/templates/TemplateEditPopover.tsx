@@ -13,7 +13,7 @@ import {
 } from '@/src/components/ui/popover';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { useMonacoTheme } from '@/src/hooks/useMonacoTheme';
+import { useMonacoTheme } from '@superglue/web/src/hooks/use-monaco-theme';
 import { DEFAULT_CODE_TEMPLATE, extractCredentials, formatValueForDisplay, normalizeTemplateExpression } from '@/src/lib/templating-utils';
 import Editor from '@monaco-editor/react';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';

@@ -1,44 +1,12 @@
 import { UploadedFileInfo } from '@/src/lib/file-utils';
-import { Integration } from '@superglue/shared';
+import { ExecutionStep, Integration } from '@superglue/shared';
 
-export interface StepConfig {
-  id: string;
-  integrationId?: string;
-  dataSelector?: string;
-  failureBehavior?: 'FAIL' | 'CONTINUE';
-  apiConfig: {
-    id: string;
-    instruction?: string;
-    urlHost: string;
-    urlPath: string;
-    method: string;
-    headers: Record<string, string> | string;
-    queryParams: Record<string, string> | string;
-    body?: string;
-    pagination?: any;
-  };
-}
-
-export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'aborted';
-
-export interface StepExecutionState {
-  stepInput: Record<string, any>;
-  dataSelectorOutput: any | null;
-  dataSelectorError: string | null;
-  result: any | null;
-  error: string | null;
-  status: StepStatus;
-  isLoopStep: boolean;
-  loopItemCount: number | null;
-  currentRunId: string | null;
-}
 
 export interface PayloadState {
   manualPayloadText: string;
   uploadedFiles: UploadedFileInfo[];
   filePayloads: Record<string, any>;
   computedPayload: Record<string, any>;
-  isValid: boolean;
   hasUserEdited: boolean;
 }
 
@@ -48,91 +16,117 @@ export interface ToolDefinition {
   finalTransform: string;
   inputSchema: any | null;
   responseSchema: any | null;
+  folder?: string;
+  isArchived: boolean;
 }
 
 export interface ToolConfigContextValue {
   tool: ToolDefinition;
-  steps: StepConfig[];
+  steps: ExecutionStep[];
   payload: PayloadState;
   integrations: Integration[];
-  readOnly: boolean;
   
-  // Tool mutations
+  // Raw string versions for editing (tool has parsed objects)
+  inputSchema: string | null;
+  responseSchema: string;
+  finalTransform: string;
+  
   setToolId: (id: string) => void;
   setInstruction: (instruction: string) => void;
   setFinalTransform: (transform: string) => void;
   setInputSchema: (schema: string | null) => void;
   setResponseSchema: (schema: string) => void;
+  setFolder: (folder: string | undefined) => void;
+  setIsArchived: (archived: boolean) => void;
   
-  // Payload mutations
   setPayloadText: (text: string) => void;
-  uploadFiles: (files: File[]) => Promise<void>;
-  removeFile: (key: string) => void;
+  setUploadedFiles: (files: UploadedFileInfo[]) => void;
+  setFilePayloads: (payloads: Record<string, any>) => void;
   markPayloadEdited: () => void;
   
-  // Step config mutations
-  addStep: (step: StepConfig, afterIndex?: number) => void;
+  addStep: (step: ExecutionStep, afterIndex?: number) => void;
   removeStep: (stepId: string) => void;
-  updateStep: (stepId: string, updates: Partial<StepConfig>, isUserInitiated?: boolean) => void;
-  reorderSteps: (fromIndex: number, toIndex: number) => void;
-  setSteps: (steps: StepConfig[]) => void;
+  updateStep: (stepId: string, updates: Partial<ExecutionStep>) => void;
+  setSteps: (steps: ExecutionStep[]) => void;
   
-  // Helpers
-  getStepConfig: (stepId: string) => StepConfig | undefined;
+  getStepConfig: (stepId: string) => ExecutionStep | undefined;
   getStepIndex: (stepId: string) => number;
 }
 
-export type TransformStatus = 'idle' | 'running' | 'fixing';
+export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'aborted';
 
-export interface ToolExecutionState {
+export interface StepExecutionState {
+  status: StepStatus;
+  result: any | null;
+  error: string | null;
+  runId: string | null;
+}
+
+export const DEFAULT_STEP_EXECUTION: StepExecutionState = {
+  status: 'pending',
+  result: null,
+  error: null,
+  runId: null,
+};
+
+export type TransformStatus = 'idle' | 'running' | 'fixing' | 'completed' | 'failed' | 'aborted';
+
+  export interface ExecutionContextValue {
+    // === PER-STEP EXECUTION STATE ===
+  stepExecutions: Record<string, StepExecutionState>;
+  
+  // === TOOL-LEVEL EXECUTION STATE ===
+  isExecutingAny: boolean;
+  currentExecutingStepIndex: number | null;
+  currentRunId: string | null;
+  isStopping: boolean;
+  
+  // === FINAL TRANSFORM STATE ===
   finalResult: any | null;
   finalError: string | null;
   transformStatus: TransformStatus;
-  isExecutingAny: boolean;
-  currentExecutingStepId: string | null;
-  currentRunId: string | null;
-}
-
-export const DEFAULT_STEP_EXECUTION_STATE: StepExecutionState = {
-  stepInput: {},
-  dataSelectorOutput: null,
-  dataSelectorError: null,
-  result: null,
-  error: null,
-  status: 'pending',
-  isLoopStep: false,
-  loopItemCount: null,
-  currentRunId: null,
-};
-
-export interface ExecutionContextValue {
-  toolExecution: ToolExecutionState;
-  stepExecutions: Record<string, StepExecutionState>;
   
-  // Step execution mutations
-  setStepInput: (stepId: string, input: Record<string, any>) => void;
-  setStepDataSelector: (stepId: string, output: any, error: string | null) => void;
-  setStepResult: (stepId: string, result: any, error: string | null, status: 'completed' | 'failed' | 'aborted') => void;
+  // === TRANSFORM STATUS CONVENIENCE GETTERS ===
+  isRunningTransform: boolean;
+  isFixingTransform: boolean;
+  isExecutingTransform: boolean;
+  canExecuteTransform: boolean;
+  
+  // === STEP MUTATIONS ===
+  setStepResult: (stepId: string, result: any, status: StepStatus, error?: string) => void;
   setStepRunning: (stepId: string, runId: string) => void;
-  resetStepExecution: (stepId: string) => void;
-  resetExecutionsFrom: (stepIndex: number) => void;  // cascade reset from step onwards
-  resetAllExecutions: () => void;
+  clearStepExecution: (stepId: string) => void;
+  clearExecutionsFrom: (stepIndex: number) => void;
+  clearAllExecutions: () => void;
   
-  // Transform mutations
-  setFinalResult: (result: any, error: string | null) => void;
-  setTransformStatus: (status: TransformStatus) => void;
+  // === EXECUTION CONTROL ===
+  startExecution: (runId: string) => void;
+  stopExecution: () => void;
+  markAsStopping: () => void;
+  finishExecution: () => void;
+  setCurrentExecutingStepIndex: (index: number | null) => void;
+  
+  // === TRANSFORM MUTATIONS ===
+  setFinalResult: (result: any, status: TransformStatus, error?: string) => void;
   setTransformRunning: (runId: string) => void;
-  resetTransform: () => void;
+  setTransformStatus: (status: TransformStatus) => void;
+  clearFinalResult: () => void;
   
-  // Execution control mutations
-  setCurrentExecutingStep: (stepId: string | null) => void;
-  setIsExecutingAny: (isExecuting: boolean) => void;
-  
-  // Helpers
+  // === STEP QUERIES (all O(1)) ===
   getStepExecution: (stepId: string) => StepExecutionState;
   getStepStatus: (stepId: string) => StepStatus;
+  getStepResult: (stepId: string) => any | null;
   isStepCompleted: (stepId: string) => boolean;
   isStepFailed: (stepId: string) => boolean;
   isStepAborted: (stepId: string) => boolean;
-  canExecuteStep: (stepIndex: number) => boolean;  // all previous completed
+  isStepRunning: (stepId: string) => boolean;
+  canExecuteStep: (stepIndex: number) => boolean;
+  
+  // === PAYLOAD HELPERS ===
+  getEvolvingPayload: (stepIndex: number) => Record<string, any>;
+  getStepResultsMap: () => Record<string, any>;
+  
+  // === DATA VERSIONING ===
+  sourceDataVersion: number;
+  incrementSourceDataVersion: () => void;
 }

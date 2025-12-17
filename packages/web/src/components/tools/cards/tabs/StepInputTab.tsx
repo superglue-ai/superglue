@@ -1,4 +1,4 @@
-import { useMonacoTheme } from '@/src/hooks/useMonacoTheme';
+import { useMonacoTheme } from '@superglue/web/src/hooks/use-monaco-theme';
 import { cn } from '@/src/lib/general-utils';
 import Editor from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
@@ -7,6 +7,7 @@ import { TemplateChip } from '../../templates/TemplateChip';
 import { TemplateContextProvider } from '../../templates/tiptap/TemplateContext';
 import { useTemplatePreview } from '../../hooks/use-template-preview';
 import { useDataProcessor } from '../../hooks/use-data-processor';
+import { useExecution } from '../../context';
 import { CopyButton } from '../../shared/CopyButton';
 import { Download, Loader2 } from 'lucide-react';
 import { Button } from '../../../ui/button';
@@ -19,23 +20,19 @@ interface StepInputTabProps {
     step: any;
     stepIndex: number;
     evolvingPayload: any;
-    canExecute: boolean;
-    readOnly?: boolean;
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     isActive?: boolean;
-    sourceDataVersion?: number;
 }
 
 export function StepInputTab({
     step,
     stepIndex,
     evolvingPayload,
-    canExecute,
-    readOnly = false,
     onEdit,
     isActive = true,
-    sourceDataVersion,
 }: StepInputTabProps) {
+    const { sourceDataVersion, canExecuteStep } = useExecution();
+    const canExecute = canExecuteStep(stepIndex);
     const { theme, onMount } = useMonacoTheme();
     const [currentHeight, setCurrentHeight] = useState('400px');
     const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -182,7 +179,6 @@ export function StepInputTab({
                             isEvaluating={isEvaluating}
                             onUpdate={handleUpdate}
                             onDelete={() => {}}
-                            readOnly={readOnly}
                             loopMode={true}
                             hideDelete={true}
                             inline={true}
@@ -239,4 +235,3 @@ export function StepInputTab({
         </div>
     );
 }
-

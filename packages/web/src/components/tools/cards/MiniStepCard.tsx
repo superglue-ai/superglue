@@ -1,8 +1,8 @@
 import { Card } from '@/src/components/ui/card';
 import { cn, getIntegrationIcon, getSimpleIcon } from '@/src/lib/general-utils';
-import { Integration } from '@superglue/shared';
 import { FileJson, FilePlay, Globe, OctagonAlert, RotateCw } from 'lucide-react';
 import React from 'react';
+import { useToolConfig, useExecution } from '../context';
 
 const ACTIVE_CARD_STYLE = "ring-1 shadow-lg" as const;
 const ACTIVE_CARD_INLINE_STYLE = {
@@ -43,7 +43,53 @@ const getStatusInfo = (isRunning: boolean, isFailed: boolean, isCompleted: boole
     };
 };
 
-export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId, isPayload = false, isTransform = false, isRunningAll = false, isTesting = false, completedSteps = [], failedSteps = [], abortedSteps = [], isFirstCard = false, isLastCard = false, integrations = [], hasTransformCompleted = false, isPayloadValid = true, payloadData, isLoopStep = false }: { step: any; index: number; isActive: boolean; onClick: () => void; stepId?: string | null; isPayload?: boolean; isTransform?: boolean; isRunningAll?: boolean; isTesting?: boolean; completedSteps?: string[]; failedSteps?: string[]; abortedSteps?: string[]; isFirstCard?: boolean; isLastCard?: boolean; integrations?: Integration[]; hasTransformCompleted?: boolean; isPayloadValid?: boolean; payloadData?: any; isLoopStep?: boolean; }) => {
+interface MiniStepCardProps {
+    step: any;
+    index: number;
+    isActive: boolean;
+    onClick: () => void;
+    stepId?: string | null;
+    isPayload?: boolean;
+    isTransform?: boolean;
+    isRunningAll?: boolean;
+    isTesting?: boolean;
+    isFirstCard?: boolean;
+    isLastCard?: boolean;
+    hasTransformCompleted?: boolean;
+    isPayloadValid?: boolean;
+    payloadData?: any;
+    isLoopStep?: boolean;
+}
+
+export const MiniStepCard = React.memo(({ 
+    step, 
+    index, 
+    isActive, 
+    onClick, 
+    stepId, 
+    isPayload = false, 
+    isTransform = false, 
+    isRunningAll = false, 
+    isTesting = false, 
+    isFirstCard = false, 
+    isLastCard = false, 
+    hasTransformCompleted = false, 
+    isPayloadValid = true, 
+    payloadData, 
+    isLoopStep = false 
+}: MiniStepCardProps) => {
+    const { integrations } = useToolConfig();
+    const { 
+        transformStatus,
+        isStepCompleted,
+        isStepFailed,
+        isStepAborted,
+    } = useExecution();
+
+    const isTransformCompleted = transformStatus === 'completed';
+    if (isTransform && hasTransformCompleted === undefined) {
+        hasTransformCompleted = isTransformCompleted;
+    }
     if (isPayload) {
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform flex items-center", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
@@ -99,9 +145,9 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
         );
     }
     if (isTransform) {
-        const isCompleted = completedSteps.includes('__final_transform__');
-        const isFailed = failedSteps.includes('__final_transform__');
-        const isAborted = abortedSteps.includes('__final_transform__');
+        const isCompleted = isStepCompleted('__final_transform__');
+        const isFailed = isStepFailed('__final_transform__');
+        const isAborted = isStepAborted('__final_transform__');
         const isRunning = isTesting || isRunningAll;
         const statusInfo = getStatusInfo(isRunning, isFailed, isCompleted, isAborted);
         return (
@@ -138,9 +184,9 @@ export const MiniStepCard = React.memo(({ step, index, isActive, onClick, stepId
             </div>
         );
     }
-    const isCompleted = stepId ? completedSteps.includes(stepId) : false;
-    const isFailed = stepId ? failedSteps.includes(stepId) : false;
-    const isAborted = stepId ? abortedSteps.includes(stepId) : false;
+    const isCompleted = stepId ? isStepCompleted(stepId) : false;
+    const isFailed = stepId ? isStepFailed(stepId) : false;
+    const isAborted = stepId ? isStepAborted(stepId) : false;
     const isRunning = isTesting || (isRunningAll && !!stepId);
     const statusInfo = getStatusInfo(isRunning, isFailed, isCompleted, isAborted);
 

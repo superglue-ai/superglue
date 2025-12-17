@@ -1,4 +1,4 @@
-import { useMonacoTheme } from '@/src/hooks/useMonacoTheme';
+import { useMonacoTheme } from '@superglue/web/src/hooks/use-monaco-theme';
 import { cn } from '@/src/lib/general-utils';
 import Editor from '@monaco-editor/react';
 import React, { useMemo, useState } from 'react';

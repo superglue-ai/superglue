@@ -1,124 +1,130 @@
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
-import { canExecuteStep } from '@/src/lib/client-utils';
-import { type UploadedFileInfo } from '@/src/lib/file-utils';
 import { buildEvolvingPayload, buildPreviousStepResults, cn } from '@/src/lib/general-utils';
 import { buildCategorizedSources } from '@/src/lib/templating-utils';
-import { Integration } from "@superglue/shared";
+import { AuthType, ExecutionStep, HttpMethod } from "@superglue/shared";
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FinalTransformMiniStepCard } from './cards/FinalTransformCard';
 import { MiniStepCard } from './cards/MiniStepCard';
 import { PayloadMiniStepCard } from './cards/PayloadCard';
 import { SpotlightStepCard } from './cards/SpotlightStepCard';
+import { useToolConfig, useExecution } from './context';
 import { AddStepDialog } from './dialogs/AddStepDialog';
 import { InstructionDisplay } from './shared/InstructionDisplay';
 
+interface PayloadItem {
+    type: 'payload';
+    data: { payloadText: string; inputSchema: string | null };
+    stepResult: undefined;
+    transformError: undefined;
+    categorizedSources: ReturnType<typeof buildCategorizedSources>;
+}
+
+interface StepItem {
+    type: 'step';
+    data: ExecutionStep;
+    stepResult: any;
+    transformError: undefined;
+    categorizedSources: ReturnType<typeof buildCategorizedSources>;
+}
+
+interface TransformItem {
+    type: 'transform';
+    data: { transform: string; responseSchema: string };
+    stepResult: any;
+    transformError: any;
+    hasTransformCompleted: boolean;
+    categorizedSources: ReturnType<typeof buildCategorizedSources>;
+}
+
+type ToolItem = PayloadItem | StepItem | TransformItem;
+
 export interface ToolStepGalleryProps {
-    steps: any[];
-    stepResults?: Record<string, any>;
-    finalTransform?: string;
-    finalResult?: any;
-    responseSchema?: string;
-    toolId?: string;
-    instruction?: string;
-    onStepsChange?: (steps: any[]) => void;
+    // Callbacks that trigger parent logic
     onStepEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
-    onFinalTransformChange?: (transform: string) => void;
-    onResponseSchemaChange?: (schema: string) => void;
-    onPayloadChange?: (payload: string) => void;
     onInstructionEdit?: () => void;
-    toolActionButtons?: React.ReactNode;
     onExecuteStep?: (stepIndex: number) => Promise<void>;
     onExecuteStepWithLimit?: (stepIndex: number, limit: number) => Promise<void>;
     onOpenFixStepDialog?: (stepIndex: number) => void;
-    onExecuteAllSteps?: () => Promise<void>;
     onExecuteTransform?: (schema: string, transform: string) => Promise<void>;
     onOpenFixTransformDialog?: () => void;
-    completedSteps?: string[];
-    failedSteps?: string[];
-    abortedSteps?: string[];
-    integrations?: Integration[];
-    isExecuting?: boolean;
-    isExecutingStep?: number;
-    isRunningTransform?: boolean;
-    isFixingTransform?: boolean;
-    currentExecutingStepIndex?: number;
-    readOnly?: boolean;
-    payloadText?: string;
-    computedPayload?: any;
-    inputSchema?: string | null;
-    onInputSchemaChange?: (schema: string | null) => void;
+    onAbort?: () => void;
+    
+    // File handling callbacks
+    onFilesUpload?: (files: File[]) => Promise<void>;
+    onFileRemove?: (key: string) => void;
+    
+    // UI-specific props
+    toolActionButtons?: React.ReactNode;
     headerActions?: React.ReactNode;
     navigateToFinalSignal?: number;
     showStepOutputSignal?: number;
     focusStepId?: string | null;
-    uploadedFiles?: UploadedFileInfo[];
-    onFilesUpload?: (files: File[]) => Promise<void>;
-    onFileRemove?: (key: string) => void;
     isProcessingFiles?: boolean;
     totalFileSize?: number;
-    filePayloads?: Record<string, any>;
     isPayloadValid?: boolean;
-    onPayloadUserEdit?: () => void;
     embedded?: boolean;
-    onAbort?: () => void;
-    sourceDataVersion?: number;
-    onDataSelectorOutputChange?: () => void;
+    
 }
 
 export function ToolStepGallery({
-    steps,
-    stepResults = {},
-    finalTransform,
-    finalResult,
-    responseSchema,
-    toolId,
-    instruction,
-    onStepsChange,
     onStepEdit: originalOnStepEdit,
-    onFinalTransformChange,
-    onResponseSchemaChange,
-    onPayloadChange,
     onInstructionEdit,
-    toolActionButtons,
     onExecuteStep,
     onExecuteStepWithLimit,
     onOpenFixStepDialog,
-    onExecuteAllSteps,
     onExecuteTransform,
     onOpenFixTransformDialog,
-    completedSteps = [],
-    failedSteps = [],
-    abortedSteps = [],
-    integrations,
-    isExecuting,
-    isExecutingStep,
-    isRunningTransform,
-    isFixingTransform,
-    currentExecutingStepIndex,
-    readOnly = false,
-    payloadText,
-    computedPayload,
-    inputSchema,
-    onInputSchemaChange,
+    onAbort,
+    onFilesUpload,
+    onFileRemove,
+    toolActionButtons,
     headerActions,
     navigateToFinalSignal,
     showStepOutputSignal,
     focusStepId,
-    uploadedFiles,
-    onFilesUpload,
-    onFileRemove,
     isProcessingFiles,
     totalFileSize,
-    filePayloads,
     isPayloadValid = true,
-    onPayloadUserEdit,
     embedded = false,
-    onAbort,
-    sourceDataVersion,
-    onDataSelectorOutputChange
 }: ToolStepGalleryProps) {
+    
+    const {
+        tool,
+        steps,
+        payload,
+        integrations,
+        inputSchema,
+        responseSchema,
+        finalTransform,
+        setSteps,
+        setPayloadText,
+    } = useToolConfig();
+    
+    const {
+        isExecutingAny,
+        currentExecutingStepIndex,
+        finalResult,
+        transformStatus,
+        incrementSourceDataVersion,
+        getStepResultsMap,
+        isRunningTransform,
+        isFixingTransform,
+    } = useExecution();
+    
+    const isExecutingStep = currentExecutingStepIndex;
+    
+    // Derive values from context
+    const toolId = tool.id;
+    const instruction = tool.instruction;
+    const payloadText = payload.manualPayloadText;
+    const computedPayload = payload.computedPayload;
+    const filePayloads = payload.filePayloads;
+    const isExecuting = isExecutingAny;
+    const stepResultsMap = getStepResultsMap();
+    
+    
     const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
     const [windowWidth, setWindowWidth] = useState(1200);
     const [containerWidth, setContainerWidth] = useState<number>(1200);
@@ -137,9 +143,9 @@ export function ToolStepGallery({
     const handleDataSelectorChange = useCallback((itemCount: number | null, isInitial: boolean) => {
         setActiveStepItemCount(itemCount);
         if (!isInitial) {
-            onDataSelectorOutputChange?.();
+            incrementSourceDataVersion?.();
         }
-    }, [onDataSelectorOutputChange]);
+    }, [incrementSourceDataVersion]);
     
     useEffect(() => {
         isConfiguratorEditingRef.current = isConfiguratorEditing;
@@ -230,38 +236,23 @@ export function ToolStepGallery({
             setRawPayloadText(payloadText);
         }
     }, [payloadText]);
-
-    const handlePayloadJsonChange = (jsonString: string) => {
-        setRawPayloadText(jsonString);
-        onPayloadChange?.(jsonString);
-    };
     
-    // Use computed payload from parent (already merged manual + files)
+    // Use computed payload from context (already merged manual + files)
     const workingPayload = computedPayload || {};
-    const stepResultsMap = useMemo(() => 
-        Array.isArray(stepResults)
-            ? stepResults.reduce((acc: Record<string, any>, result: any) => {
-                if (result.stepId) {
-                    acc[result.stepId] = result.data;
-                }
-                return acc;
-            }, {})
-            : stepResults,
-        [stepResults]
-    );
 
     const manualPayload = useMemo(() => { try { return JSON.parse(rawPayloadText || '{}'); } catch { return {}; } }, [rawPayloadText]);
-    const hasTransformCompleted = completedSteps.includes('__final_transform__');
+    const hasTransformCompleted = transformStatus === 'completed';
+    const hasTransformFailed = transformStatus === 'failed';
 
-    const toolItems = useMemo(() => [
+    const toolItems = useMemo((): ToolItem[] => [
         {
             type: 'payload',
             data: { payloadText: rawPayloadText, inputSchema },
             stepResult: undefined,
             transformError: undefined,
             categorizedSources: buildCategorizedSources({ manualPayload, filePayloads: filePayloads || {} })
-        },
-        ...steps.map((step, index) => ({
+        } as PayloadItem,
+        ...steps.map((step, index): StepItem => ({
             type: 'step',
             data: step,
             stepResult: stepResultsMap[step.id],
@@ -276,21 +267,15 @@ export function ToolStepGallery({
             type: 'transform',
             data: { transform: finalTransform, responseSchema },
             stepResult: finalResult,
-            transformError: failedSteps.includes('__final_transform__') ? stepResultsMap['__final_transform__'] : null,
+            transformError: hasTransformFailed ? stepResultsMap['__final_transform__'] : null,
             hasTransformCompleted,
             categorizedSources: buildCategorizedSources({
                 manualPayload,
                 filePayloads: filePayloads || {},
                 previousStepResults: buildPreviousStepResults(steps, stepResultsMap, steps.length - 1),
             })
-        }] : [])
-    ], [rawPayloadText, inputSchema, steps, stepResultsMap, finalTransform, responseSchema, finalResult, hasTransformCompleted, manualPayload, filePayloads, failedSteps]);
-
-    // Memoize canExecute checks to avoid running steps.every() on every render
-    const canExecuteTransform = useMemo(() => 
-        steps.every((s: any) => completedSteps.includes(s.id)),
-        [steps, completedSteps]
-    );
+        } as TransformItem] : [])
+    ], [rawPayloadText, inputSchema, steps, stepResultsMap, finalTransform, responseSchema, finalResult, hasTransformCompleted, hasTransformFailed, manualPayload, filePayloads]);
 
     const currentItem = toolItems[activeIndex];
     const indicatorIndices = toolItems.map((_, idx) => idx);
@@ -320,9 +305,9 @@ export function ToolStepGallery({
     };
 
     const handleRemoveStep = (stepId: string) => {
-        if (!onStepsChange) return;
+        if (!setSteps) return;
         const newSteps = steps.filter(step => step.id !== stepId);
-        onStepsChange(newSteps);
+        setSteps(newSteps);
         // Adjust active index if needed
         if (activeIndex >= toolItems.length - 1) {
             setActiveIndex(Math.max(0, activeIndex - 1));
@@ -330,55 +315,52 @@ export function ToolStepGallery({
     };
 
     const handleInsertStep = (afterIndex: number) => {
-        if (!onStepsChange || readOnly) return;
+        if (!setSteps) return;
 
         setPendingInsertIndex(afterIndex);
         setIsAddStepDialogOpen(true);
     };
 
     const handleConfirmInsertStep = (stepId: string, instruction: string, integrationId?: string) => {
-        if (pendingInsertIndex === null || !onStepsChange) return;
+        if (pendingInsertIndex === null || !setSteps) return;
 
         const selectedIntegration = integrationId 
             ? integrations?.find(i => i.id === integrationId)
             : undefined;
 
-        const newStep = {
+        const newStep: ExecutionStep = {
             id: stepId,
-            name: '',
             integrationId: integrationId || '',
             apiConfig: {
                 id: stepId,
                 instruction: instruction,
                 urlHost: selectedIntegration?.urlHost || '',
                 urlPath: selectedIntegration?.urlPath || '',
-                method: 'GET',
+                method: 'GET' as HttpMethod,
                 headers: {},
                 queryParams: {},
                 body: '',
-                authentication: 'NONE'
+                authentication: 'NONE' as AuthType
             },
             executionMode: 'DIRECT'
         };
 
         const newSteps = [...steps];
         newSteps.splice(pendingInsertIndex, 0, newStep);
-        onStepsChange(newSteps);
+        setSteps(newSteps);
 
         const insertedIndex = pendingInsertIndex;
         setIsAddStepDialogOpen(false);
         setPendingInsertIndex(null);
-
-        // Navigate to the newly inserted step (+1 for payload card, +1 because we insert after)
         setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
     };
 
     const handleConfirmInsertTool = (toolSteps: any[]) => {
-        if (pendingInsertIndex === null || !onStepsChange) return;
+        if (pendingInsertIndex === null || !setSteps) return;
 
         const newSteps = [...steps];
         newSteps.splice(pendingInsertIndex, 0, ...toolSteps);
-        onStepsChange(newSteps);
+        setSteps(newSteps);
 
         const insertedIndex = pendingInsertIndex;
         setIsAddStepDialogOpen(false);
@@ -389,11 +371,11 @@ export function ToolStepGallery({
     };
 
     const handleConfirmGenerateStep = (step: any) => {
-        if (pendingInsertIndex === null || !onStepsChange) return;
+        if (pendingInsertIndex === null || !setSteps) return;
 
         const newSteps = [...steps];
         newSteps.splice(pendingInsertIndex, 0, step);
-        onStepsChange(newSteps);
+        setSteps(newSteps);
 
         const insertedIndex = pendingInsertIndex;
         setIsAddStepDialogOpen(false);
@@ -494,7 +476,7 @@ export function ToolStepGallery({
                         <InstructionDisplay
                             instruction={instruction}
                             onEdit={onInstructionEdit}
-                            showEditButton={!readOnly && !!onInstructionEdit}
+                            showEditButton={!!onInstructionEdit}
                         />
                     </div>
                 )}
@@ -626,13 +608,8 @@ export function ToolStepGallery({
                                                                             item.type === 'transform' ? (isRunningTransform || isFixingTransform) :
                                                                                 false
                                                                     }
-                                                                    completedSteps={completedSteps}
-                                                                    failedSteps={failedSteps}
-                                                                    abortedSteps={abortedSteps}
                                                                     isFirstCard={globalIdx === 0}
                                                                     isLastCard={globalIdx === totalCards - 1}
-                                                                    integrations={integrations}
-                                                                    hasTransformCompleted={hasTransformCompleted}
                                                                     isPayloadValid={isPayloadValid}
                                                                     payloadData={item.type === 'payload' ? workingPayload : undefined}
                                                                     isLoopStep={globalIdx === activeIndex && activeStepItemCount !== null && activeStepItemCount > 0}
@@ -640,7 +617,7 @@ export function ToolStepGallery({
                                                             </div>
                                                             {showArrow && (
                                                                 <div style={{ flex: `0 0 ${sepWidth}px`, width: `${sepWidth}px` }} className="flex items-center justify-center">
-                                                                    {!readOnly && onStepsChange && (
+                                                                    {setSteps && (
                                                                         <button
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
@@ -653,7 +630,7 @@ export function ToolStepGallery({
                                                                             <Plus className="h-4 w-4 text-primary absolute opacity-0 group-hover:opacity-100 transition-opacity" />
                                                                         </button>
                                                                     )}
-                                                                    {(readOnly || !onStepsChange) && (
+                                                                    {!setSteps && (
                                                                         <ChevronRight className="h-5 w-5 text-muted-foreground/50" />
                                                                     )}
                                                                 </div>
@@ -716,65 +693,37 @@ export function ToolStepGallery({
                         {currentItem && (
                             currentItem.type === 'payload' ? (
                                 <PayloadMiniStepCard
-                                    payloadText={currentItem.data.payloadText}
-                                    inputSchema={currentItem.data.inputSchema}
-                                    onChange={handlePayloadJsonChange}
-                                    onInputSchemaChange={onInputSchemaChange}
-                                    readOnly={readOnly}
                                     onFilesUpload={onFilesUpload}
-                                    uploadedFiles={uploadedFiles}
                                     onFileRemove={onFileRemove}
                                     isProcessingFiles={isProcessingFiles}
                                     totalFileSize={totalFileSize}
-                                    onUserEdit={onPayloadUserEdit}
                                     isPayloadValid={isPayloadValid}
                                 />
                             ) : currentItem.type === 'transform' ? (
                                 <FinalTransformMiniStepCard
-                                    transform={currentItem.data.transform}
-                                    responseSchema={currentItem.data.responseSchema}
-                                    onTransformChange={onFinalTransformChange}
-                                    onResponseSchemaChange={onResponseSchemaChange}
-                                    readOnly={readOnly}
                                     onExecuteTransform={onExecuteTransform}
                                     onOpenFixTransformDialog={onOpenFixTransformDialog}
                                     onAbort={(isRunningTransform || isFixingTransform) ? onAbort : undefined}
-                                    isRunningTransform={isRunningTransform}
-                                    isFixingTransform={isFixingTransform}
-                                    canExecute={canExecuteTransform}
-                                    transformResult={finalResult}
-                                    transformError={currentItem.transformError}
-                                    stepInputs={activeEvolvingPayload}
-                                    hasTransformCompleted={hasTransformCompleted}
                                 />
                             ) : (
                                 <SpotlightStepCard
                                     key={currentItem.data.id}
                                     step={currentItem.data}
-                                    stepIndex={activeIndex - 1} // Adjust for payload card
+                                    stepIndex={activeIndex - 1}
                                     evolvingPayload={activeEvolvingPayload}
                                     categorizedSources={currentItem.categorizedSources}
-                                    stepResult={currentItem.stepResult}
-                                    onEdit={!readOnly ? onStepEdit : undefined}
-                                    onRemove={!readOnly && currentItem.type === 'step' ? handleRemoveStep : undefined}
+                                    onEdit={onStepEdit}
+                                    onRemove={currentItem.type === 'step' ? handleRemoveStep : undefined}
                                     onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
                                     onExecuteStepWithLimit={onExecuteStepWithLimit ? (limit) => onExecuteStepWithLimit(activeIndex - 1, limit) : undefined}
                                     onOpenFixStepDialog={onOpenFixStepDialog ? () => onOpenFixStepDialog(activeIndex - 1) : undefined}
                                     onAbort={isExecutingStep === activeIndex - 1 ? onAbort : undefined}
-                                    canExecute={canExecuteStep(activeIndex - 1, completedSteps, { steps } as any, stepResultsMap)}
                                     isExecuting={isExecutingStep === activeIndex - 1}
-                                    isGlobalExecuting={!!(isExecuting || isRunningTransform || isFixingTransform)}
-                                    currentExecutingStepIndex={currentExecutingStepIndex}
-                                    integrations={integrations}
-                                    readOnly={readOnly}
-                                    failedSteps={failedSteps}
-                                    abortedSteps={abortedSteps}
                                     showOutputSignal={focusStepId === currentItem.data.id ? showStepOutputSignal : undefined}
                                     onConfigEditingChange={setIsConfiguratorEditing}
                                     onDataSelectorChange={handleDataSelectorChange}
                                     isFirstStep={activeIndex === 1}
                                     isPayloadValid={isPayloadValid}
-                                    sourceDataVersion={sourceDataVersion}
                                 />
                             )
                         )}

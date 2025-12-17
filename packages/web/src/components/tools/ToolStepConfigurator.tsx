@@ -2,7 +2,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { splitUrl } from '@/src/lib/client-utils';
 import { composeUrl } from '@/src/lib/general-utils';
 import { buildCategorizedSources, buildCategorizedVariables, buildPaginationData, deriveCurrentItem } from '@/src/lib/templating-utils';
-import { Integration, flattenAndNamespaceCredentials } from '@superglue/shared';
+import { flattenAndNamespaceCredentials, Integration } from '@superglue/shared';
 import { ArrowDown, ChevronDown, ChevronRight, Pencil } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { JavaScriptCodeEditor } from '../editors/JavaScriptCodeEditor';
@@ -13,6 +13,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { HelpTooltip } from '../utils/HelpTooltip';
+import { useToolConfig, useExecution } from './context';
 import { CopyButton } from './shared/CopyButton';
 import { IntegrationSelector } from './shared/IntegrationSelector';
 import { type CategorizedSources, type CategorizedVariables } from './templates/tiptap/TemplateContext';
@@ -22,7 +23,6 @@ interface ToolStepConfiguratorProps {
     isLast: boolean;
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onRemove: (stepId: string) => void;
-    integrations?: Integration[];
     onCreateIntegration?: () => void;
     onEditingChange?: (editing: boolean) => void;
     disabled?: boolean;
@@ -31,11 +31,12 @@ interface ToolStepConfiguratorProps {
     categorizedSources?: CategorizedSources;
     onOpenFixStepDialog?: () => void;
     canExecute?: boolean;
-    sourceDataVersion?: number;
 }
 
 
-export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrations: propIntegrations, onCreateIntegration, onEditingChange, disabled = false, stepInput, dataSelectorOutput, categorizedSources, onOpenFixStepDialog, canExecute = true, sourceDataVersion }: ToolStepConfiguratorProps) {
+export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, onCreateIntegration, onEditingChange, disabled = false, stepInput, dataSelectorOutput, categorizedSources, onOpenFixStepDialog, canExecute = true }: ToolStepConfiguratorProps) {
+    const { integrations } = useToolConfig();
+    const { sourceDataVersion } = useExecution();
     const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
     const [paginationOpen, setPaginationOpen] = useState(false);
     const [headersText, setHeadersText] = useState('');
@@ -81,8 +82,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
             if (newHeadersText !== headersText) {
                 setHeadersText(newHeadersText);
             }
-        } catch { }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        } catch {}
     }, [step.apiConfig?.headers]);
 
     useEffect(() => {
@@ -98,7 +98,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                 setQueryParamsText(newQueryParamsText);
             }
         } catch { }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [step.apiConfig?.queryParams]);
 
     const handleImmediateEdit = (updater: (s: any) => any) => {
@@ -122,8 +121,8 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
         }));
     };
 
-    const linkedIntegration = step.integrationId && propIntegrations
-        ? propIntegrations.find(integration => integration.id === step.integrationId)
+    const linkedIntegration = step.integrationId && integrations
+        ? integrations.find(integration => integration.id === step.integrationId)
         : undefined;
 
     const credentialsMap = useMemo(() => 
@@ -197,7 +196,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, integrati
                                                     triggerClassName="h-9 border-0 bg-transparent shadow-none"
                                                     showCreateNew={!!onCreateIntegration}
                                                     onCreateNew={onCreateIntegration}
-                                                    integrations={propIntegrations}
                                                 />
                                             </div>
                                         </div>

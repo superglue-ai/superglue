@@ -24,45 +24,42 @@ import {
   Wand2,
   X
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { JavaScriptCodeEditor } from "../../editors/JavaScriptCodeEditor";
 import { JsonCodeEditor } from "../../editors/JsonCodeEditor";
+import { useToolConfig, useExecution } from "../context";
 import { useDataProcessor } from "../hooks/use-data-processor";
 import { CopyButton } from "../shared/CopyButton";
 
-export const FinalTransformMiniStepCard = ({
-  transform,
-  responseSchema,
-  onTransformChange,
-  onResponseSchemaChange,
-  readOnly,
-  onExecuteTransform,
-  onOpenFixTransformDialog,
-  onAbort,
-  isRunningTransform,
-  isFixingTransform,
-  canExecute,
-  transformResult,
-  transformError,
-  stepInputs,
-  hasTransformCompleted
-}: {
-  transform?: string;
-  responseSchema?: string;
-  onTransformChange?: (value: string) => void;
-  onResponseSchemaChange?: (value: string) => void;
-  readOnly?: boolean;
+interface FinalTransformMiniStepCardProps {
   onExecuteTransform?: (schema: string, transform: string) => void;
   onOpenFixTransformDialog?: () => void;
   onAbort?: () => void;
-  isRunningTransform?: boolean;
-  isFixingTransform?: boolean;
-  canExecute?: boolean;
-  transformResult?: any;
-  transformError?: string | null;
-  stepInputs?: any;
-  hasTransformCompleted?: boolean;
-}) => {
+}
+
+export const FinalTransformMiniStepCard = ({
+  onExecuteTransform,
+  onOpenFixTransformDialog,
+  onAbort,
+}: FinalTransformMiniStepCardProps) => {
+    const { finalTransform, responseSchema, setFinalTransform, setResponseSchema, steps } = useToolConfig();
+    const { 
+      finalResult, 
+      finalError, 
+      getEvolvingPayload,
+      isRunningTransform,
+      isFixingTransform,
+      canExecuteTransform,
+      transformStatus,
+    } = useExecution();
+    
+    const transform = finalTransform;
+    const transformResult = finalResult;
+    const transformError = finalError;
+    const canExecute = canExecuteTransform;
+    const hasTransformCompleted = transformStatus === 'completed';
+    
+    const stepInputs = useMemo(() => getEvolvingPayload(steps.length), [getEvolvingPayload, steps.length]);
     const [activeTab, setActiveTab] = useState("transform");
     const [localTransform, setLocalTransform] = useState(transform || "");
     const [localSchema, setLocalSchema] = useState(responseSchema || "");
@@ -164,16 +161,16 @@ export const FinalTransformMiniStepCard = ({
     function handleTransformChange(value: string): void {
       isInternalChangeRef.current = true;
       setLocalTransform(value);
-      if (onTransformChange) onTransformChange(value);
+      setFinalTransform(value);
     }
 
     function handleSchemaChange(value: string | null): void {
       if (value === null || value === "") {
         setLocalSchema("");
-        if (onResponseSchemaChange) onResponseSchemaChange("");
+        setResponseSchema("");
       } else {
         setLocalSchema(value);
-        if (onResponseSchemaChange) onResponseSchemaChange(value);
+        setResponseSchema(value);
       }
     }
 
@@ -200,7 +197,7 @@ export const FinalTransformMiniStepCard = ({
               <h3 className="text-lg font-semibold">Tool Result</h3>
             </div>
             <div className="flex items-center gap-2">
-              {!readOnly && (onExecuteTransform || onOpenFixTransformDialog) && (
+              {(onExecuteTransform || onOpenFixTransformDialog) && (
                 <>
                   {onExecuteTransform && (
                     <span
@@ -370,7 +367,7 @@ export const FinalTransformMiniStepCard = ({
               <JavaScriptCodeEditor
                 value={localTransform}
                 onChange={handleTransformChange}
-                readOnly={readOnly}
+                readOnly={false}
                 minHeight="150px"
                 maxHeight="250px"
                 resizable={true}

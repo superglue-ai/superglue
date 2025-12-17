@@ -1,5 +1,5 @@
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { useMonacoTheme } from '@/src/hooks/useMonacoTheme';
+import { useMonacoTheme } from '@superglue/web/src/hooks/use-monaco-theme';
 import { formatJavaScriptCode } from '@/src/lib/general-utils';
 import Editor from '@monaco-editor/react';
 import { isArrowFunction } from '@superglue/shared';

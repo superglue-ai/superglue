@@ -17,9 +17,10 @@ import {
     DropdownMenuTrigger,
 } from '@/src/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { Integration, assertValidArrowFunction, executeWithVMHelpers } from '@superglue/shared';
+import { assertValidArrowFunction, executeWithVMHelpers } from '@superglue/shared';
 import { Bug, ChevronDown, FileBraces, FileInput, FileOutput, Play, RotateCw, Route, Square, Trash2, Wand2 } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useToolConfig, useExecution } from '../context';
 import { type CategorizedSources } from '../templates/tiptap/TemplateContext';
 import { StepConfigTab } from './tabs/StepConfigTab';
 import { StepInputTab } from './tabs/StepInputTab';
@@ -28,71 +29,65 @@ import { StepResultTab } from './tabs/StepResultTab';
 const dataSelectorOutputCache = new Map<string, { output: any; error: string | null }>();
 let lastSeenDataSelectorVersion: number | undefined = undefined;
 
-export const SpotlightStepCard = React.memo(({
-    step,
-    stepIndex,
-    evolvingPayload,
-    categorizedSources,
-    stepResult,
-    onEdit,
-    onRemove,
-    onExecuteStep,
-    onExecuteStepWithLimit,
-    onOpenFixStepDialog,
-    onAbort,
-    canExecute,
-    isExecuting,
-    isGlobalExecuting,
-    currentExecutingStepIndex,
-    integrations,
-    readOnly,
-    failedSteps = [],
-    abortedSteps = [],
-    showOutputSignal,
-    onConfigEditingChange,
-    onDataSelectorChange,
-    isFirstStep = false,
-    isPayloadValid = true,
-    sourceDataVersion,
-}: {
+interface SpotlightStepCardProps {
     step: any;
     stepIndex: number;
     evolvingPayload: any;
     categorizedSources?: CategorizedSources;
-    stepResult?: any;
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onRemove?: (stepId: string) => void;
     onExecuteStep?: () => Promise<void>;
     onExecuteStepWithLimit?: (limit: number) => Promise<void>;
     onOpenFixStepDialog?: () => void;
     onAbort?: () => void;
-    canExecute?: boolean;
     isExecuting?: boolean;
-    isGlobalExecuting?: boolean;
-    currentExecutingStepIndex?: number;
-    integrations?: Integration[];
-    readOnly?: boolean;
-    failedSteps?: string[];
-    abortedSteps?: string[];
-    stepResultsMap?: Record<string, any>;
     showOutputSignal?: number;
     onConfigEditingChange?: (editing: boolean) => void;
     onDataSelectorChange?: (itemCount: number | null, isInitial: boolean) => void;
     isFirstStep?: boolean;
     isPayloadValid?: boolean;
-    sourceDataVersion?: number;
-}) => {
+}
+
+export const SpotlightStepCard = React.memo(({
+    step,
+    stepIndex,
+    evolvingPayload,
+    categorizedSources,
+    onEdit,
+    onRemove,
+    onExecuteStep,
+    onExecuteStepWithLimit,
+    onOpenFixStepDialog,
+    onAbort,
+    isExecuting,
+    showOutputSignal,
+    onConfigEditingChange,
+    onDataSelectorChange,
+    isFirstStep = false,
+    isPayloadValid = true,
+}: SpotlightStepCardProps) => {
+    // === CONSUME FROM CONTEXTS ===
+    const { integrations } = useToolConfig();
+    const {
+        isExecutingAny,
+        currentExecutingStepIndex,
+        sourceDataVersion,
+        getStepResult,
+        isStepFailed,
+        canExecuteStep,
+    } = useExecution();
+    
+    // Derive values from context
+    const isGlobalExecuting = isExecutingAny;
+    const stepResult = getStepResult(step.id);
+    const stepFailed = isStepFailed(step.id);
+    const canExecute = canExecuteStep(stepIndex);
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
     const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [pendingAction, setPendingAction] = useState<'execute' | null>(null);
     
     const DATA_SELECTOR_DEBOUNCE_MS = 400;
-    
-    if (sourceDataVersion !== lastSeenDataSelectorVersion) {
-        dataSelectorOutputCache.clear();
-        lastSeenDataSelectorVersion = sourceDataVersion;
-    }
     
     const dataSelectorCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
     const cachedOutput = dataSelectorOutputCache.get(dataSelectorCacheKey);
@@ -104,6 +99,13 @@ export const SpotlightStepCard = React.memo(({
     const lastNotifiedStepIdRef = useRef<string | null>(null);
 
     useEffect(() => {
+        if (sourceDataVersion !== lastSeenDataSelectorVersion) {
+            dataSelectorOutputCache.clear();
+            lastSeenDataSelectorVersion = sourceDataVersion;
+        }
+    }, [sourceDataVersion]);
+
+    useEffect(() => {
         const currentCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
         const cached = dataSelectorOutputCache.get(currentCacheKey);
         if (cached) {
@@ -113,7 +115,7 @@ export const SpotlightStepCard = React.memo(({
             setDataSelectorOutput(null);
             setDataSelectorError(null);
         }
-    }, [step.id]);
+    }, [step.id, sourceDataVersion, step.loopSelector]);
 
     useEffect(() => {
         if (showOutputSignal && showOutputSignal !== prevShowOutputSignalRef.current && stepResult != null) {
@@ -203,7 +205,7 @@ export const SpotlightStepCard = React.memo(({
                         </h3>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        {!readOnly && onExecuteStep && (
+                        {onExecuteStep && (
                             <div className="flex items-center">
                                 {isExecuting && onAbort ? (
                                     <Button
@@ -259,14 +261,14 @@ export const SpotlightStepCard = React.memo(({
                                 )}
                             </div>
                         )}
-                        {!readOnly && onOpenFixStepDialog && (
+                        {onOpenFixStepDialog && (
                             <span title={!canExecute ? "Execute previous steps first" : isExecuting ? "Step is executing..." : "Fix this step with AI"}>
-                                <div className={`relative flex rounded-md border border-input bg-background ${failedSteps.includes(step.id) ? 'border-destructive/50' : ''}`}>
+                                <div className={`relative flex rounded-md border border-input bg-background ${stepFailed ? 'border-destructive/50' : ''}`}>
                                     <Button
                                         variant="ghost"
                                         onClick={onOpenFixStepDialog}
                                         disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                        className={`h-8 px-3 gap-2 border-0 ${failedSteps.includes(step.id) ? 'bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive animate-pulse' : ''}`}
+                                        className={`h-8 px-3 gap-2 border-0 ${stepFailed ? 'bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive animate-pulse' : ''}`}
                                     >
                                         <Wand2 className="h-3 w-3" />
                                         <span className="font-medium text-[13px]">Fix Step</span>
@@ -274,7 +276,7 @@ export const SpotlightStepCard = React.memo(({
                                 </div>
                             </span>
                         )}
-                        {!readOnly && onRemove && (
+                        {onRemove && (
                             <Button
                                 variant="ghost"
                                 size="icon"
@@ -311,37 +313,27 @@ export const SpotlightStepCard = React.memo(({
                                 step={step}
                                 stepIndex={stepIndex}
                                 evolvingPayload={evolvingPayload}
-                                canExecute={canExecute}
-                                readOnly={readOnly}
                                 onEdit={onEdit}
                                 isActive={true}
-                                sourceDataVersion={sourceDataVersion}
                             />
                         )}
                         {activePanel === 'config' && (
                             <StepConfigTab
                                 step={step}
+                                stepIndex={stepIndex}
                                 evolvingPayload={evolvingPayload}
                                 dataSelectorOutput={dataSelectorOutput}
                                 categorizedSources={categorizedSources}
-                                canExecute={canExecute}
-                                integrations={integrations}
                                 onEdit={onEdit}
                                 onEditingChange={onConfigEditingChange}
                                 onOpenFixStepDialog={onOpenFixStepDialog}
-                                sourceDataVersion={sourceDataVersion}
                             />
                         )}
                         {activePanel === 'output' && (
                             <StepResultTab
                                 step={step}
                                 stepIndex={stepIndex}
-                                stepResult={stepResult}
-                                failedSteps={failedSteps}
-                                abortedSteps={abortedSteps}
                                 isExecuting={isExecuting}
-                                isGlobalExecuting={isGlobalExecuting}
-                                currentExecutingStepIndex={currentExecutingStepIndex}
                                 isActive={true}
                             />
                         )}
