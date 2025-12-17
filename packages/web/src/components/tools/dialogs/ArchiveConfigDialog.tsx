@@ -77,7 +77,7 @@ export function ArchiveConfigDialog({ config, isOpen, onClose, onArchived }: Arc
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction 
             onClick={handleArchive} 
-            disabled={hasActiveSchedules}
+            disabled={hasActiveSchedules || isInitiallyLoading}
           >
             Archive
           </AlertDialogAction>

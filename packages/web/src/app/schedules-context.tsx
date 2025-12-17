@@ -61,7 +61,7 @@ export function SchedulesProvider({ children }: { children: ReactNode }) {
         }
 
         refreshSchedules()
-    }, [config.superglueEndpoint])
+    }, [config.superglueEndpoint, refreshSchedules])
 
     const context: SchedulesContextType = {
         schedules,
