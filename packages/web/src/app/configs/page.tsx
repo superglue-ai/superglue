@@ -23,7 +23,7 @@ import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-
 import { Integration, Tool } from '@superglue/shared';
 import { ArrowDown, ArrowUp, ArrowUpDown, Globe, Hammer, Loader2, Plus, RotateCw, Search } from "lucide-react";
 import { useRouter } from 'next/navigation';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import * as simpleIcons from 'simple-icons';
 import { useTools } from '../tools-context';
@@ -36,12 +36,8 @@ const ConfigTable = () => {
   const {tools, isInitiallyLoading, isRefreshing, refreshTools} = useTools();
   const { integrations } = useIntegrations();
 
-  const [currentConfigs, setCurrentConfigs] = useState<Tool[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(0);
-  const [pageSize] = useState(20);
-
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [manuallyOpenedStepper, setManuallyOpenedStepper] = useState(false);
 
   const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
@@ -50,22 +46,29 @@ const ConfigTable = () => {
 
   const { selectedFolder, setSelectedFolder, filteredByFolder } = useFolderFilter(tools);
 
-  const refreshConfigs = useCallback(async () => { 
-      refreshTools();
-  }, [refreshTools]);
-
+  // Debounce search term
   useEffect(() => {
-    refreshConfigs();
-  }, [refreshConfigs]);
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-  useEffect(() => {
+  // Memoize filtered and sorted configs
+  const currentConfigs = useMemo(() => {    
     let filtered = filteredByFolder.filter(config => {
       if (!config) return false;
 
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        const configString = JSON.stringify(config).toLowerCase();
-        if (!configString.includes(searchLower)) return false;
+      if (debouncedSearchTerm) {
+        const searchLower = debouncedSearchTerm.toLowerCase();
+        // Only search relevant fields instead of entire object
+        const searchableText = [
+          config.id,
+          config.folder,
+          config.instruction
+        ].filter(Boolean).join(' ').toLowerCase();
+        
+        if (!searchableText.includes(searchLower)) return false;
       }
 
       return true;
@@ -87,16 +90,12 @@ const ConfigTable = () => {
       }
     });
 
-    setTotal(filtered.length);
+    return filtered;
+  }, [filteredByFolder, debouncedSearchTerm, sortColumn, sortDirection]);
 
-    const start = page * pageSize;
-    const end = start + pageSize;
-    setCurrentConfigs(filtered.slice(start, end));
-  }, [page, filteredByFolder, searchTerm, sortColumn, sortDirection, pageSize]);
-
-  useEffect(() => {
-    setPage(0);
-  }, [searchTerm, selectedFolder]);
+  const refreshConfigs = useCallback(() => {
+    refreshTools();
+  }, [refreshTools]);
 
   const handleTool = () => {
     setManuallyOpenedStepper(true);
@@ -142,7 +141,6 @@ const ConfigTable = () => {
     return iconName ? getSimpleIcon(iconName) : null;
   };
 
-  const totalPages = Math.ceil(total / pageSize);
 
   useEffect(() => {
     if (!isInitiallyLoading && !hasCompletedInitialLoad) {
@@ -167,8 +165,8 @@ const ConfigTable = () => {
   }
 
   return (
-    <div className="p-8 max-w-none w-full min-h-full">
-      <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2">
+    <div className="p-8 max-w-none w-full h-full flex flex-col overflow-hidden">
+      <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2 flex-shrink-0">
         <h1 className="text-2xl font-bold">Tools</h1>
         <div className="flex gap-4">
           <Button onClick={handleTool}>
@@ -178,7 +176,7 @@ const ConfigTable = () => {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 mb-4">
+      <div className="flex flex-wrap gap-3 mb-4 flex-shrink-0">
         <FolderSelector 
           tools={tools}
           selectedFolder={selectedFolder}
@@ -195,9 +193,9 @@ const ConfigTable = () => {
         </div>
       </div>
 
-      <div className="border rounded-lg">
+      <div className="border rounded-lg flex-1 overflow-auto">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 bg-background z-10">
             <TableRow>
               <TableHead className="w-[60px]"></TableHead>
               <TableHead 
@@ -395,26 +393,6 @@ const ConfigTable = () => {
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-center space-x-2 py-4">
-        <Button
-          variant="outline"
-          onClick={() => setPage(p => Math.max(0, p - 1))}
-          disabled={page === 0}
-        >
-          Previous
-        </Button>
-        <div className="text-sm">
-          Page {page + 1} of {totalPages}
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-          disabled={page >= totalPages - 1}
-        >
-          Next
-        </Button>
-      </div>
-
     </div>
   );
 };
