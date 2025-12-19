@@ -1,5 +1,4 @@
 "use client";
-import { useConfig } from "@/src/app/config-context";
 import { useIntegrations } from "@/src/app/integrations-context";
 import { useTools } from "@/src/app/tools-context";
 import { type UploadedFileInfo } from '@/src/lib/file-utils';
@@ -13,9 +12,8 @@ import { useToolData } from "./hooks/use-tool-data";
 import { ToolConfigProvider, useToolConfig, ExecutionProvider, useExecution } from "./context";
 import { ArchiveRestore, Check, Hammer, Loader2, Play, Square, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { useToast } from "../../hooks/use-toast";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../ui/alert-dialog";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { DeployButton } from "./deploy/DeployButton";
 import { FixStepDialog } from "./dialogs/FixStepDialog";
@@ -87,9 +85,6 @@ function ToolPlaygroundInner({
   innerRef,
 }: ToolPlaygroundInnerProps) {
   const router = useRouter();
-  const config = useConfig();
-  const { toast } = useToast();
-  const { refreshTools } = useTools();
   const toolConfig = useToolConfig();
   const execution = useExecution();
   
@@ -114,7 +109,6 @@ function ToolPlaygroundInner({
   const {
     currentExecutingStepIndex: contextCurrentExecutingStepIndex,
     currentRunId,
-    clearExecutionsFrom,
     clearAllExecutions,
     setFinalResult,
     setTransformStatus,
@@ -168,9 +162,10 @@ function ToolPlaygroundInner({
   const [navigateToFinalSignal, setNavigateToFinalSignal] = useState<number>(0);
   const [showStepOutputSignal, setShowStepOutputSignal] = useState<number>(0);
   const [focusStepId, setFocusStepId] = useState<string | null>(null);
-  
-  const lastUserEditedStepIdRef = useRef<string | null>(null);
-  const prevStepHashesRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    incrementSourceDataVersion();
+  }, [stepExecutions, computedPayload, incrementSourceDataVersion]);
 
   const stepResultsMap = getStepResultsMap();
 
@@ -183,7 +178,6 @@ function ToolPlaygroundInner({
 
   const [activeDialog, setActiveDialog] = useState<DialogState>({ type: 'none' });
   const modifyStepResolveRef = useRef<((shouldContinue: boolean) => void) | null>(null);
-  
   const isExecutingStep = contextCurrentExecutingStepIndex;
   const hasGeneratedDefaultPayloadRef = useRef<boolean>(false);
   
@@ -335,66 +329,40 @@ function ToolPlaygroundInner({
     updatedAt: initialTool?.updatedAt
   } as Tool), [toolId, steps, instructions, finalTransform, responseSchema, inputSchema, folder, initialTool]);
 
+  const getCurrentTool = useCallback((): Tool => ({
+    id: toolId,
+    steps: steps.map((step: ExecutionStep) => ({
+      ...step,
+      apiConfig: {
+        id: step.apiConfig.id || step.id,
+        ...step.apiConfig,
+        pagination: step.apiConfig.pagination || null
+      }
+    })),
+    responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
+    inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
+    finalTransform,
+    instruction: instructions,
+    createdAt: initialTool?.createdAt,
+    updatedAt: initialTool?.updatedAt
+  } as Tool), [toolId, steps, responseSchema, inputSchema, finalTransform, instructions, initialTool]);
+
   useImperativeHandle(innerRef, () => ({
     executeTool,
     saveTool,
-    getCurrentTool: () => currentTool,
+    getCurrentTool,
     closeRebuild: () => {
       setShowToolBuilder(false);
       onRebuildEnd?.();
     }
-  }), [currentTool, onRebuildEnd, executeTool, saveTool]);
+  }), [onRebuildEnd, executeTool, saveTool, getCurrentTool]);
 
-  const handleStepEdit = (stepId: string, updatedStep: any, isUserInitiated: boolean = false) => {
-    const idx = steps.findIndex(s => s.id === stepId);
-    if (idx !== -1) {
-      const current = steps[idx];
-      const currHash = hashStepConfig(current);
-      const nextHash = hashStepConfig(updatedStep);
-      if (currHash === nextHash) return;
-    }
-
+  const handleStepEdit = (stepId: string, updatedStep: any, _isUserInitiated?: boolean) => {
     setSteps(steps.map(step => (step.id === stepId ? {
       ...updatedStep,
       apiConfig: { ...updatedStep.apiConfig, id: updatedStep.apiConfig.id || updatedStep.id }
     } : step)));
-
-    if (isUserInitiated) {
-      lastUserEditedStepIdRef.current = stepId;
-    }
   };
-
-  const hashStepConfig = (s: any): string => {
-    try {
-      return JSON.stringify({
-        id: s.id,
-        executionMode: s.executionMode,
-        loopSelector: s.loopSelector,
-        integrationId: s.integrationId,
-        apiConfig: s.apiConfig,
-        modify: s.modify,
-        failureBehavior: s.failureBehavior,
-      });
-    } catch {
-      return '';
-    }
-  };
-
-  useEffect(() => {
-    const currentHashes = steps.map(hashStepConfig);
-    const prevHashes = prevStepHashesRef.current;
-
-    if (lastUserEditedStepIdRef.current) {
-      const editedId = lastUserEditedStepIdRef.current;
-      const idxOfEdited = steps.findIndex(s => s.id === editedId);
-      if (idxOfEdited !== -1 && prevHashes[idxOfEdited] !== currentHashes[idxOfEdited]) {
-        clearExecutionsFrom(idxOfEdited);
-      }
-      lastUserEditedStepIdRef.current = null;
-    }
-
-    prevStepHashesRef.current = currentHashes;
-  }, [steps, clearExecutionsFrom]);
 
   const handleExecuteStep = async (idx: number): Promise<void> => { await executeStepByIdx(idx); };
   const handleExecuteStepWithLimit = async (idx: number, limit: number): Promise<void> => { await executeStepByIdx(idx, { limitIterations: limit }); };
@@ -427,19 +395,20 @@ function ToolPlaygroundInner({
     setNavigateToFinalSignal(Date.now());
   };
 
-  const handleUnarchive = async () => {
-    try {
-      const client = createSuperglueClient(config.superglueEndpoint);
-      await client.archiveWorkflow(toolId, false);
-      setIsArchived(false);
-      refreshTools();
-    } catch (error: any) {
-      toast({
-        title: "Error unarchiving tool",
-        description: error.message || "An unexpected error occurred",
-        variant: "destructive",
-      });
-    }
+  // Tool action handlers
+  const handleRenamed = (newId: string) => {
+    setToolId(newId);
+    refreshTools();
+    router.push(`/tools/${encodeURIComponent(newId)}`);
+  };
+
+  const handleDuplicated = (newId: string) => {
+    refreshTools();
+    router.push(`/tools/${encodeURIComponent(newId)}`);
+  };
+
+  const handleDeleted = () => {
+    router.push('/configs');
   };
 
   const toolActionButtons = !embedded ? (
@@ -679,6 +648,34 @@ function ToolPlaygroundInner({
         />
       )}
 
+      <ToolDeployModal
+        currentTool={getCurrentTool()}
+        payload={computedPayload}
+        isOpen={activeDialog.type === 'deploy'}
+        onClose={() => setActiveDialog({ type: 'none' })}
+      />
+
+      <RenameToolDialog
+        tool={getCurrentTool()}
+        isOpen={activeDialog.type === 'rename'}
+        onClose={() => setActiveDialog({ type: 'none' })}
+        onRenamed={handleRenamed}
+      />
+
+      <DuplicateToolDialog
+        tool={getCurrentTool()}
+        isOpen={activeDialog.type === 'duplicate'}
+        onClose={() => setActiveDialog({ type: 'none' })}
+        onDuplicated={handleDuplicated}
+      />
+
+      <DeleteConfigDialog
+        config={{ ...getCurrentTool(), type: 'tool' } as any}
+        isOpen={activeDialog.type === 'delete'}
+        onClose={() => setActiveDialog({ type: 'none' })}
+        onDeleted={handleDeleted}
+      />
+
       <FixTransformDialog
         open={activeDialog.type === 'fixTransform'}
         onClose={handleCloseFixTransformDialog}
@@ -718,5 +715,5 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>((pr
 });
 
 ToolPlayground.displayName = 'ToolPlayground';
-
 export default ToolPlayground;
+

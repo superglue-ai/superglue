@@ -1,4 +1,3 @@
-import { useConfig } from '@/src/app/config-context';
 import { useIntegrations } from '@/src/app/integrations-context';
 import { useToast } from '@/src/hooks/use-toast';
 import { shouldDebounceAbort } from '@/src/lib/client-utils';
@@ -26,14 +25,12 @@ export function ToolCreateStepper({
   initialView = 'integrations'
 }: ToolCreateStepperProps) {
   const [step, setStep] = useState<ToolCreateStep>('build');
-  const [isSaving, setIsSaving] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [shouldStopExecution, setShouldStopExecution] = useState(false);
   const [isRebuildingFromPlayground, setIsRebuildingFromPlayground] = useState(false);
   
   const { toast } = useToast();
   const router = useRouter();
-  const superglueConfig = useConfig();
   const playgroundRef = useRef<ToolPlaygroundHandle>(null);
   const lastAbortTimeRef = useRef<number>(0);
 

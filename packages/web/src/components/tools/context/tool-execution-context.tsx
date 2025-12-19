@@ -1,8 +1,9 @@
 "use client";
-import { createContext, useContext, useCallback, useMemo, useState, ReactNode } from 'react';
+import { createContext, useContext, useCallback, useMemo, useState, useEffect, useRef, ReactNode } from 'react';
 import { useToolConfig } from './tool-config-context';
 import { ExecutionContextValue, StepExecutionState, StepStatus, TransformStatus, DEFAULT_STEP_EXECUTION } from './types';
 import { buildEvolvingPayload } from '@/src/lib/general-utils';
+import { ExecutionStep } from '@superglue/shared';
 
 const ExecutionContext = createContext<ExecutionContextValue | null>(null);
 
@@ -99,6 +100,50 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     setFinalErrorState(null);
     setTransformStatusState('idle');
   }, []);
+
+  const prevStepHashesRef = useRef<string[]>([]);
+  
+  const hashStepConfig = (s: ExecutionStep): string => {
+    try {
+      return JSON.stringify({
+        id: s.id,
+        executionMode: s.executionMode,
+        loopSelector: s.loopSelector,
+        integrationId: s.integrationId,
+        apiConfig: s.apiConfig,
+        modify: s.modify,
+        failureBehavior: s.failureBehavior,
+      });
+    } catch {
+      return '';
+    }
+  };
+
+  useEffect(() => {
+    const currentHashes = steps.map(hashStepConfig);
+    const prevHashes = prevStepHashesRef.current;
+    
+    if (prevHashes.length > 0) {
+      for (let i = 0; i < Math.min(currentHashes.length, prevHashes.length); i++) {
+        if (currentHashes[i] !== prevHashes[i]) {
+          const stepIdsToRemove = steps.slice(i).map(s => s.id);
+          setStepExecutions(prev => {
+            const next = { ...prev };
+            for (const id of stepIdsToRemove) {
+              delete next[id];
+            }
+            return next;
+          });
+          setFinalResultState(null);
+          setFinalErrorState(null);
+          setTransformStatusState('idle');
+          break;
+        }
+      }
+    }
+    
+    prevStepHashesRef.current = currentHashes;
+  }, [steps]);
   
   // === EXECUTION CONTROL ===
   

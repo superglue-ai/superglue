@@ -4,13 +4,14 @@ import { buildEvolvingPayload, buildPreviousStepResults, cn } from '@/src/lib/ge
 import { buildCategorizedSources } from '@/src/lib/templating-utils';
 import { AuthType, ExecutionStep, HttpMethod } from "@superglue/shared";
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FinalTransformMiniStepCard } from './cards/FinalTransformCard';
 import { MiniStepCard } from './cards/MiniStepCard';
 import { PayloadMiniStepCard } from './cards/PayloadCard';
 import { SpotlightStepCard } from './cards/SpotlightStepCard';
 import { useToolConfig, useExecution } from './context';
 import { AddStepDialog } from './dialogs/AddStepDialog';
+import { useGalleryNavigation } from './hooks/use-gallery-navigation';
 import { InstructionDisplay } from './shared/InstructionDisplay';
 
 interface PayloadItem {
@@ -41,7 +42,6 @@ interface TransformItem {
 type ToolItem = PayloadItem | StepItem | TransformItem;
 
 export interface ToolStepGalleryProps {
-    // Callbacks that trigger parent logic
     onStepEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onInstructionEdit?: () => void;
     onExecuteStep?: (stepIndex: number) => Promise<void>;
@@ -51,7 +51,6 @@ export interface ToolStepGalleryProps {
     onOpenFixTransformDialog?: () => void;
     onAbort?: () => void;
     
-    // File handling callbacks
     onFilesUpload?: (files: File[]) => Promise<void>;
     onFileRemove?: (key: string) => void;
     
@@ -90,6 +89,7 @@ export function ToolStepGallery({
     embedded = false,
 }: ToolStepGalleryProps) {
     
+    // === CONTEXT ===
     const {
         tool,
         steps,
@@ -99,7 +99,6 @@ export function ToolStepGallery({
         responseSchema,
         finalTransform,
         setSteps,
-        setPayloadText,
     } = useToolConfig();
     
     const {
@@ -112,142 +111,65 @@ export function ToolStepGallery({
         isRunningTransform,
         isFixingTransform,
     } = useExecution();
-    
-    const isExecutingStep = currentExecutingStepIndex;
-    
-    // Derive values from context
+
+    // === DERIVED VALUES FROM CONTEXT ===
     const toolId = tool.id;
     const instruction = tool.instruction;
     const payloadText = payload.manualPayloadText;
-    const computedPayload = payload.computedPayload;
+    const computedPayload = payload.computedPayload || {};
     const filePayloads = payload.filePayloads;
-    const isExecuting = isExecutingAny;
     const stepResultsMap = getStepResultsMap();
+    const hasTransformCompleted = transformStatus === 'completed';
+    const hasTransformFailed = transformStatus === 'failed';
     
-    
-    const [activeIndex, setActiveIndex] = useState(1); // Default to first tool step, not payload
-    const [windowWidth, setWindowWidth] = useState(1200);
-    const [containerWidth, setContainerWidth] = useState<number>(1200);
-    const [isHydrated, setIsHydrated] = useState(false);
-    const listRef = useRef<HTMLDivElement | null>(null);
-    const [isConfiguratorEditing, setIsConfiguratorEditing] = useState<boolean>(false);
+    // Parse manual payload for categorized sources (memoized)
+    const manualPayload = useMemo(() => {
+        try { return JSON.parse(payloadText || '{}'); } 
+        catch { return {}; }
+    }, [payloadText]);
 
+    // === LOCAL STATE ===
     const [isAddStepDialogOpen, setIsAddStepDialogOpen] = useState(false);
     const [pendingInsertIndex, setPendingInsertIndex] = useState<number | null>(null);
-    const isConfiguratorEditingRef = useRef<boolean>(false);
     const [hiddenLeftCount, setHiddenLeftCount] = useState(0);
     const [hiddenRightCount, setHiddenRightCount] = useState(0);
     const [activeStepItemCount, setActiveStepItemCount] = useState<number | null>(null);
-    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-    
+
+    // Item count: payload (1) + steps + transform (if exists)
+    const itemCount = 1 + steps.length + (finalTransform !== undefined ? 1 : 0);
+
+    // === NAVIGATION ===
+    const {
+        activeIndex,
+        setActiveIndex,
+        navigateToIndex,
+        handleNavigation,
+        handleCardClick,
+        listRef,
+        scrollContainerRef,
+        containerWidth,
+        isHydrated,
+        isNavigatingRef,
+        isConfiguratorEditing,
+        setIsConfiguratorEditing,
+    } = useGalleryNavigation({
+        initialIndex: steps.length > 0 && isPayloadValid ? 1 : 0,
+        itemCount,
+        embedded,
+    });
+
     const handleDataSelectorChange = useCallback((itemCount: number | null, isInitial: boolean) => {
         setActiveStepItemCount(itemCount);
         if (!isInitial) {
             incrementSourceDataVersion?.();
         }
     }, [incrementSourceDataVersion]);
-    
-    useEffect(() => {
-        isConfiguratorEditingRef.current = isConfiguratorEditing;
-    }, [isConfiguratorEditing]);
 
-    const isNavigatingRef = useRef<boolean>(false);
-    const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const NAV_SUPPRESS_MS = 300;
-    const NAV_DELAY_MS = 50;
-
-    const navigateToIndex = (nextIndex: number) => {
-        isNavigatingRef.current = true;
-        if (navigationTimeoutRef.current) clearTimeout(navigationTimeoutRef.current);
-        navigationTimeoutRef.current = setTimeout(() => {
-            isNavigatingRef.current = false;
-        }, NAV_SUPPRESS_MS);
-
-        setTimeout(() => {
-            setActiveIndex(nextIndex);
-            const container = listRef.current;
-            const card = container?.children?.[nextIndex] as HTMLElement | undefined;
-            if (container && card) {
-                card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-            }
-            
-            // Scroll to top based on mode
-            if (embedded) {
-                // In embedded mode, find the nearest scrollable parent
-                let scrollParent = scrollContainerRef.current?.parentElement;
-                while (scrollParent && scrollParent !== document.body) {
-                    const { overflowY } = window.getComputedStyle(scrollParent);
-                    if (overflowY === 'auto' || overflowY === 'scroll') {
-                        scrollParent.scrollTo({ top: 0, behavior: 'smooth' });
-                        break;
-                    }
-                    scrollParent = scrollParent.parentElement;
-                }
-                // Fallback: scroll window
-                if (!scrollParent || scrollParent === document.body) {
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
-            } else if (scrollContainerRef.current) {
-                // Non-embedded mode: use local scroll container
-                scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-        }, NAV_DELAY_MS);
-    };
-
-    // Hydration effect
-    useEffect(() => {
-        setIsHydrated(true);
-        setWindowWidth(window.innerWidth);
-        setContainerWidth(window.innerWidth);
-    }, []);
-
-    // Update window width on resize
-    useEffect(() => {
-        if (!isHydrated) return;
-        const handleResize = () => {
-            setWindowWidth(window.innerWidth);
-        };
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, [isHydrated]);
-
-    // Observe container width (e.g., when logs panel opens/closes) to responsively adjust cards
-    useEffect(() => {
-        if (!isHydrated) return;
-        const container = listRef.current?.parentElement?.parentElement as HTMLElement | null;
-        if (!container || typeof ResizeObserver === 'undefined') return;
-        const RESIZE_THRESHOLD = 50; // Increased from 1px to reduce sensitivity and prevent cascading re-renders
-        const ro = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                const w = (entry.contentRect?.width || container.getBoundingClientRect().width);
-                if (w && Math.abs(w - containerWidth) > RESIZE_THRESHOLD) setContainerWidth(w);
-            }
-        });
-        ro.observe(container);
-        return () => ro.disconnect();
-    }, [isHydrated, listRef.current, containerWidth]);
-
-
-    const [rawPayloadText, setRawPayloadText] = useState<string>(payloadText || '');
-
-    // Keep local payload text in sync with external prop
-    useEffect(() => {
-        if (typeof payloadText === 'string') {
-            setRawPayloadText(payloadText);
-        }
-    }, [payloadText]);
-    
-    // Use computed payload from context (already merged manual + files)
-    const workingPayload = computedPayload || {};
-
-    const manualPayload = useMemo(() => { try { return JSON.parse(rawPayloadText || '{}'); } catch { return {}; } }, [rawPayloadText]);
-    const hasTransformCompleted = transformStatus === 'completed';
-    const hasTransformFailed = transformStatus === 'failed';
-
+    // === TOOL ITEMS ===
     const toolItems = useMemo((): ToolItem[] => [
         {
             type: 'payload',
-            data: { payloadText: rawPayloadText, inputSchema },
+            data: { payloadText, inputSchema },
             stepResult: undefined,
             transformError: undefined,
             categorizedSources: buildCategorizedSources({ manualPayload, filePayloads: filePayloads || {} })
@@ -275,34 +197,77 @@ export function ToolStepGallery({
                 previousStepResults: buildPreviousStepResults(steps, stepResultsMap, steps.length - 1),
             })
         } as TransformItem] : [])
-    ], [rawPayloadText, inputSchema, steps, stepResultsMap, finalTransform, responseSchema, finalResult, hasTransformCompleted, hasTransformFailed, manualPayload, filePayloads]);
+    ], [payloadText, inputSchema, steps, stepResultsMap, finalTransform, responseSchema, finalResult, hasTransformCompleted, hasTransformFailed, manualPayload, filePayloads]);
 
     const currentItem = toolItems[activeIndex];
     const indicatorIndices = toolItems.map((_, idx) => idx);
 
     const activeEvolvingPayload = useMemo(() => {
-        if (!currentItem) return workingPayload || {};
-        if (currentItem.type === 'payload') return workingPayload || {};
+        if (!currentItem) return computedPayload;
+        if (currentItem.type === 'payload') return computedPayload;
         if (currentItem.type === 'transform') {
-            return buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, steps.length - 1);
+            return buildEvolvingPayload(computedPayload, steps, stepResultsMap, steps.length - 1);
         }
         const stepIndex = steps.findIndex(s => s.id === currentItem.data.id);
-        return buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, stepIndex - 1);
-    }, [currentItem, workingPayload, steps, stepResultsMap]);
+        return buildEvolvingPayload(computedPayload, steps, stepResultsMap, stepIndex - 1);
+    }, [currentItem, computedPayload, steps, stepResultsMap]);
 
-    const handleNavigation = (direction: 'prev' | 'next') => {
-        if (isConfiguratorEditing) return;
-        const newIndex = direction === 'prev'
-            ? Math.max(0, activeIndex - 1)
-            : Math.min(toolItems.length - 1, activeIndex + 1);
-        if (newIndex === activeIndex) return;
-        navigateToIndex(newIndex);
-    };
+    // === VISIBLE CARDS CALCULATION ===
+    const visibleCardsData = useMemo(() => {
+        const totalCards = toolItems.length;
+        const CARD_WIDTH = 180;
+        const ARROW_WIDTH = 24;
+        const GUTTER = 16;
+        const SAFE_MARGIN = 12;
+        const available = Math.max(0, containerWidth - SAFE_MARGIN);
+        
+        let cardsToShow = 1;
+        const maxCandidates = Math.min(totalCards, 12);
+        for (let c = 1; c <= maxCandidates; c++) {
+            const needed = (c * CARD_WIDTH) + ((c - 1) * (ARROW_WIDTH + GUTTER));
+            if (needed <= available) {
+                cardsToShow = c;
+            } else {
+                break;
+            }
+        }
+        cardsToShow = Math.max(1, cardsToShow);
 
-    const handleCardClick = (globalIndex: number) => {
-        if (isConfiguratorEditing) return;
-        navigateToIndex(globalIndex);
-    };
+        let startIdx = 0;
+        let endIdx = totalCards;
+        if (totalCards > cardsToShow) {
+            const halfWindow = Math.floor(cardsToShow / 2);
+            startIdx = Math.max(0, Math.min(activeIndex - halfWindow, totalCards - cardsToShow));
+            endIdx = startIdx + cardsToShow;
+        }
+
+        const visibleItems = toolItems.slice(startIdx, endIdx);
+        const visibleIndices = visibleItems.map((_, i) => startIdx + i);
+        const sepWidth = ARROW_WIDTH + GUTTER;
+        const count = Math.max(1, visibleItems.length);
+        const innerAvailable = Math.max(0, containerWidth - SAFE_MARGIN - (2 * sepWidth) - ((count - 1) * sepWidth));
+        const baseCardWidth = Math.floor(innerAvailable / count);
+        const widthRemainder = innerAvailable - (baseCardWidth * count);
+
+        return {
+            visibleItems,
+            visibleIndices,
+            startIdx,
+            endIdx,
+            totalCards,
+            hiddenLeft: startIdx,
+            hiddenRight: totalCards - endIdx,
+            sepWidth,
+            baseCardWidth,
+            widthRemainder,
+        };
+    }, [toolItems, containerWidth, activeIndex]);
+
+    // Update hidden counts for badges
+    useEffect(() => {
+        if (visibleCardsData.hiddenLeft !== hiddenLeftCount) setHiddenLeftCount(visibleCardsData.hiddenLeft);
+        if (visibleCardsData.hiddenRight !== hiddenRightCount) setHiddenRightCount(visibleCardsData.hiddenRight);
+    }, [visibleCardsData.hiddenLeft, visibleCardsData.hiddenRight, hiddenLeftCount, hiddenRightCount]);
 
     const handleRemoveStep = (stepId: string) => {
         if (!setSteps) return;
@@ -316,24 +281,29 @@ export function ToolStepGallery({
 
     const handleInsertStep = (afterIndex: number) => {
         if (!setSteps) return;
-
         setPendingInsertIndex(afterIndex);
         setIsAddStepDialogOpen(true);
     };
 
-    const handleConfirmInsertStep = (stepId: string, instruction: string, integrationId?: string) => {
+    const insertStepsAndNavigate = (stepsToInsert: ExecutionStep[]) => {
         if (pendingInsertIndex === null || !setSteps) return;
+        const newSteps = [...steps];
+        newSteps.splice(pendingInsertIndex, 0, ...stepsToInsert);
+        setSteps(newSteps);
+        const insertedIndex = pendingInsertIndex;
+        setIsAddStepDialogOpen(false);
+        setPendingInsertIndex(null);
+        setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
+    };
 
-        const selectedIntegration = integrationId 
-            ? integrations?.find(i => i.id === integrationId)
-            : undefined;
-
+    const handleConfirmInsertStep = (stepId: string, instruction: string, integrationId?: string) => {
+        const selectedIntegration = integrationId ? integrations?.find(i => i.id === integrationId) : undefined;
         const newStep: ExecutionStep = {
             id: stepId,
             integrationId: integrationId || '',
             apiConfig: {
                 id: stepId,
-                instruction: instruction,
+                instruction,
                 urlHost: selectedIntegration?.urlHost || '',
                 urlPath: selectedIntegration?.urlPath || '',
                 method: 'GET' as HttpMethod,
@@ -344,46 +314,12 @@ export function ToolStepGallery({
             },
             executionMode: 'DIRECT'
         };
-
-        const newSteps = [...steps];
-        newSteps.splice(pendingInsertIndex, 0, newStep);
-        setSteps(newSteps);
-
-        const insertedIndex = pendingInsertIndex;
-        setIsAddStepDialogOpen(false);
-        setPendingInsertIndex(null);
-        setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
+        insertStepsAndNavigate([newStep]);
     };
 
-    const handleConfirmInsertTool = (toolSteps: any[]) => {
-        if (pendingInsertIndex === null || !setSteps) return;
+    const handleConfirmInsertTool = (toolSteps: ExecutionStep[]) => insertStepsAndNavigate(toolSteps);
 
-        const newSteps = [...steps];
-        newSteps.splice(pendingInsertIndex, 0, ...toolSteps);
-        setSteps(newSteps);
-
-        const insertedIndex = pendingInsertIndex;
-        setIsAddStepDialogOpen(false);
-        setPendingInsertIndex(null);
-
-        // Navigate to the first newly inserted step
-        setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
-    };
-
-    const handleConfirmGenerateStep = (step: any) => {
-        if (pendingInsertIndex === null || !setSteps) return;
-
-        const newSteps = [...steps];
-        newSteps.splice(pendingInsertIndex, 0, step);
-        setSteps(newSteps);
-
-        const insertedIndex = pendingInsertIndex;
-        setIsAddStepDialogOpen(false);
-        setPendingInsertIndex(null);
-
-        // Navigate to the newly inserted step
-        setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
-    };
+    const handleConfirmGenerateStep = (step: ExecutionStep) => insertStepsAndNavigate([step]);
 
     const onStepEdit = (stepId: string, updatedStep: any, isUserInitiated: boolean = false) => {
         // Suppress user-initiated edits during navigation to prevent spurious resets
@@ -396,45 +332,7 @@ export function ToolStepGallery({
         }
     };
 
-    useEffect(() => {
-        setActiveIndex(steps.length > 0 && isPayloadValid ? 1 : 0);
-    }, []);
-
-    // Keyboard navigation with arrow keys
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Only handle if not typing in an input/textarea/contenteditable
-            if (e.target instanceof HTMLInputElement ||
-                e.target instanceof HTMLTextAreaElement ||
-                (e.target as HTMLElement).isContentEditable) {
-                return;
-            }
-
-            // Don't navigate when editing step config
-            if (isConfiguratorEditing) {
-                return;
-            }
-
-            // Don't navigate when inside a popover (e.g., template code editor)
-            const activeElement = document.activeElement;
-            if (activeElement?.closest('[data-radix-popper-content-wrapper]') ||
-                activeElement?.closest('.monaco-editor')) {
-                return;
-            }
-
-            if (e.key === 'ArrowLeft' && activeIndex > 0) {
-                e.preventDefault();
-                handleNavigation('prev');
-            } else if (e.key === 'ArrowRight' && activeIndex < toolItems.length - 1) {
-                e.preventDefault();
-                handleNavigation('next');
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activeIndex, toolItems.length, isConfiguratorEditing]);
-
+    // === EXTERNAL NAVIGATION SIGNALS ===
     useEffect(() => {
         if (navigateToFinalSignal) {
             navigateToIndex(toolItems.length - 1);
@@ -521,131 +419,72 @@ export function ToolStepGallery({
                                     style={{ minHeight: '150px' }}
                                 >
                                     {!isHydrated ? (
-                                        // Show a simple loading state during hydration
                                         <div className="flex items-center justify-center">
                                             <div className="w-48 h-24 bg-muted/20 rounded-md animate-pulse" />
                                         </div>
-                                    ) : (() => {
-                                        const totalCards = toolItems.length;
-                                        let startIdx = 0;
-                                        let endIdx = totalCards;
-                                        const CARD_WIDTH = 180; // px (matches card classes)
-                                        const ARROW_WIDTH = 24; // px (ChevronRight ~20px, add buffer)
-                                        const GUTTER = 16; // px (doubled spacing)
-                                        const SAFE_MARGIN = 12; // px extra space to avoid clipping
-                                        const available = Math.max(0, (containerWidth || windowWidth) - SAFE_MARGIN);
-                                        let cardsToShow = 1;
-                                        const maxCandidates = Math.min(toolItems.length, 12);
-                                        for (let c = 1; c <= maxCandidates; c++) {
-                                            const needed = (c * CARD_WIDTH) + ((c - 1) * (ARROW_WIDTH + GUTTER));
-                                            if (needed <= available) {
-                                                cardsToShow = c;
-                                            } else {
-                                                break;
-                                            }
-                                        }
-
-                                        cardsToShow = Math.max(1, cardsToShow);
-
-                                        if (totalCards <= cardsToShow) {
-                                            // Show all cards if we have fewer than cardsToShow
-                                            startIdx = 0;
-                                            endIdx = totalCards;
-                                        } else {
-                                            const halfWindow = Math.floor(cardsToShow / 2);
-                                            startIdx = Math.max(0, Math.min(activeIndex - halfWindow, totalCards - cardsToShow));
-                                            endIdx = startIdx + cardsToShow;
-                                        }
-
-                                        const visibleItems = toolItems.slice(startIdx, endIdx);
-                                        const visibleIndices = visibleItems.map((_, i) => startIdx + i);
-                                        const hasHiddenLeft = startIdx > 0;
-                                        const hasHiddenRight = endIdx < totalCards;
-                                        const hiddenLeft = startIdx;
-                                        const hiddenRight = totalCards - endIdx;
-
-                                        // Update state for badges (use ref to avoid re-render loop)
-                                        if (hiddenLeft !== hiddenLeftCount) setHiddenLeftCount(hiddenLeft);
-                                        if (hiddenRight !== hiddenRightCount) setHiddenRightCount(hiddenRight);
-                                        const sepWidth = ARROW_WIDTH + GUTTER;
-                                        const edgeWidth = sepWidth;
-                                        const count = Math.max(1, visibleItems.length);
-                                        const innerAvailable = Math.max(0, (containerWidth || windowWidth) - SAFE_MARGIN - (2 * edgeWidth) - ((count - 1) * sepWidth));
-                                        const baseCardWidth = Math.floor(innerAvailable / count);
-                                        const widthRemainder = innerAvailable - (baseCardWidth * count);
-
-                                        return (
-                                            <>
-                                                {hasHiddenLeft && null}
-
-                                                {visibleItems.length > 0 && (
-                                                    <div style={{ flex: `0 0 ${sepWidth}px`, width: `${sepWidth}px` }} />
-                                                )}
-                                                {visibleItems.map((item, idx) => {
-                                                    const globalIdx = visibleIndices[idx];
-                                                    const showArrow = idx < visibleItems.length - 1;
-                                                    return (
-                                                        <React.Fragment key={globalIdx}>
-                                                            <div
-                                                                className="flex items-center justify-center"
-                                                                style={{
-                                                                    flex: `0 0 ${baseCardWidth + (idx < widthRemainder ? 1 : 0)}px`,
-                                                                    width: `${baseCardWidth + (idx < widthRemainder ? 1 : 0)}px`,
-                                                                    maxWidth: `${baseCardWidth + (idx < widthRemainder ? 1 : 0)}px`
-                                                                }}
-                                                            >
-                                                                <MiniStepCard
-                                                                    step={item.data}
-                                                                    index={globalIdx}
-                                                                    isActive={globalIdx === activeIndex}
-                                                                    onClick={() => handleCardClick(globalIdx)}
-                                                                    stepId={item.type === 'step' ? item.data.id : undefined}
-                                                                    isPayload={item.type === 'payload'}
-                                                                    isTransform={item.type === 'transform'}
-                                                                    isRunningAll={isExecuting && currentExecutingStepIndex === (globalIdx - 1)}
-                                                                    isTesting={
-                                                                        item.type === 'step' ? (isExecutingStep === (globalIdx - 1)) :
-                                                                            item.type === 'transform' ? (isRunningTransform || isFixingTransform) :
-                                                                                false
-                                                                    }
-                                                                    isFirstCard={globalIdx === 0}
-                                                                    isLastCard={globalIdx === totalCards - 1}
-                                                                    isPayloadValid={isPayloadValid}
-                                                                    payloadData={item.type === 'payload' ? workingPayload : undefined}
-                                                                    isLoopStep={globalIdx === activeIndex && activeStepItemCount !== null && activeStepItemCount > 0}
-                                                                />
+                                    ) : (
+                                        <>
+                                            {visibleCardsData.visibleItems.length > 0 && (
+                                                <div style={{ flex: `0 0 ${visibleCardsData.sepWidth}px`, width: `${visibleCardsData.sepWidth}px` }} />
+                                            )}
+                                            {visibleCardsData.visibleItems.map((item, idx) => {
+                                                const globalIdx = visibleCardsData.visibleIndices[idx];
+                                                const showArrow = idx < visibleCardsData.visibleItems.length - 1;
+                                                const cardWidth = visibleCardsData.baseCardWidth + (idx < visibleCardsData.widthRemainder ? 1 : 0);
+                                                return (
+                                                    <React.Fragment key={globalIdx}>
+                                                        <div
+                                                            className="flex items-center justify-center"
+                                                            style={{ flex: `0 0 ${cardWidth}px`, width: `${cardWidth}px`, maxWidth: `${cardWidth}px` }}
+                                                        >
+                                                            <MiniStepCard
+                                                                step={item.data}
+                                                                index={globalIdx}
+                                                                isActive={globalIdx === activeIndex}
+                                                                onClick={() => handleCardClick(globalIdx)}
+                                                                stepId={item.type === 'step' ? item.data.id : undefined}
+                                                                isPayload={item.type === 'payload'}
+                                                                isTransform={item.type === 'transform'}
+                                                                isRunningAll={isExecutingAny && currentExecutingStepIndex === (globalIdx - 1)}
+                                                                isTesting={
+                                                                    item.type === 'step' ? (currentExecutingStepIndex === (globalIdx - 1)) :
+                                                                        item.type === 'transform' ? (isRunningTransform || isFixingTransform) :
+                                                                            false
+                                                                }
+                                                                isFirstCard={globalIdx === 0}
+                                                                isLastCard={globalIdx === visibleCardsData.totalCards - 1}
+                                                                isPayloadValid={isPayloadValid}
+                                                                payloadData={item.type === 'payload' ? computedPayload : undefined}
+                                                                isLoopStep={globalIdx === activeIndex && activeStepItemCount !== null && activeStepItemCount > 0}
+                                                            />
+                                                        </div>
+                                                        {showArrow && (
+                                                            <div style={{ flex: `0 0 ${visibleCardsData.sepWidth}px`, width: `${visibleCardsData.sepWidth}px` }} className="flex items-center justify-center">
+                                                                {setSteps ? (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleInsertStep(globalIdx);
+                                                                        }}
+                                                                        className="group relative flex items-center justify-center h-8 w-8 rounded-full hover:bg-primary/10 transition-colors"
+                                                                        title="Add step here"
+                                                                    >
+                                                                        <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:opacity-0 transition-opacity" />
+                                                                        <Plus className="h-4 w-4 text-primary absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                    </button>
+                                                                ) : (
+                                                                    <ChevronRight className="h-5 w-5 text-muted-foreground/50" />
+                                                                )}
                                                             </div>
-                                                            {showArrow && (
-                                                                <div style={{ flex: `0 0 ${sepWidth}px`, width: `${sepWidth}px` }} className="flex items-center justify-center">
-                                                                    {setSteps && (
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                handleInsertStep(globalIdx);
-                                                                            }}
-                                                                            className="group relative flex items-center justify-center h-8 w-8 rounded-full hover:bg-primary/10 transition-colors"
-                                                                            title="Add step here"
-                                                                        >
-                                                                            <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:opacity-0 transition-opacity" />
-                                                                            <Plus className="h-4 w-4 text-primary absolute opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                                        </button>
-                                                                    )}
-                                                                    {!setSteps && (
-                                                                        <ChevronRight className="h-5 w-5 text-muted-foreground/50" />
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </React.Fragment>
-                                                    );
-                                                })}
-                                                {visibleItems.length > 0 && (
-                                                    <div style={{ flex: `0 0 ${sepWidth}px`, width: `${sepWidth}px` }} />
-                                                )}
-
-                                                {hasHiddenRight && null}
-                                            </>
-                                        );
-                                    })()}
+                                                        )}
+                                                    </React.Fragment>
+                                                );
+                                            })}
+                                            {visibleCardsData.visibleItems.length > 0 && (
+                                                <div style={{ flex: `0 0 ${visibleCardsData.sepWidth}px`, width: `${visibleCardsData.sepWidth}px` }} />
+                                            )}
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -717,8 +556,8 @@ export function ToolStepGallery({
                                     onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
                                     onExecuteStepWithLimit={onExecuteStepWithLimit ? (limit) => onExecuteStepWithLimit(activeIndex - 1, limit) : undefined}
                                     onOpenFixStepDialog={onOpenFixStepDialog ? () => onOpenFixStepDialog(activeIndex - 1) : undefined}
-                                    onAbort={isExecutingStep === activeIndex - 1 ? onAbort : undefined}
-                                    isExecuting={isExecutingStep === activeIndex - 1}
+                                    onAbort={currentExecutingStepIndex === activeIndex - 1 ? onAbort : undefined}
+                                    isExecuting={currentExecutingStepIndex === activeIndex - 1}
                                     showOutputSignal={focusStepId === currentItem.data.id ? showStepOutputSignal : undefined}
                                     onConfigEditingChange={setIsConfiguratorEditing}
                                     onDataSelectorChange={handleDataSelectorChange}
@@ -738,7 +577,7 @@ export function ToolStepGallery({
                 onConfirmTool={handleConfirmInsertTool}
                 onConfirmGenerate={handleConfirmGenerateStep}
                 existingStepIds={steps.map((s: any) => s.id)}
-                stepInput={pendingInsertIndex !== null ? buildEvolvingPayload(workingPayload || {}, steps, stepResultsMap, pendingInsertIndex - 1) : undefined}
+                stepInput={pendingInsertIndex !== null ? buildEvolvingPayload(computedPayload, steps, stepResultsMap, pendingInsertIndex - 1) : undefined}
                 currentToolId={toolId}
             />
         </div>

@@ -42,63 +42,18 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, onCreateI
     const [headersText, setHeadersText] = useState('');
     const [queryParamsText, setQueryParamsText] = useState('');
 
-    useEffect(() => {
-        try {
-            const headers = step.apiConfig?.headers;
-            if (typeof headers === 'string') {
-                setHeadersText(headers);
-            } else if (headers !== undefined && headers !== null) {
-                setHeadersText(JSON.stringify(headers, null, 2));
-            } else {
-                setHeadersText('{}');
-            }
-        } catch {
-            setHeadersText('{}');
+    const serializeValue = (val: unknown): string => {
+        if (typeof val === 'string') return val;
+        if (val !== undefined && val !== null) {
+            try { return JSON.stringify(val, null, 2); } catch { return '{}'; }
         }
-        try {
-            const queryParams = step.apiConfig?.queryParams;
-            if (typeof queryParams === 'string') {
-                setQueryParamsText(queryParams);
-            } else if (queryParams !== undefined && queryParams !== null) {
-                setQueryParamsText(JSON.stringify(queryParams, null, 2));
-            } else {
-                setQueryParamsText('{}');
-            }
-        } catch {
-            setQueryParamsText('{}');
-        }
-    }, [step.id]);
-
-    // Also reflect parent updates to headers/queryParams even if id doesn't change (e.g., self-heal)
-    useEffect(() => {
-        try {
-            const headers = step.apiConfig?.headers;
-            let newHeadersText = '{}';
-            if (typeof headers === 'string') {
-                newHeadersText = headers;
-            } else if (headers !== undefined && headers !== null) {
-                newHeadersText = JSON.stringify(headers, null, 2);
-            }
-            if (newHeadersText !== headersText) {
-                setHeadersText(newHeadersText);
-            }
-        } catch {}
-    }, [step.apiConfig?.headers]);
+        return '{}';
+    };
 
     useEffect(() => {
-        try {
-            const queryParams = step.apiConfig?.queryParams;
-            let newQueryParamsText = '{}';
-            if (typeof queryParams === 'string') {
-                newQueryParamsText = queryParams;
-            } else if (queryParams !== undefined && queryParams !== null) {
-                newQueryParamsText = JSON.stringify(queryParams, null, 2);
-            }
-            if (newQueryParamsText !== queryParamsText) {
-                setQueryParamsText(newQueryParamsText);
-            }
-        } catch { }
-    }, [step.apiConfig?.queryParams]);
+        setHeadersText(serializeValue(step.apiConfig?.headers));
+        setQueryParamsText(serializeValue(step.apiConfig?.queryParams));
+    }, [step.id, step.apiConfig?.headers, step.apiConfig?.queryParams]);
 
     const handleImmediateEdit = (updater: (s: any) => any) => {
         if (disabled || !onEdit) return;
@@ -119,6 +74,31 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, onCreateI
                 urlPath: selectedIntegration?.urlPath || s.apiConfig.urlPath,
             }
         }));
+    };
+
+    const DEFAULT_PAGINATION_STOP_CONDITION = '(response, pageInfo) => !response.data || response.data.length === 0';
+
+    const handlePaginationTypeChange = (value: string) => {
+        if (disabled) return;
+        if (value === 'none') {
+            handleImmediateEdit((s) => ({
+                ...s,
+                apiConfig: { ...s.apiConfig, pagination: undefined },
+            }));
+        } else {
+            handleImmediateEdit((s) => ({
+                ...s,
+                apiConfig: {
+                    ...s.apiConfig,
+                    pagination: {
+                        type: value,
+                        pageSize: s.apiConfig.pagination?.pageSize || '50',
+                        cursorPath: s.apiConfig.pagination?.cursorPath || '',
+                        stopCondition: s.apiConfig.pagination?.stopCondition || DEFAULT_PAGINATION_STOP_CONDITION,
+                    },
+                },
+            }));
+        }
     };
 
     const linkedIntegration = step.integrationId && integrations
@@ -341,32 +321,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, onCreateI
         <div className="pl-2 mb-1">
             <Select
                 value={step.apiConfig.pagination?.type || 'none'}
-                onValueChange={(value) => {
-                    if (disabled) return;
-                    if (value === 'none') {
-                        handleImmediateEdit((s) => ({
-                            ...s,
-                            apiConfig: {
-                                ...s.apiConfig,
-                                pagination: undefined,
-                            },
-                        }));
-                    } else {
-                        handleImmediateEdit((s) => ({
-                            ...s,
-                            apiConfig: {
-                                ...s.apiConfig,
-                                pagination: {
-                                    ...(s.apiConfig.pagination || {}),
-                                    type: value,
-                                    pageSize: s.apiConfig.pagination?.pageSize || '50',
-                                    cursorPath: s.apiConfig.pagination?.cursorPath || '',
-                                    stopCondition: s.apiConfig.pagination?.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'
-                                },
-                            },
-                        }));
-                    }
-                }}
+                onValueChange={handlePaginationTypeChange}
             >
                 <SelectTrigger className="h-9" disabled={disabled}>
                                                         <SelectValue placeholder="No pagination" />
@@ -404,7 +359,7 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, onCreateI
                                                         </Label>
                                                         <div className="mt-1">
                                                             <JavaScriptCodeEditor
-                                                                value={step.apiConfig.pagination.stopCondition || '(response, pageInfo) => !response.data || response.data.length === 0'}
+                                                                value={step.apiConfig.pagination.stopCondition || DEFAULT_PAGINATION_STOP_CONDITION}
                                                                 onChange={(val) => handleImmediateEdit((s) => ({
                                                                     ...s,
                                                                     apiConfig: {

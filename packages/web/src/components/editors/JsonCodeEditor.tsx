@@ -1,4 +1,5 @@
 import { useMonacoTheme } from '@superglue/web/src/hooks/use-monaco-theme';
+import { useResizable } from '@/src/hooks/use-resizable';
 import { cn } from '@/src/lib/general-utils';
 import Editor from '@monaco-editor/react';
 import React, { useMemo, useState } from 'react';
@@ -33,7 +34,11 @@ export const JsonCodeEditor = (
         showValidation = false }: 
     JsonCodeEditorProps) => {
     const { theme, onMount } = useMonacoTheme();
-    const [currentHeight, setCurrentHeight] = useState(maxHeight);
+    const { height: resizableHeight, resizeHandleProps } = useResizable({ 
+        minHeight: 60, 
+        maxHeight: 600, 
+        initialHeight: parseInt(maxHeight) 
+    });
     const [jsonError, setJsonError] = useState<string | null>(null);
     
     const displayValue = useMemo(() => {
@@ -41,26 +46,18 @@ export const JsonCodeEditor = (
         if (readOnly && (base?.length || 0) > HIGHLIGHTING_THRESHOLD) return `${base.slice(0, HIGHLIGHTING_THRESHOLD)}\n...truncated...`;
         return base;
     }, [value, placeholder, readOnly]);
+
+    const effectiveHeight = resizable ? resizableHeight : maxHeight;
     
     return (
         <div className={cn("relative rounded-lg border shadow-sm bg-muted/30")}>
             {overlay && (<div className="absolute top-1 right-1 z-10 mr-5 flex items-center gap-1">{overlay}</div>)}
             {bottomRightOverlay && (<div className="absolute bottom-1 right-1 z-10 mr-5 flex items-center gap-1">{bottomRightOverlay}</div>)}
             {!overlay && (<div className="absolute top-1 right-1 z-10 mr-5"><CopyButton text={value || placeholder} /></div>)}
-            {resizable && (
-                <div className="absolute bottom-1 right-1 w-3 h-3 cursor-se-resize z-10" style={{ background: 'linear-gradient(135deg, transparent 50%, rgba(100,100,100,0.3) 50%)' }} onMouseDown={(e) => {
-                    e.preventDefault();
-                    const startY = e.clientY;
-                    const startHeight = parseInt(currentHeight);
-                    const handleMouseMove = (e: MouseEvent) => { const deltaY = e.clientY - startY; const newHeight = Math.max(60, Math.min(600, startHeight + deltaY)); setCurrentHeight(`${newHeight}px`); };
-                    const handleMouseUp = () => { document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp); };
-                    document.addEventListener('mousemove', handleMouseMove);
-                    document.addEventListener('mouseup', handleMouseUp);
-                }} />
-            )}
-            <div className={cn("overflow-hidden px-3", readOnly ? "cursor-not-allowed" : "cursor-text")} style={{ height: resizable ? currentHeight : maxHeight }}>
+            {resizable && <div {...resizeHandleProps} />}
+            <div className={cn("overflow-hidden px-3", readOnly ? "cursor-not-allowed" : "cursor-text")} style={{ height: effectiveHeight }}>
                 <Editor
-                    height={resizable ? currentHeight : maxHeight}
+                    height={effectiveHeight}
                     defaultLanguage="json"
                     value={displayValue}
                     onChange={(newValue) => {

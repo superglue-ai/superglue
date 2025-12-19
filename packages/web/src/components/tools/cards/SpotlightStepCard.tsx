@@ -17,17 +17,14 @@ import {
     DropdownMenuTrigger,
 } from '@/src/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { assertValidArrowFunction, executeWithVMHelpers } from '@superglue/shared';
 import { Bug, ChevronDown, FileBraces, FileInput, FileOutput, Play, RotateCw, Route, Square, Trash2, Wand2 } from 'lucide-react';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useToolConfig, useExecution } from '../context';
+import { useDataSelector } from '../hooks/use-data-selector';
 import { type CategorizedSources } from '../templates/tiptap/TemplateContext';
 import { StepConfigTab } from './tabs/StepConfigTab';
 import { StepInputTab } from './tabs/StepInputTab';
 import { StepResultTab } from './tabs/StepResultTab';
-
-const dataSelectorOutputCache = new Map<string, { output: any; error: string | null }>();
-let lastSeenDataSelectorVersion: number | undefined = undefined;
 
 interface SpotlightStepCardProps {
     step: any;
@@ -82,40 +79,20 @@ export const SpotlightStepCard = React.memo(({
     const stepResult = getStepResult(step.id);
     const stepFailed = isStepFailed(step.id);
     const canExecute = canExecuteStep(stepIndex);
+    
+    const { dataSelectorOutput, dataSelectorError } = useDataSelector({
+        stepId: step.id,
+        loopSelector: step.loopSelector,
+        evolvingPayload,
+        sourceDataVersion,
+        onDataSelectorChange,
+    });
+    
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
     const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [pendingAction, setPendingAction] = useState<'execute' | null>(null);
-    
-    const DATA_SELECTOR_DEBOUNCE_MS = 400;
-    
-    const dataSelectorCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
-    const cachedOutput = dataSelectorOutputCache.get(dataSelectorCacheKey);
-    
-    const [dataSelectorOutput, setDataSelectorOutput] = useState<any | null>(() => cachedOutput?.output ?? null);
-    const [dataSelectorError, setDataSelectorError] = useState<string | null>(() => cachedOutput?.error ?? null);
-    const lastEvalTimerRef = useRef<number | null>(null);
     const prevShowOutputSignalRef = useRef<number | undefined>(undefined);
-    const lastNotifiedStepIdRef = useRef<string | null>(null);
-
-    useEffect(() => {
-        if (sourceDataVersion !== lastSeenDataSelectorVersion) {
-            dataSelectorOutputCache.clear();
-            lastSeenDataSelectorVersion = sourceDataVersion;
-        }
-    }, [sourceDataVersion]);
-
-    useEffect(() => {
-        const currentCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
-        const cached = dataSelectorOutputCache.get(currentCacheKey);
-        if (cached) {
-            setDataSelectorOutput(cached.output);
-            setDataSelectorError(cached.error);
-        } else {
-            setDataSelectorOutput(null);
-            setDataSelectorError(null);
-        }
-    }, [step.id, sourceDataVersion, step.loopSelector]);
 
     useEffect(() => {
         if (showOutputSignal && showOutputSignal !== prevShowOutputSignalRef.current && stepResult != null) {
@@ -123,67 +100,6 @@ export const SpotlightStepCard = React.memo(({
         }
         prevShowOutputSignalRef.current = showOutputSignal;
     }, [showOutputSignal, stepResult]);
-
-    useEffect(() => {
-        if (lastEvalTimerRef.current) {
-            window.clearTimeout(lastEvalTimerRef.current);
-            lastEvalTimerRef.current = null;
-        }
-        setDataSelectorError(null);
-        
-        const currentCacheKey = `${step.id}:${sourceDataVersion}:${step.loopSelector}`;
-        
-        const t = window.setTimeout(() => {
-            try {
-                const sel = step?.loopSelector;
-                assertValidArrowFunction(sel);
-                const out = executeWithVMHelpers(sel, evolvingPayload || {});
-                
-                if (typeof out === 'function') {
-                    throw new Error('Data selector returned a function. Did you forget to call it?');
-                }
-                const normalizedOut = out === undefined ? null : out;
-                dataSelectorOutputCache.set(currentCacheKey, { output: normalizedOut, error: null });
-                setDataSelectorOutput(normalizedOut);
-                setDataSelectorError(null);
-            } catch (err: any) {
-                setDataSelectorOutput(null);
-                let errorMessage = 'Error evaluating data selector';
-                if (err) {
-                    if (err instanceof Error) {
-                        errorMessage = err.message || errorMessage;
-                    } else if (typeof err === 'string') {
-                        errorMessage = err;
-                    } else if (err?.message && typeof err.message === 'string') {
-                        errorMessage = err.message;
-                    } else {
-                        errorMessage = String(err);
-                    }
-                }
-                dataSelectorOutputCache.set(currentCacheKey, { output: null, error: errorMessage });
-                setDataSelectorError(errorMessage);
-            }
-        }, DATA_SELECTOR_DEBOUNCE_MS);
-        lastEvalTimerRef.current = t as unknown as number;
-        return () => { 
-            if (lastEvalTimerRef.current) { 
-                window.clearTimeout(lastEvalTimerRef.current); 
-                lastEvalTimerRef.current = null; 
-            } 
-        };
-    }, [step.id, step.executionMode, step.loopSelector, evolvingPayload]);
-
-    useEffect(() => {
-        const hasValidOutput = !dataSelectorError && dataSelectorOutput != null;
-        const isInitialForThisStep = lastNotifiedStepIdRef.current !== step.id;
-        
-        const itemCount = (hasValidOutput && Array.isArray(dataSelectorOutput)) ? dataSelectorOutput.length : null;
-        onDataSelectorChange?.(itemCount, isInitialForThisStep);
-        
-        if (isInitialForThisStep) {
-            lastNotifiedStepIdRef.current = step.id;
-        }
-    }, [dataSelectorOutput, dataSelectorError, onDataSelectorChange, step.id]);
 
     const handleRunStepClick = () => {
         if (isFirstStep && !isPayloadValid) {

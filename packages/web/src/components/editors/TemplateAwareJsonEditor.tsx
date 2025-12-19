@@ -14,6 +14,7 @@ import { CopyButton } from '../tools/shared/CopyButton';
 import { evaluateTemplate, parseTemplateString, prepareSourceData } from '@/src/lib/templating-utils';
 import { maskCredentials } from '@superglue/shared';
 import { useTemplateAwareEditor } from '../tools/hooks/use-template-aware-editor';
+import { useResizable } from '@/src/hooks/use-resizable';
 
 interface TemplateAwareJsonEditorProps {
     value: string;
@@ -48,7 +49,11 @@ function TemplateAwareJsonEditorInner({
 }: TemplateAwareJsonEditorProps) {
     const isUpdatingRef = useRef(false);
     const lastValueRef = useRef(value);
-    const [currentHeight, setCurrentHeight] = useState(minHeight);
+    const { height: resizableHeight, resizeHandleProps } = useResizable({ 
+        minHeight: parseInt(minHeight), 
+        maxHeight: parseInt(maxHeight), 
+        initialHeight: parseInt(minHeight) 
+    });
     const [jsonError, setJsonError] = useState<string | null>(null);
     const { categorizedVariables, categorizedSources, sourceDataVersion } = useTemplateContext();
     
@@ -177,40 +182,17 @@ function TemplateAwareJsonEditorInner({
         return () => { cancelled = true; clearTimeout(timer); };
     }, [showValidation, value, stepData, dataSelectorOutput, canExecute]);
 
-    const handleResize = (e: React.MouseEvent) => {
-        e.preventDefault();
-        const startY = e.clientY;
-        const startHeight = parseInt(currentHeight);
-        const minH = parseInt(minHeight);
-        const maxH = parseInt(maxHeight);
-        const onMove = (e: MouseEvent) => {
-            const newHeight = Math.max(minH, Math.min(maxH, startHeight + (e.clientY - startY)));
-            setCurrentHeight(`${newHeight}px`);
-        };
-        const onUp = () => {
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-        };
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
-    };
 
     return (
         <div className={cn('relative rounded-lg border shadow-sm bg-muted/30')}>
             <div className="absolute top-1 right-1 z-10 mr-1">
                 <CopyButton text={value || placeholder} />
             </div>
-            {resizable && (
-                <div 
-                    className="absolute bottom-1 right-1 w-3 h-3 cursor-se-resize z-10" 
-                    style={{ background: 'linear-gradient(135deg, transparent 50%, rgba(100,100,100,0.3) 50%)' }} 
-                    onMouseDown={handleResize}
-                />
-            )}
+            {resizable && <div {...resizeHandleProps} />}
             <div 
                 className={cn('relative', readOnly ? 'cursor-not-allowed' : 'cursor-text')}
                 style={{ 
-                    height: resizable ? currentHeight : 'auto', 
+                    height: resizable ? resizableHeight : 'auto', 
                     minHeight, 
                     maxHeight,
                     overflow: 'auto' 
