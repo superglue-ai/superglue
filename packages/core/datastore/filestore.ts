@@ -774,7 +774,7 @@ export class FileStore implements DataStore {
     const items = this.getOrgItems(this.storage.discoveryRuns, 'discovery-run', orgId);
     const total = items.length;
     const paginatedItems = items
-      .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(offset, offset + limit);
     return { items: paginatedItems, total };
   }
