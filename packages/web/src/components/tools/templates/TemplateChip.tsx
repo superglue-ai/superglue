@@ -49,7 +49,7 @@ export function TemplateChip({
   popoverTitle,
   popoverHelpText,
 }: TemplateChipProps) {
-  const { sourceDataVersion } = useTemplateContext();
+  useTemplateContext();
   const sourceData = useMemo(() => prepareSourceData(stepData, dataSelectorOutput), [stepData, dataSelectorOutput]);
   const [isHovered, setIsHovered] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -226,7 +226,6 @@ export function TemplateChip({
       loopMode={loopMode}
       title={popoverTitle}
       helpText={popoverHelpText}
-      sourceDataVersion={sourceDataVersion}
     >
       {chipContent}
     </TemplateEditPopover>

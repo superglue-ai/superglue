@@ -22,7 +22,6 @@ interface TemplateAwareTextEditorProps {
     placeholder?: string;
     className?: string;
     disabled?: boolean;
-    sourceDataVersion?: number;
     stepId?: string;
 }
 
@@ -40,7 +39,7 @@ function TemplateAwareTextEditorInner({
 }: Omit<TemplateAwareTextEditorProps, 'categorizedVariables' | 'categorizedSources'>) {
     const isUpdatingRef = useRef(false);
     const lastValueRef = useRef(value);
-    const { categorizedVariables, categorizedSources, sourceDataVersion } = useTemplateContext();
+    const { categorizedVariables, categorizedSources } = useTemplateContext();
     
     const {
         sourceData,
@@ -118,7 +117,6 @@ function TemplateAwareTextEditorInner({
                 onExternalOpenChange={setCodePopoverOpen}
                 anchorRect={popoverAnchorRect}
                 canExecute={canExecute}
-                sourceDataVersion={sourceDataVersion}
             />
         </div>
     );
@@ -135,7 +133,6 @@ export function TemplateAwareTextEditor({
     placeholder,
     className,
     disabled = false,
-    sourceDataVersion,
     stepId,
 }: TemplateAwareTextEditorProps) {
     return (
@@ -146,7 +143,6 @@ export function TemplateAwareTextEditor({
             canExecute={canExecute} 
             categorizedVariables={categorizedVariables}
             categorizedSources={categorizedSources}
-            sourceDataVersion={sourceDataVersion}
             stepId={stepId}
         >
             <TemplateAwareTextEditorInner

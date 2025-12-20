@@ -30,7 +30,6 @@ interface TemplateAwareJsonEditorProps {
     placeholder?: string;
     resizable?: boolean;
     showValidation?: boolean;
-    sourceDataVersion?: number;
     stepId?: string;
 }
 
@@ -55,7 +54,7 @@ function TemplateAwareJsonEditorInner({
         initialHeight: parseInt(minHeight) 
     });
     const [jsonError, setJsonError] = useState<string | null>(null);
-    const { categorizedVariables, categorizedSources, sourceDataVersion } = useTemplateContext();
+    const { categorizedVariables, categorizedSources } = useTemplateContext();
     
     const {
         sourceData,
@@ -224,7 +223,6 @@ function TemplateAwareJsonEditorInner({
                 onExternalOpenChange={setCodePopoverOpen}
                 anchorRect={popoverAnchorRect}
                 canExecute={canExecute}
-                sourceDataVersion={sourceDataVersion}
             />
         </div>
     );
@@ -239,7 +237,6 @@ export function TemplateAwareJsonEditor(props: TemplateAwareJsonEditorProps) {
             canExecute={props.canExecute}
             categorizedVariables={props.categorizedVariables}
             categorizedSources={props.categorizedSources}
-            sourceDataVersion={props.sourceDataVersion}
             stepId={props.stepId}
         >
             <TemplateAwareJsonEditorInner {...props} />

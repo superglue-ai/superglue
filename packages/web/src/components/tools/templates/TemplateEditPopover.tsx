@@ -98,7 +98,6 @@ interface TemplateEditPopoverProps {
   loopMode?: boolean;
   title?: string;
   helpText?: string;
-  sourceDataVersion?: number;
 }
 
 export function TemplateEditPopover({
@@ -114,7 +113,6 @@ export function TemplateEditPopover({
   loopMode = false,
   title = 'Template Expression',
   helpText,
-  sourceDataVersion,
 }: TemplateEditPopoverProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -162,7 +160,7 @@ export function TemplateEditPopover({
   const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
     codeContent,
     sourceData,
-    { enabled: open && canExecute, sourceDataVersion }
+    { enabled: open && canExecute }
   );
 
   const handleEditorMount = useCallback((editor: Monaco.editor.IStandaloneCodeEditor) => {

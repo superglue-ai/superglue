@@ -2,7 +2,7 @@
 import { createContext, useContext, useCallback, useMemo, useState, useEffect, useRef, ReactNode } from 'react';
 import { useToolConfig } from './tool-config-context';
 import { ExecutionContextValue, StepExecutionState, StepStatus, TransformStatus, DEFAULT_STEP_EXECUTION } from './types';
-import { buildEvolvingPayload } from '@/src/lib/general-utils';
+import { buildStepInput } from '@/src/lib/general-utils';
 import { ExecutionStep } from '@superglue/shared';
 
 const ExecutionContext = createContext<ExecutionContextValue | null>(null);
@@ -40,8 +40,6 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
   const [finalError, setFinalErrorState] = useState<string | null>(null);
   const [transformStatus, setTransformStatusState] = useState<TransformStatus>('idle');
   
-  // === DATA VERSIONING ===
-  const [sourceDataVersion, setSourceDataVersion] = useState(0);
   
   const setStepResult = useCallback((
     stepId: string, 
@@ -198,9 +196,6 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     setTransformStatusState('idle');
   }, []);
   
-  const incrementSourceDataVersion = useCallback(() => {
-    setSourceDataVersion(v => v + 1);
-  }, []);
   
   const getStepExecution = useCallback((stepId: string): StepExecutionState => {
     return stepExecutions[stepId] ?? DEFAULT_STEP_EXECUTION;
@@ -252,7 +247,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     [steps, stepExecutions]
   );
   
-  const getStepResultsMap = useCallback((): Record<string, any> => {
+  const stepResultsMap = useMemo(() => {
     const map: Record<string, any> = {};
     for (const [stepId, exec] of Object.entries(stepExecutions)) {
       if (exec.result !== null) {
@@ -262,15 +257,28 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     return map;
   }, [stepExecutions]);
   
-  const getEvolvingPayload = useCallback((stepIndex: number): Record<string, any> => {
-    const resultsMap = getStepResultsMap();
-    return buildEvolvingPayload(
-      payload.computedPayload,
-      steps,
-      resultsMap,
-      stepIndex - 1 // Include results up to previous step
-    );
-  }, [payload.computedPayload, steps, getStepResultsMap]);
+  const evolvingPayloads = useMemo(() => {
+    const payloads: Record<string, any> = {};
+    for (let i = 0; i < steps.length; i++) {
+      const stepId = steps[i].id;
+      payloads[stepId] = buildStepInput(
+        payload.computedPayload,
+        steps,
+        stepResultsMap,
+        i - 1
+      );
+    }
+    return payloads;
+  }, [steps, payload.computedPayload, stepResultsMap]);
+  
+  const getEvolvingPayload = useCallback((stepId?: string): Record<string, any> => {
+    if (!stepId) {
+      if (steps.length === 0) return payload.computedPayload;
+      const lastStepId = steps[steps.length - 1].id;
+      return evolvingPayloads[lastStepId] ?? payload.computedPayload;
+    }
+    return evolvingPayloads[stepId] ?? payload.computedPayload;
+  }, [steps, evolvingPayloads, payload.computedPayload]);
   
   
   const value = useMemo<ExecutionContextValue>(() => ({
@@ -323,11 +331,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     
     // Payload helpers
     getEvolvingPayload,
-    getStepResultsMap,
-    
-    // Data versioning
-    sourceDataVersion,
-    incrementSourceDataVersion,
+    stepResultsMap,
   }), [
     stepExecutions,
     isExecutingAny,
@@ -364,9 +368,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     isStepRunning,
     canExecuteStep,
     getEvolvingPayload,
-    getStepResultsMap,
-    sourceDataVersion,
-    incrementSourceDataVersion,
+    stepResultsMap,
   ]);
   
   return (

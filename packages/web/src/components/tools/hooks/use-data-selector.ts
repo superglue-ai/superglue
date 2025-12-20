@@ -1,16 +1,21 @@
 import { assertValidArrowFunction, executeWithVMHelpers } from '@superglue/shared';
 import { useEffect, useRef, useState } from 'react';
+import { useExecution } from '../context';
 
 const DATA_SELECTOR_DEBOUNCE_MS = 400;
 
-const dataSelectorOutputCache = new Map<string, { output: any; error: string | null }>();
-let lastSeenDataSelectorVersion: number | undefined = undefined;
+interface CacheEntry {
+    evolvingPayloadRef: any;
+    loopSelector: string;
+    output: any;
+    error: string | null;
+}
+
+const dataSelectorCache = new Map<string, CacheEntry>();
 
 interface UseDataSelectorOptions {
     stepId: string;
     loopSelector: string | undefined;
-    evolvingPayload: Record<string, any>;
-    sourceDataVersion: number;
     onDataSelectorChange?: (itemCount: number | null, isInitial: boolean) => void;
 }
 
@@ -22,52 +27,56 @@ interface UseDataSelectorResult {
 export function useDataSelector({
     stepId,
     loopSelector,
-    evolvingPayload,
-    sourceDataVersion,
     onDataSelectorChange,
 }: UseDataSelectorOptions): UseDataSelectorResult {
-    const [dataSelectorOutput, setDataSelectorOutput] = useState<any | null>(null);
-    const [dataSelectorError, setDataSelectorError] = useState<string | null>(null);
-    const lastEvalTimerRef = useRef<number | null>(null);
+    const { getEvolvingPayload } = useExecution();
+    const evolvingPayload = getEvolvingPayload(stepId);
+    
+    const [output, setOutput] = useState<any | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const timerRef = useRef<number | null>(null);
     const lastNotifiedStepIdRef = useRef<string | null>(null);
 
     useEffect(() => {
-        if (sourceDataVersion !== lastSeenDataSelectorVersion) {
-            dataSelectorOutputCache.clear();
-            lastSeenDataSelectorVersion = sourceDataVersion;
+        const cached = dataSelectorCache.get(stepId);
+        if (
+            cached &&
+            cached.evolvingPayloadRef === evolvingPayload &&
+            cached.loopSelector === (loopSelector ?? '')
+        ) {
+            setOutput(cached.output);
+            setError(cached.error);
+            return;
         }
-        
-        const cacheKey = `${stepId}:${sourceDataVersion}:${loopSelector}`;
-        const cached = dataSelectorOutputCache.get(cacheKey);
-        if (cached) {
-            setDataSelectorOutput(cached.output);
-            setDataSelectorError(cached.error);
-        }
-    }, [stepId, sourceDataVersion, loopSelector]);
 
-    useEffect(() => {
-        if (lastEvalTimerRef.current) {
-            window.clearTimeout(lastEvalTimerRef.current);
-            lastEvalTimerRef.current = null;
+        if (timerRef.current) {
+            window.clearTimeout(timerRef.current);
+            timerRef.current = null;
         }
-        setDataSelectorError(null);
         
-        const cacheKey = `${stepId}:${sourceDataVersion}:${loopSelector}`;
-        
-        const timerId = window.setTimeout(() => {
+        setError(null);
+
+        timerRef.current = window.setTimeout(() => {
             try {
                 assertValidArrowFunction(loopSelector);
-                const out = executeWithVMHelpers(loopSelector, evolvingPayload || {});
+                const result = executeWithVMHelpers(loopSelector, evolvingPayload || {});
                 
-                if (typeof out === 'function') {
+                if (typeof result === 'function') {
                     throw new Error('Data selector returned a function. Did you forget to call it?');
                 }
-                const normalizedOut = out === undefined ? null : out;
-                dataSelectorOutputCache.set(cacheKey, { output: normalizedOut, error: null });
-                setDataSelectorOutput(normalizedOut);
-                setDataSelectorError(null);
+                
+                const normalizedOutput = result === undefined ? null : result;
+                
+                dataSelectorCache.set(stepId, {
+                    evolvingPayloadRef: evolvingPayload,
+                    loopSelector: loopSelector ?? '',
+                    output: normalizedOutput,
+                    error: null,
+                });
+                
+                setOutput(normalizedOutput);
+                setError(null);
             } catch (err: any) {
-                setDataSelectorOutput(null);
                 let errorMessage = 'Error evaluating data selector';
                 if (err) {
                     if (err instanceof Error) {
@@ -80,33 +89,36 @@ export function useDataSelector({
                         errorMessage = String(err);
                     }
                 }
-                dataSelectorOutputCache.set(cacheKey, { output: null, error: errorMessage });
-                setDataSelectorError(errorMessage);
+                
+                dataSelectorCache.set(stepId, {
+                    evolvingPayloadRef: evolvingPayload,
+                    loopSelector: loopSelector ?? '',
+                    output: null,
+                    error: errorMessage,
+                });
+                
+                setOutput(null);
+                setError(errorMessage);
             }
-        }, DATA_SELECTOR_DEBOUNCE_MS);
-        
-        lastEvalTimerRef.current = timerId as unknown as number;
-        
-        return () => { 
-            if (lastEvalTimerRef.current) { 
-                window.clearTimeout(lastEvalTimerRef.current); 
-                lastEvalTimerRef.current = null; 
-            } 
+        }, DATA_SELECTOR_DEBOUNCE_MS) as unknown as number;
+
+        return () => {
+            if (timerRef.current) {
+                window.clearTimeout(timerRef.current);
+                timerRef.current = null;
+            }
         };
-    }, [stepId, loopSelector, evolvingPayload, sourceDataVersion]);
+    }, [stepId, loopSelector, evolvingPayload]);
 
     useEffect(() => {
-        const hasValidOutput = !dataSelectorError && dataSelectorOutput != null;
-        const isInitialForThisStep = lastNotifiedStepIdRef.current !== stepId;
-        
-        const itemCount = (hasValidOutput && Array.isArray(dataSelectorOutput)) ? dataSelectorOutput.length : null;
-        onDataSelectorChange?.(itemCount, isInitialForThisStep);
-        
-        if (isInitialForThisStep) {
+        const isInitial = lastNotifiedStepIdRef.current !== stepId;
+        const hasValidOutput = !error && output != null;
+        const itemCount = hasValidOutput && Array.isArray(output) ? output.length : null;
+        onDataSelectorChange?.(itemCount, isInitial);
+        if (isInitial) {
             lastNotifiedStepIdRef.current = stepId;
         }
-    }, [dataSelectorOutput, dataSelectorError, onDataSelectorChange, stepId]);
+    }, [output, error, stepId, onDataSelectorChange]);
 
-    return { dataSelectorOutput, dataSelectorError };
+    return { dataSelectorOutput: output, dataSelectorError: error };
 }
-

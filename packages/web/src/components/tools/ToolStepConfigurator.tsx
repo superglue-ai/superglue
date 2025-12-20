@@ -36,7 +36,6 @@ interface ToolStepConfiguratorProps {
 
 export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, onCreateIntegration, onEditingChange, disabled = false, stepInput, dataSelectorOutput, categorizedSources, onOpenFixStepDialog, canExecute = true }: ToolStepConfiguratorProps) {
     const { integrations } = useToolConfig();
-    const { sourceDataVersion } = useExecution();
     const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
     const [paginationOpen, setPaginationOpen] = useState(false);
     const [headersText, setHeadersText] = useState('');
@@ -211,7 +210,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, onCreateI
                                                     className="flex-1" 
                                                     placeholder="https://api.example.com/endpoint" 
                                                     disabled={disabled} 
-                                                    sourceDataVersion={sourceDataVersion}
                                                     stepId={step.id}
                                                 />
                                             </div>
@@ -239,7 +237,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, onCreateI
                                             maxHeight="300px"
                                             placeholder="{}"
                                             showValidation={true}
-                                            sourceDataVersion={sourceDataVersion}
                                             stepId={step.id}
                                         />
                                     </div>
@@ -265,7 +262,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, onCreateI
                                             maxHeight="300px"
                                             placeholder="{}"
                                             showValidation={true}
-                                            sourceDataVersion={sourceDataVersion}
                                             stepId={step.id}
                                         />
                                     </div>
@@ -287,7 +283,6 @@ export function ToolStepConfigurator({ step, isLast, onEdit, onRemove, onCreateI
                                                 minHeight="75px"
                                                 maxHeight="300px"
                                                 placeholder=""
-                                                sourceDataVersion={sourceDataVersion}
                                                 stepId={step.id}
                                             />
                                         </div>

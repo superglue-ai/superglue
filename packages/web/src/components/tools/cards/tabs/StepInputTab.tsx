@@ -38,7 +38,7 @@ export function StepInputTab({
     onEdit,
     isActive = true,
 }: StepInputTabProps) {
-    const { sourceDataVersion, canExecuteStep } = useExecution();
+    const { canExecuteStep } = useExecution();
     const canExecute = canExecuteStep(stepIndex);
     const { theme, onMount } = useMonacoTheme();
     const { height, resizeHandleProps } = useResizable({ minHeight: 200, maxHeight: 800, initialHeight: 400 });
@@ -56,7 +56,7 @@ export function StepInputTab({
     const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
         currentItemExpression,
         evolvingPayload,
-        { enabled: isActive && canExecute && !!evolvingPayload, debounceMs: 300, sourceDataVersion, stepId: step.id }
+        { enabled: isActive && canExecute && !!evolvingPayload, debounceMs: 300, stepId: step.id }
     );
 
     const inputProcessor = useDataProcessor(evolvingPayload, isActive);
@@ -152,7 +152,7 @@ export function StepInputTab({
                             className="absolute z-20 bg-muted rounded-sm flex items-center"
                             style={{ top: chipPosition.top, left: chipPosition.left, height: '18px', pointerEvents: 'auto' }}
                         >
-                            <TemplateContextProvider stepData={evolvingPayload} canExecute={canExecute} sourceDataVersion={sourceDataVersion} stepId={step.id}>
+                            <TemplateContextProvider stepData={evolvingPayload} canExecute={canExecute} stepId={step.id}>
                                 <TemplateChip
                                     template={templateString}
                                     evaluatedValue={previewValue}

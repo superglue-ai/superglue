@@ -1,6 +1,6 @@
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
-import { buildEvolvingPayload, buildPreviousStepResults, cn } from '@/src/lib/general-utils';
+import { buildStepInput, buildPreviousStepResults, cn } from '@/src/lib/general-utils';
 import { buildCategorizedSources } from '@/src/lib/templating-utils';
 import { AuthType, ExecutionStep, HttpMethod } from "@superglue/shared";
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
@@ -106,8 +106,7 @@ export function ToolStepGallery({
         currentExecutingStepIndex,
         finalResult,
         transformStatus,
-        incrementSourceDataVersion,
-        getStepResultsMap,
+        stepResultsMap,
         isRunningTransform,
         isFixingTransform,
     } = useExecution();
@@ -118,7 +117,6 @@ export function ToolStepGallery({
     const payloadText = payload.manualPayloadText;
     const computedPayload = payload.computedPayload || {};
     const filePayloads = payload.filePayloads;
-    const stepResultsMap = getStepResultsMap();
     const hasTransformCompleted = transformStatus === 'completed';
     const hasTransformFailed = transformStatus === 'failed';
     
@@ -160,10 +158,7 @@ export function ToolStepGallery({
 
     const handleDataSelectorChange = useCallback((itemCount: number | null, isInitial: boolean) => {
         setActiveStepItemCount(itemCount);
-        if (!isInitial) {
-            incrementSourceDataVersion?.();
-        }
-    }, [incrementSourceDataVersion]);
+    }, []);
 
     // === TOOL ITEMS ===
     const toolItems = useMemo((): ToolItem[] => [
@@ -201,16 +196,6 @@ export function ToolStepGallery({
 
     const currentItem = toolItems[activeIndex];
     const indicatorIndices = toolItems.map((_, idx) => idx);
-
-    const activeEvolvingPayload = useMemo(() => {
-        if (!currentItem) return computedPayload;
-        if (currentItem.type === 'payload') return computedPayload;
-        if (currentItem.type === 'transform') {
-            return buildEvolvingPayload(computedPayload, steps, stepResultsMap, steps.length - 1);
-        }
-        const stepIndex = steps.findIndex(s => s.id === currentItem.data.id);
-        return buildEvolvingPayload(computedPayload, steps, stepResultsMap, stepIndex - 1);
-    }, [currentItem, computedPayload, steps, stepResultsMap]);
 
     // === VISIBLE CARDS CALCULATION ===
     const visibleCardsData = useMemo(() => {
@@ -549,7 +534,6 @@ export function ToolStepGallery({
                                     key={currentItem.data.id}
                                     step={currentItem.data}
                                     stepIndex={activeIndex - 1}
-                                    evolvingPayload={activeEvolvingPayload}
                                     categorizedSources={currentItem.categorizedSources}
                                     onEdit={onStepEdit}
                                     onRemove={currentItem.type === 'step' ? handleRemoveStep : undefined}
@@ -577,7 +561,7 @@ export function ToolStepGallery({
                 onConfirmTool={handleConfirmInsertTool}
                 onConfirmGenerate={handleConfirmGenerateStep}
                 existingStepIds={steps.map((s: any) => s.id)}
-                stepInput={pendingInsertIndex !== null ? buildEvolvingPayload(computedPayload, steps, stepResultsMap, pendingInsertIndex - 1) : undefined}
+                stepInput={pendingInsertIndex !== null ? buildStepInput(computedPayload, steps, stepResultsMap, pendingInsertIndex - 1) : undefined}
                 currentToolId={toolId}
             />
         </div>

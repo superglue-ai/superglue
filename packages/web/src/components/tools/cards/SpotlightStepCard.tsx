@@ -29,7 +29,6 @@ import { StepResultTab } from './tabs/StepResultTab';
 interface SpotlightStepCardProps {
     step: any;
     stepIndex: number;
-    evolvingPayload: any;
     categorizedSources?: CategorizedSources;
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onRemove?: (stepId: string) => void;
@@ -48,7 +47,6 @@ interface SpotlightStepCardProps {
 export const SpotlightStepCard = React.memo(({
     step,
     stepIndex,
-    evolvingPayload,
     categorizedSources,
     onEdit,
     onRemove,
@@ -67,14 +65,13 @@ export const SpotlightStepCard = React.memo(({
     const { integrations } = useToolConfig();
     const {
         isExecutingAny,
-        currentExecutingStepIndex,
-        sourceDataVersion,
         getStepResult,
         isStepFailed,
         canExecuteStep,
+        getEvolvingPayload,
     } = useExecution();
     
-    // Derive values from context
+    const evolvingPayload = getEvolvingPayload(step.id);
     const isGlobalExecuting = isExecutingAny;
     const stepResult = getStepResult(step.id);
     const stepFailed = isStepFailed(step.id);
@@ -83,8 +80,6 @@ export const SpotlightStepCard = React.memo(({
     const { dataSelectorOutput, dataSelectorError } = useDataSelector({
         stepId: step.id,
         loopSelector: step.loopSelector,
-        evolvingPayload,
-        sourceDataVersion,
         onDataSelectorChange,
     });
     

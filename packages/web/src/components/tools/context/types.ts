@@ -123,10 +123,6 @@ export type TransformStatus = 'idle' | 'running' | 'fixing' | 'completed' | 'fai
   canExecuteStep: (stepIndex: number) => boolean;
   
   // === PAYLOAD HELPERS ===
-  getEvolvingPayload: (stepIndex: number) => Record<string, any>;
-  getStepResultsMap: () => Record<string, any>;
-  
-  // === DATA VERSIONING ===
-  sourceDataVersion: number;
-  incrementSourceDataVersion: () => void;
+  getEvolvingPayload: (stepId?: string) => Record<string, any>;
+  stepResultsMap: Record<string, any>;
 }

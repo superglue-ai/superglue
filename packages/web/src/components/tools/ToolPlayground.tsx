@@ -2,8 +2,7 @@
 import { useIntegrations } from "@/src/app/integrations-context";
 import { useTools } from "@/src/app/tools-context";
 import { type UploadedFileInfo } from '@/src/lib/file-utils';
-import { buildEvolvingPayload } from "@/src/lib/general-utils";
-import { createSuperglueClient } from "@/src/lib/client-utils";
+import { buildEvolvingPayload, isAbortError } from "@/src/lib/general-utils";
 import { ExecutionStep, generateDefaultFromSchema, Integration, Tool, ToolResult } from "@superglue/shared";
 import { useFileUpload } from "./hooks/use-file-upload";
 import { usePayloadValidation } from "./hooks/use-payload-validation";
@@ -112,7 +111,9 @@ function ToolPlaygroundInner({
     clearAllExecutions,
     setFinalResult,
     setTransformStatus,
+<<<<<<< HEAD
     getStepResultsMap,
+    incrementSourceDataVersion,
     isExecutingTransform,
   } = execution;
   
@@ -625,7 +626,7 @@ function ToolPlaygroundInner({
           open={activeDialog.type === 'fixStep'}
           onClose={handleCloseFixStepDialog}
           step={steps[fixStepIndex]}
-          stepInput={buildEvolvingPayload(computedPayload || {}, steps, stepResultsMap, fixStepIndex - 1)}
+          stepInput={buildStepInput(computedPayload || {}, steps, stepResultsMap, fixStepIndex - 1)}
           integrationId={steps[fixStepIndex]?.integrationId}
           errorMessage={(() => {
             const result = stepResultsMap[steps[fixStepIndex]?.id];
@@ -681,7 +682,7 @@ function ToolPlaygroundInner({
         onClose={handleCloseFixTransformDialog}
         currentTransform={finalTransform}
         responseSchema={parsedResponseSchema}
-        stepData={buildEvolvingPayload(computedPayload || {}, steps, stepResultsMap, steps.length - 1)}
+        stepData={buildStepInput(computedPayload || {}, steps, stepResultsMap, steps.length - 1)}
         errorMessage={
           typeof stepResultsMap['__final_transform__'] === 'string'
             ? stepResultsMap['__final_transform__']
