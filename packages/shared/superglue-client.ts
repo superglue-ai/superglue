@@ -75,6 +75,8 @@ export class SuperglueClient {
         finalTransform
         inputSchema
         instruction
+        folder
+        archived
     `;
 
     private static workflowScheduleQL = `
@@ -833,11 +835,17 @@ export class SuperglueClient {
             inputSchema
             responseSchema
             instruction
+            folder
+            archived
           }
         }
       `;
       const response = await this.request<{ getWorkflow: Tool }>(query, { id });
       return response.getWorkflow;
+    }
+
+    async archiveWorkflow(id: string, archived: boolean = true): Promise<Tool> {
+      return this.upsertWorkflow(id, { archived });
     }
 
     async listWorkflows(limit: number = 10, offset: number = 0): Promise<{ items: Tool[], total: number }> {
@@ -853,9 +861,9 @@ export class SuperglueClient {
       return response.listWorkflows;
     }
 
-    async listWorkflowSchedules(workflowId: string): Promise<ToolSchedule[]> {
+    async listWorkflowSchedules(workflowId?: string): Promise<ToolSchedule[]> {
       const query = `
-        query ListWorkflowSchedules ($workflowId: String!) {
+        query ListWorkflowSchedules ($workflowId: String) {
           listWorkflowSchedules(workflowId: $workflowId) {
             ${SuperglueClient.workflowScheduleQL}
           }

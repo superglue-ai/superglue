@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { IntegrationsProvider } from "./integrations-context";
+import { SchedulesProvider } from "./schedules-context";
 import { ToolsProvider } from "./tools-context";
 
 const BLACKLISTED_PATHS = ['/auth', '/login'];
@@ -16,7 +17,9 @@ export function ConditionalDataProvider({ children }: { children: React.ReactNod
     return (
         <ToolsProvider>
             <IntegrationsProvider>
-                {children}
+                <SchedulesProvider>
+                    {children}
+                </SchedulesProvider>
             </IntegrationsProvider>
         </ToolsProvider>
     )

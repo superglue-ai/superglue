@@ -93,7 +93,7 @@ export class WorkflowScheduler {
         return await this.datastore.deleteWorkflowSchedule({ id, orgId });
     }
 
-    public async listWorkflowSchedules({ workflowId, orgId }: { workflowId: string, orgId: string }): Promise<ToolScheduleInternal[]> {
+    public async listWorkflowSchedules({ workflowId, orgId }: { workflowId?: string, orgId: string }): Promise<ToolScheduleInternal[]> {
         return await this.datastore.listWorkflowSchedules({ workflowId, orgId });
     }
 }

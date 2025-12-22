@@ -39,7 +39,7 @@ export function ClientWrapper({ children, config }: Props) {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.3 }}
-                    className="w-full h-full overflow-y-scroll"
+                    className="w-full h-full overflow-y-auto"
                   >
                     {children}
                   </motion.div>

@@ -163,53 +163,6 @@ export class MemoryStore implements DataStore {
     return { items, total: filteredRuns.length };
   }
 
-  async deleteRun(params: { id: string; orgId?: string }): Promise<boolean> {
-    const { id, orgId } = params;
-    if (!id) return false;
-    const key = this.getKey('run', id, orgId);
-    const run = this.storage.runs.get(key);
-
-    if (run) {
-      const toolId = run.toolId || run.toolConfig?.id;
-      if (toolId) {
-        const indexKey = this.getKey('index', toolId, orgId);
-        const existing = this.storage.runsIndex.get(indexKey) || [];
-        const filtered = existing.filter(item => item.id !== id);
-        if (filtered.length > 0) {
-          this.storage.runsIndex.set(indexKey, filtered);
-        } else {
-          this.storage.runsIndex.delete(indexKey);
-        }
-      }
-    }
-
-    return this.storage.runs.delete(key);
-  }
-
-  async deleteAllRuns(params?: { orgId?: string }): Promise<boolean> {
-    const { orgId } = params || {};
-    const prefix = orgId ? `${orgId}:run:` : 'run:';
-    const keysToDelete: string[] = [];
-
-    for (const key of this.storage.runs.keys()) {
-      if (key.startsWith(prefix)) {
-        keysToDelete.push(key);
-      }
-    }
-
-    // Also clear index entries
-    const indexPrefix = orgId ? `${orgId}:index:` : 'index:';
-    for (const key of this.storage.runsIndex.keys()) {
-      if (key.startsWith(indexPrefix)) {
-        this.storage.runsIndex.delete(key);
-      }
-    }
-
-    keysToDelete.forEach(key => this.storage.runs.delete(key));
-
-    return true;
-  }
-
   async clearAll(): Promise<void> {
     this.storage.apis.clear();
     this.storage.runs.clear();
@@ -257,17 +210,6 @@ export class MemoryStore implements DataStore {
     const items = this.getOrgItems(this.storage.workflows, 'workflow', orgId).slice(offset, offset + limit);
     const total = this.getOrgItems(this.storage.workflows, 'workflow', orgId).length;
     return { items, total };
-  }
-
-  async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Tool[]> {
-    const { ids, orgId } = params;
-    return ids
-      .map(id => {
-        const key = this.getKey('workflow', id, orgId);
-        const workflow = this.storage.workflows.get(key);
-        return workflow ? { ...workflow, id } : null;
-      })
-      .filter((w): w is Tool => w !== null);
   }
 
   async upsertWorkflow(params: { id: string; workflow: Tool; orgId?: string }): Promise<Tool> {
@@ -377,10 +319,13 @@ export class MemoryStore implements DataStore {
   }
 
   // Workflow Schedule Methods
-  async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<ToolScheduleInternal[]> {
+  async listWorkflowSchedules(params: { workflowId?: string, orgId: string }): Promise<ToolScheduleInternal[]> {
     const { workflowId, orgId } = params;
-    return this.getOrgItems(this.storage.workflowSchedules, 'workflow-schedule', orgId)
-      .filter(schedule => schedule.workflowId === workflowId);
+    const schedules = this.getOrgItems(this.storage.workflowSchedules, 'workflow-schedule', orgId);
+    if (workflowId) {
+      return schedules.filter(schedule => schedule.workflowId === workflowId);
+    }
+    return schedules;
   }
 
   async getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<ToolScheduleInternal | null> {
@@ -463,10 +408,6 @@ export class MemoryStore implements DataStore {
     };
   }
 
-  async deleteOAuthSecret(params: { uid: string }): Promise<void> {
-    this.oauthSecrets.delete(params.uid);
-  }
-
   async createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string }): Promise<DiscoveryRun> {
     const { run, orgId } = params;
     const key = this.getKey('discovery-run', run.id, orgId);
@@ -497,7 +438,7 @@ export class MemoryStore implements DataStore {
     const items = this.getOrgItems(this.storage.discoveryRuns, 'discovery-run', orgId);
     const total = items.length;
     const paginatedItems = items
-      .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(offset, offset + limit);
     return { items: paginatedItems, total };
   }

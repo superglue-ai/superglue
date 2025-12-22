@@ -52,7 +52,7 @@
         "hasown": "^2.0.0",
         "jsonschema": "^1.5.0",
         "lucide-react": "^0.553.0",
-        "next": "^15.5.7",
+        "next": "^15.5.9",
         "posthog-js": "^1.224.0",
         "prettier": "^3.5.3",
         "react": "^19.0.0",

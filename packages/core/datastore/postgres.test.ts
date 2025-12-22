@@ -144,13 +144,6 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
                 expect(items[1].id).toBe(run1.id);
             });
 
-            it('should delete runs', async () => {
-                await store.createRun({ run: testRun });
-                await store.deleteRun({ id: testRun.id, orgId: testOrgId });
-                const retrieved = await store.getRun({ id: testRun.id, orgId: testOrgId });
-                expect(retrieved).toBeNull();
-            });
-
             it('should list runs filtered by config ID', async () => {
                 const run1: Run = { ...testRun, id: 'run1', toolId: 'config1' };
                 const run2: Run = { ...testRun, id: 'run2', toolId: 'config2' };
@@ -265,18 +258,6 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
                 const retrieved = await store.getWorkflow({ id: 'does-not-exist', orgId: testOrgId });
                 expect(retrieved).toBeNull();
             });
-
-            it('should get many workflows by ids, skipping missing ones', async () => {
-                const wf2 = { ...testWorkflow, id: 'test-workflow-id-2' };
-                await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
-                await store.upsertWorkflow({ id: wf2.id, workflow: wf2, orgId: testOrgId });
-                const result = await store.getManyWorkflows({
-                    ids: [testWorkflow.id, wf2.id, 'missing-id'],
-                    orgId: testOrgId
-                });
-                expect(result).toHaveLength(2);
-                expect(result.map(w => w.id).sort()).toEqual([testWorkflow.id, wf2.id].sort());
-            });
         });
 
         describe('Workflow Schedule', () => {
@@ -381,6 +362,27 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
                     updatedAt: expect.any(Date),
                     createdAt: expect.any(Date)
                 });
+            });
+
+            it('should list all workflow schedules for org when workflowId is not provided', async () => {
+                const testWorkflow2 = { ...testWorkflow, id: 'test-workflow-2' };
+                const testSchedule2: ToolScheduleInternal = {
+                    ...testWorkflowSchedule,
+                    id: 'schedule-2',
+                    workflowId: testWorkflow2.id,
+                };
+
+                await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
+                await store.upsertWorkflow({ id: testWorkflow2.id, workflow: testWorkflow2, orgId: testOrgId });
+                await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
+                await store.upsertWorkflowSchedule({ schedule: testSchedule2 });
+
+                const allSchedules = await store.listWorkflowSchedules({ orgId: testOrgId });
+                expect(allSchedules).toHaveLength(2);
+                
+                const scheduleIds = allSchedules.map(s => s.id);
+                expect(scheduleIds).toContain(testWorkflowSchedule.id);
+                expect(scheduleIds).toContain(testSchedule2.id);
             });
 
             it('should list due workflow schedules only', async () => {

@@ -1,7 +1,7 @@
 import { Button } from '@/src/components/ui/button';
 import { formatBytes, type UploadedFileInfo } from '@/src/lib/file-utils';
 import { cn } from '@/src/lib/general-utils';
-import { File, FileArchive, FileCode, FileJson, FileSpreadsheet, FileText, X } from 'lucide-react';
+import { File, FileArchive, FileCode, FileJson, FileSpreadsheet, FileText, X, FileDigit, FileImage, FileType, FileMusic, Loader2 } from 'lucide-react';
 
 interface FileChipProps {
     file: UploadedFileInfo;
@@ -13,6 +13,7 @@ interface FileChipProps {
     showOriginalName?: boolean;
     showSize?: boolean;
     showKey?: boolean;
+    isLoading?: boolean;
 
     maxWidth?: string;
     className?: string;
@@ -21,15 +22,66 @@ interface FileChipProps {
 const getFileIcon = (filename: string) => {
     const ext = filename.toLowerCase().split('.').pop() || '';
     switch (ext) {
+        // JSON
         case 'json': return FileJson;
+        
+        // Spreadsheets
         case 'csv': return FileSpreadsheet;
-        case 'xml': return FileCode;
         case 'xlsx': return FileSpreadsheet;
         case 'xls': return FileSpreadsheet;
-        case 'pdf': return FileText;
-        case 'txt': return FileText;
-        case 'md': return FileCode;
+        
+        // Programming languages
+        case 'py': return FileCode;
+        case 'js': return FileCode;
+        case 'ts': return FileCode;
+        case 'tsx': return FileCode;
+        case 'jsx': return FileCode;
+        case 'java': return FileCode;
+        case 'cpp': return FileCode;
+        case 'c': return FileCode;
+        case 'go': return FileCode;
+        case 'rs': return FileCode;
+        case 'rb': return FileCode;
+        case 'php': return FileCode;
+        case 'swift': return FileCode;
+        case 'kt': return FileCode;
+        case 'xml': return FileCode;
+        case 'html': return FileCode;
+        case 'css': return FileCode;
+        
+        // Text files
+        case 'txt': return FileType;
+        case 'md': return FileType;
+        
+        // PDF
+        case 'pdf': return File;
+        
+        // Images
+        case 'png': return FileImage;
+        case 'jpg': return FileImage;
+        case 'jpeg': return FileImage;
+        case 'gif': return FileImage;
+        case 'svg': return FileImage;
+        case 'webp': return FileImage;
+        
+        // Audio
+        case 'mp3': return FileMusic;
+        case 'wav': return FileMusic;
+        case 'ogg': return FileMusic;
+        case 'm4a': return FileMusic;
+        
+        // Binary
+        case 'bin': return FileDigit;
+        case 'exe': return FileDigit;
+        case 'dll': return FileDigit;
+        
+        // Archives
         case 'zip': return FileArchive;
+        case 'tar': return FileArchive;
+        case 'gz': return FileArchive;
+        case 'rar': return FileArchive;
+        case '7z': return FileArchive;
+        
         default: return File;
     }
 };
@@ -42,6 +94,7 @@ export function FileChip({
     showOriginalName = false,
     showSize = true,
     showKey = false,
+    isLoading = false,
     maxWidth,
     className
 }: FileChipProps) {
@@ -102,15 +155,18 @@ export function FileChip({
                     )}
                 </div>
             </div>
-            <div className="flex items-center gap-1 ml-2">
-                {fileStatus === 'processing' && (
-                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-amber-600 dark:border-amber-400 border-t-transparent" />
+            <div className="flex items-center gap-1 ml-2 relative group/actions">
+                {(fileStatus === 'processing' || isLoading) && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-400 dark:text-gray-500 group-hover/actions:opacity-0 transition-opacity" />
                 )}
-                {onRemove && fileStatus !== 'processing' && (
+                {onRemove && (
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6 hover:bg-background/80"
+                        className={cn(
+                            "h-6 w-6 hover:bg-background/80",
+                            (fileStatus === 'processing' || isLoading) ? "absolute opacity-0 group-hover/actions:opacity-100 transition-opacity" : ""
+                        )}
                         onClick={() => onRemove(file.key)}
                     >
                         <X className="h-3 w-3" />
@@ -120,4 +176,3 @@ export function FileChip({
         </div>
     );
 }
-

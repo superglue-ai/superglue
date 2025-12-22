@@ -35,19 +35,6 @@ export class PostgresService implements DataStore {
 
         this.initializeTables();
     }
-    async getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Tool[]> {
-        const { ids, orgId } = params;
-        const client = await this.pool.connect();
-        try {
-            const result = await client.query(
-                'SELECT id, data FROM configurations WHERE id = ANY($1) AND type = $2 AND org_id = $3',
-                [ids, 'workflow', orgId || '']
-            );
-            return result.rows.map(row => ({ ...row.data, id: row.id }));
-        } finally {
-            client.release();
-        }
-    }
     async getManyIntegrations(params: { ids: string[]; includeDocs?: boolean; orgId?: string }): Promise<Integration[]> {
         const { ids, includeDocs = true, orgId } = params;
         const client = await this.pool.connect();
@@ -221,11 +208,9 @@ export class PostgresService implements DataStore {
                 CREATE TABLE IF NOT EXISTS discovery_runs (
                     id VARCHAR(255) NOT NULL,
                     org_id VARCHAR(255) NOT NULL,
-                    file_ids TEXT[],
+                    sources JSONB NOT NULL,
                     data JSONB,
                     status VARCHAR(50) NOT NULL,
-                    started_at TIMESTAMP NOT NULL,
-                    completed_at TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (id, org_id)
@@ -526,35 +511,6 @@ export class PostgresService implements DataStore {
         }
     }
 
-    async deleteRun(params: { id: string; orgId?: string }): Promise<boolean> {
-        const { id, orgId } = params;
-        if (!id) return false;
-        const client = await this.pool.connect();
-        try {
-            const result = await client.query(
-                'DELETE FROM runs WHERE id = $1 AND org_id = $2',
-                [id, orgId || '']
-            );
-            return result.rowCount > 0;
-        } finally {
-            client.release();
-        }
-    }
-
-    async deleteAllRuns(params?: { orgId?: string }): Promise<boolean> {
-        const { orgId } = params || {};
-        const client = await this.pool.connect();
-        try {
-            const result = await client.query(
-                'DELETE FROM runs WHERE org_id = $1',
-                [orgId || '']
-            );
-            return result.rowCount > 0;
-        } finally {
-            client.release();
-        }
-    }
-
     async getWorkflow(params: { id: string; orgId?: string }): Promise<Tool | null> {
         const { id, orgId } = params;
         return this.getConfig<Tool>(id, 'workflow', orgId);
@@ -654,13 +610,22 @@ export class PostgresService implements DataStore {
     }
 
     // Workflow Schedule Methods
-    async listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<ToolScheduleInternal[]> {
+    async listWorkflowSchedules(params: { workflowId?: string, orgId: string }): Promise<ToolScheduleInternal[]> {
         const client = await this.pool.connect();
 
         try {
-            const query = 'SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE workflow_id = $1 AND org_id = $2';
-            const queryResult = await client.query(query, [params.workflowId, params.orgId]);
+            let query: string;
+            let queryParams: string[];
 
+            if (params.workflowId) {
+                query = 'SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE workflow_id = $1 AND org_id = $2';
+                queryParams = [params.workflowId, params.orgId];
+            } else {
+                query = 'SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE org_id = $1';
+                queryParams = [params.orgId];
+            }
+
+            const queryResult = await client.query(query, queryParams);
             return queryResult.rows.map(this.mapWorkflowSchedule);
         } finally {
             client.release();
@@ -1157,23 +1122,14 @@ export class PostgresService implements DataStore {
         }
     }
 
-    async deleteOAuthSecret(params: { uid: string }): Promise<void> {
-        const client = await this.pool.connect();
-        try {
-            await client.query('DELETE FROM integration_oauth WHERE uid = $1', [params.uid]);
-        } finally {
-            client.release();
-        }
-    }
-
     async createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string }): Promise<DiscoveryRun> {
         const { run, orgId = '' } = params;
         const client = await this.pool.connect();
         try {
             await client.query(
-                `INSERT INTO discovery_runs (id, org_id, file_ids, data, status, started_at, completed_at, created_at, updated_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-                [run.id, orgId, run.fileIds, JSON.stringify(run.data), run.status, run.startedAt, run.completedAt || null]
+                `INSERT INTO discovery_runs (id, org_id, sources, data, status, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                [run.id, orgId, JSON.stringify(run.sources), JSON.stringify(run.data), run.status]
             );
             return run;
         } finally {
@@ -1186,7 +1142,7 @@ export class PostgresService implements DataStore {
         const client = await this.pool.connect();
         try {
             const result = await client.query(
-                `SELECT id, file_ids, data, status, started_at, completed_at FROM discovery_runs WHERE id = $1 AND org_id = $2`,
+                `SELECT id, sources, data, status, created_at FROM discovery_runs WHERE id = $1 AND org_id = $2`,
                 [id, orgId]
             );
             if (result.rows.length === 0) return null;
@@ -1194,11 +1150,10 @@ export class PostgresService implements DataStore {
             const row = result.rows[0];
             return {
                 id: row.id,
-                fileIds: row.file_ids || [],
+                sources: row.sources || [],
                 data: row.data,
                 status: row.status,
-                startedAt: new Date(row.started_at),
-                completedAt: row.completed_at ? new Date(row.completed_at) : undefined
+                createdAt: new Date(row.created_at)
             };
         } finally {
             client.release();
@@ -1213,9 +1168,9 @@ export class PostgresService implements DataStore {
             const values: any[] = [];
             let paramCount = 1;
 
-            if (updates.fileIds !== undefined) {
-                setClauses.push(`file_ids = $${paramCount++}`);
-                values.push(updates.fileIds);
+            if (updates.sources !== undefined) {
+                setClauses.push(`sources = $${paramCount++}`);
+                values.push(JSON.stringify(updates.sources));
             }
             if (updates.data !== undefined) {
                 setClauses.push(`data = $${paramCount++}`);
@@ -1224,14 +1179,6 @@ export class PostgresService implements DataStore {
             if (updates.status !== undefined) {
                 setClauses.push(`status = $${paramCount++}`);
                 values.push(updates.status);
-            }
-            if (updates.startedAt !== undefined) {
-                setClauses.push(`started_at = $${paramCount++}`);
-                values.push(updates.startedAt);
-            }
-            if (updates.completedAt !== undefined) {
-                setClauses.push(`completed_at = $${paramCount++}`);
-                values.push(updates.completedAt);
             }
 
             setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
@@ -1261,19 +1208,18 @@ export class PostgresService implements DataStore {
             const total = parseInt(countResult.rows[0].count);
 
             const result = await client.query(
-                `SELECT id, org_id, file_ids, data, status, started_at, completed_at 
+                `SELECT id, org_id, sources, data, status, created_at 
                  FROM discovery_runs WHERE org_id = $1 
-                 ORDER BY started_at DESC LIMIT $2 OFFSET $3`,
+                 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
                 [orgId, limit, offset]
             );
 
             const items = result.rows.map(row => ({
                 id: row.id,
-                fileIds: row.file_ids || [],
+                sources: row.sources || [],
                 data: row.data,
                 status: row.status,
-                startedAt: new Date(row.started_at),
-                completedAt: row.completed_at ? new Date(row.completed_at) : undefined
+                createdAt: new Date(row.created_at)
             }));
 
             return { items, total };

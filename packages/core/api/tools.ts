@@ -168,7 +168,12 @@ async function executeToolInternal(
   });
 
   if (!tool) {
-    logMessage('warn', `Tool ${toolId} not found`, metadata);
+    logMessage('error', `Tool ${toolId} not found`, metadata);
+    return null;
+  }
+
+  if (tool.archived) {
+    logMessage('error', `Cannot execute archived tool ${toolId}`, metadata);
     return null;
   }
 
@@ -325,6 +330,10 @@ const runTool: RouteHandler = async (request, reply) => {
 
   if (!tool) {
     return sendError(reply, 404, 'Tool not found');
+  }
+
+  if (tool.archived) {
+    return sendError(reply, 400, 'Cannot execute archived tool');
   }
 
   if (tool.inputSchema && typeof tool.inputSchema === 'string') {

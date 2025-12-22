@@ -73,7 +73,7 @@ export function FixTransformDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="max-w-2xl z-[110]">
+            <DialogContent className="max-w-2xl z-[110] max-h-[90vh] overflow-y-auto">
                 <Button
                     variant="ghost"
                     size="icon"
@@ -86,7 +86,7 @@ export function FixTransformDialog({
                 </Button>
                 <DialogHeader>
                     <DialogTitle>Fix Transform</DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription className="break-words">
                         Describe what you want to fix in the transform code. This instruction will guide the auto-repair process to fix the transform.
                     </DialogDescription>
                 </DialogHeader>
@@ -109,8 +109,8 @@ export function FixTransformDialog({
                             <div className="text-xs font-medium text-destructive">
                                 Transform Error
                             </div>
-                            <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2">
-                                <p className="text-xs font-mono break-words text-muted-foreground">
+                            <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2 max-h-[200px] overflow-y-auto">
+                                <p className="text-xs font-mono break-words whitespace-pre-wrap text-muted-foreground">
                                     {errorMessage.length > 300 
                                         ? `${errorMessage.substring(0, 300)}...` 
                                         : errorMessage}

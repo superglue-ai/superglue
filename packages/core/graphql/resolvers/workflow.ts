@@ -1,15 +1,15 @@
-import { generateUniqueId, waitForIntegrationProcessing, Integration, RequestOptions, RunStatus, SelfHealingMode, Tool, ToolResult, ToolStepResult } from "@superglue/shared";
+import { generateUniqueId, Integration, RequestOptions, RunStatus, Tool, ToolResult, ToolStepResult, waitForIntegrationProcessing } from "@superglue/shared";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { parseJSON } from "../../files/index.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { ToolBuilder } from "../../tools/tool-builder.js";
 import { ToolFinder } from "../../tools/tool-finder.js";
+import { isSelfHealingEnabled } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
-import { GraphQLRequestContext } from '../types.js';
 import type { ToolExecutionPayload } from "../../worker/types.js";
-import { isSelfHealingEnabled } from "../../utils/helpers.js";
+import { GraphQLRequestContext } from '../types.js';
 
 function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
   if (newValue === null) return undefined;
@@ -59,6 +59,10 @@ export const executeWorkflowResolver = async (
       if (!workflow.steps || !Array.isArray(workflow.steps)) throw new Error("Workflow must have steps array");
     } else {
       throw new Error("Must provide either workflow ID or workflow object");
+    }
+
+    if (workflow.archived) {
+      throw new Error("Cannot execute archived workflow");
     }
 
     logMessage('debug', `Executing tool with id: ${workflow.id}, run_id: ${runId}`, metadata);
@@ -245,6 +249,8 @@ export const upsertWorkflowResolver = async (_: unknown, { id, input }: { id: st
       finalTransform: resolveField(input.finalTransform, oldWorkflow?.finalTransform, "$"),
       responseSchema: resolveField(input.responseSchema, oldWorkflow?.responseSchema),
       instruction: resolveField(input.instruction, oldWorkflow?.instruction),
+      folder: resolveField(input.folder, oldWorkflow?.folder),
+      archived: resolveField(input.archived, oldWorkflow?.archived, false),
       createdAt: oldWorkflow?.createdAt || now,
       updatedAt: now
     };
@@ -318,15 +324,17 @@ export const findRelevantToolsResolver = async (
   try {
     const metadata = context.toMetadata();
     const allTools = await context.datastore.listWorkflows({ limit: 1000, offset: 0, orgId: context.orgId });
-    const tools = (allTools.items || []).map(tool => {
-      if (tool.inputSchema && typeof tool.inputSchema === 'string') {
-        tool.inputSchema = parseJSON(tool.inputSchema);
-      }
-      if (tool.responseSchema && typeof tool.responseSchema === 'string') {
-        tool.responseSchema = parseJSON(tool.responseSchema);
-      }
-      return tool;
-    });
+    const tools = (allTools.items || [])
+      .filter(tool => !tool.archived)
+      .map(tool => {
+        if (tool.inputSchema && typeof tool.inputSchema === 'string') {
+          tool.inputSchema = parseJSON(tool.inputSchema);
+        }
+        if (tool.responseSchema && typeof tool.responseSchema === 'string') {
+          tool.responseSchema = parseJSON(tool.responseSchema);
+        }
+        return tool;
+      });
 
     const selector = new ToolFinder(metadata);
     return await selector.findTools(searchTerms, tools);

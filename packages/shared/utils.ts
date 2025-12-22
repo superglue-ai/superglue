@@ -13,9 +13,13 @@ export * from './utils/model-context-length.js';
 
 export const ALLOWED_FILE_EXTENSIONS = [
     '.json', '.csv', '.txt', '.xml',
-    '.xlsx', '.xls', '.xlsb',
+    '.xlsx', '.xls',
     '.pdf', '.docx',
-    '.zip', '.gz'
+    '.zip', '.gz',
+    // Code files (extracted as plain text)
+    '.py', '.ts', '.tsx', '.js', '.jsx', '.java', '.go', '.rs', '.rb', '.php',
+    '.c', '.cpp', '.h', '.hpp', '.cs', '.swift', '.kt', '.scala', '.sh', '.bash',
+    '.sql', '.html', '.css', '.scss', '.md', '.rst'
   ] as const;
 
 // ---- Schema inference configuration (tunable) ----

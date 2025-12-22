@@ -12,8 +12,6 @@ export interface DataStore {
   listRuns(params?: { limit?: number; offset?: number; configId?: string; status?: RunStatus; orgId?: string }): Promise<{ items: Run[], total: number }>;
   createRun(params: { run: Run }): Promise<Run>;
   updateRun(params: { id: string; orgId: string; updates: Partial<Run> }): Promise<Run>;
-  deleteRun(params: { id: string; orgId?: string }): Promise<boolean>;
-  deleteAllRuns(params?: { orgId?: string }): Promise<boolean>;
 
   // Workflow Methods
   getWorkflow(params: { id: string; orgId?: string }): Promise<Tool | null>;
@@ -21,7 +19,6 @@ export interface DataStore {
   upsertWorkflow(params: { id: string; workflow: Tool; orgId?: string }): Promise<Tool>;
   deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean>;
   renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Tool>;
-  getManyWorkflows(params: { ids: string[]; orgId?: string }): Promise<Tool[]>;
 
   // Tenant Information Methods
   getTenantInfo(): Promise<{ email: string | null, emailEntrySkipped: boolean }>;
@@ -38,11 +35,10 @@ export interface DataStore {
   // OAuth cache methods
   cacheOAuthSecret(params: { uid: string; clientId: string; clientSecret: string; ttlMs: number }): Promise<void>;
   getOAuthSecret(params: { uid: string }): Promise<{ clientId: string; clientSecret: string } | null>;
-  deleteOAuthSecret(params: { uid: string }): Promise<void>;
   copyTemplateDocumentationToUserIntegration(params: { templateId: string; userIntegrationId: string; orgId?: string }): Promise<boolean>;
 
   // Workflow Schedule
-  listWorkflowSchedules(params: { workflowId: string, orgId: string }): Promise<ToolScheduleInternal[]>;
+  listWorkflowSchedules(params: { workflowId?: string, orgId: string }): Promise<ToolScheduleInternal[]>;
   getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<ToolScheduleInternal | null>;
   upsertWorkflowSchedule(params: { schedule: ToolScheduleInternal })
   deleteWorkflowSchedule(params: { id: string, orgId: string }): Promise<boolean>;

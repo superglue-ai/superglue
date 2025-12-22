@@ -1,5 +1,6 @@
 export function traceIdMiddleware(req: any, res: any, next: any) {
-  const traceId = req.body?.variables?.traceId || generateTraceId();
+  // Check both top-level traceId variable and nested options.traceId
+  const traceId = req.body?.variables?.traceId || req.body?.variables?.options?.traceId || generateTraceId();
   req.traceId = traceId;
   next();
 }

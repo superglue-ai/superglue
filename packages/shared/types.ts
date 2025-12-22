@@ -236,6 +236,8 @@ export interface Tool extends BaseConfig {
   responseSchema?: JSONSchema;
   instruction?: string;
   originalResponseSchema?: JSONSchema;
+  folder?: string;
+  archived?: boolean;
 }
 
 export interface ToolStepResult {
@@ -472,13 +474,26 @@ export enum DiscoveryRunStatus {
   ABORTED = "ABORTED"
 }
 
+export type DiscoverySourceType = "file" | "url" | "integration";
+
+export interface DiscoverySource {
+  id: string;
+  type: DiscoverySourceType;
+}
+
+export interface DiscoveryRunData {
+  title?: string;
+  description?: string;
+  systems?: ExtendedIntegration[];
+  error?: string;
+}
+
 export interface DiscoveryRun {
   id: string;
-  fileIds: string[];
-  data?: any;
+  sources: DiscoverySource[];
+  data?: DiscoveryRunData;
   status: DiscoveryRunStatus;
-  startedAt: Date;
-  completedAt?: Date;
+  createdAt: Date;
 }
 
 export enum FileStatus {
@@ -518,4 +533,23 @@ export interface BatchFileUploadResponse {
     uploadUrl: string;
     expiresIn: number;
   }>;
+}
+
+export interface ExtendedIntegration extends Omit<Integration, 'icon'> {
+  icon?: {
+    name: string;
+    source: 'simpleicons' | 'lucide';
+  };
+  sources: string[];
+  capabilities: string[];
+  confidence: 'high' | 'medium' | 'low';
+  evidence: string;
+  systemDetails?: string;
+  matchedIntegrationId?: string; // If set, discovered system matches this existing integration
+}
+
+export interface DiscoveryResult {
+  title: string;
+  description: string;
+  systems: ExtendedIntegration[];
 }

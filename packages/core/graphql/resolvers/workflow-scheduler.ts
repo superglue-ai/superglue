@@ -23,13 +23,13 @@ function toPublicSchedule(internal: ToolScheduleInternal): ToolSchedule {
 
 export const listWorkflowSchedulesResolver = async (
   _: unknown,
-  { workflowId }: { workflowId: string },
+  { workflowId }: { workflowId?: string },
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo
 ) => {
     try {
         const workflowSchedulerService = new WorkflowScheduler(context.datastore);
-        const schedulesInternal: ToolScheduleInternal[] =  await workflowSchedulerService.listWorkflowSchedules({ workflowId, orgId: context.orgId });
+        const schedulesInternal: ToolScheduleInternal[] = await workflowSchedulerService.listWorkflowSchedules({ workflowId, orgId: context.orgId });
         
         return schedulesInternal.map(toPublicSchedule);
     } catch (error) {
