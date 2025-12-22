@@ -83,7 +83,6 @@ describe('AiSdkModel', () => {
         ],
         temperature: 0,
         maxRetries: 0,
-        maxSteps: 20,
         tools: undefined,
         toolChoice: undefined
       });
