@@ -4,8 +4,8 @@ import z from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { getToolBuilderContext } from "../context/context-builders.js";
 import { BUILD_TOOL_SYSTEM_PROMPT } from "../context/context-prompts.js";
-import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
-import { getWebSearchTool } from "../llm/llm-tools.js";
+import { LanguageModel, LLMMessage, LLMToolWithContext } from "../llm/llm-base-model.js";
+import { getWebSearchTool, searchDocumentationToolDefinition } from "../llm/llm-tools.js";
 import { logMessage } from "../utils/logs.js";
 
 export class ToolBuilder {
@@ -112,9 +112,15 @@ export class ToolBuilder {
     let lastError: string | null = null;
 
     const webSearchTool = getWebSearchTool();
-    const tools = webSearchTool 
-      ? [{ toolDefinition: { web_search: webSearchTool }, toolContext: {} }]
-      : [];
+    const firstIntegration = Object.values(this.integrations)[0];
+    const tools: LLMToolWithContext[] = [
+      { toolDefinition: searchDocumentationToolDefinition,
+        toolContext: { orgId: this.metadata.orgId, traceId: this.metadata.traceId, integration: firstIntegration },
+        maxUses: 3 },
+    ];
+    if (webSearchTool) {
+      tools.push({ toolDefinition: { web_search: webSearchTool }, toolContext: {} });
+    }
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {

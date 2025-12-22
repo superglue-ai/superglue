@@ -82,7 +82,9 @@ describe('AiSdkModel', () => {
           { role: 'user', content: 'user message' }
         ],
         temperature: 0,
-        maxRetries: 0
+        maxRetries: 0,
+        tools: undefined,
+        toolChoice: undefined
       });
       expect(result.response).toBe('test response');
       expect(result.messages).toHaveLength(4);
@@ -349,7 +351,8 @@ describe('AiSdkModel', () => {
           }],
           toolResults: [{
             toolCallId: 'call_web',
-            result: 'search results'
+            toolName: 'web_search',
+            output: 'search results'
           }]
         } as any)
         .mockResolvedValueOnce({
@@ -501,6 +504,240 @@ describe('AiSdkModel', () => {
       const result = await model.generateObject({ messages: [{ role: 'user', content: 'test' }], schema: schema });
 
       expect(result.response).toContain('Error: Vercel AI API Error');
+    });
+
+    describe('maxUses', () => {
+      it('should exclude tool after maxUses reached', async () => {
+        const model = new AiSdkModel();
+        const customToolExecute = vi.fn().mockResolvedValue({ success: true, data: 'result' });
+
+        // First call: tool is used, second call: tool should be excluded, submit is called
+        mockGenerateText
+          .mockResolvedValueOnce({
+            text: '',
+            toolCalls: [{
+              toolCallId: 'call_1',
+              toolName: 'limited_tool',
+              input: { param: 'first' }
+            }],
+            toolResults: [{
+              toolCallId: 'call_1',
+              toolName: 'limited_tool',
+              output: 'first result'
+            }]
+          } as any)
+          .mockResolvedValueOnce({
+            text: '',
+            toolCalls: [{
+              toolCallId: 'call_2',
+              toolName: 'submit',
+              input: { key: 'done' }
+            }],
+            toolResults: []
+          } as any);
+
+        const customTools = [{
+          toolDefinition: {
+            name: 'limited_tool',
+            description: 'A tool with limited uses',
+            arguments: { type: 'object' as const, properties: { param: { type: 'string' } } },
+            execute: customToolExecute
+          },
+          toolContext: {},
+          maxUses: 1
+        }];
+
+        const result = await model.generateObject({
+          messages: [{ role: 'user', content: 'test' }],
+          schema: { type: 'object', properties: { key: { type: 'string' } } },
+          tools: customTools
+        });
+
+        expect(mockGenerateText).toHaveBeenCalledTimes(2);
+
+        // First call should have the limited_tool available
+        const firstCallTools = mockGenerateText.mock.calls[0][0].tools;
+        expect(firstCallTools).toHaveProperty('limited_tool');
+
+        // Second call should NOT have the limited_tool (maxUses: 1 reached)
+        const secondCallTools = mockGenerateText.mock.calls[1][0].tools;
+        expect(secondCallTools).not.toHaveProperty('limited_tool');
+        expect(secondCallTools).toHaveProperty('submit');
+        expect(secondCallTools).toHaveProperty('abort');
+
+        expect(result.response).toEqual({ key: 'done' });
+      });
+
+      it('should allow tool usage up to maxUses limit', async () => {
+        const model = new AiSdkModel();
+        const customToolExecute = vi.fn().mockResolvedValue({ success: true, data: 'result' });
+
+        mockGenerateText
+          .mockResolvedValueOnce({
+            text: '',
+            toolCalls: [{
+              toolCallId: 'call_1',
+              toolName: 'limited_tool',
+              input: { param: 'first' }
+            }],
+            toolResults: [{ toolCallId: 'call_1', toolName: 'limited_tool', output: 'r1' }]
+          } as any)
+          .mockResolvedValueOnce({
+            text: '',
+            toolCalls: [{
+              toolCallId: 'call_2',
+              toolName: 'limited_tool',
+              input: { param: 'second' }
+            }],
+            toolResults: [{ toolCallId: 'call_2', toolName: 'limited_tool', output: 'r2' }]
+          } as any)
+          .mockResolvedValueOnce({
+            text: '',
+            toolCalls: [{
+              toolCallId: 'call_3',
+              toolName: 'submit',
+              input: { key: 'done' }
+            }],
+            toolResults: []
+          } as any);
+
+        const customTools = [{
+          toolDefinition: {
+            name: 'limited_tool',
+            description: 'A tool with limited uses',
+            arguments: { type: 'object' as const, properties: { param: { type: 'string' } } },
+            execute: customToolExecute
+          },
+          toolContext: {},
+          maxUses: 2
+        }];
+
+        await model.generateObject({
+          messages: [{ role: 'user', content: 'test' }],
+          schema: { type: 'object', properties: { key: { type: 'string' } } },
+          tools: customTools
+        });
+
+        expect(mockGenerateText).toHaveBeenCalledTimes(3);
+
+        // First and second calls should have limited_tool
+        expect(mockGenerateText.mock.calls[0][0].tools).toHaveProperty('limited_tool');
+        expect(mockGenerateText.mock.calls[1][0].tools).toHaveProperty('limited_tool');
+
+        // Third call should NOT have limited_tool (used 2 times already)
+        expect(mockGenerateText.mock.calls[2][0].tools).not.toHaveProperty('limited_tool');
+      });
+
+      it('should not limit tools without maxUses', async () => {
+        const model = new AiSdkModel();
+        const customToolExecute = vi.fn().mockResolvedValue({ success: true, data: 'result' });
+
+        mockGenerateText
+          .mockResolvedValueOnce({
+            text: '',
+            toolCalls: [{ toolCallId: 'c1', toolName: 'unlimited_tool', input: {} }],
+            toolResults: [{ toolCallId: 'c1', toolName: 'unlimited_tool', output: 'r' }]
+          } as any)
+          .mockResolvedValueOnce({
+            text: '',
+            toolCalls: [{ toolCallId: 'c2', toolName: 'unlimited_tool', input: {} }],
+            toolResults: [{ toolCallId: 'c2', toolName: 'unlimited_tool', output: 'r' }]
+          } as any)
+          .mockResolvedValueOnce({
+            text: '',
+            toolCalls: [{ toolCallId: 'c3', toolName: 'unlimited_tool', input: {} }],
+            toolResults: [{ toolCallId: 'c3', toolName: 'unlimited_tool', output: 'r' }]
+          } as any)
+          .mockResolvedValueOnce({
+            text: '',
+            toolCalls: [{ toolCallId: 'c4', toolName: 'submit', input: { key: 'done' } }],
+            toolResults: []
+          } as any);
+
+        const customTools = [{
+          toolDefinition: {
+            name: 'unlimited_tool',
+            description: 'No limit',
+            arguments: { type: 'object' as const, properties: {} },
+            execute: customToolExecute
+          },
+          toolContext: {}
+          // No maxUses specified
+        }];
+
+        await model.generateObject({
+          messages: [{ role: 'user', content: 'test' }],
+          schema: { type: 'object', properties: { key: { type: 'string' } } },
+          tools: customTools
+        });
+
+        // All 4 calls should have unlimited_tool available
+        for (let i = 0; i < 3; i++) {
+          expect(mockGenerateText.mock.calls[i][0].tools).toHaveProperty('unlimited_tool');
+        }
+      });
+
+      it('should track usage independently per tool', async () => {
+        const model = new AiSdkModel();
+
+        mockGenerateText
+          .mockResolvedValueOnce({
+            text: '',
+            toolCalls: [{ toolCallId: 'c1', toolName: 'tool_a', input: {} }],
+            toolResults: [{ toolCallId: 'c1', toolName: 'tool_a', output: 'r' }]
+          } as any)
+          .mockResolvedValueOnce({
+            text: '',
+            toolCalls: [{ toolCallId: 'c2', toolName: 'tool_b', input: {} }],
+            toolResults: [{ toolCallId: 'c2', toolName: 'tool_b', output: 'r' }]
+          } as any)
+          .mockResolvedValueOnce({
+            text: '',
+            toolCalls: [{ toolCallId: 'c3', toolName: 'submit', input: { key: 'done' } }],
+            toolResults: []
+          } as any);
+
+        const customTools = [
+          {
+            toolDefinition: {
+              name: 'tool_a',
+              description: 'Tool A',
+              arguments: { type: 'object' as const, properties: {} },
+              execute: vi.fn().mockResolvedValue({})
+            },
+            toolContext: {},
+            maxUses: 1
+          },
+          {
+            toolDefinition: {
+              name: 'tool_b',
+              description: 'Tool B',
+              arguments: { type: 'object' as const, properties: {} },
+              execute: vi.fn().mockResolvedValue({})
+            },
+            toolContext: {},
+            maxUses: 1
+          }
+        ];
+
+        await model.generateObject({
+          messages: [{ role: 'user', content: 'test' }],
+          schema: { type: 'object', properties: { key: { type: 'string' } } },
+          tools: customTools
+        });
+
+        // First call: both tools available
+        expect(mockGenerateText.mock.calls[0][0].tools).toHaveProperty('tool_a');
+        expect(mockGenerateText.mock.calls[0][0].tools).toHaveProperty('tool_b');
+
+        // Second call: tool_a used, so excluded; tool_b still available
+        expect(mockGenerateText.mock.calls[1][0].tools).not.toHaveProperty('tool_a');
+        expect(mockGenerateText.mock.calls[1][0].tools).toHaveProperty('tool_b');
+
+        // Third call: both excluded
+        expect(mockGenerateText.mock.calls[2][0].tools).not.toHaveProperty('tool_a');
+        expect(mockGenerateText.mock.calls[2][0].tools).not.toHaveProperty('tool_b');
+      });
     });
   });
 });

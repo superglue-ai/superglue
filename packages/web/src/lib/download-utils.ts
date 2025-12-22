@@ -1,24 +1,6 @@
-export const DEFAULT_MAX_DOWNLOAD_BYTES = 1000 * 1024 * 1024; // 1000 MB
+import { safeStringify } from '@superglue/shared'
 
-function safeStringify(value: any): string {
-    const seen = new WeakSet<object>();
-    try {
-        return JSON.stringify(
-            value,
-            (key, val) => {
-                if (typeof val === 'object' && val !== null) {
-                    if (seen.has(val)) return '[Circular]';
-                    seen.add(val);
-                }
-                return val;
-            },
-            2
-        );
-    } catch (err) {
-        // As a last resort, coerce to string
-        return String(value ?? '');
-    }
-}
+export const DEFAULT_MAX_DOWNLOAD_BYTES = 1000 * 1024 * 1024; // 1000 MB
 
 export function downloadJson(
     data: any,

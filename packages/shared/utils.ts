@@ -349,3 +349,23 @@ export function sampleResultObject(value: any, sampleSize = 10, seen = new WeakS
   }), {});
 }
 
+export function safeStringify(value: any): string {
+    const seen = new WeakSet<object>();
+    try {
+        return JSON.stringify(
+            value,
+            (key, val) => {
+                if (typeof val === 'object' && val !== null) {
+                    if (seen.has(val)) return '[Circular]';
+                    seen.add(val);
+                }
+                return val;
+            },
+            2
+        );
+    } catch (err) {
+        // As a last resort, coerce to string
+        return String(value ?? '');
+    }
+}
+

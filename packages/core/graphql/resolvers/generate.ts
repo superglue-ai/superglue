@@ -6,7 +6,7 @@ import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { LLMMessage } from "../../llm/llm-base-model.js";
 import { executeLLMTool, LLMToolCall } from "../../llm/llm-tool-utils.js";
 import { InstructionGenerationContext } from "../../llm/llm-tools.js";
-import { generateStepConfig } from "../../tools/tool-step-builder.js";
+import { buildSourceData, generateStepConfig } from "../../tools/tool-step-builder.js";
 import { generateWorkingTransform } from "../../tools/tool-transform.js";
 import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
@@ -122,9 +122,18 @@ export const generateStepConfigResolver = async (
       }
     ];
 
+    const sourceData = await buildSourceData({
+      stepInput,
+      credentials: mergedCredentials,
+      dataSelector: currentDataSelector,
+      integrationUrlHost: integration?.urlHost,
+      paginationPageSize: currentStepConfig?.pagination?.pageSize
+    });
+
     const generateStepConfigResult = await generateStepConfig({
       retryCount: 0,
       messages,
+      sourceData,
       integration,
       metadata
     });

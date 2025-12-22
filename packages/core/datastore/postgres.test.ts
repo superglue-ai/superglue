@@ -368,7 +368,7 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
                 const testWorkflow2 = { ...testWorkflow, id: 'test-workflow-2' };
                 const testSchedule2: ToolScheduleInternal = {
                     ...testWorkflowSchedule,
-                    id: 'schedule-2',
+                    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
                     workflowId: testWorkflow2.id,
                 };
 

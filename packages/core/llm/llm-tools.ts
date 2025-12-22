@@ -4,9 +4,10 @@ import { openai } from "@ai-sdk/openai";
 import { Integration, ServiceMetadata } from "@superglue/shared";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { LLMToolDefinition, LLMToolImplementation } from "./llm-tool-utils.js";
-import { sanitizeInstructionSuggestions } from "../utils/helpers.js";
+import { sanitizeInstructionSuggestions, runCodeInIVM } from "../utils/helpers.js";
 import { LanguageModel, LLMMessage } from "./llm-base-model.js";
 import { GENERATE_INSTRUCTIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
+import { searchIntegrationDocumentationResolver } from "../graphql/resolvers/integrations.js";
 
 export function getWebSearchTool(): any {
     const provider = process.env.LLM_PROVIDER?.toLowerCase();
@@ -95,7 +96,7 @@ export interface InstructionGenerationContext extends ServiceMetadata {
     integrations: Integration[];
 }
   
-export const generateInstructionsImplementation: LLMToolImplementation<InstructionGenerationContext> = async (args, context) => {
+export const generateInstructionsToolImplementation: LLMToolImplementation<InstructionGenerationContext> = async (args, context) => {
     const { integrations } = context;
     const metadata = context as ServiceMetadata;
   
@@ -158,7 +159,7 @@ export const generateInstructionsImplementation: LLMToolImplementation<Instructi
     };
 };
 
-export const generateInstructionsDefinition: LLMToolDefinition = {
+export const generateInstructionsToolDefinition: LLMToolDefinition = {
     name: "generate_instructions",
     description: "Generate specific, implementable workflow instructions for the available integrations.",
     arguments: {
@@ -167,3 +168,55 @@ export const generateInstructionsDefinition: LLMToolDefinition = {
       required: []
     }
 };
+
+export interface inspectSourceDataToolContext extends ServiceMetadata {
+  sourceData: JSON;
+}
+
+export const inspectSourceDataToolImplementation: LLMToolImplementation<inspectSourceDataToolContext> = async (args, context) => {
+  const { sourceData } = context;
+  const { expression } = args
+  const MAX_RESULT_CHARACTERS = 10000
+
+  if (!sourceData || typeof sourceData !== 'object') {
+    return "Error: No sourceData provided in context or it's not an object";
+  }
+
+  if (!expression || !expression.startsWith('sourceData =>')) {
+    return "Error: Expression must be a sourceData arrow function, e.g. sourceData => sourceData.key";
+  }
+
+  try {
+    const result = await runCodeInIVM(sourceData, expression)
+    
+    if (!result.success) {
+      return `Error: ${result.error || 'Failed to run expression'}`;
+    }
+    
+    let output = JSON.stringify(result.data);
+
+    if (output.length > MAX_RESULT_CHARACTERS) {
+      output = output.slice(0, MAX_RESULT_CHARACTERS) + '... [truncated]';
+    }
+    
+    return output;
+  } catch (error) {
+    return `Error: ${error instanceof Error ? error.message : String(error)}`;
+  }
+};
+
+export const inspectSourceDataToolDefinition: LLMToolDefinition = {
+  name: "inspect_source_data",
+  description: "Inspect specific parts of sourceData by running a JS expression. Results are truncated to 10000 chars, so be TARGETED - don't return the entire object. You can start by exploring structure (Object.keys), then drill into specific paths. Examples: 'sourceData => Object.keys(sourceData)' to see top-level keys, 'sourceData => sourceData.users?.length' to check array size, 'sourceData => sourceData.users?.[0]' to see first item structure.",
+  arguments: {
+    type: "object",
+    properties: {
+      "expression": {
+        type: "string",
+        description: "A JS arrow function code expression to execute on sourceData, e.g. sourceData => sourceData.currentItem.id"
+      }
+    },
+    required: ["expression"]
+  },
+  execute: inspectSourceDataToolImplementation
+}
