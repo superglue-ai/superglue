@@ -88,24 +88,7 @@ export function formatBytes(bytes: number): string {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-
-export function getFileType(filename: string): 'json' | 'csv' | 'xml' | 'excel' | 'pdf' | 'text' | 'code' | 'archive' | 'other' {
-    const ext = filename.toLowerCase().split('.').pop() || '';
-    switch (ext) {
-        case 'json': return 'json';
-        case 'csv': return 'csv';
-        case 'xml': return 'xml';
-        case 'xlsx':
-        case 'xls': return 'excel';
-        case 'pdf': return 'pdf';
-        case 'txt': return 'text';
-        case 'md':
-        case 'markdown': return 'code';
-        case 'zip': return 'archive';
-        default: return 'other';
-    }
-}
-
+// truncateFileContent: Needed for Agent File Uploads
 export function truncateFileContent(content: string, maxChars: number): { truncated: string; wasTruncated: boolean } {
     if (content.length <= maxChars) {
         return { truncated: content, wasTruncated: false };

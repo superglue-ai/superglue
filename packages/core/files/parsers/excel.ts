@@ -14,11 +14,10 @@ export class ExcelStrategy implements FileParsingStrategy {
         const signature = buffer.subarray(0, 4).toString('hex');
         if (signature !== '504b0304') return false;
 
-        // Check for Excel-specific files inside the ZIP
+        // Check for Excel-specific files inside the ZIP (xl/ folder is Excel-only)
         try {
             const zipStream = await unzipper.Open.buffer(buffer);
             const hasExcelSignature = zipStream.files.some(f =>
-                f.path === '[Content_Types].xml' ||
                 f.path === 'xl/workbook.xml' ||
                 f.path.startsWith('xl/worksheets/')
             );
