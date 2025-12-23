@@ -16,6 +16,7 @@ export const ALLOWED_FILE_EXTENSIONS = [
     '.xlsx', '.xls',
     '.pdf', '.docx',
     '.zip', '.gz',
+    '.yaml', '.yml',
     // Code files (extracted as plain text)
     '.py', '.ts', '.tsx', '.js', '.jsx', '.java', '.go', '.rs', '.rb', '.php',
     '.c', '.cpp', '.h', '.hpp', '.cs', '.swift', '.kt', '.scala', '.sh', '.bash',

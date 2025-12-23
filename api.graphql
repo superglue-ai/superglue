@@ -157,6 +157,7 @@ enum FileType {
   CSV
   JSON
   XML
+  YAML
   RAW
   AUTO
 }

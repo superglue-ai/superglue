@@ -6,6 +6,7 @@ import { GZIPStrategy, parseGZIP, setGzipParseFileFunction } from './parsers/gzi
 import { JSONStrategy, parseJSON } from './parsers/json.js';
 import { PDFStrategy, parsePDF } from './parsers/pdf.js';
 import { XMLStrategy, parseXML } from './parsers/xml.js';
+import { YAMLStrategy, parseYAML } from './parsers/yaml.js';
 import { setZipParseFileFunction, ZIPStrategy, parseZIP } from './parsers/zip.js';
 import { FileStrategyRegistry } from './strategy.js';
 
@@ -18,6 +19,7 @@ fileStrategyRegistry.register(new PDFStrategy());         // Priority 10: BINARY
 fileStrategyRegistry.register(new ZIPStrategy());         // Priority 11: ZIP_GENERIC
 fileStrategyRegistry.register(new JSONStrategy());        // Priority 20: STRUCTURED_TEXT
 fileStrategyRegistry.register(new XMLStrategy());         // Priority 20: STRUCTURED_TEXT
+fileStrategyRegistry.register(new YAMLStrategy());        // Priority 20: STRUCTURED_TEXT
 fileStrategyRegistry.register(new CSVStrategy());         // Priority 30: HEURISTIC_TEXT
 
 export async function parseFile(buffer: Buffer, fileType: SupportedFileType = SupportedFileType.AUTO): Promise<any> {
@@ -30,6 +32,8 @@ export async function parseFile(buffer: Buffer, fileType: SupportedFileType = Su
             return parseCSV(buffer);
         case SupportedFileType.XML:
             return parseXML(buffer);
+        case SupportedFileType.YAML:
+            return parseYAML(buffer);
         case SupportedFileType.EXCEL:
             return parseExcel(buffer);
         case SupportedFileType.PDF:
@@ -60,6 +64,7 @@ export * from './parsers/gzip.js';
 export * from './parsers/json.js';
 export * from './parsers/pdf.js';
 export * from './parsers/xml.js';
+export * from './parsers/yaml.js';
 export * from './parsers/zip.js';
 export * from './strategy.js';
 
