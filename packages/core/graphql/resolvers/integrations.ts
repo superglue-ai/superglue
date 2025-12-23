@@ -257,12 +257,6 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
   return defaultValue;
 }
 
-/**
- * Deep merges credentials, preserving existing values and only updating with non-placeholder values.
- * - Existing credentials are preserved
- * - New keys are added
- * - Existing keys are only overwritten if the new value is non-empty and not a placeholder
- */
 function mergeCredentials(
   newCredentials: Record<string, any> | null | undefined,
   existingCredentials: Record<string, any> | undefined
