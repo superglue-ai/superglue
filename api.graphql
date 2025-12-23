@@ -521,6 +521,13 @@ type Mutation {
     body: String
     timeout: Int
   ): CallEndpointResult!
+
+  fixWorkflow(
+    workflow: WorkflowInput!
+    fixInstructions: String!
+    lastError: String
+    integrationIds: [ID!]
+  ): FixWorkflowResult!
 }
 
 type Subscription {
@@ -560,4 +567,14 @@ type CallEndpointResult {
   body: JSON
   error: String
   duration: Int!
+}
+
+type ToolDiff {
+  old_string: String!
+  new_string: String!
+}
+
+type FixWorkflowResult {
+  workflow: Workflow!
+  diffs: [ToolDiff!]!
 }

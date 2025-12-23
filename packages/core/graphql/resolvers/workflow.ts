@@ -1,10 +1,11 @@
-import { generateUniqueId, Integration, RequestOptions, RunStatus, Tool, ToolResult, ToolStepResult, waitForIntegrationProcessing } from "@superglue/shared";
+import { generateUniqueId, Integration, RequestOptions, RunStatus, Tool, ToolDiff, ToolResult, ToolStepResult, waitForIntegrationProcessing } from "@superglue/shared";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { parseJSON } from "../../files/index.js";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { ToolBuilder } from "../../tools/tool-builder.js";
 import { ToolFinder } from "../../tools/tool-finder.js";
+import { ToolFixer } from "../../tools/tool-fixer.js";
 import { isSelfHealingEnabled } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
@@ -31,6 +32,18 @@ interface BuildWorkflowArgs {
   payload?: Record<string, unknown>;
   integrationIds?: string[];
   responseSchema?: JSONSchema;
+}
+
+interface FixWorkflowArgs {
+  workflow: Tool;
+  fixInstructions: string;
+  lastError?: string;
+  integrationIds?: string[];
+}
+
+interface FixWorkflowResult {
+  workflow: Tool;
+  diffs: ToolDiff[];
 }
 
 type GraphQLWorkflowResult = Omit<ToolResult, 'stepResults'> & { data?: any, stepResults: (ToolStepResult & { rawData: any, transformedData: any })[] };
@@ -390,6 +403,62 @@ export const buildWorkflowResolver = async (
     return workflow;
   } catch (error) {
     logMessage('error', `Failed to build workflow: ${error}`, metadata);
+    throw error;
+  }
+};
+
+export const fixWorkflowResolver = async (
+  _: unknown,
+  args: FixWorkflowArgs,
+  context: GraphQLRequestContext,
+  info: GraphQLResolveInfo,
+): Promise<FixWorkflowResult> => {
+  const metadata = context.toMetadata();
+
+  try {
+    const { workflow, fixInstructions, lastError, integrationIds } = args;
+
+    if (!workflow) {
+      throw new Error("Workflow configuration is required to fix a workflow.");
+    }
+
+    if (!fixInstructions || fixInstructions.trim() === "") {
+      throw new Error("Fix instructions are required.");
+    }
+
+    // Resolve integrations - either from provided IDs or from the workflow's integrationIds
+    let resolvedIntegrations: Integration[] = [];
+    const idsToResolve = integrationIds || workflow.integrationIds || [];
+    
+    if (idsToResolve.length > 0) {
+      const datastoreAdapter = {
+        getIntegration: async (id: string): Promise<Integration | null> => {
+          const result = await context.datastore.getIntegration({ id, includeDocs: true, orgId: context.orgId });
+          return result || null;
+        },
+        getManyIntegrations: async (ids: string[]): Promise<Integration[]> => {
+          return await context.datastore.getManyIntegrations({ ids, includeDocs: true, orgId: context.orgId });
+        }
+      };
+      resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, idsToResolve as string[]);
+    }
+
+    const fixer = new ToolFixer({
+      tool: workflow,
+      fixInstructions,
+      integrations: resolvedIntegrations,
+      lastError,
+      metadata
+    });
+
+    const result = await fixer.fixTool();
+
+    return {
+      workflow: result.tool,
+      diffs: result.diffs
+    };
+  } catch (error) {
+    logMessage('error', `Failed to fix workflow: ${error}`, metadata);
     throw error;
   }
 };

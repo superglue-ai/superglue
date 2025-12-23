@@ -10,6 +10,8 @@ import {
   ExtractArgs,
   ExtractInputRequest,
   ExtractResult,
+  FixToolArgs,
+  FixToolResult,
   GenerateStepConfigArgs,
   Integration,
   Log,
@@ -17,6 +19,7 @@ import {
   SuggestedTool,
   Tool,
   ToolArgs,
+  ToolDiff,
   ToolInputRequest,
   ToolResult,
   ToolSchedule,
@@ -409,6 +412,112 @@ export class SuperglueClient {
         }
 
         return workflow;
+      } finally {
+        if (logSubscription) {
+          setTimeout(() => {
+            logSubscription.unsubscribe();
+          }, 2000);
+        }
+      }
+    }
+
+    async fixWorkflow({tool, fixInstructions, lastError, integrationIds, verbose = true}: FixToolArgs & { verbose?: boolean }): Promise<FixToolResult> {
+      const mutation = `
+        mutation FixWorkflow($workflow: WorkflowInput!, $fixInstructions: String!, $lastError: String, $integrationIds: [ID!]) {
+          fixWorkflow(workflow: $workflow, fixInstructions: $fixInstructions, lastError: $lastError, integrationIds: $integrationIds) {
+            workflow {${SuperglueClient.workflowQL}}
+            diffs {
+              old_string
+              new_string
+            }
+          }
+        }
+      `;
+
+      let logSubscription: WebSocketSubscription | undefined;
+      if (verbose) {
+        try {
+          logSubscription = await this.subscribeToLogs({
+            onLog: (log: Log) => {
+              const timestamp = log.timestamp.toLocaleTimeString();
+              const levelColor = log.level === 'ERROR' ? '\x1b[31m' : 
+                                log.level === 'WARN' ? '\x1b[33m' : 
+                                log.level === 'DEBUG' ? '\x1b[36m' : '\x1b[0m';
+              console.log(`${levelColor}[${timestamp}] ${log.level}\x1b[0m: ${log.message}`);
+            },
+            onError: (error: Error) => {
+              console.error('Log subscription error:', error);
+            },
+            includeDebug: true
+          });
+        } catch (error) {
+          console.error('Log subscription error:', error);
+        }
+      }
+
+      // Convert tool to WorkflowInput format
+      const toolInput = {
+        id: tool.id,
+        steps: tool.steps?.map(step => {
+          const apiConfigInput = {
+            id: step.apiConfig.id,
+            urlHost: step.apiConfig.urlHost,
+            instruction: step.apiConfig.instruction,
+            urlPath: step.apiConfig.urlPath,
+            method: step.apiConfig.method,
+            queryParams: step.apiConfig.queryParams,
+            headers: step.apiConfig.headers,
+            body: step.apiConfig.body,
+            documentationUrl: step.apiConfig.documentationUrl,
+            responseSchema: step.apiConfig.responseSchema,
+            responseMapping: step.apiConfig.responseMapping,
+            authentication: step.apiConfig.authentication,
+            pagination: step.apiConfig.pagination ? {
+              type: step.apiConfig.pagination.type,
+              ...(step.apiConfig.pagination.pageSize !== undefined && { pageSize: step.apiConfig.pagination.pageSize }),
+              ...(step.apiConfig.pagination.cursorPath !== undefined && { cursorPath: step.apiConfig.pagination.cursorPath }),
+              ...(step.apiConfig.pagination.stopCondition !== undefined && { stopCondition: step.apiConfig.pagination.stopCondition }),
+            } : undefined,
+            dataPath: step.apiConfig.dataPath,
+            version: step.apiConfig.version,
+          };
+          Object.keys(apiConfigInput).forEach(key => (apiConfigInput as any)[key] === undefined && delete (apiConfigInput as any)[key]);
+          
+          const executionStepInput = {
+            id: step.id,
+            modify: step.modify,
+            apiConfig: apiConfigInput,
+            integrationId: step.integrationId,
+            executionMode: step.executionMode,
+            loopSelector: step.loopSelector,
+            loopMaxIters: step.loopMaxIters,
+            inputMapping: step.inputMapping,
+            responseMapping: step.responseMapping,
+            failureBehavior: step.failureBehavior,
+          };
+          Object.keys(executionStepInput).forEach(key => (executionStepInput as any)[key] === undefined && delete (executionStepInput as any)[key]);
+          return executionStepInput;
+        }),
+        integrationIds: tool.integrationIds,
+        finalTransform: tool.finalTransform,
+        inputSchema: tool.inputSchema,
+        responseSchema: tool.responseSchema,
+        instruction: tool.instruction,
+      };
+      Object.keys(toolInput).forEach(key => (toolInput as any)[key] === undefined && delete (toolInput as any)[key]);
+
+      try {
+        const result = await this.request<{ fixWorkflow: { workflow: Tool; diffs: ToolDiff[] } }>(mutation, {
+          workflow: toolInput,
+          fixInstructions,
+          lastError,
+          integrationIds
+        }).then(data => data.fixWorkflow);
+
+        return {
+          tool: result.workflow,
+          diffs: result.diffs
+        };
       } finally {
         if (logSubscription) {
           setTimeout(() => {

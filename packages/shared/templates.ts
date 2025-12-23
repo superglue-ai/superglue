@@ -212,7 +212,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://github.com/login/oauth/authorize",
       tokenUrl: "https://github.com/login/oauth/access_token",
-      scopes: "repo user read:org write:org admin:repo_hook admin:org_hook gist notifications delete_repo write:packages read:packages delete:packages admin:gpg_key workflow"
+      scopes: "repo user admin:org workflow gist notifications delete_repo write:packages read:packages"
     },
     keywords: [
       "repositories",
@@ -244,7 +244,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://gitlab.com/oauth/authorize",
       tokenUrl: "https://gitlab.com/oauth/token",
-      scopes: "api read_api read_user read_repository write_repository read_registry write_registry sudo admin_mode"
+      scopes: "api"
     },
     keywords: [
       "projects",
@@ -277,7 +277,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://bitbucket.org/site/oauth2/authorize",
       tokenUrl: "https://bitbucket.org/site/oauth2/access_token",
-      scopes: "repository repository:write repository:admin repository:delete issue issue:write pullrequest pullrequest:write wiki snippet account account:write team team:write webhook"
+      scopes: "repository:admin account:write team:write webhook"
     },
     keywords: [
       "repositories",
@@ -357,7 +357,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
       tokenUrl: "https://oauth2.googleapis.com/token",
-      scopes: "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.labels https://www.googleapis.com/auth/gmail.metadata https://www.googleapis.com/auth/gmail.settings.basic https://www.googleapis.com/auth/gmail.settings.sharing"
+      scopes: "https://mail.google.com/"
     },
     keywords: ["messages", "threads", "labels", "drafts", "send", "attachments", "history", "filters", "settings", "forwarding", "inbox", "profile", "oauth"]
   },
@@ -372,7 +372,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
       tokenUrl: "https://oauth2.googleapis.com/token",
-      scopes: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.metadata https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/drive.photos.readonly"
+      scopes: "https://www.googleapis.com/auth/drive"
     },
     keywords: ["files", "folders", "permissions", "sharing", "comments", "revisions", "changes", "uploads", "downloads", "metadata", "teamdrives", "export", "copy", "move", "oauth"]
   },
@@ -387,7 +387,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
       tokenUrl: "https://oauth2.googleapis.com/token",
-      scopes: "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.settings.readonly https://www.googleapis.com/auth/calendar.calendars https://www.googleapis.com/auth/calendar.calendars.readonly"
+      scopes: "https://www.googleapis.com/auth/calendar"
     },
     keywords: ["events", "calendars", "attendees", "reminders", "recurring", "availability", "free busy", "settings", "acl", "colors", "notifications", "timezone", "quick add", "oauth"]
   },
@@ -402,7 +402,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
       tokenUrl: "https://oauth2.googleapis.com/token",
-      scopes: "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly"
+      scopes: "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive"
     },
     keywords: ["spreadsheets", "sheets", "cells", "ranges", "values", "formulas", "formatting", "charts", "pivot tables", "named ranges", "protected ranges", "batch update", "append", "oauth"]
   },
@@ -417,7 +417,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
       tokenUrl: "https://oauth2.googleapis.com/token",
-      scopes: "https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/analytics https://www.googleapis.com/auth/analytics.edit https://www.googleapis.com/auth/analytics.manage.users https://www.googleapis.com/auth/analytics.manage.users.readonly https://www.googleapis.com/auth/analytics.user.deletion"
+      scopes: "https://www.googleapis.com/auth/analytics.edit"
     },
     keywords: ["properties", "dimensions", "metrics", "reports", "audiences", "conversions", "events", "goals", "segments", "real time", "user activity", "attribution", "funnels", "cohorts", "oauth"]
   },
@@ -432,7 +432,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
       tokenUrl: "https://oauth2.googleapis.com/token",
-      scopes: "https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.force-ssl https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.channel-memberships.creator https://www.googleapis.com/auth/youtubepartner"
+      scopes: "https://www.googleapis.com/auth/youtube"
     },
     keywords: ["videos", "channels", "playlists", "comments", "captions", "live streams", "analytics", "thumbnails", "subscriptions", "activities", "ratings", "uploads", "members", "oauth"]
   },
@@ -455,7 +455,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
       tokenUrl: "https://oauth2.googleapis.com/token",
-      scopes: "https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/cloud-platform.read-only https://www.googleapis.com/auth/cloudplatformprojects https://www.googleapis.com/auth/cloudplatformprojects.readonly https://www.googleapis.com/auth/devstorage.full_control https://www.googleapis.com/auth/devstorage.read_only https://www.googleapis.com/auth/devstorage.read_write"
+      scopes: "https://www.googleapis.com/auth/cloud-platform"
     },
     keywords: ["compute", "storage", "bigquery", "pubsub", "cloud run", "kubernetes", "iam", "vpc", "cloud sql", "bigtable", "dataflow", "logging", "monitoring", "oauth"]
   },
@@ -470,7 +470,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
       tokenUrl: "https://oauth2.googleapis.com/token",
-      scopes: "https://www.googleapis.com/auth/firebase https://www.googleapis.com/auth/datastore"
+      scopes: "https://www.googleapis.com/auth/firebase https://www.googleapis.com/auth/cloud-platform"
     },
     keywords: ["firestore", "realtime database", "authentication", "cloud functions", "storage", "hosting", "documents", "collections", "users", "projects", "apps", "query", "oauth"]
   },
@@ -530,7 +530,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://twitter.com/i/oauth2/authorize",
       tokenUrl: "https://api.twitter.com/2/oauth2/token",
-      scopes: "tweet.read tweet.write tweet.moderate.write users.read follows.read follows.write offline.access space.read mute.read mute.write like.read like.write list.read list.write block.read block.write bookmark.read bookmark.write"
+      scopes: "tweet.read tweet.write users.read follows.read follows.write offline.access like.read like.write list.read list.write block.read block.write bookmark.read bookmark.write mute.read mute.write"
     },
     keywords: ["tweets", "users", "followers", "timeline", "mentions", "retweets", "likes", "lists", "spaces", "direct messages", "trends", "media", "polls", "oauth"]
   },
@@ -716,7 +716,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://www.dropbox.com/oauth2/authorize",
       tokenUrl: "https://api.dropboxapi.com/oauth2/token",
-      scopes: "files.metadata.read files.metadata.write files.content.read files.content.write sharing.read sharing.write account_info.read account_info.write contacts.read"
+      scopes: "files.content.write sharing.write account_info.write"
     },
     keywords: ["files", "folders", "upload", "download", "sharing", "links", "metadata", "search", "sync", "paper", "users", "teams", "move", "copy", "delete", "oauth"]
   },
