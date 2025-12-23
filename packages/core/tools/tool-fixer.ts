@@ -355,7 +355,7 @@ ${availableIntegrationIds.join(', ')}
 
         // Convert to ToolDiff[], validating that required fields are present
         const diffs: ToolDiff[] = rawDiffs.map((d, i) => {
-          if (!d.old_string || !d.new_string === undefined) {
+          if (!d.old_string || d.new_string === undefined) {
             throw new Error(`Diff ${i + 1}: missing required field (old_string or new_string)`);
           }
           return {

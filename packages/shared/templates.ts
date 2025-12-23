@@ -716,7 +716,7 @@ export const integrations: Record<string, IntegrationConfig> = {
     oauth: {
       authUrl: "https://www.dropbox.com/oauth2/authorize",
       tokenUrl: "https://api.dropboxapi.com/oauth2/token",
-      scopes: "files.content.write sharing.write account_info.write"
+      scopes: "files.metadata.read files.metadata.write files.content.read files.content.write sharing.read sharing.write account_info.read account_info.write"
     },
     keywords: ["files", "folders", "upload", "download", "sharing", "links", "metadata", "search", "sync", "paper", "users", "teams", "move", "copy", "delete", "oauth"]
   },
