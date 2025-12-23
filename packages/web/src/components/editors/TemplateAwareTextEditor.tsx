@@ -9,7 +9,7 @@ import { useExecution } from '../tools/context/tool-execution-context';
 import { TemplateExtension } from '../tools/templates/TemplateExtension';
 import { VariableSuggestion } from '../tools/templates/TemplateVariableSuggestion';
 import { TemplateEditPopover } from '../tools/templates/TemplateEditPopover';
-import { templateStringToTiptap, tiptapToTemplateString } from '../tools/templates/tiptap/serialization';
+import { templateStringToTiptap, tiptapToTemplateString } from '@/src/lib/templating-utils';
 import { useTemplateAwareEditor } from '../tools/hooks/use-template-aware-editor';
 
 interface TemplateAwareTextEditorProps {
