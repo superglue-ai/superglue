@@ -92,7 +92,7 @@ export const upsertIntegrationResolver = async (
       // If we're starting a new fetch, set pending to true
       // If we're not starting a new fetch, preserve the existing pending state
       documentationPending: shouldFetchDoc ? true : (existingIntegrationOrNull?.documentationPending || false),
-      credentials: resolveField(input.credentials, existingIntegrationOrNull?.credentials, {}),
+      credentials: mergeCredentials(input.credentials, existingIntegrationOrNull?.credentials),
       specificInstructions: resolveField(input.specificInstructions?.trim(), existingIntegrationOrNull?.specificInstructions, ''),
       documentationKeywords: uniqueKeywords(resolveField(input.documentationKeywords, existingIntegrationOrNull?.documentationKeywords, [])),
       createdAt: existingIntegrationOrNull?.createdAt || now,
@@ -255,6 +255,31 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
   if (newValue !== undefined) return newValue;
   if (oldValue !== undefined) return oldValue;
   return defaultValue;
+}
+
+function mergeCredentials(
+  newCredentials: Record<string, any> | null | undefined,
+  existingCredentials: Record<string, any> | undefined
+): Record<string, any> {
+  if (newCredentials === null || newCredentials === undefined) {
+    return existingCredentials || {};
+  }
+  
+  if (!existingCredentials || Object.keys(existingCredentials).length === 0) {
+    return newCredentials;
+  }
+  
+  const merged = { ...existingCredentials };
+  
+  for (const [key, value] of Object.entries(newCredentials)) {
+    // Skip if value looks like a placeholder
+    if (!value || (!value.startsWith('<<') && !value.endsWith('>>'))) {
+      continue;
+    }
+    merged[key] = value;
+  }
+  
+  return merged;
 }
 
 function shouldTriggerDocFetch(input: Integration, context: GraphQLRequestContext, existingIntegration?: Integration | null): boolean {
