@@ -14,7 +14,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
 import { useMonacoTheme } from '@superglue/web/src/hooks/use-monaco-theme';
-import { DEFAULT_CODE_TEMPLATE, extractCredentials, formatValueForDisplay, normalizeTemplateExpression } from '@/src/lib/templating-utils';
+import { DEFAULT_CODE_TEMPLATE, formatValueForDisplay, normalizeTemplateExpression } from '@/src/lib/templating-utils';
 import Editor from '@monaco-editor/react';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { isArrowFunction, maskCredentials } from '@superglue/shared';
@@ -23,6 +23,7 @@ import type * as Monaco from 'monaco-editor';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTemplatePreview } from '../hooks/use-template-preview';
 import { CopyButton } from '../shared/CopyButton';
+import { useExecution } from '../context/tool-execution-context';
 
 const TEMPLATE_POPOVER_OPEN_EVENT = 'template-popover-open';
 const TEMPLATE_POPOVER_CLOSE_ALL_EVENT = 'template-popover-close-all';
@@ -79,10 +80,9 @@ const calcHeight = (content: string, maxHeight: number): number => {
 
 interface TemplateEditPopoverProps {
   template: string;
-  sourceData: any;
   onSave: (newTemplate: string) => void;
+  stepId: string;
   children?: React.ReactNode;
-  canExecute?: boolean;
   externalOpen?: boolean;
   onExternalOpenChange?: (open: boolean) => void;
   onOpenChange?: (open: boolean) => void;
@@ -94,10 +94,9 @@ interface TemplateEditPopoverProps {
 
 export function TemplateEditPopover({
   template,
-  sourceData,
   onSave,
+  stepId,
   children,
-  canExecute = true,
   externalOpen,
   onExternalOpenChange,
   onOpenChange,
@@ -106,6 +105,9 @@ export function TemplateEditPopover({
   title = 'Template Expression',
   helpText,
 }: TemplateEditPopoverProps) {
+  const { getStepTemplateData, sourceDataVersion } = useExecution();
+  const { sourceData, credentials, canExecute } = getStepTemplateData(stepId);
+  
   const [internalOpen, setInternalOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const isControlled = externalOpen !== undefined;
@@ -161,7 +163,7 @@ export function TemplateEditPopover({
   const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
     codeContent,
     sourceData,
-    { enabled: open && canExecute }
+    { enabled: open && canExecute, stepId, sourceDataVersion }
   );
 
   const handleEditorMount = useCallback((editor: Monaco.editor.IStandaloneCodeEditor) => {
@@ -211,8 +213,6 @@ export function TemplateEditPopover({
     URL.revokeObjectURL(url);
   };
 
-  const credentials = extractCredentials(sourceData);
-  
   const isLoopArray = loopMode && Array.isArray(previewValue) && previewValue.length > 0;
   const currentItemValue = isLoopArray ? previewValue[0] : previewValue;
   const activePreviewValue = (loopMode && previewTab === 'currentItem') ? currentItemValue : previewValue;

@@ -534,7 +534,6 @@ export function ToolStepGallery({
                                     key={currentItem.data.id}
                                     step={currentItem.data}
                                     stepIndex={activeIndex - 1}
-                                    categorizedSources={currentItem.categorizedSources}
                                     onEdit={onStepEdit}
                                     onRemove={currentItem.type === 'step' ? handleRemoveStep : undefined}
                                     onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}

@@ -1,9 +1,24 @@
 "use client";
 import { createContext, useContext, useCallback, useMemo, useState, useEffect, useRef, ReactNode } from 'react';
 import { useToolConfig } from './tool-config-context';
-import { ExecutionContextValue, StepExecutionState, StepStatus, TransformStatus, DEFAULT_STEP_EXECUTION } from './types';
-import { buildStepInput } from '@/src/lib/general-utils';
-import { ExecutionStep } from '@superglue/shared';
+import { 
+  ExecutionContextValue, 
+  StepExecutionState, 
+  StepStatus, 
+  TransformStatus, 
+  DEFAULT_STEP_EXECUTION,
+  StepTemplateData,
+  DataSelectorResult,
+  CategorizedVariables,
+  CategorizedSources,
+} from './types';
+import { buildStepInput, buildPreviousStepResults } from '@/src/lib/general-utils';
+import { 
+  extractCredentials, 
+  deriveCurrentItem,
+  buildPaginationData,
+} from '@/src/lib/templating-utils';
+import { ExecutionStep, flattenAndNamespaceCredentials, assertValidArrowFunction, executeWithVMHelpers } from '@superglue/shared';
 
 const ExecutionContext = createContext<ExecutionContextValue | null>(null);
 
@@ -23,49 +38,62 @@ interface ExecutionProviderProps {
   children: ReactNode;
 }
 
+const DATA_SELECTOR_DEBOUNCE_MS = 400;
+
+const emptyCategorizedVariables: CategorizedVariables = {
+  credentials: [],
+  toolInputs: [],
+  fileInputs: [],
+  currentStepData: [],
+  previousStepData: [],
+  paginationVariables: [],
+};
+
+const emptyCategorizedSources: CategorizedSources = {
+  manualPayload: {},
+  filePayloads: {},
+  previousStepResults: {},
+  currentItem: null,
+  paginationData: {},
+};
+
+const emptyStepTemplateData: StepTemplateData = {
+  sourceData: {},
+  credentials: {},
+  categorizedVariables: emptyCategorizedVariables,
+  categorizedSources: emptyCategorizedSources,
+  dataSelectorOutput: null,
+  dataSelectorError: null,
+  canExecute: false,
+};
+
 export function ExecutionProvider({ children }: ExecutionProviderProps) {
-  const { steps, payload } = useToolConfig();
+  const { steps, payload, integrations } = useToolConfig();
   
-  // === PER-STEP EXECUTION STATE ===
   const [stepExecutions, setStepExecutions] = useState<Record<string, StepExecutionState>>({});
-  
-  // === TOOL-LEVEL EXECUTION STATE ===
   const [isExecutingAny, setIsExecutingAny] = useState(false);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndexState] = useState<number | null>(null);
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
   const [isStopping, setIsStopping] = useState(false);
-  
-  // === FINAL TRANSFORM STATE ===
   const [finalResult, setFinalResultState] = useState<any | null>(null);
   const [finalError, setFinalErrorState] = useState<string | null>(null);
   const [transformStatus, setTransformStatusState] = useState<TransformStatus>('idle');
   
+  const [dataSelectorResults, setDataSelectorResults] = useState<Record<string, DataSelectorResult>>({});
+  const dataSelectorTimersRef = useRef<Record<string, number>>({});
+  const dataSelectorCacheRef = useRef<Map<string, { payloadRef: any; loopSelector: string; result: DataSelectorResult }>>(new Map());
   
-  const setStepResult = useCallback((
-    stepId: string, 
-    result: any, 
-    status: StepStatus, 
-    error?: string
-  ) => {
+  const setStepResult = useCallback((stepId: string, result: any, status: StepStatus, error?: string) => {
     setStepExecutions(prev => ({
       ...prev,
-      [stepId]: {
-        status,
-        result,
-        error: error ?? null,
-        runId: null,
-      }
+      [stepId]: { status, result, error: error ?? null, runId: null }
     }));
   }, []);
   
   const setStepRunning = useCallback((stepId: string, runId: string) => {
     setStepExecutions(prev => ({
       ...prev,
-      [stepId]: {
-        ...(prev[stepId] ?? DEFAULT_STEP_EXECUTION),
-        status: 'running',
-        runId,
-      }
+      [stepId]: { ...(prev[stepId] ?? DEFAULT_STEP_EXECUTION), status: 'running', runId }
     }));
   }, []);
   
@@ -87,9 +115,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     const stepIdsToRemove = steps.slice(stepIndex).map(s => s.id);
     setStepExecutions(prev => {
       const next = { ...prev };
-      for (const id of stepIdsToRemove) {
-        delete next[id];
-      }
+      for (const id of stepIdsToRemove) delete next[id];
       return next;
     });
     resetTransformState();
@@ -139,9 +165,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
           const stepIdsToRemove = steps.slice(i).map(s => s.id);
           setStepExecutions(prev => {
             const next = { ...prev };
-            for (const id of stepIdsToRemove) {
-              delete next[id];
-            }
+            for (const id of stepIdsToRemove) delete next[id];
             return next;
           });
           resetTransformState();
@@ -152,8 +176,6 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     
     prevStepHashesRef.current = currentHashes;
   }, [steps, resetTransformState]);
-  
-  // === EXECUTION CONTROL ===
   
   const startExecution = useCallback((runId: string) => {
     setCurrentRunId(runId);
@@ -184,15 +206,13 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     setCurrentExecutingStepIndexState(index);
   }, []);
   
-  // === TRANSFORM MUTATIONS ===
-  
   const setFinalResult = useCallback((result: any, status: TransformStatus, error?: string) => {
     setFinalResultState(result);
     setFinalErrorState(error ?? null);
     setTransformStatusState(status);
   }, []);
   
-  const setTransformRunning = useCallback((runId: string) => {
+  const setTransformRunning = useCallback((_runId: string) => {
     setTransformStatusState('running');
   }, []);
   
@@ -205,7 +225,6 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     setFinalErrorState(null);
     setTransformStatusState('idle');
   }, []);
-  
   
   const getStepExecution = useCallback((stepId: string): StepExecutionState => {
     return stepExecutions[stepId] ?? DEFAULT_STEP_EXECUTION;
@@ -240,10 +259,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     for (let i = 0; i < stepIndex; i++) {
       const stepId = steps[i]?.id;
       if (!stepId) return false;
-      const status = stepExecutions[stepId]?.status;
-      if (status !== 'completed') {
-        return false;
-      }
+      if (stepExecutions[stepId]?.status !== 'completed') return false;
     }
     return true;
   }, [steps, stepExecutions]);
@@ -260,9 +276,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
   const stepResultsMap = useMemo(() => {
     const map: Record<string, any> = {};
     for (const [stepId, exec] of Object.entries(stepExecutions)) {
-      if (exec.result !== null) {
-        map[stepId] = exec.result;
-      }
+      if (exec.result !== null) map[stepId] = exec.result;
     }
     return map;
   }, [stepExecutions]);
@@ -271,22 +285,12 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     const payloads: Record<string, any> = {};
     for (let i = 0; i < steps.length; i++) {
       const stepId = steps[i].id;
-      payloads[stepId] = buildStepInput(
-        payload.computedPayload,
-        steps,
-        stepResultsMap,
-        i - 1
-      );
+      payloads[stepId] = buildStepInput(payload.computedPayload, steps, stepResultsMap, i - 1);
     }
     return payloads;
   }, [steps, payload.computedPayload, stepResultsMap]);
   
-  const sourceDataVersionRef = useRef({
-    version: 0,
-    payloadRef: null as any,
-    resultsRef: null as any,
-    stepsLen: 0,
-  });
+  const sourceDataVersionRef = useRef({ version: 0, payloadRef: null as any, resultsRef: null as any, stepsLen: 0 });
   
   if (
     sourceDataVersionRef.current.payloadRef !== payload.computedPayload ||
@@ -311,48 +315,173 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     }
     return evolvingPayloads[stepId] ?? payload.computedPayload;
   }, [steps, evolvingPayloads, payload.computedPayload]);
-  
-  
+
+  const manualPayload = useMemo(() => {
+    try { return JSON.parse(payload.manualPayloadText || '{}'); } 
+    catch { return {}; }
+  }, [payload.manualPayloadText]);
+
+  useEffect(() => {
+    for (const step of steps) {
+      const stepId = step.id;
+      const evolvingPayload = evolvingPayloads[stepId];
+      const loopSelector = step.loopSelector ?? '';
+      
+      const cached = dataSelectorCacheRef.current.get(stepId);
+      if (cached && cached.payloadRef === evolvingPayload && cached.loopSelector === loopSelector) {
+        if (dataSelectorResults[stepId]?.output !== cached.result.output || 
+            dataSelectorResults[stepId]?.error !== cached.result.error) {
+          setDataSelectorResults(prev => ({ ...prev, [stepId]: cached.result }));
+        }
+        continue;
+      }
+
+      if (dataSelectorTimersRef.current[stepId]) {
+        window.clearTimeout(dataSelectorTimersRef.current[stepId]);
+      }
+
+      dataSelectorTimersRef.current[stepId] = window.setTimeout(() => {
+        let result: DataSelectorResult;
+        try {
+          assertValidArrowFunction(loopSelector || undefined);
+          const output = executeWithVMHelpers(loopSelector || '(sourceData) => sourceData', evolvingPayload || {});
+          if (typeof output === 'function') {
+            throw new Error('Data selector returned a function. Did you forget to call it?');
+          }
+          result = { output: output === undefined ? null : output, error: null };
+        } catch (err: any) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          result = { output: null, error: errorMessage };
+        }
+        
+        dataSelectorCacheRef.current.set(stepId, { payloadRef: evolvingPayload, loopSelector, result });
+        setDataSelectorResults(prev => ({ ...prev, [stepId]: result }));
+      }, DATA_SELECTOR_DEBOUNCE_MS) as unknown as number;
+    }
+
+    return () => {
+      for (const timer of Object.values(dataSelectorTimersRef.current)) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [steps, evolvingPayloads]);
+
+  const stepTemplateDataMap = useMemo(() => {
+    const map: Record<string, StepTemplateData> = {};
+    
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const stepId = step.id;
+      const stepIndex = i;
+      
+      const canExec = stepIndex === 0 || 
+        steps.slice(0, stepIndex).every(s => stepExecutions[s.id]?.status === 'completed');
+      
+      const evolvingPayload = evolvingPayloads[stepId] || {};
+      const dsResult = dataSelectorResults[stepId] || { output: null, error: null };
+      const currentItemObj = deriveCurrentItem(dsResult.output);
+      
+      const linkedIntegration = step.integrationId && integrations
+        ? integrations.find(int => int.id === step.integrationId)
+        : undefined;
+      
+      const integrationCredentials = flattenAndNamespaceCredentials(linkedIntegration ? [linkedIntegration] : []);
+      const paginationData = buildPaginationData(step.apiConfig?.pagination);
+      
+      const sourceData: Record<string, any> = {
+        ...integrationCredentials,
+        ...evolvingPayload,
+        ...(currentItemObj ? { currentItem: currentItemObj } : {}),
+        ...paginationData,
+      };
+      
+      const credentials = extractCredentials(sourceData);
+      
+      const previousStepResults = buildPreviousStepResults(steps, stepResultsMap, stepIndex - 1);
+      
+      const categorizedSources: CategorizedSources = {
+        manualPayload,
+        filePayloads: payload.filePayloads || {},
+        previousStepResults,
+        currentItem: currentItemObj,
+        paginationData,
+      };
+      
+      const categorizedVariables: CategorizedVariables = {
+        credentials: Object.keys(integrationCredentials),
+        toolInputs: Object.keys(manualPayload),
+        fileInputs: Object.keys(payload.filePayloads || {}),
+        currentStepData: ['currentItem'],
+        previousStepData: Object.keys(previousStepResults),
+        paginationVariables: ['page', 'offset', 'cursor', 'limit', 'pageSize'],
+      };
+      
+      map[stepId] = {
+        sourceData,
+        credentials,
+        categorizedVariables,
+        categorizedSources,
+        dataSelectorOutput: dsResult.output,
+        dataSelectorError: dsResult.error,
+        canExecute: canExec,
+      };
+    }
+    
+    return map;
+  }, [steps, stepExecutions, evolvingPayloads, dataSelectorResults, integrations, manualPayload, payload.filePayloads, stepResultsMap]);
+
+  const getStepTemplateData = useCallback((stepId: string): StepTemplateData => {
+    return stepTemplateDataMap[stepId] || emptyStepTemplateData;
+  }, [stepTemplateDataMap]);
+
+  const getSourceData = useCallback((stepId: string): Record<string, any> => {
+    return stepTemplateDataMap[stepId]?.sourceData || {};
+  }, [stepTemplateDataMap]);
+
+  const getCredentials = useCallback((stepId: string): Record<string, string> => {
+    return stepTemplateDataMap[stepId]?.credentials || {};
+  }, [stepTemplateDataMap]);
+
+  const getCategorizedVariables = useCallback((stepId: string): CategorizedVariables => {
+    return stepTemplateDataMap[stepId]?.categorizedVariables || emptyCategorizedVariables;
+  }, [stepTemplateDataMap]);
+
+  const getCategorizedSources = useCallback((stepId: string): CategorizedSources => {
+    return stepTemplateDataMap[stepId]?.categorizedSources || emptyCategorizedSources;
+  }, [stepTemplateDataMap]);
+
+  const getDataSelectorResult = useCallback((stepId: string): DataSelectorResult => {
+    return dataSelectorResults[stepId] || { output: null, error: null };
+  }, [dataSelectorResults]);
+
   const value = useMemo<ExecutionContextValue>(() => ({
     stepExecutions,
     isExecutingAny,
     currentExecutingStepIndex,
     currentRunId,
     isStopping,
-    
-    // Final transform state
     finalResult,
     finalError,
     transformStatus,
-    
-    // Transform status convenience getters
     isRunningTransform,
     isFixingTransform,
     isExecutingTransform,
     canExecuteTransform,
-    
-    // Step mutations
     setStepResult,
     setStepRunning,
     clearStepExecution,
     clearExecutionsFrom,
     clearAllExecutions,
-    
-    // Execution control
     startExecution,
     stopExecution,
     markAsStopping,
     finishExecution,
     setCurrentExecutingStepIndex,
     skipNextHashInvalidation,
-    
-    // Transform mutations
     setFinalResult,
     setTransformRunning,
     setTransformStatus,
     clearFinalResult,
-    
-    // Step queries
     getStepExecution,
     getStepStatus,
     getStepResult,
@@ -361,11 +490,15 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     isStepAborted,
     isStepRunning,
     canExecuteStep,
-    
-    // Payload helpers
     getEvolvingPayload,
     stepResultsMap,
     sourceDataVersion,
+    getStepTemplateData,
+    getSourceData,
+    getCredentials,
+    getCategorizedVariables,
+    getCategorizedSources,
+    getDataSelectorResult,
   }), [
     stepExecutions,
     isExecutingAny,
@@ -405,6 +538,12 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     getEvolvingPayload,
     stepResultsMap,
     sourceDataVersion,
+    getStepTemplateData,
+    getSourceData,
+    getCredentials,
+    getCategorizedVariables,
+    getCategorizedSources,
+    getDataSelectorResult,
   ]);
   
   return (
@@ -413,4 +552,3 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     </ExecutionContext.Provider>
   );
 }
-

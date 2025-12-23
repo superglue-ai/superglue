@@ -1,7 +1,6 @@
 import { UploadedFileInfo } from '@/src/lib/file-utils';
 import { ExecutionStep, Integration } from '@superglue/shared';
 
-
 export interface PayloadState {
   manualPayloadText: string;
   uploadedFiles: UploadedFileInfo[];
@@ -26,7 +25,6 @@ export interface ToolConfigContextValue {
   payload: PayloadState;
   integrations: Integration[];
   
-  // Raw string versions for editing (tool has parsed objects)
   inputSchema: string | null;
   responseSchema: string;
   finalTransform: string;
@@ -71,8 +69,40 @@ export const DEFAULT_STEP_EXECUTION: StepExecutionState = {
 
 export type TransformStatus = 'idle' | 'running' | 'fixing' | 'completed' | 'failed' | 'aborted';
 
-  export interface ExecutionContextValue {
-    // === PER-STEP EXECUTION STATE ===
+export interface DataSelectorResult {
+  output: any | null;
+  error: string | null;
+}
+
+export interface CategorizedVariables {
+  credentials: string[];
+  toolInputs: string[];
+  fileInputs: string[];
+  currentStepData: string[];
+  previousStepData: string[];
+  paginationVariables: string[];
+}
+
+export interface CategorizedSources {
+  manualPayload: Record<string, unknown>;
+  filePayloads: Record<string, unknown>;
+  previousStepResults: Record<string, unknown>;
+  currentItem: Record<string, unknown> | null;
+  paginationData: Record<string, unknown>;
+}
+
+export interface StepTemplateData {
+  sourceData: Record<string, any>;
+  credentials: Record<string, string>;
+  categorizedVariables: CategorizedVariables;
+  categorizedSources: CategorizedSources;
+  dataSelectorOutput: any | null;
+  dataSelectorError: string | null;
+  canExecute: boolean;
+}
+
+export interface ExecutionContextValue {
+  // === PER-STEP EXECUTION STATE ===
   stepExecutions: Record<string, StepExecutionState>;
   
   // === TOOL-LEVEL EXECUTION STATE ===
@@ -113,7 +143,7 @@ export type TransformStatus = 'idle' | 'running' | 'fixing' | 'completed' | 'fai
   setTransformStatus: (status: TransformStatus) => void;
   clearFinalResult: () => void;
   
-  // === STEP QUERIES (all O(1)) ===
+  // === STEP QUERIES ===
   getStepExecution: (stepId: string) => StepExecutionState;
   getStepStatus: (stepId: string) => StepStatus;
   getStepResult: (stepId: string) => any | null;
@@ -127,4 +157,12 @@ export type TransformStatus = 'idle' | 'running' | 'fixing' | 'completed' | 'fai
   getEvolvingPayload: (stepId?: string) => Record<string, any>;
   stepResultsMap: Record<string, any>;
   sourceDataVersion: number;
+  
+  // === PER-STEP TEMPLATE DATA ===
+  getStepTemplateData: (stepId: string) => StepTemplateData;
+  getSourceData: (stepId: string) => Record<string, any>;
+  getCredentials: (stepId: string) => Record<string, string>;
+  getCategorizedVariables: (stepId: string) => CategorizedVariables;
+  getCategorizedSources: (stepId: string) => CategorizedSources;
+  getDataSelectorResult: (stepId: string) => DataSelectorResult;
 }

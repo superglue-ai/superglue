@@ -5,7 +5,6 @@ import Editor from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { TemplateChip } from '../../templates/TemplateChip';
-import { TemplateContextProvider } from '../../templates/tiptap/TemplateContext';
 import { useTemplatePreview } from '../../hooks/use-template-preview';
 import { useDataProcessor } from '../../hooks/use-data-processor';
 import { useToolConfig, useExecution } from '../../context';
@@ -26,7 +25,6 @@ interface ChipPosition {
 interface StepInputTabProps {
     step: any;
     stepIndex: number;
-    evolvingPayload: any;
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     isActive?: boolean;
 }
@@ -34,13 +32,15 @@ interface StepInputTabProps {
 export function StepInputTab({
     step,
     stepIndex,
-    evolvingPayload,
     onEdit,
     isActive = true,
 }: StepInputTabProps) {
     const { getStepConfig } = useToolConfig();
-    const { canExecuteStep, sourceDataVersion } = useExecution();
+    const { canExecuteStep, sourceDataVersion, getEvolvingPayload, getStepTemplateData } = useExecution();
     const canExecute = canExecuteStep(stepIndex);
+    const evolvingPayload = getEvolvingPayload(step.id);
+    const { sourceData } = getStepTemplateData(step.id);
+    
     const { theme, onMount } = useMonacoTheme();
     const { height, resizeHandleProps } = useResizable({ minHeight: 200, maxHeight: 800, initialHeight: 400 });
     
@@ -56,7 +56,7 @@ export function StepInputTab({
 
     const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
         currentItemExpression,
-        evolvingPayload,
+        sourceData,
         { enabled: isActive && canExecute && !!evolvingPayload, debounceMs: 300, stepId: step.id, sourceDataVersion }
     );
 
@@ -156,24 +156,21 @@ export function StepInputTab({
                             className="absolute z-20 bg-muted rounded-sm flex items-center"
                             style={{ top: chipPosition.top, left: chipPosition.left, height: '18px', pointerEvents: 'auto' }}
                         >
-                            <TemplateContextProvider stepData={evolvingPayload} canExecute={canExecute} stepId={step.id} sourceDataVersion={sourceDataVersion}>
-                                <TemplateChip
-                                    template={templateString}
-                                    evaluatedValue={previewValue}
-                                    error={previewError ?? undefined}
-                                    stepData={evolvingPayload}
-                                    hasResult={hasResult}
-                                    canExecute={canExecute}
-                                    isEvaluating={isEvaluating}
-                                    onUpdate={handleUpdate}
-                                    onDelete={() => {}}
-                                    loopMode={true}
-                                    hideDelete={true}
-                                    inline={true}
-                                    popoverTitle="Data Selector"
-                                    popoverHelpText="Returns an array → step loops over items. Returns an object → step runs once. currentItem is either the object returned or the current array item."
-                                />
-                            </TemplateContextProvider>
+                            <TemplateChip
+                                template={templateString}
+                                evaluatedValue={previewValue}
+                                error={previewError ?? undefined}
+                                hasResult={hasResult}
+                                isEvaluating={isEvaluating}
+                                onUpdate={handleUpdate}
+                                onDelete={() => {}}
+                                stepId={step.id}
+                                loopMode={true}
+                                hideDelete={true}
+                                inline={true}
+                                popoverTitle="Data Selector"
+                                popoverHelpText="Returns an array → step loops over items. Returns an object → step runs once. currentItem is either the object returned or the current array item."
+                            />
                         </div>
                     )}
                     <Editor

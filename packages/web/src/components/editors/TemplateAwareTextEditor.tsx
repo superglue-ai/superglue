@@ -5,7 +5,8 @@ import Text from '@tiptap/extension-text';
 import History from '@tiptap/extension-history';
 import { cn } from '@/src/lib/general-utils';
 import { useEffect, useRef, useCallback } from 'react';
-import { TemplateExtension, TemplateContextProvider, useTemplateContext, type CategorizedVariables, type CategorizedSources } from '../tools/templates/tiptap';
+import { useExecution } from '../tools/context/tool-execution-context';
+import { TemplateExtension } from '../tools/templates/TemplateExtension';
 import { VariableSuggestion } from '../tools/templates/TemplateVariableSuggestion';
 import { TemplateEditPopover } from '../tools/templates/TemplateEditPopover';
 import { templateStringToTiptap, tiptapToTemplateString } from '../tools/templates/tiptap/serialization';
@@ -14,36 +15,30 @@ import { useTemplateAwareEditor } from '../tools/hooks/use-template-aware-editor
 interface TemplateAwareTextEditorProps {
     value: string;
     onChange: (value: string) => void;
-    stepData: any;
-    dataSelectorOutput?: any;
-    canExecute?: boolean;
-    categorizedVariables?: CategorizedVariables;
-    categorizedSources?: CategorizedSources;
+    stepId: string;
     placeholder?: string;
     className?: string;
     disabled?: boolean;
-    stepId?: string;
-    sourceDataVersion?: number;
 }
 
 const SingleLineDocument = Document.extend({ content: 'paragraph' });
 
 const DEBOUNCE_MS = 200;
 
-function TemplateAwareTextEditorInner({
+export function TemplateAwareTextEditor({
     value,
     onChange,
+    stepId,
     placeholder,
     className,
     disabled = false,
-    stepData,
-    dataSelectorOutput,
-    canExecute = true,
-}: Omit<TemplateAwareTextEditorProps, 'categorizedVariables' | 'categorizedSources'>) {
+}: TemplateAwareTextEditorProps) {
+    const { getStepTemplateData } = useExecution();
+    const { categorizedVariables, categorizedSources } = getStepTemplateData(stepId);
+    
     const isUpdatingRef = useRef(false);
     const lastValueRef = useRef(value);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const { categorizedVariables, categorizedSources } = useTemplateContext();
 
     const debouncedOnChange = useCallback((newValue: string) => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -53,7 +48,6 @@ function TemplateAwareTextEditorInner({
     useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
     
     const {
-        sourceData,
         suggestionConfig,
         codePopoverOpen,
         setCodePopoverOpen,
@@ -61,7 +55,7 @@ function TemplateAwareTextEditorInner({
         handleCodeSave,
         editorRef,
         cleanupSuggestion,
-    } = useTemplateAwareEditor({ stepData, dataSelectorOutput, categorizedVariables, categorizedSources });
+    } = useTemplateAwareEditor({ categorizedVariables, categorizedSources });
 
     useEffect(() => cleanupSuggestion, [cleanupSuggestion]);
 
@@ -71,7 +65,7 @@ function TemplateAwareTextEditorInner({
             Paragraph,
             Text,
             History,
-            TemplateExtension,
+            TemplateExtension.configure({ stepId }),
             VariableSuggestion.configure({ suggestion: suggestionConfig }),
         ],
         content: templateStringToTiptap(value),
@@ -122,52 +116,12 @@ function TemplateAwareTextEditorInner({
             )}
             <TemplateEditPopover
                 template=""
-                sourceData={sourceData}
                 onSave={handleCodeSave}
+                stepId={stepId}
                 externalOpen={codePopoverOpen}
                 onExternalOpenChange={setCodePopoverOpen}
                 anchorRect={popoverAnchorRect}
-                canExecute={canExecute}
             />
         </div>
-    );
-}
-
-export function TemplateAwareTextEditor({
-    value,
-    onChange,
-    stepData,
-    dataSelectorOutput,
-    canExecute = true,
-    categorizedVariables,
-    categorizedSources,
-    placeholder,
-    className,
-    disabled = false,
-    stepId,
-    sourceDataVersion = 0,
-}: TemplateAwareTextEditorProps) {
-    return (
-        <TemplateContextProvider 
-            stepData={stepData} 
-            dataSelectorOutput={dataSelectorOutput} 
-            readOnly={disabled} 
-            canExecute={canExecute} 
-            categorizedVariables={categorizedVariables}
-            categorizedSources={categorizedSources}
-            stepId={stepId}
-            sourceDataVersion={sourceDataVersion}
-        >
-            <TemplateAwareTextEditorInner
-                value={value}
-                onChange={onChange}
-                placeholder={placeholder}
-                className={className}
-                disabled={disabled}
-                stepData={stepData}
-                dataSelectorOutput={dataSelectorOutput}
-                canExecute={canExecute}
-            />
-        </TemplateContextProvider>
     );
 }

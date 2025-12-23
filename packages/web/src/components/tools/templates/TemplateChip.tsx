@@ -1,23 +1,20 @@
 import { cn } from '@/src/lib/general-utils';
-import { truncateTemplateValue, prepareSourceData, extractCredentials } from '@/src/lib/templating-utils';
+import { truncateTemplateValue } from '@/src/lib/templating-utils';
 import { maskCredentials } from '@superglue/shared';
 import { Code2, X } from 'lucide-react';
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { TemplateEditPopover } from './TemplateEditPopover';
-import { useTemplateContext } from './tiptap/TemplateContext';
+import { useExecution } from '../context/tool-execution-context';
 
 interface TemplateChipProps {
   template: string;
   evaluatedValue: any;
   error?: string;
-  stepData: any;
-  dataSelectorOutput?: any;
   hasResult?: boolean;
-  canExecute?: boolean;
   isEvaluating?: boolean;
   onUpdate: (newTemplate: string) => void;
   onDelete: () => void;
-  readOnly?: boolean;
+  stepId: string;
   inline?: boolean;
   selected?: boolean;
   forcePopoverOpen?: boolean;
@@ -32,14 +29,11 @@ export function TemplateChip({
   template,
   evaluatedValue,
   error,
-  stepData,
-  dataSelectorOutput,
   hasResult = true,
-  canExecute = true,
   isEvaluating = false,
   onUpdate,
   onDelete,
-  readOnly = false,
+  stepId,
   inline = false,
   selected = false,
   forcePopoverOpen = false,
@@ -49,7 +43,9 @@ export function TemplateChip({
   popoverTitle,
   popoverHelpText,
 }: TemplateChipProps) {
-  const sourceData = useMemo(() => prepareSourceData(stepData, dataSelectorOutput), [stepData, dataSelectorOutput]);
+  const { getStepTemplateData } = useExecution();
+  const { credentials, canExecute } = getStepTemplateData(stepId);
+  
   const [isHovered, setIsHovered] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   
@@ -63,8 +59,6 @@ export function TemplateChip({
   
   const isLoopArray = loopMode && Array.isArray(evaluatedValue) && evaluatedValue.length > 0;
   const displayValue = isLoopArray ? evaluatedValue[0] : evaluatedValue;
-
-  const credentials = useMemo(() => extractCredentials(sourceData), [sourceData]);
 
   let displayText: string;
   let isTruncated = false;
@@ -95,9 +89,9 @@ export function TemplateChip({
     originalSize = fullDisplayText.length;
     const masked = maskCredentials(fullDisplayText, credentials);
     const truncated = truncateTemplateValue(masked, 150);
-      displayText = truncated.display;
-      isTruncated = truncated.truncated;
-      originalSize = truncated.originalSize;
+    displayText = truncated.display;
+    isTruncated = truncated.truncated;
+    originalSize = truncated.originalSize;
   }
 
   const isActive = selected || effectiveOpen;
@@ -132,7 +126,7 @@ export function TemplateChip({
       border: 'border-b-green-600/30 dark:border-b-green-600/35',
       text: 'text-green-700 dark:text-green-400',
       gradient: 'linear-gradient(180deg, rgba(34, 197, 94, 0.18) 0%, rgba(22, 163, 74, 0.22) 100%)',
-        shadow: isActive
+      shadow: isActive
         ? '0 1px 0 rgba(21, 128, 61, 0.22), 0 0 11px rgba(74, 222, 128, 0.4)'
         : '0 1px 0 rgba(21, 128, 61, 0.18), 0 0 7px rgba(74, 222, 128, 0.27)'
     };
@@ -166,8 +160,7 @@ export function TemplateChip({
         chipClasses.bg,
         chipClasses.border,
         chipClasses.text,
-        !readOnly && "cursor-pointer hover:-translate-y-px active:translate-y-0.5",
-        readOnly && "cursor-default",
+        "cursor-pointer hover:-translate-y-px active:translate-y-0.5",
         inline && "align-middle"
       )}
       style={{ 
@@ -182,7 +175,7 @@ export function TemplateChip({
       <span className="w-3 h-3 flex items-center justify-center shrink-0">
         {isEvaluating ? (
           <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-        ) : !readOnly && !hideDelete && isHovered ? (
+        ) : !hideDelete && isHovered ? (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -210,16 +203,11 @@ export function TemplateChip({
     }
   };
 
-  if (readOnly) {
-    return chipContent;
-  }
-
   return (
     <TemplateEditPopover
       template={template}
-      sourceData={sourceData}
       onSave={onUpdate}
-      canExecute={canExecute}
+      stepId={stepId}
       externalOpen={effectiveOpen}
       onExternalOpenChange={handleOpenChange}
       loopMode={loopMode}

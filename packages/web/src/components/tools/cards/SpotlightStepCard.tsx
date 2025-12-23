@@ -23,10 +23,8 @@ import { Switch } from '@/src/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { splitUrl } from '@/src/lib/client-utils';
 import { composeUrl } from '@/src/lib/general-utils';
-import { buildCategorizedSources, buildCategorizedVariables, buildPaginationData, deriveCurrentItem } from '@/src/lib/templating-utils';
-import { flattenAndNamespaceCredentials, Integration } from '@superglue/shared';
 import { Bug, ChevronDown, ChevronRight, FileBraces, FileInput, FileOutput, Pencil, Play, RotateCw, Route, Square, Trash2, Wand2 } from 'lucide-react';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { JavaScriptCodeEditor } from '../../editors/JavaScriptCodeEditor';
 import { TemplateAwareJsonEditor } from '../../editors/TemplateAwareJsonEditor';
 import { TemplateAwareTextEditor } from '../../editors/TemplateAwareTextEditor';
@@ -35,14 +33,12 @@ import { useToolConfig, useExecution } from '../context';
 import { useDataSelector } from '../hooks/use-data-selector';
 import { CopyButton } from '../shared/CopyButton';
 import { IntegrationSelector } from '../shared/IntegrationSelector';
-import { type CategorizedSources, type CategorizedVariables } from '../templates/tiptap/TemplateContext';
 import { StepInputTab } from './tabs/StepInputTab';
 import { StepResultTab } from './tabs/StepResultTab';
 
 interface SpotlightStepCardProps {
     step: any;
     stepIndex: number;
-    categorizedSources?: CategorizedSources;
     onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
     onRemove?: (stepId: string) => void;
     onExecuteStep?: () => Promise<void>;
@@ -60,7 +56,6 @@ interface SpotlightStepCardProps {
 export const SpotlightStepCard = React.memo(({
     step,
     stepIndex,
-    categorizedSources,
     onEdit,
     onRemove,
     onExecuteStep,
@@ -81,17 +76,14 @@ export const SpotlightStepCard = React.memo(({
         getStepResult,
         isStepFailed,
         canExecuteStep,
-        getEvolvingPayload,
-        sourceDataVersion,
     } = useExecution();
     
-    const evolvingPayload = getEvolvingPayload(step.id);
     const isGlobalExecuting = isExecutingAny;
     const stepResult = getStepResult(step.id);
     const stepFailed = isStepFailed(step.id);
     const canExecute = canExecuteStep(stepIndex);
     
-    const { dataSelectorOutput, dataSelectorError } = useDataSelector({
+    const { dataSelectorOutput } = useDataSelector({
         stepId: step.id,
         loopSelector: step.loopSelector,
         onDataSelectorChange,
@@ -137,7 +129,7 @@ export const SpotlightStepCard = React.memo(({
         if (onConfigEditingChange) setTimeout(() => onConfigEditingChange(false), 100);
     };
 
-    const handleIntegrationChange = (value: string, selectedIntegration?: Integration) => {
+    const handleIntegrationChange = (value: string, selectedIntegration?: any) => {
         handleImmediateEdit((s) => ({
             ...s,
             integrationId: value,
@@ -172,33 +164,6 @@ export const SpotlightStepCard = React.memo(({
             }));
         }
     };
-
-    const linkedIntegration = step.integrationId && integrations
-        ? integrations.find(integration => integration.id === step.integrationId)
-        : undefined;
-
-    const credentialsMap = useMemo(() => 
-        flattenAndNamespaceCredentials(linkedIntegration ? [linkedIntegration] : []),
-        [linkedIntegration]
-    );
-
-    const currentItemObj = deriveCurrentItem(dataSelectorOutput);
-    const paginationData = buildPaginationData(step.apiConfig?.pagination);
-
-    const templateStepData = useMemo<Record<string, unknown>>(() => {
-        const baseData = (evolvingPayload && typeof evolvingPayload === 'object') ? evolvingPayload as Record<string, unknown> : {};
-        return { ...credentialsMap, ...baseData, ...(currentItemObj ? { currentItem: currentItemObj } : {}), ...paginationData };
-    }, [evolvingPayload, credentialsMap, currentItemObj, paginationData]);
-
-    const categorizedVariables = useMemo<CategorizedVariables>(
-        () => buildCategorizedVariables(Object.keys(credentialsMap), categorizedSources),
-        [credentialsMap, categorizedSources]
-    );
-
-    const completeCategorizedSources = useMemo<CategorizedSources>(
-        () => buildCategorizedSources(categorizedSources, currentItemObj, paginationData),
-        [categorizedSources, currentItemObj, paginationData]
-    );
 
     const handleRunStepClick = () => {
         if (isFirstStep && !isPayloadValid) {
@@ -327,9 +292,7 @@ export const SpotlightStepCard = React.memo(({
                             <StepInputTab
                                 step={step}
                                 stepIndex={stepIndex}
-                                evolvingPayload={evolvingPayload}
                                 onEdit={onEdit}
-                                isActive={true}
                             />
                         )}
                         {activePanel === 'config' && (
@@ -400,15 +363,9 @@ export const SpotlightStepCard = React.memo(({
                                                         const { urlHost, urlPath } = splitUrl(newValue);
                                                         handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, urlHost, urlPath } }));
                                                     }}
-                                                    stepData={templateStepData}
-                                                    dataSelectorOutput={dataSelectorOutput}
-                                                    canExecute={canExecute}
-                                                    categorizedVariables={categorizedVariables}
-                                                    categorizedSources={completeCategorizedSources}
-                                                    sourceDataVersion={sourceDataVersion}
+                                                    stepId={step.id}
                                                     className="flex-1" 
                                                     placeholder="https://api.example.com/endpoint" 
-                                                    stepId={step.id}
                                                 />
                                             </div>
                                         </div>
@@ -424,17 +381,11 @@ export const SpotlightStepCard = React.memo(({
                                                 setHeadersText(val || '');
                                                 handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, headers: val || '' } }));
                                             }}
-                                            stepData={templateStepData}
-                                            dataSelectorOutput={dataSelectorOutput}
-                                            canExecute={canExecute}
-                                            categorizedVariables={categorizedVariables}
-                                            categorizedSources={completeCategorizedSources}
+                                            stepId={step.id}
                                             minHeight="75px"
                                             maxHeight="300px"
                                             placeholder="{}"
                                             showValidation={true}
-                                            stepId={step.id}
-                                            sourceDataVersion={sourceDataVersion}
                                         />
                                     </div>
                                     <div>
@@ -448,17 +399,11 @@ export const SpotlightStepCard = React.memo(({
                                                 setQueryParamsText(val || '');
                                                 handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, queryParams: val || '' } }));
                                             }}
-                                            stepData={templateStepData}
-                                            dataSelectorOutput={dataSelectorOutput}
-                                            canExecute={canExecute}
-                                            categorizedVariables={categorizedVariables}
-                                            categorizedSources={completeCategorizedSources}
+                                            stepId={step.id}
                                             minHeight="75px"
                                             maxHeight="300px"
                                             placeholder="{}"
                                             showValidation={true}
-                                            stepId={step.id}
-                                            sourceDataVersion={sourceDataVersion}
                                         />
                                     </div>
                                     {['POST', 'PUT', 'PATCH'].includes(step.apiConfig.method) && (
@@ -470,16 +415,10 @@ export const SpotlightStepCard = React.memo(({
                                             <TemplateAwareJsonEditor
                                                 value={step.apiConfig.body || ''}
                                                 onChange={(val) => handleImmediateEdit((s) => ({ ...s, apiConfig: { ...s.apiConfig, body: val || '' } }))}
-                                                stepData={templateStepData}
-                                                dataSelectorOutput={dataSelectorOutput}
-                                                canExecute={canExecute}
-                                                categorizedVariables={categorizedVariables}
-                                                categorizedSources={completeCategorizedSources}
+                                                stepId={step.id}
                                                 minHeight="75px"
                                                 maxHeight="300px"
                                                 placeholder=""
-                                                stepId={step.id}
-                                                sourceDataVersion={sourceDataVersion}
                                             />
                                         </div>
                                     )}
@@ -709,4 +648,3 @@ export const SpotlightStepCard = React.memo(({
         </Card>
     );
 });
-

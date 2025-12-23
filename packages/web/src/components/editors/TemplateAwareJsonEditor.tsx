@@ -5,8 +5,9 @@ import Text from '@tiptap/extension-text';
 import History from '@tiptap/extension-history';
 import HardBreak from '@tiptap/extension-hard-break';
 import { cn } from '@/src/lib/general-utils';
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { TemplateExtension, TemplateContextProvider, useTemplateContext, type CategorizedVariables, type CategorizedSources } from '../tools/templates/tiptap';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { useExecution } from '../tools/context/tool-execution-context';
+import { TemplateExtension } from '../tools/templates/TemplateExtension';
 import { VariableSuggestion } from '../tools/templates/TemplateVariableSuggestion';
 import { TemplateEditPopover } from '../tools/templates/TemplateEditPopover';
 import { templateStringToTiptap, tiptapToTemplateString } from '../tools/templates/tiptap/serialization';
@@ -19,36 +20,31 @@ import { useResizable } from '@/src/hooks/use-resizable';
 interface TemplateAwareJsonEditorProps {
     value: string;
     onChange?: (value: string) => void;
-    stepData: any;
-    dataSelectorOutput?: any;
-    canExecute?: boolean;
-    categorizedVariables?: CategorizedVariables;
-    categorizedSources?: CategorizedSources;
-    readOnly?: boolean;
+    stepId: string;
     minHeight?: string;
     maxHeight?: string;
     placeholder?: string;
     resizable?: boolean;
     showValidation?: boolean;
-    stepId?: string;
-    sourceDataVersion?: number;
+    disabled?: boolean;
 }
 
 const DEBOUNCE_MS = 200;
 
-function TemplateAwareJsonEditorInner({
+export function TemplateAwareJsonEditor({
     value,
     onChange,
-    readOnly = false,
+    stepId,
     minHeight = '75px',
     maxHeight = '300px',
     placeholder = '{}',
     resizable = false,
     showValidation = false,
-    stepData,
-    dataSelectorOutput,
-    canExecute = true,
+    disabled = false,
 }: TemplateAwareJsonEditorProps) {
+    const { getStepTemplateData } = useExecution();
+    const { sourceData, credentials, canExecute, dataSelectorOutput, categorizedVariables, categorizedSources } = getStepTemplateData(stepId);
+    
     const isUpdatingRef = useRef(false);
     const lastValueRef = useRef(value);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -60,16 +56,15 @@ function TemplateAwareJsonEditorInner({
     }, [onChange]);
 
     useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+    
     const { height: resizableHeight, resizeHandleProps } = useResizable({ 
         minHeight: parseInt(minHeight), 
         maxHeight: parseInt(maxHeight), 
         initialHeight: parseInt(minHeight) 
     });
     const [jsonError, setJsonError] = useState<string | null>(null);
-    const { categorizedVariables, categorizedSources } = useTemplateContext();
     
     const {
-        sourceData,
         suggestionConfig,
         codePopoverOpen,
         setCodePopoverOpen,
@@ -77,18 +72,7 @@ function TemplateAwareJsonEditorInner({
         handleCodeSave,
         editorRef,
         cleanupSuggestion,
-    } = useTemplateAwareEditor({ stepData, dataSelectorOutput, categorizedVariables, categorizedSources });
-    
-    const credentials = useMemo(() => {
-        if (!sourceData || typeof sourceData !== 'object') return {};
-            const pattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
-        return Object.entries(sourceData).reduce((acc, [key, val]) => {
-            if (pattern.test(key) && typeof val === 'string' && val.length > 0) {
-                acc[key] = val;
-            }
-            return acc;
-        }, {} as Record<string, string>);
-    }, [sourceData]);
+    } = useTemplateAwareEditor({ categorizedVariables, categorizedSources });
 
     useEffect(() => cleanupSuggestion, [cleanupSuggestion]);
 
@@ -99,18 +83,18 @@ function TemplateAwareJsonEditorInner({
             Text,
             History,
             HardBreak,
-            TemplateExtension,
+            TemplateExtension.configure({ stepId }),
             VariableSuggestion.configure({ suggestion: suggestionConfig }),
         ],
         content: templateStringToTiptap(value),
-        editable: !readOnly,
+        editable: !disabled,
         immediatelyRender: false,
         editorProps: {
             attributes: {
                 class: cn(
                     'w-full px-3 py-2 text-xs font-mono bg-transparent',
                     'focus:outline-none',
-                    readOnly && 'cursor-not-allowed'
+                    disabled && 'cursor-not-allowed'
                 ),
             },
         },
@@ -137,7 +121,7 @@ function TemplateAwareJsonEditorInner({
         });
     }, [editor, value]);
 
-    useEffect(() => { editor?.setEditable(!readOnly); }, [editor, readOnly]);
+    useEffect(() => { editor?.setEditable(!disabled); }, [editor, disabled]);
 
     useEffect(() => {
         if (!showValidation || !value?.trim()) {
@@ -146,7 +130,7 @@ function TemplateAwareJsonEditorInner({
         }
 
         let cancelled = false;
-        const sourceData = prepareSourceData(stepData, dataSelectorOutput);
+        const localSourceData = prepareSourceData({ evolvingPayload: sourceData?.evolvingPayload }, dataSelectorOutput);
 
         const escapeForJson = (str: string) => 
             str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -167,7 +151,7 @@ function TemplateAwareJsonEditorInner({
 
                 const expression = part.rawTemplate.slice(2, -2).trim();
                 const result = canExecute 
-                    ? await evaluateTemplate(expression, sourceData).catch(() => null) 
+                    ? await evaluateTemplate(expression, localSourceData).catch(() => null) 
                     : null;
 
                 if (cancelled) return;
@@ -191,7 +175,7 @@ function TemplateAwareJsonEditorInner({
 
         const timer = setTimeout(validateJson, 300);
         return () => { cancelled = true; clearTimeout(timer); };
-    }, [showValidation, value, stepData, dataSelectorOutput, canExecute]);
+    }, [showValidation, value, sourceData, dataSelectorOutput, canExecute]);
 
 
     return (
@@ -201,7 +185,7 @@ function TemplateAwareJsonEditorInner({
             </div>
             {resizable && <div {...resizeHandleProps} />}
             <div 
-                className={cn('relative', readOnly ? 'cursor-not-allowed' : 'cursor-text')}
+                className={cn('relative', disabled ? 'cursor-not-allowed' : 'cursor-text')}
                 style={{ 
                     height: resizable ? resizableHeight : 'auto', 
                     minHeight, 
@@ -224,35 +208,17 @@ function TemplateAwareJsonEditorInner({
             </div>
             {showValidation && jsonError && (
                 <div className="absolute bottom-0 left-0 right-0 px-3 py-2 bg-destructive/10 text-destructive text-xs max-h-24 overflow-y-auto border-t z-10">
-                        Error: {Object.keys(credentials).length > 0 ? maskCredentials(jsonError, credentials) : jsonError}
+                    Error: {Object.keys(credentials).length > 0 ? maskCredentials(jsonError, credentials) : jsonError}
                 </div>
             )}
             <TemplateEditPopover
                 template=""
-                sourceData={sourceData}
                 onSave={handleCodeSave}
+                stepId={stepId}
                 externalOpen={codePopoverOpen}
                 onExternalOpenChange={setCodePopoverOpen}
                 anchorRect={popoverAnchorRect}
-                canExecute={canExecute}
             />
         </div>
-    );
-}
-
-export function TemplateAwareJsonEditor(props: TemplateAwareJsonEditorProps) {
-    return (
-        <TemplateContextProvider 
-            stepData={props.stepData} 
-            dataSelectorOutput={props.dataSelectorOutput} 
-            readOnly={props.readOnly}
-            canExecute={props.canExecute}
-            categorizedVariables={props.categorizedVariables}
-            categorizedSources={props.categorizedSources}
-            stepId={props.stepId}
-            sourceDataVersion={props.sourceDataVersion}
-        >
-            <TemplateAwareJsonEditorInner {...props} />
-        </TemplateContextProvider>
     );
 }
