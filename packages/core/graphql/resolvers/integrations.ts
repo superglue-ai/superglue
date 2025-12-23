@@ -274,7 +274,7 @@ function mergeCredentials(
   
   // If no existing credentials, return new (but filter out placeholders)
   if (!existingCredentials || Object.keys(existingCredentials).length === 0) {
-    return filterPlaceholders(newCredentials);
+    return newCredentials;
   }
   
   // Deep merge: start with existing, then apply new values (skipping placeholders)
@@ -282,7 +282,7 @@ function mergeCredentials(
   
   for (const [key, value] of Object.entries(newCredentials)) {
     // Skip if value looks like a placeholder
-    if (isPlaceholderValue(value)) {
+    if (!value || (!value.startsWith('<<') && !value.endsWith('>>'))) {
       continue;
     }
     // Update the value
@@ -290,35 +290,6 @@ function mergeCredentials(
   }
   
   return merged;
-}
-
-function isPlaceholderValue(value: any): boolean {
-  if (typeof value !== 'string') return false;
-  const v = value.trim().toLowerCase();
-  // Common placeholder patterns
-  return (
-    v === '' ||
-    v.startsWith('your_') ||
-    v.startsWith('your-') ||
-    v.startsWith('<') ||
-    v.startsWith('{{') ||
-    v.startsWith('${') ||
-    v.includes('_here') ||
-    v.includes('-here') ||
-    v === 'xxx' ||
-    v === 'placeholder' ||
-    /^[x]+$/i.test(v) // matches "xxx", "XXXX", etc.
-  );
-}
-
-function filterPlaceholders(credentials: Record<string, any>): Record<string, any> {
-  const filtered: Record<string, any> = {};
-  for (const [key, value] of Object.entries(credentials)) {
-    if (!isPlaceholderValue(value)) {
-      filtered[key] = value;
-    }
-  }
-  return filtered;
 }
 
 function shouldTriggerDocFetch(input: Integration, context: GraphQLRequestContext, existingIntegration?: Integration | null): boolean {
