@@ -19,6 +19,7 @@ import {
   deleteWorkflowResolver,
   executeWorkflowResolver,
   findRelevantToolsResolver,
+  fixWorkflowResolver,
   getWorkflowResolver,
   listWorkflowsResolver,
   upsertWorkflowResolver
@@ -63,6 +64,7 @@ export const resolvers = {
     generateStepConfig: generateStepConfigResolver,
     generateTransform: generateTransformResolver,
     callEndpoint: callEndpointResolver,
+    fixWorkflow: fixWorkflowResolver,
   },
   Subscription: {
     logs: logsResolver,

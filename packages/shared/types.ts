@@ -421,6 +421,24 @@ export interface BuildToolArgs {
 // Legacy alias
 export type BuildWorkflowArgs = BuildToolArgs;
 
+export interface ToolDiff {
+  old_string: string;
+  new_string: string;
+}
+
+export interface FixToolArgs {
+  tool: Tool;
+  fixInstructions: string;
+  lastError?: string;
+  stepResults?: ToolStepResult[];
+  integrationIds?: string[];
+}
+
+export interface FixToolResult {
+  tool: Tool;
+  diffs: ToolDiff[];
+}
+
 export interface GenerateStepConfigArgs {
   integrationId?: string;
   currentDataSelector?: string;
