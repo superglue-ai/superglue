@@ -10,6 +10,7 @@ import { PDFStrategy } from './pdf.js';
 import { GZIPStrategy } from './gzip.js';
 import { DOCXStrategy } from './docx.js';
 import { ExcelStrategy } from './excel.js';
+import { YAMLStrategy, parseYAML } from './yaml.js';
 import JSZip from 'jszip';
 import { promisify } from 'util';
 import { gzip } from 'zlib';
@@ -247,6 +248,65 @@ describe('File Parsing - Comprehensive Tests', () => {
 
       const result = await parseFile(buffer, SupportedFileType.XML);
       expect(result.ROOT).toBeDefined();
+    });
+  });
+
+  describe('YAML Parsing', () => {
+    it('should parse YAML with explicit type', async () => {
+      const yamlData = 'name: test\nvalue: 123';
+      const buffer = Buffer.from(yamlData);
+
+      const result = await parseFile(buffer, SupportedFileType.YAML);
+      expect(result).toEqual({ name: 'test', value: 123 });
+    });
+
+    it('should auto-detect YAML with document start marker', async () => {
+      const yamlData = '---\nname: test\nvalue: 123';
+      const buffer = Buffer.from(yamlData);
+
+      const result = await parseFile(buffer, SupportedFileType.AUTO);
+      expect(result).toEqual({ name: 'test', value: 123 });
+    });
+
+    it('should parse nested YAML objects', async () => {
+      const yamlData = `user:
+  name: Alice
+  profile:
+    age: 30
+    city: NYC`;
+      const buffer = Buffer.from(yamlData);
+
+      const result = await parseFile(buffer, SupportedFileType.YAML);
+      expect(result.user.profile.age).toBe(30);
+    });
+
+    it('should parse YAML arrays', async () => {
+      const yamlData = `items:
+  - name: first
+  - name: second`;
+      const buffer = Buffer.from(yamlData);
+
+      const result = await parseFile(buffer, SupportedFileType.YAML);
+      expect(result.items).toHaveLength(2);
+    });
+
+    it('should handle YAML strategy detection', () => {
+      const strategy = new YAMLStrategy();
+
+      const yamlWithDocStart = Buffer.from('---\nkey: value');
+      expect(strategy.canHandle(yamlWithDocStart)).toBe(true);
+
+      const yamlKeyValue = Buffer.from('key: value\nanother: test');
+      expect(strategy.canHandle(yamlKeyValue)).toBe(true);
+
+      const jsonData = Buffer.from('{"key": "value"}');
+      expect(strategy.canHandle(jsonData)).toBe(false);
+    });
+
+    it('should not detect JSON arrays as YAML', () => {
+      const strategy = new YAMLStrategy();
+      const jsonArray = Buffer.from('[1, 2, 3]');
+      expect(strategy.canHandle(jsonArray)).toBe(false);
     });
   });
 
