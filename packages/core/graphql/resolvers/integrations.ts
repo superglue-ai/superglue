@@ -261,17 +261,14 @@ function mergeCredentials(
   newCredentials: Record<string, any> | null | undefined,
   existingCredentials: Record<string, any> | undefined
 ): Record<string, any> {
-  // If no new credentials, return existing or empty
   if (newCredentials === null || newCredentials === undefined) {
     return existingCredentials || {};
   }
   
-  // If no existing credentials, return new (but filter out placeholders)
   if (!existingCredentials || Object.keys(existingCredentials).length === 0) {
     return newCredentials;
   }
   
-  // Deep merge: start with existing, then apply new values (skipping placeholders)
   const merged = { ...existingCredentials };
   
   for (const [key, value] of Object.entries(newCredentials)) {
@@ -279,7 +276,6 @@ function mergeCredentials(
     if (!value || (!value.startsWith('<<') && !value.endsWith('>>'))) {
       continue;
     }
-    // Update the value
     merged[key] = value;
   }
   
