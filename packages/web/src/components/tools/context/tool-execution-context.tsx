@@ -1,23 +1,9 @@
 "use client";
 import { createContext, useContext, useCallback, useMemo, useState, useEffect, useRef, ReactNode } from 'react';
 import { useToolConfig } from './tool-config-context';
-import { 
-  ExecutionContextValue, 
-  StepExecutionState, 
-  StepStatus, 
-  TransformStatus, 
-  DEFAULT_STEP_EXECUTION,
-  StepTemplateData,
-  DataSelectorResult,
-  CategorizedVariables,
-  CategorizedSources,
-} from './types';
+import { ExecutionContextValue, StepExecutionState, StepStatus, TransformStatus, DEFAULT_STEP_EXECUTION,StepTemplateData, DataSelectorResult, CategorizedVariables, CategorizedSources } from './types';
 import { buildStepInput, buildPreviousStepResults } from '@/src/lib/general-utils';
-import { 
-  extractCredentials, 
-  deriveCurrentItem,
-  buildPaginationData,
-} from '@/src/lib/templating-utils';
+import { extractCredentials, deriveCurrentItem, buildPaginationData } from '@/src/lib/templating-utils';
 import { ExecutionStep, flattenAndNamespaceCredentials, assertValidArrowFunction, executeWithVMHelpers } from '@superglue/shared';
 
 const ExecutionContext = createContext<ExecutionContextValue | null>(null);

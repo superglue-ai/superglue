@@ -114,7 +114,6 @@ export function normalizeTemplateExpression(expr: string): string {
     const accessor = buildAccessor(segments);
     return `(sourceData) => sourceData${accessor}`;
   }
-  // Single segment - use dot notation if valid identifier, bracket notation otherwise
   if (VALID_IDENTIFIER.test(trimmed)) {
     return `(sourceData) => sourceData.${trimmed}`;
   }
