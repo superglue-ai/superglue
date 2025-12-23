@@ -77,6 +77,12 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     });
   }, []);
   
+  const resetTransformState = useCallback(() => {
+    setFinalResultState(null);
+    setFinalErrorState(null);
+    setTransformStatusState('idle');
+  }, []);
+  
   const clearExecutionsFrom = useCallback((stepIndex: number) => {
     const stepIdsToRemove = steps.slice(stepIndex).map(s => s.id);
     setStepExecutions(prev => {
@@ -86,20 +92,20 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       }
       return next;
     });
-    // Also clear final transform when any step is cleared
-    setFinalResultState(null);
-    setFinalErrorState(null);
-    setTransformStatusState('idle');
-  }, [steps]);
+    resetTransformState();
+  }, [steps, resetTransformState]);
   
   const clearAllExecutions = useCallback(() => {
     setStepExecutions({});
-    setFinalResultState(null);
-    setFinalErrorState(null);
-    setTransformStatusState('idle');
-  }, []);
+    resetTransformState();
+  }, [resetTransformState]);
 
   const prevStepHashesRef = useRef<string[]>([]);
+  const skipNextHashInvalidationRef = useRef(false);
+  
+  const skipNextHashInvalidation = useCallback(() => {
+    skipNextHashInvalidationRef.current = true;
+  }, []);
   
   const hashStepConfig = (s: ExecutionStep): string => {
     try {
@@ -121,6 +127,12 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     const currentHashes = steps.map(hashStepConfig);
     const prevHashes = prevStepHashesRef.current;
     
+    if (skipNextHashInvalidationRef.current) {
+      skipNextHashInvalidationRef.current = false;
+      prevStepHashesRef.current = currentHashes;
+      return;
+    }
+    
     if (prevHashes.length > 0) {
       for (let i = 0; i < Math.min(currentHashes.length, prevHashes.length); i++) {
         if (currentHashes[i] !== prevHashes[i]) {
@@ -132,16 +144,14 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
             }
             return next;
           });
-          setFinalResultState(null);
-          setFinalErrorState(null);
-          setTransformStatusState('idle');
+          resetTransformState();
           break;
         }
       }
     }
     
     prevStepHashesRef.current = currentHashes;
-  }, [steps]);
+  }, [steps, resetTransformState]);
   
   // === EXECUTION CONTROL ===
   
@@ -271,6 +281,28 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     return payloads;
   }, [steps, payload.computedPayload, stepResultsMap]);
   
+  const sourceDataVersionRef = useRef({
+    version: 0,
+    payloadRef: null as any,
+    resultsRef: null as any,
+    stepsLen: 0,
+  });
+  
+  if (
+    sourceDataVersionRef.current.payloadRef !== payload.computedPayload ||
+    sourceDataVersionRef.current.resultsRef !== stepResultsMap ||
+    sourceDataVersionRef.current.stepsLen !== steps.length
+  ) {
+    sourceDataVersionRef.current = {
+      version: sourceDataVersionRef.current.version + 1,
+      payloadRef: payload.computedPayload,
+      resultsRef: stepResultsMap,
+      stepsLen: steps.length,
+    };
+  }
+  
+  const sourceDataVersion = sourceDataVersionRef.current.version;
+  
   const getEvolvingPayload = useCallback((stepId?: string): Record<string, any> => {
     if (!stepId) {
       if (steps.length === 0) return payload.computedPayload;
@@ -312,6 +344,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     markAsStopping,
     finishExecution,
     setCurrentExecutingStepIndex,
+    skipNextHashInvalidation,
     
     // Transform mutations
     setFinalResult,
@@ -332,6 +365,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     // Payload helpers
     getEvolvingPayload,
     stepResultsMap,
+    sourceDataVersion,
   }), [
     stepExecutions,
     isExecutingAny,
@@ -355,6 +389,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     markAsStopping,
     finishExecution,
     setCurrentExecutingStepIndex,
+    skipNextHashInvalidation,
     setFinalResult,
     setTransformRunning,
     setTransformStatus,
@@ -369,6 +404,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     canExecuteStep,
     getEvolvingPayload,
     stepResultsMap,
+    sourceDataVersion,
   ]);
   
   return (

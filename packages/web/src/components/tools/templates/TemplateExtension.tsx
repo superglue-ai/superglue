@@ -8,7 +8,7 @@ import { useTemplatePreview } from '../hooks/use-template-preview';
 
 function TemplateNodeView(props: NodeViewProps) {
     const { node, deleteNode, updateAttributes, selected, editor } = props;
-    const { stepData, dataSelectorOutput, readOnly, canExecute = true, stepId } = useTemplateContext();
+    const { stepData, dataSelectorOutput, readOnly, canExecute = true, stepId, sourceDataVersion } = useTemplateContext();
     const [isEditorFocused, setIsEditorFocused] = useState(false);
     const [forcePopoverOpen, setForcePopoverOpen] = useState(false);
     
@@ -25,7 +25,7 @@ function TemplateNodeView(props: NodeViewProps) {
     const { previewValue, previewError, hasResult, isEvaluating } = useTemplatePreview(
         expression,
         sourceData,
-        { enabled: shouldEvaluate, debounceMs: 100, stepId }
+        { enabled: shouldEvaluate, debounceMs: 100, stepId, sourceDataVersion }
     );
 
     useEffect(() => {

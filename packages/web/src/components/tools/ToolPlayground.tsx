@@ -437,73 +437,64 @@ function ToolPlaygroundInner({
       {isArchived ? (
         <Button
           variant="outline"
-          onClick={handleUnarchive}
+          onClick={handleStopExecution}
+          disabled={saving || isExecutingStep != null || isExecutingTransform}
           className="h-9 px-4"
         >
-          <ArchiveRestore className="h-4 w-4" />
-          Unarchive
+          <Square className="h-4 w-4" />
+          Stop Execution
         </Button>
       ) : (
-        <>
-          {loading ? (
-            <Button
-              variant="outline"
-              onClick={handleStopExecution}
-              disabled={saving || (isExecutingStep != null) || isExecutingTransform}
-              className="h-9 px-4"
-            >
-              <Square className="h-4 w-4" />
-              Stop Execution
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              onClick={handleRunAllSteps}
-              disabled={loading || saving || (isExecutingStep != null) || isExecutingTransform}
-              className="h-9 px-4"
-            >
-              <Play className="h-4 w-4" />
-              Run all Steps
-            </Button>
-          )}
-          {!hideRebuildButton && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                onRebuildStart?.();
-                setShowToolBuilder(true);
-              }}
-              className="h-9 px-5"
-            >
-              <Hammer className="h-4 w-4" />
-              Rebuild
-            </Button>
-          )}
-          {!embedded && toolId && (
-            <DeployButton
-              tool={currentTool}
-              payload={computedPayload}
-              onBeforeOpen={saveTool}
-              size="default"
-              className="h-9 px-5"
-              disabled={saving || loading}
-            />
-          )}
-          <Button
-            variant="default"
-            onClick={saveTool}
-            disabled={saving || loading}
-            className="h-9 px-5 w-[108px] shadow-md border border-primary/40"
-          >
-            {saving ? "Saving..." : justSaved ? (
-              <>
-                <Check className="mr-1 h-3.5 w-3.5" />
-                Saved
-              </>
-            ) : "Save"}
+        <Button
+          variant="outline"
+          onClick={handleRunAllSteps}
+          disabled={loading || saving || isExecutingStep != null || isExecutingTransform}
+          className="h-9 px-4"
+        >
+          <Play className="h-4 w-4" />
+          Run all Steps
           </Button>
-        </>
       )}
+      {!hideRebuildButton && (
+        <Button
+          variant="outline"
+          onClick={() => {
+            onRebuildStart?.();
+            setShowToolBuilder(true);
+          }}
+          className="h-9 px-5"
+        >
+          <Hammer className="h-4 w-4" />
+          Rebuild
+        </Button>
+      )}
+      {!embedded && (
+        <Button
+          variant="outline"
+          onClick={async () => {
+            await saveTool();
+            setActiveDialog({ type: 'deploy' });
+          }}
+          className="h-9 px-5"
+          disabled={saving || loading}
+        >
+          <CloudUpload className="h-4 w-4" />
+          Deploy
+        </Button>
+      )}
+      <Button
+        variant="default"
+        onClick={saveTool}
+        disabled={saving || loading}
+        className="h-9 px-5 w-[108px] shadow-md border border-primary/40"
+      >
+        {saving ? "Saving..." : justSaved ? (
+          <>
+            <Check className="mr-1 h-3.5 w-3.5" />
+            Saved
+          </>
+        ) : "Save"}
+      </Button>
     </div>
   );
 

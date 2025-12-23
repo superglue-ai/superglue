@@ -105,6 +105,7 @@ export type TransformStatus = 'idle' | 'running' | 'fixing' | 'completed' | 'fai
   markAsStopping: () => void;
   finishExecution: () => void;
   setCurrentExecutingStepIndex: (index: number | null) => void;
+  skipNextHashInvalidation: () => void;
   
   // === TRANSFORM MUTATIONS ===
   setFinalResult: (result: any, status: TransformStatus, error?: string) => void;
@@ -125,4 +126,5 @@ export type TransformStatus = 'idle' | 'running' | 'fixing' | 'completed' | 'fai
   // === PAYLOAD HELPERS ===
   getEvolvingPayload: (stepId?: string) => Record<string, any>;
   stepResultsMap: Record<string, any>;
+  sourceDataVersion: number;
 }

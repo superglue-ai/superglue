@@ -4,7 +4,7 @@ import Paragraph from '@tiptap/extension-paragraph';
 import Text from '@tiptap/extension-text';
 import History from '@tiptap/extension-history';
 import { cn } from '@/src/lib/general-utils';
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { TemplateExtension, TemplateContextProvider, useTemplateContext, type CategorizedVariables, type CategorizedSources } from '../tools/templates/tiptap';
 import { VariableSuggestion } from '../tools/templates/TemplateVariableSuggestion';
 import { TemplateEditPopover } from '../tools/templates/TemplateEditPopover';
@@ -23,9 +23,12 @@ interface TemplateAwareTextEditorProps {
     className?: string;
     disabled?: boolean;
     stepId?: string;
+    sourceDataVersion?: number;
 }
 
 const SingleLineDocument = Document.extend({ content: 'paragraph' });
+
+const DEBOUNCE_MS = 200;
 
 function TemplateAwareTextEditorInner({
     value,
@@ -39,7 +42,15 @@ function TemplateAwareTextEditorInner({
 }: Omit<TemplateAwareTextEditorProps, 'categorizedVariables' | 'categorizedSources'>) {
     const isUpdatingRef = useRef(false);
     const lastValueRef = useRef(value);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { categorizedVariables, categorizedSources } = useTemplateContext();
+
+    const debouncedOnChange = useCallback((newValue: string) => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => onChange(newValue), DEBOUNCE_MS);
+    }, [onChange]);
+
+    useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
     
     const {
         sourceData,
@@ -81,7 +92,7 @@ function TemplateAwareTextEditorInner({
             const newValue = tiptapToTemplateString(editor.getJSON());
             if (newValue !== lastValueRef.current) {
                 lastValueRef.current = newValue;
-                onChange(newValue);
+                debouncedOnChange(newValue);
             }
         },
     });
@@ -134,6 +145,7 @@ export function TemplateAwareTextEditor({
     className,
     disabled = false,
     stepId,
+    sourceDataVersion = 0,
 }: TemplateAwareTextEditorProps) {
     return (
         <TemplateContextProvider 
@@ -144,6 +156,7 @@ export function TemplateAwareTextEditor({
             categorizedVariables={categorizedVariables}
             categorizedSources={categorizedSources}
             stepId={stepId}
+            sourceDataVersion={sourceDataVersion}
         >
             <TemplateAwareTextEditorInner
                 value={value}

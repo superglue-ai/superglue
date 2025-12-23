@@ -5,7 +5,7 @@ import Text from '@tiptap/extension-text';
 import History from '@tiptap/extension-history';
 import HardBreak from '@tiptap/extension-hard-break';
 import { cn } from '@/src/lib/general-utils';
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { TemplateExtension, TemplateContextProvider, useTemplateContext, type CategorizedVariables, type CategorizedSources } from '../tools/templates/tiptap';
 import { VariableSuggestion } from '../tools/templates/TemplateVariableSuggestion';
 import { TemplateEditPopover } from '../tools/templates/TemplateEditPopover';
@@ -31,7 +31,10 @@ interface TemplateAwareJsonEditorProps {
     resizable?: boolean;
     showValidation?: boolean;
     stepId?: string;
+    sourceDataVersion?: number;
 }
+
+const DEBOUNCE_MS = 200;
 
 function TemplateAwareJsonEditorInner({
     value,
@@ -48,6 +51,15 @@ function TemplateAwareJsonEditorInner({
 }: TemplateAwareJsonEditorProps) {
     const isUpdatingRef = useRef(false);
     const lastValueRef = useRef(value);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const debouncedOnChange = useCallback((newValue: string) => {
+        if (!onChange) return;
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => onChange(newValue), DEBOUNCE_MS);
+    }, [onChange]);
+
+    useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
     const { height: resizableHeight, resizeHandleProps } = useResizable({ 
         minHeight: parseInt(minHeight), 
         maxHeight: parseInt(maxHeight), 
@@ -107,7 +119,7 @@ function TemplateAwareJsonEditorInner({
             const newValue = tiptapToTemplateString(editor.getJSON());
             if (newValue !== lastValueRef.current) {
                 lastValueRef.current = newValue;
-                onChange?.(newValue);
+                debouncedOnChange(newValue);
             }
         },
     });
@@ -238,6 +250,7 @@ export function TemplateAwareJsonEditor(props: TemplateAwareJsonEditorProps) {
             categorizedVariables={props.categorizedVariables}
             categorizedSources={props.categorizedSources}
             stepId={props.stepId}
+            sourceDataVersion={props.sourceDataVersion}
         >
             <TemplateAwareJsonEditorInner {...props} />
         </TemplateContextProvider>

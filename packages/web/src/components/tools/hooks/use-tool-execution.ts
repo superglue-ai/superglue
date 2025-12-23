@@ -60,7 +60,8 @@ export function useToolExecution(
     setCurrentExecutingStepIndex,
     setFinalResult,
     setTransformStatus,
-    getStepResultsMap,
+    stepResultsMap,
+    skipNextHashInvalidation,
   } = useExecution();
 
   const currentRunIdRef = useRef<string | null>(null);
@@ -148,7 +149,7 @@ export function useToolExecution(
         };
       }
 
-      const currentStepResultsMap = getStepResultsMap();
+      const currentStepResultsMap = stepResultsMap;
       const single = await executeSingleStep({
         client,
         step: stepToExecute,
@@ -167,6 +168,7 @@ export function useToolExecution(
         const updatedStep = limitIterations && originalLoopSelector
           ? { ...single.updatedStep, loopSelector: originalLoopSelector }
           : single.updatedStep;
+        skipNextHashInvalidation();
         setSteps(steps.map((step, i) => i === idx ? updatedStep : step));
         
         if (selfHealing && single.success) {
@@ -201,7 +203,7 @@ export function useToolExecution(
     await executeWithRunId(async () => {
       setTransformStatus(selfHealing ? 'fixing' : 'running');
 
-      const currentStepResultsMap = getStepResultsMap();
+      const currentStepResultsMap = stepResultsMap;
       const stepData: Record<string, any> = {};
       Object.entries(currentStepResultsMap).forEach(([stepId, result]) => {
         if (stepId !== '__final_transform__') {
@@ -316,6 +318,7 @@ export function useToolExecution(
       if (state.currentTool.steps) {
         const returnedStepsJson = JSON.stringify(state.currentTool.steps);
         if (originalStepsJson !== returnedStepsJson) {
+          skipNextHashInvalidation();
           setSteps(state.currentTool.steps);
           if (effectiveSelfHealing) {
             toast({

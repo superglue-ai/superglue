@@ -49,7 +49,6 @@ export function TemplateChip({
   popoverTitle,
   popoverHelpText,
 }: TemplateChipProps) {
-  useTemplateContext();
   const sourceData = useMemo(() => prepareSourceData(stepData, dataSelectorOutput), [stepData, dataSelectorOutput]);
   const [isHovered, setIsHovered] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);

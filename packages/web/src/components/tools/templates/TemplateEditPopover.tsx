@@ -27,14 +27,6 @@ import { CopyButton } from '../shared/CopyButton';
 const TEMPLATE_POPOVER_OPEN_EVENT = 'template-popover-open';
 const TEMPLATE_POPOVER_CLOSE_ALL_EVENT = 'template-popover-close-all';
 
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      window.dispatchEvent(new CustomEvent(TEMPLATE_POPOVER_CLOSE_ALL_EVENT));
-    }
-  });
-}
-
 const POPOVER_Z_INDEX = 200;
 const POPOVER_WIDTH_PX = 700;
 const MODAL_WIDTH_PX = 900;
@@ -140,11 +132,20 @@ export function TemplateEditPopover({
       if ((e as CustomEvent).detail !== popoverId) setOpen(false);
     };
     const handleCloseAll = () => setOpen(false);
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        window.dispatchEvent(new CustomEvent(TEMPLATE_POPOVER_CLOSE_ALL_EVENT));
+      }
+    };
+    
     window.addEventListener(TEMPLATE_POPOVER_OPEN_EVENT, handleOtherOpen);
     window.addEventListener(TEMPLATE_POPOVER_CLOSE_ALL_EVENT, handleCloseAll);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
     return () => {
       window.removeEventListener(TEMPLATE_POPOVER_OPEN_EVENT, handleOtherOpen);
       window.removeEventListener(TEMPLATE_POPOVER_CLOSE_ALL_EVENT, handleCloseAll);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [setOpen, popoverId]);
 

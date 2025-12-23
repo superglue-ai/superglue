@@ -8,7 +8,7 @@ import { TemplateChip } from '../../templates/TemplateChip';
 import { TemplateContextProvider } from '../../templates/tiptap/TemplateContext';
 import { useTemplatePreview } from '../../hooks/use-template-preview';
 import { useDataProcessor } from '../../hooks/use-data-processor';
-import { useExecution } from '../../context';
+import { useToolConfig, useExecution } from '../../context';
 import { CopyButton } from '../../shared/CopyButton';
 import { Download, Loader2 } from 'lucide-react';
 import { Button } from '../../../ui/button';
@@ -38,7 +38,8 @@ export function StepInputTab({
     onEdit,
     isActive = true,
 }: StepInputTabProps) {
-    const { canExecuteStep } = useExecution();
+    const { getStepConfig } = useToolConfig();
+    const { canExecuteStep, sourceDataVersion } = useExecution();
     const canExecute = canExecuteStep(stepIndex);
     const { theme, onMount } = useMonacoTheme();
     const { height, resizeHandleProps } = useResizable({ minHeight: 200, maxHeight: 800, initialHeight: 400 });
@@ -56,7 +57,7 @@ export function StepInputTab({
     const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
         currentItemExpression,
         evolvingPayload,
-        { enabled: isActive && canExecute && !!evolvingPayload, debounceMs: 300, stepId: step.id }
+        { enabled: isActive && canExecute && !!evolvingPayload, debounceMs: 300, stepId: step.id, sourceDataVersion }
     );
 
     const inputProcessor = useDataProcessor(evolvingPayload, isActive);
@@ -113,8 +114,11 @@ export function StepInputTab({
 
     const handleUpdate = useCallback((newTemplate: string) => {
         const expression = newTemplate.replace(/^<<|>>$/g, '');
-        onEdit?.(step.id, { ...step, loopSelector: expression }, true);
-    }, [onEdit, step]);
+        const latestStep = getStepConfig(step.id);
+        if (latestStep) {
+            onEdit?.(step.id, { ...latestStep, loopSelector: expression }, true);
+        }
+    }, [onEdit, step.id, getStepConfig]);
 
     return (
         <div>
@@ -152,7 +156,7 @@ export function StepInputTab({
                             className="absolute z-20 bg-muted rounded-sm flex items-center"
                             style={{ top: chipPosition.top, left: chipPosition.left, height: '18px', pointerEvents: 'auto' }}
                         >
-                            <TemplateContextProvider stepData={evolvingPayload} canExecute={canExecute} stepId={step.id}>
+                            <TemplateContextProvider stepData={evolvingPayload} canExecute={canExecute} stepId={step.id} sourceDataVersion={sourceDataVersion}>
                                 <TemplateChip
                                     template={templateString}
                                     evaluatedValue={previewValue}
