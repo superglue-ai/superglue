@@ -92,7 +92,7 @@ export const upsertIntegrationResolver = async (
       // If we're starting a new fetch, set pending to true
       // If we're not starting a new fetch, preserve the existing pending state
       documentationPending: shouldFetchDoc ? true : (existingIntegrationOrNull?.documentationPending || false),
-      credentials: resolveField(input.credentials, existingIntegrationOrNull?.credentials, {}),
+      credentials: mergeCredentials(input.credentials, existingIntegrationOrNull?.credentials),
       specificInstructions: resolveField(input.specificInstructions?.trim(), existingIntegrationOrNull?.specificInstructions, ''),
       documentationKeywords: uniqueKeywords(resolveField(input.documentationKeywords, existingIntegrationOrNull?.documentationKeywords, [])),
       createdAt: existingIntegrationOrNull?.createdAt || now,
@@ -255,6 +255,70 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
   if (newValue !== undefined) return newValue;
   if (oldValue !== undefined) return oldValue;
   return defaultValue;
+}
+
+/**
+ * Deep merges credentials, preserving existing values and only updating with non-placeholder values.
+ * - Existing credentials are preserved
+ * - New keys are added
+ * - Existing keys are only overwritten if the new value is non-empty and not a placeholder
+ */
+function mergeCredentials(
+  newCredentials: Record<string, any> | null | undefined,
+  existingCredentials: Record<string, any> | undefined
+): Record<string, any> {
+  // If no new credentials, return existing or empty
+  if (newCredentials === null || newCredentials === undefined) {
+    return existingCredentials || {};
+  }
+  
+  // If no existing credentials, return new (but filter out placeholders)
+  if (!existingCredentials || Object.keys(existingCredentials).length === 0) {
+    return filterPlaceholders(newCredentials);
+  }
+  
+  // Deep merge: start with existing, then apply new values (skipping placeholders)
+  const merged = { ...existingCredentials };
+  
+  for (const [key, value] of Object.entries(newCredentials)) {
+    // Skip if value looks like a placeholder
+    if (isPlaceholderValue(value)) {
+      continue;
+    }
+    // Update the value
+    merged[key] = value;
+  }
+  
+  return merged;
+}
+
+function isPlaceholderValue(value: any): boolean {
+  if (typeof value !== 'string') return false;
+  const v = value.trim().toLowerCase();
+  // Common placeholder patterns
+  return (
+    v === '' ||
+    v.startsWith('your_') ||
+    v.startsWith('your-') ||
+    v.startsWith('<') ||
+    v.startsWith('{{') ||
+    v.startsWith('${') ||
+    v.includes('_here') ||
+    v.includes('-here') ||
+    v === 'xxx' ||
+    v === 'placeholder' ||
+    /^[x]+$/i.test(v) // matches "xxx", "XXXX", etc.
+  );
+}
+
+function filterPlaceholders(credentials: Record<string, any>): Record<string, any> {
+  const filtered: Record<string, any> = {};
+  for (const [key, value] of Object.entries(credentials)) {
+    if (!isPlaceholderValue(value)) {
+      filtered[key] = value;
+    }
+  }
+  return filtered;
 }
 
 function shouldTriggerDocFetch(input: Integration, context: GraphQLRequestContext, existingIntegration?: Integration | null): boolean {
