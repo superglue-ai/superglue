@@ -10,38 +10,7 @@ const ACTIVE_CARD_INLINE_STYLE = {
     boxShadow: '0 10px 15px -3px rgba(255, 165, 0, 0.1), 0 4px 6px -4px rgba(255, 165, 0, 0.1), 0 0 0 1px #FFA500'
 };
 
-const getStatusInfo = (isRunning: boolean, isFailed: boolean, isCompleted: boolean, isAborted: boolean) => {
-    if (isRunning) return {
-        text: "Running",
-        color: "text-amber-600 dark:text-amber-400",
-        dotColor: "bg-amber-600 dark:bg-amber-400",
-        animate: true
-    };
-    if (isAborted) return {
-        text: "Pending",
-        color: "text-gray-500 dark:text-gray-400",
-        dotColor: "bg-gray-500 dark:bg-gray-400",
-        animate: false
-    };
-    if (isFailed) return {
-        text: "Failed",
-        color: "text-red-600 dark:text-red-400",
-        dotColor: "bg-red-600 dark:bg-red-400",
-        animate: false
-    };
-    if (isCompleted) return {
-        text: "Completed",
-        color: "text-muted-foreground",
-        dotColor: "bg-green-600 dark:bg-green-400",
-        animate: false
-    };
-    return {
-        text: "Pending",
-        color: "text-gray-500 dark:text-gray-400",
-        dotColor: "bg-gray-500 dark:bg-gray-400",
-        animate: false
-    };
-};
+const RUNNING_STATUS = { text: "Running", color: "text-amber-600 dark:text-amber-400", dotColor: "bg-amber-600 dark:bg-amber-400", animate: true } as const;
 
 interface MiniStepCardProps {
     step: any;
@@ -81,9 +50,7 @@ export const MiniStepCard = React.memo(({
     const { integrations } = useToolConfig();
     const { 
         transformStatus,
-        isStepCompleted,
-        isStepFailed,
-        isStepAborted,
+        getStepStatusInfo,
     } = useExecution();
 
     const isTransformCompleted = transformStatus === 'completed';
@@ -145,11 +112,8 @@ export const MiniStepCard = React.memo(({
         );
     }
     if (isTransform) {
-        const isCompleted = isStepCompleted('__final_transform__');
-        const isFailed = isStepFailed('__final_transform__');
-        const isAborted = isStepAborted('__final_transform__');
         const isRunning = isTesting || isRunningAll;
-        const statusInfo = getStatusInfo(isRunning, isFailed, isCompleted, isAborted);
+        const statusInfo = isRunning ? RUNNING_STATUS : getStepStatusInfo('__final_transform__');
         return (
             <div className={cn("cursor-pointer transition-all duration-300 ease-out transform", "opacity-90 hover:opacity-100 hover:scale-[1.01]")} onClick={onClick} style={{ height: '100%' }}>
                 <Card 
@@ -184,11 +148,9 @@ export const MiniStepCard = React.memo(({
             </div>
         );
     }
-    const isCompleted = stepId ? isStepCompleted(stepId) : false;
-    const isFailed = stepId ? isStepFailed(stepId) : false;
-    const isAborted = stepId ? isStepAborted(stepId) : false;
     const isRunning = isTesting || (isRunningAll && !!stepId);
-    const statusInfo = getStatusInfo(isRunning, isFailed, isCompleted, isAborted);
+    const baseStatusInfo = stepId ? getStepStatusInfo(stepId) : { text: "Pending", color: "text-gray-500 dark:text-gray-400", dotColor: "bg-gray-500 dark:bg-gray-400", animate: false };
+    const statusInfo = isRunning ? RUNNING_STATUS : baseStatusInfo;
 
     const linkedIntegration = step.integrationId && integrations
         ? integrations.find(integration => integration.id === step.integrationId)

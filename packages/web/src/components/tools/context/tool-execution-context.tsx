@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useCallback, useMemo, useState, useEffect, useRef, ReactNode } from 'react';
 import { useToolConfig } from './tool-config-context';
-import { ExecutionContextValue, StepExecutionState, StepStatus, TransformStatus, DEFAULT_STEP_EXECUTION,StepTemplateData, DataSelectorResult, CategorizedVariables, CategorizedSources } from './types';
+import { ExecutionContextValue, StepExecutionState, StepStatus, TransformStatus, DEFAULT_STEP_EXECUTION, StepTemplateData, DataSelectorResult, CategorizedVariables, CategorizedSources, StepStatusInfo } from './types';
 import { buildStepInput, buildPreviousStepResults } from '@/src/lib/general-utils';
 import { extractCredentials, deriveCurrentItem, buildPaginationData } from '@/src/lib/templating-utils';
 import { ExecutionStep, flattenAndNamespaceCredentials, assertValidArrowFunction, executeWithVMHelpers } from '@superglue/shared';
@@ -239,6 +239,20 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
   const isStepRunning = useCallback((stepId: string): boolean => {
     return stepExecutions[stepId]?.status === 'running';
   }, [stepExecutions]);
+
+  const getStepStatusInfo = useCallback((stepId: string): StepStatusInfo => {
+    const exec = stepExecutions[stepId];
+    const running = exec?.status === 'running';
+    const failed = exec?.status === 'failed';
+    const completed = exec?.status === 'completed';
+    const aborted = exec?.status === 'aborted';
+    
+    if (running) return { text: "Running", color: "text-amber-600 dark:text-amber-400", dotColor: "bg-amber-600 dark:bg-amber-400", animate: true };
+    if (aborted) return { text: "Pending", color: "text-gray-500 dark:text-gray-400", dotColor: "bg-gray-500 dark:bg-gray-400", animate: false };
+    if (failed) return { text: "Failed", color: "text-red-600 dark:text-red-400", dotColor: "bg-red-600 dark:bg-red-400", animate: false };
+    if (completed) return { text: "Completed", color: "text-muted-foreground", dotColor: "bg-green-600 dark:bg-green-400", animate: false };
+    return { text: "Pending", color: "text-gray-500 dark:text-gray-400", dotColor: "bg-gray-500 dark:bg-gray-400", animate: false };
+  }, [stepExecutions]);
   
   const canExecuteStep = useCallback((stepIndex: number): boolean => {
     if (stepIndex === 0) return true;
@@ -471,6 +485,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     getStepExecution,
     getStepStatus,
     getStepResult,
+    getStepStatusInfo,
     isStepCompleted,
     isStepFailed,
     isStepAborted,
@@ -516,6 +531,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     getStepExecution,
     getStepStatus,
     getStepResult,
+    getStepStatusInfo,
     isStepCompleted,
     isStepFailed,
     isStepAborted,

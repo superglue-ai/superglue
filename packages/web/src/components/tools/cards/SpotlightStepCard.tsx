@@ -16,7 +16,6 @@ import { TemplateAwareJsonEditor } from '../../editors/TemplateAwareJsonEditor';
 import { TemplateAwareTextEditor } from '../../editors/TemplateAwareTextEditor';
 import { HelpTooltip } from '../../utils/HelpTooltip';
 import { useToolConfig, useExecution } from '../context';
-import { useDataSelector } from '../hooks/use-data-selector';
 import { CopyButton } from '../shared/CopyButton';
 import { IntegrationSelector } from '../shared/IntegrationSelector';
 import { StepInputTab } from './tabs/StepInputTab';
@@ -62,6 +61,7 @@ export const SpotlightStepCard = React.memo(({
         getStepResult,
         isStepFailed,
         canExecuteStep,
+        getDataSelectorResult,
     } = useExecution();
     
     const isGlobalExecuting = isExecutingAny;
@@ -69,11 +69,19 @@ export const SpotlightStepCard = React.memo(({
     const stepFailed = isStepFailed(step.id);
     const canExecute = canExecuteStep(stepIndex);
     
-    const { dataSelectorOutput } = useDataSelector({
-        stepId: step.id,
-        loopSelector: step.loopSelector,
-        onDataSelectorChange,
-    });
+    const { output: dataSelectorOutput, error: dataSelectorError } = getDataSelectorResult(step.id);
+    const lastNotifiedStepIdRef = useRef<string | null>(null);
+    
+    // Notify parent of data selector changes
+    useEffect(() => {
+        const isInitial = lastNotifiedStepIdRef.current !== step.id;
+        const hasValidOutput = !dataSelectorError && dataSelectorOutput != null;
+        const itemCount = hasValidOutput && Array.isArray(dataSelectorOutput) ? dataSelectorOutput.length : null;
+        onDataSelectorChange?.(itemCount, isInitial);
+        if (isInitial) {
+            lastNotifiedStepIdRef.current = step.id;
+        }
+    }, [dataSelectorOutput, dataSelectorError, step.id, onDataSelectorChange]);
     
     const [activePanel, setActivePanel] = useState<'input' | 'config' | 'output'>('config');
     const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);

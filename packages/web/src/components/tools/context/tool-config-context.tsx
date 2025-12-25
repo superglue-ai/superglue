@@ -130,6 +130,12 @@ export function ToolConfigProvider({
     return steps.findIndex(s => s.id === stepId);
   }, [steps]);
 
+  const getStepIntegration = useCallback((stepId: string) => {
+    const step = steps.find(s => s.id === stepId);
+    if (!step?.integrationId) return undefined;
+    return integrations.find(i => i.id === step.integrationId);
+  }, [steps, integrations]);
+
   const value = useMemo<ToolConfigContextValue>(() => ({
     tool,
     steps,
@@ -160,6 +166,7 @@ export function ToolConfigProvider({
     
     getStepConfig,
     getStepIndex,
+    getStepIntegration,
   }), [
     tool,
     steps,
@@ -173,6 +180,7 @@ export function ToolConfigProvider({
     updateStep,
     getStepConfig,
     getStepIndex,
+    getStepIntegration,
   ]);
 
   return (

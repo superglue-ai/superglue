@@ -49,6 +49,7 @@ export interface ToolConfigContextValue {
   
   getStepConfig: (stepId: string) => ExecutionStep | undefined;
   getStepIndex: (stepId: string) => number;
+  getStepIntegration: (stepId: string) => Integration | undefined;
 }
 
 export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'aborted';
@@ -101,6 +102,13 @@ export interface StepTemplateData {
   canExecute: boolean;
 }
 
+export interface StepStatusInfo {
+  text: string;
+  color: string;
+  dotColor: string;
+  animate: boolean;
+}
+
 export interface ExecutionContextValue {
   // === PER-STEP EXECUTION STATE ===
   stepExecutions: Record<string, StepExecutionState>;
@@ -147,6 +155,7 @@ export interface ExecutionContextValue {
   getStepExecution: (stepId: string) => StepExecutionState;
   getStepStatus: (stepId: string) => StepStatus;
   getStepResult: (stepId: string) => any | null;
+  getStepStatusInfo: (stepId: string) => StepStatusInfo;
   isStepCompleted: (stepId: string) => boolean;
   isStepFailed: (stepId: string) => boolean;
   isStepAborted: (stepId: string) => boolean;
