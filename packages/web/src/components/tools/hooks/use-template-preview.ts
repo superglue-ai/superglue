@@ -29,19 +29,19 @@ export function useTemplatePreview(
 ): UseTemplatePreviewResult {
     const { enabled = true, debounceMs = 500, stepId = 'global', sourceDataVersion = 0 } = options;
     
-    const [previewValue, setPreviewValue] = useState<any>(undefined);
-    const [previewError, setPreviewError] = useState<string | null>(null);
+    const cacheKey = `${stepId}:${expression}:v${sourceDataVersion}`;
+    const cached = templateCache.get(cacheKey);
+    
+    const [previewValue, setPreviewValue] = useState<any>(cached?.value);
+    const [previewError, setPreviewError] = useState<string | null>(cached?.error ?? null);
     const [isEvaluating, setIsEvaluating] = useState(false);
-    const [hasResult, setHasResult] = useState(false);
+    const [hasResult, setHasResult] = useState(!!cached);
     const evalVersionRef = useRef(0);
     const sourceDataRef = useRef(sourceData);
     sourceDataRef.current = sourceData;
 
     useEffect(() => {
-        if (!enabled) {
-            setIsEvaluating(false);
-            return;
-        }
+        if (!enabled) return;
 
         if (expression === DEFAULT_CODE_TEMPLATE) {
             setPreviewValue(undefined);
@@ -98,7 +98,7 @@ export function useTemplatePreview(
         }, debounceMs);
 
         return () => clearTimeout(timer);
-    }, [expression, stepId, enabled, debounceMs, sourceDataVersion]);
+    }, [expression, stepId, debounceMs, sourceDataVersion]);
 
     return { previewValue, previewError, isEvaluating, hasResult };
 }

@@ -12,7 +12,7 @@ import { VariableSuggestion } from '../tools/templates/TemplateVariableSuggestio
 import { TemplateEditPopover } from '../tools/templates/TemplateEditPopover';
 import { templateStringToTiptap, tiptapToTemplateString } from '@/src/lib/templating-utils';
 import { CopyButton } from '../tools/shared/CopyButton';
-import { evaluateTemplate, parseTemplateString, prepareSourceData } from '@/src/lib/templating-utils';
+import { evaluateTemplate, parseTemplateString } from '@/src/lib/templating-utils';
 import { maskCredentials } from '@superglue/shared';
 import { useTemplateAwareEditor } from '../tools/hooks/use-template-aware-editor';
 import { useResizable } from '@/src/hooks/use-resizable';
@@ -130,7 +130,6 @@ export function TemplateAwareJsonEditor({
         }
 
         let cancelled = false;
-        const localSourceData = prepareSourceData({ evolvingPayload: sourceData?.evolvingPayload }, dataSelectorOutput);
 
         const escapeForJson = (str: string) => 
             str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -151,7 +150,7 @@ export function TemplateAwareJsonEditor({
 
                 const expression = part.rawTemplate.slice(2, -2).trim();
                 const result = canExecute 
-                    ? await evaluateTemplate(expression, localSourceData).catch(() => null) 
+                    ? await evaluateTemplate(expression, sourceData).catch(() => null) 
                     : null;
 
                 if (cancelled) return;

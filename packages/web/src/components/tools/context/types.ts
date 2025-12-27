@@ -163,7 +163,7 @@ export interface ExecutionContextValue {
   canExecuteStep: (stepIndex: number) => boolean;
   
   // === PAYLOAD HELPERS ===
-  getEvolvingPayload: (stepId?: string) => Record<string, any>;
+  getStepInput: (stepId?: string) => Record<string, any>;
   stepResultsMap: Record<string, any>;
   sourceDataVersion: number;
   

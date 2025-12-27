@@ -36,9 +36,9 @@ export function StepInputTab({
     isActive = true,
 }: StepInputTabProps) {
     const { getStepConfig } = useToolConfig();
-    const { canExecuteStep, sourceDataVersion, getEvolvingPayload, getStepTemplateData } = useExecution();
+    const { canExecuteStep, sourceDataVersion, getStepInput, getStepTemplateData } = useExecution();
     const canExecute = canExecuteStep(stepIndex);
-    const evolvingPayload = getEvolvingPayload(step.id);
+    const stepInput = getStepInput(step.id);
     const { sourceData } = getStepTemplateData(step.id);
     
     const { theme, onMount } = useMonacoTheme();
@@ -57,10 +57,10 @@ export function StepInputTab({
     const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
         currentItemExpression,
         sourceData,
-        { enabled: isActive && canExecute && !!evolvingPayload, debounceMs: 300, stepId: step.id, sourceDataVersion }
+        { enabled: isActive && canExecute && !!stepInput, debounceMs: 300, stepId: step.id, sourceDataVersion }
     );
 
-    const inputProcessor = useDataProcessor(evolvingPayload, isActive);
+    const inputProcessor = useDataProcessor(stepInput, isActive);
 
     const displayData = useMemo(() => {
         if (!isActive || cannotExecuteYet) {
@@ -141,7 +141,7 @@ export function StepInputTab({
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
-                        onClick={() => downloadJson(evolvingPayload, 'step_input.json')}
+                        onClick={() => downloadJson(stepInput, 'step_input.json')}
                         title="Download step input as JSON"
                     >
                         <Download className="h-3 w-3" />

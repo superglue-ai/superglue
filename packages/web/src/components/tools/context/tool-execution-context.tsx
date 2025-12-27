@@ -67,7 +67,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
   
   const [dataSelectorResults, setDataSelectorResults] = useState<Record<string, DataSelectorResult>>({});
   const dataSelectorTimersRef = useRef<Record<string, number>>({});
-  const dataSelectorCacheRef = useRef<Map<string, { payloadRef: any; loopSelector: string; result: DataSelectorResult }>>(new Map());
+  const dataSelectorCacheRef = useRef<Map<string, { version: number; loopSelector: string; result: DataSelectorResult }>>(new Map());
   
   const setStepResult = useCallback((stepId: string, result: any, status: StepStatus, error?: string) => {
     setStepExecutions(prev => ({
@@ -150,6 +150,8 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
         if (currentHashes[i] !== prevHashes[i]) {
           const stepIdsToRemove = steps.slice(i).map(s => s.id);
           setStepExecutions(prev => {
+            const hasExecutionsToRemove = stepIdsToRemove.some(id => prev[id]);
+            if (!hasExecutionsToRemove) return prev;
             const next = { ...prev };
             for (const id of stepIdsToRemove) delete next[id];
             return next;
@@ -281,7 +283,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     return map;
   }, [stepExecutions]);
   
-  const evolvingPayloads = useMemo(() => {
+  const stepInputs = useMemo(() => {
     const payloads: Record<string, any> = {};
     for (let i = 0; i < steps.length; i++) {
       const stepId = steps[i].id;
@@ -307,14 +309,14 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
   
   const sourceDataVersion = sourceDataVersionRef.current.version;
   
-  const getEvolvingPayload = useCallback((stepId?: string): Record<string, any> => {
+  const getStepInput = useCallback((stepId?: string): Record<string, any> => {
     if (!stepId) {
       if (steps.length === 0) return payload.computedPayload;
       const lastStepId = steps[steps.length - 1].id;
-      return evolvingPayloads[lastStepId] ?? payload.computedPayload;
+      return stepInputs[lastStepId] ?? payload.computedPayload;
     }
-    return evolvingPayloads[stepId] ?? payload.computedPayload;
-  }, [steps, evolvingPayloads, payload.computedPayload]);
+    return stepInputs[stepId] ?? payload.computedPayload;
+  }, [steps, stepInputs, payload.computedPayload]);
 
   const manualPayload = useMemo(() => {
     try { return JSON.parse(payload.manualPayloadText || '{}'); } 
@@ -324,11 +326,11 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
   useEffect(() => {
     for (const step of steps) {
       const stepId = step.id;
-      const evolvingPayload = evolvingPayloads[stepId];
+      const stepInput = stepInputs[stepId];
       const loopSelector = step.loopSelector ?? '';
       
       const cached = dataSelectorCacheRef.current.get(stepId);
-      if (cached && cached.payloadRef === evolvingPayload && cached.loopSelector === loopSelector) {
+      if (cached && cached.version === sourceDataVersion && cached.loopSelector === loopSelector) {
         if (dataSelectorResults[stepId]?.output !== cached.result.output || 
             dataSelectorResults[stepId]?.error !== cached.result.error) {
           setDataSelectorResults(prev => ({ ...prev, [stepId]: cached.result }));
@@ -344,7 +346,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
         let result: DataSelectorResult;
         try {
           assertValidArrowFunction(loopSelector || undefined);
-          const output = executeWithVMHelpers(loopSelector || '(sourceData) => sourceData', evolvingPayload || {});
+          const output = executeWithVMHelpers(loopSelector || '(sourceData) => sourceData', stepInput || {});
           if (typeof output === 'function') {
             throw new Error('Data selector returned a function. Did you forget to call it?');
           }
@@ -354,7 +356,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
           result = { output: null, error: errorMessage };
         }
         
-        dataSelectorCacheRef.current.set(stepId, { payloadRef: evolvingPayload, loopSelector, result });
+        dataSelectorCacheRef.current.set(stepId, { version: sourceDataVersion, loopSelector, result });
         setDataSelectorResults(prev => ({ ...prev, [stepId]: result }));
       }, DATA_SELECTOR_DEBOUNCE_MS) as unknown as number;
     }
@@ -364,7 +366,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
         window.clearTimeout(timer);
       }
     };
-  }, [steps, evolvingPayloads]);
+  }, [steps, sourceDataVersion]);
 
   const stepTemplateDataMap = useMemo(() => {
     const map: Record<string, StepTemplateData> = {};
@@ -377,7 +379,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       const canExec = stepIndex === 0 || 
         steps.slice(0, stepIndex).every(s => stepExecutions[s.id]?.status === 'completed');
       
-      const evolvingPayload = evolvingPayloads[stepId] || {};
+      const stepInput = stepInputs[stepId] || {};
       const dsResult = dataSelectorResults[stepId] || { output: null, error: null };
       const currentItemObj = deriveCurrentItem(dsResult.output);
       
@@ -390,7 +392,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       
       const sourceData: Record<string, any> = {
         ...integrationCredentials,
-        ...evolvingPayload,
+        ...stepInput,
         ...(currentItemObj ? { currentItem: currentItemObj } : {}),
         ...paginationData,
       };
@@ -428,7 +430,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     }
     
     return map;
-  }, [steps, stepExecutions, evolvingPayloads, dataSelectorResults, integrations, manualPayload, payload.filePayloads, stepResultsMap]);
+  }, [steps, stepExecutions, stepInputs, dataSelectorResults, integrations, manualPayload, payload.filePayloads, stepResultsMap]);
 
   const getStepTemplateData = useCallback((stepId: string): StepTemplateData => {
     return stepTemplateDataMap[stepId] || emptyStepTemplateData;
@@ -491,7 +493,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     isStepAborted,
     isStepRunning,
     canExecuteStep,
-    getEvolvingPayload,
+    getStepInput,
     stepResultsMap,
     sourceDataVersion,
     getStepTemplateData,
@@ -537,7 +539,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     isStepAborted,
     isStepRunning,
     canExecuteStep,
-    getEvolvingPayload,
+    getStepInput,
     stepResultsMap,
     sourceDataVersion,
     getStepTemplateData,

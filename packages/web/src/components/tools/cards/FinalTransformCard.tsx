@@ -46,7 +46,7 @@ export const FinalTransformMiniStepCard = ({
     const { 
       finalResult, 
       finalError, 
-      getEvolvingPayload,
+      getStepInput,
       isRunningTransform,
       isFixingTransform,
       canExecuteTransform,
@@ -59,7 +59,7 @@ export const FinalTransformMiniStepCard = ({
     const canExecute = canExecuteTransform;
     const hasTransformCompleted = transformStatus === 'completed';
     
-    const stepInputs = getEvolvingPayload();
+    const stepInputs = getStepInput();
     const [activeTab, setActiveTab] = useState("transform");
     const [localTransform, setLocalTransform] = useState(transform || "");
     const [localSchema, setLocalSchema] = useState(responseSchema || "");
