@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/src/components/ui/button";
-import { useTheme } from "@/src/hooks/useTheme";
+import { useTheme } from "@/src/hooks/use-theme";
 import { Blocks, Book, ExternalLink, Hammer, History, Menu, Monitor, Moon, Sun } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";

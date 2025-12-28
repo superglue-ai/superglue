@@ -5,7 +5,8 @@ import { IntegrationForm } from '@/src/components/integrations/IntegrationForm';
 import { FileChip } from '@/src/components/ui/FileChip';
 import { useToast } from '@/src/hooks/use-toast';
 import { needsUIToTriggerDocFetch } from '@/src/lib/client-utils';
-import { formatBytes, generateUniqueKey, MAX_TOTAL_FILE_SIZE_TOOLS, processAndExtractFile, sanitizeFileName, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { formatBytes, MAX_TOTAL_FILE_SIZE_TOOLS, type UploadedFileInfo } from '@/src/lib/file-utils';
+import { useFileUpload } from './hooks/use-file-upload';
 import { cn, composeUrl, getIntegrationIcon as getIntegrationIconName, getSimpleIcon, inputErrorStyles } from '@/src/lib/general-utils';
 import { tokenRegistry } from '@/src/lib/token-registry';
 import { Integration, IntegrationInput, Tool, UpsertMode, SuperglueClient } from '@superglue/shared';
@@ -112,10 +113,15 @@ export function ToolBuilder({
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
 
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileInfo[]>(initialFiles);
-  const [totalFileSize, setTotalFileSize] = useState(initialFiles.reduce((sum, f) => sum + f.size, 0));
-  const [isProcessingFiles, setIsProcessingFiles] = useState(false);
-  const [filePayloads, setFilePayloads] = useState<Record<string, any>>({});
+  const {
+    uploadedFiles,
+    filePayloads,
+    totalFileSize,
+    isProcessing: isProcessingFiles,
+    uploadFiles: handleFilesUpload,
+    removeFile: handleFileRemove,
+    setUploadedFiles,
+  } = useFileUpload();
 
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>(initialIntegrationIds);
 
@@ -147,6 +153,12 @@ export function ToolBuilder({
       return waitForIntegrationProcessing(clientAdapter, integrationIds);
     }
   }), [client]);
+
+  useEffect(() => {
+    if (initialFiles.length > 0) {
+      setUploadedFiles(initialFiles);
+    }
+  }, []);
 
   useEffect(() => {
     if (view === 'instructions' && selectedIntegrationIds.length > 0 && !isGeneratingSuggestions) {
@@ -291,84 +303,6 @@ export function ToolBuilder({
   const handleIntegrationFormCancel = () => {
     setShowIntegrationForm(false);
     setIntegrationFormEdit(null);
-  };
-
-  const handleFilesUpload = async (files: File[]) => {
-    setIsProcessingFiles(true);
-
-    try {
-      const newSize = files.reduce((sum, f) => sum + f.size, 0);
-      if (totalFileSize + newSize > MAX_TOTAL_FILE_SIZE_TOOLS) {
-        toast({
-          title: 'Size limit exceeded',
-          description: `Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE_TOOLS)}`,
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      const existingKeys = Object.keys(filePayloads);
-      const newFiles: UploadedFileInfo[] = [];
-
-      for (const file of files) {
-        try {
-          const baseKey = sanitizeFileName(file.name, { removeExtension: true, lowercase: false });
-          const key = generateUniqueKey(baseKey, [...existingKeys, ...newFiles.map(f => f.key)]);
-
-          const fileInfo: UploadedFileInfo = {
-            name: file.name,
-            size: file.size,
-            key,
-            status: 'processing'
-          };
-          newFiles.push(fileInfo);
-          setUploadedFiles(prev => [...prev, fileInfo]);
-
-          const parsedData = await processAndExtractFile(file, client);
-
-          setFilePayloads(prev => ({ ...prev, [key]: parsedData }));
-          existingKeys.push(key);
-
-          setUploadedFiles(prev => prev.map(f =>
-            f.key === key ? { ...f, status: 'ready' } : f
-          ));
-
-        } catch (error: any) {
-          const fileInfo = newFiles.find(f => f.name === file.name);
-          if (fileInfo) {
-            setUploadedFiles(prev => prev.map(f =>
-              f.key === fileInfo.key
-                ? { ...f, status: 'error', error: error.message }
-                : f
-            ));
-          }
-
-          toast({
-            title: 'File processing failed',
-            description: `Failed to parse ${file.name}: ${error.message}`,
-            variant: 'destructive'
-          });
-        }
-      }
-      setTotalFileSize(prev => prev + newSize);
-
-    } finally {
-      setIsProcessingFiles(false);
-    }
-  };
-
-  const handleFileRemove = (key: string) => {
-    const fileToRemove = uploadedFiles.find(f => f.key === key);
-    if (!fileToRemove) return;
-
-    setFilePayloads(prev => {
-      const copy = { ...prev };
-      delete copy[key];
-      return copy;
-    });
-
-    setUploadedFiles(prev => prev.filter(f => f.key !== key));
-    setTotalFileSize(prev => Math.max(0, prev - (fileToRemove.size || 0)));
   };
 
   const handleBuildTool = async () => {

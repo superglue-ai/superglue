@@ -6,32 +6,34 @@ import { Download, Loader2, OctagonX, X } from 'lucide-react';
 import { useState } from 'react';
 import { JsonCodeEditor } from '../../../editors/JsonCodeEditor';
 import { useDataProcessor } from '../../hooks/use-data-processor';
+import { useExecution } from '../../context';
 import { CopyButton } from '../../shared/CopyButton';
 import { isAbortError } from '@/src/lib/general-utils';
 
 interface StepResultTabProps {
     step: any;
     stepIndex: number;
-    stepResult?: any;
-    failedSteps?: string[];
-    abortedSteps?: string[];
     isExecuting?: boolean;
-    isGlobalExecuting?: boolean;
-    currentExecutingStepIndex?: number;
     isActive?: boolean;
 }
 
 export function StepResultTab({
     step,
     stepIndex,
-    stepResult,
-    failedSteps = [],
-    abortedSteps = [],
     isExecuting,
-    isGlobalExecuting,
-    currentExecutingStepIndex,
     isActive = true,
 }: StepResultTabProps) {
+    const { 
+        getStepResult, 
+        isStepFailed, 
+        isStepAborted, 
+        isExecutingAny, 
+        currentExecutingStepIndex 
+    } = useExecution();
+    
+    const stepResult = getStepResult(step.id);
+    const stepFailed = isStepFailed(step.id);
+    const stepAborted = isStepAborted(step.id);
     const [outputViewMode, setOutputViewMode] = useState<'preview' | 'schema'>('preview');
 
     const outputProcessor = useDataProcessor(stepResult, isActive);
@@ -43,11 +45,9 @@ export function StepResultTab({
         }
     };
 
-    const stepFailed = failedSteps?.includes(step.id);
-    const stepAborted = abortedSteps?.includes(step.id);
     const errorResult = (stepFailed || stepAborted) && (!stepResult || typeof stepResult === 'string');
     const isPending = !stepFailed && !stepAborted && stepResult === undefined;
-    const isActivelyRunning = !!(isExecuting || (isGlobalExecuting && currentExecutingStepIndex === stepIndex));
+    const isActivelyRunning = !!(isExecuting || (isExecutingAny && currentExecutingStepIndex === stepIndex));
 
     let outputString = '';
     let isTruncated = false;

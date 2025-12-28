@@ -5,55 +5,66 @@ import Text from '@tiptap/extension-text';
 import History from '@tiptap/extension-history';
 import HardBreak from '@tiptap/extension-hard-break';
 import { cn } from '@/src/lib/general-utils';
-import { useEffect, useRef, useState, useMemo } from 'react';
-import { TemplateExtension, TemplateContextProvider, useTemplateContext, type CategorizedVariables, type CategorizedSources } from '../tools/templates/tiptap';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { useExecution } from '../tools/context/tool-execution-context';
+import { TemplateExtension } from '../tools/templates/TemplateExtension';
 import { VariableSuggestion } from '../tools/templates/TemplateVariableSuggestion';
 import { TemplateEditPopover } from '../tools/templates/TemplateEditPopover';
-import { templateStringToTiptap, tiptapToTemplateString } from '../tools/templates/tiptap/serialization';
+import { templateStringToTiptap, tiptapToTemplateString } from '@/src/lib/templating-utils';
 import { CopyButton } from '../tools/shared/CopyButton';
-import { evaluateTemplate, parseTemplateString, prepareSourceData } from '@/src/lib/templating-utils';
+import { evaluateTemplate, parseTemplateString } from '@/src/lib/templating-utils';
 import { maskCredentials } from '@superglue/shared';
 import { useTemplateAwareEditor } from '../tools/hooks/use-template-aware-editor';
+import { useResizable } from '@/src/hooks/use-resizable';
 
 interface TemplateAwareJsonEditorProps {
     value: string;
     onChange?: (value: string) => void;
-    stepData: any;
-    dataSelectorOutput?: any;
-    canExecute?: boolean;
-    categorizedVariables?: CategorizedVariables;
-    categorizedSources?: CategorizedSources;
-    readOnly?: boolean;
+    stepId: string;
     minHeight?: string;
     maxHeight?: string;
     placeholder?: string;
     resizable?: boolean;
     showValidation?: boolean;
-    sourceDataVersion?: number;
-    stepId?: string;
+    disabled?: boolean;
 }
 
-function TemplateAwareJsonEditorInner({
+const DEBOUNCE_MS = 200;
+
+export function TemplateAwareJsonEditor({
     value,
     onChange,
-    readOnly = false,
+    stepId,
     minHeight = '75px',
     maxHeight = '300px',
     placeholder = '{}',
     resizable = false,
     showValidation = false,
-    stepData,
-    dataSelectorOutput,
-    canExecute = true,
+    disabled = false,
 }: TemplateAwareJsonEditorProps) {
+    const { getStepTemplateData } = useExecution();
+    const { sourceData, credentials, canExecute, dataSelectorOutput, categorizedVariables, categorizedSources } = getStepTemplateData(stepId);
+    
     const isUpdatingRef = useRef(false);
     const lastValueRef = useRef(value);
-    const [currentHeight, setCurrentHeight] = useState(minHeight);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const debouncedOnChange = useCallback((newValue: string) => {
+        if (!onChange) return;
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => onChange(newValue), DEBOUNCE_MS);
+    }, [onChange]);
+
+    useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+    
+    const { height: resizableHeight, resizeHandleProps } = useResizable({ 
+        minHeight: parseInt(minHeight), 
+        maxHeight: parseInt(maxHeight), 
+        initialHeight: parseInt(minHeight) 
+    });
     const [jsonError, setJsonError] = useState<string | null>(null);
-    const { categorizedVariables, categorizedSources, sourceDataVersion } = useTemplateContext();
     
     const {
-        sourceData,
         suggestionConfig,
         codePopoverOpen,
         setCodePopoverOpen,
@@ -61,18 +72,7 @@ function TemplateAwareJsonEditorInner({
         handleCodeSave,
         editorRef,
         cleanupSuggestion,
-    } = useTemplateAwareEditor({ stepData, dataSelectorOutput, categorizedVariables, categorizedSources });
-    
-    const credentials = useMemo(() => {
-        if (!sourceData || typeof sourceData !== 'object') return {};
-            const pattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
-        return Object.entries(sourceData).reduce((acc, [key, val]) => {
-            if (pattern.test(key) && typeof val === 'string' && val.length > 0) {
-                acc[key] = val;
-            }
-            return acc;
-        }, {} as Record<string, string>);
-    }, [sourceData]);
+    } = useTemplateAwareEditor({ categorizedVariables, categorizedSources });
 
     useEffect(() => cleanupSuggestion, [cleanupSuggestion]);
 
@@ -83,18 +83,18 @@ function TemplateAwareJsonEditorInner({
             Text,
             History,
             HardBreak,
-            TemplateExtension,
+            TemplateExtension.configure({ stepId }),
             VariableSuggestion.configure({ suggestion: suggestionConfig }),
         ],
         content: templateStringToTiptap(value),
-        editable: !readOnly,
+        editable: !disabled,
         immediatelyRender: false,
         editorProps: {
             attributes: {
                 class: cn(
                     'w-full px-3 py-2 text-xs font-mono bg-transparent',
                     'focus:outline-none',
-                    readOnly && 'cursor-not-allowed'
+                    disabled && 'cursor-not-allowed'
                 ),
             },
         },
@@ -103,7 +103,7 @@ function TemplateAwareJsonEditorInner({
             const newValue = tiptapToTemplateString(editor.getJSON());
             if (newValue !== lastValueRef.current) {
                 lastValueRef.current = newValue;
-                onChange?.(newValue);
+                debouncedOnChange(newValue);
             }
         },
     });
@@ -121,7 +121,7 @@ function TemplateAwareJsonEditorInner({
         });
     }, [editor, value]);
 
-    useEffect(() => { editor?.setEditable(!readOnly); }, [editor, readOnly]);
+    useEffect(() => { editor?.setEditable(!disabled); }, [editor, disabled]);
 
     useEffect(() => {
         if (!showValidation || !value?.trim()) {
@@ -130,7 +130,6 @@ function TemplateAwareJsonEditorInner({
         }
 
         let cancelled = false;
-        const sourceData = prepareSourceData(stepData, dataSelectorOutput);
 
         const escapeForJson = (str: string) => 
             str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -175,42 +174,19 @@ function TemplateAwareJsonEditorInner({
 
         const timer = setTimeout(validateJson, 300);
         return () => { cancelled = true; clearTimeout(timer); };
-    }, [showValidation, value, stepData, dataSelectorOutput, canExecute]);
+    }, [showValidation, value, sourceData, dataSelectorOutput, canExecute]);
 
-    const handleResize = (e: React.MouseEvent) => {
-        e.preventDefault();
-        const startY = e.clientY;
-        const startHeight = parseInt(currentHeight);
-        const minH = parseInt(minHeight);
-        const maxH = parseInt(maxHeight);
-        const onMove = (e: MouseEvent) => {
-            const newHeight = Math.max(minH, Math.min(maxH, startHeight + (e.clientY - startY)));
-            setCurrentHeight(`${newHeight}px`);
-        };
-        const onUp = () => {
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-        };
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
-    };
 
     return (
         <div className={cn('relative rounded-lg border shadow-sm bg-muted/30')}>
             <div className="absolute top-1 right-1 z-10 mr-1">
                 <CopyButton text={value || placeholder} />
             </div>
-            {resizable && (
-                <div 
-                    className="absolute bottom-1 right-1 w-3 h-3 cursor-se-resize z-10" 
-                    style={{ background: 'linear-gradient(135deg, transparent 50%, rgba(100,100,100,0.3) 50%)' }} 
-                    onMouseDown={handleResize}
-                />
-            )}
+            {resizable && <div {...resizeHandleProps} />}
             <div 
-                className={cn('relative', readOnly ? 'cursor-not-allowed' : 'cursor-text')}
+                className={cn('relative', disabled ? 'cursor-not-allowed' : 'cursor-text')}
                 style={{ 
-                    height: resizable ? currentHeight : 'auto', 
+                    height: resizable ? resizableHeight : 'auto', 
                     minHeight, 
                     maxHeight,
                     overflow: 'auto' 
@@ -231,36 +207,17 @@ function TemplateAwareJsonEditorInner({
             </div>
             {showValidation && jsonError && (
                 <div className="absolute bottom-0 left-0 right-0 px-3 py-2 bg-destructive/10 text-destructive text-xs max-h-24 overflow-y-auto border-t z-10">
-                        Error: {Object.keys(credentials).length > 0 ? maskCredentials(jsonError, credentials) : jsonError}
+                    Error: {Object.keys(credentials).length > 0 ? maskCredentials(jsonError, credentials) : jsonError}
                 </div>
             )}
             <TemplateEditPopover
                 template=""
-                sourceData={sourceData}
                 onSave={handleCodeSave}
+                stepId={stepId}
                 externalOpen={codePopoverOpen}
                 onExternalOpenChange={setCodePopoverOpen}
                 anchorRect={popoverAnchorRect}
-                canExecute={canExecute}
-                sourceDataVersion={sourceDataVersion}
             />
         </div>
-    );
-}
-
-export function TemplateAwareJsonEditor(props: TemplateAwareJsonEditorProps) {
-    return (
-        <TemplateContextProvider 
-            stepData={props.stepData} 
-            dataSelectorOutput={props.dataSelectorOutput} 
-            readOnly={props.readOnly}
-            canExecute={props.canExecute}
-            categorizedVariables={props.categorizedVariables}
-            categorizedSources={props.categorizedSources}
-            sourceDataVersion={props.sourceDataVersion}
-            stepId={props.stepId}
-        >
-            <TemplateAwareJsonEditorInner {...props} />
-        </TemplateContextProvider>
     );
 }
