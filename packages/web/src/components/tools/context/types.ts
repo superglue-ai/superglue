@@ -88,7 +88,7 @@ export interface CategorizedSources {
   manualPayload: Record<string, unknown>;
   filePayloads: Record<string, unknown>;
   previousStepResults: Record<string, unknown>;
-  currentItem: Record<string, unknown> | null;
+  currentItem: unknown;
   paginationData: Record<string, unknown>;
 }
 

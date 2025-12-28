@@ -292,22 +292,28 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     return payloads;
   }, [steps, payload.computedPayload, stepResultsMap]);
   
-  const sourceDataVersionRef = useRef({ version: 0, payloadRef: null as any, resultsRef: null as any, stepsLen: 0 });
+  // stepInputVersion tracks changes to step inputs (payload + previous step results)
+  // Used by data selector effect to know when to re-evaluate
+  const stepInputVersionRef = useRef({ version: 0, payloadRef: null as any, resultsRef: null as any, stepsLen: 0 });
   
   if (
-    sourceDataVersionRef.current.payloadRef !== payload.computedPayload ||
-    sourceDataVersionRef.current.resultsRef !== stepResultsMap ||
-    sourceDataVersionRef.current.stepsLen !== steps.length
+    stepInputVersionRef.current.payloadRef !== payload.computedPayload ||
+    stepInputVersionRef.current.resultsRef !== stepResultsMap ||
+    stepInputVersionRef.current.stepsLen !== steps.length
   ) {
-    sourceDataVersionRef.current = {
-      version: sourceDataVersionRef.current.version + 1,
+    stepInputVersionRef.current = {
+      version: stepInputVersionRef.current.version + 1,
       payloadRef: payload.computedPayload,
       resultsRef: stepResultsMap,
       stepsLen: steps.length,
     };
   }
-  
-  const sourceDataVersion = sourceDataVersionRef.current.version;
+
+  const stepInputVersion = stepInputVersionRef.current.version;
+  // Incremented when setDataSelectorResults is called with new data
+  const dataSelectorVersionRef = useRef(0);
+  // Combined version for template cache - invalidates when EITHER step inputs OR data selector output changes
+  const sourceDataVersion = stepInputVersion * 10000 + dataSelectorVersionRef.current;
   
   const getStepInput = useCallback((stepId?: string): Record<string, any> => {
     if (!stepId) {
@@ -330,7 +336,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       const loopSelector = step.loopSelector ?? '';
       
       const cached = dataSelectorCacheRef.current.get(stepId);
-      if (cached && cached.version === sourceDataVersion && cached.loopSelector === loopSelector) {
+      if (cached && cached.version === stepInputVersion && cached.loopSelector === loopSelector) {
         if (dataSelectorResults[stepId]?.output !== cached.result.output || 
             dataSelectorResults[stepId]?.error !== cached.result.error) {
           setDataSelectorResults(prev => ({ ...prev, [stepId]: cached.result }));
@@ -356,7 +362,8 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
           result = { output: null, error: errorMessage };
         }
         
-        dataSelectorCacheRef.current.set(stepId, { version: sourceDataVersion, loopSelector, result });
+        dataSelectorCacheRef.current.set(stepId, { version: stepInputVersion, loopSelector, result });
+        dataSelectorVersionRef.current += 1;
         setDataSelectorResults(prev => ({ ...prev, [stepId]: result }));
       }, DATA_SELECTOR_DEBOUNCE_MS) as unknown as number;
     }
@@ -366,7 +373,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
         window.clearTimeout(timer);
       }
     };
-  }, [steps, sourceDataVersion]);
+  }, [steps, stepInputVersion]);
 
   const stepTemplateDataMap = useMemo(() => {
     const map: Record<string, StepTemplateData> = {};
@@ -393,7 +400,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       const sourceData: Record<string, any> = {
         ...integrationCredentials,
         ...stepInput,
-        ...(currentItemObj ? { currentItem: currentItemObj } : {}),
+        ...(currentItemObj != null ? { currentItem: currentItemObj } : {}),
         ...paginationData,
       };
       

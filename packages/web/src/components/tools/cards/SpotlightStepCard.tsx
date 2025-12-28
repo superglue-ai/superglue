@@ -519,7 +519,7 @@ export const SpotlightStepCard = React.memo(({
                                         >
                                             <div className="flex items-center gap-1">
                                                 {advancedSettingsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                                                <span>Advanced Step Settings</span>
+                                                <span>Advanced Settings</span>
                                             </div>
                                         </div>
                                         <div className={`overflow-hidden transition-all duration-200 ease-in-out ${advancedSettingsOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>

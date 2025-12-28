@@ -268,14 +268,11 @@ export function buildCategorizedSources(
   };
 }
 
-export function deriveCurrentItem(dataSelectorOutput: unknown): Record<string, unknown> | null {
-  if (dataSelectorOutput && typeof dataSelectorOutput === 'object' && !Array.isArray(dataSelectorOutput)) {
-    return dataSelectorOutput as Record<string, unknown>;
+export function deriveCurrentItem(dataSelectorOutput: unknown): unknown {
+  if (Array.isArray(dataSelectorOutput)) {
+    return dataSelectorOutput.length > 0 ? dataSelectorOutput[0] : null;
   }
-  if (Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 0) {
-    return dataSelectorOutput[0] as Record<string, unknown>;
-  }
-  return null;
+  return dataSelectorOutput;
 }
 interface TiptapJSONContent {
   type?: string;

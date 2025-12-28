@@ -2,17 +2,17 @@
 import { useIntegrations } from "@/src/app/integrations-context";
 import { useTools } from "@/src/app/tools-context";
 import { type UploadedFileInfo } from '@/src/lib/file-utils';
-import { buildEvolvingPayload, isAbortError } from "@/src/lib/general-utils";
+import { buildStepInput, isAbortError } from "@/src/lib/general-utils";
 import { ExecutionStep, generateDefaultFromSchema, Integration, Tool, ToolResult } from "@superglue/shared";
 import { useFileUpload } from "./hooks/use-file-upload";
 import { usePayloadValidation } from "./hooks/use-payload-validation";
 import { useToolExecution } from "./hooks/use-tool-execution";
 import { useToolData } from "./hooks/use-tool-data";
 import { ToolConfigProvider, useToolConfig, ExecutionProvider, useExecution } from "./context";
-import { ArchiveRestore, Check, Hammer, Loader2, Play, Square, X } from "lucide-react";
+import { Check, Hammer, Loader2, Play, Square, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from "../ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { DeployButton } from "./deploy/DeployButton";
 import { FixStepDialog } from "./dialogs/FixStepDialog";
@@ -22,7 +22,6 @@ import { FolderPicker } from "./folders/FolderPicker";
 import { ToolActionsMenu } from "./ToolActionsMenu";
 import { ToolBuilder, type BuildContext } from "./ToolBuilder";
 import { ToolStepGallery } from "./ToolStepGallery";
-import { isAbortError } from "@/src/lib/general-utils";
 
 export interface ToolPlaygroundProps {
   id?: string;
@@ -84,6 +83,7 @@ function ToolPlaygroundInner({
   innerRef,
 }: ToolPlaygroundInnerProps) {
   const router = useRouter();
+  const { refreshTools } = useTools();
   const toolConfig = useToolConfig();
   const execution = useExecution();
   
@@ -111,9 +111,7 @@ function ToolPlaygroundInner({
     clearAllExecutions,
     setFinalResult,
     setTransformStatus,
-<<<<<<< HEAD
-    getStepResultsMap,
-    incrementSourceDataVersion,
+    stepResultsMap,
     isExecutingTransform,
   } = execution;
   
@@ -163,12 +161,6 @@ function ToolPlaygroundInner({
   const [navigateToFinalSignal, setNavigateToFinalSignal] = useState<number>(0);
   const [showStepOutputSignal, setShowStepOutputSignal] = useState<number>(0);
   const [focusStepId, setFocusStepId] = useState<string | null>(null);
-
-  useEffect(() => {
-    incrementSourceDataVersion();
-  }, [stepExecutions, computedPayload, incrementSourceDataVersion]);
-
-  const stepResultsMap = getStepResultsMap();
 
   type DialogState = 
     | { type: 'none' }
@@ -344,9 +336,10 @@ function ToolPlaygroundInner({
     inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
     finalTransform,
     instruction: instructions,
+    folder,
     createdAt: initialTool?.createdAt,
     updatedAt: initialTool?.updatedAt
-  } as Tool), [toolId, steps, responseSchema, inputSchema, finalTransform, instructions, initialTool]);
+  } as Tool), [toolId, steps, responseSchema, inputSchema, finalTransform, instructions, folder, initialTool]);
 
   useImperativeHandle(innerRef, () => ({
     executeTool,
@@ -396,22 +389,6 @@ function ToolPlaygroundInner({
     setNavigateToFinalSignal(Date.now());
   };
 
-  // Tool action handlers
-  const handleRenamed = (newId: string) => {
-    setToolId(newId);
-    refreshTools();
-    router.push(`/tools/${encodeURIComponent(newId)}`);
-  };
-
-  const handleDuplicated = (newId: string) => {
-    refreshTools();
-    router.push(`/tools/${encodeURIComponent(newId)}`);
-  };
-
-  const handleDeleted = () => {
-    router.push('/configs');
-  };
-
   const toolActionButtons = !embedded ? (
     <div className="flex items-center gap-1">
       <FolderPicker
@@ -424,6 +401,7 @@ function ToolPlaygroundInner({
         showLabel
         onRenamed={(newId) => {
           setToolId(newId);
+          refreshTools();
           router.push(`/tools/${encodeURIComponent(newId)}`);
         }}
         onArchived={() => router.push('/configs')}
@@ -434,11 +412,11 @@ function ToolPlaygroundInner({
 
   const defaultHeaderActions = (
     <div className="flex items-center gap-2">
-      {isArchived ? (
+      {loading ? (
         <Button
           variant="outline"
           onClick={handleStopExecution}
-          disabled={saving || isExecutingStep != null || isExecutingTransform}
+          disabled={saving || (isExecutingStep != null) || isExecutingTransform}
           className="h-9 px-4"
         >
           <Square className="h-4 w-4" />
@@ -448,14 +426,14 @@ function ToolPlaygroundInner({
         <Button
           variant="outline"
           onClick={handleRunAllSteps}
-          disabled={loading || saving || isExecutingStep != null || isExecutingTransform}
+          disabled={loading || saving || (isExecutingStep != null) || isExecutingTransform || isArchived}
           className="h-9 px-4"
         >
           <Play className="h-4 w-4" />
           Run all Steps
-          </Button>
+        </Button>
       )}
-      {!hideRebuildButton && (
+      {!hideRebuildButton && !isArchived && (
         <Button
           variant="outline"
           onClick={() => {
@@ -468,33 +446,31 @@ function ToolPlaygroundInner({
           Rebuild
         </Button>
       )}
-      {!embedded && (
-        <Button
-          variant="outline"
-          onClick={async () => {
-            await saveTool();
-            setActiveDialog({ type: 'deploy' });
-          }}
+      {!embedded && toolId && !isArchived && (
+        <DeployButton
+          tool={currentTool}
+          payload={computedPayload}
+          onBeforeOpen={saveTool}
+          size="default"
           className="h-9 px-5"
           disabled={saving || loading}
+        />
+      )}
+      {!isArchived && (
+        <Button
+          variant="default"
+          onClick={saveTool}
+          disabled={saving || loading}
+          className="h-9 px-5 w-[108px] shadow-md border border-primary/40"
         >
-          <CloudUpload className="h-4 w-4" />
-          Deploy
+          {saving ? "Saving..." : justSaved ? (
+            <>
+              <Check className="mr-1 h-3.5 w-3.5" />
+              Saved
+            </>
+          ) : "Save"}
         </Button>
       )}
-      <Button
-        variant="default"
-        onClick={saveTool}
-        disabled={saving || loading}
-        className="h-9 px-5 w-[108px] shadow-md border border-primary/40"
-      >
-        {saving ? "Saving..." : justSaved ? (
-          <>
-            <Check className="mr-1 h-3.5 w-3.5" />
-            Saved
-          </>
-        ) : "Save"}
-      </Button>
     </div>
   );
 
@@ -640,34 +616,6 @@ function ToolPlaygroundInner({
         />
       )}
 
-      <ToolDeployModal
-        currentTool={getCurrentTool()}
-        payload={computedPayload}
-        isOpen={activeDialog.type === 'deploy'}
-        onClose={() => setActiveDialog({ type: 'none' })}
-      />
-
-      <RenameToolDialog
-        tool={getCurrentTool()}
-        isOpen={activeDialog.type === 'rename'}
-        onClose={() => setActiveDialog({ type: 'none' })}
-        onRenamed={handleRenamed}
-      />
-
-      <DuplicateToolDialog
-        tool={getCurrentTool()}
-        isOpen={activeDialog.type === 'duplicate'}
-        onClose={() => setActiveDialog({ type: 'none' })}
-        onDuplicated={handleDuplicated}
-      />
-
-      <DeleteConfigDialog
-        config={{ ...getCurrentTool(), type: 'tool' } as any}
-        isOpen={activeDialog.type === 'delete'}
-        onClose={() => setActiveDialog({ type: 'none' })}
-        onDeleted={handleDeleted}
-      />
-
       <FixTransformDialog
         open={activeDialog.type === 'fixTransform'}
         onClose={handleCloseFixTransformDialog}
@@ -708,4 +656,3 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>((pr
 
 ToolPlayground.displayName = 'ToolPlayground';
 export default ToolPlayground;
-
