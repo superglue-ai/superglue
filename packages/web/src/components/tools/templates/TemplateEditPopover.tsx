@@ -18,7 +18,8 @@ import { DEFAULT_CODE_TEMPLATE, formatValueForDisplay, normalizeTemplateExpressi
 import Editor from '@monaco-editor/react';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { isArrowFunction, maskCredentials } from '@superglue/shared';
-import { AlertCircle, Download, Eye, EyeOff, Loader2, Maximize2, Minimize2 } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Loader2, Maximize2, Minimize2 } from 'lucide-react';
+import { DownloadButton } from '@/src/components/ui/download-button';
 import type * as Monaco from 'monaco-editor';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTemplatePreview } from '../hooks/use-template-preview';
@@ -202,17 +203,6 @@ export function TemplateEditPopover({
     setOpen(false);
   };
 
-  const handleDownload = () => {
-    const downloadContent = (showRevealButton && showCredentials) ? previewDisplayRaw : maskedPreview;
-    const blob = new Blob([downloadContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `template-result.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const isLoopArray = loopMode && Array.isArray(previewValue) && previewValue.length > 0;
   const currentItemValue = isLoopArray ? previewValue[0] : previewValue;
   const activePreviewValue = (loopMode && previewTab === 'currentItem') ? currentItemValue : previewValue;
@@ -352,13 +342,11 @@ export function TemplateEditPopover({
                 </button>
               )}
               <CopyButton getData={() => previewDisplay} />
-              <button
-                onClick={handleDownload}
-                className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted/80 transition-colors"
-                title="Download"
-              >
-                <Download className="h-3 w-3 text-muted-foreground" />
-              </button>
+              <DownloadButton 
+                data={activePreviewValue} 
+                filename="template-result.json"
+                credentials={showCredentials ? undefined : credentials}
+              />
             </div>
           </div>
         )}

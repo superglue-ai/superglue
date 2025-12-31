@@ -9,9 +9,8 @@ import { useTemplatePreview } from '../../hooks/use-template-preview';
 import { useDataProcessor } from '../../hooks/use-data-processor';
 import { useToolConfig, useExecution } from '../../context';
 import { CopyButton } from '../../shared/CopyButton';
-import { Download, Loader2 } from 'lucide-react';
-import { Button } from '../../../ui/button';
-import { downloadJson } from '@/src/lib/download-utils';
+import { DownloadButton } from '@/src/components/ui/download-button';
+import { Loader2 } from 'lucide-react';
 
 const PLACEHOLDER_VALUE = '';
 const CURRENT_ITEM_KEY = '"currentItem"';
@@ -137,15 +136,7 @@ export function StepInputTab({
                         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     )}
                     <CopyButton text={displayData} />
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => downloadJson(stepInput, 'step_input.json')}
-                        title="Download step input as JSON"
-                    >
-                        <Download className="h-3 w-3" />
-                    </Button>
+                    <DownloadButton data={stepInput} filename="step_input.json" />
                 </div>
                 
                 <div {...resizeHandleProps} />

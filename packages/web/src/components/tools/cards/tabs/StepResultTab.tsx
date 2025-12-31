@@ -1,8 +1,7 @@
-import { Button } from '@/src/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { downloadJson } from '@/src/lib/download-utils';
+import { DownloadButton } from '@/src/components/ui/download-button';
 import { isEmptyData } from '@/src/lib/general-utils';
-import { Download, Loader2, OctagonX, X } from 'lucide-react';
+import { Loader2, OctagonX, X } from 'lucide-react';
 import { useState } from 'react';
 import { JsonCodeEditor } from '../../../editors/JsonCodeEditor';
 import { useDataProcessor } from '../../hooks/use-data-processor';
@@ -141,15 +140,7 @@ export function StepResultTab({
                                     </TabsList>
                                 </Tabs>
                                 <CopyButton text={outputString} />
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() => downloadJson(stepResult, `step_${step.id}_result.json`)}
-                                    title="Download step result as JSON"
-                                >
-                                    <Download className="h-3 w-3" />
-                                </Button>
+                                <DownloadButton data={stepResult} filename={`step_${step.id}_result.json`} />
                             </div>
                         }
                     />

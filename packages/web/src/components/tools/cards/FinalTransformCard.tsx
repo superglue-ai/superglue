@@ -8,13 +8,12 @@ import {
   TabsTrigger,
 } from "@/src/components/ui/tabs";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
-import { downloadJson } from "@/src/lib/download-utils";
+import { DownloadButton } from "@/src/components/ui/download-button";
 import {
   isEmptyData,
 } from "@/src/lib/general-utils";
 import {
   Code2,
-  Download,
   FileBracesCorner,
   FileInput,
   FilePlay,
@@ -341,17 +340,7 @@ export const FinalTransformMiniStepCard = ({
                           {inputData.bytes.toLocaleString()} bytes
                         </span>
                         <CopyButton text={inputData.displayString} />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() =>
-                            downloadJson(stepInputs, "transform_step_inputs.json")
-                          }
-                          title="Download transform inputs as JSON"
-                        >
-                          <Download className="h-3 w-3" />
-                        </Button>
+                        <DownloadButton data={stepInputs} filename="transform_step_inputs.json" />
                       </div>
                     }
                   />
@@ -460,20 +449,7 @@ export const FinalTransformMiniStepCard = ({
                               {outputData.bytes.toLocaleString()} bytes
                             </span>
                             <CopyButton text={outputData.displayString} />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() =>
-                                downloadJson(
-                                  transformResult,
-                                  "tool_result.json"
-                                )
-                              }
-                              title="Download tool result as JSON"
-                            >
-                              <Download className="h-3 w-3" />
-                            </Button>
+                            <DownloadButton data={transformResult} filename="tool_result.json" />
                           </div>
                         }
                       />
