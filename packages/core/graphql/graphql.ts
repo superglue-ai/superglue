@@ -1,27 +1,48 @@
-import { GraphQLUpload } from 'graphql-upload-ts';
+import { GraphQLUpload } from "graphql-upload-ts";
 import fs from "node:fs";
-import { callResolver } from "./resolvers/call.js";
+import { callEndpointResolver } from "./resolvers/call-endpoint.js";
 import { deleteApiResolver } from "./resolvers/delete.js";
 import { extractResolver } from "./resolvers/extract.js";
-import { generateInstructionsResolver, generateStepConfigResolver } from "./resolvers/generate.js";
+import {
+  generateInstructionsResolver,
+  generateStepConfigResolver,
+  generateTransformResolver,
+} from "./resolvers/generate.js";
 import { getApiResolver, getRunResolver } from "./resolvers/get.js";
-import { cacheOauthClientCredentialsResolver, deleteIntegrationResolver, findRelevantIntegrationsResolver, getIntegrationResolver, getOAuthClientCredentialsResolver, listIntegrationsResolver, searchIntegrationDocumentationResolver, upsertIntegrationResolver } from "./resolvers/integrations.js";
+import {
+  cacheOauthClientCredentialsResolver,
+  deleteIntegrationResolver,
+  findRelevantIntegrationsResolver,
+  getIntegrationResolver,
+  getOAuthClientCredentialsResolver,
+  listIntegrationsResolver,
+  searchIntegrationDocumentationResolver,
+  upsertIntegrationResolver,
+} from "./resolvers/integrations.js";
 import { listApisResolver, listRunsResolver } from "./resolvers/list.js";
 import { logsResolver } from "./resolvers/logs.js";
+import { renameWorkflowResolver } from "./resolvers/rename-workflow.js";
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
 import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant.js";
-import { updateApiConfigIdResolver } from "./resolvers/update-id.js";
 import { upsertApiResolver } from "./resolvers/upsert.js";
-import { deleteWorkflowScheduleResolver, listWorkflowSchedulesResolver, upsertWorkflowScheduleResolver } from "./resolvers/workflow-scheduler.js";
 import {
+  deleteWorkflowScheduleResolver,
+  listWorkflowSchedulesResolver,
+  upsertWorkflowScheduleResolver,
+} from "./resolvers/workflow-scheduler.js";
+import {
+  abortToolExecutionResolver,
   buildWorkflowResolver,
   deleteWorkflowResolver,
   executeWorkflowResolver,
   findRelevantToolsResolver,
+  fixWorkflowResolver,
   getWorkflowResolver,
   listWorkflowsResolver,
-  upsertWorkflowResolver
+  upsertWorkflowResolver,
 } from "./resolvers/workflow.js";
+
+export const typeDefs = fs.readFileSync("../../api.graphql", "utf8");
 
 export const resolvers = {
   Query: {
@@ -42,15 +63,15 @@ export const resolvers = {
   },
   Mutation: {
     setTenantInfo: setTenantInfoResolver,
-    call: callResolver,
     extract: extractResolver,
     executeWorkflow: executeWorkflowResolver,
+    abortToolExecution: abortToolExecutionResolver,
     buildWorkflow: buildWorkflowResolver,
     upsertWorkflow: upsertWorkflowResolver,
     deleteWorkflow: deleteWorkflowResolver,
+    renameWorkflow: renameWorkflowResolver,
     upsertApi: upsertApiResolver,
     deleteApi: deleteApiResolver,
-    updateApiConfigId: updateApiConfigIdResolver,
     upsertIntegration: upsertIntegrationResolver,
     cacheOauthClientCredentials: cacheOauthClientCredentialsResolver,
     getOAuthClientCredentials: getOAuthClientCredentialsResolver,
@@ -58,6 +79,9 @@ export const resolvers = {
     upsertWorkflowSchedule: upsertWorkflowScheduleResolver,
     deleteWorkflowSchedule: deleteWorkflowScheduleResolver,
     generateStepConfig: generateStepConfigResolver,
+    generateTransform: generateTransformResolver,
+    callEndpoint: callEndpointResolver,
+    fixWorkflow: fixWorkflowResolver,
   },
   Subscription: {
     logs: logsResolver,
@@ -66,6 +90,25 @@ export const resolvers = {
   JSONSchema: JSONSchemaResolver,
   JSONata: JSONataResolver,
   Upload: GraphQLUpload,
+  ExtractConfig: {
+    // Ensure ExtractConfig.id is always non-null at runtime, even though schema allows nullable
+    // for union type compatibility with ApiConfig
+    id: (parent: any) => {
+      // If id is null/undefined, generate one (shouldn't happen, but safety check)
+      if (!parent.id) {
+        throw new Error("Workflow.id is missing");
+      }
+      return parent.id;
+    },
+  },
+  Workflow: {
+    // Ensure Workflow.id is always non-null at runtime, even though schema allows nullable
+    // for union type compatibility with ApiConfig
+    id: (parent: any) => {
+      // If id is null/undefined, generate one (shouldn't happen, but safety check)
+      return parent.id || crypto.randomUUID();
+    },
+  },
   ConfigType: {
     __resolveType(obj: any, context: any, info: any) {
       // Get the parent field name from the path
@@ -83,4 +126,3 @@ export const resolvers = {
     },
   },
 };
-export const typeDefs = fs.readFileSync("../../api.graphql", "utf8");

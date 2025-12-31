@@ -23,20 +23,20 @@ type ApiConfig implements BaseConfig {
   version: String
   createdAt: DateTime
   updatedAt: DateTime
-  
-  urlHost: String                   # Base URL for the API (e.g., "https://api.stripe.com")
-  urlPath: String                   # Path component of the URL (e.g., "/v1/customers")
-  method: HttpMethod                # HTTP method to use (default: GET)
-  headers: JSON                     # Request headers (default: {})
-  queryParams: JSON                 # URL query parameters (default: {})
-  body: String                      # Request body for POST/PUT/PATCH requests
-  instruction: String               # Natural language description
-  authentication: AuthType          # Authentication method (default: NONE)
-  responseSchema: JSONSchema        # Expected response format (auto-generated if not provided)
-  responseMapping: JSONata          # JSONata transformation (optional)
-  pagination: Pagination            # Pagination configuration (default: DISABLED)
-  dataPath: String                  # JSONPath to extract data from response (e.g., "$.data")
-  documentationUrl: String          # API documentation URL
+
+  urlHost: String # Base URL for the API (e.g., "https://api.stripe.com")
+  urlPath: String # Path component of the URL (e.g., "/v1/customers")
+  method: HttpMethod # HTTP method to use (default: GET)
+  headers: JSON # Request headers (default: {})
+  queryParams: JSON # URL query parameters (default: {})
+  body: String # Request body for POST/PUT/PATCH requests
+  instruction: String # Natural language description
+  authentication: AuthType # Authentication method (default: NONE)
+  responseSchema: JSONSchema # Expected response format (auto-generated if not provided)
+  responseMapping: JSONata # JSONata transformation (optional)
+  pagination: Pagination # Pagination configuration (default: DISABLED)
+  dataPath: String # JSONPath to extract data from response (e.g., "$.data")
+  documentationUrl: String # API documentation URL
 }
 ```
 
@@ -52,13 +52,13 @@ type Workflow implements BaseConfig {
   version: String
   createdAt: DateTime
   updatedAt: DateTime
-  
-  steps: [ExecutionStep!]           # Workflow execution steps
-  integrationIds: [ID]              # Integration IDs used in workflow
-  instruction: String               # Natural language description
-  finalTransform: JSONata           # Final data transformation
-  responseSchema: JSONSchema        # Expected final output format
-  inputSchema: JSONSchema           # Expected input format
+
+  steps: [ExecutionStep!] # Workflow execution steps
+  integrationIds: [ID] # Integration IDs used in workflow
+  instruction: String # Natural language description
+  finalTransform: JSONata # Final data transformation
+  responseSchema: JSONSchema # Expected final output format
+  inputSchema: JSONSchema # Expected input format
 }
 ```
 
@@ -69,30 +69,31 @@ Configuration for scheduled workflow execution. Workflows can be executed on a r
 ```graphql
 type WorkflowSchedule {
   id: ID!
-  workflowId: String!               # ID of the workflow to execute
-  cronExpression: String!           # Cron expression (5-field: minute hour day month weekday)
-  timezone: String!                 # IANA timezone (e.g., "America/New_York", "UTC", "Europe/London")
-  enabled: Boolean!                 # Whether the schedule is active
-  payload: JSON                     # Input data to pass to workflow execution
-  options: JSON                     # Execution options (timeout, retries, etc.)
-  lastRunAt: DateTime               # Timestamp of last execution
-  nextRunAt: DateTime!              # Calculated next execution time (in UTC)
+  workflowId: String! # ID of the workflow to execute
+  cronExpression: String! # Cron expression (5-field: minute hour day month weekday)
+  timezone: String! # IANA timezone (e.g., "America/New_York", "UTC", "Europe/London")
+  enabled: Boolean! # Whether the schedule is active
+  payload: JSON # Input data to pass to workflow execution
+  options: JSON # Execution options (timeout, retries, etc.)
+  lastRunAt: DateTime # Timestamp of last execution
+  nextRunAt: DateTime! # Calculated next execution time (in UTC)
   createdAt: DateTime!
   updatedAt: DateTime!
 }
 
 input WorkflowScheduleInput {
-  id: ID                            # Schedule ID (for updates only)
-  workflowId: ID                    # Workflow ID (required for new schedules)
-  cronExpression: String            # Cron expression (required for new schedules)
-  timezone: String                  # IANA timezone (required for new schedules)
-  enabled: Boolean                  # Enable or disable the schedule
-  payload: JSON                     # Input data for workflow execution
-  options: JSON                     # Execution options
+  id: ID # Schedule ID (for updates only)
+  workflowId: ID # Workflow ID (required for new schedules)
+  cronExpression: String # Cron expression (required for new schedules)
+  timezone: String # IANA timezone (required for new schedules)
+  enabled: Boolean # Enable or disable the schedule
+  payload: JSON # Input data for workflow execution
+  options: JSON # Execution options
 }
 ```
 
 **Cron Expression Format:**
+
 - Uses standard 5-field cron syntax: `minute hour day month weekday`
 - Minute: 0-59
 - Hour: 0-23
@@ -103,6 +104,7 @@ input WorkflowScheduleInput {
 - Does NOT support seconds or years
 
 **Common Examples:**
+
 - `0 2 * * *` - Daily at 2:00 AM
 - `0 * * * *` - Every hour
 - `*/15 * * * *` - Every 15 minutes
@@ -110,6 +112,7 @@ input WorkflowScheduleInput {
 - `0 0 * * 0` - Weekly on Sunday at midnight
 
 **Timezone Handling:**
+
 - All schedules require a valid IANA timezone
 - Next run times are calculated in the specified timezone
 - Times are stored in UTC internally
@@ -122,13 +125,14 @@ Individual step within a workflow.
 ```graphql
 type ExecutionStep {
   id: String!
-  apiConfig: ApiConfig!             # API configuration for this step
-  integrationId: ID                 # Integration to use for this step
-  executionMode: String             # DIRECT | LOOP
-  loopSelector: JSONata             # JSONata expression for loop iteration
-  loopMaxIters: Int                 # Maximum loop iterations
-  inputMapping: JSONata             # Input data transformation
-  responseMapping: JSONata          # Response data transformation
+  modify: Boolean # Whether this step modifies data (writes, updates, deletes)
+  apiConfig: ApiConfig! # API configuration for this step
+  integrationId: ID # Integration to use for this step
+  executionMode: String # DIRECT | LOOP
+  loopSelector: JSONata # JSONata expression for loop iteration
+  loopMaxIters: Int # Maximum loop iterations
+  inputMapping: JSONata # Input data transformation
+  responseMapping: JSONata # Response data transformation
 }
 ```
 
@@ -139,16 +143,16 @@ Third-party service integration configuration.
 ```graphql
 type Integration {
   id: ID!
-  name: String                      # Human-readable name
-  type: String                      # Integration type
-  urlHost: String                   # Base host URL
-  urlPath: String                   # Default path
-  credentials: JSON                 # Stored credentials (encrypted at rest)
-  documentationUrl: String          # Link to API documentation
-  documentation: String             # Documentation content
-  documentationPending: Boolean     # Whether documentation is being processed
-  icon: String                      # Icon URL
-  version: String                   # Integration version
+  name: String # Human-readable name
+  type: String # Integration type
+  urlHost: String # Base host URL
+  urlPath: String # Default path
+  credentials: JSON # Stored credentials (encrypted at rest)
+  documentationUrl: String # Link to API documentation
+  documentation: String # Documentation content
+  documentationPending: Boolean # Whether documentation is being processed
+  icon: String # Icon URL
+  version: String # Integration version
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -160,8 +164,8 @@ AI-suggested integration based on natural language search terms.
 
 ```graphql
 type SuggestedIntegration {
-  integration: Integration!         # Full integration object
-  reason: String!                   # Why this integration is relevant
+  integration: Integration! # Full integration object
+  reason: String! # Why this integration is relevant
 }
 ```
 
@@ -171,17 +175,17 @@ AI-suggested tool (workflow) based on natural language search terms.
 
 ```graphql
 type ToolStep {
-  integrationId: String             # Integration used in this step
-  instruction: String               # Step-level instruction
+  integrationId: String # Integration used in this step
+  instruction: String # Step-level instruction
 }
 
 type SuggestedTool {
-  id: ID!                           # Tool identifier
-  instruction: String               # What the tool does
-  inputSchema: JSONSchema           # Input schema for the tool
-  steps: [ToolStep!]!               # Steps and integrations used
-  responseSchema: JSONSchema        # Output schema for the tool
-  reason: String!                   # Why this tool matches the search
+  id: ID! # Tool identifier
+  instruction: String # What the tool does
+  inputSchema: JSONSchema # Input schema for the tool
+  steps: [ToolStep!]! # Steps and integrations used
+  responseSchema: JSONSchema # Output schema for the tool
+  reason: String! # Why this tool matches the search
 }
 ```
 
@@ -191,8 +195,8 @@ Tenant account information.
 
 ```graphql
 type TenantInfo {
-  email: String                     # Tenant email
-  emailEntrySkipped: Boolean!       # Whether email entry was skipped
+  email: String # Tenant email
+  emailEntrySkipped: Boolean! # Whether email entry was skipped
 }
 ```
 
@@ -221,8 +225,7 @@ Result of individual workflow step execution.
 type WorkflowStepResult {
   stepId: String!
   success: Boolean!
-  rawData: JSON
-  transformedData: JSON
+  data: JSON
   error: String
 }
 ```
@@ -263,14 +266,15 @@ Configuration for automatic pagination handling.
 
 ```graphql
 type Pagination {
-  type: PaginationType!             # Pagination strategy (OFFSET_BASED, PAGE_BASED, CURSOR_BASED, DISABLED)
-  pageSize: String                  # Number of items per page (default: "100")
-  cursorPath: String                # JSONPath to cursor field for cursor-based pagination (e.g., "$.next_cursor")
-  stopCondition: String             # Condition to stop pagination (optional)
+  type: PaginationType! # Pagination strategy (OFFSET_BASED, PAGE_BASED, CURSOR_BASED, DISABLED)
+  pageSize: String # Number of items per page (default: "100")
+  cursorPath: String # JSONPath to cursor field for cursor-based pagination (e.g., "$.next_cursor")
+  stopCondition: String # Condition to stop pagination (optional)
 }
 ```
 
 **Pagination Types:**
+
 - `OFFSET_BASED`: Uses offset/limit parameters
 - `PAGE_BASED`: Uses page number and page size
 - `CURSOR_BASED`: Uses cursor tokens for navigation
@@ -279,6 +283,7 @@ type Pagination {
 ## List Types
 
 ### RunList
+
 ```graphql
 type RunList {
   items: [RunResult!]!
@@ -287,6 +292,7 @@ type RunList {
 ```
 
 ### WorkflowList
+
 ```graphql
 type WorkflowList {
   items: [Workflow!]!
@@ -295,6 +301,7 @@ type WorkflowList {
 ```
 
 ### IntegrationList
+
 ```graphql
 type IntegrationList {
   items: [Integration!]!
@@ -333,6 +340,7 @@ Supported file formats:
 - `JSON` - JSON files
 - `CSV` - CSV files
 - `XML` - XML files
+- `YAML` - YAML files
 
 ### DecompressionMethod
 
@@ -439,15 +447,13 @@ Result of an individual step within a workflow execution.
 type WorkflowStepResult {
   stepId: String!
   success: Boolean!
-  rawData: JSON
-  transformedData: JSON
+  data: JSON
   error: String
 }
 ```
 
 - `stepId`: Identifier of the step within the workflow
-- `rawData`: Raw response data before transformation
-- `transformedData`: Data after applying transformations
+- `data`: Response Data
 
 ### ExecutionStep
 
@@ -456,9 +462,10 @@ Configuration for a single step within a workflow.
 ```graphql
 type ExecutionStep {
   id: String!
+  modify: Boolean # Whether this step modifies data (writes, updates, deletes)
   apiConfig: ApiConfig!
   integrationId: ID
-  executionMode: String     # DIRECT | LOOP
+  executionMode: String # DIRECT | LOOP
   loopSelector: JSONata
   loopMaxIters: Int
   inputMapping: JSONata
@@ -466,6 +473,7 @@ type ExecutionStep {
 }
 ```
 
+- `modify`: Indicates whether this operation modifies data on the system it operates on (creates, updates, or deletes). Read-only operations should be `false`. Default is `false`.
 - `executionMode`: How to execute the step (DIRECT for single execution, LOOP for batch processing)
 - `loopSelector`: JSONata expression to select items for looping
 - `loopMaxIters`: Maximum iterations for loop mode (default: 1000)
@@ -487,7 +495,7 @@ type SuggestedIntegration {
 - `reason`: Explanation of why this integration was suggested
 - `savedCredentials`: Names of credentials already saved for this integration
 
- See also:
+See also:
 
 - [Overview](overview.md) for common parameters
 - [Mutations](mutations.md) for operations using these types

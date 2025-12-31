@@ -8,26 +8,23 @@ export class SupabaseKeyManager implements AuthManager {
 
   constructor() {
     this.initialRefreshPromise = this.refreshApiKeys();
-    setInterval(
-      () => this.refreshApiKeys(),
-      this.API_KEY_CACHE_TTL
-    );
+    setInterval(() => this.refreshApiKeys(), this.API_KEY_CACHE_TTL);
   }
 
   public async authenticate(token: string): Promise<AuthResult> {
     await this.initialRefreshPromise;
-    
+
     let keys = await this.getApiKeys();
-    let key = keys.find(k => k.key === token);
+    let key = keys.find((k) => k.key === token);
     if (!key) {
       await this.refreshApiKeys();
       keys = await this.getApiKeys();
-      key = keys.find(k => k.key === token);
+      key = keys.find((k) => k.key === token);
     }
 
-    return { 
+    return {
       success: !!key,
-      orgId: key?.orgId || ''
+      orgId: key?.orgId || "",
     };
   }
 
@@ -41,8 +38,8 @@ export class SupabaseKeyManager implements AuthManager {
     const SUPABASE_SERVICE_ROLE_KEY = process.env.PRIV_SUPABASE_SERVICE_ROLE_KEY;
 
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
-      console.error('Missing required Supabase environment variables');
-      throw new Error('Missing required Supabase environment variables');
+      console.error("Missing required Supabase environment variables");
+      throw new Error("Missing required Supabase environment variables");
     }
 
     const PAGE_SIZE = 1000;
@@ -53,16 +50,16 @@ export class SupabaseKeyManager implements AuthManager {
     while (hasMore) {
       const url = `${SUPABASE_URL}/rest/v1/sg_superglue_api_keys?select=org_id,key,is_active&limit=${PAGE_SIZE}&offset=${offset}`;
       const response = await fetch(url, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          'Prefer': 'count=exact'
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          Prefer: "count=exact",
         },
       });
 
       if (!response.ok) {
-        logMessage('error', `Failed to fetch API keys: ${response.statusText}`);
+        logMessage("error", `Failed to fetch API keys: ${response.statusText}`);
         return [];
       }
 
@@ -76,14 +73,16 @@ export class SupabaseKeyManager implements AuthManager {
       }
     }
 
-    return allData.filter(item => item.is_active === true).map(item => ({ orgId: item.org_id, key: item.key }));
+    return allData
+      .filter((item) => item.is_active === true)
+      .map((item) => ({ orgId: item.org_id, key: item.key }));
   }
 
   private async refreshApiKeys(): Promise<void> {
     try {
       this.cachedApiKeys = await this.fetchApiKeys();
     } catch (error) {
-      console.error('Failed to refresh API keys:', error);
+      console.error("Failed to refresh API keys:", error);
       this.cachedApiKeys = [];
     }
   }

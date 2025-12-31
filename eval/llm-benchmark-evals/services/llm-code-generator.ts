@@ -1,5 +1,5 @@
-import type { Metadata } from "@superglue/shared";
-import { generateText } from 'ai';
+import type { ServiceMetadata } from "@superglue/shared";
+import { generateText } from "ai";
 import { logMessage } from "../../../packages/core/utils/logs.js";
 import type { IntegrationConfig, ToolConfig } from "../../tool-evals/types.js";
 
@@ -8,27 +8,27 @@ const MAX_CODE_SIZE = 10000;
 export class LlmCodeGenerator {
   constructor(
     private model: any,
-    private metadata: Metadata
+    private metadata: ServiceMetadata,
   ) {}
 
   async generate(tool: ToolConfig, integrations: IntegrationConfig[]): Promise<string> {
     const systemPrompt = this.getSystemPrompt();
     const userPrompt = this.generatePrompt(tool, integrations);
 
-    logMessage('info', `Generating code for tool ${tool.id}`, this.metadata);
+    logMessage("info", `Generating code for tool ${tool.id}`, this.metadata);
 
     const response = await generateText({
       model: this.model,
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
       ],
       // temperature: 0.1,
     });
 
     const code = this.extractCode(response.text);
     if (!code) {
-      throw new Error('No valid JavaScript code found in LLM response');
+      throw new Error("No valid JavaScript code found in LLM response");
     }
 
     return this.truncateCode(code);
@@ -42,28 +42,34 @@ Always wrap your code in <<CODE>> and <</CODE>> tags (note the closing tag has a
   }
 
   private generatePrompt(tool: ToolConfig, integrations: IntegrationConfig[]): string {
-    const integrationDetails = integrations.map(integration => {
-      const credentialEntries = Object.entries(integration.credentials || {});
-      const credentialPairs = credentialEntries.map(([key, value]) => {
-        if (!value || value === '') {
-          logMessage('warn', `Missing credential ${key} for integration ${integration.id}`, this.metadata);
-          return `    const ${key} = "MISSING_CREDENTIAL";`;
-        }
-        return `    const ${key} = "${value}";`;
-      });
+    const integrationDetails = integrations
+      .map((integration) => {
+        const credentialEntries = Object.entries(integration.credentials || {});
+        const credentialPairs = credentialEntries.map(([key, value]) => {
+          if (!value || value === "") {
+            logMessage(
+              "warn",
+              `Missing credential ${key} for integration ${integration.id}`,
+              this.metadata,
+            );
+            return `    const ${key} = "MISSING_CREDENTIAL";`;
+          }
+          return `    const ${key} = "${value}";`;
+        });
 
-      const codeSnippet = `// ${integration.name} Configuration
+        const codeSnippet = `// ${integration.name} Configuration
 const ${integration.id}_config = {
     baseUrl: "${integration.urlHost}"
 };
-${credentialPairs.join('\n')};`;
+${credentialPairs.join("\n")};`;
 
-      return `Integration: ${integration.name}
+        return `Integration: ${integration.name}
 Base URL: ${integration.urlHost}
 
 Ready-to-use configuration:
 ${codeSnippet}`;
-    }).join('\n\n---\n\n');
+      })
+      .join("\n\n---\n\n");
 
     return `Task: ${tool.instruction}
 
@@ -112,7 +118,7 @@ return executeTask();
 
   private extractCode(response: string): string | null {
     let cleanResponse = response.trim();
-    if (cleanResponse.startsWith('`') && cleanResponse.endsWith('`')) {
+    if (cleanResponse.startsWith("`") && cleanResponse.endsWith("`")) {
       cleanResponse = cleanResponse.slice(1, -1).trim();
     }
 
@@ -135,8 +141,11 @@ return executeTask();
     }
 
     // Last resort: if response looks like code
-    if (cleanResponse.includes('fetch(') || cleanResponse.includes('async function')) {
-      cleanResponse = cleanResponse.replace(/^<<CODE>>/, '').replace(/<<CODE>>$/, '').trim();
+    if (cleanResponse.includes("fetch(") || cleanResponse.includes("async function")) {
+      cleanResponse = cleanResponse
+        .replace(/^<<CODE>>/, "")
+        .replace(/<<CODE>>$/, "")
+        .trim();
       return cleanResponse;
     }
 
@@ -150,4 +159,3 @@ return executeTask();
     return code;
   }
 }
-

@@ -1,82 +1,107 @@
-import { SelfHealingMode } from "@superglue/client";
+import { SelfHealingMode } from "@superglue/shared";
 import { calculateNextRun } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { DataStore } from "../datastore/types.js";
 import { executeWorkflowResolver } from "../graphql/resolvers/workflow.js";
+import { GraphQLRequestContext, WorkerPools } from "../graphql/types.js";
 import { logMessage } from "../utils/logs.js";
 
 export class WorkflowSchedulerWorker {
-    private datastore: DataStore;
-    private intervalId: NodeJS.Timeout;
-    private intervalMs: number;
-    private isRunning: boolean = false;
+  private datastore: DataStore;
+  private workerPools: WorkerPools;
+  private intervalId: NodeJS.Timeout;
+  private intervalMs: number;
+  private isRunning: boolean = false;
 
-    constructor(datastore: DataStore, intervalMs: number = 1000 * 30) {
-        this.datastore = datastore;
-        this.intervalMs = intervalMs;
+  constructor(datastore: DataStore, workerPools: WorkerPools, intervalMs: number = 1000 * 30) {
+    this.datastore = datastore;
+    this.workerPools = workerPools;
+    this.intervalMs = intervalMs;
+  }
+
+  public start(): void {
+    if (this.isRunning) {
+      return;
     }
 
-    public start(): void {
-        if (this.isRunning) {
-            return;
-        }
+    this.isRunning = true;
+    this.intervalId = setInterval(this.pollAndExecute.bind(this), this.intervalMs);
 
-        this.isRunning = true;
-        this.intervalId = setInterval(this.pollAndExecute.bind(this), this.intervalMs);
+    logMessage("info", "WORKFLOW SCHEDULER: Async scheduler service started");
+  }
 
-        logMessage('info', 'WORKFLOW SCHEDULER: Async scheduler service started');
+  public stop(): void {
+    if (!this.isRunning) {
+      return;
     }
 
-    public stop(): void {
-        if (!this.isRunning) {
-            return;
-        }
-
-        this.isRunning = false;
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-            this.intervalId = null;
-        }
-
-        logMessage('info', 'WORKFLOW SCHEDULER: Scheduler service stopped');
+    this.isRunning = false;
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
     }
 
-    private async pollAndExecute(): Promise<void> {
-        const schedules = await this.datastore.listDueWorkflowSchedules();
-        logMessage('debug', `WORKFLOW SCHEDULER: Found ${schedules.length} due schedules`);
+    logMessage("info", "WORKFLOW SCHEDULER: Scheduler service stopped");
+  }
 
-        for (const schedule of schedules) {
-            try {
-                logMessage('debug', `WORKFLOW SCHEDULER: Running scheduled workflow ${schedule.workflowId}`);
+  private async pollAndExecute(): Promise<void> {
+    const schedules = await this.datastore.listDueWorkflowSchedules();
+    logMessage("debug", `WORKFLOW SCHEDULER: Found ${schedules.length} due schedules`);
 
-                const now = new Date(Date.now());
-                const nextRun = calculateNextRun(schedule.cronExpression, schedule.timezone, now);
-                await this.datastore.updateScheduleNextRun({ id: schedule.id, nextRunAt: nextRun, lastRunAt: now });
+    for (const schedule of schedules) {
+      try {
+        const traceId = crypto.randomUUID();
+        logMessage(
+          "info",
+          `WORKFLOW SCHEDULER: Running scheduled workflow ${schedule.workflowId}`,
+          { orgId: schedule.orgId, traceId },
+        );
 
-                const context = {
-                    datastore: this.datastore,
-                    orgId: schedule.orgId
-                };
+        const now = new Date(Date.now());
+        const nextRun = calculateNextRun(schedule.cronExpression, schedule.timezone, now);
+        await this.datastore.updateScheduleNextRun({
+          id: schedule.id,
+          nextRunAt: nextRun,
+          lastRunAt: now,
+        });
 
-                const options = schedule.options ? {
-                    ...schedule.options,
-                    selfHealing: schedule.options.selfHealing ? SelfHealingMode[schedule.options.selfHealing as keyof typeof SelfHealingMode] : undefined
-                } : {};
+        const context: GraphQLRequestContext = {
+          datastore: this.datastore,
+          workerPools: this.workerPools,
+          traceId,
+          orgId: schedule.orgId,
+          toMetadata: function () {
+            return { orgId: this.orgId, traceId: this.traceId };
+          },
+        };
 
-                await executeWorkflowResolver(
-                    {},
-                    {
-                        input: { id: schedule.workflowId },
-                        payload: schedule.payload || {},
-                        credentials: {},
-                        options
-                    },
-                    context,
-                    {} as GraphQLResolveInfo
-                );
-            } catch (error) {
-                logMessage('error', `WORKFLOW SCHEDULER: Failed to run scheduled workflow ${schedule.workflowId}: ${error}`);
+        const options = schedule.options
+          ? {
+              ...schedule.options,
+              selfHealing: schedule.options.selfHealing
+                ? SelfHealingMode[schedule.options.selfHealing as keyof typeof SelfHealingMode]
+                : undefined,
             }
-        }
+          : {};
+
+        await executeWorkflowResolver(
+          {},
+          {
+            input: { id: schedule.workflowId },
+            payload: schedule.payload || {},
+            credentials: {},
+            options,
+          },
+          context,
+          {} as GraphQLResolveInfo,
+        );
+      } catch (error) {
+        logMessage(
+          "error",
+          `WORKFLOW SCHEDULER: Failed to run scheduled workflow ${schedule.workflowId}: ${error}`,
+          { orgId: schedule.orgId },
+        );
+      }
     }
+  }
 }

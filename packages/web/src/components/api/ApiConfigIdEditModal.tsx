@@ -1,5 +1,5 @@
 import { useConfig } from "@/src/app/config-context";
-import { tokenRegistry } from '@/src/lib/token-registry';
+import { tokenRegistry } from "@/src/lib/token-registry";
 import { Button } from "@/src/components/ui/button";
 import {
   Dialog,
@@ -11,7 +11,6 @@ import {
 } from "@/src/components/ui/dialog";
 import { Input } from "@/src/components/ui/input";
 import { useToast } from "@/src/hooks/use-toast";
-import { SuperglueClient } from '@superglue/client';
 import React, { useState } from "react";
 
 type ApiConfigIdEditModalProps = {
@@ -52,16 +51,15 @@ const ApiConfigIdEditModal = ({
         return;
       }
 
-
       // TODO: Once the client SDK is updated:
       // const result = await superglueClient.updateApiConfigId(configId, newConfigId);
 
       // TODO: remove! call GraphQL mutation directly until it's in the SDK
       const response = await fetch(`${config.superglueEndpoint}/graphql`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenRegistry.getToken()}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${tokenRegistry.getToken()}`,
         },
         body: JSON.stringify({
           query: `
@@ -73,9 +71,9 @@ const ApiConfigIdEditModal = ({
           `,
           variables: {
             oldId: configId,
-            newId: newConfigId
-          }
-        })
+            newId: newConfigId,
+          },
+        }),
       });
 
       const result = await response.json();
@@ -98,7 +96,9 @@ const ApiConfigIdEditModal = ({
       onConfigUpdated(newConfigId);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred while updating the config ID");
+      setError(
+        err instanceof Error ? err.message : "An error occurred while updating the config ID",
+      );
       console.error("Error updating config ID:", err);
     } finally {
       setIsSubmitting(false);
@@ -134,25 +134,19 @@ const ApiConfigIdEditModal = ({
               </div>
             </div>
 
-            {error && (
-              <div className="text-red-500 text-sm mt-2">{error}</div>
-            )}
+            {error && <div className="text-red-500 text-sm mt-2">{error}</div>}
 
             <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded-md border border-amber-200 dark:border-amber-800 mt-2">
               <p className="text-amber-800 dark:text-amber-300 dark:text-amber-300 text-sm">
-                <strong>Warning:</strong> Changing the ID will break any existing code that references the current ID.
-                Make sure to update all references in your application code.
+                <strong>Warning:</strong> Changing the ID will break any existing code that
+                references the current ID. Make sure to update all references in your application
+                code.
               </p>
             </div>
           </div>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
@@ -165,4 +159,4 @@ const ApiConfigIdEditModal = ({
   );
 };
 
-export default ApiConfigIdEditModal; 
+export default ApiConfigIdEditModal;

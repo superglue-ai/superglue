@@ -1,0 +1,36 @@
+{
+  "name": "@superglue/client",
+  "version": "3.0.1",
+  "description": "TypeScript SDK for the Superglue AI API",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "scripts": {
+    "generate": "orval",
+    "build": "npm run generate && tsc",
+    "publish:patch": "../scripts/publish-sdk-js.sh patch",
+    "publish:minor": "../scripts/publish-sdk-js.sh minor",
+    "publish:major": "../scripts/publish-sdk-js.sh major"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "orval": "^7.3.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "superglue",
+    "api",
+    "sdk",
+    "typescript"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/superglue-ai/superglue.git",
+    "directory": "packages/sdk/js"
+  }
+}

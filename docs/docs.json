@@ -29,27 +29,18 @@
               "guides/creating-a-tool",
               "guides/debugging-a-tool",
               "guides/deploying-a-tool",
+              "guides/using-template-expressions",
               "guides/using-the-agent",
               "mcp/using-the-mcp"
             ]
           },
           {
-            "group": "JavaScript SDK",
-            "pages": [
-              "sdk/overview",
-              "sdk/methods",
-              "sdk/types"
-            ]
+            "group": "SDK Reference",
+            "pages": ["sdk/overview", "sdk/methods", "sdk/types"]
           },
           {
             "group": "API Reference",
-            "pages": [
-              "api/overview",
-              "api/types",
-              "api/queries",
-              "api/mutations",
-              "api/subscriptions"
-            ]
+            "openapi": "openapi.yaml"
           }
         ]
       }

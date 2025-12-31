@@ -1,46 +1,41 @@
-import { ApiConfig, Integration } from "@superglue/client";
+import {
+  ApiConfig,
+  GenerateStepConfigArgs,
+  GenerateTransformArgs,
+  Integration,
+} from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { executeTool, ToolCall } from "../../execute/tools.js";
-import { InstructionGenerationContext } from "../../utils/workflow-tools.js";
-import { telemetryClient } from "../../utils/telemetry.js";
-import { Context, Metadata } from '../types.js';
-import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { getGenerateStepConfigContext } from "../../context/context-builders.js";
-import { LLMMessage } from "../../llm/language-model.js";
 import { GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../../context/context-prompts.js";
+import { IntegrationManager } from "../../integrations/integration-manager.js";
+import { LLMMessage } from "../../llm/llm-base-model.js";
+import { executeLLMTool, LLMToolCall } from "../../llm/llm-tool-utils.js";
+import { InstructionGenerationContext } from "../../llm/llm-tools.js";
+import { buildSourceData, generateStepConfig } from "../../tools/tool-step-builder.js";
+import { generateWorkingTransform } from "../../tools/tool-transform.js";
 import { logMessage } from "../../utils/logs.js";
-import { generateStepConfig } from "../../build/tool-step-builder.js";
-
-interface GenerateStepConfigArgs {
-  integrationId?: string;
-  instruction: string;
-  currentStepConfig?: Partial<ApiConfig>;
-  stepInput?: Record<string, any>;
-  credentials?: Record<string, string>;
-  errorMessage?: string;
-  editInstruction?: string;
-}
+import { telemetryClient } from "../../utils/telemetry.js";
+import { GraphQLRequestContext } from "../types.js";
 
 export const generateInstructionsResolver = async (
   _: any,
   { integrations }: { integrations: Integration[] },
-  context: Context,
-  info: GraphQLResolveInfo
+  context: GraphQLRequestContext,
+  info: GraphQLResolveInfo,
 ) => {
   try {
-    const toolCall: ToolCall = {
+    const toolCall: LLMToolCall = {
       id: crypto.randomUUID(),
       name: "generate_instructions",
-      arguments: {}
+      arguments: {},
     };
 
     const toolContext: InstructionGenerationContext = {
-      orgId: context.orgId,
-      runId: crypto.randomUUID(),
-      integrations: integrations
+      ...context.toMetadata(),
+      integrations: integrations,
     };
 
-    const callResult = await executeTool(toolCall, toolContext);
+    const callResult = await executeLLMTool(toolCall, toolContext);
 
     if (callResult.error) {
       throw new Error(callResult.error);
@@ -53,7 +48,8 @@ export const generateInstructionsResolver = async (
     throw new Error("Failed to generate instructions");
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
-      integrations: integrations
+      traceId: context.traceId,
+      integrations: integrations,
     });
     throw error;
   }
@@ -61,75 +57,164 @@ export const generateInstructionsResolver = async (
 
 export const generateStepConfigResolver = async (
   _: any,
-  { integrationId, instruction, currentStepConfig, stepInput, credentials, errorMessage, editInstruction }: GenerateStepConfigArgs,
-  context: Context,
-  info: GraphQLResolveInfo
-) => {
+  {
+    integrationId,
+    currentStepConfig,
+    currentDataSelector,
+    stepInput,
+    credentials,
+    errorMessage,
+  }: GenerateStepConfigArgs,
+  context: GraphQLRequestContext,
+  info: GraphQLResolveInfo,
+): Promise<{ config: ApiConfig; dataSelector: string }> => {
   try {
-    const metadata: Metadata = { orgId: context.orgId, runId: crypto.randomUUID() };
-    
-    let integration: Integration | undefined;
-    let integrationDocs = '';
-    let integrationSpecificInstructions = '';
+    const metadata = context.toMetadata();
 
-    if (editInstruction && editInstruction.length < 100) {
-      logMessage('error', `Edit instruction must be at least 100 characters long`, metadata);
-      throw new Error('Edit instruction must be at least 100 characters long');
+    // Extract instruction from currentStepConfig
+    const instruction = currentStepConfig?.instruction;
+    if (!instruction) {
+      throw new Error("Instruction is required in currentStepConfig");
     }
-    if (errorMessage && errorMessage.length < 100) {
-      throw new Error('Error message must be at least 100 characters long');
-    }
-    
+
+    let integration: Integration | undefined;
+    let integrationDocs = "";
+    let integrationSpecificInstructions = "";
+    let integrationCredentials: Record<string, string> = {};
+
     if (integrationId) {
       try {
-        logMessage('info', `Generating step config for integration ${integrationId}`, metadata);
-        const integrationManager = new IntegrationManager(integrationId, context.datastore, context.orgId);
+        logMessage("info", `Generating step config for integration ${integrationId}`, metadata);
+        const integrationManager = new IntegrationManager(
+          integrationId,
+          context.datastore,
+          context.toMetadata(),
+        );
         integration = await integrationManager.getIntegration();
-        integrationDocs = (await integrationManager.getDocumentation())?.content || '';
-        integrationSpecificInstructions = integration.specificInstructions || '';
+        integrationDocs = (await integrationManager.getDocumentation())?.content || "";
+        integrationSpecificInstructions = integration.specificInstructions || "";
+
+        // Get integration credentials and prefix keys with integration ID
+        if (integration?.credentials) {
+          Object.entries(integration.credentials).forEach(([key, value]) => {
+            integrationCredentials[`${integrationId}_${key}`] = String(value);
+          });
+        }
       } catch (error) {
         telemetryClient?.captureException(error, context.orgId, {
-          integrationId
+          integrationId,
         });
       }
     }
-    
-    const mode = errorMessage ? 'self-healing' 
-      : editInstruction ? 'edit' 
-      : 'create';
-    
-    const userPrompt = getGenerateStepConfigContext({
-      instruction,
-      previousStepConfig: currentStepConfig,
-      stepInput,
-      credentials,
-      integrationDocumentation: integrationDocs,
-      integrationSpecificInstructions: integrationSpecificInstructions,
-      errorMessage,
-      editInstruction
-    }, { characterBudget: 50000, mode });
+
+    // Merge provided credentials with integration credentials (provided credentials take precedence)
+    const mergedCredentials = {
+      ...integrationCredentials,
+      ...(credentials || {}),
+    };
+
+    // Mode is either 'self-healing' if there's an error, or 'edit' (since we're always editing based on updated instruction)
+    const mode = errorMessage ? "self-healing" : "edit";
+
+    const userPrompt = getGenerateStepConfigContext(
+      {
+        instruction,
+        previousStepConfig: currentStepConfig,
+        previousStepDataSelector: currentDataSelector,
+        stepInput,
+        credentials: mergedCredentials,
+        integrationDocumentation: integrationDocs,
+        integrationSpecificInstructions: integrationSpecificInstructions,
+        errorMessage,
+      },
+      { characterBudget: 50000, mode },
+    );
 
     const messages: LLMMessage[] = [
       {
         role: "system",
-        content: GENERATE_STEP_CONFIG_SYSTEM_PROMPT
+        content: GENERATE_STEP_CONFIG_SYSTEM_PROMPT,
       },
       {
         role: "user",
-        content: userPrompt
-      }
+        content: userPrompt,
+      },
     ];
 
-    const generateStepConfigResult = await generateStepConfig(0, messages);
-          
+    const sourceData = await buildSourceData({
+      stepInput,
+      credentials: mergedCredentials,
+      dataSelector: currentDataSelector,
+      integrationUrlHost: integration?.urlHost,
+      paginationPageSize: currentStepConfig?.pagination?.pageSize,
+    });
+
+    const generateStepConfigResult = await generateStepConfig({
+      retryCount: 0,
+      messages,
+      sourceData,
+      integration,
+      metadata,
+    });
+
     if (!generateStepConfigResult.success || !generateStepConfigResult.config) {
       throw new Error(generateStepConfigResult.error || "No step config generated");
     }
-          
-    return generateStepConfigResult.config;
+
+    // Merge the generated config with the current config
+    // Only preserve instruction and id which is not part of generated config
+    const mergedConfig = {
+      ...generateStepConfigResult.config,
+      id: currentStepConfig.id || crypto.randomUUID(), // Add this line
+      instruction: currentStepConfig.instruction,
+    } as ApiConfig;
+
+    return { config: mergedConfig, dataSelector: generateStepConfigResult.dataSelector };
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
-      integrationId
+      traceId: context.traceId,
+      integrationId,
+    });
+
+    throw error;
+  }
+};
+
+export const generateTransformResolver = async (
+  _: any,
+  { currentTransform, responseSchema, stepData, errorMessage, instruction }: GenerateTransformArgs,
+  context: GraphQLRequestContext,
+  info: GraphQLResolveInfo,
+): Promise<{ transformCode: string; data?: any }> => {
+  try {
+    const metadata = context.toMetadata();
+
+    const prompt =
+      (instruction || "Create transformation code.") +
+      (currentTransform
+        ? `\nOriginally, we used the following transformation: ${currentTransform}`
+        : "") +
+      (errorMessage ? `\nThe transformation failed with the following error: ${errorMessage}` : "");
+
+    const result = await generateWorkingTransform({
+      targetSchema: responseSchema,
+      inputData: stepData,
+      instruction: prompt,
+      metadata,
+    });
+
+    if (!result) {
+      throw new Error("Failed to generate transform code");
+    }
+
+    return {
+      transformCode: result.transformCode,
+      data: result.data,
+    };
+  } catch (error) {
+    telemetryClient?.captureException(error, context.orgId, {
+      errorMessage,
+      instruction,
     });
     throw error;
   }

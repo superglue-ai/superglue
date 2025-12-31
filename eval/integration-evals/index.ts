@@ -10,5 +10,3 @@ main().catch((error) => {
 });
 
 export { main };
-
-

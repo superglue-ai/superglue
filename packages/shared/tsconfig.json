@@ -3,11 +3,11 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": ".",
+    "declaration": true,
+    "declarationMap": true,
     "paths": {
-      "@/*": [
-        "./*"
-      ]
-    }  
+      "@/*": ["./*"]
+    }
   },
   "include": ["./**/*"]
-} 
+}

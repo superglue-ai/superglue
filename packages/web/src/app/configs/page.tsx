@@ -1,28 +1,8 @@
-"use client"
+"use client";
 
-import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
-import { useIntegrations } from '@/src/app/integrations-context';
-import { ConfigCreateStepper } from '@/src/components/api/ConfigCreateStepper';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/src/components/ui/alert-dialog";
+import { useIntegrations } from "@/src/app/integrations-context";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/src/components/ui/select";
 import {
   Table,
   TableBody,
@@ -32,163 +12,111 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 
-import ToolSchedulesList from '@/src/components/tools/schedule/ToolSchedulesList';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
-import { loadFromCache, saveToCache } from '@/src/lib/cache-utils';
-import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
-import { ApiConfig, Integration, SuperglueClient, Workflow as Tool } from '@superglue/client';
-import { Calendar, Check, Copy, Filter, Globe, Hammer, History, Loader2, Play, Plus, RotateCw, Search, Settings, Trash2 } from "lucide-react";
-import { useRouter } from 'next/navigation';
-import React from 'react';
-import type { SimpleIcon } from 'simple-icons';
-import * as simpleIcons from 'simple-icons';
-import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
+import { DeployButton } from "@/src/components/tools/deploy/DeployButton";
+import { FolderSelector, useFolderFilter } from "@/src/components/tools/folders/FolderSelector";
+import { InlineFolderPicker } from "@/src/components/tools/folders/InlineFolderPicker";
+import { CopyButton } from "@/src/components/tools/shared/CopyButton";
+import { ToolActionsMenu } from "@/src/components/tools/ToolActionsMenu";
+import { ToolCreateStepper } from "@/src/components/tools/ToolCreateStepper";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/src/components/ui/tooltip";
+import { getIntegrationIcon as getIntegrationIconName } from "@/src/lib/general-utils";
+import { Integration, Tool } from "@superglue/shared";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Globe,
+  Hammer,
+  Loader2,
+  Plus,
+  RotateCw,
+  Search,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import type { SimpleIcon } from "simple-icons";
+import * as simpleIcons from "simple-icons";
+import { useTools } from "../tools-context";
 
-const CACHE_PREFIX = 'superglue-tools-cache';
-
-interface CachedTools {
-  configs: (ApiConfig | Tool)[];
-  timestamp: number;
-}
+type SortColumn = "id" | "folder" | "instruction" | "updatedAt";
+type SortDirection = "asc" | "desc";
 
 const ConfigTable = () => {
   const router = useRouter();
-  const [allConfigs, setAllConfigs] = React.useState<(ApiConfig | Tool)[]>([]);
-  const [configs, setConfigs] = React.useState<(ApiConfig | Tool)[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [total, setTotal] = React.useState(0);
-  const [page, setPage] = React.useState(0);
-  const [pageSize] = React.useState(20);
-  const config = useConfig();
+  const { tools, isInitiallyLoading, isRefreshing, refreshTools } = useTools();
   const { integrations } = useIntegrations();
-  const [configToDelete, setConfigToDelete] = React.useState<ApiConfig | Tool | null>(null);
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
-  const [copiedId, setCopiedId] = React.useState<string | null>(null);
-  const [expandedToolId, setExpandedToolId] = React.useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = React.useState("");
-  const [selectedIntegration, setSelectedIntegration] = React.useState<string>("all");
-  const [showToolStepper, setShowToolStepper] = React.useState(false);
 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [manuallyOpenedStepper, setManuallyOpenedStepper] = useState(false);
 
-  const refreshConfigs = React.useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      const superglueClient = new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: tokenRegistry.getToken()
-      });
+  const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
+  const [sortColumn, setSortColumn] = useState<SortColumn>("updatedAt");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
-      const [apiConfigs, toolConfigs] = await Promise.all([
-        superglueClient.listApis(1000, 0),
-        superglueClient.listWorkflows(1000, 0),
-      ]);
+  const { selectedFolder, setSelectedFolder, filteredByFolder } = useFolderFilter(tools);
 
-      const combinedConfigs = [
-        ...apiConfigs.items.map(item => ({ ...item, type: 'api' as const })),
-        ...toolConfigs.items.map((item: any) => ({ ...item, type: 'tool' as const }))
-      ].sort((a, b) => {
-        const dateA = new Date(a.updatedAt || a.createdAt).getTime();
-        const dateB = new Date(b.updatedAt || b.createdAt).getTime();
-        return dateB - dateA;
-      });
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-      setAllConfigs(combinedConfigs);
-      setTotal(combinedConfigs.length);
-      setPage(0);
-
-      saveToCache(CACHE_PREFIX, {
-        configs: combinedConfigs,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      console.error('Error fetching configs:', error);
-    } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [config.superglueEndpoint]);
-
-  React.useEffect(() => {
-    const cachedData = loadFromCache<CachedTools>(CACHE_PREFIX);
-    if (cachedData) {
-      setAllConfigs(cachedData.configs);
-      setTotal(cachedData.configs.length);
-      setLoading(false);
-    }
-    refreshConfigs();
-  }, [refreshConfigs]);
-
-  React.useEffect(() => {
-    const filtered = allConfigs.filter(config => {
+  // Memoize filtered and sorted configs
+  const currentConfigs = useMemo(() => {
+    let filtered = filteredByFolder.filter((config) => {
       if (!config) return false;
 
-      // Search filter
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        const configString = JSON.stringify(config).toLowerCase();
-        if (!configString.includes(searchLower)) return false;
-      }
+      if (debouncedSearchTerm) {
+        const searchLower = debouncedSearchTerm.toLowerCase();
+        // Only search relevant fields instead of entire object
+        const searchableText = [config.id, config.folder, config.instruction]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
 
-      // Integration filter
-      if (selectedIntegration !== "all") {
-        const configType = (config as any).type;
-        const isTool = configType === 'tool';
-
-        if (!isTool) return false;
-
-        const tool = config as Tool;
-        const allIntegrationIds = new Set<string>();
-
-        if (tool.integrationIds) {
-          tool.integrationIds.forEach(id => allIntegrationIds.add(id));
-        }
-
-        if (tool.steps) {
-          tool.steps.forEach((step: any) => {
-            if (step.integrationId) {
-              allIntegrationIds.add(step.integrationId);
-            }
-          });
-        }
-
-        if (!allIntegrationIds.has(selectedIntegration)) return false;
+        if (!searchableText.includes(searchLower)) return false;
       }
 
       return true;
     });
 
-    setTotal(filtered.length);
+    filtered = [...filtered].sort((a, b) => {
+      const dir = sortDirection === "asc" ? 1 : -1;
+      switch (sortColumn) {
+        case "id":
+          return dir * a.id.localeCompare(b.id);
+        case "folder":
+          return dir * (a.folder || "").localeCompare(b.folder || "");
+        case "instruction":
+          return dir * (a.instruction || "").localeCompare(b.instruction || "");
+        case "updatedAt":
+          return (
+            dir *
+            (new Date(a.updatedAt || a.createdAt).getTime() -
+              new Date(b.updatedAt || b.createdAt).getTime())
+          );
+        default:
+          return 0;
+      }
+    });
 
-    const start = page * pageSize;
-    const end = start + pageSize;
-    setConfigs(filtered.slice(start, end));
-  }, [page, allConfigs, searchTerm, selectedIntegration, pageSize]);
+    return filtered;
+  }, [filteredByFolder, debouncedSearchTerm, sortColumn, sortDirection]);
 
-  React.useEffect(() => {
-    if (searchTerm || selectedIntegration !== "all") {
-      setPage(0);
-    }
-  }, [searchTerm, selectedIntegration]);
+  const refreshConfigs = useCallback(() => {
+    refreshTools();
+  }, [refreshTools]);
 
   const handleTool = () => {
-    setShowToolStepper(true);
-  };
-
-
-  const handleEdit = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    router.push(`/configs/${id}/edit`);
-  };
-
-  const handlePlay = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    router.push(`/configs/${id}/run`);
-  };
-
-
-  const handleViewLogs = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    router.push(`/runs/${id}`);
+    setManuallyOpenedStepper(true);
   };
 
   const handlePlayTool = (e: React.MouseEvent, id: string) => {
@@ -197,61 +125,22 @@ const ConfigTable = () => {
     router.push(`/tools/${encodeURIComponent(id)}`);
   };
 
-  const handleDelete = async () => {
-    if (!configToDelete) return;
-
-    try {
-      const superglueClient = new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: tokenRegistry.getToken()
-      });
-
-      let deletePromise;
-
-      switch ((configToDelete as any)?.type) {
-        case 'api':
-          deletePromise = superglueClient.deleteApi(configToDelete.id);
-          break;
-        case 'tool':
-          deletePromise = superglueClient.deleteWorkflow(configToDelete.id);
-          break;
-        default:
-          console.error('Unknown config type for deletion:', (configToDelete as any)?.type);
-          return;
-      }
-
-      await deletePromise;
-
-      const deletedId = configToDelete.id;
-      setConfigToDelete(null);
-      setAllConfigs(prev => prev.filter(c => c.id !== deletedId));
-      setTotal(prev => prev - 1);
-    } catch (error) {
-      console.error('Error deleting config:', error);
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection(column === "updatedAt" ? "desc" : "asc");
     }
   };
 
-  const handleCopyId = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(id);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const [copiedDetails, setCopiedDetails] = React.useState<string | null>(null);
-
-  const handleCopyDetails = (e: React.MouseEvent, text: string) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(text);
-    setCopiedDetails(text);
-    setTimeout(() => setCopiedDetails(null), 2000);
-  };
-
-  const handleScheduleClick = async (e: React.MouseEvent, toolId: string) => {
-    e.stopPropagation();
-
-    const newExpandedToolId = toolId === expandedToolId ? null : toolId;
-    setExpandedToolId(newExpandedToolId);
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
+    return sortDirection === "asc" ? (
+      <ArrowUp className="ml-1 h-3 w-3" />
+    ) : (
+      <ArrowDown className="ml-1 h-3 w-3" />
+    );
   };
 
   const getSimpleIcon = (name: string): SimpleIcon | null => {
@@ -272,26 +161,31 @@ const ConfigTable = () => {
     return iconName ? getSimpleIcon(iconName) : null;
   };
 
-  const totalPages = Math.ceil(total / pageSize);
+  useEffect(() => {
+    if (!isInitiallyLoading && !hasCompletedInitialLoad) {
+      setHasCompletedInitialLoad(true);
+    }
+  }, [isInitiallyLoading, hasCompletedInitialLoad]);
 
-  if (showToolStepper) {
+  const shouldShowStepper =
+    manuallyOpenedStepper || (hasCompletedInitialLoad && tools.length === 0);
+
+  if (shouldShowStepper) {
     return (
       <div className="max-w-none w-full min-h-full">
-        <ToolCreateStepper onComplete={() => {
-          setShowToolStepper(false);
-          refreshConfigs();
-        }} />
+        <ToolCreateStepper
+          onComplete={() => {
+            setManuallyOpenedStepper(false);
+            refreshConfigs();
+          }}
+        />
       </div>
-    )
-  }
-
-  if (allConfigs.length === 0 && !loading && !isRefreshing) {
-    setShowToolStepper(true);
+    );
   }
 
   return (
-    <div className="p-8 max-w-none w-full min-h-full">
-      <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2">
+    <div className="p-8 max-w-none w-full h-full flex flex-col overflow-hidden">
+      <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2 flex-shrink-0">
         <h1 className="text-2xl font-bold">Tools</h1>
         <div className="flex gap-4">
           <Button onClick={handleTool}>
@@ -301,8 +195,13 @@ const ConfigTable = () => {
         </div>
       </div>
 
-      <div className="flex gap-3 mb-4">
-        <div className="relative flex-1">
+      <div className="flex flex-wrap gap-3 mb-4 flex-shrink-0">
+        <FolderSelector
+          tools={tools}
+          selectedFolder={selectedFolder}
+          onFolderChange={setSelectedFolder}
+        />
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by ID or details..."
@@ -311,30 +210,49 @@ const ConfigTable = () => {
             className="pl-10"
           />
         </div>
-        <Select value={selectedIntegration} onValueChange={setSelectedIntegration}>
-          <SelectTrigger className="w-[200px]">
-            <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-            <SelectValue placeholder="Filter by integration" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Integrations</SelectItem>
-            {integrations.map((integration) => (
-              <SelectItem key={integration.id} value={integration.id}>
-                {integration.id}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
-      <div className="border rounded-lg">
+      <div className="border rounded-lg flex-1 overflow-auto">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 bg-background z-10">
             <TableRow>
               <TableHead className="w-[60px]"></TableHead>
-              <TableHead>ID</TableHead>
-              <TableHead>Details</TableHead>
-              <TableHead>Updated At</TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-muted/50 select-none"
+                onClick={() => handleSort("id")}
+              >
+                <div className="flex items-center">
+                  ID
+                  <SortIcon column="id" />
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-muted/50 select-none"
+                onClick={() => handleSort("folder")}
+              >
+                <div className="flex items-center">
+                  Folder
+                  <SortIcon column="folder" />
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-muted/50 select-none"
+                onClick={() => handleSort("instruction")}
+              >
+                <div className="flex items-center">
+                  Instructions
+                  <SortIcon column="instruction" />
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-muted/50 select-none"
+                onClick={() => handleSort("updatedAt")}
+              >
+                <div className="flex items-center">
+                  Updated At
+                  <SortIcon column="updatedAt" />
+                </div>
+              </TableHead>
               <TableHead className="text-right">
                 <TooltipProvider>
                   <Tooltip>
@@ -345,7 +263,7 @@ const ConfigTable = () => {
                         onClick={refreshConfigs}
                         className="transition-transform"
                       >
-                        <RotateCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        <RotateCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -357,282 +275,139 @@ const ConfigTable = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading && allConfigs.length === 0 ? (
+            {isInitiallyLoading && tools.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={6} className="h-24 text-center">
                   <Loader2 className="h-6 w-6 animate-spin text-foreground inline-block" />
                 </TableCell>
               </TableRow>
-            ) : configs.length === 0 ? (
+            ) : currentConfigs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                  No results found
+                <TableCell colSpan={6} className="h-24 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <span>
+                      {selectedFolder !== "all" ? "No tools in this folder" : "No results found"}
+                    </span>
+                    {selectedFolder !== "all" && (
+                      <Button variant="outline" size="sm" onClick={() => setSelectedFolder("all")}>
+                        Show all tools
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
-              configs.map((config) => {
-                const configType = (config as any).type;
-                const isApi = configType === 'api';
-                const isTool = configType === 'tool';
+              currentConfigs.map((tool) => {
+                const allIntegrationIds = new Set<string>();
 
-                const handleRunClick = (e: React.MouseEvent) => {
-                  if (isApi) handlePlay(e, config.id);
-                  else if (isTool) handlePlayTool(e, config.id);
-                };
+                if (tool.integrationIds) {
+                  tool.integrationIds.forEach((id) => allIntegrationIds.add(id));
+                }
+
+                if (tool.steps) {
+                  tool.steps.forEach((step: any) => {
+                    if (step.integrationId) {
+                      allIntegrationIds.add(step.integrationId);
+                    }
+                  });
+                }
+
+                const integrationIdsArray = Array.from(allIntegrationIds);
 
                 return (
-                  <React.Fragment key={`${configType}-${config.id}`}>
-                    <TableRow
-                      key={`${configType}-${config.id}`}
-                      className="hover:bg-secondary"
-                    // Consider adding onClick={() => handleRowClick(config)} if needed
-                    >
-                      <TableCell className="w-[60px]">
-                        {isTool && (() => {
-                          const tool = config as Tool;
-                          const allIntegrationIds = new Set<string>();
-
-                          if (tool.integrationIds) {
-                            tool.integrationIds.forEach(id => allIntegrationIds.add(id));
-                          }
-
-                          if (tool.steps) {
-                            tool.steps.forEach((step: any) => {
-                              if (step.integrationId) {
-                                allIntegrationIds.add(step.integrationId);
-                              }
-                            });
-                          }
-
-                          const integrationIdsArray = Array.from(allIntegrationIds);
-
-                          return integrationIdsArray.length > 0 ? (
-                            <div className="flex items-center justify-center gap-1 flex-shrink-0">
-                              {integrationIdsArray.map((integrationId: string) => {
-                                const integration = integrations.find(i => i.id === integrationId);
-                                if (!integration) return null;
-                                const icon = getIntegrationIcon(integration);
-                                return icon ? (
-                                  <TooltipProvider key={integrationId}>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <svg
-                                          width="14"
-                                          height="14"
-                                          viewBox="0 0 24 24"
-                                          fill={`#${icon.hex}`}
-                                          className="flex-shrink-0"
-                                        >
-                                          <path d={icon.path} />
-                                        </svg>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>{integration.id}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                ) : (
-                                  <TooltipProvider key={integrationId}>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>{integration.id}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                );
-                              })}
-                            </div>
-                          ) : null;
-                        })()}
-                      </TableCell>
-                      <TableCell className="font-medium max-w-[200px] truncate relative group">
-                        <div className="flex items-center space-x-1">
-                          <span className="truncate">{config.id}</span>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={(e) => handleCopyId(e, config.id)}
-                                >
-                                  {copiedId === config.id ? (
-                                    <Check className="h-3.5 w-3.5 text-green-500" />
-                                  ) : (
-                                    <Copy className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">
-                                <p>{copiedId === config.id ? "Copied!" : "Copy ID"}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                  <TableRow key={tool.id} className="hover:bg-secondary">
+                    <TableCell className="w-[60px]">
+                      {integrationIdsArray.length > 0 ? (
+                        <div className="flex items-center justify-center gap-1 flex-shrink-0">
+                          {integrationIdsArray.map((integrationId: string) => {
+                            const integration = integrations.find((i) => i.id === integrationId);
+                            if (!integration) return null;
+                            const icon = getIntegrationIcon(integration);
+                            return icon ? (
+                              <TooltipProvider key={integrationId}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill={`#${icon.hex}`}
+                                      className="flex-shrink-0"
+                                    >
+                                      <path d={icon.path} />
+                                    </svg>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{integration.id}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              <TooltipProvider key={integrationId}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{integration.id}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            );
+                          })}
                         </div>
-                      </TableCell>
-                      <TableCell className="max-w-[300px] truncate relative group">
-                        <div className="flex items-center space-x-1">
-                          <span className="truncate">{config.instruction}</span>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={(e) => handleCopyDetails(e, config.instruction || '')}
-                                >
-                                  {copiedDetails === config.instruction ? (
-                                    <Check className="h-3.5 w-3.5 text-green-500" />
-                                  ) : (
-                                    <Copy className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">
-                                <p>{copiedDetails === config.instruction ? "Copied!" : "Copy details"}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="font-medium max-w-[200px] truncate relative group">
+                      <div className="flex items-center space-x-1">
+                        <span className="truncate">{tool.id}</span>
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <CopyButton text={tool.id} />
                         </div>
-                      </TableCell>
-                      <TableCell className="w-[150px]">
-                        {config.updatedAt ? new Date(config.updatedAt).toLocaleDateString() : (config.createdAt ? new Date(config.createdAt).toLocaleDateString() : '')}
-                      </TableCell>
-                      <TableCell className="w-[100px]">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={handleRunClick}
-                            className="gap-2"
-                          >
-                            {isTool ? <Hammer className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                            View
-                          </Button>
-                          {isTool && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => handleScheduleClick(e, config.id)}
-                              className="gap-2"
-                            >
-                              <Calendar className="h-4 w-4" />
-                              Schedules
-                            </Button>
-                          )}
-                          <TooltipProvider>
-                            {/* Common Actions */}
-                            {isApi && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={(e) => handleViewLogs(e, config.id)}
-                                  >
-                                    <History className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>View Run History</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-
-                            {isApi && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={(e) => handleEdit(e, config.id)}
-                                  >
-                                    <Settings className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Edit Configuration</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-
-                            {/* Delete Action (Available for all types) */}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setConfigToDelete(config);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Delete {isApi ? 'Configuration' : 'Tool'}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-
-                    {/* Expanded Details Row */}
-                    {expandedToolId === config.id && (
-                      <TableRow>
-                        <TableCell colSpan={5} className="p-0">
-                          <ToolSchedulesList toolId={config.id} />
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </React.Fragment>
+                      </div>
+                    </TableCell>
+                    <TableCell className="w-[200px] min-w-[200px] max-w-[400px]">
+                      <InlineFolderPicker tool={tool} />
+                    </TableCell>
+                    <TableCell className="max-w-[300px] truncate relative group">
+                      <div className="flex items-center space-x-1">
+                        <span className="truncate">{tool.instruction}</span>
+                        {tool.instruction && (
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <CopyButton text={tool.instruction} />
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="w-[150px]">
+                      {tool.updatedAt
+                        ? new Date(tool.updatedAt).toLocaleDateString()
+                        : tool.createdAt
+                          ? new Date(tool.createdAt).toLocaleDateString()
+                          : ""}
+                    </TableCell>
+                    <TableCell className="w-[140px]">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={(e) => handlePlayTool(e, tool.id)}
+                          className="gap-2"
+                        >
+                          <Hammer className="h-4 w-4" />
+                          View
+                        </Button>
+                        {!tool.archived && <DeployButton tool={tool} className="gap-2" />}
+                        <ToolActionsMenu tool={tool} />
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 );
               })
             )}
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-center space-x-2 py-4">
-        <Button
-          variant="outline"
-          onClick={() => setPage(p => Math.max(0, p - 1))}
-          disabled={page === 0}
-        >
-          Previous
-        </Button>
-        <div className="text-sm">
-          Page {page + 1} of {totalPages}
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-          disabled={page >= totalPages - 1}
-        >
-          Next
-        </Button>
-      </div>
-
-      <AlertDialog open={!!configToDelete} onOpenChange={(open) => !open && setConfigToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this configuration. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

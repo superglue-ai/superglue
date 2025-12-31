@@ -15,17 +15,15 @@
         "id": "ORD-001",
         "date": "2024-01-15",
         "items": [
-          {"product": "Laptop", "quantity": 1, "price": 1299.99},
-          {"product": "Mouse", "quantity": 2, "price": 29.99}
+          { "product": "Laptop", "quantity": 1, "price": 1299.99 },
+          { "product": "Mouse", "quantity": 2, "price": 29.99 }
         ],
         "total": 1359.97
       },
       {
         "id": "ORD-002",
         "date": "2024-02-10",
-        "items": [
-          {"product": "Monitor", "quantity": 1, "price": 399.99}
-        ],
+        "items": [{ "product": "Monitor", "quantity": 1, "price": 399.99 }],
         "total": 399.99
       }
     ],
@@ -54,8 +52,8 @@
         "id": "ORD-003",
         "date": "2024-01-20",
         "items": [
-          {"product": "Desk Chair", "quantity": 1, "price": 249.99},
-          {"product": "Desk Lamp", "quantity": 1, "price": 39.99}
+          { "product": "Desk Chair", "quantity": 1, "price": 249.99 },
+          { "product": "Desk Lamp", "quantity": 1, "price": 39.99 }
         ],
         "total": 289.98
       }
@@ -85,26 +83,22 @@
         "id": "ORD-004",
         "date": "2024-01-25",
         "items": [
-          {"product": "Keyboard", "quantity": 1, "price": 89.99},
-          {"product": "Mouse", "quantity": 1, "price": 29.99},
-          {"product": "Headphones", "quantity": 1, "price": 149.99}
+          { "product": "Keyboard", "quantity": 1, "price": 89.99 },
+          { "product": "Mouse", "quantity": 1, "price": 29.99 },
+          { "product": "Headphones", "quantity": 1, "price": 149.99 }
         ],
         "total": 269.97
       },
       {
         "id": "ORD-005",
         "date": "2024-02-05",
-        "items": [
-          {"product": "Webcam", "quantity": 1, "price": 79.99}
-        ],
+        "items": [{ "product": "Webcam", "quantity": 1, "price": 79.99 }],
         "total": 79.99
       },
       {
         "id": "ORD-006",
         "date": "2024-02-18",
-        "items": [
-          {"product": "Standing Desk", "quantity": 1, "price": 599.99}
-        ],
+        "items": [{ "product": "Standing Desk", "quantity": 1, "price": 599.99 }],
         "total": 599.99
       }
     ],
@@ -154,8 +148,8 @@
         "id": "ORD-007",
         "date": "2024-02-01",
         "items": [
-          {"product": "Tablet", "quantity": 1, "price": 499.99},
-          {"product": "Case", "quantity": 1, "price": 29.99}
+          { "product": "Tablet", "quantity": 1, "price": 499.99 },
+          { "product": "Case", "quantity": 1, "price": 29.99 }
         ],
         "total": 529.98
       }
@@ -184,17 +178,15 @@
       {
         "id": "ORD-008",
         "date": "2024-01-30",
-        "items": [
-          {"product": "Printer", "quantity": 1, "price": 299.99}
-        ],
+        "items": [{ "product": "Printer", "quantity": 1, "price": 299.99 }],
         "total": 299.99
       },
       {
         "id": "ORD-009",
         "date": "2024-02-12",
         "items": [
-          {"product": "Paper", "quantity": 5, "price": 9.99},
-          {"product": "Ink Cartridge", "quantity": 2, "price": 39.99}
+          { "product": "Paper", "quantity": 5, "price": 9.99 },
+          { "product": "Ink Cartridge", "quantity": 2, "price": 39.99 }
         ],
         "total": 129.93
       }
@@ -224,8 +216,8 @@
         "id": "ORD-010",
         "date": "2024-02-08",
         "items": [
-          {"product": "Laptop", "quantity": 1, "price": 1299.99},
-          {"product": "Laptop Bag", "quantity": 1, "price": 49.99}
+          { "product": "Laptop", "quantity": 1, "price": 1299.99 },
+          { "product": "Laptop Bag", "quantity": 1, "price": 49.99 }
         ],
         "total": 1349.98
       }
@@ -254,9 +246,7 @@
       {
         "id": "ORD-011",
         "date": "2024-01-18",
-        "items": [
-          {"product": "Monitor", "quantity": 2, "price": 399.99}
-        ],
+        "items": [{ "product": "Monitor", "quantity": 2, "price": 399.99 }],
         "total": 799.98
       }
     ],
@@ -284,17 +274,15 @@
       {
         "id": "ORD-012",
         "date": "2024-02-14",
-        "items": [
-          {"product": "Desk", "quantity": 1, "price": 449.99}
-        ],
+        "items": [{ "product": "Desk", "quantity": 1, "price": 449.99 }],
         "total": 449.99
       },
       {
         "id": "ORD-013",
         "date": "2024-02-20",
         "items": [
-          {"product": "Bookshelf", "quantity": 1, "price": 179.99},
-          {"product": "Books", "quantity": 10, "price": 15.99}
+          { "product": "Bookshelf", "quantity": 1, "price": 179.99 },
+          { "product": "Books", "quantity": 10, "price": 15.99 }
         ],
         "total": 339.89
       }
@@ -323,9 +311,7 @@
       {
         "id": "ORD-014",
         "date": "2024-02-22",
-        "items": [
-          {"product": "Chair", "quantity": 4, "price": 179.99}
-        ],
+        "items": [{ "product": "Chair", "quantity": 4, "price": 179.99 }],
         "total": 719.96
       }
     ],
@@ -339,4 +325,3 @@
     }
   }
 ]
-

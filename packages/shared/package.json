@@ -4,24 +4,34 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./templates": "./dist/templates.js",
-    "./utils": "./dist/utils.js",
-    "./files": "./dist/files/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./templates": {
+      "types": "./dist/templates.d.ts",
+      "default": "./dist/templates.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "default": "./dist/utils.js"
+    }
   },
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@ai-sdk/amazon-bedrock": "^3.0.61",
     "@ai-sdk/anthropic": "^2.0.25",
     "@ai-sdk/azure": "^2.0.52",
     "@ai-sdk/google": "^2.0.20",
     "@ai-sdk/openai": "^2.0.46",
     "@anthropic-ai/sdk": "^0.64.0",
-    "@superglue/client": "^2.3.55",
     "ai": "^5.0.76",
+    "axios": "^1.7.9",
     "cron-parser": "^5.3.1",
+    "graphql-ws": "^6.0.4",
     "cron-validate": "^1.5.2",
     "json-schema": "^0.4.0",
     "lodash.isequal": "^4.5.0",

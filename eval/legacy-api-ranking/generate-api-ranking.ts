@@ -102,8 +102,8 @@
 //                     collectLogs: true,
 //                     saveRuns: false,
 //                     delayBetweenAttempts: config.settings.delayBetweenAttempts || 0,
-//                     enableSoftValidation: config.settings.enableSoftValidation || false, 
-//                     expectedResult: workflow.expectedResult 
+//                     enableSoftValidation: config.settings.enableSoftValidation || false,
+//                     expectedResult: workflow.expectedResult
 //                 }
 //             );
 
@@ -277,4 +277,4 @@
 //     .catch((error) => {
 //         console.error('❌ API Ranking generation failed:', error);
 //         process.exit(1);
-//     }); 
+//     });

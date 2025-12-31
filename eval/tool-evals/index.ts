@@ -11,14 +11,14 @@ import { config } from "dotenv";
 import { MetricsCalculator } from "./services/metrics-calculator.js";
 import { CsvReporter } from "./reporters/csv-reporter.js";
 import { ConsoleReporter } from "./reporters/console-reporter.js";
-import { closeAllPools } from "../../packages/core/execute/postgres/postgres.js";
+import { closeAllPools } from "../../packages/core/tools/strategies/postgres/postgres.js";
 import { JsonReporter } from "./reporters/json-reporter.js";
 import { shutdownSharedHtmlMarkdownPool } from "../../packages/core/utils/html-markdown-pool.js";
 import { PlaywrightFetchingStrategy } from "../../packages/core/documentation/strategies/fetching-playwright.js";
 
-const envPath = process.cwd().endsWith('packages/core')
-  ? path.join(process.cwd(), '../../.env')
-  : path.join(process.cwd(), '.env');
+const envPath = process.cwd().endsWith("packages/core")
+  ? path.join(process.cwd(), "../../.env")
+  : path.join(process.cwd(), ".env");
 config({ path: envPath });
 
 async function main(): Promise<void> {
@@ -29,37 +29,51 @@ async function main(): Promise<void> {
   let store: FileStore | undefined;
 
   try {
-    const config = await loadConfig( "../tool-eval-config.json");
+    const config = await loadConfig("../tool-eval-config.json");
     const storePath = join(dirname(fileURLToPath(import.meta.url)), "./.data");
     store = new FileStore(storePath);
 
     const integrationSetupService = new IntegrationSetupService(store, config, metadata);
     const integrations = await integrationSetupService.setupIntegrations();
-  
-    const enabledTools = config.enabledTools === 'all' ? config.tools : config.tools.filter(tool => config.enabledTools.includes(tool.id));
 
-    const enabledToolsCount = config.enabledTools === 'all' ? config.tools.length : config.enabledTools.length;
-    logMessage("info", `Integrations setup: ${integrations.length}, Tools: ${config.tools.length}, Enabled tools: ${enabledToolsCount}`, metadata);
+    const enabledTools =
+      config.enabledTools === "all"
+        ? config.tools
+        : config.tools.filter((tool) => config.enabledTools.includes(tool.id));
+
+    const enabledToolsCount =
+      config.enabledTools === "all" ? config.tools.length : config.enabledTools.length;
+    logMessage(
+      "info",
+      `Integrations setup: ${integrations.length}, Tools: ${config.tools.length}, Enabled tools: ${enabledToolsCount}`,
+      metadata,
+    );
 
     const agentEvalRunner = new ToolRunnerService(store, metadata, config.validationLlmConfig);
-    const toolAttempts = await agentEvalRunner.runTools(enabledTools, integrations, config.settings);
+    const toolAttempts = await agentEvalRunner.runTools(
+      enabledTools,
+      integrations,
+      config.settings,
+    );
 
     const metricsCalculatorService = new MetricsCalculator();
     const metrics = metricsCalculatorService.calculateMetrics(toolAttempts);
 
     const baseDir = dirname(fileURLToPath(import.meta.url));
-    const timestamp = new Date().toISOString().split('.')[0].replace(/[:.]/g, '-');
+    const timestamp = new Date().toISOString().split(".")[0].replace(/[:.]/g, "-");
 
     const csvReporter = new CsvReporter(baseDir, metadata);
     csvReporter.report(timestamp, metrics);
-    
+
     const jsonReporter = new JsonReporter(baseDir, metadata, config.settings.attemptsEachMode);
     jsonReporter.reportAttempts(timestamp, toolAttempts, config);
 
     const duration = new Date().getTime() - startedAt.getTime();
     logMessage("info", `Agent Evaluation Completed in ${(duration / 1000).toFixed(1)}s`, metadata);
 
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await new Promise<void>((resolve) => process.stdout.write("", () => resolve()));
+    await new Promise<void>((resolve) => process.stderr.write("", () => resolve()));
     ConsoleReporter.report(metrics, timestamp, baseDir);
   } catch (error) {
     const message = error instanceof Error ? error.stack || error.message : String(error);
@@ -74,7 +88,7 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch(error => {
-  console.error('Fatal error:', error);
+main().catch((error) => {
+  console.error("Fatal error:", error);
   process.exit(1);
 });

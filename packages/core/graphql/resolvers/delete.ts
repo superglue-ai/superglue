@@ -1,11 +1,11 @@
 import { GraphQLResolveInfo } from "graphql";
-import { Context } from '../types.js';
+import { GraphQLRequestContext } from "../types.js";
 
 export const deleteApiResolver = async (
   _: any,
-  { id }: { id: string; },
-  context: Context,
-  info: GraphQLResolveInfo
+  { id }: { id: string },
+  context: GraphQLRequestContext,
+  info: GraphQLResolveInfo,
 ) => {
   const existing = await context.datastore.getApiConfig({ id, orgId: context.orgId });
   if (!existing) {

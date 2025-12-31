@@ -5,7 +5,7 @@ scalar DateTime
 scalar Upload
 
 interface BaseConfig {
-  id: ID!
+  id: ID
   version: String
   createdAt: DateTime
   updatedAt: DateTime
@@ -16,7 +16,7 @@ union ConfigType = ApiConfig | Workflow | ExtractConfig
 # deprecated - only left in for backwards compatibility with one customer
 type ApiConfig implements BaseConfig {
   # BaseConfig
-  id: ID!
+  id: ID
   version: String
   createdAt: DateTime
   updatedAt: DateTime
@@ -40,7 +40,7 @@ type ApiConfig implements BaseConfig {
 # used by the tool creation for file content extraction
 type ExtractConfig implements BaseConfig {
   # BaseConfig
-  id: ID!
+  id: ID
   version: String
   createdAt: DateTime
   updatedAt: DateTime
@@ -72,6 +72,21 @@ type RunResult {
   config: ConfigType
 }
 
+type Run {
+  id: ID!
+  toolId: String!
+  status: RunStatus!
+  toolConfig: Workflow
+  toolPayload: JSON
+  toolResult: JSON
+  stepResults: [WorkflowStepResult!]
+  options: JSON
+  requestSource: String
+  error: String
+  startedAt: DateTime!
+  completedAt: DateTime
+}
+
 type Pagination {
   type: PaginationType!
   pageSize: String
@@ -80,7 +95,7 @@ type Pagination {
 }
 
 type RunList {
-  items: [RunResult!]!
+  items: [Run!]!
   total: Int!
 }
 
@@ -142,8 +157,14 @@ enum FileType {
   CSV
   JSON
   XML
+  YAML
   RAW
   AUTO
+}
+
+enum FailureBehavior {
+  FAIL
+  CONTINUE
 }
 
 enum LogLevel {
@@ -218,6 +239,13 @@ enum SelfHealingMode {
   DISABLED
 }
 
+enum RunStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  ABORTED
+}
+
 input ApiInputRequest @oneOf {
   endpoint: ApiInput
   id: ID
@@ -252,7 +280,7 @@ type Log {
   message: String!
   level: LogLevel!
   timestamp: DateTime!
-  runId: ID
+  traceId: ID
 }
 
 type SuggestedIntegration {
@@ -282,7 +310,7 @@ type Query {
   findRelevantIntegrations(searchTerms: String): [SuggestedIntegration!]
   findRelevantTools(searchTerms: String): [SuggestedTool!]
 
-  getRun(id: ID!): RunResult
+  getRun(id: ID!): Run
   getApi(id: ID!): ApiConfig
   getWorkflow(id: ID!): Workflow
   getIntegration(id: ID!): Integration
@@ -290,7 +318,7 @@ type Query {
   generateInstructions(integrations: [IntegrationInput!]!): [String!]!
   getTenantInfo: TenantInfo
 
-  listWorkflowSchedules(workflowId: String!): [WorkflowSchedule!]!
+  listWorkflowSchedules(workflowId: String): [WorkflowSchedule!]!
 }
 
 type TenantInfo {
@@ -300,6 +328,7 @@ type TenantInfo {
 
 type ExecutionStep {
   id: String!
+  modify: Boolean
   apiConfig: ApiConfig!
   integrationId: ID
   executionMode: String # DIRECT | LOOP
@@ -307,10 +336,12 @@ type ExecutionStep {
   loopMaxIters: Int
   inputMapping: JSONata
   responseMapping: JSONata
+  failureBehavior: FailureBehavior
 }
 
 input ExecutionStepInput {
   id: String!
+  modify: Boolean
   apiConfig: ApiInput!
   integrationId: ID
   executionMode: String # DIRECT | LOOP
@@ -318,11 +349,12 @@ input ExecutionStepInput {
   loopMaxIters: Int
   inputMapping: JSONata
   responseMapping: JSONata
+  failureBehavior: FailureBehavior
 }
 
 type Workflow implements BaseConfig {
   # BaseConfig
-  id: ID!
+  id: ID
   version: String
   createdAt: DateTime
   updatedAt: DateTime
@@ -335,6 +367,8 @@ type Workflow implements BaseConfig {
   responseSchema: JSONSchema
   inputSchema: JSONSchema
   originalResponseSchema: JSONSchema
+  folder: String
+  archived: Boolean
 }
 
 type WorkflowStepResult {
@@ -343,6 +377,16 @@ type WorkflowStepResult {
   rawData: JSON
   transformedData: JSON
   error: String
+}
+
+type GenerateStepConfigResult {
+  config: ApiConfig!
+  dataSelector: String!
+}
+
+type GenerateTransformResult {
+  transformCode: String!
+  data: JSON
 }
 
 type WorkflowResult {
@@ -354,6 +398,11 @@ type WorkflowResult {
   completedAt: DateTime!
   config: Workflow
   stepResults: [WorkflowStepResult!]
+}
+
+type AbortToolExecutionResult {
+  success: Boolean!
+  runId: ID!
 }
 
 type WorkflowSchedule {
@@ -379,6 +428,8 @@ input WorkflowInput {
   responseSchema: JSONSchema
   version: String
   instruction: String
+  folder: String
+  archived: Boolean
 }
 
 input WorkflowScheduleInput {
@@ -394,13 +445,6 @@ input WorkflowScheduleInput {
 type Mutation {
   setTenantInfo(email: String, emailEntrySkipped: Boolean): TenantInfo!
 
-  call(
-    input: ApiInputRequest!
-    payload: JSON
-    credentials: JSON
-    options: RequestOptions
-  ): RunResult!
-
   extract(
     input: ExtractInputRequest!
     payload: JSON
@@ -413,27 +457,40 @@ type Mutation {
     payload: JSON
     credentials: JSON
     options: RequestOptions
+    runId: ID
+    traceId: ID
   ): WorkflowResult!
+
+  abortToolExecution(runId: ID!): AbortToolExecutionResult!
 
   buildWorkflow(
     instruction: String!
     payload: JSON
     integrationIds: [ID!]
     responseSchema: JSONSchema
+    traceId: ID
   ): Workflow!
 
   generateStepConfig(
-    instruction: String!
     integrationId: String
     currentStepConfig: JSON
+    currentDataSelector: String
     stepInput: JSON
     credentials: JSON
     errorMessage: String
-    editInstruction: String
   ): GenerateStepConfigResult!
+
+  generateTransform(
+    currentTransform: String!
+    responseSchema: JSONSchema
+    stepData: JSON!
+    errorMessage: String
+    instruction: String
+  ): GenerateTransformResult!
 
   upsertWorkflow(id: ID!, input: JSON!): Workflow!
   deleteWorkflow(id: ID!): Boolean!
+  renameWorkflow(oldId: ID!, newId: ID!): Workflow!
 
   upsertWorkflowSchedule(schedule: WorkflowScheduleInput!): WorkflowSchedule!
   deleteWorkflowSchedule(id: ID!): Boolean!
@@ -441,16 +498,31 @@ type Mutation {
   upsertApi(id: ID!, input: JSON!): ApiConfig!
   deleteApi(id: ID!): Boolean!
 
-  updateApiConfigId(oldId: ID!, newId: ID!): ApiConfig!
-
-  upsertIntegration(
-    input: IntegrationInput!
-    mode: UpsertMode = UPSERT
-  ): Integration!
+  upsertIntegration(input: IntegrationInput!, mode: UpsertMode = UPSERT): Integration!
   deleteIntegration(id: ID!): Boolean!
 
-  cacheOauthClientCredentials(clientCredentialsUid: String!, clientId: String!, clientSecret: String!): Boolean!
+  cacheOauthClientCredentials(
+    clientCredentialsUid: String!
+    clientId: String!
+    clientSecret: String!
+  ): Boolean!
   getOAuthClientCredentials(templateId: ID, clientCredentialsUid: String): OAuthClientCredentials!
+
+  callEndpoint(
+    integrationId: ID
+    method: HttpMethod!
+    url: String!
+    headers: JSON
+    body: String
+    timeout: Int
+  ): CallEndpointResult!
+
+  fixWorkflow(
+    workflow: WorkflowInput!
+    fixInstructions: String!
+    lastError: String
+    integrationIds: [ID!]
+  ): FixWorkflowResult!
 }
 
 type Subscription {
@@ -482,8 +554,22 @@ type OAuthClientCredentials {
   client_secret: String!
 }
 
-type GenerateStepConfigResult {
+type CallEndpointResult {
   success: Boolean!
+  status: Int
+  statusText: String
+  headers: JSON
+  body: JSON
   error: String
-  config: JSON!
+  duration: Int!
+}
+
+type ToolDiff {
+  old_string: String!
+  new_string: String!
+}
+
+type FixWorkflowResult {
+  workflow: Workflow!
+  diffs: [ToolDiff!]!
 }

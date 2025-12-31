@@ -1,4 +1,3 @@
-import type { DataStore } from "@superglue/shared";
 import express from "express";
 import fs from "node:fs";
 import type { AddressInfo } from "node:net";
@@ -6,6 +5,7 @@ import path from "node:path";
 import { afterAll, beforeAll } from "vitest";
 import { FileStore } from "../datastore/filestore.js";
 import { MemoryStore } from "../datastore/memory.js";
+import type { DataStore } from "../datastore/types.js";
 
 /**
  * Creates and manages a mock HTTP server for integration tests

@@ -1,6 +1,6 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { logMessage } from '../../../packages/core/utils/logs.js';
+import * as fs from "fs";
+import * as path from "path";
+import { logMessage } from "../../../packages/core/utils/logs.js";
 
 interface BenchmarkFetchResult {
   siteName: string;
@@ -22,15 +22,15 @@ interface BenchmarkEvalResult {
 const SIGNIFICANT_CHANGE_THRESHOLD = 10;
 
 export class BenchmarkComparer {
-  private metadata = { orgId: 'documentation-eval', userId: 'system' };
-  
+  private metadata = { orgId: "documentation-eval", userId: "system" };
+
   constructor(private benchmarkDir: string) {}
 
   compareFetchResults(currentCsvPath: string): void {
-    const benchmarkPath = path.join(this.benchmarkDir, 'fetch-results-baseline.csv');
-    
+    const benchmarkPath = path.join(this.benchmarkDir, "fetch-results-baseline.csv");
+
     if (!fs.existsSync(benchmarkPath)) {
-      logMessage('info', '⚠️  No fetch benchmark found - skipping comparison', this.metadata);
+      logMessage("info", "⚠️  No fetch benchmark found - skipping comparison", this.metadata);
       return;
     }
 
@@ -38,23 +38,35 @@ export class BenchmarkComparer {
     const current = this.parseFetchCsv(currentCsvPath);
 
     // Only compare sites that exist in both
-    const commonSites = Object.keys(current).filter(site => benchmark[site]);
-    const newSites = Object.keys(current).filter(site => !benchmark[site]);
-    
+    const commonSites = Object.keys(current).filter((site) => benchmark[site]);
+    const newSites = Object.keys(current).filter((site) => !benchmark[site]);
+
     if (commonSites.length === 0) {
-      logMessage('info', '⚠️  No common sites between current run and benchmark - skipping comparison', this.metadata);
+      logMessage(
+        "info",
+        "⚠️  No common sites between current run and benchmark - skipping comparison",
+        this.metadata,
+      );
       if (newSites.length > 0) {
-        logMessage('info', `ℹ️  New sites not in benchmark: ${newSites.join(', ')}`, this.metadata);
+        logMessage("info", `ℹ️  New sites not in benchmark: ${newSites.join(", ")}`, this.metadata);
       }
       return;
     }
 
     if (newSites.length > 0) {
-      logMessage('info', `ℹ️  New sites not in benchmark (skipping): ${newSites.join(', ')}`, this.metadata);
+      logMessage(
+        "info",
+        `ℹ️  New sites not in benchmark (skipping): ${newSites.join(", ")}`,
+        this.metadata,
+      );
     }
 
-    logMessage('info', 'Fetch Performance vs Benchmark:', this.metadata);
-    logMessage('info', '═════════════════════════════════════════════════════════════════', this.metadata);
+    logMessage("info", "Fetch Performance vs Benchmark:", this.metadata);
+    logMessage(
+      "info",
+      "═════════════════════════════════════════════════════════════════",
+      this.metadata,
+    );
 
     let significantChanges = 0;
     const changes: string[] = [];
@@ -66,27 +78,37 @@ export class BenchmarkComparer {
       const docSizeChange = ((c.docSizeMB - b.docSizeMB) / b.docSizeMB) * 100;
 
       if (Math.abs(docSizeChange) > SIGNIFICANT_CHANGE_THRESHOLD) {
-        const emoji = docSizeChange > 0 ? '📈' : '📉';
-        changes.push(`${emoji} ${siteName}: Doc size ${docSizeChange > 0 ? '+' : ''}${docSizeChange.toFixed(1)}%`);
+        const emoji = docSizeChange > 0 ? "📈" : "📉";
+        changes.push(
+          `${emoji} ${siteName}: Doc size ${docSizeChange > 0 ? "+" : ""}${docSizeChange.toFixed(1)}%`,
+        );
         significantChanges++;
       }
     }
 
     if (significantChanges === 0) {
-      logMessage('info', `✅ No significant changes from benchmark (compared ${commonSites.length} sites)`, this.metadata);
+      logMessage(
+        "info",
+        `✅ No significant changes from benchmark (compared ${commonSites.length} sites)`,
+        this.metadata,
+      );
     } else {
       for (const change of changes) {
-        logMessage('info', change, this.metadata);
+        logMessage("info", change, this.metadata);
       }
     }
-    logMessage('info', '═════════════════════════════════════════════════════════════════\n', this.metadata);
+    logMessage(
+      "info",
+      "═════════════════════════════════════════════════════════════════\n",
+      this.metadata,
+    );
   }
 
   compareEvalResults(currentCsvPath: string): void {
-    const benchmarkPath = path.join(this.benchmarkDir, 'evaluation-debug-baseline.csv');
-    
+    const benchmarkPath = path.join(this.benchmarkDir, "evaluation-debug-baseline.csv");
+
     if (!fs.existsSync(benchmarkPath)) {
-      logMessage('info', '⚠️  No eval benchmark found - skipping comparison', this.metadata);
+      logMessage("info", "⚠️  No eval benchmark found - skipping comparison", this.metadata);
       return;
     }
 
@@ -94,23 +116,35 @@ export class BenchmarkComparer {
     const current = this.parseEvalCsv(currentCsvPath);
 
     // Only compare sites that exist in both
-    const commonSites = Object.keys(current).filter(site => benchmark[site]);
-    const newSites = Object.keys(current).filter(site => !benchmark[site]);
-    
+    const commonSites = Object.keys(current).filter((site) => benchmark[site]);
+    const newSites = Object.keys(current).filter((site) => !benchmark[site]);
+
     if (commonSites.length === 0) {
-      logMessage('info', '⚠️  No common sites between current run and benchmark - skipping comparison', this.metadata);
+      logMessage(
+        "info",
+        "⚠️  No common sites between current run and benchmark - skipping comparison",
+        this.metadata,
+      );
       if (newSites.length > 0) {
-        logMessage('info', `ℹ️  New sites not in benchmark: ${newSites.join(', ')}`, this.metadata);
+        logMessage("info", `ℹ️  New sites not in benchmark: ${newSites.join(", ")}`, this.metadata);
       }
       return;
     }
 
     if (newSites.length > 0) {
-      logMessage('info', `ℹ️  New sites not in benchmark (skipping): ${newSites.join(', ')}`, this.metadata);
+      logMessage(
+        "info",
+        `ℹ️  New sites not in benchmark (skipping): ${newSites.join(", ")}`,
+        this.metadata,
+      );
     }
 
-    logMessage('info', 'Eval Quality vs Benchmark:', this.metadata);
-    logMessage('info', '═════════════════════════════════════════════════════════════════', this.metadata);
+    logMessage("info", "Eval Quality vs Benchmark:", this.metadata);
+    logMessage(
+      "info",
+      "═════════════════════════════════════════════════════════════════",
+      this.metadata,
+    );
 
     let significantChanges = 0;
     const changes: { site: string; metric: string; change: number; emoji: string }[] = [];
@@ -124,26 +158,30 @@ export class BenchmarkComparer {
       const completenessChange = c.completenessScore - b.completenessScore;
 
       if (Math.abs(retrievalChange) > SIGNIFICANT_CHANGE_THRESHOLD) {
-        const emoji = retrievalChange > 0 ? '📈' : '📉';
-        changes.push({ site: siteName, metric: 'Retrieval', change: retrievalChange, emoji });
+        const emoji = retrievalChange > 0 ? "📈" : "📉";
+        changes.push({ site: siteName, metric: "Retrieval", change: retrievalChange, emoji });
         significantChanges++;
       }
 
       if (Math.abs(endpointChange) > SIGNIFICANT_CHANGE_THRESHOLD) {
-        const emoji = endpointChange > 0 ? '📈' : '📉';
-        changes.push({ site: siteName, metric: 'Endpoint', change: endpointChange, emoji });
+        const emoji = endpointChange > 0 ? "📈" : "📉";
+        changes.push({ site: siteName, metric: "Endpoint", change: endpointChange, emoji });
         significantChanges++;
       }
 
       if (Math.abs(completenessChange) > SIGNIFICANT_CHANGE_THRESHOLD) {
-        const emoji = completenessChange > 0 ? '📈' : '📉';
-        changes.push({ site: siteName, metric: 'Completeness', change: completenessChange, emoji });
+        const emoji = completenessChange > 0 ? "📈" : "📉";
+        changes.push({ site: siteName, metric: "Completeness", change: completenessChange, emoji });
         significantChanges++;
       }
     }
 
     if (significantChanges === 0) {
-      logMessage('info', `✅ No significant changes from benchmark (compared ${commonSites.length} sites)`, this.metadata);
+      logMessage(
+        "info",
+        `✅ No significant changes from benchmark (compared ${commonSites.length} sites)`,
+        this.metadata,
+      );
     } else {
       // Group by site and show all changes
       const bySite = new Map<string, typeof changes>();
@@ -159,40 +197,44 @@ export class BenchmarkComparer {
         .map(([site, siteChanges]) => ({
           site,
           changes: siteChanges,
-          totalChange: siteChanges.reduce((sum, c) => sum + Math.abs(c.change), 0)
+          totalChange: siteChanges.reduce((sum, c) => sum + Math.abs(c.change), 0),
         }))
         .sort((a, b) => b.totalChange - a.totalChange);
 
       for (const { site, changes: siteChanges } of sortedSites) {
         const changeStr = siteChanges
-          .map(c => `${c.metric} ${c.change > 0 ? '+' : ''}${c.change.toFixed(0)}`)
-          .join(', ');
-        logMessage('info', `${siteChanges[0].emoji} ${site}: ${changeStr}`, this.metadata);
+          .map((c) => `${c.metric} ${c.change > 0 ? "+" : ""}${c.change.toFixed(0)}`)
+          .join(", ");
+        logMessage("info", `${siteChanges[0].emoji} ${site}: ${changeStr}`, this.metadata);
       }
     }
-    logMessage('info', '═════════════════════════════════════════════════════════════════\n', this.metadata);
+    logMessage(
+      "info",
+      "═════════════════════════════════════════════════════════════════\n",
+      this.metadata,
+    );
   }
 
   private parseFetchCsv(csvPath: string): Record<string, BenchmarkFetchResult> {
-    const content = fs.readFileSync(csvPath, 'utf-8');
-    const lines = content.split('\n').slice(1); // Skip header
+    const content = fs.readFileSync(csvPath, "utf-8");
+    const lines = content.split("\n").slice(1); // Skip header
     const results: Record<string, BenchmarkFetchResult> = {};
 
     for (const line of lines) {
-      if (!line.trim() || line.includes('AVERAGE')) continue;
+      if (!line.trim() || line.includes("AVERAGE")) continue;
 
       const parts = line.match(/(?:[^,"]+|"[^"]*")+/g);
       if (!parts || parts.length < 7) continue;
 
-      const siteName = parts[0].replace(/^"|"$/g, '');
+      const siteName = parts[0].replace(/^"|"$/g, "");
       results[siteName] = {
         siteName,
         pages: parseFloat(parts[1]),
         docSizeMB: parseFloat(parts[2]),
-        hasOpenAPI: parts[3] === 'Yes',
+        hasOpenAPI: parts[3] === "Yes",
         openApiSizeKB: parseFloat(parts[4]),
         docFetchSPerPage: parseFloat(parts[5]),
-        openApiFetchS: parseFloat(parts[6])
+        openApiFetchS: parseFloat(parts[6]),
       };
     }
 
@@ -200,8 +242,8 @@ export class BenchmarkComparer {
   }
 
   private parseEvalCsv(csvPath: string): Record<string, BenchmarkEvalResult> {
-    const content = fs.readFileSync(csvPath, 'utf-8');
-    const lines = content.split('\n').slice(1); // Skip header
+    const content = fs.readFileSync(csvPath, "utf-8");
+    const lines = content.split("\n").slice(1); // Skip header
     const results: Record<string, { scores: number[]; counts: number[] }> = {};
 
     for (const line of lines) {
@@ -210,7 +252,7 @@ export class BenchmarkComparer {
       const parts = line.match(/(?:[^,]+|"[^"]*")+/g);
       if (!parts || parts.length < 11) continue;
 
-      const siteName = parts[2].replace(/^"|"$/g, '');
+      const siteName = parts[2].replace(/^"|"$/g, "");
       const retrievalScore = parseFloat(parts[8]);
       const endpointScore = parseFloat(parts[9]);
       const completenessScore = parseFloat(parts[10]);
@@ -239,11 +281,10 @@ export class BenchmarkComparer {
         siteName,
         retrievalScore: data.counts[0] > 0 ? data.scores[0] / data.counts[0] : 0,
         endpointScore: data.counts[1] > 0 ? data.scores[1] / data.counts[1] : 0,
-        completenessScore: data.counts[2] > 0 ? data.scores[2] / data.counts[2] : 0
+        completenessScore: data.counts[2] > 0 ? data.scores[2] / data.counts[2] : 0,
       };
     }
 
     return averaged;
   }
 }
-

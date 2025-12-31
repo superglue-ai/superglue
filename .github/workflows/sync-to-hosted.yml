@@ -1,0 +1,86 @@
+name: Sync to Hosted Repo
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  sync-to-hosted:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Clone hosted repo
+        env:
+          HOSTED_TOKEN: ${{ secrets.HOSTED_REPO_TOKEN }}
+        run: |
+          git clone https://x-access-token:${HOSTED_TOKEN}@github.com/superglue-ai/superglue-hosted.git hosted-repo
+
+      - name: Create branch and sync changes
+        working-directory: hosted-repo
+        run: |
+          git remote add source ..
+          git fetch source
+
+          BRANCH_NAME="sync-from-main-$(date +%s)"
+          git checkout -b "${BRANCH_NAME}"
+
+          git cherry-pick ${{ github.event.pull_request.merge_commit_sha }} -X ours --strategy-option=ignore-space-change || {
+            echo "Cherry-pick had conflicts, handling them..."
+            
+            # Auto-resolve package-lock.json conflicts by using ours version
+            if [ -f package-lock.json ]; then
+              echo "Resetting package-lock.json to avoid merge conflicts"
+              git checkout --ours package-lock.json 2>/dev/null || true
+            fi
+            
+            # Stage all resolved files
+            git add -A
+            
+            # Continue cherry-pick
+            git cherry-pick --continue --no-edit || {
+              # If continue fails, just commit what we have
+              git commit --no-edit -m "Sync from main (auto-resolved conflicts)" || true
+            }
+          }
+
+          git push origin "${BRANCH_NAME}"
+
+          echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
+
+      - name: Create Pull Request
+        if: success()
+        env:
+          HOSTED_TOKEN: ${{ secrets.HOSTED_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOSTED_REPO_TOKEN }}
+          PR_BODY: |
+            **Auto-synced from main repository**
+
+            Original PR: ${{ github.event.pull_request.html_url }}
+            Merged by: @${{ github.event.pull_request.merged_by.login }}
+
+            ---
+
+            ${{ github.event.pull_request.body }}
+        run: |
+          cd hosted-repo
+          echo "$PR_BODY" > pr_body.txt
+
+          gh pr create \
+            --repo superglue-ai/superglue-hosted \
+            --base main \
+            --head "${BRANCH_NAME}" \
+            --title "Sync: ${{ github.event.pull_request.title }}" \
+            --body-file pr_body.txt

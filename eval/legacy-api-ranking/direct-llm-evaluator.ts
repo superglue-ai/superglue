@@ -64,7 +64,7 @@
 //         ];
 
 //         const results = await Promise.all(
-//             providers.map(provider => 
+//             providers.map(provider =>
 //                 this.evaluateWithProvider(provider, workflow, integrations, maxAttempts)
 //             )
 //         );
@@ -155,7 +155,7 @@
 //             ];
 
 //             let model;
-            
+
 //             switch (provider) {
 //                 case 'claude-sonnet-4-20250514':
 //                     model = await this.getAnthropicModel('claude-sonnet-4-20250514');
@@ -280,14 +280,14 @@
 //         baseUrl: "https://api.stripe.com"
 //     };
 //     const secret_key = "sk_test_123"; // Define credentials OUTSIDE the config object
-    
+
 //     const response = await fetch(stripe_config.baseUrl + '/v1/subscriptions', {
 //         headers: {
 //             'Authorization': 'Bearer ' + secret_key,
 //             'Content-Type': 'application/json'
 //         }
 //     });
-    
+
 //     const data = await response.json();
 //     // Process data and return result
 //     return { result: data };
@@ -369,30 +369,30 @@
 //                 eval(wrappedCode),
 //                 timeoutPromise
 //             ]);
-            
+
 //             return result;
 //         } catch (error) {
 //             throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
 //         }
 //     }
 
-    // /**
-    //  * Evaluate if the result matches the instruction
-    //  */
-    // private async evaluateResult(
-    //     result: any,
-    //     instruction: string,
-    //     integrations: Integration[]
-    // ): Promise<{ success: boolean; reason?: string }> {
-    //     try {
-    //         // Load evaluateResponse dynamically
-    //         const { evaluateStepResponse } = await import('../../execute/workflow-step.js');
-    //         const documentation = integrations[0]?.documentation || '';
-    //         const evaluation = await evaluateStepResponse({
-    //             data: result,
-    //             endpoint: {instruction} as any,
-    //             documentation
-    //         });
+// /**
+//  * Evaluate if the result matches the instruction
+//  */
+// private async evaluateResult(
+//     result: any,
+//     instruction: string,
+//     integrations: Integration[]
+// ): Promise<{ success: boolean; reason?: string }> {
+//     try {
+//         // Load evaluateResponse dynamically
+//         const { evaluateStepResponse } = await import('../../execute/workflow-step.js');
+//         const documentation = integrations[0]?.documentation || '';
+//         const evaluation = await evaluateStepResponse({
+//             data: result,
+//             endpoint: {instruction} as any,
+//             documentation
+//         });
 
 //             return {
 //                 success: evaluation.success,
@@ -429,4 +429,4 @@
 //             missing
 //         };
 //     }
-// } 
+// }

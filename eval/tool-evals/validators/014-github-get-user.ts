@@ -1,13 +1,13 @@
-import assert from 'assert';
+import assert from "assert";
 
 const EXPECTED_DATA = {
-  "user": {
-    "id": 237506962,
-    "username": "Evals304",
-    "profilePictureUrl": "https://avatars.githubusercontent.com/u/237506962?v=4",
-    "url": "https://github.com/Evals304",
-    "createdAt": "2025-10-12T00:13:19Z"
-  }
+  user: {
+    id: 237506962,
+    username: "Evals304",
+    profilePictureUrl: "https://avatars.githubusercontent.com/u/237506962?v=4",
+    url: "https://github.com/Evals304",
+    createdAt: "2025-10-12T00:13:19Z",
+  },
 };
 
 function isDeepEqual(expected: any, received: any): boolean {
@@ -21,7 +21,10 @@ function isDeepEqual(expected: any, received: any): boolean {
   if (keysExpected.length !== keysReceived.length) return false;
 
   for (const key of keysExpected) {
-    if (!Object.prototype.hasOwnProperty.call(received, key) || !isDeepEqual(expected[key], received[key])) {
+    if (
+      !Object.prototype.hasOwnProperty.call(received, key) ||
+      !isDeepEqual(expected[key], received[key])
+    ) {
       return false;
     }
   }
@@ -30,7 +33,8 @@ function isDeepEqual(expected: any, received: any): boolean {
 }
 
 export default function validate(data: any, payload: any): void {
-  assert(isDeepEqual(EXPECTED_DATA, data), `Data does not match expected structure. Expected: ${JSON.stringify(EXPECTED_DATA)}, Received: ${JSON.stringify(data)}`);
+  assert(
+    isDeepEqual(EXPECTED_DATA, data),
+    `Data does not match expected structure. Expected: ${JSON.stringify(EXPECTED_DATA)}, Received: ${JSON.stringify(data)}`,
+  );
 }
-
-

@@ -2,7 +2,9 @@
   "name": "superglue",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/core",
+    "packages/shared",
+    "packages/web"
   ],
   "packageManager": "npm@11.0.0",
   "scripts": {
@@ -14,6 +16,7 @@
     "test:coverage": "turbo run test:coverage",
     "test:evals": "npx tsx eval/tool-evals/index.ts",
     "test:integration-evals": "npx tsx eval/integration-evals/index.ts",
+    "test:sdk": "cd eval/sdk-test && npm install && node run-with-server.js",
     "test:all": "npm run test:unit && npm run test:integration",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
@@ -21,9 +24,9 @@
   },
   "dependencies": {
     "@playwright/test": "^1.55.0",
-    "@superglue/client": "^2.3.55",
     "dotenv": "^16.4.7",
-    "dotenv-cli": "^8.0.0"
+    "dotenv-cli": "^8.0.0",
+    "ssh2-sftp-client": "^12.0.1"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",

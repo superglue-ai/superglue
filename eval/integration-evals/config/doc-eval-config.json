@@ -76,7 +76,21 @@
       "documentationUrl": "https://developers.google.com/gmail/api/reference/rest",
       "urlHost": "https://gmail.googleapis.com",
       "openApiUrl": "https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest",
-      "keywords": ["messages", "threads", "labels", "drafts", "send", "attachments", "history", "filters", "settings", "forwarding", "inbox", "profile", "oauth"],
+      "keywords": [
+        "messages",
+        "threads",
+        "labels",
+        "drafts",
+        "send",
+        "attachments",
+        "history",
+        "filters",
+        "settings",
+        "forwarding",
+        "inbox",
+        "profile",
+        "oauth"
+      ],
       "testQuestions": [
         "How do I list all messages in a user's mailbox?",
         "How do I list all labels in a mailbox?",
@@ -90,7 +104,23 @@
       "urlHost": "https://api.openai.com",
       "documentationUrl": "https://platform.openai.com/docs/api-reference/introduction",
       "openApiUrl": "https://app.stainless.com/api/spec/documented/openai/openapi.documented.yml",
-      "keywords": ["completions", "chat", "models", "embeddings", "images", "audio", "files", "fine-tuning", "assistants", "threads", "messages", "runs", "moderation", "usage", "api key"],
+      "keywords": [
+        "completions",
+        "chat",
+        "models",
+        "embeddings",
+        "images",
+        "audio",
+        "files",
+        "fine-tuning",
+        "assistants",
+        "threads",
+        "messages",
+        "runs",
+        "moderation",
+        "usage",
+        "api key"
+      ],
       "testQuestions": [
         "What parameter do I use to get structured output?",
         "How can I retrieve files from my vector database?",
@@ -131,10 +161,7 @@
       "urlHost": "https://libopenstorage.github.io",
       "openApiUrl": "https://libopenstorage.github.io/w/swagger-ui/",
       "keywords": ["storage", "volume", "cluster", "snapshots", "backup", "nodes"],
-      "testQuestions": [
-        "Create a new role",
-        "Activate a cluster domain"
-      ]
+      "testQuestions": ["Create a new role", "Activate a cluster domain"]
     },
     {
       "id": "caspio-api",
@@ -143,11 +170,16 @@
       "documentationUrl": "https://demo.caspio.com/integrations/rest/swagger/index.html",
       "urlHost": "https://demo.caspio.com",
       "openApiUrl": "https://demo.caspio.com/integrations/rest/swagger/index.html",
-      "keywords": ["tables", "views","records", "DataPage", "applications", "authentication", "webhook"],
-      "testQuestions": [
-        "how do I deploy a DataPage?",
-        "Create a new ongoing webhook"
-      ]
+      "keywords": [
+        "tables",
+        "views",
+        "records",
+        "DataPage",
+        "applications",
+        "authentication",
+        "webhook"
+      ],
+      "testQuestions": ["how do I deploy a DataPage?", "Create a new ongoing webhook"]
     },
     {
       "id": "epaypolicy-api",
@@ -169,7 +201,22 @@
       "documentationUrl": "https://docs.x.com/x-api/introduction",
       "urlHost": "https://api.twitter.com",
       "openApiUrl": "https://api.x.com/2/openapi.json",
-      "keywords": ["tweets", "users", "followers", "timeline", "mentions", "retweets", "likes", "lists", "spaces", "direct messages", "trends", "media", "polls", "oauth"],
+      "keywords": [
+        "tweets",
+        "users",
+        "followers",
+        "timeline",
+        "mentions",
+        "retweets",
+        "likes",
+        "lists",
+        "spaces",
+        "direct messages",
+        "trends",
+        "media",
+        "polls",
+        "oauth"
+      ],
       "testQuestions": [
         "How is pagination handled in the Twitter API?",
         "How do I get posts from a user's timeline?"
@@ -182,7 +229,23 @@
       "documentationUrl": "https://developer.atlassian.com/cloud/trello/rest",
       "urlHost": "https://api.trello.com",
       "openApiUrl": "https://developer.atlassian.com/cloud/trello/swagger.v3.json",
-      "keywords": ["boards", "cards", "lists", "members", "labels", "attachments", "checklists", "comments", "actions", "organizations", "teams", "power-ups", "custom fields", "stickers", "api key"],
+      "keywords": [
+        "boards",
+        "cards",
+        "lists",
+        "members",
+        "labels",
+        "attachments",
+        "checklists",
+        "comments",
+        "actions",
+        "organizations",
+        "teams",
+        "power-ups",
+        "custom fields",
+        "stickers",
+        "api key"
+      ],
       "testQuestions": [
         "How do I create a new board?",
         "How do I get a list of all cards in a board?"
@@ -208,11 +271,24 @@
       "documentationUrl": "https://developers.linear.app/docs/graphql/working-with-the-graphql-api",
       "urlHost": "https://api.linear.app/graphql",
       "openApiUrl": "https://developers.linear.app/docs/graphql/working-with-the-graphql-api",
-      "keywords": ["issues", "projects", "cycles", "teams", "users", "comments", "labels", "milestones", "roadmaps", "workflows", "states", "graphql", "mutations", "queries", "api key"],
-      "testQuestions": [
-        "How do I create a new triage issue?",
-        "How do I get a list of all issues?"
-      ]
+      "keywords": [
+        "issues",
+        "projects",
+        "cycles",
+        "teams",
+        "users",
+        "comments",
+        "labels",
+        "milestones",
+        "roadmaps",
+        "workflows",
+        "states",
+        "graphql",
+        "mutations",
+        "queries",
+        "api key"
+      ],
+      "testQuestions": ["How do I create a new triage issue?", "How do I get a list of all issues?"]
     },
     {
       "id": "claude-api",
@@ -221,7 +297,17 @@
       "documentationUrl": "https://docs.anthropic.com/claude/reference",
       "urlHost": "https://api.anthropic.com",
       "openApiUrl": "https://docs.anthropic.com/claude/reference",
-      "keywords": ["messages", "completions", "claude", "models", "prompts", "conversations", "tokens", "streaming", "api key"],
+      "keywords": [
+        "messages",
+        "completions",
+        "claude",
+        "models",
+        "prompts",
+        "conversations",
+        "tokens",
+        "streaming",
+        "api key"
+      ],
       "testQuestions": [
         "How does Claude handle Rate Limiting?",
         "How do I create a new message in a conversation?"
@@ -247,7 +333,26 @@
       "documentationUrl": "https://developer.atlassian.com/cloud/jira/platform/rest/v3",
       "urlHost": "https://{your-domain}.atlassian.net/rest/api",
       "openApiUrl": "https://developer.atlassian.com/cloud/jira/platform/swagger-v3.json",
-      "keywords": ["issues", "projects", "boards", "sprints", "epics", "users", "workflows", "fields", "components", "versions", "priorities", "statuses", "comments", "attachments", "jql", "query", "search", "api key"],
+      "keywords": [
+        "issues",
+        "projects",
+        "boards",
+        "sprints",
+        "epics",
+        "users",
+        "workflows",
+        "fields",
+        "components",
+        "versions",
+        "priorities",
+        "statuses",
+        "comments",
+        "attachments",
+        "jql",
+        "query",
+        "search",
+        "api key"
+      ],
       "testQuestions": [
         "Get all issues from the current active sprint, categorize them by status",
         "Get all issues marked as Blocked or High Priority that are still in progress?"
@@ -290,7 +395,25 @@
       "documentationUrl": "https://posthog.com/docs/api",
       "urlHost": "https://us.posthog.com/api",
       "openApiUrl": "https://app.posthog.com/api/schema/",
-      "keywords": ["events", "users", "products", "dashboard", "properties", "cohorts", "funnels", "retention", "insights", "engage", "import", "export", "jql", "query", "segmentation", "track", "api key"],
+      "keywords": [
+        "events",
+        "users",
+        "products",
+        "dashboard",
+        "properties",
+        "cohorts",
+        "funnels",
+        "retention",
+        "insights",
+        "engage",
+        "import",
+        "export",
+        "jql",
+        "query",
+        "segmentation",
+        "track",
+        "api key"
+      ],
       "testQuestions": [
         "Get the project IDs of all projects in my posthog account.",
         "Get all events in the last 30 days for a project"
@@ -332,7 +455,23 @@
       "documentationUrl": "https://docs.snowflake.com/en/developer-guide/sql-api/index",
       "urlHost": "https://account.snowflakecomputing.com",
       "openApiUrl": "https://github.com/snowflakedb/snowflake-rest-api-specs",
-      "keywords": ["warehouses", "databases", "schemas", "tables", "views", "stages", "pipes", "tasks", "streams", "procedures", "functions", "roles", "users", "sql", "api key"],
+      "keywords": [
+        "warehouses",
+        "databases",
+        "schemas",
+        "tables",
+        "views",
+        "stages",
+        "pipes",
+        "tasks",
+        "streams",
+        "procedures",
+        "functions",
+        "roles",
+        "users",
+        "sql",
+        "api key"
+      ],
       "testQuestions": [
         "List all warehouses in my Snowflake account.",
         "Get all tables in the TESTING_SCHEMA in the snowflake SUPERGLUE_DATA database."

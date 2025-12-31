@@ -1,5 +1,39 @@
-import { Integration, SelfHealingMode, SuperglueClient, Workflow as Tool } from "@superglue/client";
+import {
+  ExecutionStep,
+  Integration,
+  SelfHealingMode,
+  SuperglueClient,
+  Tool,
+} from "@superglue/shared";
+import { isAbortError } from "./general-utils";
 import { tokenRegistry } from "./token-registry";
+
+const BASE62_REGEX = /^[a-zA-Z0-9_-]*$/;
+
+export const ABORT_DEBOUNCE_MS = 2000;
+
+export function shouldDebounceAbort(lastAbortTime: number): boolean {
+  const now = Date.now();
+  return now - lastAbortTime < ABORT_DEBOUNCE_MS;
+}
+
+export function isValidToolName(name: string): boolean {
+  return BASE62_REGEX.test(name);
+}
+
+export function validateToolName(name: string): string | null {
+  if (!name) {
+    return "Tool name cannot be empty";
+  }
+  if (name.length > 100) {
+    return "Tool name cannot be longer than 100 characters";
+  }
+  if (!isValidToolName(name)) {
+    return "Tool name can only contain letters, numbers, hyphens, and underscores";
+  }
+
+  return null;
+}
 
 export interface StepExecutionResult {
   stepId: string;
@@ -7,6 +41,7 @@ export interface StepExecutionResult {
   data?: any;
   error?: string;
   updatedStep?: any;
+  runId?: string;
 }
 
 export interface FinalTransformExecutionResult {
@@ -15,6 +50,7 @@ export interface FinalTransformExecutionResult {
   error?: string;
   updatedTransform?: string;
   updatedResponseSchema?: any;
+  runId?: string;
 }
 
 export interface ToolExecutionState {
@@ -23,59 +59,70 @@ export interface ToolExecutionState {
   stepResults: Record<string, StepExecutionResult>;
   completedSteps: string[];
   failedSteps: string[];
+  abortedSteps: string[];
   isExecuting: boolean;
   currentStepIndex: number;
   interrupted?: boolean;
 }
 
-export function createSingleStepTool(
-  tool: Tool,
-  stepIndex: number,
-  previousResults: Record<string, any> = {}
-): Tool {
-  if (stepIndex < 0 || stepIndex >= tool.steps.length) {
-    throw new Error(`Invalid step index: ${stepIndex}`);
-  }
-
-  const step = tool.steps[stepIndex];
-
-  const singleStepTool: any = {
-    id: `${tool.id}_step_${stepIndex}`,
-    steps: [step],
-    finalTransform: ''
-  };
-
-  return singleStepTool;
-}
-
-export async function executeSingleStep(
+export async function abortExecution(
   client: SuperglueClient,
-  tool: Tool,
-  stepIndex: number,
-  payload: any,
-  previousResults: Record<string, any> = {},
-  selfHealing: boolean = false
-): Promise<StepExecutionResult> {
-  const step = tool.steps[stepIndex];
+  runId: string | null,
+): Promise<boolean> {
+  if (!runId) return false;
 
   try {
-    const singleStepTool = createSingleStepTool(tool, stepIndex, previousResults);
+    const result = await client.abortToolExecution(runId);
+    return result.success;
+  } catch (error) {
+    console.error("Failed to abort execution:", error);
+    return false;
+  }
+}
+
+export async function executeSingleStep({
+  client,
+  step,
+  toolId,
+  payload,
+  previousResults,
+  selfHealing,
+  onRunIdGenerated,
+}: {
+  client: SuperglueClient;
+  step: ExecutionStep;
+  toolId: string;
+  payload: any;
+  previousResults: Record<string, any>;
+  selfHealing: boolean;
+  onRunIdGenerated?: (runId: string) => void;
+}): Promise<StepExecutionResult> {
+  const stepRunId = generateUUID();
+
+  if (onRunIdGenerated) {
+    onRunIdGenerated(stepRunId);
+  }
+
+  try {
+    const singleStepTool: Tool = {
+      id: `${toolId}_step_${step.id}`,
+      steps: [step],
+      finalTransform: "",
+    } as any;
 
     const executionPayload = {
       ...payload,
-      ...Object.keys(previousResults).reduce((acc, stepId) => ({
-        ...acc,
-        [`${stepId}`]: previousResults[stepId]
-      }), {})
+      ...previousResults,
     };
 
     const result = await client.executeWorkflow({
-      workflow: singleStepTool,
+      tool: singleStepTool,
       payload: executionPayload,
       options: {
         testMode: selfHealing,
-        selfHealing: selfHealing ? SelfHealingMode.REQUEST_ONLY : SelfHealingMode.DISABLED
-      }
+        selfHealing: selfHealing ? SelfHealingMode.REQUEST_ONLY : SelfHealingMode.DISABLED,
+      },
+      runId: stepRunId,
     });
 
     const stepResult = result.stepResults[0];
@@ -83,15 +130,17 @@ export async function executeSingleStep(
     return {
       stepId: step.id,
       success: result.success,
-      data: stepResult.transformedData,
+      data: stepResult.data,
       error: result.error,
-      updatedStep: result.config?.steps?.[0]
+      updatedStep: result.config?.steps?.[0],
+      runId: stepRunId,
     };
   } catch (error: any) {
     return {
       stepId: step.id,
       success: false,
-      error: error.message || 'Step execution failed'
+      error: error.message || "Step execution failed",
+      runId: stepRunId,
     };
   }
 }
@@ -102,7 +151,8 @@ export async function executeToolStepByStep(
   payload: any,
   onStepComplete?: (stepIndex: number, result: StepExecutionResult) => void,
   selfHealing: boolean = false,
-  shouldStop?: () => boolean
+  onBeforeStep?: (stepIndex: number, step: any) => Promise<boolean>,
+  onStepRunIdChange?: (stepRunId: string) => void,
 ): Promise<ToolExecutionState> {
   const state: ToolExecutionState = {
     originalTool: tool,
@@ -110,31 +160,36 @@ export async function executeToolStepByStep(
     stepResults: {},
     completedSteps: [],
     failedSteps: [],
+    abortedSteps: [],
     isExecuting: true,
     currentStepIndex: 0,
-    interrupted: false
+    interrupted: false,
   };
 
   const previousResults: Record<string, any> = {};
 
   for (let i = 0; i < tool.steps.length; i++) {
-    if (shouldStop && shouldStop()) {
-      state.isExecuting = false;
-      state.interrupted = true;
-      return state;
-    }
-
     state.currentStepIndex = i;
     const step = tool.steps[i];
 
-    const result = await executeSingleStep(
+    if (onBeforeStep) {
+      const shouldContinue = await onBeforeStep(i, step);
+      if (!shouldContinue) {
+        state.isExecuting = false;
+        state.interrupted = true;
+        return state;
+      }
+    }
+
+    const result = await executeSingleStep({
       client,
-      state.currentTool,
-      i,
+      step,
+      toolId: state.currentTool.id,
       payload,
       previousResults,
-      selfHealing
-    );
+      selfHealing,
+      onRunIdGenerated: onStepRunIdChange,
+    });
 
     state.stepResults[step.id] = result;
 
@@ -146,16 +201,17 @@ export async function executeToolStepByStep(
       if (result.updatedStep) {
         state.currentTool = {
           ...state.currentTool,
-          steps: state.currentTool.steps.map((s, idx) =>
-            idx === i ? result.updatedStep : s
-          )
+          steps: state.currentTool.steps.map((s, idx) => (idx === i ? result.updatedStep : s)),
         };
       }
     } else {
-      state.failedSteps.push(step.id);
+      if (result.error && isAbortError(result.error)) {
+        state.abortedSteps.push(step.id);
+      } else {
+        state.failedSteps.push(step.id);
+      }
       state.isExecuting = false;
 
-      // Stop execution on failure
       if (onStepComplete) {
         onStepComplete(i, result);
       }
@@ -165,49 +221,43 @@ export async function executeToolStepByStep(
     if (onStepComplete) {
       onStepComplete(i, result);
     }
-    if (shouldStop && shouldStop()) {
-      state.isExecuting = false;
-      state.interrupted = true;
-      return state;
-    }
   }
 
   if (tool.finalTransform && state.failedSteps.length === 0) {
-    // Final guard before executing transform
-    if (shouldStop && shouldStop()) {
-      state.isExecuting = false;
-      state.interrupted = true;
-      return state;
-    }
     const finalResult = await executeFinalTransform(
       client,
-      tool.id || 'tool',
+      tool.id || "tool",
       state.currentTool.finalTransform || tool.finalTransform,
       tool.responseSchema,
       tool.inputSchema,
       payload,
       previousResults,
-      selfHealing
+      selfHealing,
+      onStepRunIdChange,
     );
 
-    state.stepResults['__final_transform__'] = {
-      stepId: '__final_transform__',
+    state.stepResults["__final_transform__"] = {
+      stepId: "__final_transform__",
       success: finalResult.success,
       data: finalResult.data,
-      error: finalResult.error
+      error: finalResult.error,
     };
 
     if (finalResult.success) {
-      state.completedSteps.push('__final_transform__');
+      state.completedSteps.push("__final_transform__");
 
       if (finalResult.updatedTransform && selfHealing) {
         state.currentTool = {
           ...state.currentTool,
-          finalTransform: finalResult.updatedTransform
+          finalTransform: finalResult.updatedTransform,
         };
       }
     } else {
-      state.failedSteps.push('__final_transform__');
+      if (isAbortError(finalResult.error)) {
+        state.abortedSteps.push("__final_transform__");
+      } else {
+        state.failedSteps.push("__final_transform__");
+      }
     }
   }
 
@@ -223,38 +273,48 @@ export async function executeFinalTransform(
   inputSchema: any,
   payload: any,
   previousResults: Record<string, any>,
-  selfHealing: boolean = false
+  selfHealing: boolean = false,
+  onRunIdGenerated?: (runId: string) => void,
 ): Promise<FinalTransformExecutionResult> {
+  const transformRunId = generateUUID();
+
+  if (onRunIdGenerated) {
+    onRunIdGenerated(transformRunId);
+  }
+
   try {
     const finalPayload = {
       ...payload,
-      ...previousResults
+      ...previousResults,
     };
     const result = await client.executeWorkflow({
-      workflow: {
+      tool: {
         id: `${toolId}_final_transform`,
         steps: [],
         finalTransform,
         responseSchema,
-        inputSchema: inputSchema
+        inputSchema: inputSchema,
       },
       payload: finalPayload,
       options: {
         testMode: selfHealing,
-        selfHealing: selfHealing ? SelfHealingMode.TRANSFORM_ONLY : SelfHealingMode.DISABLED
-      }
+        selfHealing: selfHealing ? SelfHealingMode.TRANSFORM_ONLY : SelfHealingMode.DISABLED,
+      },
+      runId: transformRunId,
     });
     return {
       success: result.success,
       data: result.data,
       error: result.error,
       updatedTransform: result.config?.finalTransform,
-      updatedResponseSchema: result.config?.responseSchema
+      updatedResponseSchema: result.config?.responseSchema,
+      runId: transformRunId,
     };
   } catch (error: any) {
     return {
       success: false,
-      error: error.message || 'Final transform execution failed'
+      error: error.message || "Final transform execution failed",
+      runId: transformRunId,
     };
   }
 }
@@ -263,7 +323,7 @@ export function canExecuteStep(
   stepIndex: number,
   completedSteps: string[],
   tool: Tool,
-  stepResults?: Record<string, any>
+  stepResults?: Record<string, any>,
 ): boolean {
   if (stepIndex === 0) {
     return true;
@@ -284,29 +344,28 @@ export function canExecuteStep(
   return true;
 }
 
-
 export const isJsonEmpty = (inputJson: string): boolean => {
   try {
-    if (!inputJson) return true
-    const parsedJson = JSON.parse(inputJson)
-    return Object.keys(parsedJson).length === 0
+    if (!inputJson) return true;
+    const parsedJson = JSON.parse(inputJson);
+    return Object.keys(parsedJson).length === 0;
   } catch (error) {
     // If invalid JSON, we consider it empty
-    return true
+    return true;
   }
-}
+};
 
 export const findArraysOfObjects = (obj: any): Record<string, any[]> => {
   const arrays: Record<string, any[]> = {};
 
-  const traverse = (value: any, path: string = '') => {
-    if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
+  const traverse = (value: any, path: string = "") => {
+    if (Array.isArray(value) && value.length > 0 && typeof value[0] === "object") {
       arrays[path] = value;
     }
 
-    if (typeof value === 'object' && value !== null) {
+    if (typeof value === "object" && value !== null) {
       Object.entries(value).forEach(([key, val]) => {
-        traverse(val, `${path ? `${path}.` : ''}${key}`);
+        traverse(val, `${path ? `${path}.` : ""}${key}`);
       });
     }
   };
@@ -324,58 +383,61 @@ export const findArraysOfObjects = (obj: any): Record<string, any[]> => {
 
 export const parseCredentialsHelper = (simpleCreds: string): Record<string, string> => {
   try {
-    const creds = simpleCreds?.trim() || ""
+    const creds = simpleCreds?.trim() || "";
     if (!creds) {
-      return {}
+      return {};
     }
 
-    if (creds.startsWith('{')) {
-      return JSON.parse(creds)
+    if (creds.startsWith("{")) {
+      return JSON.parse(creds);
     }
 
-    if (creds.startsWith('Bearer ')) {
-      return { token: creds.replace('Bearer ', '') }
+    if (creds.startsWith("Bearer ")) {
+      return { token: creds.replace("Bearer ", "") };
     }
 
-    if (creds.startsWith('Basic ')) {
-      return { token: creds.replace('Basic ', '') }
+    if (creds.startsWith("Basic ")) {
+      return { token: creds.replace("Basic ", "") };
     }
 
-    return { token: creds }
+    return { token: creds };
   } catch (error) {
-    return {}
+    return {};
   }
-}
+};
 
 export const splitUrl = (url: string) => {
   if (!url) {
     return {
-      urlHost: '',
-      urlPath: ''
-    }
+      urlHost: "",
+      urlPath: "",
+    };
   }
 
   // Find the position after the protocol (://)
-  const protocolEnd = url.indexOf('://');
+  const protocolEnd = url.indexOf("://");
   // Find the first slash after the protocol
-  const firstSlashAfterProtocol = url.indexOf('/', protocolEnd + 3);
+  const firstSlashAfterProtocol = url.indexOf("/", protocolEnd + 3);
 
   if (firstSlashAfterProtocol === -1) {
     // No path, entire URL is the host
     return {
       urlHost: url,
-      urlPath: ''
-    }
+      urlPath: "",
+    };
   }
 
   // Split at the first slash after protocol
   return {
     urlHost: url.substring(0, firstSlashAfterProtocol),
-    urlPath: url.substring(firstSlashAfterProtocol)
-  }
-}
+    urlPath: url.substring(firstSlashAfterProtocol),
+  };
+};
 
-export function needsUIToTriggerDocFetch(newIntegration: Integration, oldIntegration: Integration | null): boolean {
+export function needsUIToTriggerDocFetch(
+  newIntegration: Integration,
+  oldIntegration: Integration | null,
+): boolean {
   // If documentation was manually provided, no fetch needed.
   if (newIntegration.documentation && newIntegration.documentation.trim()) {
     return false;
@@ -387,9 +449,11 @@ export function needsUIToTriggerDocFetch(newIntegration: Integration, oldIntegra
   }
 
   // If any of the relevant URLs have changed, fetch is needed.
-  if (newIntegration.urlHost !== oldIntegration.urlHost ||
+  if (
+    newIntegration.urlHost !== oldIntegration.urlHost ||
     newIntegration.urlPath !== oldIntegration.urlPath ||
-    newIntegration.documentationUrl !== oldIntegration.documentationUrl) {
+    newIntegration.documentationUrl !== oldIntegration.documentationUrl
+  ) {
     return true;
   }
 
@@ -398,8 +462,8 @@ export function needsUIToTriggerDocFetch(newIntegration: Integration, oldIntegra
 
 export const deepMergePreferRight = (left: any, right: any): any => {
   if (Array.isArray(left) && Array.isArray(right)) return right;
-  if (typeof left !== 'object' || left === null) return right ?? left;
-  if (typeof right !== 'object' || right === null) return right ?? left;
+  if (typeof left !== "object" || left === null) return right ?? left;
+  if (typeof right !== "object" || right === null) return right ?? left;
   const result: Record<string, any> = { ...left };
   for (const key of new Set([...Object.keys(left), ...Object.keys(right)])) {
     result[key] = deepMergePreferRight(left[key], right[key]);
@@ -413,7 +477,7 @@ export const deepMergePreferRight = (left: any, right: any): any => {
  */
 export function generateUUID(): string {
   // Use native crypto.randomUUID if available (secure contexts only)
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
     try {
       return crypto.randomUUID();
     } catch (e) {
@@ -422,25 +486,27 @@ export function generateUUID(): string {
   }
 
   // Fallback implementation using crypto.getRandomValues (available in more contexts)
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
     const array = new Uint8Array(16);
     crypto.getRandomValues(array);
-    
+
     // Set the version to 4 (random)
     array[6] = (array[6] & 0x0f) | 0x40;
     // Set the variant to 1 (RFC4122)
     array[8] = (array[8] & 0x3f) | 0x80;
 
-    return [...array].map((b, i) => {
-      const hex = b.toString(16).padStart(2, '0');
-      return (i === 4 || i === 6 || i === 8 || i === 10) ? `-${hex}` : hex;
-    }).join('');
+    return [...array]
+      .map((b, i) => {
+        const hex = b.toString(16).padStart(2, "0");
+        return i === 4 || i === 6 || i === 8 || i === 10 ? `-${hex}` : hex;
+      })
+      .join("");
   }
 
   // Final fallback for environments without crypto (should be rare)
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 }
@@ -449,5 +515,5 @@ export function createSuperglueClient(endpoint: string): SuperglueClient {
   return new SuperglueClient({
     endpoint,
     apiKey: tokenRegistry.getToken(),
-  })
+  });
 }

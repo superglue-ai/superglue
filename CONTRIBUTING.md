@@ -15,7 +15,7 @@ We welcome contributions through GitHub pull requests. This document outlines ou
 
 We gratefully welcome improvements to [documentation](https://docs.superglue.cloud/introduction), the core application (this repo) and our [SDK](https://github.com/superglue-ai/superglue-js). We especially encourage contributions that address bugs and/or improve performance in the core application. We discourage contributions to the web package that are purely cosmetic, unless this contribution references an approved open issue.
 
-In case you have any questions, feel free to join our [discord]((https://discord.gg/vUKnuhHtfW)) and come talk to us
+In case you have any questions, feel free to join our [discord](<(https://discord.gg/vUKnuhHtfW)>) and come talk to us
 
 > And if you like the project, but just don't have time to contribute code, that's fine. There are other easy ways to support the project and show your appreciation, which we would also be very happy about:
 >
@@ -27,9 +27,9 @@ In case you have any questions, feel free to join our [discord]((https://discord
 
 ## Making contributions
 
-_Before starting work on any significant contributions, please [open an issue]((https://github.com/superglue-ai/superglue/issues)). Discussing your proposed changes ahead of time will make the contribution process smooth for everyone. We discourage prospective contributors from working on changes and opening pull requests that do not reference an existing issue, since any changes that were not discussed beforehand are very likely to be rejected.
+\_Before starting work on any significant contributions, please [open an issue](<(https://github.com/superglue-ai/superglue/issues)>). Discussing your proposed changes ahead of time will make the contribution process smooth for everyone. We discourage prospective contributors from working on changes and opening pull requests that do not reference an existing issue, since any changes that were not discussed beforehand are very likely to be rejected.
 
-Once we've discussed your changes and you've got your code ready, make sure that all tests are passing and open your pull request. Note that we will be unable to merge your contributions unless you have signed the Contributor License Agreement (CLA). Failing to do so will result in your changes being rejected. A good first step is therefore to search for current open [issues](https://github.com/superglue-ai/superglue/issues). 
+Once we've discussed your changes and you've got your code ready, make sure that all tests are passing and open your pull request. Note that we will be unable to merge your contributions unless you have signed the Contributor License Agreement (CLA). Failing to do so will result in your changes being rejected. A good first step is therefore to search for current open [issues](https://github.com/superglue-ai/superglue/issues).
 
 ## Project Overview
 
@@ -63,19 +63,19 @@ See this [diagram](https://docs.superglue.cloud/guides/architecture) for an over
 ├── LICENSE
 ```
 
-- **`packages/core`**:  
+- **`packages/core`**:
   - Contains the backend GraphQL API (`graphql/`), workflow engine (`workflow/`), LLM integration (`llm/`), integration logic (`integrations/`), and datastore implementations (`datastore/` for Postgres, FileStore, Memory).
   - Tests are in `tests/` and alongside implementations.
-- **`packages/web`**:  
+- **`packages/web`**:
   - Next.js 15 App Router frontend, using TypeScript, shadcn/ui, and Tailwind CSS.
   - UI components in `src/components/`, pages in `src/app/`.
-- **`packages/shared`**:  
+- **`packages/shared`**:
   - Shared TypeScript code (types, utils, templates) used by both backend and frontend.
-- **`docs/`**:  
+- **`docs/`**:
   - API reference, guides, and docs.
-- **`docker/`**:  
+- **`docker/`**:
   - Dockerfiles for backend, frontend, and local development.
-- **Monorepo**:  
+- **Monorepo**:
   - Managed with npm workspaces and turbo.
 
 ## Development Setup
@@ -89,22 +89,26 @@ See this [diagram](https://docs.superglue.cloud/guides/architecture) for an over
 ### Quickstart
 
 1. **Install dependencies:**
+
    ```sh
    npm install
    ```
 
 2. **Start local dev environment:**
+
    ```sh
    # Start backend and frontend in dev mode
    npm run dev
    ```
 
 3. **Run unit tests:**
+
    ```sh
    npm run test
    ```
 
 4. **Build for production:**
+
    ```sh
    npm run build
    ```
@@ -133,6 +137,6 @@ We use GitHub Actions for CI/CD, the configuration is in [`.github/workflows/nod
 
 ## License
 
-superglue uses a GNU License. See [LICENSE](https://github.com/superglue-ai/superglue/blob/main/LICENSE) and [docs](https://docs.superglue.cloud/introduction) for more details.
+superglue uses a Functional Source License. See [LICENSE](https://github.com/superglue-ai/superglue/blob/main/LICENSE) and [docs](https://docs.superglue.cloud/introduction) for more details.
 
 When contributing to the superglue codebase, you need to agree to the [Contributor License Agreement](https://cla-assistant.io/superglue-ai/superglue). You only need to do this once and the CLA bot will remind you if you haven't signed it yet.

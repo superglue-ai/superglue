@@ -2,25 +2,12 @@
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "build": {
-      "dependsOn": [
-        "^build"
-      ],
-      "outputs": [
-        "dist/**",
-        ".next/**"
-      ],
-      "inputs": [
-        "src/**/*.tsx",
-        "src/**/*.ts",
-        "*.ts",
-        "*.tsx",
-        "package.json"
-      ]
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**"],
+      "inputs": ["src/**/*.tsx", "src/**/*.ts", "*.ts", "*.tsx", "package.json"]
     },
     "dev": {
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "cache": false,
       "persistent": true
     },
@@ -29,18 +16,12 @@
       "persistent": true
     },
     "test": {
-      "dependsOn": [
-        "@superglue/core#build"
-      ],
+      "dependsOn": ["@superglue/core#build"],
       "outputs": []
     },
     "test:coverage": {
-      "dependsOn": [
-        "@superglue/core#build"
-      ],
-      "outputs": [
-        "coverage/**"
-      ]
+      "dependsOn": ["@superglue/core#build"],
+      "outputs": ["coverage/**"]
     }
   },
   "globalEnv": [
@@ -72,6 +53,7 @@
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "STORAGE_DIR",
     "LLM_PROVIDER",
+    "LLM_FALLBACK_PROVIDER",
     "AI_GATEWAY_MODEL",
     "AI_GATEWAY_API_KEY",
     "FRONTEND_LLM_PROVIDER",
@@ -93,6 +75,12 @@
     "AZURE_RESOURCE_NAME",
     "AZURE_BASE_URL",
     "AZURE_API_VERSION",
-    "AZURE_USE_DEPLOYMENT_BASED_URLS"
+    "AZURE_USE_DEPLOYMENT_BASED_URLS",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_REGION",
+    "AWS_SESSION_TOKEN",
+    "BEDROCK_MODEL",
+    "AWS_BASE_URL"
   ]
 }

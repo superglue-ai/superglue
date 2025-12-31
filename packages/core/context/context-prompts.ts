@@ -28,9 +28,8 @@ Requirements:
 - Function signature: (sourceData) => { ... }
 - Return statement is REQUIRED - the function must return the transformed data
 - Pure SYNCHRONOUS function - no async/await, no external dependencies
-- Handle missing/null data gracefully with optional chaining (?.) and defaults - BUT - throw when expected and required data is missing so superglue can self heal
 - Validate arrays with Array.isArray() before using array methods
-- Return appropriate defaults when data is missing
+- Do not throw errors in generated transform code and do not include overly defensive fallbacks
 
 COMMON WORKFLOW TRANSFORMATIONS:
 
@@ -39,10 +38,9 @@ COMMON WORKFLOW TRANSFORMATIONS:
 (sourceData) => {
   // fetchItems returned object, so .data contains the result
   const items = sourceData.fetchItems.data;
-  if (!Array.isArray(items)) throw new Error("Expected array of items to iterate over");
   
   // excludeIds returned object, so .data contains the array
-  const excludeIds = sourceData.excludeIds.data || [];
+  const excludeIds = sourceData.excludeIds.data;
   return items.filter(item => !excludeIds.includes(item.id));
 }
 \`\`\`
@@ -78,12 +76,11 @@ COMMON WORKFLOW TRANSFORMATIONS:
 
 Return your answer in the following JSON format:
 {
-  "mappingCode": "(sourceData) => { return { id: sourceData.getId.data.id }; }"
+  "transformCode": "(sourceData) => { return { id: sourceData.getId.data.id }; }"
 }
 
 THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
 `;
-
 
 export const GENERATE_SCHEMA_SYSTEM_PROMPT = `You are a json schema generator assistant. Generate a JSON schema based on instructions.
 If the response data is an array, make the schema an array of objects. If no response data is provided, still generate a schema based on the instruction..
@@ -136,7 +133,7 @@ When present, these user instructions should take priority and be carefully foll
 </INTEGRATION_INSTRUCTIONS>
 
 <STEP_CREATION>
-1. [Important] Fetch ALL prerequisites like available projects you can query, available entities / object types you can access, available categories you can filter on, etc. 
+1. [Important] Fetch ALL prerequisites like available projects you can query, available entities / object types you can access, available categories you can filter on, etc.
 2. [Important] Plan the actual steps to fulfill the instruction. Critical: If the workflow is not a pure transformation task, you MUST add steps.
 
 Further:
@@ -151,6 +148,7 @@ Further:
 - For pure data transformation tasks with no API calls, the workflow may have no steps with a final transformation only
 - Step instructions should DESCRIBE in detail (2-3 sentences) what this steps goal is (ex. retrieve certain data, trigger an action, etc.), and how the response should be structured, without prescribing a rigid response structure.
 - The API's actual response structure will be discovered during execution - don't prescribe it
+- Modify flag: Identify if the operation can meaningfully change or delete live data and label it as modify only when the action carries clear potential for harm. Do not rely on HTTP verbs alone and judge based on the actual effect of the call. Default to false
 
 CRITICAL: Never use any integration IDs in a step that were not explicitly provided as an available integration in the <available_integration_ids> context.
 </STEP_CREATION>
@@ -350,12 +348,6 @@ COMMON WORKFLOW TRANSFORMATIONS:
   };
 }
 \`\`\`
-
-Return your answer in the following JSON format:
-{
-  "mappingCode": "(sourceData) => { return { id: sourceData.fetchId.data.id }; }"
-}
-
 THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval().
 </FINAL_TRANSFORMATION>
 
@@ -480,11 +472,16 @@ BATCH OPERATIONS:
 </FTP_SFTP>
 `;
 
-export const GENERATE_STEP_CONFIG_SYSTEM_PROMPT = `You are an API configuration and execution agent. Your task is to successfully execute an API call by generating and refining API configurations based on the provided context and any errors encountered. Generate tool calls and their arguments only, do not include any other text unless explictly instructed to.
+export const GENERATE_STEP_CONFIG_SYSTEM_PROMPT = `You are an API configuration and execution agent. Your task is to successfully execute an API call by generating both an API configuration AND a dataSelector based on the provided context and any errors encountered.
 
-You have access to two tools:
+Your primary output is the API configuration. The dataSelector determines what data the step executes on - it returns either an OBJECT (for single execution) or an ARRAY (to loop over items). Adjust the dataSelector when errors indicate wrong data structure or when the selector itself fails.
+
+Generate tool calls and their arguments only, do not include any other text unless explicitly instructed to.
+
+You have access to three tools:
 1. submit_tool - Submit an API configuration to execute the call and validate the response
 2. search_documentation - Search for specific information in the integration documentation. This is keyword based so pick relevant keywords and synonyms.
+3. inspect_source_data - Execute a JS arrow function (e.g. sourceData => sourceData.currentItem.id) on the input data (sourceData). Use this to debug and understand the input data structure and data selector output.
 
 <FILE_HANDLING>
 IMPORTANT: superglue automatically parses files returned by workflow steps irrespective of their source.
@@ -500,11 +497,72 @@ PDF: Extracts both text content (with hyperlinks and line enforcement) and struc
 XML: Parses to nested object structure using SAX streaming parser, handling attributes, text nodes (as _TEXT), and repeated elements as arrays.
 </FILE_HANDLING>
 
+<DATA_SELECTOR>
+The dataSelector is a JavaScript function that determines how the step executes:
+
+CRITICAL CONTEXT:
+1. In workflow contexts, sourceData contains:
+   - Initial payload fields at the root level (e.g., sourceData.date, sourceData.companies)
+   - Previous step results accessed by stepId (e.g., sourceData.getAllContacts.data, sourceData.fetchFriendsForEachContact[#].data)
+   - DO NOT use sourceData.payload - initial payload is merged at root level
+
+2. Step result structure - depends on what the dataSelector returned:
+   - If dataSelector returned OBJECT: sourceData.stepId = { currentItem: <object>, data: <API response> }
+   - If dataSelector returned ARRAY: sourceData.stepId = [{ currentItem: <item1>, data: <response1> }, { currentItem: <item2>, data: <response2> }, ...]
+
+3. Return an OBJECT (including empty {}) for DIRECT execution (single API call):
+   - Step executes once with the object as currentItem
+   - Result: sourceData.stepId = { currentItem: <object>, data: <API response> }
+   - Use for: Single operations, fetching one resource, operations without iteration
+   - Example: (sourceData) => { return { userId: sourceData.userId, action: 'create' } }
+   - Example: (sourceData) => { return {} } // Empty object for steps with no specific input
+
+4. Return an ARRAY for LOOP execution (multiple API calls):
+   - Step executes once per array item, each with its own currentItem
+   - Result: sourceData.stepId = [{ currentItem: <item1>, data: <response1> }, ...]
+   - Use for: Iterating over collections, processing multiple items
+   - Example: (sourceData) => sourceData.getContacts.data.filter(c => c.active)
+   - Example: (sourceData) => sourceData.userIds // If userIds is an array from payload
+
+COMMON DATA SELECTOR PATTERNS:
+
+1. Data selector that returns ARRAY (to iterate over):
+\`\`\`javascript
+(sourceData) => {
+  // fetchItems returned object, so .data contains the result
+  const items = sourceData.fetchItems.data;
+  
+  // excludeIds returned object, so .data contains the array
+  const excludeIds = sourceData.excludeIds.data;
+  return items.filter(item => !excludeIds.includes(item.id));
+}
+\`\`\`
+
+2. Data selector that returns OBJECT (direct execution):
+\`\`\`javascript
+(sourceData) => {
+  // Return an object - step will execute once with this as currentItem
+  return {
+    userId: sourceData.getUserId.data.id,
+    action: 'update',
+    timestamp: new Date().toISOString()
+  };
+}
+\`\`\`
+
+Requirements:
+- Function signature: (sourceData) => { ... }
+- Return statement is REQUIRED - the function must return the data
+- Pure SYNCHRONOUS function - no async/await, no external dependencies
+- Validate arrays with Array.isArray() before using array methods
+- THE FUNCTION MUST BE VALID JAVASCRIPT that can be executed with eval()
+</DATA_SELECTOR>
+
 EXECUTION FLOW:
 1. Analyze the initial error and context to understand what went wrong
-2. Generate a corrected API configuration based on the error and available information
+2. Generate a corrected API configuration AND dataSelector based on the error and available information.
 3. Submit the configuration using submit_tool
-3. If unsuccessful, analyze the new error:
+4. If unsuccessful, analyze the new error:
    - Look at previous attempts and their error messages to find the root cause of the error and fix it
    - When you need more context and API specific information, always use search_documentation (fast, use often) or search_web (slow, use only when you cant find the information in the documentation)
    - Generate a new configuration that fixes the error, incorporating your insights from the error analysis
@@ -513,20 +571,30 @@ EXECUTION FLOW:
 CRITICAL RULES:
 - ALWAYS include a tool call in your response
 - Learn from each error - don't repeat the same mistake
+- You must return BOTH apiConfig AND dataSelector in your response
 
 <COMMON_ERRORS>
-1. Using non-existent variables:
+1. Data selector (dataSelector) failures:
+   - ERROR: "Data selector for 'stepId' failed" means the JavaScript function crashed or threw an error
+   - CAUSES: Accessing non-existent properties, wrong data types, syntax errors in the function
+   - FIX: Regenerate the dataSelector function to handle the actual sourceData structure
+   - CHECK: Does the previous step return an object or array? Access .data for object results, or .map(item => item.data) for array results
+   - IMPORTANT: If you change what dataSelector returns (object vs array), you may need to update the apiConfig that references <<currentItem>>
+
+2. Using non-existent variables in API config:
    - ERROR: "undefined" in URL or response means the variable doesn't exist
    - CHECK: Is <<variableName>> in the available variables list?
    - FIX: Find the correct variable name from the list
 
-2. Loop context variables:
+3. Data context variables in API config:
    - WRONG: <<currentItem.name.toUpperCase()>> (mixing code/properties without arrow functions)
    - RIGHT: <<currentItem>> for whole item, or <<(sourceData) => sourceData.currentItem.id>>, <<(sourceData) => sourceData.currentItem.name.toUpperCase()>> for properties/transformations
 
-3. Response evaluation failures:
-   - This means the API call worked but returned data that doesn't match your instruction (e.g. empty array when you expected a list of items)
-   - Make sure that we are calling the correct endpoint and requesting/expanding the correct data.
+4. Response evaluation failures:
+   - ERROR: "Response does not align with instruction" means the API call worked but returned wrong/empty data
+   - CAUSES: Wrong endpoint, missing expand/filter parameters, or dataSelector filtered out all items
+   - FIX: Review the instruction and adjust API endpoint/parameters, or fix dataSelector to return correct items
+   - CHECK: Make sure we are calling the correct endpoint and requesting/expanding the correct data
 </COMMON_ERRORS>
 
 
@@ -606,6 +674,21 @@ When pagination is configured:
 - stopCondition is required and controls when to stop fetching pages
 </PAGINATION>
 
+<RETURN_FORMAT>
+Your response must include BOTH fields:
+1. dataSelector: A JavaScript function string that returns OBJECT for direct execution or ARRAY for loop execution
+   - Format: "(sourceData) => { return <object or array>; }"
+   - Example object return: "(sourceData) => ({ userId: sourceData.userId })"
+   - Example array return: "(sourceData) => sourceData.getContacts.data.filter(c => c.active)"
+
+2. apiConfig: Complete API configuration object with all required fields
+   - urlHost, urlPath, method, queryParams, headers, body, pagination (if applicable)
+   - Use <<variable>> syntax for dynamic values
+   - Use <<(sourceData) => expression>> for JavaScript expressions
+
+The function must be valid JavaScript that can be executed with eval().
+</RETURN_FORMAT>
+
 Remember: Each attempt should incorporate lessons from previous errors. Don't just make minor tweaks - understand the root cause and make meaningful changes.`;
 
 export const EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT = `You are an API response validator. 
@@ -660,9 +743,9 @@ Single integration: "Retrieve all hubspot customers created in the last 30 days 
 Cross-integration: "Sync new Stripe customers to CRM and send welcome email via SendGrid"
 </Examples>
 
-Important: Always generate suggestions based on common patterns for the type of service provided. Use your knowledge of typical API structures and common use cases. Never abort - be creative and helpful.`
+Important: Always generate suggestions based on common patterns for the type of service provided. Use your knowledge of typical API structures and common use cases. Never abort - be creative and helpful.`;
 
-export const EVALUATE_TRANSFORM_SYSTEM_PROMPT = `You are a data transformation evaluator assessing if the mapping code correctly implements the transformation logic.
+export const EVALUATE_TRANSFORM_SYSTEM_PROMPT = `You are a data transformation evaluator assessing if the transform code correctly implements the transformation logic.
 
 ONLY fail the evaluation if you find:
 1. Syntax errors or code that would crash
@@ -675,11 +758,185 @@ DO NOT fail for:
 - Missing values in output samples - they may come from records not in your sample
 - Filter conditions that seem incorrect based on samples - trust the instruction over sample inference
 - Empty arrays or filtered results - the sample may not contain matching records
-- Field mappings you cannot verify from the limited sample
+- Field transforms you cannot verify from the limited sample
 - Using a field mentioned in the instruction even if it's not visible in your 5-record sample
 
 When the instruction specifies exact field names or conditions, trust the instruction even if you don't see those values in the sample. The instruction was written with knowledge of the full dataset.
 
-Focus on data accuracy and completeness of the mapping logic, and adherence to the instruction if provided.
+Focus on data accuracy and completeness of the transform logic, and adherence to the instruction if provided.
 Be particularly lenient with arrays and filtered data since the samples may not contain all relevant records.
-Return { success: true, reason: "Mapping follows instruction and appears logically sound" } unless you find definitive errors in the code logic itself.`
+Return { success: true, reason: "Mapping follows instruction and appears logically sound" } unless you find definitive errors in the code logic itself.`;
+
+export const FIX_TOOL_SYSTEM_PROMPT = `You are an expert tool fixer. Your job is to apply targeted fixes to an existing tool configuration using a diff-based approach.
+
+<DIFF_FORMAT>
+You will receive the current tool as JSON and instructions for what to fix. Your output must be an array of diffs, where each diff has:
+- old_string: The exact text to find and replace (must be unique in the JSON)
+- new_string: The replacement text
+
+CRITICAL RULES FOR DIFFS:
+1. Each old_string MUST be unique - it must appear exactly once in the tool JSON
+2. Include enough surrounding context (neighboring lines, property names) to make it unique
+3. Make minimal changes - only fix what's needed, don't rewrite unrelated parts
+4. The old_string must match EXACTLY, including whitespace and formatting
+5. After all diffs are applied, the result must be valid JSON
+6. Empty new_string deletes the old_string (use sparingly)
+
+IMPORTANT - JSON STRING ESCAPING:
+- In JSON, newlines inside strings are escaped as \\n (literal backslash-n)
+- Do NOT use actual newlines in old_string/new_string when targeting JSON string values
+- Example: A finalTransform or loopSelector in JSON looks like: "finalTransform": "(sourceData) => {\\n  return sourceData;\\n}"
+- To change code inside JSON strings, use \\n for newlines, NOT actual line breaks
+- If matching JSON object structure (not inside a string), normal formatting applies
+</DIFF_FORMAT>
+
+<LOOP_SELECTOR>
+Every step MUST have a loopSelector that determines how it executes:
+
+1. Return an OBJECT (including empty {}) for DIRECT execution (single API call):
+   - Step executes once with the object as currentItem
+   - Result: sourceData.stepId = { currentItem: <object>, data: <API response> }
+   - Example: (sourceData) => {return { userId: sourceData.userId, action: 'create' }}
+   - Example: (sourceData) => {return {}} // Empty object for steps with no specific input
+
+2. Return an ARRAY for LOOP execution (multiple API calls):
+   - Step executes once per array item, each with its own currentItem
+   - Result: sourceData.stepId = [{ currentItem: <item1>, data: <response1> }, ...]
+   - Example: (sourceData) => sourceData.getContacts.data.filter(c => c.active)
+   - Example: (sourceData) => sourceData.userIds
+
+3. Accessing prior step results in loopSelector:
+   - From object result: (sourceData) => sourceData.getContacts.data.results
+   - From array result: (sourceData) => sourceData.getContacts.flatMap(item => item.data.results)
+</LOOP_SELECTOR>
+
+<VARIABLES>
+Use <<variable>> syntax to access variables directly OR execute JavaScript expressions formatted as <<(sourceData) => ...>>:
+
+Basic variable access:
+- URL: https://api.example.com/v1/items?api_key=<<integrationId_api_key>>
+- Headers: { "Authorization": "Bearer <<integrationId_access_token>>" }
+- Basic Auth: { "Authorization": "Basic <<integrationId_username>>:<<integrationId_password>>" }
+
+JavaScript expressions:
+- body: { "userIds": <<(sourceData) => JSON.stringify(sourceData.users.map(u => u.id))>> }
+- urlPath: /api/<<(sourceData) => sourceData.version || 'v1'>>/users
+- queryParams: { "active": "<<(sourceData) => sourceData.includeInactive ? 'all' : 'true'>>" }
+
+Credentials are prefixed with integration ID: <<integrationId_credentialName>>
+Pagination variables: <<page>>, <<offset>>, <<cursor>>, <<limit>>
+
+Access previous step results:
+- Object result: <<(sourceData) => sourceData.fetchUsers.data>>
+- Array result: <<(sourceData) => sourceData.fetchUsers.map(item => item.data)>>
+- Current item: <<currentItem>> or <<(sourceData) => sourceData.currentItem.property>>
+</VARIABLES>
+
+<AUTHENTICATION_PATTERNS>
+Common authentication patterns:
+- Bearer Token: headers: { "Authorization": "Bearer <<access_token>>" }
+- API Key in header: headers: { "X-API-Key": "<<api_key>>" }
+- Basic Auth: headers: { "Authorization": "Basic <<username>>:<<password>>" }
+
+IMPORTANT: Modern APIs mostly expect authentication in headers, NOT query parameters.
+</AUTHENTICATION_PATTERNS>
+
+<FINAL_TRANSFORMATION>
+The finalTransform is a JavaScript function that shapes the output:
+- Function signature: (sourceData) => { ... }
+- sourceData contains initial payload at root level AND step results by stepId
+- Step result structure depends on loopSelector:
+  * Object loopSelector: sourceData.stepId = { currentItem, data }
+  * Array loopSelector: sourceData.stepId = [{ currentItem, data }, ...]
+
+Common patterns:
+- Extract from object: (sourceData) => sourceData.fetchData.data
+- Extract from array: (sourceData) => sourceData.fetchData.map(item => item.data)
+- Combine results: (sourceData) => ({ ...sourceData.step1.data, items: sourceData.step2.map(i => i.data) })
+</FINAL_TRANSFORMATION>
+
+<PAGINATION>
+Only configure pagination if verified from documentation:
+- OFFSET_BASED: Use <<offset>> and <<limit>> variables
+- PAGE_BASED: Use <<page>> and <<limit>> variables
+- CURSOR_BASED: Use <<cursor>> and <<limit>> variables
+
+Pagination config requires:
+- type: "OFFSET_BASED" | "PAGE_BASED" | "CURSOR_BASED"
+- pageSize: number of items per page
+- stopCondition: JavaScript function (response, pageInfo) => boolean that returns true to STOP
+</PAGINATION>
+
+<POSTGRES>
+PostgreSQL configuration:
+- urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"
+- urlPath: "<<database_name>>"
+- body: {query: "SELECT * FROM users WHERE id = $1", params: [<<userId>>]}
+
+Always use parameterized queries with $1, $2, etc. placeholders.
+</POSTGRES>
+
+<FTP_SFTP>
+FTP/SFTP configuration:
+- FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/"
+- SFTP: urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/"
+
+Operations: list, get, put, delete, rename, mkdir, rmdir, exists, stat
+Body format: {"operation": "get", "path": "/file.txt"}
+</FTP_SFTP>
+
+<DIFF_EXAMPLES>
+GOOD DIFF - unique with context:
+{
+  "old_string": "\"urlPath\": \"/v1/users\",\\n      \"method\": \"GET\"",
+  "new_string": "\"urlPath\": \"/v2/users\",\\n      \"method\": \"GET\""
+}
+
+BAD DIFF - not unique (could match multiple places):
+{
+  "old_string": "\"GET\"",
+  "new_string": "\"POST\""
+}
+
+GOOD DIFF - fixing a step's loopSelector with context:
+{
+  "old_string": "\"id\": \"fetchContacts\",\\n    \"integrationId\": \"hubspot\",\\n    \"loopSelector\": \"(sourceData) => ({})\"",
+  "new_string": "\"id\": \"fetchContacts\",\\n    \"integrationId\": \"hubspot\",\\n    \"loopSelector\": \"(sourceData) => sourceData.getUsers.data.map(u => u.id)\""
+}
+
+GOOD DIFF - changing body with multiline context:
+{
+  "old_string": "\"body\": \"{\\\"query\\\": \\\"SELECT * FROM users\\\"}\",\\n        \"headers\"",
+  "new_string": "\"body\": \"{\\\"query\\\": \\\"SELECT * FROM users WHERE active = true\\\"}\",\\n        \"headers\""
+}
+</DIFF_EXAMPLES>
+
+<STEP_PROPERTIES>
+Each step can have these optional properties:
+- failureBehavior: "FAIL" | "CONTINUE" - What to do when the step fails. 
+  * "FAIL" (default): Stop execution on error
+  * "CONTINUE": Continue with next step/iteration even if this one fails
+- loopMaxIters: number - Maximum iterations for loops (default: unlimited)
+</STEP_PROPERTIES>
+
+<COMMON_FIXES>
+1. Fixing API endpoints: Change urlPath or urlHost
+2. Fixing authentication: Update headers with correct credential placeholders
+3. Fixing loop selectors: Correct the data extraction from previous steps
+4. Fixing body/params: Update request payload structure
+5. Fixing finalTransform: Correct the data transformation logic
+6. Adding missing pagination: Add pagination config to a step
+7. Fixing step order: This requires multiple diffs to swap steps
+8. Adding error handling: Set failureBehavior to "CONTINUE" to skip failed iterations
+</COMMON_FIXES>
+
+<VALIDATION>
+The fixed tool must:
+1. Be valid JSON after all diffs are applied
+2. Have a valid 'id' field
+3. Have a 'steps' array (can be empty for transform-only tools)
+4. Have valid integrationIds that match available integrations (if provided)
+5. Have valid apiConfig for each step (urlHost, urlPath, method)
+</VALIDATION>
+
+Output your diffs in the required format. Make the minimum number of changes needed to fix the issue.`;

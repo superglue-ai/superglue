@@ -1,8 +1,8 @@
 import { getCacheScopeIdentifier } from "./cache-scope-identifier";
 
 const getCacheKey = (scopeIdentifier: string, prefix: string) => {
-  const hash = scopeIdentifier.split('').reduce((acc, char) => {
-    return ((acc << 5) - acc) + char.charCodeAt(0) | 0;
+  const hash = scopeIdentifier.split("").reduce((acc, char) => {
+    return ((acc << 5) - acc + char.charCodeAt(0)) | 0;
   }, 0);
   return `${prefix}-${Math.abs(hash)}`;
 };
@@ -18,7 +18,7 @@ export const loadFromCache = <T>(prefix: string): T | null => {
     if (!cached) return null;
     return JSON.parse(cached);
   } catch (error) {
-    console.error('Error loading cached data:', error);
+    console.error("Error loading cached data:", error);
     return null;
   }
 };
@@ -26,31 +26,39 @@ export const loadFromCache = <T>(prefix: string): T | null => {
 export const saveToCache = (prefix: string, data: unknown): void => {
   const scopeIdentifier = getCacheScopeIdentifier();
   if (!scopeIdentifier) return;
-  
+
   try {
     const serialized = JSON.stringify(data);
     if (serialized.length > MAX_CACHE_SIZE) {
-      console.warn(`Cache data too large (${(serialized.length / 1024 / 1024).toFixed(2)}MB), skipping cache`);
+      console.warn(
+        `Cache data too large (${(serialized.length / 1024 / 1024).toFixed(2)}MB), skipping cache`,
+      );
       return;
     }
     localStorage.setItem(getCacheKey(scopeIdentifier, prefix), serialized);
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-      console.warn('localStorage quota exceeded, clearing old cache entries');
+    if (
+      error instanceof DOMException &&
+      (error.name === "QuotaExceededError" || error.code === 22)
+    ) {
+      console.warn("localStorage quota exceeded, clearing old cache entries");
       try {
-        // Clear old cache entries and retry
+        // Clear old cache entries and retry - match both 'cache' and 'superglue-' prefixed keys
         const keys = Object.keys(localStorage);
-        keys.filter(k => k.includes('cache')).forEach(k => localStorage.removeItem(k));
+        const currentKey = getCacheKey(scopeIdentifier, prefix);
+        keys
+          .filter((k) => k !== currentKey && (k.includes("cache") || k.startsWith("superglue-")))
+          .forEach((k) => localStorage.removeItem(k));
         const serialized = JSON.stringify(data);
         if (serialized.length <= MAX_CACHE_SIZE) {
-          localStorage.setItem(getCacheKey(scopeIdentifier, prefix), serialized);
+          localStorage.setItem(currentKey, serialized);
         }
       } catch (retryError) {
-        console.error('Failed to save cache after cleanup:', retryError);
+        // If still failing, just give up silently - cache is non-essential
+        console.warn("Failed to save cache after cleanup, skipping");
       }
     } else {
-      console.error('Error saving cache data:', error);
+      console.error("Error saving cache data:", error);
     }
   }
 };
-

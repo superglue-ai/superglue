@@ -1,37 +1,41 @@
+import { ServiceMetadata } from "@superglue/shared";
+import { Integration } from "@superglue/shared";
 import { DataStore } from "../../../packages/core/datastore/types.js";
-import { logMessage } from "../../../packages/core/utils/logs.js";
-import type { AgentEvalConfig, IntegrationConfig } from "../types.js";
-import { Integration } from "@superglue/client";
 import { DocumentationFetcher } from "../../../packages/core/documentation/index.js";
-import { Metadata } from "@playwright/test";
+import { logMessage } from "../../../packages/core/utils/logs.js";
+import { replaceVariables } from "../../../packages/core/utils/helpers.js";
+import type { AgentEvalConfig, IntegrationConfig } from "../types.js";
 
 export class IntegrationSetupService {
   constructor(
     private datastore: DataStore,
     private config: AgentEvalConfig,
-    private metadata: Metadata
+    private metadata: ServiceMetadata,
   ) {}
 
   async setupIntegrations(): Promise<Integration[]> {
-    const enabledTools = this.config.enabledTools === 'all' 
-      ? this.config.tools 
-      : this.config.tools.filter(tool => this.config.enabledTools.includes(tool.id));
-    
-    const usedIntegrationIds = new Set(
-      enabledTools.flatMap(tool => tool.integrationIds)
-    );
-    
-    const integrationConfigs = this.config.integrations.filter(integration => 
-      usedIntegrationIds.has(integration.id)
+    const enabledTools =
+      this.config.enabledTools === "all"
+        ? this.config.tools
+        : this.config.tools.filter((tool) => this.config.enabledTools.includes(tool.id));
+
+    const usedIntegrationIds = new Set(enabledTools.flatMap((tool) => tool.integrationIds));
+
+    const integrationConfigs = this.config.integrations.filter((integration) =>
+      usedIntegrationIds.has(integration.id),
     );
 
     this.applyEnvironmentVariablesToConfigs(integrationConfigs);
 
     const integrations = await Promise.all(
-      integrationConfigs.map((config) => this.setupSingleIntegration(config))
+      integrationConfigs.map((config) => this.setupSingleIntegration(config)),
     );
 
-    logMessage("info", `${integrations.length}/${integrationConfigs.length} integrations setup complete`, this.metadata);
+    logMessage(
+      "info",
+      `${integrations.length}/${integrationConfigs.length} integrations setup complete`,
+      this.metadata,
+    );
     return integrations;
   }
 
@@ -50,22 +54,27 @@ export class IntegrationSetupService {
         credentials: integrationConfig.credentials,
       };
     }
-
-    if (integrationConfig.id === "postgres-lego") {
-      // replace the username, password, host, port, and database in the urlHost with the values from the credentials
-      integrationConfig.urlHost = integrationConfig.urlHost.replace("<<username>>", integrationConfig.credentials.username).replace("<<password>>", integrationConfig.credentials.password).replace("<<host>>", integrationConfig.credentials.host).replace("<<port>>", integrationConfig.credentials.port).replace("<<database>>", integrationConfig.credentials.database);
-    }
+    const scopedCredentials = Object.entries(integrationConfig.credentials ?? {}).reduce(
+      (acc, [key, value]) => {
+        acc[`${integrationConfig.id}_${key}`] = value;
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
 
     const docFetcher = new DocumentationFetcher(
       {
-        urlHost: integrationConfig.urlHost,
-        urlPath: integrationConfig.urlPath,
-        documentationUrl: integrationConfig.documentationUrl,
-        openApiUrl: integrationConfig.openApiUrl,
+        urlHost: await replaceVariables(integrationConfig.urlHost, scopedCredentials),
+        urlPath: await replaceVariables(integrationConfig.urlPath, scopedCredentials),
+        documentationUrl: await replaceVariables(
+          integrationConfig.documentationUrl,
+          scopedCredentials,
+        ),
+        openApiUrl: await replaceVariables(integrationConfig.openApiUrl, scopedCredentials),
         keywords: integrationConfig.keywords,
       },
-      integrationConfig.credentials || {},
-      this.metadata
+      scopedCredentials,
+      this.metadata,
     );
 
     const docString = await docFetcher.fetchAndProcess();
@@ -107,13 +116,13 @@ export class IntegrationSetupService {
       }
 
       for (const [key, _] of Object.entries(config.credentials)) {
-        const expectedEnvVarName = `${config.id.toUpperCase().replace(/-/g, '_')}_${key.toUpperCase()}`;
+        const expectedEnvVarName = `${config.id.toUpperCase().replace(/-/g, "_")}_${key.toUpperCase()}`;
         const envValue = process.env[expectedEnvVarName];
 
         if (envValue) {
           config.credentials[key] = envValue;
         } else {
-          logMessage('warn', `Missing credential: ${config.id}.${key} (${expectedEnvVarName})`);
+          logMessage("warn", `Missing credential: ${config.id}.${key} (${expectedEnvVarName})`);
         }
       }
     }

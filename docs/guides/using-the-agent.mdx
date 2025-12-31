@@ -6,7 +6,9 @@ description: "How to interact with the superglue agent"
 The superglue agent handles integration setup, API discovery, and tool building through a chat interface. Talk to it in natural language — it handles the technical details.
 
 <Note>
-  The agent is available in the hosted version at [app.superglue.cloud](https://app.superglue.cloud). For self-hosted MCP usage, see the [MCP guide](/mcp/using-the-mcp).
+  The agent is available in the hosted version at
+  [app.superglue.cloud](https://app.superglue.cloud). For self-hosted MCP usage, see the [MCP
+  guide](/mcp/using-the-mcp).
 </Note>
 
 ---
@@ -30,13 +32,11 @@ The agent uses a broad range of tools to help you manage your integrations and t
     **`call_endpoint`** - Test API endpoints directly with credential injection
   </Accordion>
 
-  <Accordion title="Tool Building & Execution" icon="wrench">
-    **`find_tools`** - Search for existing saved tools by natural language query
-    
-    **`build_and_execute_tool`** - Build and test tools from natural language instructions
-    
-    **`execute_tool`** - Execute previously saved tools by ID with optional payloads
-  </Accordion>
+<Accordion title="Tool Building & Execution" icon="wrench">
+  **`find_tools`** - Search for existing saved tools by natural language query
+  **`build_and_execute_tool`** - Build and test tools from natural language instructions
+  **`execute_tool`** - Execute previously saved tools by ID with optional payloads
+</Accordion>
 
   <Accordion title="Scheduling" icon="clock">
     **`list_tool_schedules`** - View all schedules for a specific tool
@@ -53,19 +53,16 @@ The agent uses a broad range of tools to help you manage your integrations and t
 
 Configure OAuth flows without touching code. The agent walks you through integration setup, handles the authorization code flow and stores your credentials securely.
 
- <video
-      autoPlay
-      className="w-full rounded-lg"
-      src="../resources/using-agent-oauth.mp4"
-    />
+<video autoPlay className="w-full rounded-lg" src="../resources/using-agent-oauth.mp4" />
 
 **What this shows:**
+
 - You can set up and run the OAuth 2.0 authorization code flow in the chat with one click
 - The agent checks your existing integrations to prevent duplicate setup
 - The agent automatically stores your credentials and automatically verifies your setup
 
 <Card icon="plug" href="https://app.superglue.cloud" horizontal>
-      Start creating integrations with the agent
+  Start creating integrations with the agent
 </Card>
 
 ---
@@ -79,12 +76,13 @@ Point the agent at your custom APIs. It can test endpoints, authentication, and 
 </video>
 
 **What this shows:**
+
 - You can upload documentation as files directly in the chat
 - The agent can extract endpoint information from uploaded docs
 - The agent automates endpoint discovery and parameter inference and enables API interaction through conversation
 
 <Card icon="comments" href="https://app.superglue.cloud" horizontal>
-      Start talking to your APIs
+  Start talking to your APIs
 </Card>
 
 ---

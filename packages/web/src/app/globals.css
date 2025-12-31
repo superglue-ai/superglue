@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Tippy.js base styles for suggestions dropdown */
+.tippy-box {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+}
+
+.tippy-content {
+  padding: 0;
+}
+
 body {
   overflow: hidden;
   font-family: var(--font-jetbrains-sans);
@@ -231,7 +242,6 @@ html.dark {
 }
 
 @layer components {
-
   /* Red outline for destructive outline buttons */
   .btn-outline.text-destructive,
   .btn[variant="outline"].text-destructive,
@@ -255,7 +265,9 @@ html.dark {
     border: none !important;
     outline: none !important;
     background-color: transparent !important;
-    transition: background 0.2s, color 0.2s;
+    transition:
+      background 0.2s,
+      color 0.2s;
   }
 
   .btn-ghost:hover:not(:disabled),
@@ -276,7 +288,9 @@ html.dark {
     background-color: hsl(var(--primary)) !important;
     color: hsl(var(--primary-foreground)) !important;
     border: none !important;
-    transition: background 0.2s, color 0.2s;
+    transition:
+      background 0.2s,
+      color 0.2s;
   }
 
   .btn:hover:not(:disabled),
@@ -300,7 +314,9 @@ html.dark {
     background-color: hsl(var(--secondary)) !important;
     color: hsl(var(--secondary-foreground)) !important;
     border: none !important;
-    transition: background 0.2s, color 0.2s;
+    transition:
+      background 0.2s,
+      color 0.2s;
   }
 
   .btn-secondary:hover:not(:disabled) {
@@ -313,7 +329,9 @@ html.dark {
     background-color: transparent !important;
     color: hsl(var(--ghost-foreground)) !important;
     border: none !important;
-    transition: background 0.2s, color 0.2s;
+    transition:
+      background 0.2s,
+      color 0.2s;
   }
 
   .btn-link {
@@ -332,7 +350,9 @@ html.dark {
     background-color: hsl(var(--destructive)) !important;
     color: hsl(var(--destructive-foreground)) !important;
     border: none !important;
-    transition: background 0.2s, color 0.2s;
+    transition:
+      background 0.2s,
+      color 0.2s;
   }
 
   .btn-destructive:hover:not(:disabled) {
@@ -345,7 +365,10 @@ html.dark {
     background-color: transparent !important;
     color: hsl(var(--outline-foreground)) !important;
     border: 1px solid hsl(var(--outline-border)) !important;
-    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    transition:
+      background 0.2s,
+      color 0.2s,
+      border-color 0.2s;
   }
 
   .btn-outline:hover:not(:disabled) {
@@ -356,27 +379,29 @@ html.dark {
 
   .btn-success,
   .btn[variant="success"] {
-    background-color: #FFA500 !important;
+    background-color: #ffa500 !important;
     color: #000 !important;
     border: none !important;
-    transition: background 0.2s, color 0.2s;
+    transition:
+      background 0.2s,
+      color 0.2s;
   }
 
   .btn-success:hover:not(:disabled),
   .btn[variant="success"]:hover:not(:disabled) {
-    background-color: #FFD700 !important;
+    background-color: #ffd700 !important;
     color: #000 !important;
   }
 
   .dark .btn-success,
   .dark .btn[variant="success"] {
-    background-color: #FFA500 !important;
+    background-color: #ffa500 !important;
     color: #000 !important;
   }
 
   .dark .btn-success:hover:not(:disabled),
   .dark .btn[variant="success"]:hover:not(:disabled) {
-    background-color: #FFD700 !important;
+    background-color: #ffd700 !important;
     color: #000 !important;
   }
 }
@@ -394,7 +419,9 @@ html.dark {
 
 .code-editor {
   @apply rounded-md border border-input bg-transparent;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .code-editor:focus-within {
@@ -404,7 +431,7 @@ html.dark {
 
 .switch-on,
 .custom-switch[data-state="checked"] {
-  background-color: #FFA500 !important;
+  background-color: #ffa500 !important;
 }
 
 .switch-off,
@@ -417,9 +444,9 @@ html.dark {
 .switch-thumb,
 .switch-on .switch-thumb,
 .custom-switch-thumb,
-.custom-switch>span,
+.custom-switch > span,
 .custom-switch .custom-switch-thumb,
-.custom-switch [data-state]>span,
+.custom-switch [data-state] > span,
 .custom-switch * {
   background-color: #fff !important;
   transition: background 0.2s;

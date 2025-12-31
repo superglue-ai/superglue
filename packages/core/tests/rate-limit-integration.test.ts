@@ -1,6 +1,6 @@
-import { type ApiConfig, HttpMethod } from "@superglue/client";
+import { type ApiConfig, HttpMethod } from "@superglue/shared";
 import { describe, expect, it } from "vitest";
-import { runStepConfig } from "../execute/api/api.legacy.js";
+import { callHttp } from "../tools/strategies/http/http.js";
 import { MockServerFactory } from "./test-utils.js";
 
 describe("Rate Limit Integration Test with real server", () => {
@@ -39,7 +39,13 @@ describe("Rate Limit Integration Test with real server", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    const result = await runStepConfig({config: config, payload: {}, credentials: {}, options: {}});
+    const result = await callHttp({
+      config: config,
+      payload: {},
+      credentials: {},
+      options: {},
+      metadata: {},
+    });
     // Should have made 2 requests (one 429, one 200)
     expect(requestCount).toBe(2);
     expect(result.data).toEqual({ success: true, data: "Rate limit test passed" });
@@ -57,6 +63,8 @@ describe("Rate Limit Integration Test with real server", () => {
       updatedAt: new Date(),
     };
     // Should throw an error about rate limit exceeded
-    await expect(runStepConfig({config: config, payload: {}, credentials: {}, options: {}})).rejects.toThrow(/Rate limit exceeded/);
+    await expect(
+      callHttp({ config: config, payload: {}, credentials: {}, options: {}, metadata: {} }),
+    ).rejects.toThrow(/Rate limit exceeded/);
   });
 });

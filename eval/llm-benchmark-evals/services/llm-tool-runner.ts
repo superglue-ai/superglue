@@ -1,7 +1,13 @@
-import type { Metadata } from "@superglue/shared";
+import type { ServiceMetadata } from "@superglue/shared";
 import { logMessage } from "../../../packages/core/utils/logs.js";
 import { ToolValidationService } from "../../tool-evals/services/tool-validation.js";
-import { AttemptStatus, type IntegrationConfig, type ToolAttempt, type ToolConfig, ToolFailureReason } from "../../tool-evals/types.js";
+import {
+  AttemptStatus,
+  type IntegrationConfig,
+  type ToolAttempt,
+  type ToolConfig,
+  ToolFailureReason,
+} from "../../tool-evals/types.js";
 import { CodeExecutor, type ExecutionResult } from "./code-executor.js";
 import { LlmCodeGenerator } from "./llm-code-generator.js";
 
@@ -10,8 +16,8 @@ export class LlmToolRunner {
   private validationService: ToolValidationService;
 
   constructor(
-    private metadata: Metadata,
-    validationLlmConfig?: { provider: string; model: string }
+    private metadata: ServiceMetadata,
+    validationLlmConfig?: { provider: string; model: string },
   ) {
     this.codeExecutor = new CodeExecutor();
     this.validationService = new ToolValidationService(validationLlmConfig);
@@ -21,19 +27,19 @@ export class LlmToolRunner {
     providerModel: any,
     providerName: string,
     tools: ToolConfig[],
-    integrations: IntegrationConfig[]
+    integrations: IntegrationConfig[],
   ): Promise<ToolAttempt[]> {
     const codeGenerator = new LlmCodeGenerator(providerModel, this.metadata);
     const attempts: ToolAttempt[] = [];
 
     for (const tool of tools) {
-      logMessage('info', `Running tool ${tool.id} with provider ${providerName}`, this.metadata);
-      
-      const toolIntegrations = integrations.filter(i => tool.integrationIds.includes(i.id));
+      logMessage("info", `Running tool ${tool.id} with provider ${providerName}`, this.metadata);
+
+      const toolIntegrations = integrations.filter((i) => tool.integrationIds.includes(i.id));
       const attempt = await this.runSingleAttempt(tool, toolIntegrations, codeGenerator);
       attempts.push(attempt);
 
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     return attempts;
@@ -42,7 +48,7 @@ export class LlmToolRunner {
   private async runSingleAttempt(
     tool: ToolConfig,
     integrations: IntegrationConfig[],
-    codeGenerator: LlmCodeGenerator
+    codeGenerator: LlmCodeGenerator,
   ): Promise<ToolAttempt> {
     const attempt: ToolAttempt = {
       toolConfig: tool,
@@ -73,10 +79,9 @@ export class LlmToolRunner {
 
         // Validation phase: LLM judge
         try {
-          const validationResult = await this.validationService.validate(
-            tool,
-            { data: executionResult.data } as any
-          );
+          const validationResult = await this.validationService.validate(tool, {
+            data: executionResult.data,
+          } as any);
           attempt.validationResult = validationResult;
           attempt.status = this.validationService.determineStatus(attempt as any);
 
@@ -84,11 +89,16 @@ export class LlmToolRunner {
             attempt.failureReason = ToolFailureReason.VALIDATION;
           }
         } catch (validationError) {
-          logMessage('error', `Validation failed for tool ${tool.id}: ${validationError}`, this.metadata);
+          logMessage(
+            "error",
+            `Validation failed for tool ${tool.id}: ${validationError}`,
+            this.metadata,
+          );
           attempt.validationResult = {
             passed: false,
             functionPassed: false,
-            functionError: validationError instanceof Error ? validationError.message : String(validationError),
+            functionError:
+              validationError instanceof Error ? validationError.message : String(validationError),
           };
           attempt.status = AttemptStatus.VALIDATION_FAILED_LLM_FAILED;
           attempt.failureReason = ToolFailureReason.VALIDATION;
@@ -98,7 +108,11 @@ export class LlmToolRunner {
         attempt.executionError = executionResult.error;
         attempt.status = AttemptStatus.EXECUTION_FAILED;
         attempt.failureReason = ToolFailureReason.EXECUTION;
-        logMessage('warn', `Execution failed for tool ${tool.id}: ${attempt.executionError}`, this.metadata);
+        logMessage(
+          "warn",
+          `Execution failed for tool ${tool.id}: ${attempt.executionError}`,
+          this.metadata,
+        );
       }
     } catch (buildError) {
       attempt.buildTime = Date.now() - buildStart;
@@ -106,10 +120,9 @@ export class LlmToolRunner {
       attempt.buildError = buildError instanceof Error ? buildError.message : String(buildError);
       attempt.status = AttemptStatus.BUILD_FAILED;
       attempt.failureReason = ToolFailureReason.BUILD;
-      logMessage('warn', `Build failed for tool ${tool.id}: ${attempt.buildError}`, this.metadata);
+      logMessage("warn", `Build failed for tool ${tool.id}: ${attempt.buildError}`, this.metadata);
     }
 
     return attempt;
   }
 }
-

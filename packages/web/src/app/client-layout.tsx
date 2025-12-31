@@ -1,30 +1,30 @@
-"use client"
-import { AnimatePresence, motion } from 'framer-motion';
-import { usePathname } from 'next/navigation';
-import { Sidebar } from '../components/sidebar/Sidebar';
-import { Toaster } from '../components/ui/toaster';
-import { LogSidebar } from '../components/utils/LogSidebar';
-import { ServerMonitor } from '../components/utils/ServerMonitor';
-import { ConfigProvider } from './config-context';
-import { jetbrainsMono, jetbrainsSans } from './fonts';
-import { IntegrationsProvider } from './integrations-context';
-import { CSPostHogProvider } from './providers';
-import { useToken } from '../hooks/use-token';
+"use client";
+import { AnimatePresence, motion } from "framer-motion";
+import { usePathname } from "next/navigation";
+import { Sidebar } from "../components/sidebar/Sidebar";
+import { Toaster } from "../components/ui/toaster";
+import { LogSidebar } from "../components/utils/LogSidebar";
+import { ServerMonitor } from "../components/utils/ServerMonitor";
+import { ConfigProvider } from "./config-context";
+import { jetbrainsMono, jetbrainsSans } from "./fonts";
+import { CSPostHogProvider } from "./providers";
+import { useToken } from "../hooks/use-token";
+import { ConditionalDataProvider } from "./conditional-data-provider";
 
 interface Props {
-  children: React.ReactNode
-  config: any  // keep existing type
+  children: React.ReactNode;
+  config: any; // keep existing type
 }
 
 export function ClientWrapper({ children, config }: Props) {
-  const pathname = usePathname()
-  const isAuthPage = pathname?.startsWith('/auth')
+  const pathname = usePathname();
+  const isAuthPage = pathname?.startsWith("/auth");
   const token = useToken();
 
   return (
     <ConfigProvider config={config}>
-      <IntegrationsProvider>
-        <CSPostHogProvider>
+      <CSPostHogProvider>
+        <ConditionalDataProvider>
           <div className={`${jetbrainsSans.variable} ${jetbrainsMono.variable} antialiased`}>
             {isAuthPage ? (
               children
@@ -37,7 +37,7 @@ export function ClientWrapper({ children, config }: Props) {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.3 }}
-                    className="w-full h-full overflow-y-scroll"
+                    className="w-full h-full overflow-y-auto"
                   >
                     {children}
                   </motion.div>
@@ -52,8 +52,8 @@ export function ClientWrapper({ children, config }: Props) {
             <Toaster />
             {token && <ServerMonitor />}
           </div>
-        </CSPostHogProvider>
-      </IntegrationsProvider>
+        </ConditionalDataProvider>
+      </CSPostHogProvider>
     </ConfigProvider>
-  )
+  );
 }

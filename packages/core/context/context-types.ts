@@ -1,94 +1,90 @@
-import { Integration, JSONSchema, ExecutionStep, ApiConfig } from "@superglue/client";
-import { IntegrationManager } from "../integrations/integration-manager.js";
+import { Integration, JSONSchema, ApiConfig, ServiceMetadata } from "@superglue/shared";
 
 export type ObjectContextOptions = {
-    characterBudget: number;
-    include?: { schema?: boolean; preview?: boolean; samples?: boolean };
-    tuning?: {
-        previewDepthLimit?: number;
-        previewArrayLimit?: number;
-        previewObjectKeyLimit?: number;
-        samplesMaxArrayPaths?: number;
-        samplesItemsPerArray?: number;
-        sampleObjectMaxDepth?: number;
-    };
+  characterBudget: number;
+  include?: { schema?: boolean; preview?: boolean; samples?: boolean };
+  tuning?: {
+    previewDepthLimit?: number;
+    previewArrayLimit?: number;
+    previewObjectKeyLimit?: number;
+    samplesMaxArrayPaths?: number;
+    samplesItemsPerArray?: number;
+    sampleObjectMaxDepth?: number;
+  };
 };
 
 export type IntegrationContextOptions = {
-    characterBudget: number;
-    include?: { authContext?: boolean; paginationContext?: boolean; generalContext?: boolean };
-    tuning?: {
-        documentationMaxSections?: number;
-        documentationMaxChars?: number;
-    };
+  characterBudget: number;
+  include?: { authContext?: boolean; paginationContext?: boolean; generalContext?: boolean };
+  tuning?: {
+    documentationMaxSections?: number;
+    documentationMaxChars?: number;
+  };
+  metadata: ServiceMetadata;
 };
 
 export type ToolBuilderContextOptions = {
-    characterBudget: number;
-    include?: { integrationContext?: boolean; availableVariablesContext?: boolean; payloadContext?: boolean; userInstruction?: boolean };
+  characterBudget: number;
+  include?: {
+    integrationContext?: boolean;
+    availableVariablesContext?: boolean;
+    payloadContext?: boolean;
+    userInstruction?: boolean;
+  };
 };
 
 export type ToolBuilderContextInput = {
-    integrations: Integration[];
-    payload: any;
-    userInstruction: string;
-    responseSchema?: JSONSchema;
-};
-
-export type LoopSelectorContextInput = {
-    step: ExecutionStep;
-    payload: any;
-    instruction: string;
-};
-
-export type LoopSelectorContextOptions = {
-    characterBudget: number;
+  integrations: Integration[];
+  payload: any;
+  userInstruction: string;
+  responseSchema?: JSONSchema;
+  metadata: ServiceMetadata;
 };
 
 export type EvaluateStepResponseContextInput = {
-    data: any;
-    config: ApiConfig;
-    docSearchResultsForStepInstruction: string;
+  data: any;
+  config: ApiConfig;
+  docSearchResultsForStepInstruction: string;
 };
 
 export type EvaluateStepResponseContextOptions = {
-    characterBudget: number;
+  characterBudget: number;
 };
 
 export type TransformContextInput = {
-    instruction: string;
-    targetSchema: JSONSchema;
-    sourceData: any;
+  instruction: string;
+  targetSchema: JSONSchema;
+  sourceData: any;
 };
 
 export type TransformContextOptions = {
-    characterBudget: number;
+  characterBudget: number;
 };
 
 export type EvaluateTransformContextInput = {
-    instruction: string;
-    targetSchema: JSONSchema;
-    sourceData: any;
-    transformedData: any;
-    transformCode: string;
+  instruction: string;
+  targetSchema: JSONSchema;
+  sourceData: any;
+  transformedData: any;
+  transformCode: string;
 };
 
 export type EvaluateTransformContextOptions = {
-    characterBudget: number;
+  characterBudget: number;
 };
 
 export type GenerateStepConfigContextInput = {
-    instruction: string;
-    previousStepConfig?: Partial<ApiConfig>;
-    stepInput?: any;
-    credentials?: Record<string, string>;
-    integrationDocumentation: string;
-    integrationSpecificInstructions: string;
-    errorMessage?: string;
-    editInstruction?: string;
+  instruction: string;
+  previousStepConfig?: Partial<ApiConfig>;
+  previousStepDataSelector?: string;
+  stepInput?: any;
+  credentials?: Record<string, string>;
+  integrationDocumentation: string;
+  integrationSpecificInstructions: string;
+  errorMessage?: string;
 };
 
 export type GenerateStepConfigContextOptions = {
-    characterBudget: number;
-    mode: 'create' | 'edit' | 'self-healing';
+  characterBudget: number;
+  mode: "create" | "edit" | "self-healing";
 };

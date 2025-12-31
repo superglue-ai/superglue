@@ -1,11 +1,11 @@
-import { Metadata } from "@superglue/shared";
+import { ServiceMetadata } from "@superglue/shared";
 import { OpenApiFetchingStrategy } from "../types.js";
 import { logMessage } from "../../utils/logs.js";
-import { extractOpenApiUrlFromHtml, fetchMultipleOpenApiSpecs } from '../documentation-utils.js';
+import { extractOpenApiUrlFromHtml, fetchMultipleOpenApiSpecs } from "../documentation-utils.js";
 
 /**
  * Strategy for extracting OpenAPI spec URLs from HTML content
- * 
+ *
  * This strategy analyzes raw HTML content (from previous fetching strategies)
  * to find potential OpenAPI specification URLs that may not have been detected
  * by other methods.
@@ -17,16 +17,16 @@ export class HtmlLinkExtractorStrategy implements OpenApiFetchingStrategy {
     this.rawHtmlContent = rawHtmlContent;
   }
 
-  async tryFetch(data: any, sourceUrl: string, metadata: Metadata): Promise<string | null> {
+  async tryFetch(data: any, sourceUrl: string, metadata: ServiceMetadata): Promise<string | null> {
     const content = this.rawHtmlContent;
-    
+
     if (!content) {
-        logMessage('debug', 'HtmlLinkExtractorStrategy: No raw HTML content provided', metadata);
+      logMessage("debug", "HtmlLinkExtractorStrategy: No raw HTML content provided", metadata);
       return null;
     }
 
     // Convert to string if needed
-    const contentString = typeof content === 'string' ? content : JSON.stringify(content);
+    const contentString = typeof content === "string" ? content : JSON.stringify(content);
     const trimmedContent = contentString.trim();
 
     // Check if content is HTML
@@ -35,16 +35,28 @@ export class HtmlLinkExtractorStrategy implements OpenApiFetchingStrategy {
       return null;
     }
 
-    logMessage('debug', 'HtmlLinkExtractorStrategy: Detected HTML content, searching for OpenAPI links', metadata);
+    logMessage(
+      "debug",
+      "HtmlLinkExtractorStrategy: Detected HTML content, searching for OpenAPI links",
+      metadata,
+    );
 
     // Extract OpenAPI URL from HTML
     const openApiUrl = extractOpenApiUrlFromHtml(contentString);
     if (!openApiUrl) {
-      logMessage('debug', 'HtmlLinkExtractorStrategy: No OpenAPI URL found in HTML content', metadata);
+      logMessage(
+        "debug",
+        "HtmlLinkExtractorStrategy: No OpenAPI URL found in HTML content",
+        metadata,
+      );
       return null;
     }
 
-    logMessage('info', `HtmlLinkExtractorStrategy: Found OpenAPI URL in HTML: ${openApiUrl}`, metadata);
+    logMessage(
+      "info",
+      `HtmlLinkExtractorStrategy: Found OpenAPI URL in HTML: ${openApiUrl}`,
+      metadata,
+    );
 
     // Convert relative URL to absolute if needed
     let absoluteOpenApiUrl = openApiUrl;
@@ -53,21 +65,32 @@ export class HtmlLinkExtractorStrategy implements OpenApiFetchingStrategy {
         const baseUrl = new URL(sourceUrl).origin;
         absoluteOpenApiUrl = new URL(openApiUrl, baseUrl).href;
       } catch (error) {
-        logMessage('warn', `HtmlLinkExtractorStrategy: Failed to resolve relative URL ${openApiUrl}: ${error?.message}`, metadata);
+        logMessage(
+          "warn",
+          `HtmlLinkExtractorStrategy: Failed to resolve relative URL ${openApiUrl}: ${error?.message}`,
+          metadata,
+        );
         return null;
       }
     }
 
     // Use the utility function to fetch and validate the OpenAPI spec
     const specs = await fetchMultipleOpenApiSpecs([absoluteOpenApiUrl], metadata);
-    
+
     if (specs) {
-      logMessage('info', `HtmlLinkExtractorStrategy: Successfully fetched and validated OpenAPI spec from ${absoluteOpenApiUrl}`, metadata);
+      logMessage(
+        "info",
+        `HtmlLinkExtractorStrategy: Successfully fetched and validated OpenAPI spec from ${absoluteOpenApiUrl}`,
+        metadata,
+      );
       return specs;
     }
 
-    logMessage('debug', `HtmlLinkExtractorStrategy: Failed to fetch valid OpenAPI spec from ${absoluteOpenApiUrl}`, metadata);
+    logMessage(
+      "debug",
+      `HtmlLinkExtractorStrategy: Failed to fetch valid OpenAPI spec from ${absoluteOpenApiUrl}`,
+      metadata,
+    );
     return null;
   }
 }
-
