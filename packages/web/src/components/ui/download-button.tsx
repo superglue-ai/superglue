@@ -21,7 +21,12 @@ export function DownloadButton({
   title = "Download as JSON"
 }: DownloadButtonProps) {
   const handleDownload = () => {
-    let content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    let content: string;
+    try {
+      content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    } catch {
+      content = String(data);
+    }
     if (credentials && Object.keys(credentials).length > 0) {
       content = maskCredentials(content, credentials);
     }

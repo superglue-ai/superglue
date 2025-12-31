@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { splitUrl } from '@/src/lib/client-utils';
 import { composeUrl } from '@/src/lib/general-utils';
 import { Bug, ChevronDown, ChevronRight, FileBraces, FileInput, FileOutput, Pencil, Play, RotateCw, Route, Square, Trash2, Wand2 } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { JavaScriptCodeEditor } from '../../editors/JavaScriptCodeEditor';
 import { TemplateAwareJsonEditor } from '../../editors/TemplateAwareJsonEditor';
 import { TemplateAwareTextEditor } from '../../editors/TemplateAwareTextEditor';
@@ -88,6 +88,13 @@ export const SpotlightStepCard = React.memo(({
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [pendingAction, setPendingAction] = useState<'execute' | null>(null);
     const prevShowOutputSignalRef = useRef<number | undefined>(undefined);
+    const editingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    
+    useEffect(() => {
+        return () => {
+            if (editingTimeoutRef.current) clearTimeout(editingTimeoutRef.current);
+        };
+    }, []);
     
     // === CONFIG TAB STATE (from ToolStepConfigurator) ===
     const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
@@ -115,13 +122,16 @@ export const SpotlightStepCard = React.memo(({
         prevShowOutputSignalRef.current = showOutputSignal;
     }, [showOutputSignal, stepResult]);
 
-    const handleImmediateEdit = (updater: (s: any) => any) => {
+    const handleImmediateEdit = useCallback((updater: (s: any) => any) => {
         if (!onEdit) return;
         const updated = updater(step);
-        if (onConfigEditingChange) onConfigEditingChange(true);
+        if (onConfigEditingChange) {
+            onConfigEditingChange(true);
+            if (editingTimeoutRef.current) clearTimeout(editingTimeoutRef.current);
+            editingTimeoutRef.current = setTimeout(() => onConfigEditingChange(false), 100);
+        }
         onEdit(step.id, updated, true);
-        if (onConfigEditingChange) setTimeout(() => onConfigEditingChange(false), 100);
-    };
+    }, [onEdit, onConfigEditingChange, step]);
 
     const handleIntegrationChange = (value: string, selectedIntegration?: any) => {
         handleImmediateEdit((s) => ({

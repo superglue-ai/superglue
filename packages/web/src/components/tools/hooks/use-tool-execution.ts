@@ -306,7 +306,9 @@ export function useToolExecution(
               setFocusStepId(res.stepId);
               setShowStepOutputSignal(Date.now());
             }
-          } catch { }
+          } catch {
+            // Ignore individual step processing errors to not halt the overall execution
+          }
         },
         effectiveSelfHealing,
         handleBeforeStepExecution,

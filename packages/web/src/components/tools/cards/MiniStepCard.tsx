@@ -42,7 +42,7 @@ export const MiniStepCard = React.memo(({
     isTesting = false, 
     isFirstCard = false, 
     isLastCard = false, 
-    hasTransformCompleted = false, 
+    hasTransformCompleted, 
     isPayloadValid = true, 
     payloadData, 
     isLoopStep = false 

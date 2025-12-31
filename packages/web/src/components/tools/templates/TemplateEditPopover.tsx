@@ -345,7 +345,7 @@ export function TemplateEditPopover({
               <DownloadButton 
                 data={activePreviewValue} 
                 filename="template-result.json"
-                credentials={showCredentials ? undefined : credentials}
+                credentials={(showCredentials && showRevealButton) ? undefined : credentials}
               />
             </div>
           </div>

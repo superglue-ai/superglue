@@ -98,7 +98,7 @@ export function useTemplatePreview(
         }, debounceMs);
 
         return () => clearTimeout(timer);
-    }, [expression, stepId, debounceMs, sourceDataVersion]);
+    }, [expression, stepId, debounceMs, sourceDataVersion, enabled]);
 
     return { previewValue, previewError, isEvaluating, hasResult };
 }

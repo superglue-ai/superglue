@@ -48,11 +48,19 @@ export function useGalleryNavigation({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const isNavigatingRef = useRef(false);
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const navDelayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isConfiguratorEditingRef = useRef(false);
 
   useEffect(() => {
     isConfiguratorEditingRef.current = isConfiguratorEditing;
   }, [isConfiguratorEditing]);
+
+  useEffect(() => {
+    return () => {
+      if (navigationTimeoutRef.current) clearTimeout(navigationTimeoutRef.current);
+      if (navDelayTimeoutRef.current) clearTimeout(navDelayTimeoutRef.current);
+    };
+  }, []);
 
   // Hydration
   useEffect(() => {
@@ -124,7 +132,8 @@ export function useGalleryNavigation({
       isNavigatingRef.current = false;
     }, NAV_SUPPRESS_MS);
 
-    setTimeout(() => {
+    if (navDelayTimeoutRef.current) clearTimeout(navDelayTimeoutRef.current);
+    navDelayTimeoutRef.current = setTimeout(() => {
       setActiveIndex(nextIndex);
       
       const container = listRef.current;

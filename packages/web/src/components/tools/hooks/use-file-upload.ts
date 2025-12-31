@@ -68,19 +68,19 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
       const keysToRemove: string[] = [];
 
       for (const file of files) {
+        const baseKey = sanitizeFileName(file.name, { removeExtension: true, lowercase: false });
+        const key = generateUniqueKey(baseKey, [...existingKeys, ...newFiles.map(f => f.key)]);
+
+        const fileInfo: UploadedFileInfo = {
+          name: file.name,
+          size: file.size,
+          key,
+          status: 'processing',
+        };
+        newFiles.push(fileInfo);
+        existingKeys.push(key);
+
         try {
-          const baseKey = sanitizeFileName(file.name, { removeExtension: true, lowercase: false });
-          const key = generateUniqueKey(baseKey, [...existingKeys, ...newFiles.map(f => f.key)]);
-
-          const fileInfo: UploadedFileInfo = {
-            name: file.name,
-            size: file.size,
-            key,
-            status: 'processing',
-          };
-          newFiles.push(fileInfo);
-          existingKeys.push(key);
-
           const client = createSuperglueClient(config.superglueEndpoint);
           const parsedData = await processAndExtractFile(file, client);
 
@@ -88,11 +88,8 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
           fileInfo.status = 'ready';
           keysToRemove.push(key);
         } catch (error: any) {
-          const fileInfo = newFiles.find(f => f.name === file.name);
-          if (fileInfo) {
-            fileInfo.status = 'error';
-            fileInfo.error = error.message;
-          }
+          fileInfo.status = 'error';
+          fileInfo.error = error.message;
 
           toast({
             title: 'File processing failed',

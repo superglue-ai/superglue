@@ -139,15 +139,16 @@ export function useToolData(options: UseToolDataOptions) {
         throw new Error("Invalid input schema JSON");
       }
 
+      const effectiveToolId = toolId.trim() || `wf-${Date.now()}`;
       if (!toolId.trim()) {
-        setToolId(`wf-${Date.now()}`);
+        setToolId(effectiveToolId);
       }
       setSaving(true);
 
       const stepsToSave = steps;
 
       const toolToSave: Tool = {
-        id: toolId,
+        id: effectiveToolId,
         steps: stepsToSave.map((step: ExecutionStep) => ({
           ...step,
           apiConfig: {
@@ -167,7 +168,7 @@ export function useToolData(options: UseToolDataOptions) {
         await onSave(toolToSave, computedPayload);
       } else {
         const client = createSuperglueClient(config.superglueEndpoint);
-        const savedTool = await client.upsertWorkflow(toolId, toolToSave as any);
+        const savedTool = await client.upsertWorkflow(effectiveToolId, toolToSave as any);
 
         if (!savedTool) {
           throw new Error("Failed to save tool");

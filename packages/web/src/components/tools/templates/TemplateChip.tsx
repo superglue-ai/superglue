@@ -89,9 +89,9 @@ export function TemplateChip({
     originalSize = fullDisplayText.length;
     const masked = maskCredentials(fullDisplayText, credentials);
     const truncated = truncateTemplateValue(masked, 150);
-    displayText = truncated.display;
-    isTruncated = truncated.truncated;
-    originalSize = truncated.originalSize;
+      displayText = truncated.display;
+      isTruncated = truncated.truncated;
+      originalSize = truncated.originalSize;
   }
 
   const isActive = selected || effectiveOpen;
@@ -126,7 +126,7 @@ export function TemplateChip({
       border: 'border-b-green-600/30 dark:border-b-green-600/35',
       text: 'text-green-700 dark:text-green-400',
       gradient: 'linear-gradient(180deg, rgba(34, 197, 94, 0.18) 0%, rgba(22, 163, 74, 0.22) 100%)',
-      shadow: isActive
+        shadow: isActive
         ? '0 1px 0 rgba(21, 128, 61, 0.22), 0 0 11px rgba(74, 222, 128, 0.4)'
         : '0 1px 0 rgba(21, 128, 61, 0.18), 0 0 7px rgba(74, 222, 128, 0.27)'
     };

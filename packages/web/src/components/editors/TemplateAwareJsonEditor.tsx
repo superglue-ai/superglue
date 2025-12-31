@@ -207,7 +207,7 @@ export function TemplateAwareJsonEditor({
             </div>
             {showValidation && jsonError && (
                 <div className="absolute bottom-0 left-0 right-0 px-3 py-2 bg-destructive/10 text-destructive text-xs max-h-24 overflow-y-auto border-t z-10">
-                    Error: {Object.keys(credentials).length > 0 ? maskCredentials(jsonError, credentials) : jsonError}
+                        Error: {Object.keys(credentials).length > 0 ? maskCredentials(jsonError, credentials) : jsonError}
                 </div>
             )}
             <TemplateEditPopover

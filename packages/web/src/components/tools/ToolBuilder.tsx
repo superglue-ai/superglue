@@ -199,11 +199,11 @@ export function ToolBuilder({
     setShowResponseSchemaSection(section === 'schema' ? prev => !prev : false);
   }, [isBuilding, initializePayloadIfEmpty]);
 
-  useEffect(() => {
-    if (initialFiles.length > 0) {
-      setUploadedFiles(initialFiles);
-    }
-  }, [initialFiles, setUploadedFiles]);
+  const initialFilesApplied = useRef(false);
+  if (!initialFilesApplied.current && initialFiles.length > 0) {
+    initialFilesApplied.current = true;
+    setUploadedFiles(initialFiles);
+  }
 
   useEffect(() => {
     if (view === 'instructions' && selectedIntegrationIds.length > 0 && !isGeneratingSuggestions) {

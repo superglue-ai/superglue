@@ -83,15 +83,29 @@ export function ToolConfigProvider({
     [manualPayloadText, filePayloads]
   );
 
-  const tool = useMemo<ToolDefinition>(() => ({
-    id: toolId,
-    instruction,
-    finalTransform,
-    inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
-    responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
-    folder,
-    isArchived,
-  }), [toolId, instruction, finalTransform, inputSchema, responseSchema, folder, isArchived]);
+  const tool = useMemo<ToolDefinition>(() => {
+    let parsedInputSchema = null;
+    let parsedResponseSchema = null;
+    try {
+      if (inputSchema) parsedInputSchema = JSON.parse(inputSchema);
+    } catch {
+      // Invalid JSON, keep as null
+    }
+    try {
+      if (responseSchema) parsedResponseSchema = JSON.parse(responseSchema);
+    } catch {
+      // Invalid JSON, keep as null
+    }
+    return {
+      id: toolId,
+      instruction,
+      finalTransform,
+      inputSchema: parsedInputSchema,
+      responseSchema: parsedResponseSchema,
+      folder,
+      isArchived,
+    };
+  }, [toolId, instruction, finalTransform, inputSchema, responseSchema, folder, isArchived]);
 
   const payload = useMemo<PayloadState>(() => ({
     manualPayloadText,
