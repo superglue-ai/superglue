@@ -19,7 +19,7 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Check formatting (Prettier)
         run: npx prettier --check "packages/**/*.{ts,tsx,js,jsx,json,md}" --ignore-path .gitignore
