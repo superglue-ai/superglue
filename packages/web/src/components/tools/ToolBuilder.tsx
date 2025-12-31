@@ -14,7 +14,7 @@ import { ALLOWED_FILE_EXTENSIONS, generateDefaultFromSchema, integrationOptions 
 import { waitForIntegrationProcessing } from '@superglue/shared/utils';
 import { Validator } from 'jsonschema';
 import { Check, Clock, FileJson, FileWarning, Globe, Key, Loader2, Paperclip, Pencil, Plus, Wrench, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { JsonCodeEditor } from '../editors/JsonCodeEditor';
 import JsonSchemaEditor from '../editors/JsonSchemaEditor';
@@ -47,41 +47,52 @@ interface ToolBuilderProps {
   initialInputSchema?: string | null;
   initialFiles?: UploadedFileInfo[];
   onToolBuilt: (tool: Tool, context: BuildContext) => void;
-  onCancel?: () => void;
   mode?: 'build' | 'rebuild';
 }
 
-// Check if a response schema is meaningful (not just empty or basic structure)
+const FADE_IN_STYLE = { animationDelay: '0ms', animationFillMode: 'backwards' } as const;
+
+const ACTIVE_SECTION_STYLE = "bg-[#FFD700]/40 border-[#FF8C00] text-foreground";
+const INACTIVE_FILLED_STYLE = "bg-[#FFD700]/40 border-[#FFA500] text-foreground";
+const ACTIVE_EMPTY_STYLE = "border-foreground/70 text-foreground hover:bg-accent/50";
+const INACTIVE_EMPTY_STYLE = "border-border text-muted-foreground hover:bg-accent/50";
+
+const toIntegrationInput = (i: Integration): IntegrationInput => ({
+  id: i.id,
+  urlHost: i.urlHost,
+  urlPath: i.urlPath,
+  documentationUrl: i.documentationUrl,
+  documentation: i.documentation,
+  credentials: i.credentials,
+});
+
 const isMeaningfulResponseSchema = (schemaText: string | null): boolean => {
-  if (!schemaText || !schemaText.trim()) {
-    return false;
-  }
-  if (schemaText.trim() === '{}') {
+  if (!schemaText || !schemaText.trim() || schemaText.trim() === '{}') {
     return false;
   }
 
   try {
     const schema = JSON.parse(schemaText);
-    
-    // Try to generate a default - if it fails or is empty, schema is not meaningful
     try {
       const defaultValue = generateDefaultFromSchema(schema);
-      // Check if the generated default is an empty object
       if (typeof defaultValue === 'object' && defaultValue !== null) {
         return Object.keys(defaultValue).length > 0;
       }
-      // If it's not an object or is null, consider it meaningful
       return true;
     } catch {
-      // If we can't generate a default, it's not a meaningful schema
       return false;
     }
   } catch {
-    // Invalid JSON
     return false;
   }
 };
 
+const getSectionButtonStyle = (hasContent: boolean, isActive: boolean): string => {
+  if (hasContent) {
+    return isActive ? ACTIVE_SECTION_STYLE : INACTIVE_FILLED_STYLE;
+  }
+  return isActive ? ACTIVE_EMPTY_STYLE : INACTIVE_EMPTY_STYLE;
+};
 
 export function ToolBuilder({
   initialView = 'integrations',
@@ -92,7 +103,6 @@ export function ToolBuilder({
   initialInputSchema = null,
   initialFiles = [],
   onToolBuilt,
-  onCancel,
   mode = 'build'
 }: ToolBuilderProps) {
   const [view, setView] = useState<ToolBuilderView>(initialView);
@@ -107,7 +117,6 @@ export function ToolBuilder({
   const [responseSchema, setResponseSchema] = useState(initialResponseSchema);
   const [inputSchema, setInputSchema] = useState<string | null>(initialInputSchema);
   const [enforceInputSchema, setEnforceInputSchema] = useState(true);
-  // Always default to 'current' (generated from tool input)
   const [inputSchemaMode, setInputSchemaMode] = useState<'current' | 'custom'>('current');
 
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
@@ -131,7 +140,6 @@ export function ToolBuilder({
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
-  // Always start with all sections closed
   const [showPayloadSection, setShowPayloadSection] = useState(false);
   const [showFileUploadSection, setShowFileUploadSection] = useState(false);
   const [showResponseSchemaSection, setShowResponseSchemaSection] = useState(false);
@@ -145,20 +153,57 @@ export function ToolBuilder({
     apiKey: tokenRegistry.getToken(),
   }), [superglueConfig.superglueEndpoint]);
 
-  const { waitForIntegrationReady } = useMemo(() => ({
-    waitForIntegrationReady: (integrationIds: string[]) => {
-      const clientAdapter = {
-        getIntegration: (id: string) => client.getIntegration(id)
-      };
-      return waitForIntegrationProcessing(clientAdapter, integrationIds);
+  const waitForIntegrationReady = useCallback((integrationIds: string[]) => {
+    const clientAdapter = {
+      getIntegration: (id: string) => client.getIntegration(id)
+    };
+    return waitForIntegrationProcessing(clientAdapter, integrationIds);
+  }, [client]);
+
+  const hasMeaningfulSchema = useMemo(
+    () => isMeaningfulResponseSchema(responseSchema),
+    [responseSchema]
+  );
+
+  const trimmedPayload = payload.trim();
+  const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
+  const isValidPayloadJson = useMemo(() => {
+    try {
+      JSON.parse(trimmedPayload || '{}');
+      return true;
+    } catch {
+      return false;
     }
-  }), [client]);
+  }, [trimmedPayload]);
+
+  const toggleIntegration = useCallback((id: string) => {
+    setSelectedIntegrationIds(ids =>
+      ids.includes(id) ? ids.filter(i => i !== id) : [...ids, id]
+    );
+  }, []);
+
+  const initializePayloadIfEmpty = useCallback(() => {
+    if (payload.trim() === '') {
+      setPayload('{}');
+      setValidationErrors(prev => ({ ...prev, payload: false }));
+    }
+  }, [payload]);
+
+  const handleSectionToggle = useCallback((section: 'payload' | 'files' | 'schema') => {
+    if (isBuilding) return;
+
+    initializePayloadIfEmpty();
+
+    setShowPayloadSection(section === 'payload' ? prev => !prev : false);
+    setShowFileUploadSection(section === 'files' ? prev => !prev : false);
+    setShowResponseSchemaSection(section === 'schema' ? prev => !prev : false);
+  }, [isBuilding, initializePayloadIfEmpty]);
 
   useEffect(() => {
     if (initialFiles.length > 0) {
       setUploadedFiles(initialFiles);
     }
-  }, []);
+  }, [initialFiles, setUploadedFiles]);
 
   useEffect(() => {
     if (view === 'instructions' && selectedIntegrationIds.length > 0 && !isGeneratingSuggestions) {
@@ -173,7 +218,6 @@ export function ToolBuilder({
     }
   }, [view]);
 
-  // Auto-resize textarea when instruction changes (including initial mount)
   useEffect(() => {
     if (textareaRef.current && instruction) {
       textareaRef.current.style.height = 'auto';
@@ -181,14 +225,12 @@ export function ToolBuilder({
     }
   }, [instruction]);
 
-  // Validate payload against custom input schema
   useEffect(() => {
     if (validationTimeoutRef.current) {
       clearTimeout(validationTimeoutRef.current);
     }
 
     validationTimeoutRef.current = setTimeout(() => {
-      // Only validate if custom schema mode is active and schema is set
       if (enforceInputSchema && inputSchemaMode === 'custom' && inputSchema) {
         try {
           const payloadData = JSON.parse(payload || '{}');
@@ -197,7 +239,7 @@ export function ToolBuilder({
           const validator = new Validator();
           const result = validator.validate(mergedPayload, schemaObj);
           setIsPayloadValid(result.valid);
-        } catch (e) {
+        } catch {
           setIsPayloadValid(false);
         }
       } else {
@@ -212,35 +254,24 @@ export function ToolBuilder({
     };
   }, [payload, inputSchema, filePayloads, enforceInputSchema, inputSchemaMode]);
 
-  const toIntegrationInput = (i: Integration): IntegrationInput => ({
-    id: i.id,
-    urlHost: i.urlHost,
-    urlPath: i.urlPath,
-    documentationUrl: i.documentationUrl,
-    documentation: i.documentation,
-    credentials: i.credentials,
-  });
-
   const handleGenerateInstructions = async () => {
-    if (selectedIntegrationIds.length === 0) {
-      return;
-    }
+    if (selectedIntegrationIds.length === 0) return;
+
     setIsGeneratingSuggestions(true);
     try {
       const selectedIntegrationInputs = selectedIntegrationIds
         .map(id => integrations.find(i => i.id === id))
         .filter(Boolean)
         .map(toIntegrationInput);
-      
+
       if (selectedIntegrationInputs.length === 0) {
         setIsGeneratingSuggestions(false);
         return;
       }
-      
+
       try {
         const suggestionsText = await client.generateInstructions(selectedIntegrationInputs);
-        const suggestionsArray = suggestionsText.filter(s => s.trim());
-        setSuggestions(suggestionsArray);
+        setSuggestions(suggestionsText.filter(s => s.trim()));
       } catch (error: any) {
         toast({
           title: 'Error Connecting to LLM',
@@ -265,8 +296,8 @@ export function ToolBuilder({
     setIntegrationFormEdit(null);
 
     try {
-      const mode = integrationFormEdit ? UpsertMode.UPDATE : UpsertMode.CREATE;
-      const savedIntegration = await client.upsertIntegration(integration.id, integration, mode);
+      const upsertMode = integrationFormEdit ? UpsertMode.UPDATE : UpsertMode.CREATE;
+      const savedIntegration = await client.upsertIntegration(integration.id, integration, upsertMode);
       const willTriggerDocFetch = needsUIToTriggerDocFetch(savedIntegration, integrationFormEdit);
 
       if (willTriggerDocFetch) {
@@ -287,7 +318,6 @@ export function ToolBuilder({
       });
 
       await refreshIntegrations();
-
       return savedIntegration;
     } catch (error) {
       console.error('Error saving integration:', error);
@@ -336,6 +366,7 @@ export function ToolBuilder({
     setShowFileUploadSection(false);
     setShowResponseSchemaSection(false);
     setIsBuilding(true);
+
     try {
       const parsedPayload = JSON.parse(payload || '{}');
       const effectivePayload = { ...parsedPayload, ...filePayloads };
@@ -346,7 +377,7 @@ export function ToolBuilder({
         responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
         save: false
       });
-      
+
       if (!response) {
         throw new Error('Failed to build tool');
       }
@@ -387,8 +418,12 @@ export function ToolBuilder({
     }
   };
 
-  const handleNextFromIntegrations = () => {
-    setView('instructions');
+  const getPayloadButtonLabel = (): string => {
+    if (!isPayloadValid && enforceInputSchema && inputSchemaMode === 'custom' && inputSchema) {
+      return 'Input Does Not Match Schema';
+    }
+    if (isEmptyPayload) return 'Attach JSON Tool Input';
+    return isValidPayloadJson ? 'JSON Tool Input Attached' : 'Invalid Input JSON';
   };
 
   if (view === 'integrations') {
@@ -403,7 +438,7 @@ export function ToolBuilder({
               Choose one or more integrations, or choose none to create transform-only tools
             </p>
           </div>
-          
+
           <div className="border rounded-2xl bg-card p-6 space-y-4">
             <div className="flex items-center gap-3">
               <Input
@@ -436,17 +471,20 @@ export function ToolBuilder({
                       sys.urlPath.toLowerCase().includes(integrationSearch.toLowerCase())
                     );
 
+                    const colorClasses = {
+                      blue: 'text-blue-800 dark:text-blue-300 bg-blue-500/10',
+                      amber: 'text-amber-800 dark:text-amber-300 bg-amber-500/10',
+                      green: 'text-green-800 dark:text-green-300 bg-green-500/10'
+                    };
+
                     return (
                       <>
                         {filteredIntegrations.map(sys => {
                           const selected = selectedIntegrationIds.includes(sys.id);
                           const badge = getAuthBadge(sys);
-                          const colorClasses = {
-                            blue: 'text-blue-800 dark:text-blue-300 bg-blue-500/10',
-                            amber: 'text-amber-800 dark:text-amber-300 bg-amber-500/10',
-                            green: 'text-green-800 dark:text-green-300 bg-green-500/10'
-                          };
-                          
+                          const iconName = getIntegrationIconName(sys);
+                          const icon = iconName ? getSimpleIcon(iconName) : null;
+
                           return (
                             <div
                               key={sys.id}
@@ -456,32 +494,16 @@ export function ToolBuilder({
                                   ? "bg-primary/10 dark:bg-primary/40 border border-primary/50 dark:border-primary/60 hover:bg-primary/15 dark:hover:bg-primary/25"
                                   : "bg-muted/30 border border-border hover:bg-muted/50 hover:border-border/80"
                               )}
-                              onClick={() => {
-                                if (selected) {
-                                  setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
-                                } else {
-                                  setSelectedIntegrationIds(ids => [...ids, sys.id]);
-                                }
-                              }}
+                              onClick={() => toggleIntegration(sys.id)}
                             >
                               <div className="flex items-center gap-3 flex-1 min-w-0">
-                                {(() => {
-                                  const iconName = getIntegrationIconName(sys);
-                                  const icon = iconName ? getSimpleIcon(iconName) : null;
-                                  return icon ? (
-                                    <svg
-                                      width="20"
-                                      height="20"
-                                      viewBox="0 0 24 24"
-                                      fill={`#${icon.hex}`}
-                                      className="flex-shrink-0"
-                                    >
-                                      <path d={icon.path} />
-                                    </svg>
-                                  ) : (
-                                    <Globe className="h-5 w-5 flex-shrink-0 text-foreground" />
-                                  );
-                                })()}
+                                {icon ? (
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill={`#${icon.hex}`} className="flex-shrink-0">
+                                    <path d={icon.path} />
+                                  </svg>
+                                ) : (
+                                  <Globe className="h-5 w-5 flex-shrink-0 text-foreground" />
+                                )}
                                 <div className="flex flex-col min-w-0">
                                   <span className="font-medium text-sm truncate">{sys.id}</span>
                                   <span className="text-xs text-muted-foreground truncate">
@@ -517,11 +539,7 @@ export function ToolBuilder({
                                   )}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (selected) {
-                                      setSelectedIntegrationIds(ids => ids.filter(i => i !== sys.id));
-                                    } else {
-                                      setSelectedIntegrationIds(ids => [...ids, sys.id]);
-                                    }
+                                    toggleIntegration(sys.id);
                                   }}
                                 >
                                   {selected && <Check className="h-3 w-3 text-primary-foreground" />}
@@ -574,7 +592,7 @@ export function ToolBuilder({
 
             <div className="flex justify-end mt-3">
               <Button
-                onClick={handleNextFromIntegrations}
+                onClick={() => setView('instructions')}
                 className="h-8 px-4 rounded-full flex-shrink-0"
               >
                 {selectedIntegrationIds.length === 0
@@ -585,7 +603,7 @@ export function ToolBuilder({
               </Button>
             </div>
           </div>
-        
+
           {showIntegrationForm && typeof document !== 'undefined' && createPortal(
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
               <div className="bg-background rounded-xl max-w-2xl w-full p-0">
@@ -614,15 +632,15 @@ export function ToolBuilder({
             What should your tool do for you?
           </h2>
         </div>
-        
-          <div className="flex flex-wrap gap-2 justify-center mb-4">
+
+        <div className="flex flex-wrap gap-2 justify-center mb-4">
           {selectedIntegrationIds.map(id => {
             const integration = integrations.find(i => i.id === id);
             if (!integration) return null;
-            
+
             const iconName = getIntegrationIconName(integration);
             const icon = iconName ? getSimpleIcon(iconName) : null;
-            
+
             return (
               <button
                 key={id}
@@ -638,20 +656,14 @@ export function ToolBuilder({
                 disabled={isBuilding}
                 className={cn(
                   "group flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-border transition-all",
-                  isBuilding 
-                    ? "opacity-50 cursor-not-allowed" 
+                  isBuilding
+                    ? "opacity-50 cursor-not-allowed"
                     : "hover:bg-red-500/10 hover:border-red-500/50"
                 )}
                 title={isBuilding ? "Cannot modify while building" : "Click to remove"}
               >
                 {icon ? (
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill={`#${icon.hex}`}
-                    className="flex-shrink-0"
-                  >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill={`#${icon.hex}`} className="flex-shrink-0">
                     <path d={icon.path} />
                   </svg>
                 ) : (
@@ -664,7 +676,7 @@ export function ToolBuilder({
               </button>
             );
           })}
-          
+
           <button
             onClick={() => !isBuilding && setView('integrations')}
             disabled={isBuilding}
@@ -707,88 +719,25 @@ export function ToolBuilder({
           <div className="flex justify-between items-center gap-2 mt-3">
             <div className="flex gap-2">
               <button
-                onClick={() => {
-                  if (isBuilding) return;
-                  if (showFileUploadSection) setShowFileUploadSection(false);
-                  if (showResponseSchemaSection) setShowResponseSchemaSection(false);
-                  setShowPayloadSection(!showPayloadSection);
-                  if (!showPayloadSection && payload.trim() === '') {
-                    setPayload('{}');
-                    setValidationErrors(prev => ({ ...prev, payload: false }));
-                  }
-                }}
+                onClick={() => handleSectionToggle('payload')}
                 disabled={isBuilding}
                 className={cn(
                   "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 border",
                   isBuilding && "opacity-50 cursor-not-allowed",
-                  (() => {
-                    const trimmedPayload = payload.trim();
-                    const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
-
-                    if (isEmptyPayload) {
-                      return showPayloadSection
-                        ? "border-foreground/70 text-foreground hover:bg-accent/50"
-                        : "border-border text-muted-foreground hover:bg-accent/50";
-                    }
-
-                    try {
-                      JSON.parse(trimmedPayload);
-                      return showPayloadSection
-                        ? "bg-[#FFD700]/40 border-[#FF8C00] text-foreground"
-                        : "bg-[#FFD700]/40 border-[#FFA500] text-foreground";
-                    } catch {
-                      return showPayloadSection
-                        ? "bg-[#FFD700]/40 border-[#FF8C00] text-foreground"
-                        : "bg-[#FFD700]/40 border-[#FFA500] text-foreground";
-                    }
-                  })()
+                  getSectionButtonStyle(!isEmptyPayload, showPayloadSection)
                 )}
               >
                 <FileJson className="h-4 w-4" />
-                {(() => {
-                  const trimmedPayload = payload.trim();
-                  const isEmptyPayload = !trimmedPayload || trimmedPayload === '{}';
-
-                  // Check schema validation if custom schema is active
-                  if (!isPayloadValid && enforceInputSchema && inputSchemaMode === 'custom' && inputSchema) {
-                    return 'Input Does Not Match Schema';
-                  }
-
-                  if (isEmptyPayload) {
-                    return 'Attach JSON Tool Input';
-                  }
-
-                  try {
-                    JSON.parse(trimmedPayload);
-                    return 'JSON Tool Input Attached';
-                  } catch {
-                    return 'Invalid Input JSON';
-                  }
-                })()}
+                {getPayloadButtonLabel()}
               </button>
 
               <button
-                onClick={() => {
-                  if (isBuilding) return;
-                  if (showPayloadSection) setShowPayloadSection(false);
-                  if (!showPayloadSection && payload.trim() === '') {
-                    setPayload('{}');
-                    setValidationErrors(prev => ({ ...prev, payload: false }));
-                  }
-                  if (showResponseSchemaSection) setShowResponseSchemaSection(false);
-                  setShowFileUploadSection(!showFileUploadSection);
-                }}
+                onClick={() => handleSectionToggle('files')}
                 disabled={isBuilding}
                 className={cn(
                   "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 border",
                   isBuilding && "opacity-50 cursor-not-allowed",
-                  uploadedFiles.length > 0
-                    ? showFileUploadSection
-                      ? "bg-[#FFD700]/40 border-[#FF8C00] text-foreground"
-                      : "bg-[#FFD700]/40 border-[#FFA500] text-foreground"
-                    : showFileUploadSection
-                      ? "border-foreground/70 text-foreground hover:bg-accent/50"
-                      : "border-border text-muted-foreground hover:bg-accent/50"
+                  getSectionButtonStyle(uploadedFiles.length > 0, showFileUploadSection)
                 )}
               >
                 <Paperclip className="h-4 w-4" />
@@ -796,39 +745,16 @@ export function ToolBuilder({
               </button>
 
               <button
-                onClick={() => {
-                  if (isBuilding) return;
-                  if (showPayloadSection) setShowPayloadSection(false);
-                  if (!showPayloadSection && payload.trim() === '') {
-                    setPayload('{}');
-                    setValidationErrors(prev => ({ ...prev, payload: false }));
-                  }
-                  if (showFileUploadSection) setShowFileUploadSection(false);
-                  setShowResponseSchemaSection(!showResponseSchemaSection);
-                }}
+                onClick={() => handleSectionToggle('schema')}
                 disabled={isBuilding}
                 className={cn(
                   "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 border",
                   isBuilding && "opacity-50 cursor-not-allowed",
-                  (() => {
-                    const hasMeaningfulSchema = isMeaningfulResponseSchema(responseSchema);
-                    
-                    if (!hasMeaningfulSchema) {
-                      return showResponseSchemaSection
-                        ? "border-foreground/70 text-foreground hover:bg-accent/50"
-                        : "border-border text-muted-foreground hover:bg-accent/50";
-                    }
-                    
-                    return showResponseSchemaSection
-                      ? "bg-[#FFD700]/40 border-[#FF8C00] text-foreground"
-                      : "bg-[#FFD700]/40 border-[#FFA500] text-foreground";
-                  })()
+                  getSectionButtonStyle(hasMeaningfulSchema, showResponseSchemaSection)
                 )}
               >
                 <FileWarning className="h-4 w-4" />
-                {isMeaningfulResponseSchema(responseSchema) 
-                  ? 'Tool Result Schema Defined' 
-                  : 'Enforce Tool Result Schema'}
+                {hasMeaningfulSchema ? 'Tool Result Schema Defined' : 'Enforce Tool Result Schema'}
               </button>
             </div>
 
@@ -837,7 +763,7 @@ export function ToolBuilder({
               disabled={isBuilding || !instruction.trim() || !isPayloadValid}
               className="h-8 px-4 rounded-full flex-shrink-0 flex items-center gap-2"
               title={
-                !isPayloadValid 
+                !isPayloadValid
                   ? 'Payload does not match custom input schema'
                   : mode === 'rebuild' ? 'Rebuild Tool' : 'Build Tool'
               }
@@ -861,7 +787,7 @@ export function ToolBuilder({
         )}
 
         {showPayloadSection && (
-          <div className="space-y-3 border rounded-lg p-4 bg-card animate-fade-in mt-3" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
+          <div className="space-y-3 border rounded-lg p-4 bg-card animate-fade-in mt-3" style={FADE_IN_STYLE}>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium text-sm">JSON Tool Input</h4>
@@ -895,7 +821,7 @@ export function ToolBuilder({
                 placeholder="{}"
                 showValidation={true}
               />
-              
+
               {!isPayloadValid && enforceInputSchema && inputSchemaMode === 'custom' && inputSchema && (
                 <div className="mt-2 p-3 bg-destructive/10 border border-destructive/50 rounded-md">
                   <div className="flex items-start gap-2">
@@ -955,7 +881,7 @@ export function ToolBuilder({
         )}
 
         {showFileUploadSection && (
-          <div className="space-y-3 border rounded-lg p-4 bg-card animate-fade-in mt-3" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
+          <div className="space-y-3 border rounded-lg p-4 bg-card animate-fade-in mt-3" style={FADE_IN_STYLE}>
             <div className="space-y-2">
               <h4 className="font-medium text-sm">File Tool Input</h4>
               <input
@@ -1015,7 +941,7 @@ export function ToolBuilder({
         )}
 
         {showResponseSchemaSection && (
-          <div className="border rounded-lg p-4 bg-card animate-fade-in mt-3" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
+          <div className="border rounded-lg p-4 bg-card animate-fade-in mt-3" style={FADE_IN_STYLE}>
             <h4 className="font-medium text-sm mb-3">Tool Result Schema</h4>
             <p className="text-xs text-muted-foreground mt-2">
               Define a JSON Schema to validate the tool's response
@@ -1041,7 +967,7 @@ export function ToolBuilder({
           </div>
         )}
       </div>
-      
+
       {suggestions.length > 0 && !instruction.trim() && !showPayloadSection && !showFileUploadSection && !showResponseSchemaSection && (
         <div className="w-full max-w-4xl space-y-2 mt-4">
           <p className="text-sm text-muted-foreground text-center">Suggestions</p>
@@ -1067,4 +993,3 @@ export function ToolBuilder({
     </div>
   );
 }
-

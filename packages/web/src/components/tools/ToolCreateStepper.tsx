@@ -132,7 +132,6 @@ export function ToolCreateStepper({
               initialView={initialView}
               initialIntegrationIds={initialIntegrationIds}
               onToolBuilt={handleToolBuilt}
-              onCancel={handleClose}
             />
           )}
 

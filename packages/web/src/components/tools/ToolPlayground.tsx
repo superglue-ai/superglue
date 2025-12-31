@@ -505,7 +505,6 @@ function ToolPlaygroundInner({
             initialInputSchema={payloadSchemaString}
             initialFiles={uploadedFiles}
             onToolBuilt={handleToolRebuilt}
-            onCancel={() => setShowToolBuilder(false)}
             mode="rebuild"
           />
         </div>
