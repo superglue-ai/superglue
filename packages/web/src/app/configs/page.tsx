@@ -358,9 +358,11 @@ const ConfigTable = () => {
                     <TableCell className="max-w-[300px] truncate relative group">
                       <div className="flex items-center space-x-1">
                         <span className="truncate">{tool.instruction}</span>
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                          <CopyButton text={tool.instruction || ''} />
-                        </div>
+                        {tool.instruction && (
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <CopyButton text={tool.instruction} />
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="w-[150px]">

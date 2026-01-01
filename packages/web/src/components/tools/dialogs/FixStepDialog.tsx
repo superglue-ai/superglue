@@ -108,9 +108,10 @@ export function FixStepDialog({
     };
 
     const handleClose = () => {
-        setInstruction(step?.apiConfig?.instruction || '');
-        setIsAutoHealing(false);
-        onClose();
+        if (!isProcessing) {
+            setInstruction(step?.apiConfig?.instruction || '');
+            onClose();
+        }
     };
 
     const isProcessing = isGenerating || isAutoHealing;
