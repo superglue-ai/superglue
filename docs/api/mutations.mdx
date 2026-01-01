@@ -10,7 +10,6 @@ description: "Mutations are used to execute operations and manage configs."
 Executes a workflow (multiple APIs or Endpoints) in a single call. Returns detailed step-by-step results.
 
 **Parameters:**
-
 - `input`: WorkflowInputRequest! - Either a workflow configuration or saved workflow ID
 - `payload`: JSON - Input data for the workflow (optional)
 - `credentials`: JSON - Runtime credentials for integrations (optional)
@@ -65,7 +64,6 @@ Executes a workflow (multiple APIs or Endpoints) in a single call. Returns detai
 Builds a workflow automatically based on instructions and available integrations. Uses AI to determine the optimal sequence of API calls and data transformations. Supports both API-based workflows and transform-only workflows for data processing.
 
 **Parameters:**
-
 - `instruction`: String! - Natural language description of what the workflow should do (required)
 - `payload`: JSON - Sample input data to help with workflow generation (optional, supports file upload data)
 - `integrationIds`: [ID!] - List of integration IDs to use in the workflow (optional - omit for transform-only workflows)
@@ -148,7 +146,6 @@ Builds a workflow automatically based on instructions and available integrations
       }
     });
     ```
-
   </Tab>
 </Tabs>
 
@@ -157,13 +154,11 @@ Builds a workflow automatically based on instructions and available integrations
 Generates or refines an API configuration for a single workflow step using AI. Supports creating configurations from scratch, editing existing ones, or fixing failed configurations. Can work with or without an integration context.
 
 **Use Cases:**
-
 - **Create**: Generate a new API config from an instruction (e.g., "Get all active users from the database")
 - **Edit**: Modify an existing config with new requirements (e.g., "Add pagination")
 - **Fix**: Automatically repair a failed config when errors occur
 
 **Parameters:**
-
 - `integrationId`: String - Integration to use for context/documentation (optional)
 - `currentStepConfig`: JSON - Existing API config to edit or fix (must include an `instruction` field)
 - `stepInput`: JSON - Sample input data available to the step (optional)
@@ -237,7 +232,6 @@ Generates or refines an API configuration for a single workflow step using AI. S
       errorMessage: "API call failed with status 401: Unauthorized. Check authentication header format..."
     });
     ```
-
   </Tab>
 </Tabs>
 
@@ -312,7 +306,6 @@ Deletes a workflow configuration. Returns `true` if successful.
 Creates or updates a workflow schedule for recurring execution.
 
 **Parameters:**
-
 - `schedule`: WorkflowScheduleInput! - Schedule configuration (required)
 
 <Tabs>
@@ -380,7 +373,6 @@ Creates or updates a workflow schedule for recurring execution.
       timezone: "Europe/London"
     });
     ```
-
   </Tab>
 </Tabs>
 
@@ -408,7 +400,6 @@ Deletes a workflow schedule. Returns `true` if successful.
 Creates or updates an integration configuration. Integrations represent connections to external APIs or databases.
 
 **Parameters:**
-
 - `input`: IntegrationInput! - Integration configuration (required)
 - `mode`: UpsertMode - CREATE, UPDATE, or UPSERT (default: UPSERT)
 

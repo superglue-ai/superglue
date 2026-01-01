@@ -119,8 +119,8 @@ The `sourceData` might look like this:
 ```
 
 <Note>
-  Integration templates are only resolved at tool execution time and get merged with tool-specific
-  credentials.
+  Integration templates are only resolved at tool execution time and get merged
+  with tool-specific credentials.
 </Note>
 
 ### Tool step context
@@ -230,7 +230,8 @@ Stop after fetching a specific number of items:
 Stop when on last page (from total pages header):
 
 ```javascript
-(response, pageInfo) => pageInfo.page >= parseInt(response.headers["x-total-pages"] || "1");
+(response, pageInfo) =>
+  pageInfo.page >= parseInt(response.headers["x-total-pages"] || "1");
 ```
 
 Combine multiple conditions:
@@ -238,7 +239,9 @@ Combine multiple conditions:
 ```javascript
 (response, pageInfo) => {
   const items = response.data.results || [];
-  return items.length === 0 || !response.data.next || pageInfo.totalFetched >= 5000;
+  return (
+    items.length === 0 || !response.data.next || pageInfo.totalFetched >= 5000
+  );
 };
 ```
 

@@ -5,21 +5,18 @@ Tests Superglue's tool builder and executor against real API integrations. Valid
 ## What It Tests
 
 The framework validates:
-
 - **Tool Building**: Can the agent create working API tools from natural language instructions?
 - **Execution**: Do the built tools successfully call APIs and return data?
 - **Self-Healing**: Can tools recover from errors through retries?
 - **Determinism**: Do repeated builds produce consistent results?
 
 Two test modes:
-
 - **One-Shot**: Build and execute without retries (tests first-attempt success)
 - **Self-Healing**: Build with error recovery enabled (tests resilience)
 
 ## Running Tests
 
 From project root:
-
 ```bash
 npm run test:evals
 ```
@@ -31,13 +28,11 @@ npm run test:evals
 Add API credentials to root `.env` file using the pattern: `{INTEGRATION_ID}_{CREDENTIAL_KEY}`
 
 Example for integration `id: "stripe"` with credential `api_key`:
-
 ```bash
 STRIPE_API_KEY=sk_test_abc123...
 ```
 
 **Current test integrations:**
-
 ```bash
 # Project Management
 CLICKUP_API_TOKEN=<your_token>
@@ -85,7 +80,6 @@ Results are written to `eval/tool-evals/data/results/` with timestamp:
 - **Console**: Live output during test run
 
 ### Key Metrics
-
 - **Success Rate**: % of tools that executed successfully
 - **Build Success**: % of tools that built without errors
 - **Execution Success**: % of built tools that ran successfully
@@ -95,31 +89,26 @@ Results are written to `eval/tool-evals/data/results/` with timestamp:
 ## Adding New Tests
 
 ### Basic Test
-
 Add to `tool-eval-config.json`:
 
 ```json
 {
-  "integrations": [
-    {
-      "id": "myapi",
-      "name": "My API",
-      "urlHost": "https://api.myapi.com",
-      "documentationUrl": "https://docs.myapi.com/api",
-      "credentials": {
-        "api_key": ""
-      }
+  "integrations": [{
+    "id": "myapi",
+    "name": "My API",
+    "urlHost": "https://api.myapi.com",
+    "documentationUrl": "https://docs.myapi.com/api",
+    "credentials": {
+      "api_key": ""
     }
-  ],
-  "tools": [
-    {
-      "id": "myapi-get-users",
-      "name": "Get Users",
-      "type": "retrieval",
-      "instruction": "Fetch all users from My API",
-      "integrationIds": ["myapi"]
-    }
-  ]
+  }],
+  "tools": [{
+    "id": "myapi-get-users",
+    "name": "Get Users",
+    "type": "retrieval",
+    "instruction": "Fetch all users from My API",
+    "integrationIds": ["myapi"]
+  }]
 }
 ```
 
@@ -143,7 +132,6 @@ Add `expectedData` and optional `skipValidation`:
 ```
 
 **skipValidation** excludes fields from validation:
-
 - Useful for dynamic data (IDs, timestamps, counts)
 - Uses JSONPath syntax
 - Array syntax: `users[0].id` skips ID in first user

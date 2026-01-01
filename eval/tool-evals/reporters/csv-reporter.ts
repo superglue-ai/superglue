@@ -9,7 +9,7 @@ export class CsvReporter {
 
   constructor(
     private baseDir: string,
-    private metadata: ServiceMetadata,
+    private metadata: ServiceMetadata
   ) {
     this.resultsDir = join(baseDir, "data/results");
   }
@@ -36,7 +36,7 @@ export class CsvReporter {
       "mode",
       "success",
       "avg_build_time_ms",
-      "avg_exec_time_ms",
+      "avg_exec_time_ms"
     ];
 
     const rows: string[] = [headers.join(",")];
@@ -57,11 +57,9 @@ export class CsvReporter {
     const isOneShot = mode === "one-shot";
     const success = isOneShot ? tool.hadOneShotSuccess : tool.hadSelfHealingSuccess;
     const avgBuildTime = tool.averageBuildTimeMs;
-    const avgExecTime = isOneShot
-      ? tool.oneShotAverageExecutionTimeMs
-      : tool.selfHealingAverageExecutionTimeMs;
+    const avgExecTime = isOneShot ? tool.oneShotAverageExecutionTimeMs : tool.selfHealingAverageExecutionTimeMs;
 
-    const escapeCsv = (str: string | undefined | null) => `"${(str ?? "").replace(/"/g, '""')}"`;
+    const escapeCsv = (str: string | undefined | null) => `"${(str ?? '').replace(/"/g, '""')}"`;
 
     return [
       escapeCsv(tool.toolId),
@@ -69,7 +67,8 @@ export class CsvReporter {
       mode,
       success ? "true" : "false",
       avgBuildTime?.toFixed(2) ?? "",
-      avgExecTime?.toFixed(2) ?? "",
+      avgExecTime?.toFixed(2) ?? ""
     ].join(",");
   }
 }
+

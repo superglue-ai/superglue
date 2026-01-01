@@ -22,8 +22,8 @@ jobs:
         run: npm install
 
       - name: Check formatting (Prettier)
-        run: npx prettier --check "packages/**/*.{ts,tsx,js,jsx,json,md}" --ignore-path .gitignore
+        run: npx prettier --check "packages/**/*.{ts,tsx,js,jsx,json,md,mdx}" --ignore-path .gitignore
 
       - name: Check for secrets
-        run: npx secretlint "**/*.{ts,tsx,js,jsx,json,md}"
+        run: npx secretlint "**/*.{ts,tsx,js,jsx,json,md,mdx}"
 

@@ -368,7 +368,14 @@
         "database": ""
       },
       "description": "PostgreSQL LEGO database for testing",
-      "keywords": ["database", "sql", "postgres", "postgresql", "api key", "tables"]
+      "keywords": [
+        "database",
+        "sql",
+        "postgres",
+        "postgresql",
+        "api key",
+        "tables"
+      ]
     },
     {
       "id": "timbuk2-shopify",
@@ -462,7 +469,15 @@
       "urlPath": "",
       "documentationUrl": "http://speedtest.tele2.net/",
       "credentials": {},
-      "keywords": ["ftp", "speedtest", "download", "upload", "files", "performance", "bandwidth"]
+      "keywords": [
+        "ftp",
+        "speedtest",
+        "download",
+        "upload",
+        "files",
+        "performance",
+        "bandwidth"
+      ]
     },
     {
       "id": "berkshire-hathaway-letter",
@@ -472,7 +487,13 @@
       "documentationUrl": "https://www.berkshirehathaway.com/letters/2024ltr.pdf",
       "credentials": {},
       "description": "Berkshire Hathaway 2024 shareholder letter",
-      "keywords": ["letter", "shareholder", "letter", "shareholder", "pdf"]
+      "keywords": [
+        "letter",
+        "shareholder",
+        "letter",
+        "shareholder",
+        "pdf"
+      ]
     },
     {
       "id": "sec-gov",
@@ -523,7 +544,15 @@
       "documentationUrl": "https://www.openbrewerydb.org/documentation",
       "credentials": {},
       "description": "Public API for brewery data across the United States",
-      "keywords": ["breweries", "brewery", "beer", "state", "city", "search", "pagination"]
+      "keywords": [
+        "breweries",
+        "brewery",
+        "beer",
+        "state",
+        "city",
+        "search",
+        "pagination"
+      ]
     },
     {
       "id": "openalex",
@@ -533,7 +562,14 @@
       "documentationUrl": "https://docs.openalex.org",
       "credentials": {},
       "description": "Open catalog of scholarly papers, authors, institutions, and more",
-      "keywords": ["works", "authors", "institutions", "publications", "research", "papers"]
+      "keywords": [
+        "works",
+        "authors",
+        "institutions",
+        "publications",
+        "research",
+        "papers"
+      ]
     },
     {
       "id": "punkapi",
@@ -905,7 +941,9 @@
       "description": "Fetch all breweries in California and return total count",
       "type": "retrieval",
       "instruction": "Count all breweries in California using the Open Brewery DB API. Return a JSON object with this structure: { total_brewery_count: number }",
-      "integrationIds": ["open-brewery-db"],
+      "integrationIds": [
+        "open-brewery-db"
+      ],
       "payload": {},
       "validationFunction": "validators/037-brewery-db-california-count.ts",
       "expectedResultDescription": "Should count all breweries in California state. Expected total of 919 breweries."
@@ -916,7 +954,9 @@
       "description": "Fetch exactly 1000 scholarly works published in 2025 using pagination",
       "type": "retrieval",
       "instruction": "Fetch exactly 1000 works published in 2025 from the OpenAlex API. Filter by publication_year:2025. Return a JSON object with this structure: { total_fetched: number, publication_year: number}> }",
-      "integrationIds": ["openalex"],
+      "integrationIds": [
+        "openalex"
+      ],
       "payload": {},
       "validationFunction": "validators/038-openalex-fetch-1000-works-2025.ts",
       "expectedResultDescription": "Should fetch exactly 1000 scholarly works from 2025 using OpenAlex pagination. Expected count 1000 with publication_year 2025."
@@ -927,7 +967,9 @@
       "description": "Fetch exactly 1000 scholarly works published in 2025 using pagination with a reminder to use pagination",
       "type": "retrieval",
       "instruction": "Fetch exactly 1000 works published in 2025 from the OpenAlex API. Remember to use pagination and configure it correctly. Return a JSON object with this structure: { total_fetched: number, publication_year: number}> }",
-      "integrationIds": ["openalex"],
+      "integrationIds": [
+        "openalex"
+      ],
       "payload": {},
       "validationFunction": "validators/039-openalex-pagination-1000-works-2025.ts",
       "expectedResultDescription": "Should fetch exactly 1000 scholarly works from 2025 with explicit pagination reminder. Expected count 1000 with publication_year 2025."
@@ -938,7 +980,9 @@
       "description": "Fetch all BrewDog beers from the catalogue",
       "type": "retrieval",
       "instruction": "Fetch all beers from the BrewDog PunkAPI catalogue. Return a JSON object with this structure: { total_count: number, first_beer_name: string, last_beer_name: string }.",
-      "integrationIds": ["punkapi"],
+      "integrationIds": [
+        "punkapi"
+      ],
       "payload": {},
       "validationFunction": "validators/040-punkapi-fetch-all-beers.ts",
       "expectedResultDescription": "Should fetch all 415 BrewDog beers from PunkAPI catalogue. Expected first beer 'Punk IPA 2007 - 2010' and last beer 'Aplomb Bomb'."
@@ -949,7 +993,9 @@
       "description": "Fetch all BrewDog beers from the catalogue with a reminder to use pagination",
       "type": "retrieval",
       "instruction": "Fetch all beers from the BrewDog PunkAPI catalogue. Remember to use pagination. Return a JSON object with this structure: { total_count: number, first_beer_name: string, last_beer_name: string }.",
-      "integrationIds": ["punkapi"],
+      "integrationIds": [
+        "punkapi"
+      ],
       "payload": {},
       "validationFunction": "validators/041-punkapi-fetch-all-beers-with-pagination-reminder.ts",
       "expectedResultDescription": "Should fetch all 415 BrewDog beers with explicit pagination reminder. Expected first beer 'Punk IPA 2007 - 2010' and last beer 'Aplomb Bomb'."
@@ -960,7 +1006,9 @@
       "description": "Post a message to the evals channel",
       "type": "action",
       "instruction": "Post a message into the evals channel with the message 'Hi, this is the superglue bot running some evals'",
-      "integrationIds": ["slack"],
+      "integrationIds": [
+        "slack"
+      ],
       "payload": {},
       "validationFunction": "validators/042-slack-post-eval-message.ts",
       "expectedResultDescription": "Should successfully post message 'Hi, this is the superglue bot running some evals' to the evals channel. Expected response ok: true with a channel ID."
@@ -971,7 +1019,9 @@
       "description": "List all channels whose name doesn't start with sg-",
       "type": "retrieval",
       "instruction": "List all public and private channels in the workspace whose name does not start with 'sg-'. Return a JSON object with this structure: { channel_count: number, channels: Array<{id: string, name: string, is_private: boolean}> }",
-      "integrationIds": ["slack"],
+      "integrationIds": [
+        "slack"
+      ],
       "payload": {},
       "skipValidationFunction": true,
       "expectedResultDescription": "Should return all Slack channels (public and private) whose names do NOT start with 'sg-'. Expected channels to exclude anything starting with 'sg-' prefix. Channel count should match the number of channels in the array."
@@ -982,7 +1032,9 @@
       "description": "Retrieve exactly 20 messages from all-superglue channel",
       "type": "retrieval",
       "instruction": "Retrieve the last 20 messages from the all-superglue channel. Return a JSON object with this structure: { message_count: number, messages: Array<{type: string, ts: string, text: string}> }. The message_count must equal the number of messages retrieved.",
-      "integrationIds": ["slack"],
+      "integrationIds": [
+        "slack"
+      ],
       "payload": {},
       "validationFunction": "validators/044-slack-get-last-20-messages.ts",
       "expectedResultDescription": "Should retrieve exactly 20 most recent messages from the 'all-superglue' Slack channel. Expected message_count to be exactly 20."
@@ -993,7 +1045,9 @@
       "description": "Retrieve exactly 1005 messages from the evals channel",
       "type": "retrieval",
       "instruction": "Retrieve exactly 1005 messages from the evals channel. Return a JSON object with this structure: { message_count: number }. The message_count must equal the number of messages retrieved.",
-      "integrationIds": ["slack"],
+      "integrationIds": [
+        "slack"
+      ],
       "payload": {},
       "validationFunction": "validators/045-slack-get-all-messages.ts",
       "expectedResultDescription": "Should retrieve exactly 1005 messages from the 'evals' Slack channel (tests pagination handling). Expected message_count to be exactly 1005."

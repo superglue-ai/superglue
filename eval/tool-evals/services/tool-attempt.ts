@@ -5,182 +5,162 @@ import { ToolBuilder } from "../../../packages/core/tools/tool-builder.js";
 import { DataStore } from "../../../packages/core/datastore/types.js";
 import { ToolExecutor } from "../../../packages/core/tools/tool-executor.js";
 import { IntegrationManager } from "../../../packages/core/integrations/integration-manager.js";
-import {
-  AttemptStatus,
-  ToolAttempt,
-  ToolConfig,
-  ToolFailureReason,
-  ValidationLLMConfig,
-} from "../types.js";
+import { AttemptStatus, ToolAttempt, ToolConfig, ToolFailureReason, ValidationLLMConfig } from "../types.js";
 import { ToolValidationService } from "./tool-validation.js";
 
 export class SuperglueToolAttemptService {
-  private validationService: ToolValidationService;
-  private selfHealingRetries: number;
+    private validationService: ToolValidationService;
+    private selfHealingRetries: number;
 
-  constructor(
-    private metadata: ServiceMetadata,
-    private datastore: DataStore,
-    validationLlmConfig?: ValidationLLMConfig,
-    selfHealingRetries?: number,
-  ) {
-    this.validationService = new ToolValidationService(validationLlmConfig);
-    this.selfHealingRetries = selfHealingRetries ?? 3;
-  }
-
-  public async runToolAttempt(
-    toolConfig: ToolConfig,
-    integrations: Integration[],
-    selfHealingEnabled: boolean = true,
-  ): Promise<ToolAttempt> {
-    const attempt: ToolAttempt = {
-      toolConfig,
-      selfHealingEnabled: selfHealingEnabled,
-      buildTime: null,
-      buildSuccess: false,
-      executionTime: null,
-      executionSuccess: false,
-      status: AttemptStatus.BUILD_FAILED,
-      createdAt: new Date(),
-    };
-
-    const buildStart = Date.now();
-    let workflow: Tool | undefined;
-    try {
-      workflow = await this.buildWorkflow(toolConfig, integrations);
-
-      attempt.buildSuccess = true;
-      attempt.workflow = workflow;
-      attempt.buildTime = Date.now() - buildStart;
-    } catch (error) {
-      attempt.buildTime = Date.now() - buildStart;
-      attempt.buildError = error instanceof Error ? error.message : String(error);
-      attempt.failureReason = ToolFailureReason.BUILD;
-      attempt.status = AttemptStatus.BUILD_FAILED;
-
-      return attempt;
+    constructor(
+        private metadata: ServiceMetadata,
+        private datastore: DataStore,
+        validationLlmConfig?: ValidationLLMConfig,
+        selfHealingRetries?: number
+    ) {
+        this.validationService = new ToolValidationService(validationLlmConfig);
+        this.selfHealingRetries = selfHealingRetries ?? 3;
     }
 
-    const execStart = Date.now();
-    try {
-      const workflowResult = await this.executeWorkflow(
-        toolConfig,
-        workflow,
-        integrations,
-        selfHealingEnabled,
-      );
-      attempt.executionTime = Date.now() - execStart;
-      attempt.result = workflowResult;
+    public async runToolAttempt(
+        toolConfig: ToolConfig,
+        integrations: Integration[],
+        selfHealingEnabled: boolean = true
+    ): Promise<ToolAttempt> {
+        const attempt: ToolAttempt = {
+            toolConfig,
+            selfHealingEnabled: selfHealingEnabled,
+            buildTime: null,
+            buildSuccess: false,
+            executionTime: null,
+            executionSuccess: false,
+            status: AttemptStatus.BUILD_FAILED,
+            createdAt: new Date(),
+        };
 
-      if (!workflowResult.success) {
-        attempt.executionSuccess = false;
-        attempt.executionError = this.determineErrorMessage(workflowResult);
-        attempt.failureReason = ToolFailureReason.EXECUTION;
-        attempt.status = AttemptStatus.EXECUTION_FAILED;
-        console.error(`Execution failed: ${attempt.executionError}`);
-        return attempt;
-      }
+        const buildStart = Date.now();
+        let workflow: Tool | undefined;
+        try {
+            workflow = await this.buildWorkflow(toolConfig, integrations);
 
-      // Execution succeeded - tool ran and returned data
-      attempt.executionSuccess = true;
+            attempt.buildSuccess = true;
+            attempt.workflow = workflow;
+            attempt.buildTime = Date.now() - buildStart;
+        } catch (error) {
+            attempt.buildTime = Date.now() - buildStart;
+            attempt.buildError = error instanceof Error ? error.message : String(error);
+            attempt.failureReason = ToolFailureReason.BUILD;
+            attempt.status = AttemptStatus.BUILD_FAILED;
 
-      // Now validate the returned data
-      const validationResult = await this.validationService.validate(toolConfig, workflowResult);
-      attempt.validationResult = validationResult;
-      attempt.status = this.validationService.determineStatus(attempt);
-
-      // Set failure reason if validation didn't pass
-      if (!validationResult.passed) {
-        attempt.failureReason = ToolFailureReason.VALIDATION;
-      }
-
-      return attempt;
-    } catch (error) {
-      attempt.executionTime = Date.now() - execStart;
-      attempt.executionError = error instanceof Error ? error.message : String(error);
-      attempt.failureReason = ToolFailureReason.EXECUTION;
-      attempt.status = AttemptStatus.EXECUTION_FAILED;
-
-      return attempt;
-    }
-  }
-
-  private async buildWorkflow(toolConfig: ToolConfig, integrations: Integration[]): Promise<Tool> {
-    const builder = new ToolBuilder(
-      toolConfig.instruction,
-      integrations,
-      toolConfig.payload || {},
-      {},
-      this.metadata,
-    );
-
-    const workflow = await builder.buildTool();
-    workflow.id = await generateUniqueId({
-      baseId: workflow.id,
-      exists: async (id) =>
-        !!(await this.datastore.getWorkflow({
-          id,
-          orgId: this.metadata.orgId,
-        })),
-    });
-
-    return workflow;
-  }
-
-  private async executeWorkflow(
-    toolConfig: ToolConfig,
-    workflow: Tool,
-    integrations: Integration[],
-    selfHealingEnabled: boolean,
-  ): Promise<ToolResult> {
-    const executor = new ToolExecutor({
-      tool: workflow,
-      metadata: this.metadata,
-      integrations: IntegrationManager.fromIntegrations(
-        integrations,
-        this.datastore,
-        this.metadata,
-      ),
-    });
-
-    const allCredentials = integrations.reduce(
-      (acc, integ) => {
-        if (integ.credentials && typeof integ.credentials === "object") {
-          for (const [key, value] of Object.entries(integ.credentials)) {
-            acc[`${integ.id}_${key}`] = value;
-          }
+            return attempt;
         }
-        return acc;
-      },
-      {} as Record<string, string>,
-    );
 
-    const workflowResult = await executor.execute({
-      payload: toolConfig.payload || {},
-      credentials: allCredentials,
-      options: {
-        selfHealing: selfHealingEnabled ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED,
-        testMode: selfHealingEnabled ? true : false,
-        retries: selfHealingEnabled ? this.selfHealingRetries : 0,
-      },
-    });
+        const execStart = Date.now();
+        try {
+            const workflowResult = await this.executeWorkflow(toolConfig, workflow, integrations, selfHealingEnabled);
+            attempt.executionTime = Date.now() - execStart;
+            attempt.result = workflowResult;
 
-    return workflowResult;
-  }
+            if (!workflowResult.success) {
+                attempt.executionSuccess = false;
+                attempt.executionError = this.determineErrorMessage(workflowResult);
+                attempt.failureReason = ToolFailureReason.EXECUTION;
+                attempt.status = AttemptStatus.EXECUTION_FAILED;
+                console.error(`Execution failed: ${attempt.executionError}`);
+                return attempt;
+            }
 
-  private determineErrorMessage(workflowResult: ToolResult): string | undefined {
-    if (workflowResult.success) {
-      return;
+            // Execution succeeded - tool ran and returned data
+            attempt.executionSuccess = true;
+
+            // Now validate the returned data
+            const validationResult = await this.validationService.validate(toolConfig, workflowResult);
+            attempt.validationResult = validationResult;
+            attempt.status = this.validationService.determineStatus(attempt);
+
+            // Set failure reason if validation didn't pass
+            if (!validationResult.passed) {
+                attempt.failureReason = ToolFailureReason.VALIDATION;
+            }
+
+            return attempt;
+        } catch (error) {
+            attempt.executionTime = Date.now() - execStart;
+            attempt.executionError = error instanceof Error ? error.message : String(error);
+            attempt.failureReason = ToolFailureReason.EXECUTION;
+            attempt.status = AttemptStatus.EXECUTION_FAILED;
+            
+            return attempt;
+        }
     }
 
-    if (typeof workflowResult.error === "string") {
-      return workflowResult.error;
+    private async buildWorkflow(
+        toolConfig: ToolConfig,
+        integrations: Integration[]
+    ): Promise<Tool> {
+        const builder = new ToolBuilder(
+            toolConfig.instruction,
+            integrations,
+            toolConfig.payload || {},
+            {},
+            this.metadata
+        );
+
+        const workflow = await builder.buildTool();
+        workflow.id = await generateUniqueId({
+            baseId: workflow.id,
+            exists: async (id) =>
+                !!(await this.datastore.getWorkflow({
+                    id,
+                    orgId: this.metadata.orgId,
+                })),
+        });
+
+        return workflow;
     }
 
-    if (typeof workflowResult.error === "object") {
-      return JSON.stringify(workflowResult.error);
+    private async executeWorkflow(
+        toolConfig: ToolConfig,
+        workflow: Tool,
+        integrations: Integration[],
+        selfHealingEnabled: boolean
+    ): Promise<ToolResult> {
+        const executor = new ToolExecutor(
+            { tool: workflow, metadata: this.metadata, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata) }
+        );
+
+        const allCredentials = integrations.reduce(
+            (acc, integ) => {
+                if (integ.credentials && typeof integ.credentials === "object") {
+                    for (const [key, value] of Object.entries(integ.credentials)) {
+                        acc[`${integ.id}_${key}`] = value;
+                    }
+                }
+                return acc;
+            },
+            {} as Record<string, string>
+        );
+
+        const workflowResult = await executor.execute(
+            { payload: toolConfig.payload || {}, credentials: allCredentials, options: { selfHealing: selfHealingEnabled ? SelfHealingMode.ENABLED : SelfHealingMode.DISABLED, testMode: selfHealingEnabled ? true : false, retries: selfHealingEnabled ? this.selfHealingRetries : 0 } }
+        );
+
+        return workflowResult;
     }
 
-    return "Unknown error";
-  }
+    private determineErrorMessage(workflowResult: ToolResult): string | undefined {
+        if (workflowResult.success) {
+            return;
+        }
+
+        if (typeof workflowResult.error === 'string') {
+            return workflowResult.error;
+        }
+
+        if (typeof workflowResult.error === 'object') {
+            return JSON.stringify(workflowResult.error);
+        }
+
+        return 'Unknown error';
+    }
 }

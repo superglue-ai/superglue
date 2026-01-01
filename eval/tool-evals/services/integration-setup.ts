@@ -10,32 +10,29 @@ export class IntegrationSetupService {
   constructor(
     private datastore: DataStore,
     private config: AgentEvalConfig,
-    private metadata: ServiceMetadata,
+    private metadata: ServiceMetadata
   ) {}
 
   async setupIntegrations(): Promise<Integration[]> {
-    const enabledTools =
-      this.config.enabledTools === "all"
-        ? this.config.tools
-        : this.config.tools.filter((tool) => this.config.enabledTools.includes(tool.id));
-
-    const usedIntegrationIds = new Set(enabledTools.flatMap((tool) => tool.integrationIds));
-
-    const integrationConfigs = this.config.integrations.filter((integration) =>
-      usedIntegrationIds.has(integration.id),
+    const enabledTools = this.config.enabledTools === 'all' 
+      ? this.config.tools 
+      : this.config.tools.filter(tool => this.config.enabledTools.includes(tool.id));
+    
+    const usedIntegrationIds = new Set(
+      enabledTools.flatMap(tool => tool.integrationIds)
+    );
+    
+    const integrationConfigs = this.config.integrations.filter(integration => 
+      usedIntegrationIds.has(integration.id)
     );
 
     this.applyEnvironmentVariablesToConfigs(integrationConfigs);
 
     const integrations = await Promise.all(
-      integrationConfigs.map((config) => this.setupSingleIntegration(config)),
+      integrationConfigs.map((config) => this.setupSingleIntegration(config))
     );
 
-    logMessage(
-      "info",
-      `${integrations.length}/${integrationConfigs.length} integrations setup complete`,
-      this.metadata,
-    );
+    logMessage("info", `${integrations.length}/${integrationConfigs.length} integrations setup complete`, this.metadata);
     return integrations;
   }
 
@@ -59,22 +56,19 @@ export class IntegrationSetupService {
         acc[`${integrationConfig.id}_${key}`] = value;
         return acc;
       },
-      {} as Record<string, string>,
+      {} as Record<string, string>
     );
 
     const docFetcher = new DocumentationFetcher(
       {
         urlHost: await replaceVariables(integrationConfig.urlHost, scopedCredentials),
         urlPath: await replaceVariables(integrationConfig.urlPath, scopedCredentials),
-        documentationUrl: await replaceVariables(
-          integrationConfig.documentationUrl,
-          scopedCredentials,
-        ),
+        documentationUrl: await replaceVariables(integrationConfig.documentationUrl, scopedCredentials),
         openApiUrl: await replaceVariables(integrationConfig.openApiUrl, scopedCredentials),
         keywords: integrationConfig.keywords,
       },
       scopedCredentials,
-      this.metadata,
+      this.metadata
     );
 
     const docString = await docFetcher.fetchAndProcess();
@@ -116,13 +110,13 @@ export class IntegrationSetupService {
       }
 
       for (const [key, _] of Object.entries(config.credentials)) {
-        const expectedEnvVarName = `${config.id.toUpperCase().replace(/-/g, "_")}_${key.toUpperCase()}`;
+        const expectedEnvVarName = `${config.id.toUpperCase().replace(/-/g, '_')}_${key.toUpperCase()}`;
         const envValue = process.env[expectedEnvVarName];
 
         if (envValue) {
           config.credentials[key] = envValue;
         } else {
-          logMessage("warn", `Missing credential: ${config.id}.${key} (${expectedEnvVarName})`);
+          logMessage('warn', `Missing credential: ${config.id}.${key} (${expectedEnvVarName})`);
         }
       }
     }

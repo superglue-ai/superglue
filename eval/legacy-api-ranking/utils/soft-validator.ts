@@ -1,53 +1,44 @@
-import { parseJSON } from "@core/files/parsers/json.js";
-import { logMessage } from "@core/utils/logs.js";
-import { sampleResultObject } from "@/packages/shared/utils.js";
-import { LLMMessage } from "@core/llm/llm-base-model.js";
-import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { parseJSON } from '@core/files/parsers/json.js';
+import { logMessage } from '@core/utils/logs.js';
+import { sampleResultObject } from '@/packages/shared/utils.js';
+import { LLMMessage } from '@core/llm/llm-base-model.js';
+import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 const softValidationSchema = z.object({
-  success: z
-    .boolean()
-    .describe(
-      "True if the actual result reasonably aligns with the expected criteria (be lenient)",
-    ),
-  reason: z
-    .string()
-    .describe(
-      "Brief explanation of why it passes or fails validation (focus on core objectives, not minor differences)",
-    ),
+    success: z.boolean().describe('True if the actual result reasonably aligns with the expected criteria (be lenient)'),
+    reason: z.string().describe('Brief explanation of why it passes or fails validation (focus on core objectives, not minor differences)')
 });
 
 export type SoftValidationResult = z.infer<typeof softValidationSchema>;
 
 export async function validateWorkflowResult(
-  actualResult: any,
-  expectedResult: string,
-  workflowInstruction: string,
-  metadata: { orgId: string; userId: string },
+    actualResult: any,
+    expectedResult: string,
+    workflowInstruction: string,
+    metadata: { orgId: string; userId: string }
 ): Promise<z.infer<typeof softValidationSchema>> {
-  const { LanguageModel } = await import("@core/llm/llm-base-model.js");
+    const { LanguageModel } = await import('@core/llm/llm-base-model.js');
 
-  let actualContent = JSON.stringify(actualResult, null, 2);
-  if (actualContent.length > 10000) {
-    // Sample if too large
-    actualContent =
-      JSON.stringify(sampleResultObject(actualResult, 10), null, 2) + "\n\n...truncated...";
-  }
+        let actualContent = JSON.stringify(actualResult, null, 2);
+        if (actualContent.length > 10000) {
+            // Sample if too large
+            actualContent = JSON.stringify(sampleResultObject(actualResult, 10), null, 2) + "\n\n...truncated...";
+        }
 
-  let expectedContent = expectedResult;
-  let isExpectedJson = false;
+        let expectedContent = expectedResult;
+        let isExpectedJson = false;
 
-  try {
-    const parsed = parseJSON(expectedResult);
-    expectedContent = JSON.stringify(parsed, null, 2);
-    isExpectedJson = true;
-  } catch (e) {
-    expectedContent = expectedResult;
-    isExpectedJson = false;
-  }
+        try {
+            const parsed = parseJSON(expectedResult);
+            expectedContent = JSON.stringify(parsed, null, 2);
+            isExpectedJson = true;
+        } catch (e) {
+            expectedContent = expectedResult;
+            isExpectedJson = false;
+        }
 
-  const systemPrompt = `You are a workflow result validator for integration testing. Your job is to determine if the actual workflow result meets the expected criteria.
+        const systemPrompt = `You are a workflow result validator for integration testing. Your job is to determine if the actual workflow result meets the expected criteria.
 
 IMPORTANT CONSIDERATIONS:
 - For operations that create, update, delete, or send data (non-retrieval operations), minimal or empty responses often indicate success
@@ -76,10 +67,10 @@ FLEXIBILITY GUIDELINES:
 - Nested structures can vary as long as the data is present
 - Aggregations, groupings, or sorting will be handled in later steps if needed`;
 
-  const userPrompt = `Workflow Instruction: "${workflowInstruction}"
+        const userPrompt = `Workflow Instruction: "${workflowInstruction}"
 
 Expected Result:
-${isExpectedJson ? "(JSON Structure - flexible matching expected)" : "(Description - general guidance)"}
+${isExpectedJson ? '(JSON Structure - flexible matching expected)' : '(Description - general guidance)'}
 ${expectedContent}
 
 Actual Result:
@@ -87,24 +78,24 @@ ${actualContent}
 
 Please validate if the actual result reasonably aligns with the expected criteria. Remember to be lenient and focus on whether the core objective was achieved.`;
 
-  const messages: LLMMessage[] = [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
-  ];
+        const messages: LLMMessage[] = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+        ];
 
-  const result = await LanguageModel.generateObject<z.infer<typeof softValidationSchema>>({
-    messages,
-    schema: zodToJsonSchema(softValidationSchema),
-    temperature: 0.1,
-  });
+        const result = await LanguageModel.generateObject<z.infer<typeof softValidationSchema>>({
+            messages,
+            schema: zodToJsonSchema(softValidationSchema),
+            temperature: 0.1
+        });
 
-  if (!result.success) {
-    logMessage("error", `Soft validation failed: ${result.response}`, metadata);
-    return {
-      success: false,
-      reason: `Validation error: ${result.response}`,
-    };
-  }
+        if (!result.success) {
+            logMessage('error', `Soft validation failed: ${result.response}`, metadata);
+            return {
+                success: false,
+                reason: `Validation error: ${result.response}`
+            };
+        }
 
-  return result.response;
+        return result.response;
 }

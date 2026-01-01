@@ -34,7 +34,6 @@ subscription {
 ### Example Usage
 
 **WebSocket Connection:**
-
 ```graphql
 subscription {
   logs {
@@ -48,17 +47,16 @@ subscription {
 ```
 
 **Client Implementation:**
-
 ```typescript
-import { createClient } from "graphql-ws";
-import { WebSocket } from "ws";
+import { createClient } from 'graphql-ws';
+import { WebSocket } from 'ws';
 
 const client = createClient({
-  url: "wss://graphql.superglue.cloud/graphql",
+  url: 'wss://graphql.superglue.cloud/graphql',
   webSocketImpl: WebSocket,
   connectionParams: {
-    Authorization: "Bearer YOUR_API_KEY",
-  },
+    Authorization: 'Bearer YOUR_API_KEY'
+  }
 });
 
 client.subscribe(
@@ -77,13 +75,13 @@ client.subscribe(
   },
   {
     next: (data) => {
-      console.log("Log received:", data);
+      console.log('Log received:', data);
     },
     error: (err) => {
-      console.error("Subscription error:", err);
+      console.error('Subscription error:', err);
     },
     complete: () => {
-      console.log("Subscription completed");
+      console.log('Subscription completed');
     },
   },
 );

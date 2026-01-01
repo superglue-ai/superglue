@@ -58,7 +58,11 @@ Click **Stop Execution** to halt the run after the current step completes.
 
 ### Step Input
 
-<img src="../resources/step-input.png" alt="Step input" className="w-full rounded-lg mb-4" />
+<img
+  src="../resources/step-input.png"
+  alt="Step input"
+  className="w-full rounded-lg mb-4"
+/>
 
 The **Step Input** section shows exactly what data flows into the step and how it is shaped:
 
@@ -68,7 +72,11 @@ The **Step Input** section shows exactly what data flows into the step and how i
 
 ### Step Config
 
-<img src="../resources/step-config.png" alt="Step output" className="w-full rounded-lg" />
+<img
+  src="../resources/step-config.png"
+  alt="Step output"
+  className="w-full rounded-lg"
+/>
 
 The **Step Config** tab shows how this step calls the external system:
 
@@ -79,7 +87,7 @@ The **Step Config** tab shows how this step calls the external system:
 - **Headers (JSON)** – JSON object with the request headers sent to the server (for example, the `Authorization` header)
 - **Query Parameters** – JSON object with the query parameters appended to the request URL
 - **Body** – Request body content, which can be JSON, form data, plain text, or any format
-- **Pagination** – controls how the step fetches multiple pages (strategy, page size, cursor/offset paths) or shows _No pagination_ when pagination is disabled
+- **Pagination** – controls how the step fetches multiple pages (strategy, page size, cursor/offset paths) or shows *No pagination* when pagination is disabled
 - **Stop Condition (JavaScript)** – optional JavaScript function that inspects each `response` and pagination state to decide when to stop fetching more pages
 
 ### Template Chips
@@ -99,7 +107,11 @@ To insert a new template, type `@` anywhere in a text field to open the **variab
 
 ### Step Result
 
-<img src="../resources/step-output.png" alt="Step output" className="w-full rounded-lg" />
+<img
+  src="../resources/step-output.png"
+  alt="Step output"
+  className="w-full rounded-lg"
+/>
 
 After execution, the **Output** section shows:
 
@@ -119,7 +131,7 @@ Executes just this one step using the current configuration and previous step re
 - Debug a specific failure in isolation
 - Verify your instruction changes work
 
-If the **Step Data Selector** returns an array, the step becomes iterational—it runs once for each item in the array. In this case, you can choose to run a single iteration using the dropdown on the **Run Step** button.
+If the **Step Data Selector** returns an array, the step becomes iterational—it runs once for each item in the array. In this case, you can choose to run a single iteration using the dropdown on the **Run Step** button.   
 
 ### Fix Step
 
@@ -138,8 +150,8 @@ Use this when:
 - You've made manual changes but they're not working as expected
 
 <Note>
-  A fixed step will update the step configuration in the view but will not save it. You need to
-  publish the tool to persist changes.
+  A fixed step will update the step configuration in the view but will not save
+  it. You need to publish the tool to persist changes.
 </Note>
 
 ## Final Transform

@@ -62,7 +62,6 @@ AVERAGE                       16   1.16 MB       2/2    5109 KB      1.55      0
 ```
 
 **Fetch CSV Columns:**
-
 - `Site`: Site name
 - `Pages (estimated)`: Estimated page count based on size
 - `Doc Size (MB)`: Total documentation size
@@ -82,7 +81,6 @@ AVERAGE                       16   1.16 MB       2/2    5109 KB      1.55      0
 ```
 
 **Evaluation CSV Columns:**
-
 - `timestamp`, `siteId`, `siteName`: Metadata
 - `question`, `searchQuery`: Question and generated search
 - `searchResultsSizeKB`: Retrieved content size
@@ -111,12 +109,10 @@ Only significant changes (>10% or >10 points) are reported. If no changes are si
 ## Benchmark Management
 
 Baseline files are stored in `benchmark/`:
-
 - `fetch-results-baseline.csv` - Fetch performance baseline
 - `evaluation-debug-baseline.csv` - Eval quality baseline
 
 To update benchmarks after improvements:
-
 ```bash
 cp results/fetch-results-<timestamp>.csv benchmark/fetch-results-baseline.csv
 cp results/evaluation-debug-<timestamp>.csv benchmark/evaluation-debug-baseline.csv
