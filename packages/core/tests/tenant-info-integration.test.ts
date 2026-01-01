@@ -118,7 +118,11 @@ describe("Tenant Info Basic Tests", () => {
       await datastore.setTenantInfo({ email: testEmail, emailEntrySkipped: true });
 
       // Create a mock resolver that mimics the actual getTenantInfoResolver
-      const mockGetTenantInfoResolver = async (_: any, __: any, { datastore }: { datastore: DataStore }) => {
+      const mockGetTenantInfoResolver = async (
+        _: any,
+        __: any,
+        { datastore }: { datastore: DataStore },
+      ) => {
         return await datastore.getTenantInfo();
       };
 
@@ -141,7 +145,11 @@ describe("Tenant Info Basic Tests", () => {
       };
 
       const testEmail = "set-resolver@example.com";
-      await mockSetTenantInfoResolver(null, { email: testEmail, emailEntrySkipped: true }, { datastore });
+      await mockSetTenantInfoResolver(
+        null,
+        { email: testEmail, emailEntrySkipped: true },
+        { datastore },
+      );
 
       const result = await datastore.getTenantInfo();
       expect(result).toEqual({
@@ -181,7 +189,11 @@ describe("Tenant Info Basic Tests", () => {
       envManager.set("NEXT_PUBLIC_DISABLE_WELCOME_SCREEN", "true");
 
       // Create a mock resolver that mimics the actual getTenantInfoResolver with env var handling
-      const mockGetTenantInfoResolver = async (_: any, __: any, { datastore }: { datastore: DataStore }) => {
+      const mockGetTenantInfoResolver = async (
+        _: any,
+        __: any,
+        { datastore }: { datastore: DataStore },
+      ) => {
         if (process.env.NEXT_PUBLIC_DISABLE_WELCOME_SCREEN === "true") {
           return {
             email: null,
@@ -253,7 +265,10 @@ describe("Tenant Info Basic Tests", () => {
 
         // Handle setTenantInfo mutation
         if (query.includes("setTenantInfo")) {
-          await datastore.setTenantInfo({ email: variables?.email, emailEntrySkipped: variables?.emailEntrySkipped });
+          await datastore.setTenantInfo({
+            email: variables?.email,
+            emailEntrySkipped: variables?.emailEntrySkipped,
+          });
           const updatedInfo = await datastore.getTenantInfo();
           return res.json({
             data: {

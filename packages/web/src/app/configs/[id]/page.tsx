@@ -1,7 +1,7 @@
-'use client'
+"use client";
 
-import { useConfig } from '@/src/app/config-context';
-import { tokenRegistry } from '@/src/lib/token-registry';
+import { useConfig } from "@/src/app/config-context";
+import { tokenRegistry } from "@/src/lib/token-registry";
 import {
   Accordion,
   AccordionContent,
@@ -9,16 +9,16 @@ import {
   AccordionTrigger,
 } from "@/src/components/ui/accordion";
 import { Button } from "@/src/components/ui/button";
-import { composeUrl } from '@/src/lib/general-utils';
-import { ApiConfig, SuperglueClient } from '@superglue/shared';
-import { ExternalLink } from 'lucide-react';
-import { useParams, useRouter } from 'next/navigation';
-import React from 'react';
+import { composeUrl } from "@/src/lib/general-utils";
+import { ApiConfig, SuperglueClient } from "@superglue/shared";
+import { ExternalLink } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import React from "react";
 
 const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void }) => {
   const router = useRouter();
   const params = useParams();
-  id = id ?? params.id as string;
+  id = id ?? (params.id as string);
   const [config, setConfig] = React.useState<ApiConfig | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -31,11 +31,11 @@ const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void })
           setLoading(true);
           const superglueClient = new SuperglueClient({
             endpoint: superglueConfig.superglueEndpoint,
-            apiKey: tokenRegistry.getToken()
-          })
+            apiKey: tokenRegistry.getToken(),
+          });
           const foundConfig = await superglueClient.getApi(id);
           if (!foundConfig) {
-            throw new Error('Configuration not found');
+            throw new Error("Configuration not found");
           }
           const transformedConfig = {
             ...foundConfig,
@@ -46,8 +46,8 @@ const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void })
 
           setConfig(transformedConfig as ApiConfig);
         } catch (error) {
-          console.error('Error fetching config:', error);
-          setError(error instanceof Error ? error.message : 'An error occurred');
+          console.error("Error fetching config:", error);
+          setError(error instanceof Error ? error.message : "An error occurred");
         } finally {
           setLoading(false);
         }
@@ -68,7 +68,7 @@ const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void })
   if (error || !config) {
     return (
       <div className="flex flex-col items-center justify-center h-48">
-        <p className="text-red-500 mb-4">{error || 'Configuration not found'}</p>
+        <p className="text-red-500 mb-4">{error || "Configuration not found"}</p>
         <Button variant="outline" onClick={onClose}>
           Close
         </Button>
@@ -115,7 +115,7 @@ const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void })
                 <dl className="grid grid-cols-2 gap-4">
                   <div>
                     <dt className="font-medium text-gray-500">Type</dt>
-                    <dd className="mt-1">{config.authentication || 'None'}</dd>
+                    <dd className="mt-1">{config.authentication || "None"}</dd>
                   </div>
                 </dl>
               </AccordionContent>
@@ -133,7 +133,7 @@ const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void })
                           {JSON.stringify(config.headers ?? {}, null, 2)}
                         </pre>
                       ) : (
-                        'No headers specified'
+                        "No headers specified"
                       )}
                     </dd>
                   </div>
@@ -172,9 +172,7 @@ const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void })
                   <div className="col-span-2">
                     <dt className="font-medium text-gray-500">Response Mapping</dt>
                     <dd className="mt-1">
-                      <pre className="bg-gray-900 p-2 rounded">
-                        {config.responseMapping}
-                      </pre>
+                      <pre className="bg-gray-900 p-2 rounded">{config.responseMapping}</pre>
                     </dd>
                   </div>
                 </dl>
@@ -187,11 +185,11 @@ const ApiConfigDetail = ({ id, onClose }: { id?: string; onClose?: () => void })
                 <dl className="grid grid-cols-2 gap-4">
                   <div>
                     <dt className="font-medium text-gray-500">Type</dt>
-                    <dd className="mt-1">{config.pagination?.type || 'Disabled'}</dd>
+                    <dd className="mt-1">{config.pagination?.type || "Disabled"}</dd>
                   </div>
                   <div>
                     <dt className="font-medium text-gray-500">Page Size</dt>
-                    <dd className="mt-1">{config.pagination?.pageSize || 'N/A'}</dd>
+                    <dd className="mt-1">{config.pagination?.pageSize || "N/A"}</dd>
                   </div>
                 </dl>
               </AccordionContent>

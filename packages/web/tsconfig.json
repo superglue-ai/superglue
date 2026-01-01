@@ -6,15 +6,9 @@
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     },
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "strict": false,
     "noEmit": true,
@@ -35,17 +29,6 @@
     "moduleResolution": "Node",
     "sourceMap": true
   },
-  "include": [
-    "src/**/*",
-    "next-env.d.ts",
-    ".next/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    ".next",
-    "dist",
-    "coverage",
-    "*.config.js",
-    "*.config.ts"
-  ]
+  "include": ["src/**/*", "next-env.d.ts", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", ".next", "dist", "coverage", "*.config.js", "*.config.ts"]
 }

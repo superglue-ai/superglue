@@ -1,10 +1,14 @@
-import { cn } from '@/src/lib/general-utils';
-import { truncateTemplateValue, prepareSourceData, extractCredentials } from '@/src/lib/templating-utils';
-import { maskCredentials } from '@superglue/shared';
-import { Code2, X } from 'lucide-react';
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { TemplateEditPopover } from './TemplateEditPopover';
-import { useTemplateContext } from './tiptap/TemplateContext';
+import { cn } from "@/src/lib/general-utils";
+import {
+  truncateTemplateValue,
+  prepareSourceData,
+  extractCredentials,
+} from "@/src/lib/templating-utils";
+import { maskCredentials } from "@superglue/shared";
+import { Code2, X } from "lucide-react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { TemplateEditPopover } from "./TemplateEditPopover";
+import { useTemplateContext } from "./tiptap/TemplateContext";
 
 interface TemplateChipProps {
   template: string;
@@ -50,18 +54,21 @@ export function TemplateChip({
   popoverHelpText,
 }: TemplateChipProps) {
   const { sourceDataVersion } = useTemplateContext();
-  const sourceData = useMemo(() => prepareSourceData(stepData, dataSelectorOutput), [stepData, dataSelectorOutput]);
+  const sourceData = useMemo(
+    () => prepareSourceData(stepData, dataSelectorOutput),
+    [stepData, dataSelectorOutput],
+  );
   const [isHovered, setIsHovered] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  
+
   const effectiveOpen = isPopoverOpen || forcePopoverOpen;
 
-  const templateExpr = template.replace(/^<<|>>$/g, '').trim();
+  const templateExpr = template.replace(/^<<|>>$/g, "").trim();
 
   const hasError = !!error;
   const isUnresolved = !hasError && !canExecute;
   const isResolvedUndefined = !hasError && canExecute && hasResult && evaluatedValue === undefined;
-  
+
   const isLoopArray = loopMode && Array.isArray(evaluatedValue) && evaluatedValue.length > 0;
   const displayValue = isLoopArray ? evaluatedValue[0] : evaluatedValue;
 
@@ -72,22 +79,22 @@ export function TemplateChip({
   let originalSize = 0;
 
   if (hasError) {
-    displayText = `Error: ${error.slice(0, 50)}${error.length > 50 ? '...' : ''}`;
+    displayText = `Error: ${error.slice(0, 50)}${error.length > 50 ? "..." : ""}`;
   } else if (isUnresolved) {
-    displayText = `unresolved: ${templateExpr.slice(0, 30)}${templateExpr.length > 30 ? '...' : ''}`;
+    displayText = `unresolved: ${templateExpr.slice(0, 30)}${templateExpr.length > 30 ? "..." : ""}`;
   } else if (isResolvedUndefined) {
-    displayText = 'undefined';
+    displayText = "undefined";
   } else {
     let fullDisplayText: string;
     if (displayValue === null) {
-      fullDisplayText = 'null';
-    } else if (typeof displayValue === 'string') {
-      fullDisplayText = displayValue === '' ? '""' : displayValue;
-    } else if (typeof displayValue === 'object') {
+      fullDisplayText = "null";
+    } else if (typeof displayValue === "string") {
+      fullDisplayText = displayValue === "" ? '""' : displayValue;
+    } else if (typeof displayValue === "object") {
       try {
         fullDisplayText = JSON.stringify(displayValue);
       } catch {
-        fullDisplayText = '[Complex Object]';
+        fullDisplayText = "[Complex Object]";
       }
     } else {
       fullDisplayText = String(displayValue);
@@ -96,46 +103,48 @@ export function TemplateChip({
     originalSize = fullDisplayText.length;
     const masked = maskCredentials(fullDisplayText, credentials);
     const truncated = truncateTemplateValue(masked, 150);
-      displayText = truncated.display;
-      isTruncated = truncated.truncated;
-      originalSize = truncated.originalSize;
+    displayText = truncated.display;
+    isTruncated = truncated.truncated;
+    originalSize = truncated.originalSize;
   }
 
   const isActive = selected || effectiveOpen;
-  
+
   const getChipClasses = () => {
     if (hasError) {
       return {
-        bg: 'border-red-400/20 dark:border-red-400/25',
-        border: 'border-b-red-600/30 dark:border-b-red-600/35',
-        text: 'text-red-700 dark:text-red-300',
-        gradient: 'linear-gradient(180deg, rgba(248, 113, 113, 0.18) 0%, rgba(239, 68, 68, 0.22) 100%)',
+        bg: "border-red-400/20 dark:border-red-400/25",
+        border: "border-b-red-600/30 dark:border-b-red-600/35",
+        text: "text-red-700 dark:text-red-300",
+        gradient:
+          "linear-gradient(180deg, rgba(248, 113, 113, 0.18) 0%, rgba(239, 68, 68, 0.22) 100%)",
         shadow: isActive
-          ? '0 1px 0 rgba(185, 28, 28, 0.22), 0 0 11px rgba(239, 68, 68, 0.4)'
-          : '0 1px 0 rgba(185, 28, 28, 0.18), 0 0 7px rgba(239, 68, 68, 0.27)'
+          ? "0 1px 0 rgba(185, 28, 28, 0.22), 0 0 11px rgba(239, 68, 68, 0.4)"
+          : "0 1px 0 rgba(185, 28, 28, 0.18), 0 0 7px rgba(239, 68, 68, 0.27)",
       };
     }
-    
+
     if (isUnresolved) {
       return {
-        bg: 'border-gray-400/20 dark:border-gray-500/25',
-        border: 'border-b-gray-500/30 dark:border-b-gray-600/35',
-        text: 'text-gray-600 dark:text-gray-300',
-        gradient: 'linear-gradient(180deg, rgba(156, 163, 175, 0.15) 0%, rgba(107, 114, 128, 0.18) 100%)',
+        bg: "border-gray-400/20 dark:border-gray-500/25",
+        border: "border-b-gray-500/30 dark:border-b-gray-600/35",
+        text: "text-gray-600 dark:text-gray-300",
+        gradient:
+          "linear-gradient(180deg, rgba(156, 163, 175, 0.15) 0%, rgba(107, 114, 128, 0.18) 100%)",
         shadow: isActive
-          ? '0 1px 0 rgba(55, 65, 81, 0.22), 0 0 9px rgba(156, 163, 175, 0.32)'
-          : '0 1px 0 rgba(55, 65, 81, 0.18), 0 0 5px rgba(156, 163, 175, 0.2)'
+          ? "0 1px 0 rgba(55, 65, 81, 0.22), 0 0 9px rgba(156, 163, 175, 0.32)"
+          : "0 1px 0 rgba(55, 65, 81, 0.18), 0 0 5px rgba(156, 163, 175, 0.2)",
       };
     }
-    
+
     return {
-      bg: 'border-green-400/20 dark:border-green-400/25',
-      border: 'border-b-green-600/30 dark:border-b-green-600/35',
-      text: 'text-green-700 dark:text-green-400',
-      gradient: 'linear-gradient(180deg, rgba(34, 197, 94, 0.18) 0%, rgba(22, 163, 74, 0.22) 100%)',
-        shadow: isActive
-        ? '0 1px 0 rgba(21, 128, 61, 0.22), 0 0 11px rgba(74, 222, 128, 0.4)'
-        : '0 1px 0 rgba(21, 128, 61, 0.18), 0 0 7px rgba(74, 222, 128, 0.27)'
+      bg: "border-green-400/20 dark:border-green-400/25",
+      border: "border-b-green-600/30 dark:border-b-green-600/35",
+      text: "text-green-700 dark:text-green-400",
+      gradient: "linear-gradient(180deg, rgba(34, 197, 94, 0.18) 0%, rgba(22, 163, 74, 0.22) 100%)",
+      shadow: isActive
+        ? "0 1px 0 rgba(21, 128, 61, 0.22), 0 0 11px rgba(74, 222, 128, 0.4)"
+        : "0 1px 0 rgba(21, 128, 61, 0.18), 0 0 7px rgba(74, 222, 128, 0.27)",
     };
   };
 
@@ -144,18 +153,18 @@ export function TemplateChip({
 
   useEffect(() => {
     if (!effectiveOpen || !chipRef.current) return;
-    
+
     const chip = chipRef.current;
     const scrollParent = chip.closest('[style*="overflow"]') as HTMLElement | null;
     if (!scrollParent) return;
-    
+
     const handleScroll = () => {
       setIsPopoverOpen(false);
       onPopoverOpenChange?.(false);
     };
-    
-    scrollParent.addEventListener('scroll', handleScroll);
-    return () => scrollParent.removeEventListener('scroll', handleScroll);
+
+    scrollParent.addEventListener("scroll", handleScroll);
+    return () => scrollParent.removeEventListener("scroll", handleScroll);
   }, [effectiveOpen, onPopoverOpenChange]);
 
   const chipContent = (
@@ -169,12 +178,12 @@ export function TemplateChip({
         chipClasses.text,
         !readOnly && "cursor-pointer hover:-translate-y-px active:translate-y-0.5",
         readOnly && "cursor-default",
-        inline && "align-middle"
+        inline && "align-middle",
       )}
-      style={{ 
-        lineHeight: '1.3', 
+      style={{
+        lineHeight: "1.3",
         background: chipClasses.gradient,
-        boxShadow: chipClasses.shadow 
+        boxShadow: chipClasses.shadow,
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -198,9 +207,7 @@ export function TemplateChip({
           <Code2 className="h-3 w-3" />
         )}
       </span>
-      <span className="max-w-[200px] truncate">
-        {displayText}
-      </span>
+      <span className="max-w-[200px] truncate">{displayText}</span>
     </span>
   );
 

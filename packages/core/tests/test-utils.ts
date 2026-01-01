@@ -156,7 +156,6 @@ export class DataStoreFactory {
   static createMemoryStore(): DataStore {
     return new MemoryStore();
   }
-
 }
 
 export class EnvVarManager {

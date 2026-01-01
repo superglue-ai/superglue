@@ -14,7 +14,7 @@ export interface Log {
 }
 
 export interface MessagePart {
-  type: 'content' | 'tool';
+  type: "content" | "tool";
   content?: string;
   tool?: ToolCall;
   id: string;
@@ -23,7 +23,7 @@ export interface MessagePart {
 export interface Message {
   id: string;
   content: string;
-  role: 'user' | 'assistant' | 'system';
+  role: "user" | "assistant" | "system";
   timestamp: Date;
   tools?: ToolCall[];
   parts?: MessagePart[];
@@ -32,7 +32,7 @@ export interface Message {
     name: string;
     size?: number;
     key: string;
-    status?: 'processing' | 'ready' | 'error';
+    status?: "processing" | "ready" | "error";
     error?: string;
   }>;
 }
@@ -42,38 +42,45 @@ export interface ToolCall {
   name: string;
   input?: any;
   output?: any;
-  status: 'pending' | 'awaiting_confirmation' | 'running' | 'completed' | 'declined' | 'stopped' | 'error';
+  status:
+    | "pending"
+    | "awaiting_confirmation"
+    | "running"
+    | "completed"
+    | "declined"
+    | "stopped"
+    | "error";
   error?: string;
   startTime?: Date;
   endTime?: Date;
   logs?: Array<{
-      id: string;
-      message: string;
-      level: string;
-      timestamp: Date;
-      traceId?: string;
-      orgId?: string;
+    id: string;
+    message: string;
+    level: string;
+    timestamp: Date;
+    traceId?: string;
+    orgId?: string;
   }>;
   buildResult?: any;
 }
 
 export enum UserRole {
-  ADMIN = 'admin',
-  MEMBER = 'member'
+  ADMIN = "admin",
+  MEMBER = "member",
 }
 
 export enum SupportedFileType {
-  JSON = 'JSON',
-  CSV = 'CSV',
-  XML = 'XML',
-  YAML = 'YAML',
-  EXCEL = 'EXCEL',
-  PDF = 'PDF',
-  DOCX = 'DOCX',
-  ZIP = 'ZIP',
-  GZIP = 'GZIP',
-  RAW = 'RAW',
-  AUTO = 'AUTO'
+  JSON = "JSON",
+  CSV = "CSV",
+  XML = "XML",
+  YAML = "YAML",
+  EXCEL = "EXCEL",
+  PDF = "PDF",
+  DOCX = "DOCX",
+  ZIP = "ZIP",
+  GZIP = "GZIP",
+  RAW = "RAW",
+  AUTO = "AUTO",
 }
 
 // Types from SDK
@@ -88,14 +95,14 @@ export enum HttpMethod {
   DELETE = "DELETE",
   PATCH = "PATCH",
   HEAD = "HEAD",
-  OPTIONS = "OPTIONS"
+  OPTIONS = "OPTIONS",
 }
 
 export enum CacheMode {
   ENABLED = "ENABLED",
   READONLY = "READONLY",
   WRITEONLY = "WRITEONLY",
-  DISABLED = "DISABLED"
+  DISABLED = "DISABLED",
 }
 
 export enum FileType {
@@ -109,14 +116,14 @@ export enum FileType {
   DOCX = "DOCX",
   ZIP = "ZIP",
   RAW = "RAW",
-  AUTO = "AUTO"
+  AUTO = "AUTO",
 }
 
 export enum AuthType {
   NONE = "NONE",
   OAUTH2 = "OAUTH2",
   HEADER = "HEADER",
-  QUERY_PARAM = "QUERY_PARAM"
+  QUERY_PARAM = "QUERY_PARAM",
 }
 
 export enum DecompressionMethod {
@@ -124,41 +131,41 @@ export enum DecompressionMethod {
   DEFLATE = "DEFLATE",
   NONE = "NONE",
   AUTO = "AUTO",
-  ZIP = "ZIP"
+  ZIP = "ZIP",
 }
 
 export enum PaginationType {
   OFFSET_BASED = "OFFSET_BASED",
   PAGE_BASED = "PAGE_BASED",
   CURSOR_BASED = "CURSOR_BASED",
-  DISABLED = "DISABLED"
+  DISABLED = "DISABLED",
 }
 
 export enum LogLevel {
   DEBUG = "DEBUG",
   INFO = "INFO",
   WARN = "WARN",
-  ERROR = "ERROR"
+  ERROR = "ERROR",
 }
 
 export enum UpsertMode {
   CREATE = "CREATE",
   UPDATE = "UPDATE",
-  UPSERT = "UPSERT"
+  UPSERT = "UPSERT",
 }
 
 export enum SelfHealingMode {
   ENABLED = "ENABLED",
   TRANSFORM_ONLY = "TRANSFORM_ONLY",
   REQUEST_ONLY = "REQUEST_ONLY",
-  DISABLED = "DISABLED"
+  DISABLED = "DISABLED",
 }
 
 export enum RunStatus {
   RUNNING = "RUNNING",
   SUCCESS = "SUCCESS",
   FAILED = "FAILED",
-  ABORTED = "ABORTED"
+  ABORTED = "ABORTED",
 }
 
 export interface BaseConfig {
@@ -222,12 +229,12 @@ export interface ExecutionStep {
   modify?: boolean;
   apiConfig: ApiConfig;
   integrationId?: string;
-  executionMode?: 'DIRECT' | 'LOOP';
+  executionMode?: "DIRECT" | "LOOP";
   loopSelector?: string;
   loopMaxIters?: number;
   inputMapping?: JSONata;
   responseMapping?: JSONata;
-  failureBehavior?: 'FAIL' | 'CONTINUE';
+  failureBehavior?: "FAIL" | "CONTINUE";
 }
 
 export interface Tool extends BaseConfig {
@@ -312,7 +319,6 @@ export interface SuggestedTool {
   }>;
   reason: string;
 }
-
 
 export type RunResult = ApiResult | ToolResult;
 
@@ -403,11 +409,10 @@ export interface GenerateTransformArgs {
   responseSchema?: JSONSchema;
   stepData: Record<string, any>;
   errorMessage?: string;
-  instruction?: string;  
+  instruction?: string;
 }
 
-
-// Legacy alias  
+// Legacy alias
 export type WorkflowArgs = ToolArgs;
 
 export interface BuildToolArgs {
@@ -463,7 +468,7 @@ export type ToolScheduleInput = {
   enabled?: boolean;
   payload?: Record<string, any>;
   options?: RequestOptions;
-}
+};
 
 export type ToolSchedule = {
   id: string;
@@ -477,10 +482,7 @@ export type ToolSchedule = {
   nextRunAt: Date;
   createdAt: Date;
   updatedAt: Date;
-}
-
-
-
+};
 
 // Legacy aliases
 export type WorkflowScheduleInput = ToolScheduleInput;
@@ -491,7 +493,7 @@ export enum DiscoveryRunStatus {
   PROCESSING = "PROCESSING",
   COMPLETED = "COMPLETED",
   FAILED = "FAILED",
-  ABORTED = "ABORTED"
+  ABORTED = "ABORTED",
 }
 
 export type DiscoverySourceType = "file" | "url" | "integration";
@@ -521,7 +523,7 @@ export enum FileStatus {
   UPLOADING = "UPLOADING",
   PROCESSING = "PROCESSING",
   COMPLETED = "COMPLETED",
-  FAILED = "FAILED"
+  FAILED = "FAILED",
 }
 
 export interface FileReference {
@@ -555,14 +557,14 @@ export interface BatchFileUploadResponse {
   }>;
 }
 
-export interface ExtendedIntegration extends Omit<Integration, 'icon'> {
+export interface ExtendedIntegration extends Omit<Integration, "icon"> {
   icon?: {
     name: string;
-    source: 'simpleicons' | 'lucide';
+    source: "simpleicons" | "lucide";
   };
   sources: string[];
   capabilities: string[];
-  confidence: 'high' | 'medium' | 'low';
+  confidence: "high" | "medium" | "low";
   evidence: string;
   systemDetails?: string;
   matchedIntegrationId?: string; // If set, discovered system matches this existing integration

@@ -5,7 +5,12 @@ import { Tool } from "@superglue/shared";
 import { Archive, ArchiveRestore, CopyPlus, Edit2, MoreVertical } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { ArchiveConfigDialog } from "./dialogs/ArchiveConfigDialog";
 import { DuplicateToolDialog } from "./dialogs/DuplicateToolDialog";
 import { RenameToolDialog } from "./dialogs/RenameToolDialog";
@@ -27,11 +32,11 @@ export function ToolActionsMenu({
   onRenamed,
   onDuplicated,
   disabled = false,
-  showLabel = false
+  showLabel = false,
 }: ToolActionsMenuProps) {
   const config = useConfig();
   const { refreshTools } = useTools();
-  
+
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
@@ -72,7 +77,9 @@ export function ToolActionsMenu({
             size={showLabel ? "sm" : "icon"}
             disabled={disabled}
             onClick={(e) => e.stopPropagation()}
-            className={showLabel ? "h-8 gap-1.5 text-muted-foreground hover:text-foreground" : undefined}
+            className={
+              showLabel ? "h-8 gap-1.5 text-muted-foreground hover:text-foreground" : undefined
+            }
           >
             <MoreVertical className={showLabel ? "h-3.5 w-3.5" : "h-4 w-4"} />
             {showLabel && <span className="text-xs">More</span>}
@@ -124,4 +131,3 @@ export function ToolActionsMenu({
     </>
   );
 }
-

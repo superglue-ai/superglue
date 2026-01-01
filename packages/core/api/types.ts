@@ -1,7 +1,7 @@
-import { ServiceMetadata, UserRole } from '@superglue/shared';
-import { FastifyReply, FastifyRequest } from 'fastify';
-import type { DataStore } from '../datastore/types.js';
-import type { WorkerPools } from '../worker/types.js';
+import { ServiceMetadata, UserRole } from "@superglue/shared";
+import { FastifyReply, FastifyRequest } from "fastify";
+import type { DataStore } from "../datastore/types.js";
+import type { WorkerPools } from "../worker/types.js";
 
 export interface AuthenticatedFastifyRequest extends FastifyRequest {
   traceId?: string;
@@ -13,7 +13,7 @@ export interface AuthenticatedFastifyRequest extends FastifyRequest {
   };
   datastore: DataStore;
   workerPools: WorkerPools;
-  
+
   toMetadata: () => ServiceMetadata;
 }
 
@@ -22,7 +22,7 @@ export interface RouteHandler {
 }
 
 export interface RouteConfig {
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   path: string;
   handler: RouteHandler;
   schema?: any;
@@ -53,7 +53,7 @@ export interface OpenAPIToolStep {
   instruction?: string;
   modify?: boolean;
   dataSelector?: string;
-  failureBehavior?: 'fail' | 'continue';
+  failureBehavior?: "fail" | "continue";
 }
 
 export interface OpenAPITool {
@@ -86,7 +86,7 @@ export interface OpenAPIRun {
   runId: string;
   toolId: string;
   tool?: { id: string; version?: string };
-  status: 'running' | 'success' | 'failed' | 'aborted';
+  status: "running" | "success" | "failed" | "aborted";
   toolPayload?: Record<string, unknown>;
   data?: Record<string, unknown>;
   error?: string;

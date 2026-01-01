@@ -20,10 +20,20 @@ export interface ToolFixerResult {
 }
 
 const diffSchema = z.object({
-  diffs: z.array(z.object({
-    old_string: z.string().describe("The exact string to find and replace. Must be unique within the tool JSON. Include enough context (surrounding text) to make it unique."),
-    new_string: z.string().describe("The replacement string. Can be empty to delete the old_string.")
-  })).describe("Array of search/replace operations to apply to the tool JSON")
+  diffs: z
+    .array(
+      z.object({
+        old_string: z
+          .string()
+          .describe(
+            "The exact string to find and replace. Must be unique within the tool JSON. Include enough context (surrounding text) to make it unique.",
+          ),
+        new_string: z
+          .string()
+          .describe("The replacement string. Can be empty to delete the old_string."),
+      }),
+    )
+    .describe("Array of search/replace operations to apply to the tool JSON"),
 });
 
 export class ToolFixer {
@@ -38,10 +48,13 @@ export class ToolFixer {
   constructor(options: ToolFixerOptions) {
     this.tool = options.tool;
     this.fixInstructions = options.fixInstructions;
-    this.integrations = options.integrations.reduce((acc, int) => {
-      acc[int.id] = int;
-      return acc;
-    }, {} as Record<string, Integration>);
+    this.integrations = options.integrations.reduce(
+      (acc, int) => {
+        acc[int.id] = int;
+        return acc;
+      },
+      {} as Record<string, Integration>,
+    );
     this.lastError = options.lastError;
     this.stepResults = options.stepResults;
     this.metadata = options.metadata;
@@ -62,9 +75,9 @@ export class ToolFixer {
   private sortObjectKeys(obj: any): any {
     if (obj === null || obj === undefined) return obj;
     if (Array.isArray(obj)) {
-      return obj.map(item => this.sortObjectKeys(item));
+      return obj.map((item) => this.sortObjectKeys(item));
     }
-    if (typeof obj === 'object') {
+    if (typeof obj === "object") {
       const sorted: any = {};
       const keys = Object.keys(obj).sort();
       for (const key of keys) {
@@ -94,10 +107,10 @@ ${this.lastError}
     }
 
     if (this.stepResults && this.stepResults.length > 0) {
-      const stepResultsSummary = this.stepResults.map(sr => ({
+      const stepResultsSummary = this.stepResults.map((sr) => ({
         stepId: sr.stepId,
         success: sr.success,
-        error: sr.error
+        error: sr.error,
       }));
       userContent += `\n\n<step_results>
 ${JSON.stringify(stepResultsSummary, null, 2)}
@@ -107,13 +120,13 @@ ${JSON.stringify(stepResultsSummary, null, 2)}
     const availableIntegrationIds = Object.keys(this.integrations);
     if (availableIntegrationIds.length > 0) {
       userContent += `\n\n<available_integration_ids>
-${availableIntegrationIds.join(', ')}
+${availableIntegrationIds.join(", ")}
 </available_integration_ids>`;
     }
 
     return [
       { role: "system", content: FIX_TOOL_SYSTEM_PROMPT },
-      { role: "user", content: userContent }
+      { role: "user", content: userContent },
     ];
   }
 
@@ -123,8 +136,8 @@ ${availableIntegrationIds.join(', ')}
    */
   private tryNormalizeForJsonString(str: string, serializedTool: string): string | null {
     // If the string contains actual newlines, try escaping them
-    if (str.includes('\n')) {
-      const escaped = str.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+    if (str.includes("\n")) {
+      const escaped = str.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
       if (this.countOccurrences(serializedTool, escaped) === 1) {
         return escaped;
       }
@@ -141,7 +154,10 @@ ${availableIntegrationIds.join(', ')}
    */
   private tryFuzzyMatch(str: string, serializedTool: string): string | null {
     // Try trimming whitespace from each line
-    const trimmedLines = str.split('\n').map(l => l.trim()).join('\n');
+    const trimmedLines = str
+      .split("\n")
+      .map((l) => l.trim())
+      .join("\n");
     if (trimmedLines !== str && this.countOccurrences(serializedTool, trimmedLines) === 1) {
       return trimmedLines;
     }
@@ -173,12 +189,15 @@ ${availableIntegrationIds.join(', ')}
    * - Each old_string must be unique (appear exactly once)
    * - Automatically normalizes strings with newlines for JSON matching
    */
-  private validateDiffs(diffs: ToolDiff[], serializedTool: string): { valid: boolean; error?: string; normalizedDiffs?: ToolDiff[] } {
+  private validateDiffs(
+    diffs: ToolDiff[],
+    serializedTool: string,
+  ): { valid: boolean; error?: string; normalizedDiffs?: ToolDiff[] } {
     const normalizedDiffs: ToolDiff[] = [];
-    
+
     for (let i = 0; i < diffs.length; i++) {
       const diff = diffs[i];
-      
+
       if (!diff.old_string) {
         return { valid: false, error: `Diff ${i + 1}: old_string cannot be empty` };
       }
@@ -186,18 +205,25 @@ ${availableIntegrationIds.join(', ')}
       let occurrences = this.countOccurrences(serializedTool, diff.old_string);
       let normalizedOldString = diff.old_string;
       let normalizedNewString = diff.new_string;
-      
+
       // If not found, try normalizing for JSON string escaping
       if (occurrences === 0) {
         const normalized = this.tryNormalizeForJsonString(diff.old_string, serializedTool);
         if (normalized) {
           normalizedOldString = normalized;
           // Also escape the new_string if it contains newlines
-          if (diff.new_string.includes('\n')) {
-            normalizedNewString = diff.new_string.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+          if (diff.new_string.includes("\n")) {
+            normalizedNewString = diff.new_string
+              .replace(/\n/g, "\\n")
+              .replace(/\r/g, "\\r")
+              .replace(/\t/g, "\\t");
           }
           occurrences = 1;
-          logMessage('info', `Diff ${i + 1}: Auto-normalized string escaping for JSON match`, this.metadata);
+          logMessage(
+            "info",
+            `Diff ${i + 1}: Auto-normalized string escaping for JSON match`,
+            this.metadata,
+          );
         }
       }
 
@@ -207,20 +233,20 @@ ${availableIntegrationIds.join(', ')}
         if (fuzzyMatch) {
           normalizedOldString = fuzzyMatch;
           occurrences = 1;
-          logMessage('info', `Diff ${i + 1}: Found fuzzy match for old_string`, this.metadata);
+          logMessage("info", `Diff ${i + 1}: Found fuzzy match for old_string`, this.metadata);
         }
       }
-      
+
       if (occurrences === 0) {
         // Provide a more helpful error message with actual content hint
-        const hasNewlines = diff.old_string.includes('\n');
-        const hint = hasNewlines 
-          ? ' Note: Your old_string contains actual newlines. In JSON strings, newlines must be escaped as \\n (backslash-n).'
-          : '';
-        
+        const hasNewlines = diff.old_string.includes("\n");
+        const hint = hasNewlines
+          ? " Note: Your old_string contains actual newlines. In JSON strings, newlines must be escaped as \\n (backslash-n)."
+          : "";
+
         // Try to find what the LLM might have been looking for
         const searchKey = diff.old_string.match(/"(\w+)":\s*/)?.[1];
-        let contextHint = '';
+        let contextHint = "";
         if (searchKey) {
           const keyPattern = `"${searchKey}":`;
           const keyIdx = serializedTool.indexOf(keyPattern);
@@ -229,23 +255,23 @@ ${availableIntegrationIds.join(', ')}
             contextHint = ` The key "${searchKey}" exists. Actual content starts with: ${actualContent}...`;
           }
         }
-        
-        return { 
-          valid: false, 
-          error: `Diff ${i + 1}: old_string not found in tool JSON. The string "${diff.old_string.substring(0, 100)}${diff.old_string.length > 100 ? '...' : ''}" does not exist.${hint}${contextHint}` 
+
+        return {
+          valid: false,
+          error: `Diff ${i + 1}: old_string not found in tool JSON. The string "${diff.old_string.substring(0, 100)}${diff.old_string.length > 100 ? "..." : ""}" does not exist.${hint}${contextHint}`,
         };
       }
-      
+
       if (occurrences > 1) {
-        return { 
-          valid: false, 
-          error: `Diff ${i + 1}: old_string is not unique (found ${occurrences} occurrences). Include more surrounding context to make it unique.` 
+        return {
+          valid: false,
+          error: `Diff ${i + 1}: old_string is not unique (found ${occurrences} occurrences). Include more surrounding context to make it unique.`,
         };
       }
-      
+
       normalizedDiffs.push({
         old_string: normalizedOldString,
-        new_string: normalizedNewString
+        new_string: normalizedNewString,
       });
     }
 
@@ -279,15 +305,19 @@ ${availableIntegrationIds.join(', ')}
   /**
    * Parse the modified JSON back to a Tool object and validate it
    */
-  private parseAndValidateTool(modifiedJson: string): { valid: boolean; tool?: Tool; error?: string } {
+  private parseAndValidateTool(modifiedJson: string): {
+    valid: boolean;
+    tool?: Tool;
+    error?: string;
+  } {
     try {
       const parsed = JSON.parse(modifiedJson);
-      
+
       // Basic validation
-      if (!parsed.id || typeof parsed.id !== 'string') {
+      if (!parsed.id || typeof parsed.id !== "string") {
         return { valid: false, error: "Tool must have a valid 'id' string" };
       }
-      
+
       if (!Array.isArray(parsed.steps)) {
         return { valid: false, error: "Tool must have a 'steps' array" };
       }
@@ -302,8 +332,15 @@ ${availableIntegrationIds.join(', ')}
         if (!step.apiConfig) {
           return { valid: false, error: `Step ${i + 1} (${step.id}): missing 'apiConfig'` };
         }
-        if (step.integrationId && availableIntegrationIds.length > 0 && !availableIntegrationIds.includes(step.integrationId)) {
-          return { valid: false, error: `Step ${i + 1} (${step.id}): invalid integrationId '${step.integrationId}'. Available: ${availableIntegrationIds.join(', ')}` };
+        if (
+          step.integrationId &&
+          availableIntegrationIds.length > 0 &&
+          !availableIntegrationIds.includes(step.integrationId)
+        ) {
+          return {
+            valid: false,
+            error: `Step ${i + 1} (${step.id}): invalid integrationId '${step.integrationId}'. Available: ${availableIntegrationIds.join(", ")}`,
+          };
         }
       }
 
@@ -325,12 +362,16 @@ ${availableIntegrationIds.join(', ')}
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        logMessage('info', `Fixing tool${attempt > 0 ? ` (attempt ${attempt + 1}/${maxRetries})` : ''}`, this.metadata);
+        logMessage(
+          "info",
+          `Fixing tool${attempt > 0 ? ` (attempt ${attempt + 1}/${maxRetries})` : ""}`,
+          this.metadata,
+        );
 
         if (attempt > 0 && lastAttemptError) {
           messages.push({
             role: "user",
-            content: `The previous diff attempt failed: "${lastAttemptError}". Please fix this issue and try again with corrected diffs.`
+            content: `The previous diff attempt failed: "${lastAttemptError}". Please fix this issue and try again with corrected diffs.`,
           } as LLMMessage);
         }
 
@@ -338,7 +379,7 @@ ${availableIntegrationIds.join(', ')}
           messages,
           schema: this.diffSchemaJson,
           temperature: 0.0,
-          metadata: this.metadata
+          metadata: this.metadata,
         });
 
         messages = generateDiffResult.messages;
@@ -360,7 +401,7 @@ ${availableIntegrationIds.join(', ')}
           }
           return {
             old_string: d.old_string,
-            new_string: d.new_string ?? ''
+            new_string: d.new_string ?? "",
           };
         });
 
@@ -393,22 +434,24 @@ ${availableIntegrationIds.join(', ')}
           updatedAt: new Date(),
         };
 
-        logMessage('info', `Tool fixed successfully with ${diffs.length} diff(s)`, this.metadata);
+        logMessage("info", `Tool fixed successfully with ${diffs.length} diff(s)`, this.metadata);
 
         return {
           tool: fixedTool,
-          diffs: appliedDiffs
+          diffs: appliedDiffs,
         };
-
       } catch (error: any) {
         lastAttemptError = error.message;
-        logMessage('error', `Error during tool fix attempt ${attempt + 1}: ${error.message}`, this.metadata);
+        logMessage(
+          "error",
+          `Error during tool fix attempt ${attempt + 1}: ${error.message}`,
+          this.metadata,
+        );
       }
     }
 
     const finalErrorMsg = `Tool fix failed after ${maxRetries} attempts. Last error: ${lastAttemptError}`;
-    logMessage('error', finalErrorMsg, this.metadata);
+    logMessage("error", finalErrorMsg, this.metadata);
     throw new Error(finalErrorMsg);
   }
 }
-

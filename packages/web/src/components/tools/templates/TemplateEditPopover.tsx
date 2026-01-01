@@ -1,34 +1,35 @@
-import { Button } from '@/src/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/src/components/ui/dialog';
-import { Label } from '@/src/components/ui/label';
+import { Button } from "@/src/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/src/components/ui/dialog";
+import { Label } from "@/src/components/ui/label";
 import {
   Popover,
   PopoverAnchor,
   PopoverContent,
   PopoverTrigger,
-} from '@/src/components/ui/popover';
-import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { HelpTooltip } from '@/src/components/utils/HelpTooltip';
-import { useMonacoTheme } from '@/src/hooks/useMonacoTheme';
-import { DEFAULT_CODE_TEMPLATE, extractCredentials, formatValueForDisplay, normalizeTemplateExpression } from '@/src/lib/templating-utils';
-import Editor from '@monaco-editor/react';
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import { isArrowFunction, maskCredentials } from '@superglue/shared';
-import { AlertCircle, Download, Eye, EyeOff, Loader2, Maximize2, Minimize2 } from 'lucide-react';
-import type * as Monaco from 'monaco-editor';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { useTemplatePreview } from '../hooks/use-template-preview';
-import { CopyButton } from '../shared/CopyButton';
+} from "@/src/components/ui/popover";
+import { Tabs, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
+import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
+import { useMonacoTheme } from "@/src/hooks/useMonacoTheme";
+import {
+  DEFAULT_CODE_TEMPLATE,
+  extractCredentials,
+  formatValueForDisplay,
+  normalizeTemplateExpression,
+} from "@/src/lib/templating-utils";
+import Editor from "@monaco-editor/react";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { isArrowFunction, maskCredentials } from "@superglue/shared";
+import { AlertCircle, Download, Eye, EyeOff, Loader2, Maximize2, Minimize2 } from "lucide-react";
+import type * as Monaco from "monaco-editor";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useTemplatePreview } from "../hooks/use-template-preview";
+import { CopyButton } from "../shared/CopyButton";
 
-const TEMPLATE_POPOVER_OPEN_EVENT = 'template-popover-open';
-const TEMPLATE_POPOVER_CLOSE_ALL_EVENT = 'template-popover-close-all';
+const TEMPLATE_POPOVER_OPEN_EVENT = "template-popover-open";
+const TEMPLATE_POPOVER_CLOSE_ALL_EVENT = "template-popover-close-all";
 
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
       window.dispatchEvent(new CustomEvent(TEMPLATE_POPOVER_CLOSE_ALL_EVENT));
     }
@@ -42,26 +43,26 @@ const LINE_HEIGHT_PX = 19;
 const EDITOR_PADDING_PX = 16;
 const MIN_EDITOR_HEIGHT_PX = 40;
 const DEFAULT_CODE_HEIGHT_PX = 80;
-const MAX_CODE_HEIGHT_VH = 0.20;
+const MAX_CODE_HEIGHT_VH = 0.2;
 const MAX_PREVIEW_HEIGHT_VH = 0.15;
 const MODAL_CODE_HEIGHT_VH = 0.35;
-const MODAL_PREVIEW_HEIGHT_VH = 0.30;
+const MODAL_PREVIEW_HEIGHT_VH = 0.3;
 const CHARS_PER_LINE_ESTIMATE = 100;
 
 const MONACO_OPTIONS: Monaco.editor.IStandaloneEditorConstructionOptions = {
   minimap: { enabled: false },
   fontSize: 12,
-  lineNumbers: 'on',
+  lineNumbers: "on",
   lineNumbersMinChars: 3,
   glyphMargin: false,
   folding: false,
   scrollBeyondLastLine: false,
-  wordWrap: 'on',
+  wordWrap: "on",
   contextmenu: false,
-  renderLineHighlight: 'none',
+  renderLineHighlight: "none",
   scrollbar: {
-    vertical: 'auto',
-    horizontal: 'hidden',
+    vertical: "auto",
+    horizontal: "hidden",
     verticalScrollbarSize: 6,
     horizontalScrollbarSize: 6,
   },
@@ -77,12 +78,15 @@ const MONACO_OPTIONS: Monaco.editor.IStandaloneEditorConstructionOptions = {
 };
 
 const calcHeight = (content: string, maxHeight: number): number => {
-  const lines = (content || '').split('\n');
+  const lines = (content || "").split("\n");
   let totalLines = 0;
   for (const line of lines) {
     totalLines += Math.max(1, Math.ceil(line.length / CHARS_PER_LINE_ESTIMATE));
   }
-  return Math.min(maxHeight, Math.max(MIN_EDITOR_HEIGHT_PX, totalLines * LINE_HEIGHT_PX + EDITOR_PADDING_PX));
+  return Math.min(
+    maxHeight,
+    Math.max(MIN_EDITOR_HEIGHT_PX, totalLines * LINE_HEIGHT_PX + EDITOR_PADDING_PX),
+  );
 };
 
 interface TemplateEditPopoverProps {
@@ -112,7 +116,7 @@ export function TemplateEditPopover({
   onOpenChange,
   anchorRect,
   loopMode = false,
-  title = 'Template Expression',
+  title = "Template Expression",
   helpText,
   sourceDataVersion,
 }: TemplateEditPopoverProps) {
@@ -121,21 +125,24 @@ export function TemplateEditPopover({
   const isControlled = externalOpen !== undefined;
   const open = isControlled ? externalOpen : internalOpen;
   const popoverId = useId();
-  
-  const setOpen = useCallback((newOpen: boolean) => {
-    if (isControlled) {
-      onExternalOpenChange?.(newOpen);
-    } else {
-      setInternalOpen(newOpen);
-    }
-    onOpenChange?.(newOpen);
-    if (!newOpen) {
-      setIsFullscreen(false);
-    }
-    if (newOpen) {
-      window.dispatchEvent(new CustomEvent(TEMPLATE_POPOVER_OPEN_EVENT, { detail: popoverId }));
-    }
-  }, [isControlled, onExternalOpenChange, onOpenChange, popoverId]);
+
+  const setOpen = useCallback(
+    (newOpen: boolean) => {
+      if (isControlled) {
+        onExternalOpenChange?.(newOpen);
+      } else {
+        setInternalOpen(newOpen);
+      }
+      onOpenChange?.(newOpen);
+      if (!newOpen) {
+        setIsFullscreen(false);
+      }
+      if (newOpen) {
+        window.dispatchEvent(new CustomEvent(TEMPLATE_POPOVER_OPEN_EVENT, { detail: popoverId }));
+      }
+    },
+    [isControlled, onExternalOpenChange, onOpenChange, popoverId],
+  );
 
   useEffect(() => {
     const handleOtherOpen = (e: Event) => {
@@ -150,29 +157,32 @@ export function TemplateEditPopover({
     };
   }, [setOpen, popoverId]);
 
-  const templateContent = template.replace(/^<<|>>$/g, '');
+  const templateContent = template.replace(/^<<|>>$/g, "");
   const { theme, onMount } = useMonacoTheme();
-  
+
   const [codeContent, setCodeContent] = useState(DEFAULT_CODE_TEMPLATE);
   const [showCredentials, setShowCredentials] = useState(false);
-  const [previewTab, setPreviewTab] = useState<'expression' | 'currentItem'>('currentItem');
+  const [previewTab, setPreviewTab] = useState<"expression" | "currentItem">("currentItem");
   const [codeEditorHeight, setCodeEditorHeight] = useState(DEFAULT_CODE_HEIGHT_PX);
   const codeEditorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
-  
+
   const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
     codeContent,
     sourceData,
-    { enabled: open && canExecute, sourceDataVersion }
+    { enabled: open && canExecute, sourceDataVersion },
   );
 
-  const handleEditorMount = useCallback((editor: Monaco.editor.IStandaloneCodeEditor) => {
-    codeEditorRef.current = editor;
-    onMount(editor);
-    setTimeout(() => {
-      editor.getAction('editor.action.formatDocument')?.run();
-      editor.setScrollPosition({ scrollTop: 0 });
-    }, 100);
-  }, [onMount]);
+  const handleEditorMount = useCallback(
+    (editor: Monaco.editor.IStandaloneCodeEditor) => {
+      codeEditorRef.current = editor;
+      onMount(editor);
+      setTimeout(() => {
+        editor.getAction("editor.action.formatDocument")?.run();
+        editor.setScrollPosition({ scrollTop: 0 });
+      }, 100);
+    },
+    [onMount],
+  );
 
   useEffect(() => {
     if (open) {
@@ -189,7 +199,7 @@ export function TemplateEditPopover({
       const calculatedHeight = calcHeight(initialCode, maxCodeHeight);
       setCodeEditorHeight(Math.max(DEFAULT_CODE_HEIGHT_PX, calculatedHeight));
       setTimeout(() => {
-        codeEditorRef.current?.getAction('editor.action.formatDocument')?.run();
+        codeEditorRef.current?.getAction("editor.action.formatDocument")?.run();
         codeEditorRef.current?.setScrollPosition({ scrollTop: 0 });
       }, 150);
     }
@@ -202,10 +212,10 @@ export function TemplateEditPopover({
   };
 
   const handleDownload = () => {
-    const downloadContent = (showRevealButton && showCredentials) ? previewDisplayRaw : maskedPreview;
-    const blob = new Blob([downloadContent], { type: 'text/plain' });
+    const downloadContent = showRevealButton && showCredentials ? previewDisplayRaw : maskedPreview;
+    const blob = new Blob([downloadContent], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = `template-result.txt`;
     a.click();
@@ -213,16 +223,18 @@ export function TemplateEditPopover({
   };
 
   const credentials = extractCredentials(sourceData);
-  
+
   const isLoopArray = loopMode && Array.isArray(previewValue) && previewValue.length > 0;
   const currentItemValue = isLoopArray ? previewValue[0] : previewValue;
-  const activePreviewValue = (loopMode && previewTab === 'currentItem') ? currentItemValue : previewValue;
-  
+  const activePreviewValue =
+    loopMode && previewTab === "currentItem" ? currentItemValue : previewValue;
+
   const isLoading = isEvaluating || !hasResult;
-  const previewDisplayRaw = isLoading ? '' : formatValueForDisplay(activePreviewValue);
-  const maskedPreview = Object.keys(credentials).length > 0 
-    ? maskCredentials(previewDisplayRaw, credentials) 
-    : previewDisplayRaw;
+  const previewDisplayRaw = isLoading ? "" : formatValueForDisplay(activePreviewValue);
+  const maskedPreview =
+    Object.keys(credentials).length > 0
+      ? maskCredentials(previewDisplayRaw, credentials)
+      : previewDisplayRaw;
   const credentialsAreMasked = maskedPreview !== previewDisplayRaw;
   const isDirectCredentialRef = Object.keys(credentials).includes(templateContent.trim());
   const showRevealButton = credentialsAreMasked && isDirectCredentialRef;
@@ -231,14 +243,14 @@ export function TemplateEditPopover({
   useEffect(() => {
     if (!open) return;
     const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = originalOverflow;
     };
   }, [open]);
 
   const [, forceUpdate] = useState(0);
-  const resolvedAnchorRect = typeof anchorRect === 'function' ? anchorRect() : anchorRect;
+  const resolvedAnchorRect = typeof anchorRect === "function" ? anchorRect() : anchorRect;
 
   useEffect(() => {
     if (resolvedAnchorRect && resolvedAnchorRect.left <= 0 && resolvedAnchorRect.top <= 0 && open) {
@@ -247,46 +259,52 @@ export function TemplateEditPopover({
   }, [resolvedAnchorRect, open, setOpen]);
 
   useEffect(() => {
-    if (!open || typeof anchorRect !== 'function') return;
-    const handleScroll = () => forceUpdate(n => n + 1);
-    window.addEventListener('scroll', handleScroll, true);
-    return () => window.removeEventListener('scroll', handleScroll, true);
+    if (!open || typeof anchorRect !== "function") return;
+    const handleScroll = () => forceUpdate((n) => n + 1);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => window.removeEventListener("scroll", handleScroll, true);
   }, [open, anchorRect]);
 
   const maxPreviewHeightVh = isFullscreen ? MODAL_PREVIEW_HEIGHT_VH : MAX_PREVIEW_HEIGHT_VH;
   const maxPreviewHeight = window.innerHeight * maxPreviewHeightVh;
   const previewEditorHeight = calcHeight(previewDisplay, maxPreviewHeight);
-  const effectiveCodeHeight = isFullscreen ? Math.max(codeEditorHeight, window.innerHeight * MODAL_CODE_HEIGHT_VH) : codeEditorHeight;
-  const effectivePreviewHeight = isFullscreen ? Math.max(previewEditorHeight, window.innerHeight * MODAL_PREVIEW_HEIGHT_VH) : previewEditorHeight;
+  const effectiveCodeHeight = isFullscreen
+    ? Math.max(codeEditorHeight, window.innerHeight * MODAL_CODE_HEIGHT_VH)
+    : codeEditorHeight;
+  const effectivePreviewHeight = isFullscreen
+    ? Math.max(previewEditorHeight, window.innerHeight * MODAL_PREVIEW_HEIGHT_VH)
+    : previewEditorHeight;
 
   const popoverContent = (
     <div className="space-y-4">
       <div>
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1">
-            <Label className="text-xs text-muted-foreground">
-              {title}
-            </Label>
+            <Label className="text-xs text-muted-foreground">{title}</Label>
             {helpText && <HelpTooltip text={helpText} />}
           </div>
           <button
             type="button"
             onClick={() => setIsFullscreen(!isFullscreen)}
             className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted/80 transition-colors"
-            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
           >
-            {isFullscreen ? <Minimize2 className="h-3.5 w-3.5 text-muted-foreground" /> : <Maximize2 className="h-3.5 w-3.5 text-muted-foreground" />}
+            {isFullscreen ? (
+              <Minimize2 className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <Maximize2 className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
           </button>
         </div>
-        <div 
-          className="rounded-md border overflow-hidden relative" 
+        <div
+          className="rounded-md border overflow-hidden relative"
           style={{ height: effectiveCodeHeight }}
         >
           <Editor
             height={effectiveCodeHeight}
             defaultLanguage="javascript"
             value={codeContent}
-            onChange={(val) => setCodeContent(val || '')}
+            onChange={(val) => setCodeContent(val || "")}
             onMount={handleEditorMount}
             options={MONACO_OPTIONS}
             theme={theme}
@@ -298,7 +316,9 @@ export function TemplateEditPopover({
         {codeContent && !isArrowFunction(codeContent) && (
           <div className="text-[10px] text-amber-600 dark:text-amber-400 px-1 pt-1 flex items-center gap-1">
             <span>⚠</span>
-            <span>Code will be auto-wrapped with (sourceData) =&gt; {'{'} ... {'}'} when executed</span>
+            <span>
+              Code will be auto-wrapped with (sourceData) =&gt; {"{"} ... {"}"} when executed
+            </span>
           </div>
         )}
       </div>
@@ -307,10 +327,24 @@ export function TemplateEditPopover({
         <div className="flex items-center justify-between mb-1">
           <Label className="text-xs text-muted-foreground">Preview</Label>
           {isLoopArray && (
-            <Tabs value={previewTab} onValueChange={(v) => setPreviewTab(v as 'expression' | 'currentItem')} className="w-auto">
+            <Tabs
+              value={previewTab}
+              onValueChange={(v) => setPreviewTab(v as "expression" | "currentItem")}
+              className="w-auto"
+            >
               <TabsList className="h-6 p-0.5 rounded-md">
-                <TabsTrigger value="currentItem" className="h-full px-2 text-[10px] rounded-sm data-[state=active]:rounded-sm">Current Item</TabsTrigger>
-                <TabsTrigger value="expression" className="h-full px-2 text-[10px] rounded-sm data-[state=active]:rounded-sm">Iteration Items</TabsTrigger>
+                <TabsTrigger
+                  value="currentItem"
+                  className="h-full px-2 text-[10px] rounded-sm data-[state=active]:rounded-sm"
+                >
+                  Current Item
+                </TabsTrigger>
+                <TabsTrigger
+                  value="expression"
+                  className="h-full px-2 text-[10px] rounded-sm data-[state=active]:rounded-sm"
+                >
+                  Iteration Items
+                </TabsTrigger>
               </TabsList>
             </Tabs>
           )}
@@ -321,12 +355,15 @@ export function TemplateEditPopover({
             <span>Preview available when step inputs are provided</span>
           </div>
         ) : previewError ? (
-          <div className="p-3 bg-destructive/10 rounded-md text-xs text-destructive overflow-auto" style={{ height: effectivePreviewHeight }}>
+          <div
+            className="p-3 bg-destructive/10 rounded-md text-xs text-destructive overflow-auto"
+            style={{ height: effectivePreviewHeight }}
+          >
             {previewError}
           </div>
         ) : (
-          <div 
-            className="relative rounded-md border bg-muted/30 overflow-hidden transition-[height] duration-150" 
+          <div
+            className="relative rounded-md border bg-muted/30 overflow-hidden transition-[height] duration-150"
             style={{ height: effectivePreviewHeight }}
           >
             {isLoading && (
@@ -347,7 +384,7 @@ export function TemplateEditPopover({
                 <button
                   onClick={() => setShowCredentials(!showCredentials)}
                   className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
-                  title={showCredentials ? 'Hide credentials' : 'Show credentials'}
+                  title={showCredentials ? "Hide credentials" : "Show credentials"}
                 >
                   {showCredentials ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                 </button>
@@ -369,7 +406,12 @@ export function TemplateEditPopover({
         <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="h-8 text-xs">
           Cancel
         </Button>
-        <Button size="sm" onClick={handleSave} disabled={!!previewError || !codeContent} className="h-8 text-xs">
+        <Button
+          size="sm"
+          onClick={handleSave}
+          disabled={!!previewError || !codeContent}
+          className="h-8 text-xs"
+        >
           Save
         </Button>
       </div>
@@ -384,7 +426,13 @@ export function TemplateEditPopover({
     avoidCollisions: true,
     collisionPadding: 24,
     sticky: "always" as const,
-    style: { width: POPOVER_WIDTH_PX, maxWidth: '90vw', maxHeight: '70vh', overflowY: 'auto' as const, zIndex: POPOVER_Z_INDEX },
+    style: {
+      width: POPOVER_WIDTH_PX,
+      maxWidth: "90vw",
+      maxHeight: "70vh",
+      overflowY: "auto" as const,
+      zIndex: POPOVER_Z_INDEX,
+    },
     onOpenAutoFocus: (e: Event) => e.preventDefault(),
     onInteractOutside: (e: Event) => e.preventDefault(),
     onPointerDownOutside: (e: Event) => e.preventDefault(),
@@ -402,9 +450,15 @@ export function TemplateEditPopover({
           </Popover>
         )}
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent 
+          <DialogContent
             className="p-4 max-w-none border border-border/60"
-            style={{ width: MODAL_WIDTH_PX, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', zIndex: POPOVER_Z_INDEX }}
+            style={{
+              width: MODAL_WIDTH_PX,
+              maxWidth: "95vw",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              zIndex: POPOVER_Z_INDEX,
+            }}
             onEscapeKeyDown={(e) => e.preventDefault()}
           >
             <VisuallyHidden>
@@ -426,18 +480,16 @@ export function TemplateEditPopover({
         <PopoverAnchor asChild>
           <span
             style={{
-              position: 'fixed',
+              position: "fixed",
               left: resolvedAnchorRect.left,
               top: resolvedAnchorRect.top,
               width: 0,
               height: 0,
-              pointerEvents: 'none',
+              pointerEvents: "none",
             }}
           />
         </PopoverAnchor>
-        <PopoverContent {...popoverProps}>
-          {popoverContent}
-        </PopoverContent>
+        <PopoverContent {...popoverProps}>{popoverContent}</PopoverContent>
       </Popover>
     );
   }
@@ -445,12 +497,8 @@ export function TemplateEditPopover({
   if (children) {
     return (
       <Popover open={open} onOpenChange={setOpen} modal={false}>
-        <PopoverTrigger asChild>
-          {children}
-        </PopoverTrigger>
-        <PopoverContent {...popoverProps}>
-          {popoverContent}
-        </PopoverContent>
+        <PopoverTrigger asChild>{children}</PopoverTrigger>
+        <PopoverContent {...popoverProps}>{popoverContent}</PopoverContent>
       </Popover>
     );
   }

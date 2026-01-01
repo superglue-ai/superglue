@@ -19,6 +19,6 @@ export default async function (payload: any) {
   try {
     return await run(payload);
   } finally {
-    parentPort?.postMessage({ type: 'logs_flushed', runId: payload.runId });
+    parentPort?.postMessage({ type: "logs_flushed", runId: payload.runId });
   }
 }

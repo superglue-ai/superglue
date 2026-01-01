@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { workerManager } from '@/src/workers/worker-manager';
-import { getDataHash } from '@/src/lib/weak-cache';
-import type { TaskType } from '@/src/workers/compute-worker';
+import { useEffect, useRef, useState } from "react";
+import { workerManager } from "@/src/workers/worker-manager";
+import { getDataHash } from "@/src/lib/weak-cache";
+import type { TaskType } from "@/src/workers/compute-worker";
 
 interface UseWorkerComputeResult<T> {
   result: T | null;
@@ -12,13 +12,13 @@ interface UseWorkerComputeResult<T> {
 export function useComputeWorkerCached<T = any>(
   taskType: TaskType,
   data: any,
-  isActive: boolean
+  isActive: boolean,
 ): UseWorkerComputeResult<T> {
   const [result, setResult] = useState<T | null>(null);
   const [isComputing, setIsComputing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const lastDataHashRef = useRef<string>('');
+  const lastDataHashRef = useRef<string>("");
   const lastDataRef = useRef<any>(null);
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export function useComputeWorkerCached<T = any>(
         setIsComputing(false);
       })
       .catch((err) => {
-        setError(err.message || 'Computation failed');
+        setError(err.message || "Computation failed");
         setIsComputing(false);
       });
   }, [data, taskType, isActive]);
@@ -63,4 +63,3 @@ export function useComputeWorkerCached<T = any>(
     error,
   };
 }
-

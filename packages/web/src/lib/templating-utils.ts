@@ -1,10 +1,10 @@
-import { executeWithVMHelpers, isArrowFunction } from '@superglue/shared';
+import { executeWithVMHelpers, isArrowFunction } from "@superglue/shared";
 
-export const DEFAULT_CODE_TEMPLATE = '(sourceData) => { return {} }';
+export const DEFAULT_CODE_TEMPLATE = "(sourceData) => { return {} }";
 const CREDENTIAL_PATTERN = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
 
 export interface TemplatePart {
-  type: 'text' | 'template';
+  type: "text" | "template";
   value: string;
   start: number;
   end: number;
@@ -32,19 +32,19 @@ export function parseTemplateString(input: string): TemplatePart[] {
   while ((match = pattern.exec(input)) !== null) {
     if (match.index > lastIndex) {
       parts.push({
-        type: 'text',
+        type: "text",
         value: input.slice(lastIndex, match.index),
         start: lastIndex,
-        end: match.index
+        end: match.index,
       });
     }
 
     parts.push({
-      type: 'template',
+      type: "template",
       value: match[1].trim(),
       start: match.index,
       end: match.index + match[0].length,
-      rawTemplate: match[0]
+      rawTemplate: match[0],
     });
 
     lastIndex = match.index + match[0].length;
@@ -52,10 +52,10 @@ export function parseTemplateString(input: string): TemplatePart[] {
 
   if (lastIndex < input.length) {
     parts.push({
-      type: 'text',
+      type: "text",
       value: input.slice(lastIndex),
       start: lastIndex,
-      end: input.length
+      end: input.length,
     });
   }
 
@@ -63,15 +63,15 @@ export function parseTemplateString(input: string): TemplatePart[] {
 }
 
 function sanitizeEvaluationResult(value: any): any {
-  if (typeof value === 'function') return '[Function]';
-  if (typeof value === 'symbol') return '[Symbol]';
-  if (typeof value === 'bigint') return value.toString();
-  
+  if (typeof value === "function") return "[Function]";
+  if (typeof value === "symbol") return "[Symbol]";
+  if (typeof value === "bigint") return value.toString();
+
   try {
     JSON.stringify(value);
     return value;
   } catch {
-    return '[Non-serializable Object]';
+    return "[Non-serializable Object]";
   }
 }
 
@@ -79,38 +79,44 @@ export async function executeTemplateCode(code: string, data: any): Promise<any>
   try {
     return executeWithVMHelpers(code, data);
   } catch (error) {
-    throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Code execution failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
 const VALID_IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
 
 function escapeForBracket(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 function buildAccessor(segments: string[]): string {
-  return segments.map(seg => 
-    VALID_IDENTIFIER.test(seg) ? `.${seg}` : `["${escapeForBracket(seg)}"]`
-  ).join('');
+  return segments
+    .map((seg) => (VALID_IDENTIFIER.test(seg) ? `.${seg}` : `["${escapeForBracket(seg)}"]`))
+    .join("");
 }
 
 export function normalizeTemplateExpression(expr: string): string {
   const trimmed = expr.trim();
   if (!trimmed) {
-    throw new Error('Empty template expression');
+    throw new Error("Empty template expression");
   }
   if (isArrowFunction(trimmed)) {
     return trimmed;
   }
-  if (trimmed.startsWith('sourceData.') || trimmed.startsWith('sourceData[') || trimmed === 'sourceData') {
+  if (
+    trimmed.startsWith("sourceData.") ||
+    trimmed.startsWith("sourceData[") ||
+    trimmed === "sourceData"
+  ) {
     return `(sourceData) => ${trimmed}`;
   }
-  if (trimmed.includes('[') && /^[a-zA-Z_$]/.test(trimmed)) {
+  if (trimmed.includes("[") && /^[a-zA-Z_$]/.test(trimmed)) {
     return `(sourceData) => sourceData.${trimmed}`;
   }
-  if (trimmed.includes('.') && !trimmed.includes(' ')) {
-    const segments = trimmed.split('.');
+  if (trimmed.includes(".") && !trimmed.includes(" ")) {
+    const segments = trimmed.split(".");
     const accessor = buildAccessor(segments);
     return `(sourceData) => sourceData${accessor}`;
   }
@@ -121,10 +127,7 @@ export function normalizeTemplateExpression(expr: string): string {
   return `(sourceData) => sourceData["${escapeForBracket(trimmed)}"]`;
 }
 
-export async function evaluateTemplate(
-  expr: string,
-  sourceData: any
-): Promise<EvaluationResult> {
+export async function evaluateTemplate(expr: string, sourceData: any): Promise<EvaluationResult> {
   try {
     const normalizedExpr = normalizeTemplateExpression(expr);
     const result = await executeTemplateCode(normalizedExpr, sourceData);
@@ -134,25 +137,25 @@ export async function evaluateTemplate(
     return {
       success: false,
       value: undefined,
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     };
   }
 }
 
 export function truncateTemplateValue(value: any, maxLength: number = 200): TruncatedValue {
   let stringValue: string;
-  
+
   if (value === undefined) {
-    stringValue = 'undefined';
+    stringValue = "undefined";
   } else if (value === null) {
-    stringValue = 'null';
-  } else if (typeof value === 'string') {
+    stringValue = "null";
+  } else if (typeof value === "string") {
     stringValue = value;
-  } else if (typeof value === 'object') {
+  } else if (typeof value === "object") {
     try {
       stringValue = JSON.stringify(value);
     } catch {
-      stringValue = '[Complex Object]';
+      stringValue = "[Complex Object]";
     }
   } else {
     stringValue = String(value);
@@ -164,48 +167,53 @@ export function truncateTemplateValue(value: any, maxLength: number = 200): Trun
     return {
       display: stringValue,
       truncated: false,
-      originalSize
+      originalSize,
     };
   }
 
   return {
-    display: stringValue.slice(0, maxLength) + '...',
+    display: stringValue.slice(0, maxLength) + "...",
     truncated: true,
-    originalSize
+    originalSize,
   };
 }
 
 export function prepareSourceData(stepData: any, dataSelectorOutput?: any): any {
   const base = { ...(stepData || {}) };
-  
+
   if (dataSelectorOutput !== undefined) {
-    base.currentItem = Array.isArray(dataSelectorOutput) ? dataSelectorOutput[0] : dataSelectorOutput;
+    base.currentItem = Array.isArray(dataSelectorOutput)
+      ? dataSelectorOutput[0]
+      : dataSelectorOutput;
   }
-  
+
   return base;
 }
 
 export function formatValueForDisplay(value: any): string {
-  if (value === undefined) return 'undefined';
-  if (value === null) return 'null';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  
+  if (value === undefined) return "undefined";
+  if (value === null) return "null";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+
   try {
     return JSON.stringify(value, null, 2);
   } catch {
-    return '[Object]';
+    return "[Object]";
   }
 }
 
 export function extractCredentials(data: Record<string, unknown>): Record<string, string> {
-  if (!data || typeof data !== 'object') return {};
-  return Object.entries(data).reduce((acc, [key, value]) => {
-    if (CREDENTIAL_PATTERN.test(key) && typeof value === 'string' && value.length > 0) {
-      acc[key] = value;
-    }
-    return acc;
-  }, {} as Record<string, string>);
+  if (!data || typeof data !== "object") return {};
+  return Object.entries(data).reduce(
+    (acc, [key, value]) => {
+      if (CREDENTIAL_PATTERN.test(key) && typeof value === "string" && value.length > 0) {
+        acc[key] = value;
+      }
+      return acc;
+    },
+    {} as Record<string, string>,
+  );
 }
 
 export interface PaginationConfig {
@@ -231,11 +239,11 @@ export interface CategorizedSources {
 }
 
 export function buildPaginationData(config?: PaginationConfig): Record<string, unknown> {
-  const pageSize = config?.pageSize || '50';
+  const pageSize = config?.pageSize || "50";
   return {
     page: 1,
     offset: 0,
-    cursor: `[cursor from ${config?.cursorPath || 'response'} - evaluated at runtime]`,
+    cursor: `[cursor from ${config?.cursorPath || "response"} - evaluated at runtime]`,
     limit: pageSize,
     pageSize,
   };
@@ -249,16 +257,16 @@ export function buildCategorizedVariables(
     credentials: credentialKeys,
     toolInputs: Object.keys(sources?.manualPayload || {}),
     fileInputs: Object.keys(sources?.filePayloads || {}),
-    currentStepData: ['currentItem'],
+    currentStepData: ["currentItem"],
     previousStepData: Object.keys(sources?.previousStepResults || {}),
-    paginationVariables: ['page', 'offset', 'cursor', 'limit', 'pageSize'],
+    paginationVariables: ["page", "offset", "cursor", "limit", "pageSize"],
   };
 }
 
 export function buildCategorizedSources(
   sources?: Partial<CategorizedSources>,
   currentItem?: Record<string, unknown> | null,
-  paginationData?: Record<string, unknown>
+  paginationData?: Record<string, unknown>,
 ): CategorizedSources {
   return {
     manualPayload: sources?.manualPayload || {},
@@ -270,7 +278,11 @@ export function buildCategorizedSources(
 }
 
 export function deriveCurrentItem(dataSelectorOutput: unknown): Record<string, unknown> | null {
-  if (dataSelectorOutput && typeof dataSelectorOutput === 'object' && !Array.isArray(dataSelectorOutput)) {
+  if (
+    dataSelectorOutput &&
+    typeof dataSelectorOutput === "object" &&
+    !Array.isArray(dataSelectorOutput)
+  ) {
     return dataSelectorOutput as Record<string, unknown>;
   }
   if (Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 0) {
@@ -278,4 +290,3 @@ export function deriveCurrentItem(dataSelectorOutput: unknown): Record<string, u
   }
   return null;
 }
-

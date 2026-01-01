@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { RunsTable } from '@/src/components/runs/RunsTable';
+import { RunsTable } from "@/src/components/runs/RunsTable";
 
 const RunsPage = () => {
   return (

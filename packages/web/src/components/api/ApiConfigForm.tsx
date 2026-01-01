@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useConfig } from '@/src/app/config-context';
-import ApiConfigIdEditModal from '@/src/components/api/ApiConfigIdEditModal';
-import { ApiPlayground } from '@/src/components/api/ApiPlayground';
-import { JsonCodeEditor } from '@/src/components/editors/JsonCodeEditor';
+import { useConfig } from "@/src/app/config-context";
+import ApiConfigIdEditModal from "@/src/components/api/ApiConfigIdEditModal";
+import { ApiPlayground } from "@/src/components/api/ApiPlayground";
+import { JsonCodeEditor } from "@/src/components/editors/JsonCodeEditor";
 import JsonSchemaEditor from "@/src/components/editors/JsonSchemaEditor";
 import {
   AlertDialog,
@@ -39,12 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/src/components/ui/select";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/src/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { Textarea } from "@/src/components/ui/textarea";
 import {
   Tooltip,
@@ -53,18 +48,25 @@ import {
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
 import { useToast } from "@/src/hooks/use-toast";
-import { isJsonEmpty } from '@/src/lib/client-utils';
-import { tokenRegistry } from '@/src/lib/token-registry';
-import { ApiConfig, AuthType, CacheMode, HttpMethod, PaginationType, SuperglueClient } from '@superglue/shared';
-import { ArrowLeft, Info } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import React from 'react';
+import { isJsonEmpty } from "@/src/lib/client-utils";
+import { tokenRegistry } from "@/src/lib/token-registry";
+import {
+  ApiConfig,
+  AuthType,
+  CacheMode,
+  HttpMethod,
+  PaginationType,
+  SuperglueClient,
+} from "@superglue/shared";
+import { ArrowLeft, Info } from "lucide-react";
+import { useRouter } from "next/navigation";
+import React from "react";
 
-const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
-const AUTH_TYPES = ['NONE', 'HEADER', 'QUERY_PARAM', 'OAUTH2'];
-const PAGINATION_TYPES = ['OFFSET_BASED', 'PAGE_BASED', 'CURSOR_BASED', 'DISABLED'];
+const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
+const AUTH_TYPES = ["NONE", "HEADER", "QUERY_PARAM", "OAUTH2"];
+const PAGINATION_TYPES = ["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED", "DISABLED"];
 
-const InfoTooltip = ({ text }: { text: string; }) => (
+const InfoTooltip = ({ text }: { text: string }) => (
   <TooltipProvider delayDuration={100}>
     <Tooltip>
       <TooltipTrigger type="button">
@@ -77,28 +79,27 @@ const InfoTooltip = ({ text }: { text: string; }) => (
   </TooltipProvider>
 );
 
-
-const ApiConfigForm = ({ id }: { id?: string; }) => {
+const ApiConfigForm = ({ id }: { id?: string }) => {
   const router = useRouter();
   const [searchParamsChecked, setSearchParamsChecked] = React.useState(false);
   const { toast } = useToast();
 
   const [formData, setFormData] = React.useState({
-    id: '',
-    urlHost: '',
-    urlPath: '',
-    method: 'auto',
-    instruction: '',
-    queryParams: '',
-    headers: '',
-    body: '',
-    documentationUrl: '',
-    responseSchema: '',
-    responseMapping: '',
-    dataPath: '',
-    authentication: 'auto',
-    paginationType: 'auto',
-    pageSize: ''
+    id: "",
+    urlHost: "",
+    urlPath: "",
+    method: "auto",
+    instruction: "",
+    queryParams: "",
+    headers: "",
+    body: "",
+    documentationUrl: "",
+    responseSchema: "",
+    responseMapping: "",
+    dataPath: "",
+    authentication: "auto",
+    paginationType: "auto",
+    pageSize: "",
   });
 
   const [isAutofilling, setIsAutofilling] = React.useState(false);
@@ -158,11 +159,13 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
     }
 
     if (!formData.id) {
-      formData.id = formData.urlHost
-        .replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, '')  // Remove http:// or https://
-        .replace(/\//g, '')           // Remove all slashes
-        + (formData.urlPath ? formData.urlPath.split('/').pop() : '')
-        + '-' + Math.floor(1000 + Math.random() * 9000);
+      formData.id =
+        formData.urlHost
+          .replace(/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//, "") // Remove http:// or https://
+          .replace(/\//g, "") + // Remove all slashes
+        (formData.urlPath ? formData.urlPath.split("/").pop() : "") +
+        "-" +
+        Math.floor(1000 + Math.random() * 9000);
     }
 
     try {
@@ -175,7 +178,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
 
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
-        apiKey: tokenRegistry.getToken()
+        apiKey: tokenRegistry.getToken(),
       });
       const response = await superglueClient.upsertApi(formData.id, payload);
       if (!response) {
@@ -192,9 +195,8 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
         description: "Configuration saved successfully",
         variant: "default",
       });
-
     } catch (error) {
-      console.error('Error saving config:', error);
+      console.error("Error saving config:", error);
       toast({
         title: "Error Saving Configuration",
         description: "An error occurred while saving the configuration: " + error,
@@ -203,40 +205,45 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
     }
   };
 
-  const handleChange = (field: string) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string
-  ) => {
-    const value = typeof e === 'string' ? e : e.target.value;
-    setFormData(prev => {
-      const newState = { ...prev, [field]: value };
-      return newState;
-    });
-    setHasUnsavedChanges(true);
+  const handleChange =
+    (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string) => {
+      const value = typeof e === "string" ? e : e.target.value;
+      setFormData((prev) => {
+        const newState = { ...prev, [field]: value };
+        return newState;
+      });
+      setHasUnsavedChanges(true);
 
-    if (field === 'id') {
-      setEditingId(value);
-    }
-  };
+      if (field === "id") {
+        setEditingId(value);
+      }
+    };
 
   const handleApiRun = (runConfig: ApiConfig) => {
     // Update form data based on the config used in the playground run
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev, // Keep existing form data
       id: runConfig.id || prev.id, // Update ID if changed (though unlikely here)
       urlHost: runConfig.urlHost || prev.urlHost,
       urlPath: runConfig.urlPath || prev.urlPath,
       method: runConfig.method || prev.method,
       // instruction: runConfig.instruction || prev.instruction, // Instruction likely doesn't change on run
-      queryParams: runConfig.queryParams ? JSON.stringify(runConfig.queryParams, null, 2) : prev.queryParams,
+      queryParams: runConfig.queryParams
+        ? JSON.stringify(runConfig.queryParams, null, 2)
+        : prev.queryParams,
       headers: runConfig.headers ? JSON.stringify(runConfig.headers, null, 2) : prev.headers,
       body: runConfig.body || prev.body,
       // documentationUrl: runConfig.documentationUrl || prev.documentationUrl, // Doc URL unlikely to change
-      responseSchema: runConfig.responseSchema ? JSON.stringify(runConfig.responseSchema, null, 2) : prev.responseSchema,
+      responseSchema: runConfig.responseSchema
+        ? JSON.stringify(runConfig.responseSchema, null, 2)
+        : prev.responseSchema,
       responseMapping: runConfig.responseMapping || prev.responseMapping,
       dataPath: runConfig.dataPath || prev.dataPath,
       authentication: runConfig.authentication || prev.authentication,
       paginationType: runConfig.pagination?.type || prev.paginationType,
-      pageSize: runConfig.pagination?.pageSize ? String(runConfig.pagination.pageSize) : prev.pageSize,
+      pageSize: runConfig.pagination?.pageSize
+        ? String(runConfig.pagination.pageSize)
+        : prev.pageSize,
     }));
   };
 
@@ -248,30 +255,30 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
     try {
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
-        apiKey: tokenRegistry.getToken()
+        apiKey: tokenRegistry.getToken(),
       });
       const data = await superglueClient.getApi(editingId);
       setFormData({
         id: data.id,
         urlHost: data.urlHost,
         instruction: data.instruction,
-        urlPath: data.urlPath || '',
-        method: data.method || 'auto',
+        urlPath: data.urlPath || "",
+        method: data.method || "auto",
         queryParams: JSON.stringify(data.queryParams || {}, null, 2),
         headers: JSON.stringify(data.headers || {}, null, 2),
-        body: data.body || '',
-        documentationUrl: data.documentationUrl || '',
+        body: data.body || "",
+        documentationUrl: data.documentationUrl || "",
         responseSchema: JSON.stringify(data.responseSchema || {}, null, 2),
-        responseMapping: data.responseMapping || '',
-        dataPath: data.dataPath || '',
-        authentication: data.authentication || 'auto',
-        paginationType: data.pagination?.type || 'auto',
-        pageSize: String(data.pagination?.pageSize || "")
+        responseMapping: data.responseMapping || "",
+        dataPath: data.dataPath || "",
+        authentication: data.authentication || "auto",
+        paginationType: data.pagination?.type || "auto",
+        pageSize: String(data.pagination?.pageSize || ""),
       });
 
       setSearchParamsChecked(true);
     } catch (error) {
-      console.error('Error fetching config:', error);
+      console.error("Error fetching config:", error);
     }
   };
 
@@ -285,15 +292,21 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
       queryParams: isJsonEmpty(formData.queryParams) ? null : JSON.parse(formData.queryParams),
       body: formData.body,
       dataPath: formData.dataPath,
-      method: formData.method !== "auto" ? formData.method as HttpMethod : null,
-      authentication: formData.authentication !== "auto" ? formData.authentication as AuthType : null,
-      responseSchema: isJsonEmpty(formData.responseSchema) ? null : JSON.parse(formData.responseSchema),
+      method: formData.method !== "auto" ? (formData.method as HttpMethod) : null,
+      authentication:
+        formData.authentication !== "auto" ? (formData.authentication as AuthType) : null,
+      responseSchema: isJsonEmpty(formData.responseSchema)
+        ? null
+        : JSON.parse(formData.responseSchema),
       responseMapping: formData.responseMapping ? String(formData.responseMapping) : null,
       documentationUrl: formData.documentationUrl,
-      pagination: formData.paginationType !== "auto" ? {
-        type: formData.paginationType as PaginationType,
-        pageSize: formData.pageSize || null
-      } : null
+      pagination:
+        formData.paginationType !== "auto"
+          ? {
+              type: formData.paginationType as PaginationType,
+              pageSize: formData.pageSize || null,
+            }
+          : null,
     };
     return config;
   };
@@ -324,15 +337,15 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
       }
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
-        apiKey: tokenRegistry.getToken()
+        apiKey: tokenRegistry.getToken(),
       });
 
       const response = await superglueClient.call({
         endpoint: buildEndpointConfig(formData),
         credentials: parsedCredentials,
         options: {
-          cacheMode: CacheMode.DISABLED
-        }
+          cacheMode: CacheMode.DISABLED,
+        },
       });
       if (response.error) {
         throw new Error(response.error);
@@ -342,27 +355,27 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
       const config = response.config as ApiConfig;
       if (config) {
         setFormData({
-          id: formData.id || config.id || '',
-          urlHost: config.urlHost || '',
-          urlPath: config.urlPath || '',
-          method: config.method || 'auto',
-          instruction: config.instruction || '',
+          id: formData.id || config.id || "",
+          urlHost: config.urlHost || "",
+          urlPath: config.urlPath || "",
+          method: config.method || "auto",
+          instruction: config.instruction || "",
           queryParams: JSON.stringify(config.queryParams || {}, null, 2),
           headers: JSON.stringify(config.headers || {}, null, 2),
-          body: config.body || '',
-          documentationUrl: config.documentationUrl || '',
+          body: config.body || "",
+          documentationUrl: config.documentationUrl || "",
           responseSchema: JSON.stringify(config.responseSchema || {}, null, 2),
-          responseMapping: config.responseMapping || '',
-          dataPath: config.dataPath || '',
-          authentication: config.authentication || 'auto',
-          paginationType: config.pagination?.type || 'auto',
-          pageSize: String(config.pagination?.pageSize || '')
+          responseMapping: config.responseMapping || "",
+          dataPath: config.dataPath || "",
+          authentication: config.authentication || "auto",
+          paginationType: config.pagination?.type || "auto",
+          pageSize: String(config.pagination?.pageSize || ""),
         });
       }
 
       setIsAutofillDialogOpen(false);
     } catch (error: any) {
-      console.error('Error during autofill:', error);
+      console.error("Error during autofill:", error);
       toast({
         title: "Autofill Failed",
         description: error?.message || "An error occurred while autofilling the configuration",
@@ -393,7 +406,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
 
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
-        apiKey: tokenRegistry.getToken()
+        apiKey: tokenRegistry.getToken(),
       });
       await superglueClient.upsertApi(formData.id, payload);
       setHasUnsavedChanges(false);
@@ -405,7 +418,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
         variant: "default",
       });
     } catch (error) {
-      console.error('Error saving config:', error);
+      console.error("Error saving config:", error);
       toast({
         title: "Error Saving Configuration",
         description: "An error occurred while saving the configuration: " + error,
@@ -420,11 +433,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
 
   return (
     <div className="p-8 max-w-none w-full min-h-full">
-      <Button
-        variant="ghost"
-        onClick={() => router.push('/configs')}
-        className="mb-4"
-      >
+      <Button variant="ghost" onClick={() => router.push("/configs")} className="mb-4">
         <ArrowLeft className="mr-2 h-4 w-4" />
         Back
       </Button>
@@ -432,10 +441,8 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
       <form onSubmit={handleSubmit} className="h-full">
         <Card className="mb-6 h-[calc(100vh-12rem)]">
           <CardHeader>
-            <CardTitle>{editingId ? 'Edit' : 'Create'} API Configuration</CardTitle>
-            <CardDescription>
-              Configure the API endpoint and its behavior
-            </CardDescription>
+            <CardTitle>{editingId ? "Edit" : "Create"} API Configuration</CardTitle>
+            <CardDescription>Configure the API endpoint and its behavior</CardDescription>
           </CardHeader>
           <CardContent className="h-[calc(100%-5rem)]">
             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full h-full">
@@ -444,11 +451,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                 <TabsTrigger value="request">Request</TabsTrigger>
                 <TabsTrigger value="responseMapping">Response Mapping</TabsTrigger>
                 <TabsTrigger value="advanced">Advanced</TabsTrigger>
-                {editingId && (
-                  <TabsTrigger value="test">
-                    Run
-                  </TabsTrigger>
-                )}
+                {editingId && <TabsTrigger value="test">Run</TabsTrigger>}
               </TabsList>
 
               <div className="overflow-y-auto h-[calc(100%-4rem)]">
@@ -464,7 +467,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                           <Input
                             id="id"
                             value={formData.id}
-                            onChange={handleChange('id')}
+                            onChange={handleChange("id")}
                             placeholder="unique-identifier"
                             disabled={!!editingId}
                             className={`${editingId ? "disabled:opacity-100" : ""} ${editingId ? "rounded-r-none" : ""}`}
@@ -504,7 +507,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                         <Input
                           id="urlHost"
                           value={formData.urlHost}
-                          onChange={handleChange('urlHost')}
+                          onChange={handleChange("urlHost")}
                           placeholder="https://api.example.com"
                           required
                         />
@@ -518,7 +521,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                         <Textarea
                           id="instruction"
                           value={formData.instruction}
-                          onChange={handleChange('instruction')}
+                          onChange={handleChange("instruction")}
                           placeholder="Get a list of all available products."
                           className="h-full"
                           required
@@ -529,7 +532,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                     <div className="h-full overflow-y-hidden">
                       <JsonSchemaEditor
                         value={formData.responseSchema}
-                        onChange={handleChange('responseSchema')}
+                        onChange={handleChange("responseSchema")}
                       />
                     </div>
                   </div>
@@ -545,7 +548,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                       <Input
                         id="urlPath"
                         value={formData.urlPath}
-                        onChange={handleChange('urlPath')}
+                        onChange={handleChange("urlPath")}
                         placeholder="/rest/v1/products"
                       />
                     </div>
@@ -554,16 +557,13 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                         HTTP Method
                         <InfoTooltip text="The HTTP method to use for the request. Select 'Auto' to let the system determine the appropriate method." />
                       </Label>
-                      <Select
-                        value={formData.method}
-                        onValueChange={handleChange('method')}
-                      >
+                      <Select value={formData.method} onValueChange={handleChange("method")}>
                         <SelectTrigger>
                           <SelectValue placeholder="Auto" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="auto">Auto</SelectItem>
-                          {HTTP_METHODS.map(method => (
+                          {HTTP_METHODS.map((method) => (
                             <SelectItem key={method} value={method}>
                               {method}
                             </SelectItem>
@@ -579,7 +579,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                       </Label>
                       <JsonCodeEditor
                         value={formData.headers}
-                        onChange={handleChange('headers')}
+                        onChange={handleChange("headers")}
                         minHeight="128px"
                         maxHeight="128px"
                         showValidation={true}
@@ -593,7 +593,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                       </Label>
                       <JsonCodeEditor
                         value={formData.queryParams}
-                        onChange={handleChange('queryParams')}
+                        onChange={handleChange("queryParams")}
                         minHeight="128px"
                         maxHeight="128px"
                         showValidation={true}
@@ -608,7 +608,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                       <Textarea
                         id="body"
                         value={formData.body}
-                        onChange={handleChange('body')}
+                        onChange={handleChange("body")}
                         placeholder="Request body..."
                         className="h-32 font-mono"
                       />
@@ -626,7 +626,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                       <Input
                         id="dataPath"
                         value={formData.dataPath}
-                        onChange={handleChange('dataPath')}
+                        onChange={handleChange("dataPath")}
                         placeholder="products"
                         className="font-mono"
                       />
@@ -639,7 +639,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                       <Textarea
                         id="responseMapping"
                         value={formData.responseMapping}
-                        onChange={handleChange('responseMapping')}
+                        onChange={handleChange("responseMapping")}
                         placeholder="$.data"
                         className="h-48 font-mono"
                       />
@@ -657,7 +657,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                       <Input
                         id="documentationUrl"
                         value={formData.documentationUrl}
-                        onChange={handleChange('documentationUrl')}
+                        onChange={handleChange("documentationUrl")}
                         placeholder="https://docs.example.com"
                       />
                     </div>
@@ -672,14 +672,14 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                           </Label>
                           <Select
                             value={formData.authentication}
-                            onValueChange={handleChange('authentication')}
+                            onValueChange={handleChange("authentication")}
                           >
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="auto">Auto</SelectItem>
-                              {AUTH_TYPES.map(type => (
+                              {AUTH_TYPES.map((type) => (
                                 <SelectItem key={type} value={type}>
                                   {type}
                                 </SelectItem>
@@ -700,14 +700,14 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                           </Label>
                           <Select
                             value={formData.paginationType}
-                            onValueChange={handleChange('paginationType')}
+                            onValueChange={handleChange("paginationType")}
                           >
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="auto">Auto</SelectItem>
-                              {PAGINATION_TYPES.map(type => (
+                              {PAGINATION_TYPES.map((type) => (
                                 <SelectItem key={type} value={type}>
                                   {type}
                                 </SelectItem>
@@ -724,9 +724,9 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
                             id="pageSize"
                             type="number"
                             value={formData.pageSize}
-                            onChange={handleChange('pageSize')}
+                            onChange={handleChange("pageSize")}
                             min="1"
-                            disabled={formData.paginationType === 'DISABLED'}
+                            disabled={formData.paginationType === "DISABLED"}
                           />
                         </div>
                       </div>
@@ -754,29 +754,39 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
         </Card>
 
         <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={() => router.push('/configs')}>
+          <Button type="button" variant="outline" onClick={() => router.push("/configs")}>
             Cancel
           </Button>
-          <Button
-            type="button"
-            onClick={handleAutofill}
-            disabled={isAutofilling}
-          >
+          <Button type="button" onClick={handleAutofill} disabled={isAutofilling}>
             {isAutofilling ? (
               <span className="flex items-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <svg
+                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
                 </svg>
                 Generating...
               </span>
             ) : (
-              'Autofill Configuration'
+              "Autofill Configuration"
             )}
           </Button>
-          <Button type="submit">
-            {editingId ? 'Save' : 'Create'} Configuration
-          </Button>
+          <Button type="submit">{editingId ? "Save" : "Create"} Configuration</Button>
         </div>
       </form>
 
@@ -795,7 +805,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
               <Input
                 id="autofillHost"
                 value={formData.urlHost}
-                onChange={handleChange('urlHost')}
+                onChange={handleChange("urlHost")}
                 placeholder="https://api.example.com"
               />
             </div>
@@ -805,7 +815,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
               <Textarea
                 id="autofillInstruction"
                 value={formData.instruction}
-                onChange={handleChange('instruction')}
+                onChange={handleChange("instruction")}
                 placeholder="Describe what this API configuration does..."
                 rows={3}
               />
@@ -816,7 +826,7 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
               <Input
                 id="autofillDocUrl"
                 value={formData.documentationUrl}
-                onChange={handleChange('documentationUrl')}
+                onChange={handleChange("documentationUrl")}
                 placeholder="https://docs.example.com"
               />
             </div>
@@ -834,50 +844,54 @@ const ApiConfigForm = ({ id }: { id?: string; }) => {
           </div>
 
           <div className="flex justify-end gap-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsAutofillDialogOpen(false)}
-            >
+            <Button type="button" variant="outline" onClick={() => setIsAutofillDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              type="button"
-              onClick={handleAutofillSubmit}
-              disabled={isAutofilling}
-            >
+            <Button type="button" onClick={handleAutofillSubmit} disabled={isAutofilling}>
               {isAutofilling ? (
                 <span className="flex items-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <svg
+                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
                   </svg>
                   Generating...
                 </span>
               ) : (
-                'Generate Configuration'
+                "Generate Configuration"
               )}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog
-        open={showUnsavedChangesDialog}
-        onOpenChange={setShowUnsavedChangesDialog}
-      >
+      <AlertDialog open={showUnsavedChangesDialog} onOpenChange={setShowUnsavedChangesDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Save Configuration?</AlertDialogTitle>
             <AlertDialogDescription>
-              You have unsaved changes. You need to save them to run the configuration. Would you like to save the configuration now?
+              You have unsaved changes. You need to save them to run the configuration. Would you
+              like to save the configuration now?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleSaveAndRun}>
-              Save & Run
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleSaveAndRun}>Save & Run</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

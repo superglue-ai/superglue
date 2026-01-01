@@ -1,21 +1,40 @@
-import { HttpMethod, RequestOptions, ServiceMetadata, ApiConfig as StepConfig } from "@superglue/shared";
-import { Pool, PoolConfig } from 'pg';
+import {
+  HttpMethod,
+  RequestOptions,
+  ServiceMetadata,
+  ApiConfig as StepConfig,
+} from "@superglue/shared";
+import { Pool, PoolConfig } from "pg";
 import { server_defaults } from "../../../default.js";
 import { parseJSON } from "../../../files/index.js";
 import { composeUrl, replaceVariables } from "../../../utils/helpers.js";
 import { logMessage } from "../../../utils/logs.js";
-import { StepExecutionInput, StepExecutionStrategy, StepStrategyExecutionResult } from "../strategy.js";
+import {
+  StepExecutionInput,
+  StepExecutionStrategy,
+  StepStrategyExecutionResult,
+} from "../strategy.js";
 
 export class PostgresStepExecutionStrategy implements StepExecutionStrategy {
-  readonly version = '1.0.0';
+  readonly version = "1.0.0";
 
   async shouldExecute(stepConfig: StepConfig): Promise<boolean> {
-    return stepConfig.method === HttpMethod.POST && (stepConfig.urlHost?.startsWith("postgres://") || stepConfig.urlHost?.startsWith("postgresql://"));
+    return (
+      stepConfig.method === HttpMethod.POST &&
+      (stepConfig.urlHost?.startsWith("postgres://") ||
+        stepConfig.urlHost?.startsWith("postgresql://"))
+    );
   }
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
     const { stepConfig, stepInputData, credentials, requestOptions, metadata } = input;
-    const rows = await callPostgres({ endpoint: stepConfig, payload: stepInputData, credentials, options: requestOptions, metadata });
+    const rows = await callPostgres({
+      endpoint: stepConfig,
+      payload: stepInputData,
+      credentials,
+      options: requestOptions,
+      metadata,
+    });
     return {
       success: true,
       strategyExecutionData: rows,
@@ -67,15 +86,15 @@ function getOrCreatePool(connectionString: string, poolConfig: PoolConfig): Pool
     connectionTimeoutMillis: 5000, // How long to wait for a connection
   });
 
-  pool.on('error', (err) => {
-    console.error('Unexpected pool error:', err);
+  pool.on("error", (err) => {
+    console.error("Unexpected pool error:", err);
     poolCache.delete(cacheKey);
   });
 
   poolCache.set(cacheKey, {
     pool,
     lastUsed: Date.now(),
-    connectionString
+    connectionString,
   });
 
   startCleanupInterval();
@@ -89,24 +108,41 @@ export async function closeAllPools(): Promise<void> {
     cleanupInterval = null;
   }
 
-  const closePromises = Array.from(poolCache.values()).map(entry =>
-    entry.pool.end().catch(console.error)
+  const closePromises = Array.from(poolCache.values()).map((entry) =>
+    entry.pool.end().catch(console.error),
   );
 
   await Promise.all(closePromises);
   poolCache.clear();
 }
 
-export async function callPostgres({ endpoint, payload, credentials, options, metadata }: { endpoint: StepConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata: ServiceMetadata }): Promise<any> {
+export async function callPostgres({
+  endpoint,
+  payload,
+  credentials,
+  options,
+  metadata,
+}: {
+  endpoint: StepConfig;
+  payload: Record<string, any>;
+  credentials: Record<string, any>;
+  options: RequestOptions;
+  metadata: ServiceMetadata;
+}): Promise<any> {
   const requestVars = { ...payload, ...credentials };
-  let connectionString = await replaceVariables(composeUrl(endpoint.urlHost, endpoint.urlPath), requestVars);
-  connectionString = connectionString.replace(/\/+(\?)/, '$1').replace(/\/+$/, '');
+  let connectionString = await replaceVariables(
+    composeUrl(endpoint.urlHost, endpoint.urlPath),
+    requestVars,
+  );
+  connectionString = connectionString.replace(/\/+(\?)/, "$1").replace(/\/+$/, "");
 
   let bodyParsed: any;
   try {
     bodyParsed = parseJSON(await replaceVariables(endpoint.body, requestVars));
   } catch (error) {
-    throw new Error(`Invalid JSON in body: ${error.message} for body: ${JSON.stringify(endpoint.body)}`);
+    throw new Error(
+      `Invalid JSON in body: ${error.message} for body: ${JSON.stringify(endpoint.body)}`,
+    );
   }
   const queryText = bodyParsed.query;
   const queryParams = bodyParsed.params || bodyParsed.values; // Support both 'params' and 'values' keys
@@ -114,9 +150,10 @@ export async function callPostgres({ endpoint, payload, credentials, options, me
   const poolConfig: PoolConfig = {
     connectionString,
     statement_timeout: options?.timeout || server_defaults.POSTGRES.DEFAULT_TIMEOUT,
-    ssl: connectionString.includes('sslmode=') || connectionString.includes('localhost') === false
-      ? { rejectUnauthorized: false }
-      : false
+    ssl:
+      connectionString.includes("sslmode=") || connectionString.includes("localhost") === false
+        ? { rejectUnauthorized: false }
+        : false,
   };
 
   const pool = getOrCreatePool(connectionString, poolConfig);
@@ -125,13 +162,12 @@ export async function callPostgres({ endpoint, payload, credentials, options, me
 
   do {
     try {
-      logMessage("debug", `Executing PostgreSQL query: ${queryText?.split(' ')?.[0]}`, metadata);
+      logMessage("debug", `Executing PostgreSQL query: ${queryText?.split(" ")?.[0]}`, metadata);
       const result = queryParams
         ? await pool.query(queryText, queryParams)
         : await pool.query(queryText);
       return result.rows;
     } catch (error) {
-
       attempts++;
 
       if (attempts > maxRetries) {
@@ -141,11 +177,11 @@ export async function callPostgres({ endpoint, payload, credentials, options, me
             : ` for query: ${queryText}`;
           throw new Error(`PostgreSQL error: ${error.message}${errorContext}`);
         }
-        throw new Error('Unknown PostgreSQL error occurred');
+        throw new Error("Unknown PostgreSQL error occurred");
       }
 
       const retryDelay = options?.retryDelay || server_defaults.POSTGRES.DEFAULT_RETRY_DELAY;
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
+      await new Promise((resolve) => setTimeout(resolve, retryDelay));
     }
   } while (attempts <= maxRetries);
 }

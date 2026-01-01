@@ -1,8 +1,12 @@
 import { ApiConfig } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
-import { GraphQLRequestContext } from '../types.js';
+import { GraphQLRequestContext } from "../types.js";
 
-function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined, defaultValue?: T): T | undefined {
+function resolveField<T>(
+  newValue: T | null | undefined,
+  oldValue: T | undefined,
+  defaultValue?: T,
+): T | undefined {
   if (newValue === null) return undefined;
   if (newValue !== undefined) return newValue;
   if (oldValue !== undefined) return oldValue;
@@ -11,9 +15,9 @@ function resolveField<T>(newValue: T | null | undefined, oldValue: T | undefined
 
 export const upsertApiResolver = async (
   _: any,
-  { id, input }: { id: string; input: ApiConfig; },
+  { id, input }: { id: string; input: ApiConfig },
   context: GraphQLRequestContext,
-  info: GraphQLResolveInfo
+  info: GraphQLResolveInfo,
 ) => {
   if (!id) {
     throw new Error("id is required");
@@ -28,9 +32,9 @@ export const upsertApiResolver = async (
   }
 
   const config = {
-    urlHost: resolveField(input.urlHost, oldConfig?.urlHost, ''),
-    urlPath: resolveField(input.urlPath, oldConfig?.urlPath, ''),
-    instruction: resolveField(input.instruction, oldConfig?.instruction, ''),
+    urlHost: resolveField(input.urlHost, oldConfig?.urlHost, ""),
+    urlPath: resolveField(input.urlPath, oldConfig?.urlPath, ""),
+    instruction: resolveField(input.instruction, oldConfig?.instruction, ""),
     createdAt: resolveField(input.createdAt, oldConfig?.createdAt, new Date()),
     updatedAt: new Date(),
     id: id,
@@ -44,7 +48,7 @@ export const upsertApiResolver = async (
     authentication: resolveField(input.authentication, oldConfig?.authentication),
     pagination: resolveField(input.pagination, oldConfig?.pagination),
     dataPath: resolveField(input.dataPath, oldConfig?.dataPath),
-    version: resolveField(input.version, oldConfig?.version)
+    version: resolveField(input.version, oldConfig?.version),
   };
   await context.datastore.upsertApiConfig({ id, config, orgId: context.orgId });
   return config;

@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useSchedules } from '@/src/app/schedules-context';
+import { useSchedules } from "@/src/app/schedules-context";
 import { Button } from "@/src/components/ui/button";
 import { Tool } from "@superglue/shared";
 import { CloudUpload } from "lucide-react";
@@ -16,11 +16,18 @@ interface DeployButtonProps {
   className?: string;
 }
 
-export function DeployButton({ tool, payload = {}, onBeforeOpen, disabled, size = "sm", className }: DeployButtonProps) {
+export function DeployButton({
+  tool,
+  payload = {},
+  onBeforeOpen,
+  disabled,
+  size = "sm",
+  className,
+}: DeployButtonProps) {
   const { getSchedulesForTool } = useSchedules();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const activeCount = getSchedulesForTool(tool.id).filter(s => s.enabled).length;
+  const activeCount = getSchedulesForTool(tool.id).filter((s) => s.enabled).length;
 
   const handleClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -64,4 +71,3 @@ export function DeployButton({ tool, payload = {}, onBeforeOpen, disabled, size 
     </>
   );
 }
-

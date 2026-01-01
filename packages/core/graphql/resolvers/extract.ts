@@ -4,19 +4,24 @@ import { GraphQLResolveInfo } from "graphql";
 import { parseFile } from "../../files/index.js";
 import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { maskCredentials } from '@superglue/shared';
-import { GraphQLRequestContext, ServiceMetadata } from '../types.js';
+import { maskCredentials } from "@superglue/shared";
+import { GraphQLRequestContext, ServiceMetadata } from "../types.js";
 
 export const extractResolver = async (
   _: any,
-  { input, payload, credentials, options }: {
+  {
+    input,
+    payload,
+    credentials,
+    options,
+  }: {
     input: ExtractInputRequest;
     payload: any;
     credentials: Record<string, string>;
     options: RequestOptions;
   },
   context: GraphQLRequestContext,
-  info: GraphQLResolveInfo
+  info: GraphQLResolveInfo,
 ) => {
   const callId = crypto.randomUUID();
   const startedAt = new Date();
@@ -24,7 +29,7 @@ export const extractResolver = async (
 
   try {
     if (!input.file) {
-      logMessage('error', "Extract call failed. No file provided", metadata);
+      logMessage("error", "Extract call failed. No file provided", metadata);
       return {
         id: callId,
         success: false,
@@ -34,7 +39,7 @@ export const extractResolver = async (
       };
     }
 
-    const { createReadStream, filename } = await input.file as any;
+    const { createReadStream, filename } = (await input.file) as any;
     const stream = createReadStream();
     const chunks: Buffer[] = [];
     for await (const chunk of stream) {

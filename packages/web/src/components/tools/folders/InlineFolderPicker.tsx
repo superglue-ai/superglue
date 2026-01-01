@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { useConfig } from "@/src/app/config-context";
 import { useTools } from "@/src/app/tools-context";
@@ -31,10 +31,5 @@ export function InlineFolderPicker({ tool }: InlineFolderPickerProps) {
     }
   };
 
-  return (
-    <FolderPicker
-      value={tool.folder}
-      onChange={handleFolderChange}
-    />
-  );
+  return <FolderPicker value={tool.folder} onChange={handleFolderChange} />;
 }
