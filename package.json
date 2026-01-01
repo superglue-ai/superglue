@@ -18,7 +18,8 @@
     "test:integration-evals": "npx tsx eval/integration-evals/index.ts",
     "test:sdk": "cd eval/sdk-test && npm install && node run-with-server.js",
     "test:all": "npm run test:unit && npm run test:integration",
-    "lint": "turbo run lint",
+    "lint": "npx prettier --check \"packages/**/*.{ts,tsx,js,jsx,json,md,mdx}\" --ignore-path .gitignore",
+    "lint:fix": "npx prettier --write \"packages/**/*.{ts,tsx,js,jsx,json,md,mdx}\" --ignore-path .gitignore",
     "clean": "turbo run clean",
     "generate-ranking": "tsc && node --max-old-space-size=12288 --expose-gc dist/eval/api-ranking/generate-api-ranking.js"
   },
@@ -40,5 +41,8 @@
     "turbo": "^2.5.6",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
+  },
+  "prettier": {
+    "printWidth": 100
   }
 }
