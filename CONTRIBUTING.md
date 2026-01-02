@@ -13,7 +13,7 @@ The best ways to contribute to superglue:
 
 We welcome contributions through GitHub pull requests. This document outlines our conventions regarding contributions, areas where we actively encourage contributions, development workflow and other resources. Our goal is to engage with the open-source community and to ensure that your contributions are accepted quickly, while ensuring high quality of contributions.
 
-We gratefully welcome improvements to [documentation](https://docs.superglue.cloud/introduction), the core application (this repo) and our [SDK](https://github.com/superglue-ai/superglue-js). We especially encourage contributions that address bugs and/or improve performance in the core application. We discourage contributions to the web package that are purely cosmetic, unless this contribution references an approved open issue.
+We gratefully welcome improvements to [documentation](https://docs.superglue.cloud/getting-started/introduction), the core application (this repo) and our [SDK](https://github.com/superglue-ai/superglue-js). We especially encourage contributions that address bugs and/or improve performance in the core application. We discourage contributions to the web package that are purely cosmetic, unless this contribution references an approved open issue.
 
 In case you have any questions, feel free to join our [discord](<(https://discord.gg/vUKnuhHtfW)>) and come talk to us
 
@@ -45,7 +45,7 @@ Once we've discussed your changes and you've got your code ready, make sure that
 
 ### Architecture Overview
 
-See this [diagram](https://docs.superglue.cloud/guides/architecture) for an overview of the architecture.
+For an overview of Superglue’s architecture and foundational concepts, see the [Core Concepts](https://docs.superglue.cloud/getting-started/core-concepts) page.
 
 ## Repository Structure
 
