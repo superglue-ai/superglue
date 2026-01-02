@@ -37,7 +37,6 @@ import {
   ToolResult,
 } from "@superglue/shared";
 import { Validator } from "jsonschema";
-import isEqual from "lodash.isequal";
 import { ArchiveRestore, Check, Hammer, Loader2, Play, Square, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -446,7 +445,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(
             ) {
               return true;
             }
-            if (isEqual(payload, generatedDefault)) {
+            if (JSON.stringify(payload) === JSON.stringify(generatedDefault)) {
               return false;
             }
           } catch (e) {
