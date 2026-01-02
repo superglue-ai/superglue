@@ -29,10 +29,20 @@ SOFTWARE.
 */
 
 import { JSONSchema4, JSONSchema4TypeName } from "json-schema";
-import isEqual from "lodash.isequal";
 import keys from "lodash.keys";
 import merge from "lodash.merge";
 import xor from "lodash.xor";
+
+function isEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  const bObj = b as Record<string, unknown>;
+  return keysA.every((k) => k in bObj && isEqual((a as Record<string, unknown>)[k], bObj[k]));
+}
 
 export interface JSONSchema3or4 {
   id?: JSONSchema4["id"] | undefined;

@@ -10,6 +10,18 @@ import { StepExecutionResult } from "./client-utils";
 
 export const inputErrorStyles = "border-red-500 focus:border-red-500 focus:ring-red-500";
 
+/** Deep equality check for JSON-serializable objects */
+export function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  const bObj = b as Record<string, unknown>;
+  return keysA.every((k) => k in bObj && deepEqual((a as Record<string, unknown>)[k], bObj[k]));
+}
+
 export type Theme = "light" | "dark" | "system";
 
 export function getThemeScript(): string {
