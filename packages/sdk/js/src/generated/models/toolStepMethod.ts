@@ -9,8 +9,7 @@
 /**
  * HTTP method. For non-HTTP protocols, use POST.
  */
-export type ToolStepMethod =
-  (typeof ToolStepMethod)[keyof typeof ToolStepMethod];
+export type ToolStepMethod = (typeof ToolStepMethod)[keyof typeof ToolStepMethod];
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const ToolStepMethod = {

@@ -30,7 +30,7 @@ export function ToolDeployModal({
   currentTool,
   payload,
   isOpen,
-  onClose = () => {}
+  onClose = () => {},
 }: ToolDeployModalProps) {
   const superglueConfig = useConfig();
   const [activeTab, setActiveTab] = useState("schedule");
@@ -111,7 +111,7 @@ await runTool("${currentTool.id}", {
       "command": "npx",
       "args": [
         "mcp-remote",
-        "${superglueConfig.apiEndpoint.includes('https://api.superglue') ? "https://mcp.superglue.ai" : `${superglueConfig.superglueEndpoint}/mcp`}",
+        "${superglueConfig.apiEndpoint.includes("https://api.superglue") ? "https://mcp.superglue.ai" : `${superglueConfig.superglueEndpoint}/mcp`}",
         "--header",
         "Authorization:\${AUTH_HEADER}"
       ],
@@ -128,12 +128,7 @@ await runTool("${currentTool.id}", {
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Deploy your Tool</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="shrink-0"
-              onClick={onClose}
-            >
+            <Button variant="ghost" size="icon" className="shrink-0" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
           </DialogTitle>
@@ -143,8 +138,7 @@ await runTool("${currentTool.id}", {
           {/* Tool ID section */}
           <div className="space-y-3 flex-shrink-0">
             <p className="text-muted-foreground">
-              Your tool is ready to use in production. Choose how you want to
-              deploy it:
+              Your tool is ready to use in production. Choose how you want to deploy it:
             </p>
           </div>
 
@@ -179,214 +173,184 @@ await runTool("${currentTool.id}", {
                 value="schedule"
                 className="flex flex-col gap-6 mt-4 overflow-y-auto flex-1"
               >
-              <div className="space-y-2">
-                <p className="text-muted-foreground">
-                  Automate your workflow by scheduling it to run at specific
-                  times or intervals.
-                </p>
-              </div>
+                <div className="space-y-2">
+                  <p className="text-muted-foreground">
+                    Automate your workflow by scheduling it to run at specific times or intervals.
+                  </p>
+                </div>
 
-              <AnimatePresence initial={false}>
-                {scheduleSuccess && (
-                  <motion.div
-                    key="success"
-                    initial={{ opacity: 0, height: 0, overflow: "hidden" }}
-                    animate={{ opacity: 1, height: "auto", overflow: "visible" }}
-                    exit={{ opacity: 0, height: 0, overflow: "hidden" }}
-                    transition={{ duration: 0.3, ease: "easeInOut" }}
-                  >
-                    <div className="flex items-center gap-2 rounded-md border bg-muted text-muted-foreground text-base px-3 py-2">
-                      <CheckCircle className="h-4 w-4 text-foreground text-green-600" />
-                      <span>Schedule created successfully.</span>
-                    </div>
-                  </motion.div>
-                )}
-                {!scheduleSuccess && (
-                  <motion.div
-                    key="form"
-                    initial={{ opacity: 1 }}
-                    exit={{ opacity: 0, height: 0, overflow: "hidden" }}
-                    transition={{ duration: 0.3, ease: "easeInOut" }}
-                  >
-                    <ToolSchedulesList
-                      toolId={currentTool.id}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                <AnimatePresence initial={false}>
+                  {scheduleSuccess && (
+                    <motion.div
+                      key="success"
+                      initial={{ opacity: 0, height: 0, overflow: "hidden" }}
+                      animate={{ opacity: 1, height: "auto", overflow: "visible" }}
+                      exit={{ opacity: 0, height: 0, overflow: "hidden" }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                    >
+                      <div className="flex items-center gap-2 rounded-md border bg-muted text-muted-foreground text-base px-3 py-2">
+                        <CheckCircle className="h-4 w-4 text-foreground text-green-600" />
+                        <span>Schedule created successfully.</span>
+                      </div>
+                    </motion.div>
+                  )}
+                  {!scheduleSuccess && (
+                    <motion.div
+                      key="form"
+                      initial={{ opacity: 1 }}
+                      exit={{ opacity: 0, height: 0, overflow: "hidden" }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                    >
+                      <ToolSchedulesList toolId={currentTool.id} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
-              <div className="text-sm text-muted-foreground ">
-                <a
-                  href="https://docs.superglue.cloud/guides/deploying-a-tool#scheduled-execution"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:underline"
-                >
-                  Learn more about scheduling tools
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
+                <div className="text-sm text-muted-foreground ">
+                  <a
+                    href="https://docs.superglue.cloud/guides/deploying-a-tool#scheduled-execution"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 hover:underline"
+                  >
+                    Learn more about scheduling tools
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               </TabsContent>
             )}
 
             {/* SDK/API Tab */}
             {activeTab === "sdk" && (
-              <TabsContent
-                value="sdk"
-                className="mt-4 overflow-y-auto overflow-x-hidden flex-1"
-              >
-              <div className="space-y-2 mb-4">
-                <p className="text-muted-foreground">
-                  For programmatic execution, use our JavaScript or Python SDK,
-                  or access the REST API directly via cURL. You'll find your tool-specific
-                  code snippets below. Simply replace the placeholder with your
-                  superglue API key.
-                </p>
-              </div>
+              <TabsContent value="sdk" className="mt-4 overflow-y-auto overflow-x-hidden flex-1">
+                <div className="space-y-2 mb-4">
+                  <p className="text-muted-foreground">
+                    For programmatic execution, use our JavaScript or Python SDK, or access the REST
+                    API directly via cURL. You'll find your tool-specific code snippets below.
+                    Simply replace the placeholder with your superglue API key.
+                  </p>
+                </div>
 
-              {/* TypeScript / JavaScript */}
-              <div className="min-w-0">
-                <button
-                  onClick={() =>
-                    setExpandedSdk(
-                      expandedSdk === "typescript" ? null : "typescript"
-                    )
-                  }
-                  className="w-full flex items-center py-3 px-0 hover:!bg-transparent focus:outline-none cursor-pointer"
-                >
-                  <ChevronRight
-                    className={cn(
-                      "h-4 w-4 mr-2 transition-transform",
-                      expandedSdk === "typescript" && "rotate-90"
+                {/* TypeScript / JavaScript */}
+                <div className="min-w-0">
+                  <button
+                    onClick={() =>
+                      setExpandedSdk(expandedSdk === "typescript" ? null : "typescript")
+                    }
+                    className="w-full flex items-center py-3 px-0 hover:!bg-transparent focus:outline-none cursor-pointer"
+                  >
+                    <ChevronRight
+                      className={cn(
+                        "h-4 w-4 mr-2 transition-transform",
+                        expandedSdk === "typescript" && "rotate-90",
+                      )}
+                    />
+                    <span className="text-sm">JavaScript</span>
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {expandedSdk === "typescript" && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeInOut" }}
+                        className="overflow-x-hidden pb-3"
+                      >
+                        {/* Install */}
+                        <div className="mt-3">
+                          <div className="text-xs text-muted-foreground mb-2">Install</div>
+                          <CodeSnippet code="npm install @superglue/client" language="bash" />
+                        </div>
+
+                        {/* Code */}
+                        <div className="mt-4">
+                          <div className="text-xs text-muted-foreground mb-2">Code</div>
+                          <CodeSnippet code={typescriptCode} language="typescript" />
+                        </div>
+                      </motion.div>
                     )}
-                  />
-                  <span className="text-sm">JavaScript</span>
-                </button>
-                <AnimatePresence initial={false}>
-                  {expandedSdk === "typescript" && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: "easeInOut" }}
-                      className="overflow-x-hidden pb-3"
-                    >
-                      {/* Install */}
-                      <div className="mt-3">
-                        <div className="text-xs text-muted-foreground mb-2">
-                          Install
-                        </div>
-                        <CodeSnippet
-                          code="npm install @superglue/client"
-                          language="bash"
-                        />
-                      </div>
+                  </AnimatePresence>
+                </div>
 
-                      {/* Code */}
-                      <div className="mt-4">
-                        <div className="text-xs text-muted-foreground mb-2">
-                          Code
+                {/* Python */}
+                <div className="min-w-0">
+                  <button
+                    onClick={() => setExpandedSdk(expandedSdk === "python" ? null : "python")}
+                    className="w-full flex items-center py-3 px-0 hover:!bg-transparent focus:outline-none cursor-pointer"
+                  >
+                    <ChevronRight
+                      className={cn(
+                        "h-4 w-4 mr-2 transition-transform",
+                        expandedSdk === "python" && "rotate-90",
+                      )}
+                    />
+                    <span className="text-sm">Python</span>
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {expandedSdk === "python" && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeInOut" }}
+                        className="overflow-x-hidden pb-3"
+                      >
+                        {/* Install */}
+                        <div className="mt-3">
+                          <div className="text-xs text-muted-foreground mb-2">Install</div>
+                          <CodeSnippet code="pip install superglue-client" language="bash" />
                         </div>
-                        <CodeSnippet
-                          code={typescriptCode}
-                          language="typescript"
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
 
-              {/* Python */}
-              <div className="min-w-0">
-                <button
-                  onClick={() =>
-                    setExpandedSdk(expandedSdk === "python" ? null : "python")
-                  }
-                  className="w-full flex items-center py-3 px-0 hover:!bg-transparent focus:outline-none cursor-pointer"
-                >
-                  <ChevronRight
-                    className={cn(
-                      "h-4 w-4 mr-2 transition-transform",
-                      expandedSdk === "python" && "rotate-90"
+                        {/* Code */}
+                        <div className="mt-4">
+                          <div className="text-xs text-muted-foreground mb-2">Code</div>
+                          <CodeSnippet code={pythonCode} language="python" />
+                        </div>
+                      </motion.div>
                     )}
-                  />
-                  <span className="text-sm">Python</span>
-                </button>
-                <AnimatePresence initial={false}>
-                  {expandedSdk === "python" && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: "easeInOut" }}
-                      className="overflow-x-hidden pb-3"
-                    >
-                      {/* Install */}
-                      <div className="mt-3">
-                        <div className="text-xs text-muted-foreground mb-2">
-                          Install
-                        </div>
-                        <CodeSnippet
-                          code="pip install superglue-client"
-                          language="bash"
-                        />
-                      </div>
+                  </AnimatePresence>
+                </div>
 
-                      {/* Code */}
-                      <div className="mt-4">
-                        <div className="text-xs text-muted-foreground mb-2">
-                          Code
-                        </div>
-                        <CodeSnippet code={pythonCode} language="python" />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* cURL */}
-              <div className="min-w-0">
-                <button
-                  onClick={() =>
-                    setExpandedSdk(expandedSdk === "curl" ? null : "curl")
-                  }
-                  className="w-full flex items-center py-3 px-0 hover:!bg-transparent focus:outline-none cursor-pointer"
-                >
-                  <ChevronRight
-                    className={cn(
-                      "h-4 w-4 mr-2 transition-transform",
-                      expandedSdk === "curl" && "rotate-90"
+                {/* cURL */}
+                <div className="min-w-0">
+                  <button
+                    onClick={() => setExpandedSdk(expandedSdk === "curl" ? null : "curl")}
+                    className="w-full flex items-center py-3 px-0 hover:!bg-transparent focus:outline-none cursor-pointer"
+                  >
+                    <ChevronRight
+                      className={cn(
+                        "h-4 w-4 mr-2 transition-transform",
+                        expandedSdk === "curl" && "rotate-90",
+                      )}
+                    />
+                    <span className="text-sm">cURL</span>
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {expandedSdk === "curl" && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeInOut" }}
+                        className="overflow-x-hidden pb-3"
+                      >
+                        <CodeSnippet code={curlCommand} language="bash" />
+                      </motion.div>
                     )}
-                  />
-                  <span className="text-sm">cURL</span>
-                </button>
-                <AnimatePresence initial={false}>
-                  {expandedSdk === "curl" && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: "easeInOut" }}
-                      className="overflow-x-hidden pb-3"
-                    >
-                      <CodeSnippet code={curlCommand} language="bash" />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                  </AnimatePresence>
+                </div>
 
-              <div className="text-sm text-muted-foreground mt-5">
-                <a
-                  href="https://docs.superglue.cloud/sdk/overview"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:underline"
-                >
-                  Learn more about the SDK
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
+                <div className="text-sm text-muted-foreground mt-5">
+                  <a
+                    href="https://docs.superglue.cloud/sdk/overview"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 hover:underline"
+                  >
+                    Learn more about the SDK
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               </TabsContent>
             )}
 
@@ -396,79 +360,73 @@ await runTool("${currentTool.id}", {
                 value="webhook"
                 className="flex flex-col gap-4 mt-4 overflow-y-auto flex-1"
               >
-              <div className="space-y-2">
-                <p className="text-muted-foreground">
-                  Get notified when your tool execution completes. Specify a webhook when executing the tool, and superglue will send the results to that endpoint automatically.
-                </p>
-              </div>
+                <div className="space-y-2">
+                  <p className="text-muted-foreground">
+                    Get notified when your tool execution completes. Specify a webhook when
+                    executing the tool, and superglue will send the results to that endpoint
+                    automatically.
+                  </p>
+                </div>
 
-              <div className="space-y-2">
+                <div className="space-y-2">
+                  <CodeSnippet code={webhookExample} language="javascript" />
+                </div>
 
-                <CodeSnippet code={webhookExample} language="javascript" />
-              </div>
-
-              <div className="text-sm text-muted-foreground mt-2">
-                <a
-                  href="https://docs.superglue.cloud/api/overview#webhooks"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:underline"
-                >
-                  Learn more about webhooks in superglue
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
+                <div className="text-sm text-muted-foreground mt-2">
+                  <a
+                    href="https://docs.superglue.cloud/api/overview#webhooks"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 hover:underline"
+                  >
+                    Learn more about webhooks in superglue
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               </TabsContent>
             )}
 
             {/* MCP Tab */}
             {activeTab === "mcp" && (
-              <TabsContent
-                value="mcp"
-                className="flex flex-col gap-4 mt-4 overflow-y-auto flex-1"
-              >
-              <div className="space-y-2">
-                <p className="text-muted-foreground">
-                  Make this tool available to Claude, Cursor, or any
-                  MCP-compatible agent. Simply replace the placeholder with your
-                  superglue API key.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <div className="text-sm font-medium mb-2">
-                    1. Add superglue MCP server to your config
-                  </div>
-                  <CodeSnippet code={mcpConfig} language="json" />
+              <TabsContent value="mcp" className="flex flex-col gap-4 mt-4 overflow-y-auto flex-1">
+                <div className="space-y-2">
+                  <p className="text-muted-foreground">
+                    Make this tool available to Claude, Cursor, or any MCP-compatible agent. Simply
+                    replace the placeholder with your superglue API key.
+                  </p>
                 </div>
 
-                <div>
-                  <div className="text-sm font-medium mb-2">
-                    2. Use in your AI agent
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-sm font-medium mb-2">
+                      1. Add superglue MCP server to your config
+                    </div>
+                    <CodeSnippet code={mcpConfig} language="json" />
                   </div>
-                  <CodeSnippet
-                    code={`Please execute the superglue tool "${currentTool.id}"`}
-                    language="bash"
-                  />
-                </div>
-              </div>
 
-              <div className="text-sm text-muted-foreground mt-2">
-                <a
-                  href="https://docs.superglue.cloud/mcp/using-the-mcp"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:underline"
-                >
-                  Learn more about using your tools via MCP
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
+                  <div>
+                    <div className="text-sm font-medium mb-2">2. Use in your AI agent</div>
+                    <CodeSnippet
+                      code={`Please execute the superglue tool "${currentTool.id}"`}
+                      language="bash"
+                    />
+                  </div>
+                </div>
+
+                <div className="text-sm text-muted-foreground mt-2">
+                  <a
+                    href="https://docs.superglue.cloud/mcp/using-the-mcp"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 hover:underline"
+                  >
+                    Learn more about using your tools via MCP
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               </TabsContent>
             )}
           </Tabs>
-
         </div>
       </DialogContent>
     </Dialog>

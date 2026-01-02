@@ -1,31 +1,31 @@
-'use client'
+"use client";
 
-import { useConfig } from '@/src/app/config-context';
-import { useToast } from '@/src/hooks/use-toast';
-import { tokenRegistry } from '@/src/lib/token-registry';
-import { ApiConfig, CacheMode, SuperglueClient } from '@superglue/shared';
-import { Loader2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import { AutoSizer, List } from 'react-virtualized';
-import JsonSchemaEditor from '../editors/JsonSchemaEditor';
-import { CopyButton } from '../tools/shared/CopyButton';
-import { Button } from '../ui/button';
-import { Card, CardContent } from '../ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { useConfig } from "@/src/app/config-context";
+import { useToast } from "@/src/hooks/use-toast";
+import { tokenRegistry } from "@/src/lib/token-registry";
+import { ApiConfig, CacheMode, SuperglueClient } from "@superglue/shared";
+import { Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AutoSizer, List } from "react-virtualized";
+import JsonSchemaEditor from "../editors/JsonSchemaEditor";
+import { CopyButton } from "../tools/shared/CopyButton";
+import { Button } from "../ui/button";
+import { Card, CardContent } from "../ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 interface InteractiveApiPlaygroundProps {
-  configId: string
-  instruction: string
-  onInstructionChange?: (instruction: string) => void
-  responseSchema: string
-  onResponseSchemaChange: (schema: string) => void
-  initialRawResponse?: any
-  responseMapping?: any
-  onMappedResponse?: (response: any) => void
-  onRun?: () => Promise<void>
-  isRunning?: boolean
-  mappedResponseData?: any
-  hideRunButton?: boolean
+  configId: string;
+  instruction: string;
+  onInstructionChange?: (instruction: string) => void;
+  responseSchema: string;
+  onResponseSchemaChange: (schema: string) => void;
+  initialRawResponse?: any;
+  responseMapping?: any;
+  onMappedResponse?: (response: any) => void;
+  onRun?: () => Promise<void>;
+  isRunning?: boolean;
+  mappedResponseData?: any;
+  hideRunButton?: boolean;
 }
 
 interface CustomRequestOptions {
@@ -37,9 +37,9 @@ interface CustomRequestOptions {
   responseSchema?: object;
 }
 
-export function InteractiveApiPlayground({ 
-  configId, 
-  instruction, 
+export function InteractiveApiPlayground({
+  configId,
+  instruction,
   onInstructionChange,
   responseSchema,
   onResponseSchemaChange,
@@ -49,123 +49,128 @@ export function InteractiveApiPlayground({
   onRun,
   isRunning,
   mappedResponseData,
-  hideRunButton
+  hideRunButton,
 }: InteractiveApiPlaygroundProps) {
-  const [isLoading, setIsLoading] = useState(false)
-  const [rawResponse, setRawResponse] = useState<any>(initialRawResponse || null)
-  const [mappedResponse, setMappedResponse] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState('raw')
-  const { toast } = useToast()
-  const superglueConfig = useConfig()
-  const [config, setConfig] = useState<ApiConfig | null>(null)
+  const [isLoading, setIsLoading] = useState(false);
+  const [rawResponse, setRawResponse] = useState<any>(initialRawResponse || null);
+  const [mappedResponse, setMappedResponse] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState("raw");
+  const { toast } = useToast();
+  const superglueConfig = useConfig();
+  const [config, setConfig] = useState<ApiConfig | null>(null);
 
   const fetchConfig = async () => {
     try {
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
-        apiKey: tokenRegistry.getToken()
-      })
-      const data = await superglueClient.getApi(configId)
-      setConfig(data)
+        apiKey: tokenRegistry.getToken(),
+      });
+      const data = await superglueClient.getApi(configId);
+      setConfig(data);
     } catch (error) {
-      console.error('Error fetching config:', error)
+      console.error("Error fetching config:", error);
     }
-  }
-
+  };
 
   // Fetch config on mount
   useEffect(() => {
     if (configId) {
-      fetchConfig()
+      fetchConfig();
     }
-  }, [configId])
+  }, [configId]);
 
   const handleRun = async () => {
     // TODO: deduplicate this with ConfigCreateStepper.tsx
     if (onRun) {
-      return onRun()
+      return onRun();
     }
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
-        apiKey: tokenRegistry.getToken()
-      })
+        apiKey: tokenRegistry.getToken(),
+      });
 
       // 1. First upsert the API config with the new schema and instruction
       await superglueClient.upsertApi(configId, {
         id: configId,
         instruction,
-        responseSchema: JSON.parse(responseSchema)
-      })
+        responseSchema: JSON.parse(responseSchema),
+      });
 
       // 2. Call the API using the config ID and get mapped response
       const mappedResult = await superglueClient.call({
         id: configId,
         options: {
-          cacheMode: CacheMode.WRITEONLY
-        }
-      })
+          cacheMode: CacheMode.WRITEONLY,
+        },
+      });
 
       if (mappedResult.error) {
-        throw new Error(mappedResult.error)
+        throw new Error(mappedResult.error);
       }
 
       // 3. Set the mapped response
-      setMappedResponse(mappedResult.data)
-      onMappedResponse?.(mappedResult.data)
-      setActiveTab('mapped')
+      setMappedResponse(mappedResult.data);
+      onMappedResponse?.(mappedResult.data);
+      setActiveTab("mapped");
     } catch (error: any) {
-      console.error('Error running API:', error)
+      console.error("Error running API:", error);
       toast({
-        title: 'Error Running API',
-        description: error?.message || 'An error occurred while running the API',
-        variant: 'destructive'
-      })
+        title: "Error Running API",
+        description: error?.message || "An error occurred while running the API",
+        variant: "destructive",
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // Update mapped response when it comes from props
   useEffect(() => {
     if (mappedResponseData) {
-      setMappedResponse(mappedResponseData)
-      setActiveTab('mapped')
+      setMappedResponse(mappedResponseData);
+      setActiveTab("mapped");
     }
-  }, [mappedResponseData])
+  }, [mappedResponseData]);
 
   // Memoize the line splitting for each content type
   const rawResponseLines = useMemo(() => {
-    return rawResponse ? JSON.stringify(rawResponse, null, 2).split('\n') : ['Response will appear here...']
-  }, [rawResponse])
+    return rawResponse
+      ? JSON.stringify(rawResponse, null, 2).split("\n")
+      : ["Response will appear here..."];
+  }, [rawResponse]);
 
   const mappedResponseLines = useMemo(() => {
-    if (isRunning || isLoading) return ['Loading...']
-    return mappedResponse ? JSON.stringify(mappedResponse, null, 2).split('\n') : ['Output will appear here...']
-  }, [mappedResponse, isRunning, isLoading])
+    if (isRunning || isLoading) return ["Loading..."];
+    return mappedResponse
+      ? JSON.stringify(mappedResponse, null, 2).split("\n")
+      : ["Output will appear here..."];
+  }, [mappedResponse, isRunning, isLoading]);
 
-  const renderRow = (lines: string[]) => ({ index, key, style }: any) => {
-    const line = lines[index]
-    const indentMatch = line?.match(/^(\s*)/)
-    const indentLevel = indentMatch ? indentMatch[0].length : 0
-    
-    return (
-      <div 
-        key={key} 
-        style={{
-          ...style,
-          whiteSpace: 'pre',
-          paddingLeft: `${indentLevel * 8}px`,
-        }} 
-        className="font-mono text-xs overflow-hidden text-ellipsis"
-      >
-        {line?.trimLeft()}
-      </div>
-    )
-  }
+  const renderRow =
+    (lines: string[]) =>
+    ({ index, key, style }: any) => {
+      const line = lines[index];
+      const indentMatch = line?.match(/^(\s*)/);
+      const indentLevel = indentMatch ? indentMatch[0].length : 0;
 
-  const getLineCount = (lines: string[]) => lines.length
+      return (
+        <div
+          key={key}
+          style={{
+            ...style,
+            whiteSpace: "pre",
+            paddingLeft: `${indentLevel * 8}px`,
+          }}
+          className="font-mono text-xs overflow-hidden text-ellipsis"
+        >
+          {line?.trimLeft()}
+        </div>
+      );
+    };
+
+  const getLineCount = (lines: string[]) => lines.length;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
@@ -173,28 +178,20 @@ export function InteractiveApiPlayground({
       <div className="flex flex-col space-y-4 overflow-hidden h-full">
         <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
           <div className="flex-1 min-h-0 bg-background h-full">
-            <JsonSchemaEditor
-              value={responseSchema}
-              onChange={onResponseSchemaChange}
-            />
+            <JsonSchemaEditor value={responseSchema} onChange={onResponseSchemaChange} />
           </div>
         </div>
 
         {!hideRunButton && (
           <div className="flex justify-end">
-            <Button
-              onClick={handleRun}
-              disabled={isRunning || isLoading}
-            >
+            <Button onClick={handleRun} disabled={isRunning || isLoading}>
               {isRunning || isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Running...
                 </>
               ) : (
-                <>
-                  ✨ Run
-                </>
+                <>✨ Run</>
               )}
             </Button>
           </div>
@@ -207,9 +204,15 @@ export function InteractiveApiPlayground({
           <Card className="h-full flex flex-col">
             <CardContent className="p-0 h-full flex flex-col bg-secondary">
               <TabsList className="w-full rounded-t-lg rounded-b-none">
-                <TabsTrigger value="raw" className="flex-1">Raw API Response</TabsTrigger>
-                <TabsTrigger value="mapped" className="flex-1">🍯 Output</TabsTrigger>
-                <TabsTrigger value="jsonata" className="flex-1">Response Mapping</TabsTrigger>
+                <TabsTrigger value="raw" className="flex-1">
+                  Raw API Response
+                </TabsTrigger>
+                <TabsTrigger value="mapped" className="flex-1">
+                  🍯 Output
+                </TabsTrigger>
+                <TabsTrigger value="jsonata" className="flex-1">
+                  Response Mapping
+                </TabsTrigger>
               </TabsList>
 
               <div className="flex-1 min-h-0">
@@ -236,7 +239,10 @@ export function InteractiveApiPlayground({
                   </div>
                 </TabsContent>
 
-                <TabsContent value="mapped" className="m-0 h-full data-[state=active]:flex flex-col">
+                <TabsContent
+                  value="mapped"
+                  className="m-0 h-full data-[state=active]:flex flex-col"
+                >
                   <div className="flex-1 min-h-0 p-4 overflow-hidden relative">
                     {mappedResponse && !(isRunning || isLoading) && (
                       <div className="absolute top-2 right-8 z-10">
@@ -259,7 +265,10 @@ export function InteractiveApiPlayground({
                   </div>
                 </TabsContent>
 
-                <TabsContent value="jsonata" className="m-0 h-full data-[state=active]:flex flex-col">
+                <TabsContent
+                  value="jsonata"
+                  className="m-0 h-full data-[state=active]:flex flex-col"
+                >
                   <div className="flex-1 min-h-0 p-4 overflow-y-auto relative">
                     {responseMapping && !(isRunning || isLoading) && (
                       <div className="absolute top-2 right-8 z-10">
@@ -267,7 +276,9 @@ export function InteractiveApiPlayground({
                       </div>
                     )}
                     <pre className="text-xs whitespace-pre-wrap leading-[18px]">
-                      {isRunning || isLoading ? 'Loading...' : (responseMapping || 'No JSONata mapping available')}
+                      {isRunning || isLoading
+                        ? "Loading..."
+                        : responseMapping || "No JSONata mapping available"}
                     </pre>
                   </div>
                 </TabsContent>
@@ -277,5 +288,5 @@ export function InteractiveApiPlayground({
         </Tabs>
       </div>
     </div>
-  )
-} 
+  );
+}

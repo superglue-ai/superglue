@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { useTools } from "@/src/app/tools-context";
 import { Button } from "@/src/components/ui/button";
@@ -10,11 +10,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/src/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/src/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
 import { cn } from "@/src/lib/general-utils";
 import { Check, Folder } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -36,13 +32,13 @@ interface FolderPickerProps {
   width?: string;
 }
 
-export function FolderPicker({ 
-  value, 
-  onChange, 
+export function FolderPicker({
+  value,
+  onChange,
   trigger,
   disabled,
   align = "start",
-  width = "w-[250px]"
+  width = "w-[250px]",
 }: FolderPickerProps) {
   const { tools } = useTools();
   const [open, setOpen] = useState(false);
@@ -55,23 +51,25 @@ export function FolderPicker({
       className="h-8 gap-2 text-muted-foreground hover:text-foreground max-w-full focus-visible:ring-0 focus-visible:ring-offset-0"
     >
       <Folder className="h-3.5 w-3.5" />
-      {value && value !== UNCATEGORIZED ? <span className="truncate text-xs max-w-[250px]">{value}</span> : null}
+      {value && value !== UNCATEGORIZED ? (
+        <span className="truncate text-xs max-w-[250px]">{value}</span>
+      ) : null}
     </Button>
   );
 
   const flatFolders = useMemo(() => {
-    const fromTools = tools.map(t => t.folder).filter(Boolean) as string[];
+    const fromTools = tools.map((t) => t.folder).filter(Boolean) as string[];
     const uniqueFolders = Array.from(new Set([...fromTools, ...(value ? [value] : [])])).sort();
     const flatList: FolderNode[] = [];
     const processedPaths = new Set<string>();
 
-    uniqueFolders.forEach(folderPath => {
-      const parts = folderPath.split('/');
-      let currentPath = '';
-      
+    uniqueFolders.forEach((folderPath) => {
+      const parts = folderPath.split("/");
+      let currentPath = "";
+
       parts.forEach((part, index) => {
         currentPath = index === 0 ? part : `${currentPath}/${part}`;
-        
+
         if (!processedPaths.has(currentPath)) {
           processedPaths.add(currentPath);
           flatList.push({
@@ -86,18 +84,17 @@ export function FolderPicker({
     return flatList;
   }, [tools, value]);
 
-  const allFolderPaths = useMemo(() => 
-    flatFolders.map(f => f.fullPath)
-  , [flatFolders]);
+  const allFolderPaths = useMemo(() => flatFolders.map((f) => f.fullPath), [flatFolders]);
 
   const filteredFolders = useMemo(() => {
     if (!searchValue) return flatFolders;
     const lower = searchValue.toLowerCase();
-    return flatFolders.filter(f => f.fullPath.toLowerCase().includes(lower));
+    return flatFolders.filter((f) => f.fullPath.toLowerCase().includes(lower));
   }, [flatFolders, searchValue]);
 
-  const showCreateOption = searchValue.trim() && 
-    !allFolderPaths.some(f => f.toLowerCase() === searchValue.toLowerCase());
+  const showCreateOption =
+    searchValue.trim() &&
+    !allFolderPaths.some((f) => f.toLowerCase() === searchValue.toLowerCase());
 
   const handleSelect = (folder: string | null) => {
     onChange(folder);
@@ -106,12 +103,15 @@ export function FolderPicker({
   };
 
   return (
-    <Popover open={open} onOpenChange={(isOpen) => {
-      if (!disabled) {
-        setOpen(isOpen);
-        if (!isOpen) setSearchValue("");
-      }
-    }}>
+    <Popover
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!disabled) {
+          setOpen(isOpen);
+          if (!isOpen) setSearchValue("");
+        }
+      }}
+    >
       <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
         {trigger || defaultTrigger}
       </PopoverTrigger>
@@ -155,9 +155,7 @@ export function FolderPicker({
                 ) : (
                   <Folder className="mr-2 h-4 w-4 flex-shrink-0" />
                 )}
-                <span className={cn(!value && "font-medium")}>
-                  No Folder
-                </span>
+                <span className={cn(!value && "font-medium")}>No Folder</span>
               </CommandItem>
               {filteredFolders.map((folder) => {
                 const isSelected = value === folder.fullPath;
@@ -167,14 +165,16 @@ export function FolderPicker({
                     value={folder.fullPath}
                     onSelect={() => handleSelect(folder.fullPath)}
                     className="cursor-pointer py-1.5"
-                    style={{ paddingLeft: `${(folder.depth * 12) + 8}px` }}
+                    style={{ paddingLeft: `${folder.depth * 12 + 8}px` }}
                   >
                     {isSelected ? (
                       <Check className="mr-2 h-4 w-4 flex-shrink-0" />
                     ) : (
                       <Folder className="mr-2 h-4 w-4 flex-shrink-0" />
                     )}
-                    <span className={cn("truncate", isSelected && "font-medium")}>{folder.name}</span>
+                    <span className={cn("truncate", isSelected && "font-medium")}>
+                      {folder.name}
+                    </span>
                   </CommandItem>
                 );
               })}
@@ -197,4 +197,3 @@ export function FolderPicker({
     </Popover>
   );
 }
-

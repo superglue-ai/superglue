@@ -4,15 +4,9 @@
     "outDir": "./dist",
     "rootDir": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     }
   },
-  "include": [
-    "./**/*"
-  ],
-  "exclude": [
-    "**/*.test.ts"
-  ]
+  "include": ["./**/*"],
+  "exclude": ["**/*.test.ts"]
 }

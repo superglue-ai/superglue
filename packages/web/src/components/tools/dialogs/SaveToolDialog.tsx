@@ -2,7 +2,14 @@ import { useConfig } from "@/src/app/config-context";
 import { useTools } from "@/src/app/tools-context";
 import { FolderPicker, UNCATEGORIZED } from "@/src/components/tools/folders/FolderPicker";
 import { Button } from "@/src/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/src/components/ui/dialog";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { createSuperglueClient, isValidToolName, validateToolName } from "@/src/lib/client-utils";
@@ -44,14 +51,14 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
     if (!tool) return;
 
     const trimmedName = toolName.trim();
-    
+
     const validationError = validateToolName(trimmedName);
     if (validationError) {
       setError(validationError);
       return;
     }
 
-    const existingTool = tools.find(t => t.id === trimmedName);
+    const existingTool = tools.find((t) => t.id === trimmedName);
     if (existingTool) {
       setError("A tool with this name already exists");
       return;
@@ -63,16 +70,16 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
 
       const toolToSave = { ...tool, id: trimmedName, folder: selectedFolder || undefined };
       const saved = await client.upsertWorkflow(trimmedName, toolToSave as any);
-      if (!saved) throw new Error('Failed to save tool');
+      if (!saved) throw new Error("Failed to save tool");
 
       handleClose();
-      
+
       if (onSaved) {
         onSaved(saved);
       }
     } catch (error: any) {
-      console.error('Error saving tool:', error);
-      setError(error.message || 'Failed to save tool');
+      console.error("Error saving tool:", error);
+      setError(error.message || "Failed to save tool");
     } finally {
       setIsSaving(false);
     }
@@ -80,12 +87,14 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent onKeyDown={(e) => {
-        if (e.key === 'Enter' && !isSaving && (e.target as HTMLElement).tagName !== 'BUTTON') {
-          e.preventDefault();
-          handleSave();
-        }
-      }}>
+      <DialogContent
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !isSaving && (e.target as HTMLElement).tagName !== "BUTTON") {
+            e.preventDefault();
+            handleSave();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Save Tool</DialogTitle>
           <DialogDescription>
@@ -133,22 +142,13 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
               }
             />
           </div>
-          {error && (
-            <p className="text-sm text-red-500">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-500">{error}</p>}
         </div>
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={handleClose}
-            disabled={isSaving}
-          >
+          <Button variant="outline" onClick={handleClose} disabled={isSaving}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={isSaving}
-          >
+          <Button onClick={handleSave} disabled={isSaving}>
             {isSaving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -7,9 +7,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/src/components/ui/alert-dialog';
-import { Button } from '@/src/components/ui/button';
-import { OctagonAlert, X } from 'lucide-react';
+} from "@/src/components/ui/alert-dialog";
+import { Button } from "@/src/components/ui/button";
+import { OctagonAlert, X } from "lucide-react";
 
 interface ModifyStepConfirmDialogProps {
   open: boolean;
@@ -28,12 +28,14 @@ export function ModifyStepConfirmDialog({
 }: ModifyStepConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
-      <AlertDialogContent onKeyDown={(e) => {
-        if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'BUTTON') {
-          e.preventDefault();
-          onConfirm();
-        }
-      }}>
+      <AlertDialogContent
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "BUTTON") {
+            e.preventDefault();
+            onConfirm();
+          }
+        }}
+      >
         <Button
           variant="ghost"
           size="icon"
@@ -50,19 +52,18 @@ export function ModifyStepConfirmDialog({
             <AlertDialogTitle>Confirm Step Execution</AlertDialogTitle>
           </div>
           <AlertDialogDescription className="pt-2">
-            The next step <span className="font-medium text-foreground">{stepName || stepId}</span> has the potential to modify data on the system it connects to.
-            <br /><br />
+            The next step <span className="font-medium text-foreground">{stepName || stepId}</span>{" "}
+            has the potential to modify data on the system it connects to.
+            <br />
+            <br />
             Do you want to continue executing this step?
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel}>Inspect Step</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>
-            Continue Execution
-          </AlertDialogAction>
+          <AlertDialogAction onClick={onConfirm}>Continue Execution</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );
 }
-

@@ -1,28 +1,33 @@
-import { Run, RunStatus } from '@superglue/shared';
-import { logMessage } from '../utils/logs.js';
-import { registerApiModule } from './registry.js';
+import { Run, RunStatus } from "@superglue/shared";
+import { logMessage } from "../utils/logs.js";
+import { registerApiModule } from "./registry.js";
 import {
   addTraceHeader,
   mapOpenAPIStatusToInternal,
   mapRunStatusToOpenAPI,
   parsePaginationParams,
   sendError,
-} from './response-helpers.js';
+} from "./response-helpers.js";
 import type {
   AuthenticatedFastifyRequest,
   OpenAPIRun,
   OpenAPIRunMetadata,
   RouteHandler,
-} from './types.js';
+} from "./types.js";
 
 export function mapRunToOpenAPI(run: Run): OpenAPIRun {
   const startedAt = run.startedAt instanceof Date ? run.startedAt : new Date(run.startedAt);
-  const completedAt = run.completedAt instanceof Date ? run.completedAt : run.completedAt ? new Date(run.completedAt) : undefined;
-  
+  const completedAt =
+    run.completedAt instanceof Date
+      ? run.completedAt
+      : run.completedAt
+        ? new Date(run.completedAt)
+        : undefined;
+
   const metadata: OpenAPIRunMetadata = {
     startedAt: startedAt.toISOString(),
   };
-  
+
   if (completedAt) {
     metadata.completedAt = completedAt.toISOString();
     metadata.durationMs = completedAt.getTime() - startedAt.getTime();
@@ -31,10 +36,12 @@ export function mapRunToOpenAPI(run: Run): OpenAPIRun {
   return {
     runId: run.id,
     toolId: run.toolId,
-    tool: run.toolConfig ? { 
-      id: run.toolConfig.id, 
-      version: run.toolConfig.version || '1.0.0' 
-    } : undefined,
+    tool: run.toolConfig
+      ? {
+          id: run.toolConfig.id,
+          version: run.toolConfig.version || "1.0.0",
+        }
+      : undefined,
     status: mapRunStatusToOpenAPI(run.status),
     toolPayload: run.toolPayload,
     data: run.toolResult,
@@ -63,7 +70,7 @@ const getRun: RouteHandler = async (request, reply) => {
   });
 
   if (!run) {
-    return sendError(reply, 404, 'Run not found');
+    return sendError(reply, 404, "Run not found");
   }
 
   return addTraceHeader(reply, authReq.traceId).code(200).send(mapRunToOpenAPI(run));
@@ -72,10 +79,10 @@ const getRun: RouteHandler = async (request, reply) => {
 // GET /runs - List runs
 const listRuns: RouteHandler = async (request, reply) => {
   const authReq = request as AuthenticatedFastifyRequest;
-  const query = request.query as { 
-    toolId?: string; 
+  const query = request.query as {
+    toolId?: string;
     status?: string;
-    page?: string; 
+    page?: string;
     limit?: string;
   };
 
@@ -114,14 +121,14 @@ const cancelRun: RouteHandler = async (request, reply) => {
   });
 
   if (!run) {
-    return sendError(reply, 404, 'Run not found');
+    return sendError(reply, 404, "Run not found");
   }
 
   if (run.status !== RunStatus.RUNNING) {
     return sendError(reply, 400, `Run is not currently running (status: ${run.status})`);
   }
 
-  logMessage('info', `Cancelling run ${params.runId}`, metadata);
+  logMessage("info", `Cancelling run ${params.runId}`, metadata);
 
   // Abort the task
   authReq.workerPools.toolExecution.abortTask(params.runId);
@@ -144,30 +151,29 @@ const cancelRun: RouteHandler = async (request, reply) => {
   });
 
   if (!updatedRun) {
-    return sendError(reply, 500, 'Failed to retrieve updated run');
+    return sendError(reply, 500, "Failed to retrieve updated run");
   }
 
   return addTraceHeader(reply, authReq.traceId).code(200).send(mapRunToOpenAPI(updatedRun));
 };
 
 registerApiModule({
-  name: 'runs',
+  name: "runs",
   routes: [
     {
-      method: 'GET',
-      path: '/runs/:runId',
+      method: "GET",
+      path: "/runs/:runId",
       handler: getRun,
     },
     {
-      method: 'GET',
-      path: '/runs',
+      method: "GET",
+      path: "/runs",
       handler: listRuns,
     },
     {
-      method: 'POST',
-      path: '/runs/:runId/cancel',
+      method: "POST",
+      path: "/runs/:runId/cancel",
       handler: cancelRun,
     },
   ],
 });
-

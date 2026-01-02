@@ -1,16 +1,16 @@
 "use client";
-import { useEffect, useState } from 'react';
-import { useToast } from "@/src/hooks/use-toast"
-import { useConfig } from '@/src/app/config-context';
+import { useEffect, useState } from "react";
+import { useToast } from "@/src/hooks/use-toast";
+import { useConfig } from "@/src/app/config-context";
 export function ServerMonitor() {
   const [isServerDown, setIsServerDown] = useState(false);
-  const { toast } = useToast()
+  const { toast } = useToast();
   const serverConfig = useConfig();
 
   useEffect(() => {
     const checkServer = async (retryCount = 0) => {
       try {
-        const endpoint = serverConfig.superglueEndpoint.replace(/\/$/, '');
+        const endpoint = serverConfig.superglueEndpoint.replace(/\/$/, "");
         const response = await fetch(`${endpoint}/health`);
         if (!response.ok) {
           throw new Error("Server is down");
@@ -44,4 +44,4 @@ export function ServerMonitor() {
   }, [serverConfig.superglueEndpoint, toast]);
 
   return null;
-} 
+}

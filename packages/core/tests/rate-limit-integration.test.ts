@@ -39,7 +39,13 @@ describe("Rate Limit Integration Test with real server", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    const result = await callHttp({config: config, payload: {}, credentials: {}, options: {}, metadata: {} });
+    const result = await callHttp({
+      config: config,
+      payload: {},
+      credentials: {},
+      options: {},
+      metadata: {},
+    });
     // Should have made 2 requests (one 429, one 200)
     expect(requestCount).toBe(2);
     expect(result.data).toEqual({ success: true, data: "Rate limit test passed" });
@@ -57,6 +63,8 @@ describe("Rate Limit Integration Test with real server", () => {
       updatedAt: new Date(),
     };
     // Should throw an error about rate limit exceeded
-    await expect(callHttp({config: config, payload: {}, credentials: {}, options: {}, metadata: {} })).rejects.toThrow(/Rate limit exceeded/);
+    await expect(
+      callHttp({ config: config, payload: {}, credentials: {}, options: {}, metadata: {} }),
+    ).rejects.toThrow(/Rate limit exceeded/);
   });
 });

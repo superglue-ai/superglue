@@ -1,30 +1,30 @@
-import { config } from 'dotenv'
-import { resolve } from 'node:path'
-import { defineConfig } from 'vitest/config'
+import { config } from "dotenv";
+import { resolve } from "node:path";
+import { defineConfig } from "vitest/config";
 
-config({ path: resolve(__dirname, '../../.env') })
+config({ path: resolve(__dirname, "../../.env") });
 
 export default defineConfig({
   test: {
     globals: true,
-    environment: 'node',
+    environment: "node",
     testTimeout: 12000000, // 120 minutes for integration tests
-    hookTimeout: 180000,   // 3 minutes for setup/teardown hooks
+    hookTimeout: 180000, // 3 minutes for setup/teardown hooks
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      provider: "v8",
+      reporter: ["text", "json", "html"],
       exclude: [
-        'node_modules/**',
-        'dist/**',
-        '**/*.d.ts',
-        'test/**',
-        '**/*.test.ts',
-        '**/*.spec.ts',
+        "node_modules/**",
+        "dist/**",
+        "**/*.d.ts",
+        "test/**",
+        "**/*.test.ts",
+        "**/*.spec.ts",
       ],
     },
   },
-  envDir: '../../',
+  envDir: "../../",
   build: {
     sourcemap: true,
-  }
-})
+  },
+});

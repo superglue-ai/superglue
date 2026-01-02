@@ -6,8 +6,7 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type PaginationType =
-  (typeof PaginationType)[keyof typeof PaginationType];
+export type PaginationType = (typeof PaginationType)[keyof typeof PaginationType];
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const PaginationType = {

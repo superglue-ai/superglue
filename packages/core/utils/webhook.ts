@@ -11,26 +11,33 @@ interface WebhookPayload {
 }
 
 // Handle webhook notification
-export async function notifyWebhook(webhookUrl: string, runId: string, success: boolean, data?: any, error?: string, metadata?: ServiceMetadata) {
+export async function notifyWebhook(
+  webhookUrl: string,
+  runId: string,
+  success: boolean,
+  data?: any,
+  error?: string,
+  metadata?: ServiceMetadata,
+) {
   try {
     const webhookPayload: WebhookPayload = {
       runId,
       success,
       ...(data && { data }),
-      ...(error && { error })
+      ...(error && { error }),
     };
 
     const axiosConfig: AxiosRequestConfig = {
-      method: 'POST',
+      method: "POST",
       url: webhookUrl,
       headers: {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
       },
-      data: JSON.stringify(webhookPayload)
+      data: JSON.stringify(webhookPayload),
     };
     await callAxios(axiosConfig, { timeout: 10000, retries: 3, retryDelay: 10000 });
   } catch (error) {
-    logMessage('error', `Webhook notification failed: ${error}`, metadata);
+    logMessage("error", `Webhook notification failed: ${error}`, metadata);
     // Don't throw, webhook failures shouldn't affect main operation
   }
 }

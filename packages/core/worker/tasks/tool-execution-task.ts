@@ -6,22 +6,22 @@ import { ToolExecutionPayload, ToolExecutionResult } from "../types.js";
 export async function run(payload: ToolExecutionPayload): Promise<ToolExecutionResult> {
   const startedAt = new Date();
   const metadata = { orgId: payload.orgId, traceId: payload.traceId };
-  
+
   try {
     const integrationManagers = payload.integrations.map(
-      integration => new IntegrationManager(integration, null, metadata)
+      (integration) => new IntegrationManager(integration, null, metadata),
     );
 
-    const executor = new ToolExecutor({ 
-      tool: payload.workflow, 
-      metadata, 
-      integrations: integrationManagers 
+    const executor = new ToolExecutor({
+      tool: payload.workflow,
+      metadata,
+      integrations: integrationManagers,
     });
-    
-    const result: ToolResult = await executor.execute({ 
-      payload: payload.payload, 
-      credentials: payload.credentials, 
-      options: payload.options 
+
+    const result: ToolResult = await executor.execute({
+      payload: payload.payload,
+      credentials: payload.credentials,
+      options: payload.options,
     });
 
     return {
@@ -32,7 +32,7 @@ export async function run(payload: ToolExecutionPayload): Promise<ToolExecutionR
       stepResults: result.stepResults,
       config: result.config,
       startedAt,
-      completedAt: new Date()
+      completedAt: new Date(),
     };
   } catch (error) {
     return {
@@ -43,7 +43,7 @@ export async function run(payload: ToolExecutionPayload): Promise<ToolExecutionR
       stepResults: [],
       config: payload.workflow,
       startedAt,
-      completedAt: new Date()
+      completedAt: new Date(),
     };
   }
 }

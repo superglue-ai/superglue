@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useConfig } from "@/src/app/config-context";
 import { Badge } from "@/src/components/ui/badge";
@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/ca
 import { useToast } from "@/src/hooks/use-toast";
 import { generateUUID } from "@/src/lib/client-utils";
 import { composeUrl } from "@/src/lib/general-utils";
-import { tokenRegistry } from '@/src/lib/token-registry';
+import { tokenRegistry } from "@/src/lib/token-registry";
 import { ApiConfig, CacheMode, SuperglueClient } from "@superglue/shared";
 import { AlertCircle, Clock, Play, Plus, X } from "lucide-react";
 import { useParams } from "next/navigation";
@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { CopyButton } from "../tools/shared/CopyButton";
 
 // Add this new type and state
-type Credential = { id: string; key: string; value: string; isManual?: boolean; };
+type Credential = { id: string; key: string; value: string; isManual?: boolean };
 
 // Define the props for the component including the new callback
 type ApiPlaygroundProps = {
@@ -37,7 +37,7 @@ const invalidFieldAnimation = `
 
 export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
   const params = useParams();
-  const id = configId || params.id as string;
+  const id = configId || (params.id as string);
   const { toast } = useToast();
   const [config, setConfig] = useState<ApiConfig | null>(null);
   const [response, setResponse] = useState<any>(null);
@@ -53,8 +53,8 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
     if (!str) return [];
     // Match both {varName} and <<varName>> patterns
     const matches = str.match(/\{(\w+)\}|<<(\w+)>>/g) || [];
-    return matches.map(match => {
-      if (match.startsWith('{')) {
+    return matches.map((match) => {
+      if (match.startsWith("{")) {
         return match.slice(1, -1);
       } else {
         return match.slice(2, -2);
@@ -65,8 +65,8 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
   // Save user inputs to sessionStorage instead of localStorage
   const saveUserInputs = useCallback(() => {
     if (!id) return;
-    const credentialsObj = Object.fromEntries(credentials.map(c => [c.key, c.value]));
-    const manualVars = credentials.filter(c => c.isManual).map(c => c.key);
+    const credentialsObj = Object.fromEntries(credentials.map((c) => [c.key, c.value]));
+    const manualVars = credentials.filter((c) => c.isManual).map((c) => c.key);
     sessionStorage.setItem(`sg-playground-credentials-${id}`, JSON.stringify(credentialsObj));
     sessionStorage.setItem(`sg-playground-manual-vars-${id}`, JSON.stringify(manualVars));
   }, [id, credentials]);
@@ -82,27 +82,27 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
         const parsed = JSON.parse(savedCredentials);
         const manualVars = savedManualVars ? JSON.parse(savedManualVars) : [];
 
-        setCredentials(prev => {
-          const existing = prev.map(cred => ({
+        setCredentials((prev) => {
+          const existing = prev.map((cred) => ({
             ...cred,
-            value: parsed[cred.key] || cred.value
+            value: parsed[cred.key] || cred.value,
           }));
 
           // Add manual variables that were saved but not in auto-detected ones
-          const existingKeys = new Set(existing.map(c => c.key));
+          const existingKeys = new Set(existing.map((c) => c.key));
           const additionalManual = manualVars
             .filter((key: string) => !existingKeys.has(key) && parsed[key] !== undefined)
             .map((key: string) => ({
               id: generateUUID(),
               key,
               value: parsed[key],
-              isManual: true
+              isManual: true,
             }));
 
           return [...existing, ...additionalManual];
         });
       } catch (e) {
-        console.error('Failed to parse saved credentials:', e);
+        console.error("Failed to parse saved credentials:", e);
       }
     }
   }, [id]);
@@ -113,7 +113,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
       try {
         const superglueClient = new SuperglueClient({
           endpoint: superglueConfig.superglueEndpoint,
-          apiKey: tokenRegistry.getToken()
+          apiKey: tokenRegistry.getToken(),
         });
         const data = await superglueClient.getApi(id);
         setConfig(data);
@@ -122,22 +122,26 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
           data.urlPath,
           ...Object.values(data.queryParams || {}),
           ...Object.values(data.headers || {}),
-          data.body
-        ].flatMap(value => findTemplateVars(String(value)));
-        const allVars = [...new Set(varMatches)].filter(v => !['limit', 'offset', 'page'].includes(v));
+          data.body,
+        ].flatMap((value) => findTemplateVars(String(value)));
+        const allVars = [...new Set(varMatches)].filter(
+          (v) => !["limit", "offset", "page"].includes(v),
+        );
 
         // Set credentials with unique IDs
-        setCredentials(allVars.map(key => ({
-          id: generateUUID(),
-          key,
-          value: '',
-          isManual: false
-        })));
+        setCredentials(
+          allVars.map((key) => ({
+            id: generateUUID(),
+            key,
+            value: "",
+            isManual: false,
+          })),
+        );
 
         // Load saved values after setting initial credentials
         loadUserInputs();
       } catch (err) {
-        setError('Failed to load API configuration');
+        setError("Failed to load API configuration");
         console.error(err);
       }
     };
@@ -145,13 +149,11 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
   }, [id, loadUserInputs]);
 
   const handleRunApi = async (e: React.MouseEvent) => {
-    e.preventDefault();  // Prevent any form submission
+    e.preventDefault(); // Prevent any form submission
     if (!config) return;
 
     // Check for empty credentials and mark them as invalid
-    const emptyCredentials = credentials
-      .filter(c => c.value === "")
-      .map(c => c.key);
+    const emptyCredentials = credentials.filter((c) => c.value === "").map((c) => c.key);
 
     if (emptyCredentials.length > 0) {
       setInvalidFields(new Set(emptyCredentials));
@@ -174,7 +176,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
     try {
       // Parse JSON values if they are valid JSON strings
       const credentialsObj = Object.fromEntries(
-        credentials.map(c => {
+        credentials.map((c) => {
           let value = c.value;
           try {
             // Check if the value looks like JSON (starts with { or [)
@@ -186,19 +188,19 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
             console.debug(`Failed to parse JSON for ${c.key}, using raw string`);
           }
           return [c.key, value];
-        })
+        }),
       );
 
       const superglue = new SuperglueClient({
         apiKey: tokenRegistry.getToken(),
-        endpoint: superglueConfig.superglueEndpoint
+        endpoint: superglueConfig.superglueEndpoint,
       });
       const response = await superglue.call({
         id: config.id,
         credentials: credentialsObj,
         options: {
-          cacheMode: CacheMode.READONLY
-        }
+          cacheMode: CacheMode.READONLY,
+        },
       });
       // Call the callback if it exists
       if (onRunApi) {
@@ -208,7 +210,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
       setResponse(response.data);
       setResponseTime(Date.now() - startTime);
     } catch (err: any) {
-      const errorMessage = err.message || 'Failed to execute API call';
+      const errorMessage = err.message || "Failed to execute API call";
       setError(errorMessage);
       toast({
         title: "API Call Failed",
@@ -225,24 +227,27 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
   };
 
   const handleAddVariable = () => {
-    const newKey = `var${credentials.filter(c => c.isManual).length + 1}`;
-    setCredentials(prev => [...prev, {
-      id: generateUUID(),
-      key: newKey,
-      value: '',
-      isManual: true
-    }]);
+    const newKey = `var${credentials.filter((c) => c.isManual).length + 1}`;
+    setCredentials((prev) => [
+      ...prev,
+      {
+        id: generateUUID(),
+        key: newKey,
+        value: "",
+        isManual: true,
+      },
+    ]);
   };
 
   const handleRemoveVariable = (id: string) => {
-    setCredentials(prev => prev.filter(cred => cred.id !== id));
+    setCredentials((prev) => prev.filter((cred) => cred.id !== id));
     saveUserInputs();
   };
 
   const handleKeyChange = (id: string, newKey: string) => {
-    setCredentials(prev => {
+    setCredentials((prev) => {
       const updated = [...prev];
-      const index = updated.findIndex(cred => cred.id === id);
+      const index = updated.findIndex((cred) => cred.id === id);
       if (index !== -1) {
         updated[index] = { ...updated[index], key: newKey };
       }
@@ -270,14 +275,9 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
               <CardTitle className="flex items-center justify-between">
                 <span>Request Configuration</span>
                 <div className="flex gap-2 items-center">
-                  <Button
-                    onClick={handleRunApi}
-                    disabled={loading}
-                    size="lg"
-                    className="gap-2"
-                  >
+                  <Button onClick={handleRunApi} disabled={loading} size="lg" className="gap-2">
                     <Play className="h-4 w-4" />
-                    {loading ? 'Running...' : 'Run API'}
+                    {loading ? "Running..." : "Run API"}
                   </Button>
                 </div>
               </CardTitle>
@@ -295,19 +295,12 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
 
               <div>
                 <label className="text-sm font-medium">Instruction</label>
-                <div className="mt-1 p-2 bg-secondary rounded-md">
-                  {config.instruction}
-                </div>
+                <div className="mt-1 p-2 bg-secondary rounded-md">{config.instruction}</div>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium">Variables</label>
-                  <Button
-                    onClick={handleAddVariable}
-                    size="sm"
-                    variant="outline"
-                    className="gap-1"
-                  >
+                  <Button onClick={handleAddVariable} size="sm" variant="outline" className="gap-1">
                     <Plus className="h-3 w-3" />
                     Add Variable
                   </Button>
@@ -321,8 +314,9 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
                           value={cred.key}
                           onChange={(e) => handleKeyChange(cred.id, e.target.value)}
                           disabled={!cred.isManual}
-                          className={`p-2 w-1/3 rounded-md ${cred.isManual ? 'bg-background border' : 'bg-secondary'
-                            }`}
+                          className={`p-2 w-1/3 rounded-md ${
+                            cred.isManual ? "bg-background border" : "bg-secondary"
+                          }`}
                           placeholder="Variable name"
                         />
                         <input
@@ -330,7 +324,7 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
                           value={cred.value}
                           onChange={(e) => {
                             const newCreds = [...credentials];
-                            const index = newCreds.findIndex(c => c.id === cred.id);
+                            const index = newCreds.findIndex((c) => c.id === cred.id);
                             if (index !== -1) {
                               newCreds[index].value = e.target.value;
                               setCredentials(newCreds);
@@ -344,10 +338,11 @@ export function ApiPlayground({ configId, onRunApi }: ApiPlaygroundProps) {
                           }}
                           required
                           placeholder="Enter value"
-                          className={`p-2 flex-1 bg-secondary rounded-md ${invalidFields.has(cred.key)
-                            ? 'border border-red-500 focus:border-red-500 shake'
-                            : ''
-                            }`}
+                          className={`p-2 flex-1 bg-secondary rounded-md ${
+                            invalidFields.has(cred.key)
+                              ? "border border-red-500 focus:border-red-500 shake"
+                              : ""
+                          }`}
                         />
                         {cred.isManual && (
                           <Button

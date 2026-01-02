@@ -1,5 +1,5 @@
 import { Log, LogLevel } from "./types.js";
-import { createClient, Client } from 'graphql-ws';
+import { createClient, Client } from "graphql-ws";
 
 export interface LogSubscriptionOptions {
   onLog?: (log: Log) => void;
@@ -20,7 +20,7 @@ export class WebSocketManager {
   private subscriptions: Map<string, () => void> = new Map();
 
   constructor(endpoint: string, apiKey: string) {
-    this.wsEndpoint = endpoint.replace('https:', 'wss:').replace('http:', 'ws:');
+    this.wsEndpoint = endpoint.replace("https:", "wss:").replace("http:", "ws:");
     this.apiKey = apiKey;
   }
 
@@ -29,13 +29,12 @@ export class WebSocketManager {
       this.client = createClient({
         url: this.wsEndpoint,
         connectionParams: {
-          Authorization: `Bearer ${this.apiKey}`
+          Authorization: `Bearer ${this.apiKey}`,
         },
         retryAttempts: Infinity,
         shouldRetry: () => true,
-        retryWait: (retries) => new Promise((resolve) => 
-          setTimeout(resolve, Math.min(retries * 1000, 5000))
-        ),
+        retryWait: (retries) =>
+          new Promise((resolve) => setTimeout(resolve, Math.min(retries * 1000, 5000))),
         keepAlive: 10000,
       });
     }
@@ -44,7 +43,7 @@ export class WebSocketManager {
 
   async subscribeToLogs(options: LogSubscriptionOptions = {}): Promise<WebSocketSubscription> {
     const client = this.initClient();
-    
+
     const unsubscribe = client.subscribe(
       {
         query: `
@@ -57,14 +56,14 @@ export class WebSocketManager {
               traceId
             }
           }
-        `
+        `,
       },
       {
         next: (data: any) => {
           if (data.data?.logs) {
             const log: Log = {
               ...data.data.logs,
-              timestamp: new Date(data.data.logs.timestamp)
+              timestamp: new Date(data.data.logs.timestamp),
             };
 
             if (!options.traceId || log.traceId === options.traceId) {
@@ -79,8 +78,8 @@ export class WebSocketManager {
         },
         complete: () => {
           options.onComplete?.();
-        }
-      }
+        },
+      },
     );
 
     const subscriptionId = Math.random().toString(36).substring(2, 15);
@@ -93,7 +92,7 @@ export class WebSocketManager {
           unsub();
           this.subscriptions.delete(subscriptionId);
         }
-      }
+      },
     };
   }
 
@@ -109,4 +108,3 @@ export class WebSocketManager {
     }
   }
 }
-

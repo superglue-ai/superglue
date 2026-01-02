@@ -4,58 +4,58 @@ on:
   workflow_dispatch:
     inputs:
       reason:
-        description: 'Reason for running the test'
+        description: "Reason for running the test"
         required: false
-        default: 'Manual trigger'
+        default: "Manual trigger"
   # Temporary trigger for testing - remove after confirming it works
   push:
     branches:
       - eval/add-proper-result-validation
     paths:
-      - '.github/workflows/integration-test-manual.yml'
+      - ".github/workflows/integration-test-manual.yml"
 
 # Only users with write access can trigger this workflow
 # Secrets are repository-level and shared among all authorized users
 permissions:
-  contents: read  # Read code
-  actions: read   # Read workflow runs
+  contents: read # Read code
+  actions: read # Read workflow runs
 
 jobs:
   integration-test:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Show trigger info
         run: |
           echo "🚀 Workflow triggered by: ${{ github.actor }}"
           echo "📝 Reason: ${{ inputs.reason }}"
           echo "🔐 Using repository-level secrets (shared across team)"
-          
+
       - name: Checkout repository
         uses: actions/checkout@v3
-        
+
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '24.x'
-          cache: 'npm'
-          
+          node-version: "24.x"
+          cache: "npm"
+
       - name: Install dependencies
         run: |
           rm -rf node_modules package-lock.json
           npm install
-        
+
       - name: Create custom config for GHA
         run: |
           # Create a temporary config file with GHA-specific settings
           cat > create-gha-config.js << 'EOF'
           const fs = require('fs');
           const path = require('path');
-          
+
           // Read the original config
           const configPath = path.join('packages/core/eval/integration-testing/integration-test-config.json');
           const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-          
+
           // Override the testSuite settings for GHA
           config.testSuite = {
             ...config.testSuite,
@@ -63,11 +63,11 @@ jobs:
             attemptsPerWorkflow: 1,
             delayBetweenAttempts: 500
           };
-          
+
           // Save the modified config
           const ghaConfigPath = path.join('packages/core/eval/integration-testing/gha-integration-test-config.json');
           fs.writeFileSync(ghaConfigPath, JSON.stringify(config, null, 4));
-          
+
           console.log('Created GHA-specific config with:');
           console.log('- name: GHA Integration test');
           console.log('- attemptsPerWorkflow: 1');
@@ -75,12 +75,12 @@ jobs:
           EOF
           node create-gha-config.js
           rm create-gha-config.js
-          
+
       - name: Build all packages
         run: |
           # Build shared package first, then all packages
           npm run build
-          
+
       - name: Run integration tests with custom config
         run: |
           cd packages/core
@@ -137,7 +137,7 @@ jobs:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           INTERCOM_ACCESS_TOKEN: ${{ secrets.INTERCOM_ACCESS_TOKEN }}
           OPENWEATHERMAP_API_KEY: ${{ secrets.OPENWEATHERMAP_API_KEY }}
-          
+
       - name: Check if test reports were generated
         run: |
           if [ -d "packages/core/test-reports" ]; then
@@ -146,7 +146,7 @@ jobs:
           else
             echo "No test reports directory found"
           fi
-          
+
       - name: Upload test results as artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -156,7 +156,7 @@ jobs:
             packages/core/test-reports/latest.md
             packages/core/test-reports/latest.json
           retention-days: 30
-          
+
       - name: Display test summary
         if: always()
         run: |
@@ -170,7 +170,7 @@ jobs:
           else
             echo "No test report found"
           fi
-          
+
       - name: Create job summary
         if: always()
         run: |

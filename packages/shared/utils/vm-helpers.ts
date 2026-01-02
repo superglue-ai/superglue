@@ -1,6 +1,6 @@
 export function executeWithVMHelpers(code: string, sourceData: any): any {
-  const trimmedCode = code.replace(/;\s*$/, '');
-  
+  const trimmedCode = code.replace(/;\s*$/, "");
+
   const wrappedCode = `
     ${VM_HELPERS_CODE}
     
@@ -9,12 +9,14 @@ export function executeWithVMHelpers(code: string, sourceData: any): any {
     );
     return fn(sourceData);
   `;
-  
+
   try {
-    const fn = new Function('sourceData', wrappedCode);
+    const fn = new Function("sourceData", wrappedCode);
     return fn(sourceData);
   } catch (error) {
-    throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Code execution failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -416,6 +418,3 @@ export const VM_HELPERS_CODE = `
     };
   }
 `;
-
-
-

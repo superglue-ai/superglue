@@ -3,7 +3,7 @@ name: Node.js Tests
 on:
   workflow_call: # Makes this workflow reusable
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
@@ -13,31 +13,31 @@ jobs:
       VITE_REDIS_PORT: ${{ secrets.REDIS_PORT }}
       VITE_REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
       VITE_REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
-      
+
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Use Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '24.x'
-        cache: 'npm'
-                
-    - name: Install dependencies
-      run: |
-        rm -rf node_modules package-lock.json
-        npm install
-        
-    - name: Install Playwright chromium browser
-      run: npx playwright install chromium
-      
-    - name: Run tests
-      run: npm run test
-      env:
-        REDIS_HOST: ${{ secrets.REDIS_HOST }}
-        REDIS_PORT: ${{ secrets.REDIS_PORT }}
-        REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
-        REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        PRIV_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PRIV_SUPABASE_SERVICE_ROLE_KEY }}
+      - uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "24.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
+
+      - name: Install Playwright chromium browser
+        run: npx playwright install chromium
+
+      - name: Run tests
+        run: npm run test
+        env:
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          PRIV_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PRIV_SUPABASE_SERVICE_ROLE_KEY }}

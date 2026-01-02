@@ -1,151 +1,173 @@
-import { describe, expect, it, vi } from 'vitest';
-import { toolDefinitions } from './mcp-server.js';
+import { describe, expect, it, vi } from "vitest";
+import { toolDefinitions } from "./mcp-server.js";
 
 const executeTool = toolDefinitions.superglue_execute_tool.execute;
 const findRelevantTools = toolDefinitions.superglue_find_relevant_tools.execute;
 
-
-describe('superglue_execute_tool', () => {
-  it('executes tool successfully and returns only data', async () => {
+describe("superglue_execute_tool", () => {
+  it("executes tool successfully and returns only data", async () => {
     const client = {
       executeWorkflow: vi.fn().mockResolvedValue({
         success: true,
-        data: { users: [{ id: 1, name: 'Alice' }] },
-        config: { id: 'tool-1', steps: [] },
-        stepResults: []
+        data: { users: [{ id: 1, name: "Alice" }] },
+        config: { id: "tool-1", steps: [] },
+        stepResults: [],
       }),
-      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 })
+      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
     };
-    const args = { id: 'tool-1', payload: {}, client, orgId: 'test-org' };
+    const args = { id: "tool-1", payload: {}, client, orgId: "test-org" };
     const result = await executeTool(args, {});
 
     expect(result.success).toBe(true);
-    expect(result.data).toEqual({ users: [{ id: 1, name: 'Alice' }] });
-    expect(result).not.toHaveProperty('config');
-    expect(result).not.toHaveProperty('stepResults');
+    expect(result.data).toEqual({ users: [{ id: 1, name: "Alice" }] });
+    expect(result).not.toHaveProperty("config");
+    expect(result).not.toHaveProperty("stepResults");
   });
 
-  it('returns only error message on failure', async () => {
+  it("returns only error message on failure", async () => {
     const client = {
       executeWorkflow: vi.fn().mockResolvedValue({
         success: false,
-        error: 'API rate limit exceeded',
+        error: "API rate limit exceeded",
         config: {},
-        stepResults: []
+        stepResults: [],
       }),
-      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 })
+      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
     };
-    const args = { id: 'tool-1', client, orgId: 'test-org' };
+    const args = { id: "tool-1", client, orgId: "test-org" };
     const result = await executeTool(args, {});
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe('API rate limit exceeded');
-    expect(result).not.toHaveProperty('config');
-    expect(result).not.toHaveProperty('stepResults');
+    expect(result.error).toBe("API rate limit exceeded");
+    expect(result).not.toHaveProperty("config");
+    expect(result).not.toHaveProperty("stepResults");
   });
 
-  it('rejects options parameter', async () => {
-    const client = { executeWorkflow: vi.fn(), listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }) };
-    const args = { id: 'tool-1', options: { selfHealing: 'ENABLED' }, client, orgId: 'test-org' };
+  it("rejects options parameter", async () => {
+    const client = {
+      executeWorkflow: vi.fn(),
+      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+    };
+    const args = { id: "tool-1", options: { selfHealing: "ENABLED" }, client, orgId: "test-org" };
     const result = await executeTool(args, {});
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Options parameter is not supported');
+    expect(result.error).toContain("Options parameter is not supported");
   });
 
-  it('rejects unexpected parameters', async () => {
-    const client = { executeWorkflow: vi.fn(), listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }) };
-    const args = { id: 'tool-1', unexpectedParam: 'value', client, orgId: 'test-org' };
+  it("rejects unexpected parameters", async () => {
+    const client = {
+      executeWorkflow: vi.fn(),
+      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+    };
+    const args = { id: "tool-1", unexpectedParam: "value", client, orgId: "test-org" };
     const result = await executeTool(args, {});
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Unexpected parameters: unexpectedParam');
+    expect(result.error).toContain("Unexpected parameters: unexpectedParam");
   });
 
-  it('requires id parameter', async () => {
-    const client = { executeWorkflow: vi.fn(), listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }) };
-    const args = { payload: {}, client, orgId: 'test-org' };
+  it("requires id parameter", async () => {
+    const client = {
+      executeWorkflow: vi.fn(),
+      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+    };
+    const args = { payload: {}, client, orgId: "test-org" };
     const result = await executeTool(args, {});
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Tool ID is required');
+    expect(result.error).toContain("Tool ID is required");
   });
 
-  it('truncates large results', async () => {
-    const largeData = { items: new Array(10000).fill({ id: 1, data: 'x'.repeat(100) }) };
+  it("truncates large results", async () => {
+    const largeData = { items: new Array(10000).fill({ id: 1, data: "x".repeat(100) }) };
     const client = {
       executeWorkflow: vi.fn().mockResolvedValue({
         success: true,
         data: largeData,
         config: {},
-        stepResults: []
+        stepResults: [],
       }),
-      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 })
+      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
     };
-    const args = { id: 'tool-1', client, orgId: 'test-org' };
+    const args = { id: "tool-1", client, orgId: "test-org" };
     const result = await executeTool(args, {});
 
     expect(result.success).toBe(true);
-    expect(typeof result.data).toBe('string');
-    expect(result.data).toContain('[TRUNCATED:');
+    expect(typeof result.data).toBe("string");
+    expect(result.data).toContain("[TRUNCATED:");
   });
 });
 
-describe('superglue_find_relevant_tools', () => {
-  it('returns all tools when searchTerms is wildcard', async () => {
+describe("superglue_find_relevant_tools", () => {
+  it("returns all tools when searchTerms is wildcard", async () => {
     const mockTools = [
-      { id: 'tool-1', instruction: 'Fetch users', steps: [{ integrationId: 'crm', instruction: 'Get users' }], reason: 'Available' },
-      { id: 'tool-2', instruction: 'Send email', steps: [{ integrationId: 'email', instruction: 'Send message' }], reason: 'Available' }
+      {
+        id: "tool-1",
+        instruction: "Fetch users",
+        steps: [{ integrationId: "crm", instruction: "Get users" }],
+        reason: "Available",
+      },
+      {
+        id: "tool-2",
+        instruction: "Send email",
+        steps: [{ integrationId: "email", instruction: "Send message" }],
+        reason: "Available",
+      },
     ];
     const client = {
-      findRelevantTools: vi.fn().mockResolvedValue(mockTools)
+      findRelevantTools: vi.fn().mockResolvedValue(mockTools),
     };
-    const args = { searchTerms: '*', client, orgId: 'test-org' };
+    const args = { searchTerms: "*", client, orgId: "test-org" };
     const result = await findRelevantTools(args, {});
 
     expect(result.success).toBe(true);
     expect(result.tools).toHaveLength(2);
-    expect(result.tools[0]).toHaveProperty('id');
-    expect(result.tools[0]).toHaveProperty('instruction');
-    expect(result.tools[0]).toHaveProperty('steps');
-    expect(result.tools[0]).toHaveProperty('reason');
+    expect(result.tools[0]).toHaveProperty("id");
+    expect(result.tools[0]).toHaveProperty("instruction");
+    expect(result.tools[0]).toHaveProperty("steps");
+    expect(result.tools[0]).toHaveProperty("reason");
   });
 
-  it('returns filtered tools for specific search', async () => {
+  it("returns filtered tools for specific search", async () => {
     const mockTools = [
-      { id: 'slack-tool', instruction: 'Post to Slack', steps: [{ integrationId: 'slack' }], reason: 'Matches Slack' }
+      {
+        id: "slack-tool",
+        instruction: "Post to Slack",
+        steps: [{ integrationId: "slack" }],
+        reason: "Matches Slack",
+      },
     ];
     const client = {
-      findRelevantTools: vi.fn().mockResolvedValue(mockTools)
+      findRelevantTools: vi.fn().mockResolvedValue(mockTools),
     };
-    const args = { searchTerms: 'slack message', client, orgId: 'test-org' };
+    const args = { searchTerms: "slack message", client, orgId: "test-org" };
     const result = await findRelevantTools(args, {});
 
     expect(result.success).toBe(true);
     expect(result.tools).toHaveLength(1);
-    expect(result.tools[0].id).toBe('slack-tool');
+    expect(result.tools[0].id).toBe("slack-tool");
   });
 
-  it('returns empty array when no tools match', async () => {
+  it("returns empty array when no tools match", async () => {
     const client = {
-      findRelevantTools: vi.fn().mockResolvedValue([])
+      findRelevantTools: vi.fn().mockResolvedValue([]),
     };
-    const args = { searchTerms: 'nonexistent', client, orgId: 'test-org' };
+    const args = { searchTerms: "nonexistent", client, orgId: "test-org" };
     const result = await findRelevantTools(args, {});
 
     expect(result.success).toBe(true);
     expect(result.tools).toEqual([]);
   });
 
-  it('handles errors gracefully', async () => {
+  it("handles errors gracefully", async () => {
     const client = {
-      findRelevantTools: vi.fn().mockRejectedValue(new Error('Search failed'))
+      findRelevantTools: vi.fn().mockRejectedValue(new Error("Search failed")),
     };
-    const args = { searchTerms: 'test', client, orgId: 'test-org' };
+    const args = { searchTerms: "test", client, orgId: "test-org" };
     const result = await findRelevantTools(args, {});
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Search failed');
+    expect(result.error).toBe("Search failed");
   });
 });
-

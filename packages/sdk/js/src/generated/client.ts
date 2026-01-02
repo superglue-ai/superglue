@@ -41,9 +41,7 @@ export const getListToolsUrl = (params?: ListToolsParams) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0
-    ? `/tools?${stringifiedParams}`
-    : `/tools`;
+  return stringifiedParams.length > 0 ? `/tools?${stringifiedParams}` : `/tools`;
 };
 
 export const listTools = async (
@@ -82,10 +80,7 @@ export const getGetToolUrl = (toolId: string) => {
   return `/tools/${toolId}`;
 };
 
-export const getTool = async (
-  toolId: string,
-  options?: RequestInit,
-): Promise<getToolResponse> => {
+export const getTool = async (toolId: string, options?: RequestInit): Promise<getToolResponse> => {
   return customFetch<getToolResponse>(getGetToolUrl(toolId), {
     ...options,
     method: "GET",
@@ -125,10 +120,7 @@ export type runToolResponse429 = {
   status: 429;
 };
 
-export type runToolResponseSuccess = (
-  | runToolResponse200
-  | runToolResponse202
-) & {
+export type runToolResponseSuccess = (runToolResponse200 | runToolResponse202) & {
   headers: Headers;
 };
 export type runToolResponseError = (
@@ -185,10 +177,7 @@ export const getGetRunUrl = (runId: string) => {
   return `/runs/${runId}`;
 };
 
-export const getRun = async (
-  runId: string,
-  options?: RequestInit,
-): Promise<getRunResponse> => {
+export const getRun = async (runId: string, options?: RequestInit): Promise<getRunResponse> => {
   return customFetch<getRunResponse>(getGetRunUrl(runId), {
     ...options,
     method: "GET",
@@ -215,9 +204,7 @@ export type cancelRunResponseError = cancelRunResponse400 & {
   headers: Headers;
 };
 
-export type cancelRunResponse =
-  | cancelRunResponseSuccess
-  | cancelRunResponseError;
+export type cancelRunResponse = cancelRunResponseSuccess | cancelRunResponseError;
 
 export const getCancelRunUrl = (runId: string) => {
   return `/runs/${runId}/cancel`;

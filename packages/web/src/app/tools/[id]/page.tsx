@@ -6,5 +6,5 @@ export default function ToolsPage() {
   const params = useParams();
   const id = params.id as string;
 
-  return <ToolPlayground id={id}/>
+  return <ToolPlayground id={id} />;
 }

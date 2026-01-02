@@ -14,6 +14,6 @@ export type GraphQLRequestContext = {
   userId?: string;
   orgName?: string;
   orgRole?: UserRole;
-  
+
   toMetadata: () => ServiceMetadata;
 };

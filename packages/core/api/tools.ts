@@ -1,17 +1,17 @@
-import { ExecutionStep, RequestOptions, RunStatus, Tool, ToolResult } from '@superglue/shared';
-import { parseJSON } from '../files/index.js';
-import { IntegrationManager } from '../integrations/integration-manager.js';
-import { isSelfHealingEnabled } from '../utils/helpers.js';
-import { logMessage } from '../utils/logs.js';
-import { notifyWebhook } from '../utils/webhook.js';
-import type { ToolExecutionPayload } from '../worker/types.js';
-import { registerApiModule } from './registry.js';
+import { ExecutionStep, RequestOptions, RunStatus, Tool, ToolResult } from "@superglue/shared";
+import { parseJSON } from "../files/index.js";
+import { IntegrationManager } from "../integrations/integration-manager.js";
+import { isSelfHealingEnabled } from "../utils/helpers.js";
+import { logMessage } from "../utils/logs.js";
+import { notifyWebhook } from "../utils/webhook.js";
+import type { ToolExecutionPayload } from "../worker/types.js";
+import { registerApiModule } from "./registry.js";
 import {
   addTraceHeader,
   mapRunStatusToOpenAPI,
   parsePaginationParams,
   sendError,
-} from './response-helpers.js';
+} from "./response-helpers.js";
 import type {
   AuthenticatedFastifyRequest,
   OpenAPIRun,
@@ -19,33 +19,33 @@ import type {
   OpenAPIToolStep,
   RouteHandler,
   RunToolRequestBody,
-} from './types.js';
+} from "./types.js";
 
 export const PAGINATION_TYPE_MAP: Record<string, string> = {
-  OFFSET_BASED: 'offsetBased',
-  PAGE_BASED: 'pageBased',
-  CURSOR_BASED: 'cursorBased',
-  DISABLED: 'disabled',
+  OFFSET_BASED: "offsetBased",
+  PAGE_BASED: "pageBased",
+  CURSOR_BASED: "cursorBased",
+  DISABLED: "disabled",
 };
 
 export function mapPaginationType(internalType?: string): string {
-  if (!internalType) return 'disabled';
+  if (!internalType) return "disabled";
   return PAGINATION_TYPE_MAP[internalType] || internalType.toLowerCase();
 }
 
-export function mapFailureBehavior(internal?: string): 'fail' | 'continue' | undefined {
+export function mapFailureBehavior(internal?: string): "fail" | "continue" | undefined {
   if (!internal) return undefined;
-  return internal.toLowerCase() as 'fail' | 'continue';
+  return internal.toLowerCase() as "fail" | "continue";
 }
 
 export function mapStepToOpenAPI(step: ExecutionStep): OpenAPIToolStep {
   const apiConfig = step.apiConfig;
-  const url = (apiConfig.urlHost || '') + (apiConfig.urlPath || '');
+  const url = (apiConfig.urlHost || "") + (apiConfig.urlPath || "");
 
   const result: OpenAPIToolStep = {
     id: step.id,
     url,
-    method: apiConfig.method || 'GET',
+    method: apiConfig.method || "GET",
   };
 
   if (apiConfig.queryParams) result.queryParams = apiConfig.queryParams;
@@ -73,7 +73,7 @@ export function mapToolToOpenAPI(tool: Tool): OpenAPITool {
   return {
     id: tool.id,
     name: tool.id,
-    version: tool.version || '1.0.0',
+    version: tool.version || "1.0.0",
     instruction: tool.instruction,
     inputSchema: tool.inputSchema as Record<string, unknown>,
     outputSchema: tool.responseSchema as Record<string, unknown>,
@@ -92,19 +92,32 @@ export function buildRunResponse(params: {
   toolPayload?: Record<string, unknown>;
   data?: any;
   error?: string;
-  stepResults?: ToolResult['stepResults'];
+  stepResults?: ToolResult["stepResults"];
   options?: RequestOptions;
   requestSource: string;
   traceId?: string;
   startedAt: Date;
   completedAt?: Date;
 }): OpenAPIRun {
-  const { runId, tool, status, toolPayload, data, error, stepResults, options, requestSource, traceId, startedAt, completedAt } = params;
+  const {
+    runId,
+    tool,
+    status,
+    toolPayload,
+    data,
+    error,
+    stepResults,
+    options,
+    requestSource,
+    traceId,
+    startedAt,
+    completedAt,
+  } = params;
 
   return {
     runId,
     toolId: tool.id,
-    tool: { id: tool.id, version: tool.version || '1.0.0' },
+    tool: { id: tool.id, version: tool.version || "1.0.0" },
     status: mapRunStatusToOpenAPI(status),
     toolPayload,
     data,
@@ -135,20 +148,28 @@ async function handleWebhook(
   result: { success: boolean; data?: any; error?: string },
   credentials: Record<string, unknown> | undefined,
   options: { timeout?: number } | undefined,
-  metadata: { orgId: string; traceId?: string }
+  metadata: { orgId: string; traceId?: string },
 ) {
   if (!webhookUrl) return;
 
-  if (webhookUrl.startsWith('http')) {
+  if (webhookUrl.startsWith("http")) {
     notifyWebhook(webhookUrl, runId, result.success, result.data, result.error, metadata);
-  } else if (webhookUrl.startsWith('tool:')) {
-    const chainToolId = webhookUrl.split(':')[1];
+  } else if (webhookUrl.startsWith("tool:")) {
+    const chainToolId = webhookUrl.split(":")[1];
     if (chainToolId === currentToolId) {
-      logMessage('warn', 'Tool cannot trigger itself', metadata);
+      logMessage("warn", "Tool cannot trigger itself", metadata);
       return;
     }
     // Fire-and-forget chain execution
-    executeToolInternal(authReq, chainToolId, result.data, credentials, { ...options, webhookUrl: undefined }, metadata, 'api-chain');
+    executeToolInternal(
+      authReq,
+      chainToolId,
+      result.data,
+      credentials,
+      { ...options, webhookUrl: undefined },
+      metadata,
+      "api-chain",
+    );
   }
 }
 
@@ -160,7 +181,7 @@ async function executeToolInternal(
   credentials: Record<string, unknown> | undefined,
   options: RequestOptions | undefined,
   metadata: { orgId: string; traceId?: string },
-  requestSource: string
+  requestSource: string,
 ): Promise<{ runId: string; result: ToolResult } | null> {
   const tool = await authReq.datastore.getWorkflow({
     id: toolId,
@@ -168,20 +189,20 @@ async function executeToolInternal(
   });
 
   if (!tool) {
-    logMessage('error', `Tool ${toolId} not found`, metadata);
+    logMessage("error", `Tool ${toolId} not found`, metadata);
     return null;
   }
 
   if (tool.archived) {
-    logMessage('error', `Cannot execute archived tool ${toolId}`, metadata);
+    logMessage("error", `Cannot execute archived tool ${toolId}`, metadata);
     return null;
   }
 
   // Parse schemas if strings
-  if (tool.inputSchema && typeof tool.inputSchema === 'string') {
+  if (tool.inputSchema && typeof tool.inputSchema === "string") {
     tool.inputSchema = parseJSON(tool.inputSchema);
   }
-  if (tool.responseSchema && typeof tool.responseSchema === 'string') {
+  if (tool.responseSchema && typeof tool.responseSchema === "string") {
     tool.responseSchema = parseJSON(tool.responseSchema);
   }
 
@@ -192,12 +213,12 @@ async function executeToolInternal(
     timeout: options?.timeout,
   };
 
-  const selfHealingEnabled = isSelfHealingEnabled(requestOptions, 'api');
+  const selfHealingEnabled = isSelfHealingEnabled(requestOptions, "api");
   const integrationManagers = await IntegrationManager.forToolExecution(
     tool,
     authReq.datastore,
     metadata,
-    { includeDocs: selfHealingEnabled }
+    { includeDocs: selfHealingEnabled },
   );
 
   await authReq.datastore.createRun({
@@ -239,10 +260,19 @@ async function executeToolInternal(
           completedAt: new Date(),
         },
       });
-      handleWebhook(authReq, options?.webhookUrl, toolId, runId, result, credentials, options, metadata);
+      handleWebhook(
+        authReq,
+        options?.webhookUrl,
+        toolId,
+        runId,
+        result,
+        credentials,
+        options,
+        metadata,
+      );
     })
     .catch(async (error) => {
-      logMessage('error', `Tool execution error: ${String(error)}`, metadata);
+      logMessage("error", `Tool execution error: ${String(error)}`, metadata);
       await authReq.datastore.updateRun({
         id: runId,
         orgId: authReq.authInfo.orgId,
@@ -294,7 +324,7 @@ const getTool: RouteHandler = async (request, reply) => {
   });
 
   if (!tool) {
-    return sendError(reply, 404, 'Tool not found');
+    return sendError(reply, 404, "Tool not found");
   }
 
   return addTraceHeader(reply, authReq.traceId).code(200).send(mapToolToOpenAPI(tool));
@@ -329,17 +359,17 @@ const runTool: RouteHandler = async (request, reply) => {
   });
 
   if (!tool) {
-    return sendError(reply, 404, 'Tool not found');
+    return sendError(reply, 404, "Tool not found");
   }
 
   if (tool.archived) {
-    return sendError(reply, 400, 'Cannot execute archived tool');
+    return sendError(reply, 400, "Cannot execute archived tool");
   }
 
-  if (tool.inputSchema && typeof tool.inputSchema === 'string') {
+  if (tool.inputSchema && typeof tool.inputSchema === "string") {
     tool.inputSchema = parseJSON(tool.inputSchema);
   }
-  if (tool.responseSchema && typeof tool.responseSchema === 'string') {
+  if (tool.responseSchema && typeof tool.responseSchema === "string") {
     tool.responseSchema = parseJSON(tool.responseSchema);
   }
 
@@ -348,12 +378,12 @@ const runTool: RouteHandler = async (request, reply) => {
     timeout: body.options?.timeout,
   };
 
-  const selfHealingEnabled = isSelfHealingEnabled(requestOptions, 'api');
+  const selfHealingEnabled = isSelfHealingEnabled(requestOptions, "api");
   const integrationManagers = await IntegrationManager.forToolExecution(
     tool,
     authReq.datastore,
     metadata,
-    { includeDocs: selfHealingEnabled }
+    { includeDocs: selfHealingEnabled },
   );
 
   await authReq.datastore.createRun({
@@ -365,7 +395,7 @@ const runTool: RouteHandler = async (request, reply) => {
       toolConfig: tool,
       toolPayload: body.inputs as Record<string, any>,
       options: requestOptions,
-      requestSource: 'api',
+      requestSource: "api",
       startedAt,
     },
   });
@@ -382,9 +412,7 @@ const runTool: RouteHandler = async (request, reply) => {
   };
 
   const sendResponse = (statusCode: number, run: OpenAPIRun) => {
-    return addTraceHeader(reply, metadata.traceId)
-      .code(statusCode)
-      .send(run);
+    return addTraceHeader(reply, metadata.traceId).code(statusCode).send(run);
   };
 
   // Async execution
@@ -393,41 +421,53 @@ const runTool: RouteHandler = async (request, reply) => {
       .runTask(runId, taskPayload)
       .then(async (result) => {
         await authReq.datastore.updateRun({
-        id: runId,
-        orgId: authReq.authInfo.orgId,
-        updates: {
-          status: result.success ? RunStatus.SUCCESS : RunStatus.FAILED,
-          toolConfig: result.config || tool,
-          error: result.error,
-          completedAt: new Date(),
-        },
-      });
-        handleWebhook(authReq, body.options?.webhookUrl, params.toolId, runId, result, body.credentials, body.options, metadata);
+          id: runId,
+          orgId: authReq.authInfo.orgId,
+          updates: {
+            status: result.success ? RunStatus.SUCCESS : RunStatus.FAILED,
+            toolConfig: result.config || tool,
+            error: result.error,
+            completedAt: new Date(),
+          },
+        });
+        handleWebhook(
+          authReq,
+          body.options?.webhookUrl,
+          params.toolId,
+          runId,
+          result,
+          body.credentials,
+          body.options,
+          metadata,
+        );
       })
       .catch(async (error) => {
-        logMessage('error', `Async tool execution error: ${String(error)}`, metadata);
+        logMessage("error", `Async tool execution error: ${String(error)}`, metadata);
         await authReq.datastore.updateRun({
-        id: runId,
-        orgId: authReq.authInfo.orgId,
-        updates: {
-          status: RunStatus.FAILED,
-          toolConfig: tool,
-          error: String(error),
-          completedAt: new Date(),
-        },
-      });
+          id: runId,
+          orgId: authReq.authInfo.orgId,
+          updates: {
+            status: RunStatus.FAILED,
+            toolConfig: tool,
+            error: String(error),
+            completedAt: new Date(),
+          },
+        });
       });
 
-    return sendResponse(202, buildRunResponse({
-      runId,
-      tool,
-      status: RunStatus.RUNNING,
-      toolPayload: body.inputs,
-      options: requestOptions,
-      requestSource: 'api',
-      traceId: metadata.traceId,
-      startedAt,
-    }));
+    return sendResponse(
+      202,
+      buildRunResponse({
+        runId,
+        tool,
+        status: RunStatus.RUNNING,
+        toolPayload: body.inputs,
+        options: requestOptions,
+        requestSource: "api",
+        traceId: metadata.traceId,
+        startedAt,
+      }),
+    );
   }
 
   // Sync execution
@@ -446,26 +486,38 @@ const runTool: RouteHandler = async (request, reply) => {
         completedAt,
       },
     });
-    handleWebhook(authReq, body.options?.webhookUrl, params.toolId, runId, result, body.credentials, body.options, metadata);
-
-    return sendResponse(200, buildRunResponse({
+    handleWebhook(
+      authReq,
+      body.options?.webhookUrl,
+      params.toolId,
       runId,
-      tool,
-      status,
-      toolPayload: body.inputs,
-      data: result.data,
-      error: result.error,
-      stepResults: result.stepResults,
-      options: requestOptions,
-      requestSource: 'api',
-      traceId: metadata.traceId,
-      startedAt,
-      completedAt,
-    }));
+      result,
+      body.credentials,
+      body.options,
+      metadata,
+    );
+
+    return sendResponse(
+      200,
+      buildRunResponse({
+        runId,
+        tool,
+        status,
+        toolPayload: body.inputs,
+        data: result.data,
+        error: result.error,
+        stepResults: result.stepResults,
+        options: requestOptions,
+        requestSource: "api",
+        traceId: metadata.traceId,
+        startedAt,
+        completedAt,
+      }),
+    );
   } catch (error: any) {
-    logMessage('error', `Tool execution error: ${String(error)}`, metadata);
+    logMessage("error", `Tool execution error: ${String(error)}`, metadata);
     const completedAt = new Date();
-    const isAborted = error.message?.includes('abort') || error.name === 'AbortError';
+    const isAborted = error.message?.includes("abort") || error.name === "AbortError";
     const status = isAborted ? RunStatus.ABORTED : RunStatus.FAILED;
 
     await authReq.datastore.updateRun({
@@ -479,37 +531,40 @@ const runTool: RouteHandler = async (request, reply) => {
       },
     });
 
-    return sendResponse(200, buildRunResponse({
-      runId,
-      tool,
-      status,
-      toolPayload: body.inputs,
-      error: String(error),
-      options: requestOptions,
-      requestSource: 'api',
-      traceId: metadata.traceId,
-      startedAt,
-      completedAt,
-    }));
+    return sendResponse(
+      200,
+      buildRunResponse({
+        runId,
+        tool,
+        status,
+        toolPayload: body.inputs,
+        error: String(error),
+        options: requestOptions,
+        requestSource: "api",
+        traceId: metadata.traceId,
+        startedAt,
+        completedAt,
+      }),
+    );
   }
 };
 
 registerApiModule({
-  name: 'tools',
+  name: "tools",
   routes: [
     {
-      method: 'GET',
-      path: '/tools',
+      method: "GET",
+      path: "/tools",
       handler: listTools,
     },
     {
-      method: 'GET',
-      path: '/tools/:toolId',
+      method: "GET",
+      path: "/tools/:toolId",
       handler: getTool,
     },
     {
-      method: 'POST',
-      path: '/tools/:toolId/run',
+      method: "POST",
+      path: "/tools/:toolId/run",
       handler: runTool,
     },
   ],
