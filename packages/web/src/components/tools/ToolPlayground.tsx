@@ -25,6 +25,7 @@ import {
   buildEvolvingPayload,
   computeStepOutput,
   computeToolPayload,
+  deepEqual,
   isAbortError,
   removeFileKeysFromPayload,
   wrapLoopSelectorWithLimit,
@@ -445,7 +446,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>(
             ) {
               return true;
             }
-            if (JSON.stringify(payload) === JSON.stringify(generatedDefault)) {
+            if (deepEqual(payload, generatedDefault)) {
               return false;
             }
           } catch (e) {

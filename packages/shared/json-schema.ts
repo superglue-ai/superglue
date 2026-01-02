@@ -41,9 +41,8 @@ function isEqual(a: unknown, b: unknown): boolean {
   const keysA = Object.keys(a);
   const keysB = Object.keys(b);
   if (keysA.length !== keysB.length) return false;
-  return keysA.every((k) =>
-    isEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]),
-  );
+  const bObj = b as Record<string, unknown>;
+  return keysA.every((k) => k in bObj && isEqual((a as Record<string, unknown>)[k], bObj[k]));
 }
 
 export interface JSONSchema3or4 {
