@@ -120,7 +120,6 @@ export function normalizeTemplateExpression(expr: string): string {
     const accessor = buildAccessor(segments);
     return `(sourceData) => sourceData${accessor}`;
   }
-  // Single segment - use dot notation if valid identifier, bracket notation otherwise
   if (VALID_IDENTIFIER.test(trimmed)) {
     return `(sourceData) => sourceData.${trimmed}`;
   }
@@ -277,16 +276,75 @@ export function buildCategorizedSources(
   };
 }
 
-export function deriveCurrentItem(dataSelectorOutput: unknown): Record<string, unknown> | null {
-  if (
-    dataSelectorOutput &&
-    typeof dataSelectorOutput === "object" &&
-    !Array.isArray(dataSelectorOutput)
-  ) {
-    return dataSelectorOutput as Record<string, unknown>;
+export function deriveCurrentItem(dataSelectorOutput: unknown): unknown {
+  if (Array.isArray(dataSelectorOutput)) {
+    return dataSelectorOutput.length > 0 ? dataSelectorOutput[0] : null;
   }
-  if (Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 0) {
-    return dataSelectorOutput[0] as Record<string, unknown>;
+  return dataSelectorOutput;
+}
+interface TiptapJSONContent {
+  type?: string;
+  attrs?: Record<string, any>;
+  content?: TiptapJSONContent[];
+  text?: string;
+}
+
+export function templateStringToTiptap(value: string): TiptapJSONContent {
+  if (!value) {
+    return { type: "doc", content: [{ type: "paragraph" }] };
   }
-  return null;
+
+  const parts = parseTemplateString(value);
+  const paragraphs: TiptapJSONContent[] = [];
+  let currentParagraph: TiptapJSONContent[] = [];
+
+  for (const part of parts) {
+    if (part.type === "text") {
+      const textLines = part.value.split("\n");
+      for (let i = 0; i < textLines.length; i++) {
+        if (textLines[i]) {
+          currentParagraph.push({ type: "text", text: textLines[i] });
+        }
+        if (i < textLines.length - 1) {
+          paragraphs.push({
+            type: "paragraph",
+            content: currentParagraph.length > 0 ? currentParagraph : undefined,
+          });
+          currentParagraph = [];
+        }
+      }
+    } else if (part.type === "template") {
+      currentParagraph.push({
+        type: "template",
+        attrs: { rawTemplate: part.rawTemplate },
+      });
+    }
+  }
+
+  paragraphs.push({
+    type: "paragraph",
+    content: currentParagraph.length > 0 ? currentParagraph : undefined,
+  });
+
+  return { type: "doc", content: paragraphs };
+}
+
+export function tiptapToTemplateString(json: TiptapJSONContent): string {
+  if (!json?.content) return "";
+
+  const lines: string[] = [];
+  for (const paragraph of json.content) {
+    if (paragraph.type === "paragraph") {
+      let line = "";
+      if (paragraph.content) {
+        for (const node of paragraph.content) {
+          if (node.type === "text") line += node.text || "";
+          else if (node.type === "template") line += node.attrs?.rawTemplate || "";
+          else if (node.type === "hardBreak") line += "\n";
+        }
+      }
+      lines.push(line);
+    }
+  }
+  return lines.join("\n");
 }

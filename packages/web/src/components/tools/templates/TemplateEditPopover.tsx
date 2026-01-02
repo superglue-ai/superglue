@@ -9,32 +9,25 @@ import {
 } from "@/src/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
-import { useMonacoTheme } from "@/src/hooks/useMonacoTheme";
+import { useMonacoTheme } from "@superglue/web/src/hooks/use-monaco-theme";
 import {
   DEFAULT_CODE_TEMPLATE,
-  extractCredentials,
   formatValueForDisplay,
   normalizeTemplateExpression,
 } from "@/src/lib/templating-utils";
 import Editor from "@monaco-editor/react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { isArrowFunction, maskCredentials } from "@superglue/shared";
-import { AlertCircle, Download, Eye, EyeOff, Loader2, Maximize2, Minimize2 } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Loader2, Maximize2, Minimize2 } from "lucide-react";
+import { DownloadButton } from "@/src/components/ui/download-button";
 import type * as Monaco from "monaco-editor";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTemplatePreview } from "../hooks/use-template-preview";
 import { CopyButton } from "../shared/CopyButton";
+import { useExecution } from "../context/tool-execution-context";
 
 const TEMPLATE_POPOVER_OPEN_EVENT = "template-popover-open";
 const TEMPLATE_POPOVER_CLOSE_ALL_EVENT = "template-popover-close-all";
-
-if (typeof document !== "undefined") {
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) {
-      window.dispatchEvent(new CustomEvent(TEMPLATE_POPOVER_CLOSE_ALL_EVENT));
-    }
-  });
-}
 
 const POPOVER_Z_INDEX = 200;
 const POPOVER_WIDTH_PX = 700;
@@ -91,10 +84,9 @@ const calcHeight = (content: string, maxHeight: number): number => {
 
 interface TemplateEditPopoverProps {
   template: string;
-  sourceData: any;
   onSave: (newTemplate: string) => void;
+  stepId: string;
   children?: React.ReactNode;
-  canExecute?: boolean;
   externalOpen?: boolean;
   onExternalOpenChange?: (open: boolean) => void;
   onOpenChange?: (open: boolean) => void;
@@ -102,15 +94,13 @@ interface TemplateEditPopoverProps {
   loopMode?: boolean;
   title?: string;
   helpText?: string;
-  sourceDataVersion?: number;
 }
 
 export function TemplateEditPopover({
   template,
-  sourceData,
   onSave,
+  stepId,
   children,
-  canExecute = true,
   externalOpen,
   onExternalOpenChange,
   onOpenChange,
@@ -118,8 +108,10 @@ export function TemplateEditPopover({
   loopMode = false,
   title = "Template Expression",
   helpText,
-  sourceDataVersion,
 }: TemplateEditPopoverProps) {
+  const { getStepTemplateData, sourceDataVersion } = useExecution();
+  const { sourceData, credentials, canExecute } = getStepTemplateData(stepId);
+
   const [internalOpen, setInternalOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const isControlled = externalOpen !== undefined;
@@ -149,11 +141,20 @@ export function TemplateEditPopover({
       if ((e as CustomEvent).detail !== popoverId) setOpen(false);
     };
     const handleCloseAll = () => setOpen(false);
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        window.dispatchEvent(new CustomEvent(TEMPLATE_POPOVER_CLOSE_ALL_EVENT));
+      }
+    };
+
     window.addEventListener(TEMPLATE_POPOVER_OPEN_EVENT, handleOtherOpen);
     window.addEventListener(TEMPLATE_POPOVER_CLOSE_ALL_EVENT, handleCloseAll);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       window.removeEventListener(TEMPLATE_POPOVER_OPEN_EVENT, handleOtherOpen);
       window.removeEventListener(TEMPLATE_POPOVER_CLOSE_ALL_EVENT, handleCloseAll);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [setOpen, popoverId]);
 
@@ -169,7 +170,7 @@ export function TemplateEditPopover({
   const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
     codeContent,
     sourceData,
-    { enabled: open && canExecute, sourceDataVersion },
+    { enabled: open && canExecute, stepId, sourceDataVersion },
   );
 
   const handleEditorMount = useCallback(
@@ -210,19 +211,6 @@ export function TemplateEditPopover({
     onSave(newTemplate);
     setOpen(false);
   };
-
-  const handleDownload = () => {
-    const downloadContent = showRevealButton && showCredentials ? previewDisplayRaw : maskedPreview;
-    const blob = new Blob([downloadContent], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `template-result.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const credentials = extractCredentials(sourceData);
 
   const isLoopArray = loopMode && Array.isArray(previewValue) && previewValue.length > 0;
   const currentItemValue = isLoopArray ? previewValue[0] : previewValue;
@@ -390,13 +378,11 @@ export function TemplateEditPopover({
                 </button>
               )}
               <CopyButton getData={() => previewDisplay} />
-              <button
-                onClick={handleDownload}
-                className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted/80 transition-colors"
-                title="Download"
-              >
-                <Download className="h-3 w-3 text-muted-foreground" />
-              </button>
+              <DownloadButton
+                data={activePreviewValue}
+                filename="template-result.json"
+                credentials={showCredentials && showRevealButton ? undefined : credentials}
+              />
             </div>
           </div>
         )}

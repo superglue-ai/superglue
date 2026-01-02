@@ -1,21 +1,36 @@
 import { Node, mergeAttributes, InputRule } from "@tiptap/core";
 import { NodeViewWrapper, ReactNodeViewRenderer, NodeViewProps } from "@tiptap/react";
 import { TemplateChip } from "./TemplateChip";
-import { useTemplateContext } from "./tiptap/TemplateContext";
-import { prepareSourceData } from "@/src/lib/templating-utils";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useExecution } from "../context/tool-execution-context";
+import { useEffect, useState, useCallback } from "react";
 import { useTemplatePreview } from "../hooks/use-template-preview";
+
+export interface TemplateExtensionOptions {
+  stepId: string;
+}
+
+export interface TemplateExtensionStorage {
+  stepId: string;
+}
+
+declare module "@tiptap/core" {
+  interface Commands<ReturnType> {
+    template: {
+      setStepId: (stepId: string) => ReturnType;
+    };
+  }
+
+  interface Storage {
+    template?: TemplateExtensionStorage;
+  }
+}
 
 function TemplateNodeView(props: NodeViewProps) {
   const { node, deleteNode, updateAttributes, selected, editor } = props;
-  const {
-    stepData,
-    dataSelectorOutput,
-    readOnly,
-    canExecute = true,
-    sourceDataVersion,
-    stepId,
-  } = useTemplateContext();
+  const stepId = editor.storage.template?.stepId ?? "";
+  const { getStepTemplateData, sourceDataVersion } = useExecution();
+  const { sourceData, dataSelectorOutput, canExecute } = getStepTemplateData(stepId);
+
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const [forcePopoverOpen, setForcePopoverOpen] = useState(false);
 
@@ -25,18 +40,13 @@ function TemplateNodeView(props: NodeViewProps) {
       ? rawTemplate.slice(2, -2).trim()
       : rawTemplate.trim();
 
-  const sourceData = useMemo(
-    () => prepareSourceData(stepData, dataSelectorOutput),
-    [stepData, dataSelectorOutput],
-  );
-
   const needsDataSelectorOutput = expression.includes("currentItem");
   const shouldEvaluate = canExecute && (!needsDataSelectorOutput || !!dataSelectorOutput);
 
   const { previewValue, previewError, hasResult, isEvaluating } = useTemplatePreview(
     expression,
     sourceData,
-    { enabled: shouldEvaluate, debounceMs: 100, sourceDataVersion, stepId },
+    { enabled: shouldEvaluate, debounceMs: 100, stepId, sourceDataVersion },
   );
 
   useEffect(() => {
@@ -58,13 +68,13 @@ function TemplateNodeView(props: NodeViewProps) {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (isActuallySelected && e.key === "Enter" && !readOnly) {
+      if (isActuallySelected && e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
         setForcePopoverOpen(true);
       }
     },
-    [isActuallySelected, readOnly],
+    [isActuallySelected],
   );
 
   useEffect(() => {
@@ -84,14 +94,11 @@ function TemplateNodeView(props: NodeViewProps) {
         template={rawTemplate}
         evaluatedValue={previewValue}
         error={previewError ?? undefined}
-        stepData={stepData}
-        dataSelectorOutput={dataSelectorOutput}
         hasResult={hasResult}
-        canExecute={canExecute}
         isEvaluating={isEvaluating}
         onUpdate={(newTemplate) => updateAttributes({ rawTemplate: newTemplate })}
         onDelete={deleteNode}
-        readOnly={readOnly}
+        stepId={stepId}
         inline={true}
         selected={isActuallySelected}
         forcePopoverOpen={forcePopoverOpen}
@@ -103,11 +110,36 @@ function TemplateNodeView(props: NodeViewProps) {
 
 const TEMPLATE_REGEX = /<<(.+?)>>$/;
 
-export const TemplateExtension = Node.create({
+export const TemplateExtension = Node.create<TemplateExtensionOptions, TemplateExtensionStorage>({
   name: "template",
   group: "inline",
   inline: true,
   atom: true,
+
+  addOptions() {
+    return {
+      stepId: "",
+    };
+  },
+
+  addStorage() {
+    return {
+      stepId: this.options.stepId,
+    };
+  },
+
+  addCommands() {
+    return {
+      setStepId:
+        (stepId: string) =>
+        ({ editor }) => {
+          if (editor.storage.template) {
+            editor.storage.template.stepId = stepId;
+          }
+          return true;
+        },
+    };
+  },
 
   addAttributes() {
     return {

@@ -1,19 +1,14 @@
 import { useRef, useState, useMemo, useCallback } from "react";
-import { prepareSourceData } from "@/src/lib/templating-utils";
 import { createVariableSuggestionConfig } from "../templates/TemplateVariableSuggestion";
-import type { CategorizedVariables, CategorizedSources } from "../templates/tiptap/TemplateContext";
+import type { CategorizedVariables, CategorizedSources } from "../context/types";
 import type { Editor } from "@tiptap/react";
 
 interface UseTemplateAwareEditorOptions {
-  stepData: any;
-  dataSelectorOutput?: any;
   categorizedVariables: CategorizedVariables;
   categorizedSources?: CategorizedSources;
 }
 
 export function useTemplateAwareEditor({
-  stepData,
-  dataSelectorOutput,
   categorizedVariables,
   categorizedSources,
 }: UseTemplateAwareEditorOptions) {
@@ -21,11 +16,6 @@ export function useTemplateAwareEditor({
   const [popoverAnchorPos, setPopoverAnchorPos] = useState<number | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const suggestionDestroyRef = useRef<(() => void) | null>(null);
-
-  const sourceData = useMemo(
-    () => prepareSourceData(stepData, dataSelectorOutput),
-    [stepData, dataSelectorOutput],
-  );
 
   const suggestionConfig = useMemo(
     () =>
@@ -99,7 +89,6 @@ export function useTemplateAwareEditor({
   }, []);
 
   return {
-    sourceData,
     suggestionConfig,
     codePopoverOpen,
     setCodePopoverOpen,

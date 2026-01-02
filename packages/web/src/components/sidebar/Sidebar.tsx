@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/src/components/ui/button";
-import { useTheme } from "@/src/hooks/useTheme";
+import { useTheme } from "@/src/hooks/use-theme";
 import {
   Blocks,
   Book,

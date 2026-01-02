@@ -319,38 +319,12 @@ export async function executeFinalTransform(
   }
 }
 
-export function canExecuteStep(
-  stepIndex: number,
-  completedSteps: string[],
-  tool: Tool,
-  stepResults?: Record<string, any>,
-): boolean {
-  if (stepIndex === 0) {
-    return true;
-  }
-
-  // Check that all previous steps are completed and have results
-  for (let i = 0; i < stepIndex; i++) {
-    const stepId = tool.steps[i].id;
-    if (!completedSteps.includes(stepId)) {
-      return false;
-    }
-    // If stepResults is provided, also check that the step has a result
-    if (stepResults && !stepResults[stepId]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 export const isJsonEmpty = (inputJson: string): boolean => {
   try {
     if (!inputJson) return true;
     const parsedJson = JSON.parse(inputJson);
     return Object.keys(parsedJson).length === 0;
   } catch (error) {
-    // If invalid JSON, we consider it empty
     return true;
   }
 };

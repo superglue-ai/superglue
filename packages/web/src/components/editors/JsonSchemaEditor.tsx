@@ -19,7 +19,7 @@ import { cn, MAX_DISPLAY_LINES, MAX_DISPLAY_SIZE } from "@/src/lib/general-utils
 import Editor from "@monaco-editor/react";
 import { Plus, Trash2 } from "lucide-react";
 import React from "react";
-import { useMonacoTheme } from "../../hooks/useMonacoTheme";
+import { useMonacoTheme } from "@superglue/web/src/hooks/use-monaco-theme";
 import { CopyButton } from "../tools/shared/CopyButton";
 
 interface JsonSchemaEditorProps {

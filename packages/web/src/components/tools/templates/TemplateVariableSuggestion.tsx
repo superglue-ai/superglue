@@ -15,7 +15,7 @@ import {
   ListOrdered,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { type CategorizedVariables, type CategorizedSources } from "./tiptap/TemplateContext";
+import { type CategorizedVariables, type CategorizedSources } from "../context/types";
 
 type ValueType = "object" | "array" | "string" | "number" | "other";
 
@@ -45,8 +45,16 @@ function getTypeSymbol(type: ValueType, value?: unknown): string {
   }
 }
 
+type CategorizedVariablesKey =
+  | "credentials"
+  | "toolInputs"
+  | "fileInputs"
+  | "currentStepData"
+  | "previousStepData"
+  | "paginationVariables";
+
 interface CategoryConfig {
-  key: keyof CategorizedVariables;
+  key: CategorizedVariablesKey;
   label: string;
   icon: ReactNode;
 }
