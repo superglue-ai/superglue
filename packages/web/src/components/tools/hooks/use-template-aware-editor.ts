@@ -1,95 +1,100 @@
-import { useRef, useState, useMemo, useCallback } from 'react';
-import { createVariableSuggestionConfig } from '../templates/TemplateVariableSuggestion';
-import type { CategorizedVariables, CategorizedSources } from '../context/types';
-import type { Editor } from '@tiptap/react';
+import { useRef, useState, useMemo, useCallback } from "react";
+import { createVariableSuggestionConfig } from "../templates/TemplateVariableSuggestion";
+import type { CategorizedVariables, CategorizedSources } from "../context/types";
+import type { Editor } from "@tiptap/react";
 
 interface UseTemplateAwareEditorOptions {
-    categorizedVariables: CategorizedVariables;
-    categorizedSources?: CategorizedSources;
+  categorizedVariables: CategorizedVariables;
+  categorizedSources?: CategorizedSources;
 }
 
 export function useTemplateAwareEditor({
-    categorizedVariables,
-    categorizedSources,
+  categorizedVariables,
+  categorizedSources,
 }: UseTemplateAwareEditorOptions) {
-    const [codePopoverOpen, setCodePopoverOpen] = useState(false);
-    const [popoverAnchorPos, setPopoverAnchorPos] = useState<number | null>(null);
-    const editorRef = useRef<Editor | null>(null);
-    const suggestionDestroyRef = useRef<(() => void) | null>(null);
+  const [codePopoverOpen, setCodePopoverOpen] = useState(false);
+  const [popoverAnchorPos, setPopoverAnchorPos] = useState<number | null>(null);
+  const editorRef = useRef<Editor | null>(null);
+  const suggestionDestroyRef = useRef<(() => void) | null>(null);
 
-    const suggestionConfig = useMemo(() => createVariableSuggestionConfig({
+  const suggestionConfig = useMemo(
+    () =>
+      createVariableSuggestionConfig({
         categorizedVariables,
         categorizedSources,
         onSelectVariable: (varName, range) => {
-            const isValidIdentifier = (s: string) => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(s);
-            const escapeForBracket = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-            const segments = varName.includes('\x00') ? varName.split('\x00') : [varName];
-            const accessor = segments.map(seg => 
-                isValidIdentifier(seg) ? `.${seg}` : `["${escapeForBracket(seg)}"]`
-            ).join('');
-            const templateExpr = `(sourceData) => sourceData${accessor}`;
-            editorRef.current?.chain().focus()
-                .deleteRange(range)
-                .insertContent({
-                    type: 'template',
-                    attrs: { rawTemplate: `<<${templateExpr}>>` },
-                })
-                .run();
-        },
-        onSelectCode: (range) => {
-            editorRef.current?.chain().focus().deleteRange(range).run();
-            const pos = editorRef.current?.state.selection.from ?? range.from;
-            setPopoverAnchorPos(pos);
-            setCodePopoverOpen(true);
-        },
-        onEscape: (range) => {
-            editorRef.current?.chain().focus()
-                .deleteRange(range)
-                .insertContent('@')
-                .run();
-        },
-        onOpen: (destroy) => {
-            suggestionDestroyRef.current = destroy;
-        },
-        onClose: () => {
-            suggestionDestroyRef.current = null;
-        },
-    }), [categorizedVariables, categorizedSources]);
-
-    const handleCodeSave = useCallback((template: string) => {
-        editorRef.current?.chain().focus()
+          const isValidIdentifier = (s: string) => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(s);
+          const escapeForBracket = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+          const segments = varName.includes("\x00") ? varName.split("\x00") : [varName];
+          const accessor = segments
+            .map((seg) => (isValidIdentifier(seg) ? `.${seg}` : `["${escapeForBracket(seg)}"]`))
+            .join("");
+          const templateExpr = `(sourceData) => sourceData${accessor}`;
+          editorRef.current
+            ?.chain()
+            .focus()
+            .deleteRange(range)
             .insertContent({
-                type: 'template',
-                attrs: { rawTemplate: template },
+              type: "template",
+              attrs: { rawTemplate: `<<${templateExpr}>>` },
             })
             .run();
-        setCodePopoverOpen(false);
-        setPopoverAnchorPos(null);
-    }, []);
+        },
+        onSelectCode: (range) => {
+          editorRef.current?.chain().focus().deleteRange(range).run();
+          const pos = editorRef.current?.state.selection.from ?? range.from;
+          setPopoverAnchorPos(pos);
+          setCodePopoverOpen(true);
+        },
+        onEscape: (range) => {
+          editorRef.current?.chain().focus().deleteRange(range).insertContent("@").run();
+        },
+        onOpen: (destroy) => {
+          suggestionDestroyRef.current = destroy;
+        },
+        onClose: () => {
+          suggestionDestroyRef.current = null;
+        },
+      }),
+    [categorizedVariables, categorizedSources],
+  );
 
-    const getPopoverAnchorRect = useCallback(() => {
-        if (popoverAnchorPos === null) return null;
-        const view = editorRef.current?.view;
-        if (!view) return null;
-        try {
-            const coords = view.coordsAtPos(popoverAnchorPos);
-            return { left: coords.left, top: coords.bottom };
-        } catch {
-            return null;
-        }
-    }, [popoverAnchorPos]);
+  const handleCodeSave = useCallback((template: string) => {
+    editorRef.current
+      ?.chain()
+      .focus()
+      .insertContent({
+        type: "template",
+        attrs: { rawTemplate: template },
+      })
+      .run();
+    setCodePopoverOpen(false);
+    setPopoverAnchorPos(null);
+  }, []);
 
-    const cleanupSuggestion = useCallback(() => {
-        suggestionDestroyRef.current?.();
-    }, []);
+  const getPopoverAnchorRect = useCallback(() => {
+    if (popoverAnchorPos === null) return null;
+    const view = editorRef.current?.view;
+    if (!view) return null;
+    try {
+      const coords = view.coordsAtPos(popoverAnchorPos);
+      return { left: coords.left, top: coords.bottom };
+    } catch {
+      return null;
+    }
+  }, [popoverAnchorPos]);
 
-    return {
-        suggestionConfig,
-        codePopoverOpen,
-        setCodePopoverOpen,
-        popoverAnchorRect: getPopoverAnchorRect,
-        handleCodeSave,
-        editorRef,
-        cleanupSuggestion,
-    };
+  const cleanupSuggestion = useCallback(() => {
+    suggestionDestroyRef.current?.();
+  }, []);
+
+  return {
+    suggestionConfig,
+    codePopoverOpen,
+    setCodePopoverOpen,
+    popoverAnchorRect: getPopoverAnchorRect,
+    handleCodeSave,
+    editorRef,
+    cleanupSuggestion,
+  };
 }
