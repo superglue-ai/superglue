@@ -33,7 +33,6 @@ import keys from "lodash.keys";
 import merge from "lodash.merge";
 import xor from "lodash.xor";
 
-// Simple deep equality check for JSON-serializable objects (no circular refs, no functions)
 function isEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
