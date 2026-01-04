@@ -1,5 +1,5 @@
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { DownloadButton } from '@/src/components/ui/download-button';
+import { DownloadButton } from '@superglue/web/src/components/tools/shared/download-button';
 import { isEmptyData } from '@/src/lib/general-utils';
 import { Loader2, OctagonX, X } from 'lucide-react';
 import { useState } from 'react';

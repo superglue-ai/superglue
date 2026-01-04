@@ -19,7 +19,7 @@ import Editor from '@monaco-editor/react';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { isArrowFunction, maskCredentials } from '@superglue/shared';
 import { AlertCircle, Eye, EyeOff, Loader2, Maximize2, Minimize2 } from 'lucide-react';
-import { DownloadButton } from '@/src/components/ui/download-button';
+import { DownloadButton } from '@superglue/web/src/components/tools/shared/download-button';
 import type * as Monaco from 'monaco-editor';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTemplatePreview } from '../hooks/use-template-preview';
