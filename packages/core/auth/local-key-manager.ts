@@ -10,14 +10,14 @@ export class LocalKeyManager implements AuthManager {
 
   public async authenticate(token: string): Promise<AuthResult> {
     if (!this.authToken) {
-      return { 
+      return {
         success: false,
-        orgId: ''
+        orgId: "",
       };
     }
     return {
       success: token === this.authToken,
-      orgId: this.defaultOrgId
+      orgId: this.defaultOrgId,
     };
   }
 }

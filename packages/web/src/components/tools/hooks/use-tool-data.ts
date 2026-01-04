@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
-import { useConfig } from '@/src/app/config-context';
-import { useToast } from '@/src/hooks/use-toast';
-import { createSuperglueClient } from '@/src/lib/client-utils';
-import { ExecutionStep, Tool } from '@superglue/shared';
-import { useToolConfig, useExecution } from '../context';
+import { useState, useEffect, useRef } from "react";
+import { useConfig } from "@/src/app/config-context";
+import { useToast } from "@/src/hooks/use-toast";
+import { createSuperglueClient } from "@/src/lib/client-utils";
+import { ExecutionStep, Tool } from "@superglue/shared";
+import { useToolConfig, useExecution } from "../context";
 
 interface UseToolDataOptions {
   id?: string;
@@ -15,34 +15,34 @@ interface UseToolDataOptions {
 
 export function useToolData(options: UseToolDataOptions) {
   const { id, initialTool, initialInstruction, embedded, onSave } = options;
-  
+
   const config = useConfig();
   const { toast } = useToast();
-  const { 
-    tool, 
+  const {
+    tool,
     steps,
     payload,
-    setToolId, 
-    setSteps, 
-    setFinalTransform, 
-    setResponseSchema, 
-    setInputSchema, 
+    setToolId,
+    setSteps,
+    setFinalTransform,
+    setResponseSchema,
+    setInputSchema,
     setInstruction,
     setPayloadText,
     setFolder,
     setIsArchived,
   } = useToolConfig();
-  
+
   const { clearAllExecutions } = useExecution();
-  
+
   const toolId = tool.id;
   const folder = tool.folder;
-  const finalTransform = tool.finalTransform || '';
-  const responseSchema = tool.responseSchema ? JSON.stringify(tool.responseSchema) : '';
-  const inputSchema = tool.inputSchema ? JSON.stringify(tool.inputSchema) : '';
+  const finalTransform = tool.finalTransform || "";
+  const responseSchema = tool.responseSchema ? JSON.stringify(tool.responseSchema) : "";
+  const inputSchema = tool.inputSchema ? JSON.stringify(tool.inputSchema) : "";
   const instructions = tool.instruction;
   const computedPayload = payload.computedPayload;
-  
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -57,20 +57,32 @@ export function useToolData(options: UseToolDataOptions) {
       if (!loadedTool) {
         throw new Error(`Tool with ID "${idToLoad}" not found.`);
       }
-      setToolId(loadedTool.id || '');
+      setToolId(loadedTool.id || "");
       setFolder(loadedTool.folder);
       setIsArchived(loadedTool.archived || false);
-      setSteps(loadedTool?.steps?.map(step => ({ ...step, apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id } })) || []);
-      setFinalTransform(loadedTool.finalTransform || `(sourceData) => {
+      setSteps(
+        loadedTool?.steps?.map((step) => ({
+          ...step,
+          apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id },
+        })) || [],
+      );
+      setFinalTransform(
+        loadedTool.finalTransform ||
+          `(sourceData) => {
         return {
           result: sourceData
         }
-      }`);
+      }`,
+      );
 
-      setInstruction(loadedTool.instruction || '');
-      setResponseSchema(loadedTool.responseSchema ? JSON.stringify(loadedTool.responseSchema, null, 2) : '');
+      setInstruction(loadedTool.instruction || "");
+      setResponseSchema(
+        loadedTool.responseSchema ? JSON.stringify(loadedTool.responseSchema, null, 2) : "",
+      );
 
-      setInputSchema(loadedTool.inputSchema ? JSON.stringify(loadedTool.inputSchema, null, 2) : null);
+      setInputSchema(
+        loadedTool.inputSchema ? JSON.stringify(loadedTool.inputSchema, null, 2) : null,
+      );
     } catch (error: any) {
       console.error("Error loading tool:", error);
       toast({
@@ -85,25 +97,46 @@ export function useToolData(options: UseToolDataOptions) {
 
   useEffect(() => {
     if (initialTool && initialTool.id !== lastToolId) {
-      setToolId(initialTool.id || '');
+      setToolId(initialTool.id || "");
       setFolder(initialTool.folder);
       setIsArchived(initialTool.archived || false);
-      setSteps(initialTool.steps?.map(step => ({
-        ...step,
-        apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id }
-      })) || []);
-      setFinalTransform(initialTool.finalTransform || `(sourceData) => {
+      setSteps(
+        initialTool.steps?.map((step) => ({
+          ...step,
+          apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id },
+        })) || [],
+      );
+      setFinalTransform(
+        initialTool.finalTransform ||
+          `(sourceData) => {
   return {
     result: sourceData
   }
-}`);
-      const schemaString = initialTool.responseSchema ? JSON.stringify(initialTool.responseSchema, null, 2) : '';
+}`,
+      );
+      const schemaString = initialTool.responseSchema
+        ? JSON.stringify(initialTool.responseSchema, null, 2)
+        : "";
       setResponseSchema(schemaString);
-      setInputSchema(initialTool.inputSchema ? JSON.stringify(initialTool.inputSchema, null, 2) : null);
-      setInstruction(initialInstruction || initialTool.instruction || '');
+      setInputSchema(
+        initialTool.inputSchema ? JSON.stringify(initialTool.inputSchema, null, 2) : null,
+      );
+      setInstruction(initialInstruction || initialTool.instruction || "");
       setLastToolId(initialTool.id);
     }
-  }, [initialTool, lastToolId, initialInstruction, setToolId, setSteps, setFinalTransform, setResponseSchema, setInputSchema, setInstruction, setFolder, setIsArchived]);
+  }, [
+    initialTool,
+    lastToolId,
+    initialInstruction,
+    setToolId,
+    setSteps,
+    setFinalTransform,
+    setResponseSchema,
+    setInputSchema,
+    setInstruction,
+    setFolder,
+    setIsArchived,
+  ]);
 
   useEffect(() => {
     if (!embedded && id) {
@@ -119,9 +152,9 @@ export function useToolData(options: UseToolDataOptions) {
     result: sourceData
   }
 }`);
-      setResponseSchema('');
+      setResponseSchema("");
       setInputSchema(null);
-      setPayloadText('{}');
+      setPayloadText("{}");
       clearAllExecutions();
     }
   }, [id, embedded, initialTool]);
@@ -129,12 +162,12 @@ export function useToolData(options: UseToolDataOptions) {
   const saveTool = async (): Promise<boolean> => {
     try {
       try {
-        JSON.parse(responseSchema || '{}');
+        JSON.parse(responseSchema || "{}");
       } catch (e) {
         throw new Error("Invalid response schema JSON");
       }
       try {
-        JSON.parse(inputSchema || '{}');
+        JSON.parse(inputSchema || "{}");
       } catch (e) {
         throw new Error("Invalid input schema JSON");
       }
@@ -154,8 +187,8 @@ export function useToolData(options: UseToolDataOptions) {
           apiConfig: {
             id: step.apiConfig.id || step.id,
             ...step.apiConfig,
-            pagination: step.apiConfig.pagination || null
-          }
+            pagination: step.apiConfig.pagination || null,
+          },
         })),
         responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
@@ -203,4 +236,3 @@ export function useToolData(options: UseToolDataOptions) {
     setLoading,
   };
 }
-

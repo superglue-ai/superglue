@@ -1,7 +1,14 @@
 import { useConfig } from "@/src/app/config-context";
 import { useTools } from "@/src/app/tools-context";
 import { Button } from "@/src/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/src/components/ui/dialog";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { createSuperglueClient, isValidToolName, validateToolName } from "@/src/lib/client-utils";
@@ -40,7 +47,7 @@ export function RenameToolDialog({ tool, isOpen, onClose, onRenamed }: RenameToo
     if (!tool) return;
 
     const trimmedName = newToolName.trim();
-    
+
     const validationError = validateToolName(trimmedName);
     if (validationError) {
       setError(validationError);
@@ -52,7 +59,7 @@ export function RenameToolDialog({ tool, isOpen, onClose, onRenamed }: RenameToo
       return;
     }
 
-    const existingTool = tools.find(t => t.id === trimmedName);
+    const existingTool = tools.find((t) => t.id === trimmedName);
     if (existingTool) {
       setError("A tool with this name already exists");
       return;
@@ -66,13 +73,13 @@ export function RenameToolDialog({ tool, isOpen, onClose, onRenamed }: RenameToo
 
       await refreshTools();
       handleClose();
-      
+
       if (onRenamed) {
         onRenamed(trimmedName);
       }
     } catch (error: any) {
-      console.error('Error renaming tool:', error);
-      setError(error.message || 'Failed to rename tool');
+      console.error("Error renaming tool:", error);
+      setError(error.message || "Failed to rename tool");
     } finally {
       setIsRenaming(false);
     }
@@ -80,12 +87,14 @@ export function RenameToolDialog({ tool, isOpen, onClose, onRenamed }: RenameToo
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent onKeyDown={(e) => {
-        if (e.key === 'Enter' && !isRenaming && (e.target as HTMLElement).tagName !== 'BUTTON') {
-          e.preventDefault();
-          handleRename();
-        }
-      }}>
+      <DialogContent
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !isRenaming && (e.target as HTMLElement).tagName !== "BUTTON") {
+            e.preventDefault();
+            handleRename();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Rename Tool</DialogTitle>
           <DialogDescription>
@@ -108,23 +117,14 @@ export function RenameToolDialog({ tool, isOpen, onClose, onRenamed }: RenameToo
               placeholder="Enter new tool name"
               disabled={isRenaming}
             />
-            {error && (
-              <p className="text-sm text-red-500">{error}</p>
-            )}
+            {error && <p className="text-sm text-red-500">{error}</p>}
           </div>
         </div>
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={handleClose}
-            disabled={isRenaming}
-          >
+          <Button variant="outline" onClick={handleClose} disabled={isRenaming}>
             Cancel
           </Button>
-          <Button
-            onClick={handleRename}
-            disabled={isRenaming}
-          >
+          <Button onClick={handleRename} disabled={isRenaming}>
             {isRenaming ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -139,4 +139,3 @@ export function RenameToolDialog({ tool, isOpen, onClose, onRenamed }: RenameToo
     </Dialog>
   );
 }
-

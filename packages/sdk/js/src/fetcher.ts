@@ -1,5 +1,5 @@
-let baseUrl = 'https://api.superglue.ai/v1';
-let apiKey = '';
+let baseUrl = "https://api.superglue.ai/v1";
+let apiKey = "";
 
 export const configure = (config: { baseUrl?: string; apiKey: string }) => {
   if (config.baseUrl) baseUrl = config.baseUrl;
@@ -19,4 +19,3 @@ export const customFetch = async <T>(url: string, options: RequestInit): Promise
 
   return { data, status: response.status, headers: response.headers } as T;
 };
-

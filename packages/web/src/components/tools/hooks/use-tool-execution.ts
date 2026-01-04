@@ -1,20 +1,24 @@
-import { useRef } from 'react';
-import { useConfig } from '@/src/app/config-context';
-import { useToast } from '@/src/hooks/use-toast';
-import { 
-  abortExecution, 
-  createSuperglueClient, 
-  executeFinalTransform, 
-  executeSingleStep, 
-  executeToolStepByStep, 
-  generateUUID, 
-  shouldDebounceAbort, 
-  type StepExecutionResult 
-} from '@/src/lib/client-utils';
-import { computeStepOutput, isAbortError, wrapLoopSelectorWithLimit } from '@/src/lib/general-utils';
-import { ExecutionStep, Tool, ToolResult } from '@superglue/shared';
-import { useExecution, useToolConfig } from '../context';
-import type { StepStatus, TransformStatus } from '../context/types';
+import { useRef } from "react";
+import { useConfig } from "@/src/app/config-context";
+import { useToast } from "@/src/hooks/use-toast";
+import {
+  abortExecution,
+  createSuperglueClient,
+  executeFinalTransform,
+  executeSingleStep,
+  executeToolStepByStep,
+  generateUUID,
+  shouldDebounceAbort,
+  type StepExecutionResult,
+} from "@/src/lib/client-utils";
+import {
+  computeStepOutput,
+  isAbortError,
+  wrapLoopSelectorWithLimit,
+} from "@/src/lib/general-utils";
+import { ExecutionStep, Tool, ToolResult } from "@superglue/shared";
+import { useExecution, useToolConfig } from "../context";
+import type { StepStatus, TransformStatus } from "../context/types";
 
 interface UseToolExecutionOptions {
   onExecute?: (tool: Tool, result: ToolResult) => void;
@@ -36,21 +40,21 @@ interface NavigationCallbacks {
 
 export function useToolExecution(
   options: UseToolExecutionOptions,
-  navigationCallbacks: NavigationCallbacks
+  navigationCallbacks: NavigationCallbacks,
 ) {
   const { onExecute, onStopExecution, embedded } = options;
   const { setFocusStepId, setShowStepOutputSignal, setNavigateToFinalSignal } = navigationCallbacks;
-  
+
   const config = useConfig();
   const { toast } = useToast();
   const { tool, steps, payload, setSteps, setFinalTransform } = useToolConfig();
   const toolId = tool.id;
-  const finalTransform = tool.finalTransform || '';
-  const responseSchema = tool.responseSchema ? JSON.stringify(tool.responseSchema) : '';
-  const inputSchema = tool.inputSchema ? JSON.stringify(tool.inputSchema) : '';
+  const finalTransform = tool.finalTransform || "";
+  const responseSchema = tool.responseSchema ? JSON.stringify(tool.responseSchema) : "";
+  const inputSchema = tool.inputSchema ? JSON.stringify(tool.inputSchema) : "";
   const instructions = tool.instruction;
   const computedPayload = payload.computedPayload;
-  
+
   const {
     setStepResult,
     clearAllExecutions,
@@ -72,19 +76,19 @@ export function useToolExecution(
   const handleStopExecution = async () => {
     if (shouldDebounceAbort(lastAbortTimeRef.current)) return;
     if (!currentRunIdRef.current || executionCompletedRef.current) return;
-    
+
     lastAbortTimeRef.current = Date.now();
     shouldAbortRef.current = true;
-    
-    await new Promise(resolve => setTimeout(resolve, 50));
-    
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
     if (!currentRunIdRef.current || executionCompletedRef.current) return;
-    
+
     const client = createSuperglueClient(config.superglueEndpoint);
     const success = await abortExecution(client, currentRunIdRef.current);
-    
+
     if (executionCompletedRef.current) return;
-    
+
     if (success) {
       markAsStopping();
       currentRunIdRef.current = null;
@@ -93,25 +97,25 @@ export function useToolExecution(
         description: "Tool execution has been aborted",
       });
     }
-    
+
     if (embedded && onStopExecution) {
       onStopExecution();
     }
   };
 
-  const executeWithRunId = async <T,>(
+  const executeWithRunId = async <T>(
     executor: (runId: string) => Promise<T>,
-    executionOptions?: { stepIndex?: number; onComplete?: (result: T) => void }
+    executionOptions?: { stepIndex?: number; onComplete?: (result: T) => void },
   ): Promise<T | undefined> => {
     const runId = generateUUID();
     executionCompletedRef.current = false;
     currentRunIdRef.current = runId;
     startExecution(runId);
-    
+
     if (executionOptions?.stepIndex !== undefined) {
       setCurrentExecutingStepIndex(executionOptions.stepIndex);
     }
-    
+
     try {
       const result = await executor(runId);
       executionOptions?.onComplete?.(result);
@@ -123,113 +127,121 @@ export function useToolExecution(
     }
   };
 
-  const executeStepByIdx = async (
-    idx: number, 
-    stepOptions?: ExecuteStepOptions
-  ) => {
+  const executeStepByIdx = async (idx: number, stepOptions?: ExecuteStepOptions) => {
     const { limitIterations, selfHealing = false, updatedInstruction } = stepOptions || {};
-    
-    return executeWithRunId(async () => {
-      const client = createSuperglueClient(config.superglueEndpoint);
-      
-      const originalLoopSelector = steps[idx]?.loopSelector;
-      let stepToExecute = steps[idx];
-      
-      if (updatedInstruction) {
-        stepToExecute = { 
-          ...stepToExecute, 
-          apiConfig: { ...stepToExecute.apiConfig, instruction: updatedInstruction } 
-        };
-      }
-      
-      if (limitIterations && originalLoopSelector) {
-        stepToExecute = { 
-          ...stepToExecute, 
-          loopSelector: wrapLoopSelectorWithLimit(originalLoopSelector, limitIterations) 
-        };
-      }
 
-      const currentStepResultsMap = stepResultsMap;
-      const single = await executeSingleStep({
-        client,
-        step: stepToExecute,
-        toolId,
-        payload: computedPayload,
-        previousResults: currentStepResultsMap,
-        selfHealing,
-        onRunIdGenerated: (singleRunId) => { currentRunIdRef.current = singleRunId; }
-      });
-      
-      const sid = steps[idx].id;
-      const normalized = computeStepOutput(single);
-      const isFailure = !single.success;
+    return executeWithRunId(
+      async () => {
+        const client = createSuperglueClient(config.superglueEndpoint);
 
-      if (single.updatedStep) {
-        const updatedStep = limitIterations && originalLoopSelector
-          ? { ...single.updatedStep, loopSelector: originalLoopSelector }
-          : single.updatedStep;
-        skipNextHashInvalidation();
-        setSteps(steps.map((step, i) => i === idx ? updatedStep : step));
-        
-        if (selfHealing && single.success) {
-          toast({
-            title: "Step fixed",
-            description: "The step configuration has been updated and executed successfully.",
-          });
+        const originalLoopSelector = steps[idx]?.loopSelector;
+        let stepToExecute = steps[idx];
+
+        if (updatedInstruction) {
+          stepToExecute = {
+            ...stepToExecute,
+            apiConfig: { ...stepToExecute.apiConfig, instruction: updatedInstruction },
+          };
         }
-      }
 
-      if (isFailure) {
-        const status: StepStatus = isAbortError(single.error) ? 'aborted' : 'failed';
-        setStepResult(sid, normalized.output, status, single.error || undefined);
-        if (selfHealing) {
-          throw new Error(single.error || 'Failed to fix step');
+        if (limitIterations && originalLoopSelector) {
+          stepToExecute = {
+            ...stepToExecute,
+            loopSelector: wrapLoopSelectorWithLimit(originalLoopSelector, limitIterations),
+          };
         }
-      } else {
-        setStepResult(sid, normalized.output, 'completed');
-      }
-      
-      setFocusStepId(sid);
-      setShowStepOutputSignal(Date.now());
-      return single;
-    }, { stepIndex: idx });
+
+        const currentStepResultsMap = stepResultsMap;
+        const single = await executeSingleStep({
+          client,
+          step: stepToExecute,
+          toolId,
+          payload: computedPayload,
+          previousResults: currentStepResultsMap,
+          selfHealing,
+          onRunIdGenerated: (singleRunId) => {
+            currentRunIdRef.current = singleRunId;
+          },
+        });
+
+        const sid = steps[idx].id;
+        const normalized = computeStepOutput(single);
+        const isFailure = !single.success;
+
+        if (single.updatedStep) {
+          const updatedStep =
+            limitIterations && originalLoopSelector
+              ? { ...single.updatedStep, loopSelector: originalLoopSelector }
+              : single.updatedStep;
+          skipNextHashInvalidation();
+          setSteps(steps.map((step, i) => (i === idx ? updatedStep : step)));
+
+          if (selfHealing && single.success) {
+            toast({
+              title: "Step fixed",
+              description: "The step configuration has been updated and executed successfully.",
+            });
+          }
+        }
+
+        if (isFailure) {
+          const status: StepStatus = isAbortError(single.error) ? "aborted" : "failed";
+          setStepResult(sid, normalized.output, status, single.error || undefined);
+          if (selfHealing) {
+            throw new Error(single.error || "Failed to fix step");
+          }
+        } else {
+          setStepResult(sid, normalized.output, "completed");
+        }
+
+        setFocusStepId(sid);
+        setShowStepOutputSignal(Date.now());
+        return single;
+      },
+      { stepIndex: idx },
+    );
   };
 
   const executeTransform = async (
-    schemaStr: string, 
-    transformStr: string, 
-    selfHealing: boolean = false
+    schemaStr: string,
+    transformStr: string,
+    selfHealing: boolean = false,
   ): Promise<void> => {
     await executeWithRunId(async () => {
-      setTransformStatus(selfHealing ? 'fixing' : 'running');
+      setTransformStatus(selfHealing ? "fixing" : "running");
 
       const currentStepResultsMap = stepResultsMap;
       const stepData: Record<string, any> = {};
       Object.entries(currentStepResultsMap).forEach(([stepId, result]) => {
-        if (stepId !== '__final_transform__') {
+        if (stepId !== "__final_transform__") {
           stepData[stepId] = result;
         }
       });
-      
+
       const parsedSchema = schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null;
       const client = createSuperglueClient(config.superglueEndpoint);
       const result = await executeFinalTransform(
         client,
-        toolId || 'test',
+        toolId || "test",
         transformStr || finalTransform,
         parsedSchema,
         inputSchema ? JSON.parse(inputSchema) : null,
         computedPayload,
         stepData,
         selfHealing,
-        (transformRunId) => { currentRunIdRef.current = transformRunId; }
+        (transformRunId) => {
+          currentRunIdRef.current = transformRunId;
+        },
       );
 
       if (result.success) {
-        setFinalResult(result.data, 'completed');
+        setFinalResult(result.data, "completed");
         setNavigateToFinalSignal(Date.now());
 
-        if (result.updatedTransform && result.updatedTransform !== (transformStr || finalTransform)) {
+        if (
+          result.updatedTransform &&
+          result.updatedTransform !== (transformStr || finalTransform)
+        ) {
           setFinalTransform(result.updatedTransform);
           if (selfHealing) {
             toast({
@@ -239,18 +251,18 @@ export function useToolExecution(
           }
         }
       } else {
-        const status: TransformStatus = isAbortError(result.error) ? 'aborted' : 'failed';
+        const status: TransformStatus = isAbortError(result.error) ? "aborted" : "failed";
         const message = result.error || `Transform execution ${status}`;
         setFinalResult(message, status, result.error || undefined);
       }
-      
+
       return result;
     });
   };
 
   const executeTool = async (
     setLoading: (loading: boolean) => void,
-    handleBeforeStepExecution: (stepIndex: number, step: any) => Promise<boolean>
+    handleBeforeStepExecution: (stepIndex: number, step: any) => Promise<boolean>,
   ) => {
     const runId = generateUUID();
     executionCompletedRef.current = false;
@@ -262,11 +274,12 @@ export function useToolExecution(
     setFocusStepId(null);
 
     try {
-      JSON.parse(responseSchema || '{}');
-      JSON.parse(inputSchema || '{}');
+      JSON.parse(responseSchema || "{}");
+      JSON.parse(inputSchema || "{}");
 
       const executionSteps = steps;
-      const currentResponseSchema = responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null;
+      const currentResponseSchema =
+        responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null;
       const effectiveSelfHealing = false;
 
       const executionTool = {
@@ -296,13 +309,13 @@ export function useToolExecution(
           try {
             const normalized = computeStepOutput(res);
             if (res.success) {
-              setStepResult(res.stepId, normalized.output, 'completed');
+              setStepResult(res.stepId, normalized.output, "completed");
             } else if (isAbortError(res.error)) {
-              setStepResult(res.stepId, normalized.output, 'aborted', res.error || undefined);
+              setStepResult(res.stepId, normalized.output, "aborted", res.error || undefined);
               setFocusStepId(res.stepId);
               setShowStepOutputSignal(Date.now());
             } else {
-              setStepResult(res.stepId, normalized.output, 'failed', res.error || undefined);
+              setStepResult(res.stepId, normalized.output, "failed", res.error || undefined);
               setFocusStepId(res.stepId);
               setShowStepOutputSignal(Date.now());
             }
@@ -314,7 +327,7 @@ export function useToolExecution(
         handleBeforeStepExecution,
         (stepRunId: string) => {
           currentRunIdRef.current = stepRunId;
-        }
+        },
       );
 
       if (state.currentTool.steps) {
@@ -331,40 +344,42 @@ export function useToolExecution(
         }
       }
 
-      if (state.stepResults['__final_transform__']) {
-        const normalized = computeStepOutput(state.stepResults['__final_transform__'] as StepExecutionResult);
-        const transformRes = state.stepResults['__final_transform__'];
+      if (state.stepResults["__final_transform__"]) {
+        const normalized = computeStepOutput(
+          state.stepResults["__final_transform__"] as StepExecutionResult,
+        );
+        const transformRes = state.stepResults["__final_transform__"];
         if (transformRes.success) {
-          setFinalResult(normalized.output, 'completed');
+          setFinalResult(normalized.output, "completed");
         } else if (isAbortError(transformRes.error)) {
-          setFinalResult(normalized.output, 'aborted', transformRes.error || undefined);
+          setFinalResult(normalized.output, "aborted", transformRes.error || undefined);
         } else {
-          setFinalResult(normalized.output, 'failed', transformRes.error || undefined);
+          setFinalResult(normalized.output, "failed", transformRes.error || undefined);
         }
       }
 
-      const finalData = state.stepResults['__final_transform__']?.data;
+      const finalData = state.stepResults["__final_transform__"]?.data;
 
       const wr: ToolResult = {
         id: generateUUID(),
         success: state.failedSteps.length === 0,
         data: finalData,
-        error: state.stepResults['__final_transform__']?.error,
+        error: state.stepResults["__final_transform__"]?.error,
         startedAt: new Date(),
         completedAt: new Date(),
         stepResults: Object.entries(state.stepResults)
-          .filter(([key]) => key !== '__final_transform__')
+          .filter(([key]) => key !== "__final_transform__")
           .map(([stepId, result]: [string, StepExecutionResult]) => ({
             stepId,
             success: result.success,
             data: result.data,
-            error: result.error
+            error: result.error,
           })),
         config: {
           id: toolId,
           steps: state.currentTool.steps,
           finalTransform: state.currentTool.finalTransform || finalTransform,
-        } as any
+        } as any,
       };
 
       if (state.currentTool.finalTransform && state.currentTool.finalTransform !== finalTransform) {
@@ -376,7 +391,7 @@ export function useToolExecution(
       } else {
         const firstProblematicStep = state.failedSteps[0] || state.abortedSteps[0];
         if (firstProblematicStep) {
-          if (firstProblematicStep === '__final_transform__') {
+          if (firstProblematicStep === "__final_transform__") {
             setNavigateToFinalSignal(Date.now());
           } else {
             setFocusStepId(firstProblematicStep);
@@ -398,7 +413,7 @@ export function useToolExecution(
           finalTransform: state.currentTool.finalTransform || finalTransform,
           responseSchema: currentResponseSchema,
           inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
-          instruction: instructions
+          instruction: instructions,
         } as Tool;
         onExecute(executedTool, wr);
       }
@@ -427,4 +442,3 @@ export function useToolExecution(
     executionCompletedRef,
   };
 }
-

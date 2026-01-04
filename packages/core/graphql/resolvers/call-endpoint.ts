@@ -4,7 +4,7 @@ import { GraphQLResolveInfo } from "graphql";
 import { IntegrationManager } from "../../integrations/integration-manager.js";
 import { replaceVariables } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
-import { GraphQLRequestContext } from '../types.js';
+import { GraphQLRequestContext } from "../types.js";
 
 export const callEndpointResolver = async (
   _: unknown,
@@ -14,15 +14,15 @@ export const callEndpointResolver = async (
 ): Promise<CallEndpointResult> => {
   const startTime = Date.now();
   const metadata = context.toMetadata();
-  
+
   const { integrationId, method, url, headers = {}, body, timeout = 30000 } = args;
-  const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
+  const validMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
 
   if (!method || !url || !validMethods.includes(method.toUpperCase())) {
     return {
       success: false,
-      error: `method and url are required and method must be one of: ${validMethods.join(', ')}`,
-      duration: Date.now() - startTime
+      error: `method and url are required and method must be one of: ${validMethods.join(", ")}`,
+      duration: Date.now() - startTime,
     };
   }
 
@@ -34,14 +34,20 @@ export const callEndpointResolver = async (
       const integrationManager = new IntegrationManager(integrationId, context.datastore, metadata);
       await integrationManager.refreshTokenIfNeeded();
       integration = await integrationManager.getIntegration();
-      logMessage('debug', `Loaded integration ${integrationId}`, metadata);
+      logMessage("debug", `Loaded integration ${integrationId}`, metadata);
     } catch (error) {
       integrationFetchFailed = true;
-      logMessage('warn', `Integration ${integrationId} not found or failed to load: ${error}. Proceeding without credentials.`, metadata);
+      logMessage(
+        "warn",
+        `Integration ${integrationId} not found or failed to load: ${error}. Proceeding without credentials.`,
+        metadata,
+      );
     }
   }
 
-  const credentialVariables: Record<string, any> = integration ? flattenAndNamespaceCredentials([integration]) : {};
+  const credentialVariables: Record<string, any> = integration
+    ? flattenAndNamespaceCredentials([integration])
+    : {};
 
   let finalUrl: string;
   let finalHeaders: Record<string, string>;
@@ -53,25 +59,25 @@ export const callEndpointResolver = async (
     finalBody = body ? await replaceVariables(body, credentialVariables) : undefined;
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    let contextMessage = '';
-    
+    let contextMessage = "";
+
     if (integrationFetchFailed) {
       contextMessage = ` The integration '${integrationId}' could not be found or loaded.`;
     } else if (integrationId && integration) {
       const availableKeys = Object.keys(credentialVariables || {});
-      contextMessage = ` Available credentials in integration '${integrationId}': ${availableKeys.length > 0 ? availableKeys.join(', ') : '(none)'}`;
+      contextMessage = ` Available credentials in integration '${integrationId}': ${availableKeys.length > 0 ? availableKeys.join(", ") : "(none)"}`;
     } else if (!integrationId) {
       contextMessage = ` No integrationId was provided. To use credential placeholders, specify an integrationId.`;
     }
-    
+
     return {
       success: false,
       error: `Variable substitution failed: ${errorMsg}${contextMessage}`,
-      duration: Date.now() - startTime
+      duration: Date.now() - startTime,
     };
   }
 
-  logMessage('debug', `Executing ${method} ${finalUrl}`, metadata);
+  logMessage("debug", `Executing ${method} ${finalUrl}`, metadata);
 
   try {
     const controller = new AbortController();
@@ -83,7 +89,7 @@ export const callEndpointResolver = async (
       signal: controller.signal,
     };
 
-    if (finalBody && !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())) {
+    if (finalBody && !["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase())) {
       fetchOptions.body = finalBody;
     }
 
@@ -98,9 +104,9 @@ export const callEndpointResolver = async (
 
     const responseText = await response.text();
     let responseBody: any;
-    const contentType = response.headers.get('content-type');
-    
-    if (contentType?.includes('application/json')) {
+    const contentType = response.headers.get("content-type");
+
+    if (contentType?.includes("application/json")) {
       try {
         responseBody = JSON.parse(responseText);
       } catch {
@@ -116,25 +122,23 @@ export const callEndpointResolver = async (
       statusText: response.statusText,
       headers: responseHeaders,
       body: responseBody,
-      duration
+      duration,
     };
-
   } catch (error: any) {
     const duration = Date.now() - startTime;
 
-    if (error.name === 'AbortError') {
+    if (error.name === "AbortError") {
       return {
         success: false,
         error: `Request timed out after ${timeout}ms`,
-        duration
+        duration,
       };
     }
 
     return {
       success: false,
       error: error.message || String(error),
-      duration
+      duration,
     };
   }
 };
-

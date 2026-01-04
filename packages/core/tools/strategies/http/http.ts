@@ -1,31 +1,53 @@
-import { HttpMethod, maskCredentials, PaginationType, RequestOptions, ServiceMetadata, ApiConfig as StepConfig, SupportedFileType } from "@superglue/shared";
+import {
+  HttpMethod,
+  maskCredentials,
+  PaginationType,
+  RequestOptions,
+  ServiceMetadata,
+  ApiConfig as StepConfig,
+  SupportedFileType,
+} from "@superglue/shared";
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
-import https from 'https';
+import https from "https";
 import ivm from "isolated-vm";
 import { JSONPath } from "jsonpath-plus";
 import { server_defaults } from "../../../default.js";
 import { parseFile, parseJSON } from "../../../files/index.js";
-import { composeUrl, convertBasicAuthToBase64, replaceVariables, smartMergeResponses } from "../../../utils/helpers.js";
+import {
+  composeUrl,
+  convertBasicAuthToBase64,
+  replaceVariables,
+  smartMergeResponses,
+} from "../../../utils/helpers.js";
 import { logMessage } from "../../../utils/logs.js";
-import { StepExecutionInput, StepExecutionStrategy, StepStrategyExecutionResult } from "../strategy.js";
+import {
+  StepExecutionInput,
+  StepExecutionStrategy,
+  StepStrategyExecutionResult,
+} from "../strategy.js";
 
 export class HttpStepExecutionStrategy implements StepExecutionStrategy {
-  readonly version = '1.0.0';
+  readonly version = "1.0.0";
 
   async shouldExecute(stepConfig: StepConfig): Promise<boolean> {
-    return (stepConfig.method in HttpMethod && stepConfig.urlHost?.startsWith("http"));
+    return stepConfig.method in HttpMethod && stepConfig.urlHost?.startsWith("http");
   }
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
     const { stepConfig, stepInputData, credentials, requestOptions, metadata } = input;
-    const httpResult = await callHttp({ config: stepConfig, payload: stepInputData, credentials, options: requestOptions, metadata });
+    const httpResult = await callHttp({
+      config: stepConfig,
+      payload: stepInputData,
+      credentials,
+      options: requestOptions,
+      metadata,
+    });
     return {
       success: true,
       strategyExecutionData: httpResult.data,
     };
   }
 }
-
 
 export interface CallAxiosResult {
   response: AxiosResponse;
@@ -34,11 +56,11 @@ export interface CallAxiosResult {
 }
 
 function configureHttpsAgent(): https.Agent {
-  const keepAliveEnabled = process.env.AXIOS_KEEP_ALIVE !== 'false';
+  const keepAliveEnabled = process.env.AXIOS_KEEP_ALIVE !== "false";
 
   const baseConfig = {
     rejectUnauthorized: false,
-    keepAlive: keepAliveEnabled
+    keepAlive: keepAliveEnabled,
   };
 
   if (!keepAliveEnabled) {
@@ -46,7 +68,7 @@ function configureHttpsAgent(): https.Agent {
       ...baseConfig,
       maxSockets: server_defaults.HTTP.MAX_SOCKETS,
       maxFreeSockets: server_defaults.HTTP.MAX_FREE_SOCKETS,
-      timeout: server_defaults.HTTP.DEFAULT_TIMEOUT
+      timeout: server_defaults.HTTP.DEFAULT_TIMEOUT,
     });
   }
 
@@ -55,9 +77,12 @@ function configureHttpsAgent(): https.Agent {
 
 const httpsAgent = configureHttpsAgent();
 
-export async function callAxios(config: AxiosRequestConfig, options: RequestOptions): Promise<CallAxiosResult> {
+export async function callAxios(
+  config: AxiosRequestConfig,
+  options: RequestOptions,
+): Promise<CallAxiosResult> {
   let retryCount = 0;
-  const defaultRetries = process.env.AXIOS_KEEP_ALIVE === 'false' ? 3 : 1;
+  const defaultRetries = process.env.AXIOS_KEEP_ALIVE === "false" ? 3 : 1;
   const maxRetries = Math.min(options?.retries ?? defaultRetries, server_defaults.MAX_CALL_RETRIES);
   const delay = options?.retryDelay || server_defaults.HTTP.DEFAULT_RETRY_DELAY_MS;
   const maxRateLimitWaitMs = server_defaults.HTTP.MAX_RATE_LIMIT_WAIT_MS;
@@ -66,21 +91,20 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
   let lastFailureStatus: number | undefined;
 
   config.headers = {
-    "Accept": "*/*",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    Accept: "*/*",
+    "User-Agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
     ...config.headers,
   };
 
   // Don't send body for GET, HEAD, DELETE, OPTIONS
   if (["GET", "HEAD", "DELETE", "OPTIONS"].includes(config.method!)) {
     config.data = undefined;
-  }
-  else if (config.data && config.data.trim().startsWith("{")) {
+  } else if (config.data && config.data.trim().startsWith("{")) {
     try {
       config.data = parseJSON(config.data);
-    } catch (error) { }
-  }
-  else if (!config.data) {
+    } catch (error) {}
+  } else if (!config.data) {
     config.data = undefined;
   }
 
@@ -90,21 +114,20 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
       const startTs = Date.now();
       response = await axios({
         ...config,
-        responseType: 'arraybuffer', // ALWAYS use arraybuffer to preserve data integrity
+        responseType: "arraybuffer", // ALWAYS use arraybuffer to preserve data integrity
         validateStatus: null, // Don't throw on any status
         maxContentLength: Infinity, // No limit on response size
         maxBodyLength: Infinity, // No limit on response body size
         decompress: true, // Ensure gzip/deflate responses are decompressed
-        httpsAgent
+        httpsAgent,
       });
       const durationMs = Date.now() - startTs;
 
       if (response.status === 429) {
-
         let waitTime = 0;
-        if (response.headers['retry-after']) {
+        if (response.headers["retry-after"]) {
           // Retry-After can be a date or seconds
-          const retryAfter = response.headers['retry-after'];
+          const retryAfter = response.headers["retry-after"];
           if (/^\d+$/.test(retryAfter)) {
             waitTime = parseInt(retryAfter, 10) * 1000;
           } else {
@@ -113,7 +136,10 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
           }
         } else {
           // Exponential backoff with jitter - max wait time is 1 hour
-          waitTime = Math.min(Math.pow(10, rateLimitRetryCount) * 1000 + Math.random() * 100, 3600000);
+          waitTime = Math.min(
+            Math.pow(10, rateLimitRetryCount) * 1000 + Math.random() * 100,
+            3600000,
+          );
         }
 
         // Check if we've exceeded the maximum wait time
@@ -125,7 +151,7 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
           return { response, retriesAttempted: retryCount, lastFailureStatus };
         }
 
-        await new Promise(resolve => setTimeout(resolve, waitTime));
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
 
         totalRateLimitWaitTime += waitTime;
         rateLimitRetryCount++;
@@ -135,18 +161,29 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
         response.data = Buffer.from(response.data);
       }
       if (response.status < 200 || response.status >= 300) {
-        if (response.status !== 429 && retryCount < maxRetries && durationMs < server_defaults.HTTP.QUICK_RETRY_THRESHOLD_MS) {
+        if (
+          response.status !== 429 &&
+          retryCount < maxRetries &&
+          durationMs < server_defaults.HTTP.QUICK_RETRY_THRESHOLD_MS
+        ) {
           lastFailureStatus = response.status;
           retryCount++;
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
         }
-        return { response, retriesAttempted: retryCount, lastFailureStatus: lastFailureStatus ?? response.status };
+        return {
+          response,
+          retriesAttempted: retryCount,
+          lastFailureStatus: lastFailureStatus ?? response.status,
+        };
       }
       if (retryCount > 0) {
         const method = (config.method || "GET").toString().toUpperCase();
         const url = (config as any).url || "";
-        logMessage("debug", `Automatic retry succeeded for ${method} ${url} after ${retryCount} retr${retryCount === 1 ? "y" : "ies"}${lastFailureStatus ? `; last failure status: ${lastFailureStatus}` : ""}`);
+        logMessage(
+          "debug",
+          `Automatic retry succeeded for ${method} ${url} after ${retryCount} retr${retryCount === 1 ? "y" : "ies"}${lastFailureStatus ? `; last failure status: ${lastFailureStatus}` : ""}`,
+        );
       }
       return { response, retriesAttempted: retryCount, lastFailureStatus };
     } catch (error) {
@@ -157,102 +194,116 @@ export async function callAxios(config: AxiosRequestConfig, options: RequestOpti
       }
       lastFailureStatus = response?.status;
       retryCount++;
-      await new Promise(resolve => setTimeout(resolve, delay * retryCount));
+      await new Promise((resolve) => setTimeout(resolve, delay * retryCount));
     }
-  } while (retryCount <= maxRetries || rateLimitRetryCount > 0);  // separate max retries and rate limit retries
+  } while (retryCount <= maxRetries || rateLimitRetryCount > 0); // separate max retries and rate limit retries
 }
-
 
 export class ApiCallError extends Error {
   statusCode?: number;
 
-  constructor(message: string, statusCode?: number,) {
+  constructor(message: string, statusCode?: number) {
     super(message);
-    this.name = 'ApiCallError';
+    this.name = "ApiCallError";
     this.statusCode = statusCode;
   }
 }
 export class AbortError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'AbortError';
+    this.name = "AbortError";
   }
 }
 type StatusHandlerResult = { shouldFail: boolean; message?: string };
 
 function detectHtmlErrorResponse(data: any): { isHtml: boolean; preview?: string } {
   const MAX_HTML_CHECK_BYTES = 1024; // Only check first 1KB for efficiency
-  let dataPrefix = '';
+  let dataPrefix = "";
 
   if (data instanceof Buffer) {
     // Only convert first 1KB to string for HTML detection
     const bytesToRead = Math.min(data.length, MAX_HTML_CHECK_BYTES);
-    dataPrefix = data.subarray(0, bytesToRead).toString('utf-8');
-  } else if (typeof data === 'string') {
+    dataPrefix = data.subarray(0, bytesToRead).toString("utf-8");
+  } else if (typeof data === "string") {
     dataPrefix = data.slice(0, MAX_HTML_CHECK_BYTES);
   } else {
     return { isHtml: false };
   }
 
   const trimmedLower = dataPrefix.slice(0, 100).trim().toLowerCase();
-  const isHtml = trimmedLower.startsWith('<!doctype html') || trimmedLower.startsWith('<html');
+  const isHtml = trimmedLower.startsWith("<!doctype html") || trimmedLower.startsWith("<html");
 
   return {
     isHtml,
-    preview: dataPrefix
+    preview: dataPrefix,
   };
 }
 
 export function checkResponseForErrors(
   data: any,
   status: number,
-  ctx: { axiosConfig: AxiosRequestConfig; credentials: Record<string, any>; payload: Record<string, any>; }
+  ctx: {
+    axiosConfig: AxiosRequestConfig;
+    credentials: Record<string, any>;
+    payload: Record<string, any>;
+  },
 ): void {
-  if (!data || typeof data !== 'object') return;
+  if (!data || typeof data !== "object") return;
 
   const d: any = Array.isArray(data) && data.length > 0 ? data[0] : data;
-  if (!d || typeof d !== 'object') return;
+  if (!d || typeof d !== "object") return;
 
   const throwDetected = (reason: string, value?: any) => {
-    const method = (ctx.axiosConfig?.method || 'GET').toString().toUpperCase();
-    const url = String(ctx.axiosConfig?.url || '');
+    const method = (ctx.axiosConfig?.method || "GET").toString().toUpperCase();
+    const url = String(ctx.axiosConfig?.url || "");
     const maskedConfig = maskCredentials(JSON.stringify(ctx.axiosConfig || {}), ctx.credentials);
     const previewSource = JSON.stringify(data);
     const preview = String(previewSource).slice(0, 2500);
-    const valueStr = value !== undefined ? `='${String(value).slice(0, 120)}'` : '';
+    const valueStr = value !== undefined ? `='${String(value).slice(0, 120)}'` : "";
     const message = `${method} ${url} returned ${status} but appears to be an error. Reason: ${reason}${valueStr}\nResponse preview: ${preview}\nconfig: ${maskedConfig}`;
     throw new ApiCallError(message, status);
   };
 
-  if (typeof d.code === 'number' && d.code >= 400 && d.code <= 599) {
+  if (typeof d.code === "number" && d.code >= 400 && d.code <= 599) {
     throwDetected(`code`, d.code);
   }
-  if (typeof d.status === 'number' && d.status >= 400 && d.status <= 599) {
+  if (typeof d.status === "number" && d.status >= 400 && d.status <= 599) {
     throwDetected(`status`, d.status);
   }
 
-  const errorKeys = new Set(['error', 'errors', 'error_message', 'errormessage', 'failure_reason', 'failure', 'failed']);
+  const errorKeys = new Set([
+    "error",
+    "errors",
+    "error_message",
+    "errormessage",
+    "failure_reason",
+    "failure",
+    "failed",
+  ]);
   const maxDepth = 2;
 
   const traverse = (obj: any, depth: number) => {
-    if (!obj || typeof obj !== 'object') return;
+    if (!obj || typeof obj !== "object") return;
     for (const key of Object.keys(obj)) {
       const lower = key.toLowerCase();
       if (errorKeys.has(lower)) {
         const v = obj[key];
         const isNonEmpty = Array.isArray(v)
           ? v.length > 0
-          : (typeof v === 'string')
-            ? v.trim() !== ''
-            : (typeof v === 'boolean')
+          : typeof v === "string"
+            ? v.trim() !== ""
+            : typeof v === "boolean"
               ? v === true
-              : (v && typeof v === 'object' && Object.keys(v).length > 0);
+              : v && typeof v === "object" && Object.keys(v).length > 0;
         if (isNonEmpty) {
-          throwDetected(`${key} detected: ${JSON.stringify(v).slice(0, 1000)}`, typeof v === 'string' ? v : undefined);
+          throwDetected(
+            `${key} detected: ${JSON.stringify(v).slice(0, 1000)}`,
+            typeof v === "string" ? v : undefined,
+          );
         }
       }
       const val = obj[key];
-      if (depth < maxDepth && val && typeof val === 'object') {
+      if (depth < maxDepth && val && typeof val === "object") {
         traverse(val, depth + 1);
       }
     }
@@ -270,13 +321,11 @@ type StatusHandlerInput = {
   lastFailureStatus?: number | undefined;
 };
 
-export function handle2xxStatus(
-  input: StatusHandlerInput
-): StatusHandlerResult {
+export function handle2xxStatus(input: StatusHandlerInput): StatusHandlerResult {
   const { response, axiosConfig, credentials = {}, payload = {} } = input;
   const htmlCheck = detectHtmlErrorResponse(response?.data);
   if (htmlCheck.isHtml) {
-    const url = String(axiosConfig?.url || '');
+    const url = String(axiosConfig?.url || "");
     const maskedUrl = maskCredentials(url, credentials);
     const msg = `Received HTML response instead of expected JSON data from ${maskedUrl}. \n        This usually indicates an error page or invalid endpoint.\nResponse: ${htmlCheck.preview}`;
     return { shouldFail: true, message: msg };
@@ -284,40 +333,62 @@ export function handle2xxStatus(
   return { shouldFail: false };
 }
 
-export function handle429Status(
-  input: StatusHandlerInput
-): StatusHandlerResult {
+export function handle429Status(input: StatusHandlerInput): StatusHandlerResult {
   const { response, axiosConfig, credentials = {}, payload = {} } = input;
-  const method = (axiosConfig?.method || 'GET').toString().toUpperCase();
-  const url = String(axiosConfig?.url || '');
-  const errorData = response?.data instanceof Buffer ? response.data.toString('utf-8') : response?.data;
-  const error = JSON.stringify((errorData as any)?.error || (errorData as any)?.errors || errorData || response?.statusText || "undefined");
+  const method = (axiosConfig?.method || "GET").toString().toUpperCase();
+  const url = String(axiosConfig?.url || "");
+  const errorData =
+    response?.data instanceof Buffer ? response.data.toString("utf-8") : response?.data;
+  const error = JSON.stringify(
+    (errorData as any)?.error ||
+      (errorData as any)?.errors ||
+      errorData ||
+      response?.statusText ||
+      "undefined",
+  );
   const maskedConfig = maskCredentials(JSON.stringify(axiosConfig || {}), credentials);
   let message = `${method} ${url} failed with status ${response.status}.\nResponse: ${String(error).slice(0, 1000)}\nconfig: ${maskedConfig}`;
 
-  const retryAfter = response.headers['retry-after']
-    ? `Retry-After: ${response.headers['retry-after']}`
-    : 'No Retry-After header provided';
+  const retryAfter = response.headers["retry-after"]
+    ? `Retry-After: ${response.headers["retry-after"]}`
+    : "No Retry-After header provided";
   message = `Rate limit exceeded. ${retryAfter}. Maximum wait time of 60s exceeded. \n        \n        ${message}`;
   const full = `API call failed with status ${response.status}. Response: ${message}`;
   return { shouldFail: true, message: full };
 }
 
-export function handleErrorStatus(
-  input: StatusHandlerInput
-): StatusHandlerResult {
+export function handleErrorStatus(input: StatusHandlerInput): StatusHandlerResult {
   const { response, axiosConfig, credentials = {}, payload = {} } = input;
-  const method = (axiosConfig?.method || 'GET').toString().toUpperCase();
-  const url = String(axiosConfig?.url || '');
-  const errorData = response?.data instanceof Buffer ? response.data.toString('utf-8') : response?.data;
-  const error = JSON.stringify((errorData as any)?.error || (errorData as any)?.errors || errorData || response?.statusText || "undefined");
+  const method = (axiosConfig?.method || "GET").toString().toUpperCase();
+  const url = String(axiosConfig?.url || "");
+  const errorData =
+    response?.data instanceof Buffer ? response.data.toString("utf-8") : response?.data;
+  const error = JSON.stringify(
+    (errorData as any)?.error ||
+      (errorData as any)?.errors ||
+      errorData ||
+      response?.statusText ||
+      "undefined",
+  );
   const maskedConfig = maskCredentials(JSON.stringify(axiosConfig || {}), credentials);
   const message = `${method} ${url} failed with status ${response.status}.\nResponse: ${String(error).slice(0, 1000)}\nconfig: ${maskedConfig}`;
   const full = `API call failed with status ${response.status}. Response: ${message}`;
   return { shouldFail: true, message: full };
 }
 
-export async function callHttp({ config, payload, credentials, options, metadata }: { config: StepConfig, payload: Record<string, any>, credentials: Record<string, any>, options: RequestOptions, metadata: ServiceMetadata }): Promise<{ data: any; statusCode: number; headers: Record<string, any>; }> {
+export async function callHttp({
+  config,
+  payload,
+  credentials,
+  options,
+  metadata,
+}: {
+  config: StepConfig;
+  payload: Record<string, any>;
+  credentials: Record<string, any>;
+  options: RequestOptions;
+  metadata: ServiceMetadata;
+}): Promise<{ data: any; statusCode: number; headers: Record<string, any> }> {
   const allVariables = { ...payload, ...credentials };
   let allResults = [];
   let page = 1;
@@ -339,31 +410,37 @@ export async function callHttp({ config, payload, credentials, options, metadata
       offset,
       cursor,
       limit: config.pagination?.pageSize || "50",
-      pageSize: config.pagination?.pageSize || "50"
+      pageSize: config.pagination?.pageSize || "50",
     };
 
     const requestVars = { ...paginationVars, ...allVariables };
 
     if (config.pagination?.type === PaginationType.PAGE_BASED) {
       const request = JSON.stringify(config);
-      if (!request.includes('page')) {
-        throw new Error(`Pagination type is ${PaginationType.PAGE_BASED} but no page parameter is provided in the request. Please provide a page parameter in the request.`);
+      if (!request.includes("page")) {
+        throw new Error(
+          `Pagination type is ${PaginationType.PAGE_BASED} but no page parameter is provided in the request. Please provide a page parameter in the request.`,
+        );
       }
     } else if (config.pagination?.type === PaginationType.OFFSET_BASED) {
       const request = JSON.stringify(config);
-      if (!request.includes('offset')) {
-        throw new Error(`Pagination type is ${PaginationType.OFFSET_BASED} but no offset parameter is provided in the request. Please provide an offset parameter in the request.`);
+      if (!request.includes("offset")) {
+        throw new Error(
+          `Pagination type is ${PaginationType.OFFSET_BASED} but no offset parameter is provided in the request. Please provide an offset parameter in the request.`,
+        );
       }
     } else if (config.pagination?.type === PaginationType.CURSOR_BASED) {
       const request = JSON.stringify(config);
-      if (!request.includes('cursor')) {
-        throw new Error(`Pagination type is ${PaginationType.CURSOR_BASED} but no cursor parameter is provided in the request. Please provide a cursor parameter in the request.`);
+      if (!request.includes("cursor")) {
+        throw new Error(
+          `Pagination type is ${PaginationType.CURSOR_BASED} but no cursor parameter is provided in the request. Please provide a cursor parameter in the request.`,
+        );
       }
     }
 
     // Handle headers - might be string or object
     let headersToProcess = config.headers || {};
-    if (typeof headersToProcess === 'string') {
+    if (typeof headersToProcess === "string") {
       const replacedString = await replaceVariables(headersToProcess, requestVars);
       try {
         headersToProcess = JSON.parse(replacedString);
@@ -373,20 +450,28 @@ export async function callHttp({ config, payload, credentials, options, metadata
     }
 
     const headersWithReplacedVars = Object.fromEntries(
-      (await Promise.all(
-        Object.entries(headersToProcess)
-          .map(async ([key, value]) => [key, await replaceVariables(String(value), requestVars)])
-      )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
+      (
+        await Promise.all(
+          Object.entries(headersToProcess).map(async ([key, value]) => [
+            key,
+            await replaceVariables(String(value), requestVars),
+          ]),
+        )
+      ).filter(([_, value]) => value && value !== "undefined" && value !== "null"),
     );
 
     const processedHeaders = {};
     for (const [key, value] of Object.entries(headersWithReplacedVars)) {
       let processedValue = value;
-      if (key.toLowerCase() === 'authorization' && typeof value === 'string') {
-        processedValue = value.replace(/^(Basic|Bearer)\s+(Basic|Bearer)\s+/, '$1 $2');
+      if (key.toLowerCase() === "authorization" && typeof value === "string") {
+        processedValue = value.replace(/^(Basic|Bearer)\s+(Basic|Bearer)\s+/, "$1 $2");
       }
       // Convert Basic Auth to Base64
-      if (key.toLowerCase() === 'authorization' && typeof processedValue === 'string' && processedValue.startsWith('Basic ')) {
+      if (
+        key.toLowerCase() === "authorization" &&
+        typeof processedValue === "string" &&
+        processedValue.startsWith("Basic ")
+      ) {
         processedValue = convertBasicAuthToBase64(processedValue);
       }
 
@@ -395,7 +480,7 @@ export async function callHttp({ config, payload, credentials, options, metadata
 
     // Handle query params - might be string or object
     let queryParamsToProcess = config.queryParams || {};
-    if (typeof queryParamsToProcess === 'string') {
+    if (typeof queryParamsToProcess === "string") {
       const replacedString = await replaceVariables(queryParamsToProcess, requestVars);
       try {
         queryParamsToProcess = JSON.parse(replacedString);
@@ -405,15 +490,17 @@ export async function callHttp({ config, payload, credentials, options, metadata
     }
 
     const processedQueryParams = Object.fromEntries(
-      (await Promise.all(
-        Object.entries(queryParamsToProcess)
-          .map(async ([key, value]) => [key, await replaceVariables(String(value), requestVars)])
-      )).filter(([_, value]) => value && value !== "undefined" && value !== "null")
+      (
+        await Promise.all(
+          Object.entries(queryParamsToProcess).map(async ([key, value]) => [
+            key,
+            await replaceVariables(String(value), requestVars),
+          ]),
+        )
+      ).filter(([_, value]) => value && value !== "undefined" && value !== "null"),
     );
 
-    const processedBody = config.body ?
-      await replaceVariables(config.body, requestVars) :
-      "";
+    const processedBody = config.body ? await replaceVariables(config.body, requestVars) : "";
 
     const processedUrlHost = await replaceVariables(config.urlHost, requestVars);
     const processedUrlPath = await replaceVariables(config.urlPath, requestVars);
@@ -428,9 +515,20 @@ export async function callHttp({ config, payload, credentials, options, metadata
       timeout: options?.timeout || server_defaults.HTTP.DEFAULT_TIMEOUT,
     };
 
-    const paginationInfo = config.pagination?.type === PaginationType.PAGE_BASED ? "page: " + page : config.pagination?.type === PaginationType.OFFSET_BASED ? "offset: " + offset : config.pagination?.type === PaginationType.CURSOR_BASED ? "cursor: " + cursor : "";
-    logMessage("debug", `Calling HTTP endpoint${paginationInfo ? ` (${paginationInfo})` : ""}: ${maskCredentials(processedUrl, credentials)}`, metadata);
-    
+    const paginationInfo =
+      config.pagination?.type === PaginationType.PAGE_BASED
+        ? "page: " + page
+        : config.pagination?.type === PaginationType.OFFSET_BASED
+          ? "offset: " + offset
+          : config.pagination?.type === PaginationType.CURSOR_BASED
+            ? "cursor: " + cursor
+            : "";
+    logMessage(
+      "debug",
+      `Calling HTTP endpoint${paginationInfo ? ` (${paginationInfo})` : ""}: ${maskCredentials(processedUrl, credentials)}`,
+      metadata,
+    );
+
     const axiosResult = await callAxios(axiosConfig, options);
     lastResponse = axiosResult.response;
 
@@ -440,13 +538,34 @@ export async function callHttp({ config, payload, credentials, options, metadata
     const retriesAttempted = axiosResult.retriesAttempted || 0;
     const lastFailureStatus = axiosResult.lastFailureStatus;
     if ([200, 201, 202, 203, 204, 205].includes(status)) {
-      statusHandlerResult = handle2xxStatus({ response: lastResponse, axiosConfig, credentials, payload, retriesAttempted, lastFailureStatus });
+      statusHandlerResult = handle2xxStatus({
+        response: lastResponse,
+        axiosConfig,
+        credentials,
+        payload,
+        retriesAttempted,
+        lastFailureStatus,
+      });
     } else if (status === 429) {
-      statusHandlerResult = handle429Status({ response: lastResponse, axiosConfig, credentials, payload, retriesAttempted, lastFailureStatus });
+      statusHandlerResult = handle429Status({
+        response: lastResponse,
+        axiosConfig,
+        credentials,
+        payload,
+        retriesAttempted,
+        lastFailureStatus,
+      });
     } else {
-      const base = handleErrorStatus({ response: lastResponse, axiosConfig, credentials, payload, retriesAttempted, lastFailureStatus });
+      const base = handleErrorStatus({
+        response: lastResponse,
+        axiosConfig,
+        credentials,
+        payload,
+        retriesAttempted,
+        lastFailureStatus,
+      });
       if (base.shouldFail && base.message) {
-        const suffix = `\nRetries attempted: ${retriesAttempted}${lastFailureStatus ? `; last failure status: ${lastFailureStatus}` : ''}`;
+        const suffix = `\nRetries attempted: ${retriesAttempted}${lastFailureStatus ? `; last failure status: ${lastFailureStatus}` : ""}`;
         statusHandlerResult = { shouldFail: true, message: `${base.message}${suffix}` };
       } else {
         statusHandlerResult = base;
@@ -464,10 +583,9 @@ export async function callHttp({ config, payload, credentials, options, metadata
       responseData = await parseFile(responseData, SupportedFileType.AUTO);
     }
     // Fallback for any legacy code paths or special cases - we can remove this later
-    else if (responseData && (responseData instanceof ArrayBuffer)) {
+    else if (responseData && responseData instanceof ArrayBuffer) {
       responseData = await parseFile(Buffer.from(responseData), SupportedFileType.AUTO);
-    }
-    else if (responseData && typeof responseData === 'string') {
+    } else if (responseData && typeof responseData === "string") {
       responseData = await parseFile(Buffer.from(responseData), SupportedFileType.AUTO);
     }
     const parsedResponseData = responseData;
@@ -483,32 +601,38 @@ export async function callHttp({ config, payload, credentials, options, metadata
     // Handle pagination based on whether stopCondition exists
     if (hasStopCondition) {
       const currentResponseHash = JSON.stringify(parsedResponseData);
-      const currentHasData = Array.isArray(parsedResponseData) ? parsedResponseData.length > 0 :
-        parsedResponseData && Object.keys(parsedResponseData).length > 0;
+      const currentHasData = Array.isArray(parsedResponseData)
+        ? parsedResponseData.length > 0
+        : parsedResponseData && Object.keys(parsedResponseData).length > 0;
 
       if (loopCounter === 0) {
         firstResponseHash = currentResponseHash;
         hasValidData = currentHasData;
       }
 
-      if (loopCounter === 1 && currentResponseHash === firstResponseHash && hasValidData && currentHasData) {
+      if (
+        loopCounter === 1 &&
+        currentResponseHash === firstResponseHash &&
+        hasValidData &&
+        currentHasData
+      ) {
         const maskedBody = maskCredentials(processedBody, credentials);
         const maskedParams = maskCredentials(JSON.stringify(processedQueryParams), credentials);
         const maskedHeaders = maskCredentials(JSON.stringify(processedHeaders), credentials);
 
         throw new Error(
           `Pagination configuration error: The first two API requests returned identical responses with valid data. ` +
-          `This indicates the pagination parameters are not being applied correctly. ` +
-          `Please check your pagination configuration (type: ${config.pagination?.type}, pageSize: ${config.pagination?.pageSize}), ` +
-          `body: ${maskedBody}, queryParams: ${maskedParams}, headers: ${maskedHeaders}.`
+            `This indicates the pagination parameters are not being applied correctly. ` +
+            `Please check your pagination configuration (type: ${config.pagination?.type}, pageSize: ${config.pagination?.pageSize}), ` +
+            `body: ${maskedBody}, queryParams: ${maskedParams}, headers: ${maskedHeaders}.`,
         );
       }
 
       if (loopCounter === 1 && !hasValidData && !currentHasData) {
         throw new Error(
           `Stop condition error: The API returned no data on the first request, but the stop condition did not terminate pagination. ` +
-          `The stop condition should detect empty responses and stop immediately. ` +
-          `Current stop condition: ${(config.pagination as any).stopCondition}`
+            `The stop condition should detect empty responses and stop immediately. ` +
+            `Current stop condition: ${(config.pagination as any).stopCondition}`,
         );
       }
 
@@ -519,19 +643,19 @@ export async function callHttp({ config, payload, credentials, options, metadata
           page,
           offset,
           cursor,
-          totalFetched: allResults.length
+          totalFetched: allResults.length,
         };
 
         const stopEval = await evaluateStopCondition(
           (config.pagination as any).stopCondition,
           { ...lastResponse, data: parsedResponseData },
-          pageInfo
+          pageInfo,
         );
 
         if (stopEval.error) {
           throw new Error(
             `Pagination stop condition error: ${stopEval.error}\n` +
-            `Stop condition: ${(config.pagination as any).stopCondition}`
+              `Stop condition: ${(config.pagination as any).stopCondition}`,
           );
         }
 
@@ -544,8 +668,7 @@ export async function callHttp({ config, payload, credentials, options, metadata
         allResults = allResults.concat(parsedResponseData);
       } else if (!config.dataPath) {
         allResults = smartMergeResponses(allResults, parsedResponseData);
-      }
-      else if (parsedResponseData) {
+      } else if (parsedResponseData) {
         allResults.push(parsedResponseData);
       }
     } else {
@@ -574,8 +697,8 @@ export async function callHttp({ config, payload, credentials, options, metadata
     offset += parseInt(config.pagination?.pageSize) || 50;
 
     if (config.pagination?.type === PaginationType.CURSOR_BASED) {
-      const cursorPath = config.pagination?.cursorPath || 'next_cursor';
-      const jsonPath = cursorPath.startsWith('$') ? cursorPath : `$.${cursorPath}`;
+      const cursorPath = config.pagination?.cursorPath || "next_cursor";
+      const jsonPath = cursorPath.startsWith("$") ? cursorPath : `$.${cursorPath}`;
       const result = JSONPath({ path: jsonPath, json: parsedResponseData, wrap: false });
       cursor = result;
       if (!cursor) {
@@ -588,17 +711,15 @@ export async function callHttp({ config, payload, credentials, options, metadata
   return {
     data: allResults?.length === 1 ? allResults[0] : allResults,
     statusCode: lastResponse.status,
-    headers: lastResponse.headers
+    headers: lastResponse.headers,
   };
 }
 
 export async function evaluateStopCondition(
   stopConditionCode: string,
   response: AxiosResponse,
-  pageInfo: { page: number; offset: number; cursor: any; totalFetched: number }
+  pageInfo: { page: number; offset: number; cursor: any; totalFetched: number },
 ): Promise<{ shouldStop: boolean; error?: string }> {
-
-
   const isolate = new ivm.Isolate({ memoryLimit: 4096 });
 
   try {
@@ -606,14 +727,16 @@ export async function evaluateStopCondition(
 
     // Inject the response and pageInfo as JSON strings
     // legacy support for direct response data access
-    await context.global.set('responseJSON', JSON.stringify({ data: response.data, headers: response.headers }));
-    await context.global.set('pageInfoJSON', JSON.stringify(pageInfo));
+    await context.global.set(
+      "responseJSON",
+      JSON.stringify({ data: response.data, headers: response.headers }),
+    );
+    await context.global.set("pageInfoJSON", JSON.stringify(pageInfo));
 
     // if the stop condition code starts with return or is not a function, we need to wrap it in a function
     if (stopConditionCode.startsWith("return")) {
       stopConditionCode = `(response, pageInfo) => { ${stopConditionCode} }`;
-    }
-    else if (!stopConditionCode.startsWith("(response")) {
+    } else if (!stopConditionCode.startsWith("(response")) {
       stopConditionCode = `(response, pageInfo) => ${stopConditionCode}`;
     }
 
@@ -626,23 +749,23 @@ export async function evaluateStopCondition(
             // Return the boolean result
             return Boolean(result);
         `;
-  
-      const shouldStop = await context.evalClosure(script, null, { timeout: 3000 });
-  
-      return { shouldStop: Boolean(shouldStop) };
+
+    const shouldStop = await context.evalClosure(script, null, { timeout: 3000 });
+
+    return { shouldStop: Boolean(shouldStop) };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    let helpfulError = `Stop condition evaluation failed: ${errorMessage}`;
+
+    return {
+      shouldStop: false, // Default to continue on error
+      error: helpfulError,
+    };
+  } finally {
+    try {
+      isolate.dispose();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      let helpfulError = `Stop condition evaluation failed: ${errorMessage}`;
-  
-      return {
-        shouldStop: false, // Default to continue on error
-        error: helpfulError
-      };
-    } finally {
-      try {
-        isolate.dispose();
-      } catch (error) {
-        console.error("Error disposing isolate", error);
-      }
+      console.error("Error disposing isolate", error);
     }
   }
+}

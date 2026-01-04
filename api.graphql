@@ -498,10 +498,7 @@ type Mutation {
   upsertApi(id: ID!, input: JSON!): ApiConfig!
   deleteApi(id: ID!): Boolean!
 
-  upsertIntegration(
-    input: IntegrationInput!
-    mode: UpsertMode = UPSERT
-  ): Integration!
+  upsertIntegration(input: IntegrationInput!, mode: UpsertMode = UPSERT): Integration!
   deleteIntegration(id: ID!): Boolean!
 
   cacheOauthClientCredentials(
@@ -509,10 +506,7 @@ type Mutation {
     clientId: String!
     clientSecret: String!
   ): Boolean!
-  getOAuthClientCredentials(
-    templateId: ID
-    clientCredentialsUid: String
-  ): OAuthClientCredentials!
+  getOAuthClientCredentials(templateId: ID, clientCredentialsUid: String): OAuthClientCredentials!
 
   callEndpoint(
     integrationId: ID

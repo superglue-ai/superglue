@@ -1,0 +1,8 @@
+pre-commit:
+  parallel: true
+  commands:
+    prettier:
+      glob: "packages/**/*.{ts,tsx,js,jsx,json,md,mdx}"
+      run: npx prettier --write --ignore-path .gitignore {staged_files}
+    secrets:
+      run: npx secretlint "**/*.{ts,tsx,js,jsx,json,md,mdx}" --maskSecrets {staged_files}

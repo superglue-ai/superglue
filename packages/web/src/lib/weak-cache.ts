@@ -1,4 +1,4 @@
-import type { TaskType } from '../workers/compute-worker';
+import type { TaskType } from "../workers/compute-worker";
 
 function hash(str: string): string {
   let h = 0;
@@ -9,7 +9,7 @@ function hash(str: string): string {
 }
 
 export function getDataHash(data: any): string {
-  const str = typeof data === 'string' ? data : JSON.stringify(data);
+  const str = typeof data === "string" ? data : JSON.stringify(data);
   return str.length > 500 ? hash(str) : str;
 }
 

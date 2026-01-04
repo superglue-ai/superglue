@@ -1,7 +1,7 @@
-import { Download } from 'lucide-react';
-import { Button } from '@/src/components/ui/button';
-import { downloadJson } from '@/src/lib/download-utils';
-import { maskCredentials } from '@superglue/shared';
+import { Download } from "lucide-react";
+import { Button } from "@/src/components/ui/button";
+import { downloadJson } from "@/src/lib/download-utils";
+import { maskCredentials } from "@superglue/shared";
 
 interface DownloadButtonProps {
   data: any;
@@ -12,18 +12,18 @@ interface DownloadButtonProps {
   title?: string;
 }
 
-export function DownloadButton({ 
-  data, 
-  filename, 
+export function DownloadButton({
+  data,
+  filename,
   credentials,
   disabled = false,
   className = "h-6 w-6",
-  title = "Download as JSON"
+  title = "Download as JSON",
 }: DownloadButtonProps) {
   const handleDownload = () => {
     let content: string;
     try {
-      content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+      content = typeof data === "string" ? data : JSON.stringify(data, null, 2);
     } catch {
       content = String(data);
     }
@@ -46,4 +46,3 @@ export function DownloadButton({
     </Button>
   );
 }
-

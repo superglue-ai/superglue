@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useIntegrations } from '@/src/app/integrations-context';
+import { useIntegrations } from "@/src/app/integrations-context";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import {
@@ -12,28 +12,43 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 
-import { DeployButton } from '@/src/components/tools/deploy/DeployButton';
-import { FolderSelector, useFolderFilter } from '@/src/components/tools/folders/FolderSelector';
-import { InlineFolderPicker } from '@/src/components/tools/folders/InlineFolderPicker';
-import { CopyButton } from '@/src/components/tools/shared/CopyButton';
-import { ToolActionsMenu } from '@/src/components/tools/ToolActionsMenu';
-import { ToolCreateStepper } from '@/src/components/tools/ToolCreateStepper';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip";
-import { getIntegrationIcon as getIntegrationIconName } from '@/src/lib/general-utils';
-import { Integration, Tool } from '@superglue/shared';
-import { ArrowDown, ArrowUp, ArrowUpDown, Globe, Hammer, Loader2, Plus, RotateCw, Search } from "lucide-react";
-import { useRouter } from 'next/navigation';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import type { SimpleIcon } from 'simple-icons';
-import * as simpleIcons from 'simple-icons';
-import { useTools } from '../tools-context';
+import { DeployButton } from "@/src/components/tools/deploy/DeployButton";
+import { FolderSelector, useFolderFilter } from "@/src/components/tools/folders/FolderSelector";
+import { InlineFolderPicker } from "@/src/components/tools/folders/InlineFolderPicker";
+import { CopyButton } from "@/src/components/tools/shared/CopyButton";
+import { ToolActionsMenu } from "@/src/components/tools/ToolActionsMenu";
+import { ToolCreateStepper } from "@/src/components/tools/ToolCreateStepper";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/src/components/ui/tooltip";
+import { getIntegrationIcon as getIntegrationIconName } from "@/src/lib/general-utils";
+import { Integration, Tool } from "@superglue/shared";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Globe,
+  Hammer,
+  Loader2,
+  Plus,
+  RotateCw,
+  Search,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import type { SimpleIcon } from "simple-icons";
+import * as simpleIcons from "simple-icons";
+import { useTools } from "../tools-context";
 
-type SortColumn = 'id' | 'folder' | 'instruction' | 'updatedAt';
-type SortDirection = 'asc' | 'desc';
+type SortColumn = "id" | "folder" | "instruction" | "updatedAt";
+type SortDirection = "asc" | "desc";
 
 const ConfigTable = () => {
   const router = useRouter();
-  const {tools, isInitiallyLoading, isRefreshing, refreshTools} = useTools();
+  const { tools, isInitiallyLoading, isRefreshing, refreshTools } = useTools();
   const { integrations } = useIntegrations();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -41,8 +56,8 @@ const ConfigTable = () => {
   const [manuallyOpenedStepper, setManuallyOpenedStepper] = useState(false);
 
   const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
-  const [sortColumn, setSortColumn] = useState<SortColumn>('updatedAt');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [sortColumn, setSortColumn] = useState<SortColumn>("updatedAt");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const { selectedFolder, setSelectedFolder, filteredByFolder } = useFolderFilter(tools);
 
@@ -55,19 +70,18 @@ const ConfigTable = () => {
   }, [searchTerm]);
 
   // Memoize filtered and sorted configs
-  const currentConfigs = useMemo(() => {    
-    let filtered = filteredByFolder.filter(config => {
+  const currentConfigs = useMemo(() => {
+    let filtered = filteredByFolder.filter((config) => {
       if (!config) return false;
 
       if (debouncedSearchTerm) {
         const searchLower = debouncedSearchTerm.toLowerCase();
         // Only search relevant fields instead of entire object
-        const searchableText = [
-          config.id,
-          config.folder,
-          config.instruction
-        ].filter(Boolean).join(' ').toLowerCase();
-        
+        const searchableText = [config.id, config.folder, config.instruction]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
         if (!searchableText.includes(searchLower)) return false;
       }
 
@@ -75,16 +89,20 @@ const ConfigTable = () => {
     });
 
     filtered = [...filtered].sort((a, b) => {
-      const dir = sortDirection === 'asc' ? 1 : -1;
+      const dir = sortDirection === "asc" ? 1 : -1;
       switch (sortColumn) {
-        case 'id':
+        case "id":
           return dir * a.id.localeCompare(b.id);
-        case 'folder':
-          return dir * (a.folder || '').localeCompare(b.folder || '');
-        case 'instruction':
-          return dir * (a.instruction || '').localeCompare(b.instruction || '');
-        case 'updatedAt':
-          return dir * (new Date(a.updatedAt || a.createdAt).getTime() - new Date(b.updatedAt || b.createdAt).getTime());
+        case "folder":
+          return dir * (a.folder || "").localeCompare(b.folder || "");
+        case "instruction":
+          return dir * (a.instruction || "").localeCompare(b.instruction || "");
+        case "updatedAt":
+          return (
+            dir *
+            (new Date(a.updatedAt || a.createdAt).getTime() -
+              new Date(b.updatedAt || b.createdAt).getTime())
+          );
         default:
           return 0;
       }
@@ -109,18 +127,20 @@ const ConfigTable = () => {
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
-      setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortColumn(column);
-      setSortDirection(column === 'updatedAt' ? 'desc' : 'asc');
+      setSortDirection(column === "updatedAt" ? "desc" : "asc");
     }
   };
 
   const SortIcon = ({ column }: { column: SortColumn }) => {
     if (sortColumn !== column) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
-    return sortDirection === 'asc' 
-      ? <ArrowUp className="ml-1 h-3 w-3" /> 
-      : <ArrowDown className="ml-1 h-3 w-3" />;
+    return sortDirection === "asc" ? (
+      <ArrowUp className="ml-1 h-3 w-3" />
+    ) : (
+      <ArrowDown className="ml-1 h-3 w-3" />
+    );
   };
 
   const getSimpleIcon = (name: string): SimpleIcon | null => {
@@ -141,27 +161,26 @@ const ConfigTable = () => {
     return iconName ? getSimpleIcon(iconName) : null;
   };
 
-
   useEffect(() => {
     if (!isInitiallyLoading && !hasCompletedInitialLoad) {
       setHasCompletedInitialLoad(true);
     }
   }, [isInitiallyLoading, hasCompletedInitialLoad]);
 
-  const shouldShowStepper = manuallyOpenedStepper || (
-    hasCompletedInitialLoad && 
-    tools.length === 0
-  );
+  const shouldShowStepper =
+    manuallyOpenedStepper || (hasCompletedInitialLoad && tools.length === 0);
 
   if (shouldShowStepper) {
     return (
       <div className="max-w-none w-full min-h-full">
-        <ToolCreateStepper onComplete={() => {
-          setManuallyOpenedStepper(false);
-          refreshConfigs();
-        }} />
+        <ToolCreateStepper
+          onComplete={() => {
+            setManuallyOpenedStepper(false);
+            refreshConfigs();
+          }}
+        />
       </div>
-    )
+    );
   }
 
   return (
@@ -177,7 +196,7 @@ const ConfigTable = () => {
       </div>
 
       <div className="flex flex-wrap gap-3 mb-4 flex-shrink-0">
-        <FolderSelector 
+        <FolderSelector
           tools={tools}
           selectedFolder={selectedFolder}
           onFolderChange={setSelectedFolder}
@@ -198,36 +217,36 @@ const ConfigTable = () => {
           <TableHeader className="sticky top-0 bg-background z-10">
             <TableRow>
               <TableHead className="w-[60px]"></TableHead>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer hover:bg-muted/50 select-none"
-                onClick={() => handleSort('id')}
+                onClick={() => handleSort("id")}
               >
                 <div className="flex items-center">
                   ID
                   <SortIcon column="id" />
                 </div>
               </TableHead>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer hover:bg-muted/50 select-none"
-                onClick={() => handleSort('folder')}
+                onClick={() => handleSort("folder")}
               >
                 <div className="flex items-center">
                   Folder
                   <SortIcon column="folder" />
                 </div>
               </TableHead>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer hover:bg-muted/50 select-none"
-                onClick={() => handleSort('instruction')}
+                onClick={() => handleSort("instruction")}
               >
                 <div className="flex items-center">
                   Instructions
                   <SortIcon column="instruction" />
                 </div>
               </TableHead>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer hover:bg-muted/50 select-none"
-                onClick={() => handleSort('updatedAt')}
+                onClick={() => handleSort("updatedAt")}
               >
                 <div className="flex items-center">
                   Updated At
@@ -244,7 +263,7 @@ const ConfigTable = () => {
                         onClick={refreshConfigs}
                         className="transition-transform"
                       >
-                        <RotateCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        <RotateCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -266,13 +285,11 @@ const ConfigTable = () => {
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center">
                   <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <span>{selectedFolder !== 'all' ? 'No tools in this folder' : 'No results found'}</span>
-                    {selectedFolder !== 'all' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedFolder('all')}
-                      >
+                    <span>
+                      {selectedFolder !== "all" ? "No tools in this folder" : "No results found"}
+                    </span>
+                    {selectedFolder !== "all" && (
+                      <Button variant="outline" size="sm" onClick={() => setSelectedFolder("all")}>
                         Show all tools
                       </Button>
                     )}
@@ -284,7 +301,7 @@ const ConfigTable = () => {
                 const allIntegrationIds = new Set<string>();
 
                 if (tool.integrationIds) {
-                  tool.integrationIds.forEach(id => allIntegrationIds.add(id));
+                  tool.integrationIds.forEach((id) => allIntegrationIds.add(id));
                 }
 
                 if (tool.steps) {
@@ -298,15 +315,12 @@ const ConfigTable = () => {
                 const integrationIdsArray = Array.from(allIntegrationIds);
 
                 return (
-                  <TableRow
-                    key={tool.id}
-                    className="hover:bg-secondary"
-                  >
+                  <TableRow key={tool.id} className="hover:bg-secondary">
                     <TableCell className="w-[60px]">
                       {integrationIdsArray.length > 0 ? (
                         <div className="flex items-center justify-center gap-1 flex-shrink-0">
                           {integrationIdsArray.map((integrationId: string) => {
-                            const integration = integrations.find(i => i.id === integrationId);
+                            const integration = integrations.find((i) => i.id === integrationId);
                             if (!integration) return null;
                             const icon = getIntegrationIcon(integration);
                             return icon ? (
@@ -358,13 +372,19 @@ const ConfigTable = () => {
                     <TableCell className="max-w-[300px] truncate relative group">
                       <div className="flex items-center space-x-1">
                         <span className="truncate">{tool.instruction}</span>
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                          <CopyButton text={tool.instruction || ''} />
-                        </div>
+                        {tool.instruction && (
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <CopyButton text={tool.instruction} />
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="w-[150px]">
-                      {tool.updatedAt ? new Date(tool.updatedAt).toLocaleDateString() : (tool.createdAt ? new Date(tool.createdAt).toLocaleDateString() : '')}
+                      {tool.updatedAt
+                        ? new Date(tool.updatedAt).toLocaleDateString()
+                        : tool.createdAt
+                          ? new Date(tool.createdAt).toLocaleDateString()
+                          : ""}
                     </TableCell>
                     <TableCell className="w-[140px]">
                       <div className="flex justify-end gap-2">
@@ -377,12 +397,7 @@ const ConfigTable = () => {
                           <Hammer className="h-4 w-4" />
                           View
                         </Button>
-                        {!tool.archived && (
-                          <DeployButton
-                            tool={tool}
-                            className="gap-2"
-                          />
-                        )}
+                        {!tool.archived && <DeployButton tool={tool} className="gap-2" />}
                         <ToolActionsMenu tool={tool} />
                       </div>
                     </TableCell>

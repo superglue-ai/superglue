@@ -1,4 +1,9 @@
-import { ApiConfig, GenerateStepConfigArgs, GenerateTransformArgs, Integration } from "@superglue/shared";
+import {
+  ApiConfig,
+  GenerateStepConfigArgs,
+  GenerateTransformArgs,
+  Integration,
+} from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { getGenerateStepConfigContext } from "../../context/context-builders.js";
 import { GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../../context/context-prompts.js";
@@ -10,24 +15,24 @@ import { buildSourceData, generateStepConfig } from "../../tools/tool-step-build
 import { generateWorkingTransform } from "../../tools/tool-transform.js";
 import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { GraphQLRequestContext } from '../types.js';
+import { GraphQLRequestContext } from "../types.js";
 
 export const generateInstructionsResolver = async (
   _: any,
   { integrations }: { integrations: Integration[] },
   context: GraphQLRequestContext,
-  info: GraphQLResolveInfo
+  info: GraphQLResolveInfo,
 ) => {
   try {
     const toolCall: LLMToolCall = {
       id: crypto.randomUUID(),
       name: "generate_instructions",
-      arguments: {}
+      arguments: {},
     };
 
     const toolContext: InstructionGenerationContext = {
       ...context.toMetadata(),
-      integrations: integrations
+      integrations: integrations,
     };
 
     const callResult = await executeLLMTool(toolCall, toolContext);
@@ -44,7 +49,7 @@ export const generateInstructionsResolver = async (
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
       traceId: context.traceId,
-      integrations: integrations
+      integrations: integrations,
     });
     throw error;
   }
@@ -52,32 +57,43 @@ export const generateInstructionsResolver = async (
 
 export const generateStepConfigResolver = async (
   _: any,
-  { integrationId, currentStepConfig, currentDataSelector, stepInput, credentials, errorMessage }: GenerateStepConfigArgs,
+  {
+    integrationId,
+    currentStepConfig,
+    currentDataSelector,
+    stepInput,
+    credentials,
+    errorMessage,
+  }: GenerateStepConfigArgs,
   context: GraphQLRequestContext,
-  info: GraphQLResolveInfo
-): Promise<{config: ApiConfig, dataSelector: string}> => {
+  info: GraphQLResolveInfo,
+): Promise<{ config: ApiConfig; dataSelector: string }> => {
   try {
     const metadata = context.toMetadata();
 
     // Extract instruction from currentStepConfig
     const instruction = currentStepConfig?.instruction;
     if (!instruction) {
-      throw new Error('Instruction is required in currentStepConfig');
+      throw new Error("Instruction is required in currentStepConfig");
     }
 
     let integration: Integration | undefined;
-    let integrationDocs = '';
-    let integrationSpecificInstructions = '';
+    let integrationDocs = "";
+    let integrationSpecificInstructions = "";
     let integrationCredentials: Record<string, string> = {};
 
     if (integrationId) {
       try {
-        logMessage('info', `Generating step config for integration ${integrationId}`, metadata);
-        const integrationManager = new IntegrationManager(integrationId, context.datastore, context.toMetadata());
+        logMessage("info", `Generating step config for integration ${integrationId}`, metadata);
+        const integrationManager = new IntegrationManager(
+          integrationId,
+          context.datastore,
+          context.toMetadata(),
+        );
         integration = await integrationManager.getIntegration();
-        integrationDocs = (await integrationManager.getDocumentation())?.content || '';
-        integrationSpecificInstructions = integration.specificInstructions || '';
-        
+        integrationDocs = (await integrationManager.getDocumentation())?.content || "";
+        integrationSpecificInstructions = integration.specificInstructions || "";
+
         // Get integration credentials and prefix keys with integration ID
         if (integration?.credentials) {
           Object.entries(integration.credentials).forEach(([key, value]) => {
@@ -86,7 +102,7 @@ export const generateStepConfigResolver = async (
         }
       } catch (error) {
         telemetryClient?.captureException(error, context.orgId, {
-          integrationId
+          integrationId,
         });
       }
     }
@@ -94,32 +110,35 @@ export const generateStepConfigResolver = async (
     // Merge provided credentials with integration credentials (provided credentials take precedence)
     const mergedCredentials = {
       ...integrationCredentials,
-      ...(credentials || {})
+      ...(credentials || {}),
     };
 
     // Mode is either 'self-healing' if there's an error, or 'edit' (since we're always editing based on updated instruction)
-    const mode = errorMessage ? 'self-healing' : 'edit';
+    const mode = errorMessage ? "self-healing" : "edit";
 
-    const userPrompt = getGenerateStepConfigContext({
-      instruction,
-      previousStepConfig: currentStepConfig,
-      previousStepDataSelector: currentDataSelector,
-      stepInput,
-      credentials: mergedCredentials,
-      integrationDocumentation: integrationDocs,
-      integrationSpecificInstructions: integrationSpecificInstructions,
-      errorMessage
-    }, { characterBudget: 50000, mode });
+    const userPrompt = getGenerateStepConfigContext(
+      {
+        instruction,
+        previousStepConfig: currentStepConfig,
+        previousStepDataSelector: currentDataSelector,
+        stepInput,
+        credentials: mergedCredentials,
+        integrationDocumentation: integrationDocs,
+        integrationSpecificInstructions: integrationSpecificInstructions,
+        errorMessage,
+      },
+      { characterBudget: 50000, mode },
+    );
 
     const messages: LLMMessage[] = [
       {
         role: "system",
-        content: GENERATE_STEP_CONFIG_SYSTEM_PROMPT
+        content: GENERATE_STEP_CONFIG_SYSTEM_PROMPT,
       },
       {
         role: "user",
-        content: userPrompt
-      }
+        content: userPrompt,
+      },
     ];
 
     const sourceData = await buildSourceData({
@@ -127,7 +146,7 @@ export const generateStepConfigResolver = async (
       credentials: mergedCredentials,
       dataSelector: currentDataSelector,
       integrationUrlHost: integration?.urlHost,
-      paginationPageSize: currentStepConfig?.pagination?.pageSize
+      paginationPageSize: currentStepConfig?.pagination?.pageSize,
     });
 
     const generateStepConfigResult = await generateStepConfig({
@@ -135,9 +154,9 @@ export const generateStepConfigResolver = async (
       messages,
       sourceData,
       integration,
-      metadata
+      metadata,
     });
-          
+
     if (!generateStepConfigResult.success || !generateStepConfigResult.config) {
       throw new Error(generateStepConfigResult.error || "No step config generated");
     }
@@ -150,11 +169,11 @@ export const generateStepConfigResolver = async (
       instruction: currentStepConfig.instruction,
     } as ApiConfig;
 
-    return {config: mergedConfig, dataSelector: generateStepConfigResult.dataSelector};
+    return { config: mergedConfig, dataSelector: generateStepConfigResult.dataSelector };
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
       traceId: context.traceId,
-      integrationId
+      integrationId,
     });
 
     throw error;
@@ -165,34 +184,37 @@ export const generateTransformResolver = async (
   _: any,
   { currentTransform, responseSchema, stepData, errorMessage, instruction }: GenerateTransformArgs,
   context: GraphQLRequestContext,
-  info: GraphQLResolveInfo
+  info: GraphQLResolveInfo,
 ): Promise<{ transformCode: string; data?: any }> => {
   try {
     const metadata = context.toMetadata();
 
-    const prompt = (instruction || "Create transformation code.") +
-      (currentTransform ? `\nOriginally, we used the following transformation: ${currentTransform}` : "") +
+    const prompt =
+      (instruction || "Create transformation code.") +
+      (currentTransform
+        ? `\nOriginally, we used the following transformation: ${currentTransform}`
+        : "") +
       (errorMessage ? `\nThe transformation failed with the following error: ${errorMessage}` : "");
 
     const result = await generateWorkingTransform({
       targetSchema: responseSchema,
       inputData: stepData,
       instruction: prompt,
-      metadata
+      metadata,
     });
 
     if (!result) {
-      throw new Error('Failed to generate transform code');
+      throw new Error("Failed to generate transform code");
     }
 
-    return { 
+    return {
       transformCode: result.transformCode,
-      data: result.data 
+      data: result.data,
     };
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
       errorMessage,
-      instruction
+      instruction,
     });
     throw error;
   }

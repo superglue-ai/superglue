@@ -1,6 +1,6 @@
 /**
  * GraphQL Introspection Strategy
- * 
+ *
  * Attempts to fetch GraphQL schema through introspection queries.
  */
 
@@ -8,13 +8,17 @@ import { ApiConfig } from "@superglue/shared";
 import { ServiceMetadata } from "@superglue/shared";
 import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
-import { server_defaults } from '../../default.js';
+import { server_defaults } from "../../default.js";
 import { logMessage } from "../../utils/logs.js";
 import { composeUrl } from "../../utils/helpers.js";
-import { DocumentationFetchingStrategy } from '../types.js';
+import { DocumentationFetchingStrategy } from "../types.js";
 
 export class GraphQLStrategy implements DocumentationFetchingStrategy {
-  private async fetchGraphQLSchema(url: string, config: ApiConfig, metadata: ServiceMetadata): Promise<any | null> {
+  private async fetchGraphQLSchema(
+    url: string,
+    config: ApiConfig,
+    metadata: ServiceMetadata,
+  ): Promise<any | null> {
     const introspectionQuery = getIntrospectionQuery();
 
     try {
@@ -22,9 +26,13 @@ export class GraphQLStrategy implements DocumentationFetchingStrategy {
         url,
         {
           query: introspectionQuery,
-          operationName: 'IntrospectionQuery'
+          operationName: "IntrospectionQuery",
         },
-        { headers: config.headers, params: config.queryParams, timeout: server_defaults.DOCUMENTATION.TIMEOUTS.AXIOS }
+        {
+          headers: config.headers,
+          params: config.queryParams,
+          timeout: server_defaults.DOCUMENTATION.TIMEOUTS.AXIOS,
+        },
       );
 
       if (response.data.errors) {
@@ -38,9 +46,12 @@ export class GraphQLStrategy implements DocumentationFetchingStrategy {
 
   private isLikelyGraphQL(url: string, config: ApiConfig): boolean {
     if (!url) return false;
-    return url?.includes('graphql') ||
-      Object.values({ ...config.queryParams, ...config.headers })
-        .some(val => typeof val === 'string' && val.includes('IntrospectionQuery'));
+    return (
+      url?.includes("graphql") ||
+      Object.values({ ...config.queryParams, ...config.headers }).some(
+        (val) => typeof val === "string" && val.includes("IntrospectionQuery"),
+      )
+    );
   }
 
   async tryFetch(config: ApiConfig, metadata: ServiceMetadata): Promise<string | null> {
@@ -59,10 +70,9 @@ export class GraphQLStrategy implements DocumentationFetchingStrategy {
 
     const schema = await this.fetchGraphQLSchema(url, config, metadata);
     if (schema) {
-      logMessage('info', `Successfully fetched GraphQL schema from ${url}.`, metadata);
+      logMessage("info", `Successfully fetched GraphQL schema from ${url}.`, metadata);
       return JSON.stringify(schema);
     }
     return null;
   }
 }
-

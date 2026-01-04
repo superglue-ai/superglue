@@ -9,23 +9,22 @@ export function getConfiguredModelContextLength(): number {
   let modelId: string | undefined;
 
   switch (provider) {
-    case 'anthropic':
+    case "anthropic":
       modelId = process.env.ANTHROPIC_MODEL;
       break;
-    case 'openai':
+    case "openai":
       modelId = process.env.OPENAI_MODEL;
       break;
-    case 'gemini':
+    case "gemini":
       modelId = process.env.GEMINI_MODEL;
       break;
-    case 'azure':
+    case "azure":
       modelId = process.env.AZURE_MODEL;
       break;
-    case 'bedrock':
+    case "bedrock":
       modelId = process.env.BEDROCK_MODEL;
       break;
   }
 
   return modelId ? getModelContextLength(modelId) : DEFAULT_CONTEXT_LENGTH;
 }
-

@@ -19,7 +19,12 @@ interface DeleteConfigDialogProps {
   onDeleted?: (deletedId: string) => void;
 }
 
-export function DeleteConfigDialog({ config, isOpen, onClose, onDeleted }: DeleteConfigDialogProps) {
+export function DeleteConfigDialog({
+  config,
+  isOpen,
+  onClose,
+  onDeleted,
+}: DeleteConfigDialogProps) {
   const superglueConfig = useConfig();
 
   const handleDelete = async () => {
@@ -28,13 +33,13 @@ export function DeleteConfigDialog({ config, isOpen, onClose, onDeleted }: Delet
     try {
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
-        apiKey: tokenRegistry.getToken()
+        apiKey: tokenRegistry.getToken(),
       });
 
       let deletePromise;
       const configType = (config as any)?.type;
 
-      if (configType === 'api') {
+      if (configType === "api") {
         deletePromise = superglueClient.deleteApi(config.id);
       } else {
         // Default to tool/workflow deletion
@@ -45,29 +50,32 @@ export function DeleteConfigDialog({ config, isOpen, onClose, onDeleted }: Delet
 
       const deletedId = config.id;
       onClose();
-      
+
       if (onDeleted) {
         onDeleted(deletedId);
       }
     } catch (error) {
-      console.error('Error deleting config:', error);
+      console.error("Error deleting config:", error);
     }
   };
 
-  const isApi = (config as any)?.type === 'api';
+  const isApi = (config as any)?.type === "api";
 
   return (
     <AlertDialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <AlertDialogContent onKeyDown={(e) => {
-        if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'BUTTON') {
-          e.preventDefault();
-          handleDelete();
-        }
-      }}>
+      <AlertDialogContent
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "BUTTON") {
+            e.preventDefault();
+            handleDelete();
+          }
+        }}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete this {isApi ? 'configuration' : 'tool'}. This action cannot be undone.
+            This will permanently delete this {isApi ? "configuration" : "tool"}. This action cannot
+            be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -78,4 +86,3 @@ export function DeleteConfigDialog({ config, isOpen, onClose, onDeleted }: Delet
     </AlertDialog>
   );
 }
-

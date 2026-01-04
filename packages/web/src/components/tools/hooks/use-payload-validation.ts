@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { Validator } from 'jsonschema';
-import isEqual from 'lodash.isequal';
-import { generateDefaultFromSchema } from '@superglue/shared';
+import { useState, useEffect, useRef, useMemo } from "react";
+import { Validator } from "jsonschema";
+import isEqual from "lodash.isequal";
+import { generateDefaultFromSchema } from "@superglue/shared";
 
 interface UsePayloadValidationOptions {
   computedPayload: Record<string, any>;
@@ -16,12 +16,12 @@ interface UsePayloadValidationReturn {
 }
 
 function extractPayloadSchema(fullInputSchema: string | null): any | null {
-  if (!fullInputSchema || fullInputSchema.trim() === '') {
+  if (!fullInputSchema || fullInputSchema.trim() === "") {
     return null;
   }
   try {
     const parsed = JSON.parse(fullInputSchema);
-    if (parsed && typeof parsed === 'object' && parsed.properties && parsed.properties.payload) {
+    if (parsed && typeof parsed === "object" && parsed.properties && parsed.properties.payload) {
       return parsed.properties.payload;
     }
     return parsed;
@@ -30,11 +30,7 @@ function extractPayloadSchema(fullInputSchema: string | null): any | null {
   }
 }
 
-function validatePayload(
-  payload: any,
-  payloadSchema: any | null,
-  userHasEdited: boolean
-): boolean {
+function validatePayload(payload: any, payloadSchema: any | null, userHasEdited: boolean): boolean {
   if (!payloadSchema || Object.keys(payloadSchema).length === 0) {
     return true;
   }
@@ -50,7 +46,7 @@ function validatePayload(
     if (!userHasEdited) {
       try {
         const generatedDefault = generateDefaultFromSchema(payloadSchema);
-        if (Object.keys(generatedDefault).length === 0 && typeof generatedDefault === 'object') {
+        if (Object.keys(generatedDefault).length === 0 && typeof generatedDefault === "object") {
           return true;
         }
         if (isEqual(payload, generatedDefault)) {
@@ -77,10 +73,7 @@ export function usePayloadValidation({
   const [isValidating, setIsValidating] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const payloadSchema = useMemo(
-    () => extractPayloadSchema(inputSchema),
-    [inputSchema]
-  );
+  const payloadSchema = useMemo(() => extractPayloadSchema(inputSchema), [inputSchema]);
 
   useEffect(() => {
     if (timeoutRef.current) {
@@ -104,4 +97,3 @@ export function usePayloadValidation({
 
   return { isValid, isValidating };
 }
-

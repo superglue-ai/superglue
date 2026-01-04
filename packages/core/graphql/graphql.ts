@@ -1,18 +1,35 @@
-import { GraphQLUpload } from 'graphql-upload-ts';
+import { GraphQLUpload } from "graphql-upload-ts";
 import fs from "node:fs";
 import { callEndpointResolver } from "./resolvers/call-endpoint.js";
 import { deleteApiResolver } from "./resolvers/delete.js";
 import { extractResolver } from "./resolvers/extract.js";
-import { generateInstructionsResolver, generateStepConfigResolver, generateTransformResolver } from "./resolvers/generate.js";
+import {
+  generateInstructionsResolver,
+  generateStepConfigResolver,
+  generateTransformResolver,
+} from "./resolvers/generate.js";
 import { getApiResolver, getRunResolver } from "./resolvers/get.js";
-import { cacheOauthClientCredentialsResolver, deleteIntegrationResolver, findRelevantIntegrationsResolver, getIntegrationResolver, getOAuthClientCredentialsResolver, listIntegrationsResolver, searchIntegrationDocumentationResolver, upsertIntegrationResolver } from "./resolvers/integrations.js";
+import {
+  cacheOauthClientCredentialsResolver,
+  deleteIntegrationResolver,
+  findRelevantIntegrationsResolver,
+  getIntegrationResolver,
+  getOAuthClientCredentialsResolver,
+  listIntegrationsResolver,
+  searchIntegrationDocumentationResolver,
+  upsertIntegrationResolver,
+} from "./resolvers/integrations.js";
 import { listApisResolver, listRunsResolver } from "./resolvers/list.js";
 import { logsResolver } from "./resolvers/logs.js";
 import { renameWorkflowResolver } from "./resolvers/rename-workflow.js";
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
 import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant.js";
 import { upsertApiResolver } from "./resolvers/upsert.js";
-import { deleteWorkflowScheduleResolver, listWorkflowSchedulesResolver, upsertWorkflowScheduleResolver } from "./resolvers/workflow-scheduler.js";
+import {
+  deleteWorkflowScheduleResolver,
+  listWorkflowSchedulesResolver,
+  upsertWorkflowScheduleResolver,
+} from "./resolvers/workflow-scheduler.js";
 import {
   abortToolExecutionResolver,
   buildWorkflowResolver,
@@ -22,7 +39,7 @@ import {
   fixWorkflowResolver,
   getWorkflowResolver,
   listWorkflowsResolver,
-  upsertWorkflowResolver
+  upsertWorkflowResolver,
 } from "./resolvers/workflow.js";
 
 export const typeDefs = fs.readFileSync("../../api.graphql", "utf8");
