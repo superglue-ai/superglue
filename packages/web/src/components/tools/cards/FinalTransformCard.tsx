@@ -3,7 +3,7 @@ import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
-import { DownloadButton } from "@/src/components/ui/download-button";
+import { DownloadButton } from "@superglue/web/src/components/tools/shared/download-button";
 import { isEmptyData } from "@/src/lib/general-utils";
 import {
   Code2,
