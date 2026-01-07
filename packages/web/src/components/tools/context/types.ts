@@ -45,7 +45,7 @@ export interface ToolConfigContextValue {
   addStep: (step: ExecutionStep, afterIndex?: number) => void;
   removeStep: (stepId: string) => void;
   updateStep: (stepId: string, updates: Partial<ExecutionStep>) => void;
-  setSteps: (steps: ExecutionStep[]) => void;
+  setSteps: (steps: ExecutionStep[] | ((prev: ExecutionStep[]) => ExecutionStep[])) => void;
 
   getStepConfig: (stepId: string) => ExecutionStep | undefined;
   getStepIndex: (stepId: string) => number;
