@@ -3,10 +3,8 @@
   "version": "0.1.0",
   "devDependencies": {
     "@types/cors": "^2.8.17",
-    "@types/form-data": "^2.5.1",
     "@types/js-yaml": "^4.0.9",
     "@types/jsonpath": "^0.2.4",
-    "@types/lodash.isequal": "^4.5.8",
     "@types/lodash.keys": "^4.2.9",
     "@types/lodash.merge": "^4.6.9",
     "@types/lodash.xor": "^4.5.9",
@@ -74,7 +72,6 @@
     "jsonschema": "^1.5.0",
     "jszip": "^3.10.1",
     "lodash": "^4.17.21",
-    "lodash.isequal": "^4.5.0",
     "lodash.keys": "^4.2.0",
     "lodash.merge": "^4.6.2",
     "lodash.xor": "^4.5.0",

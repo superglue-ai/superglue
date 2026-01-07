@@ -1,6 +1,8 @@
 "use client";
+import { useConfig } from "@/src/app/config-context";
 import { useIntegrations } from "@/src/app/integrations-context";
 import { useTools } from "@/src/app/tools-context";
+import { createSuperglueClient } from "@/src/lib/client-utils";
 import { type UploadedFileInfo } from "@/src/lib/file-utils";
 import { buildStepInput, isAbortError } from "@/src/lib/general-utils";
 import {
@@ -15,7 +17,8 @@ import { usePayloadValidation } from "./hooks/use-payload-validation";
 import { useToolExecution } from "./hooks/use-tool-execution";
 import { useToolData } from "./hooks/use-tool-data";
 import { ToolConfigProvider, useToolConfig, ExecutionProvider, useExecution } from "./context";
-import { Check, Hammer, Loader2, Play, Square, X } from "lucide-react";
+import { useToast } from "@/src/hooks/use-toast";
+import { ArchiveRestore, Check, Hammer, Loader2, Play, Square, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   forwardRef,
@@ -106,6 +109,8 @@ function ToolPlaygroundInner({
   innerRef,
 }: ToolPlaygroundInnerProps) {
   const router = useRouter();
+  const { toast } = useToast();
+  const config = useConfig();
   const { refreshTools } = useTools();
   const toolConfig = useToolConfig();
   const execution = useExecution();
@@ -391,8 +396,8 @@ function ToolPlaygroundInner({
   );
 
   const handleStepEdit = (stepId: string, updatedStep: any, _isUserInitiated?: boolean) => {
-    setSteps(
-      steps.map((step) =>
+    setSteps((prevSteps) =>
+      prevSteps.map((step) =>
         step.id === stepId
           ? {
               ...updatedStep,
@@ -442,6 +447,22 @@ function ToolPlaygroundInner({
     setNavigateToFinalSignal(Date.now());
   };
 
+  const handleUnarchive = async () => {
+    try {
+      const client = createSuperglueClient(config.superglueEndpoint);
+      await client.archiveWorkflow(toolId, false);
+      setIsArchived(false);
+      refreshTools();
+    } catch (error: any) {
+      console.error("Error unarchiving tool:", error);
+      toast({
+        title: "Error unarchiving tool",
+        description: error.message || "An unexpected error occurred",
+        variant: "destructive",
+      });
+    }
+  };
+
   const toolActionButtons = !embedded ? (
     <div className="flex items-center gap-1">
       <FolderPicker value={folder} onChange={(f) => setFolder(f ?? undefined)} />
@@ -462,70 +483,79 @@ function ToolPlaygroundInner({
 
   const defaultHeaderActions = (
     <div className="flex items-center gap-2">
-      {loading ? (
-        <Button
-          variant="outline"
-          onClick={handleStopExecution}
-          disabled={saving || isExecutingStep != null || isExecutingTransform}
-          className="h-9 px-4"
-        >
-          <Square className="h-4 w-4" />
-          Stop Execution
+      {isArchived ? (
+        <Button variant="outline" onClick={handleUnarchive} className="h-9 px-4">
+          <ArchiveRestore className="h-4 w-4" />
+          Unarchive
         </Button>
       ) : (
-        <Button
-          variant="outline"
-          onClick={handleRunAllSteps}
-          disabled={
-            loading || saving || isExecutingStep != null || isExecutingTransform || isArchived
-          }
-          className="h-9 px-4"
-        >
-          <Play className="h-4 w-4" />
-          Run all Steps
-        </Button>
-      )}
-      {!hideRebuildButton && !isArchived && (
-        <Button
-          variant="outline"
-          onClick={() => {
-            onRebuildStart?.();
-            setShowToolBuilder(true);
-          }}
-          className="h-9 px-5"
-        >
-          <Hammer className="h-4 w-4" />
-          Rebuild
-        </Button>
-      )}
-      {!embedded && toolId && !isArchived && (
-        <DeployButton
-          tool={currentTool}
-          payload={computedPayload}
-          onBeforeOpen={saveTool}
-          size="default"
-          className="h-9 px-5"
-          disabled={saving || loading}
-        />
-      )}
-      {!isArchived && (
-        <Button
-          variant="default"
-          onClick={saveTool}
-          disabled={saving || loading}
-          className="h-9 px-5 w-[108px] shadow-md border border-primary/40"
-        >
-          {saving ? (
-            "Saving..."
-          ) : justSaved ? (
-            <>
-              <Check className="mr-1 h-3.5 w-3.5" />
-              Saved
-            </>
+        <>
+          {loading ? (
+            <Button
+              variant="outline"
+              onClick={handleStopExecution}
+              disabled={saving || isExecutingStep != null || isExecutingTransform}
+              className="h-9 px-4"
+            >
+              <Square className="h-4 w-4" />
+              Stop Execution
+            </Button>
           ) : (
-            "Save"
+            <Button
+              variant="outline"
+              onClick={handleRunAllSteps}
+              disabled={
+                loading || saving || isExecutingStep != null || isExecutingTransform || isArchived
+              }
+              className="h-9 px-4"
+            >
+              <Play className="h-4 w-4" />
+              Run all Steps
+            </Button>
           )}
-        </Button>
+          {!hideRebuildButton && !isArchived && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                onRebuildStart?.();
+                setShowToolBuilder(true);
+              }}
+              className="h-9 px-5"
+            >
+              <Hammer className="h-4 w-4" />
+              Rebuild
+            </Button>
+          )}
+          {!embedded && toolId && !isArchived && (
+            <DeployButton
+              tool={currentTool}
+              payload={computedPayload}
+              onBeforeOpen={saveTool}
+              size="default"
+              className="h-9 px-5"
+              disabled={saving || loading}
+            />
+          )}
+          {!isArchived && (
+            <Button
+              variant="default"
+              onClick={saveTool}
+              disabled={saving || loading}
+              className="h-9 px-5 w-[108px] shadow-md border border-primary/40"
+            >
+              {saving ? (
+                "Saving..."
+              ) : justSaved ? (
+                <>
+                  <Check className="mr-1 h-3.5 w-3.5" />
+                  Saved
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
+          )}
+        </>
       )}
     </div>
   );
