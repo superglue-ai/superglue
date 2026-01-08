@@ -20,6 +20,7 @@ import {
 } from "@/src/lib/general-utils";
 import { tokenRegistry } from "@/src/lib/token-registry";
 import {
+  CredentialMode,
   Integration,
   IntegrationInput,
   Tool,
@@ -348,6 +349,7 @@ export function ToolBuilder({
         integration.id,
         integration,
         upsertMode,
+        CredentialMode.REPLACE,
       );
       const willTriggerDocFetch = needsUIToTriggerDocFetch(savedIntegration, integrationFormEdit);
 

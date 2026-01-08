@@ -7,6 +7,7 @@ import {
   BuildToolArgs,
   CallEndpointArgs,
   CallEndpointResult,
+  CredentialMode,
   ExtractArgs,
   ExtractInputRequest,
   ExtractResult,
@@ -1387,10 +1388,11 @@ export class SuperglueClient {
     id: string,
     input: Partial<Integration>,
     mode: UpsertMode = UpsertMode.UPSERT,
+    credentialMode?: CredentialMode,
   ): Promise<Integration> {
     const mutation = `
-        mutation UpsertIntegration($input: IntegrationInput!, $mode: UpsertMode) {
-          upsertIntegration(input: $input, mode: $mode) {
+        mutation UpsertIntegration($input: IntegrationInput!, $mode: UpsertMode, $credentialMode: CredentialMode) {
+          upsertIntegration(input: $input, mode: $mode, credentialMode: $credentialMode) {
             id
             name
             type
@@ -1415,6 +1417,7 @@ export class SuperglueClient {
     const response = await this.request<{ upsertIntegration: Integration }>(mutation, {
       input: integrationInput,
       mode,
+      credentialMode,
     });
     return response.upsertIntegration;
   }

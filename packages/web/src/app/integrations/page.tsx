@@ -26,7 +26,7 @@ import {
   triggerOAuthFlow,
 } from "@/src/lib/oauth-utils";
 import type { Integration } from "@superglue/shared";
-import { UpsertMode } from "@superglue/shared";
+import { CredentialMode, UpsertMode } from "@superglue/shared";
 import { integrationOptions } from "@superglue/shared";
 import { waitForIntegrationProcessing } from "@superglue/shared/utils";
 import {
@@ -295,6 +295,7 @@ export default function IntegrationsPage() {
           integration.id,
           cleanedIntegration,
           mode,
+          CredentialMode.REPLACE,
         );
 
         const willTriggerDocFetch = needsUIToTriggerDocFetch(savedIntegration, existingIntegration);

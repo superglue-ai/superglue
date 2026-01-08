@@ -154,6 +154,11 @@ export enum UpsertMode {
   UPSERT = "UPSERT",
 }
 
+export enum CredentialMode {
+  MERGE = "MERGE",
+  REPLACE = "REPLACE"
+}
+
 export enum SelfHealingMode {
   ENABLED = "ENABLED",
   TRANSFORM_ONLY = "TRANSFORM_ONLY",

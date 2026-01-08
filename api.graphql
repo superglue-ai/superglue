@@ -180,6 +180,11 @@ enum UpsertMode {
   UPSERT
 }
 
+enum CredentialMode {
+  MERGE
+  REPLACE
+}
+
 input PaginationInput {
   type: PaginationType!
   pageSize: String
@@ -498,7 +503,11 @@ type Mutation {
   upsertApi(id: ID!, input: JSON!): ApiConfig!
   deleteApi(id: ID!): Boolean!
 
-  upsertIntegration(input: IntegrationInput!, mode: UpsertMode = UPSERT): Integration!
+  upsertIntegration(
+    input: IntegrationInput!
+    mode: UpsertMode = UPSERT
+    credentialMode: CredentialMode = MERGE
+  ): Integration!
   deleteIntegration(id: ID!): Boolean!
 
   cacheOauthClientCredentials(
