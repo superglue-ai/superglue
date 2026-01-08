@@ -109,7 +109,7 @@ paths:
             type: string
           example: 550e8400-e29b-41d4-a716-446655440000
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -529,7 +529,8 @@ components:
               description: If true, return immediately (202) and execute asynchronously. If false, wait for completion (200).
             timeout:
               type: integer
-              description: Request timeout in seconds (only for synchronous execution)
+              description: Request timeout in milliseconds
+              default: 60000
             webhookUrl:
               type: string
               format: uri
@@ -590,7 +591,7 @@ components:
         error:
           type: string
           description: Error message (only present when status is failed or aborted)
-          example: Connection timeout after 30 seconds
+          example: Connection timeout after 30000 milliseconds
         stepResults:
           type: array
           description: Results from each execution step (only for multi-step tools)
