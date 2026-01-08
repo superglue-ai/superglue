@@ -3,11 +3,10 @@ import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
-import { downloadJson } from "@/src/lib/download-utils";
+import { DownloadButton } from "@superglue/web/src/components/tools/shared/download-button";
 import { isEmptyData } from "@/src/lib/general-utils";
 import {
   Code2,
-  Download,
   FileBracesCorner,
   FileInput,
   FilePlay,
@@ -17,45 +16,43 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { JavaScriptCodeEditor } from "../../editors/JavaScriptCodeEditor";
 import { JsonCodeEditor } from "../../editors/JsonCodeEditor";
+import { useToolConfig, useExecution } from "../context";
 import { useDataProcessor } from "../hooks/use-data-processor";
 import { CopyButton } from "../shared/CopyButton";
 
-export const FinalTransformMiniStepCard = ({
-  transform,
-  responseSchema,
-  onTransformChange,
-  onResponseSchemaChange,
-  readOnly,
-  onExecuteTransform,
-  onOpenFixTransformDialog,
-  onAbort,
-  isRunningTransform,
-  isFixingTransform,
-  canExecute,
-  transformResult,
-  transformError,
-  stepInputs,
-  hasTransformCompleted,
-}: {
-  transform?: string;
-  responseSchema?: string;
-  onTransformChange?: (value: string) => void;
-  onResponseSchemaChange?: (value: string) => void;
-  readOnly?: boolean;
+interface FinalTransformMiniStepCardProps {
   onExecuteTransform?: (schema: string, transform: string) => void;
   onOpenFixTransformDialog?: () => void;
   onAbort?: () => void;
-  isRunningTransform?: boolean;
-  isFixingTransform?: boolean;
-  canExecute?: boolean;
-  transformResult?: any;
-  transformError?: string | null;
-  stepInputs?: any;
-  hasTransformCompleted?: boolean;
-}) => {
+}
+
+export const FinalTransformMiniStepCard = ({
+  onExecuteTransform,
+  onOpenFixTransformDialog,
+  onAbort,
+}: FinalTransformMiniStepCardProps) => {
+  const { finalTransform, responseSchema, setFinalTransform, setResponseSchema, steps } =
+    useToolConfig();
+  const {
+    finalResult,
+    finalError,
+    getStepInput,
+    isRunningTransform,
+    isFixingTransform,
+    canExecuteTransform,
+    transformStatus,
+  } = useExecution();
+
+  const transform = finalTransform;
+  const transformResult = finalResult;
+  const transformError = finalError;
+  const canExecute = canExecuteTransform;
+  const hasTransformCompleted = transformStatus === "completed";
+
+  const stepInputs = getStepInput();
   const [activeTab, setActiveTab] = useState("transform");
   const [localTransform, setLocalTransform] = useState(transform || "");
   const [localSchema, setLocalSchema] = useState(responseSchema || "");
@@ -151,16 +148,16 @@ export const FinalTransformMiniStepCard = ({
   function handleTransformChange(value: string): void {
     isInternalChangeRef.current = true;
     setLocalTransform(value);
-    if (onTransformChange) onTransformChange(value);
+    setFinalTransform(value);
   }
 
   function handleSchemaChange(value: string | null): void {
     if (value === null || value === "") {
       setLocalSchema("");
-      if (onResponseSchemaChange) onResponseSchemaChange("");
+      setResponseSchema("");
     } else {
       setLocalSchema(value);
-      if (onResponseSchemaChange) onResponseSchemaChange(value);
+      setResponseSchema(value);
     }
   }
 
@@ -187,7 +184,7 @@ export const FinalTransformMiniStepCard = ({
             <h3 className="text-lg font-semibold">Tool Result</h3>
           </div>
           <div className="flex items-center gap-2">
-            {!readOnly && (onExecuteTransform || onOpenFixTransformDialog) && (
+            {(onExecuteTransform || onOpenFixTransformDialog) && (
               <>
                 {onExecuteTransform && (
                   <span
@@ -327,15 +324,7 @@ export const FinalTransformMiniStepCard = ({
                         {inputData.bytes.toLocaleString()} bytes
                       </span>
                       <CopyButton text={inputData.displayString} />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => downloadJson(stepInputs, "transform_step_inputs.json")}
-                        title="Download transform inputs as JSON"
-                      >
-                        <Download className="h-3 w-3" />
-                      </Button>
+                      <DownloadButton data={stepInputs} filename="transform_step_inputs.json" />
                     </div>
                   }
                 />
@@ -351,7 +340,7 @@ export const FinalTransformMiniStepCard = ({
             <JavaScriptCodeEditor
               value={localTransform}
               onChange={handleTransformChange}
-              readOnly={readOnly}
+              readOnly={false}
               minHeight="150px"
               maxHeight="250px"
               resizable={true}
@@ -442,15 +431,7 @@ export const FinalTransformMiniStepCard = ({
                           {outputData.bytes.toLocaleString()} bytes
                         </span>
                         <CopyButton text={outputData.displayString} />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => downloadJson(transformResult, "tool_result.json")}
-                          title="Download tool result as JSON"
-                        >
-                          <Download className="h-3 w-3" />
-                        </Button>
+                        <DownloadButton data={transformResult} filename="tool_result.json" />
                       </div>
                     }
                   />

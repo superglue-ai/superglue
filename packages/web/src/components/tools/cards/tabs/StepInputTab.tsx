@@ -1,107 +1,111 @@
-import { useMonacoTheme } from "@/src/hooks/useMonacoTheme";
+import { useMonacoTheme } from "@superglue/web/src/hooks/use-monaco-theme";
+import { useResizable } from "@/src/hooks/use-resizable";
 import { cn } from "@/src/lib/general-utils";
 import Editor from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { TemplateChip } from "../../templates/TemplateChip";
-import { TemplateContextProvider } from "../../templates/tiptap/TemplateContext";
 import { useTemplatePreview } from "../../hooks/use-template-preview";
 import { useDataProcessor } from "../../hooks/use-data-processor";
+import { useToolConfig, useExecution } from "../../context";
 import { CopyButton } from "../../shared/CopyButton";
-import { Download, Loader2 } from "lucide-react";
-import { Button } from "../../../ui/button";
-import { downloadJson } from "@/src/lib/download-utils";
+import { DownloadButton } from "@/src/components/ui/download-button";
+import { Loader2 } from "lucide-react";
 
 const PLACEHOLDER_VALUE = "";
 const CURRENT_ITEM_KEY = '"currentItem"';
+const CHIP_LINE_NUMBER = 2;
+
+interface ChipPosition {
+  top: number;
+  left: number;
+}
 
 interface StepInputTabProps {
   step: any;
   stepIndex: number;
-  evolvingPayload: any;
-  canExecute: boolean;
-  readOnly?: boolean;
   onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
   isActive?: boolean;
-  sourceDataVersion?: number;
 }
 
-export function StepInputTab({
-  step,
-  stepIndex,
-  evolvingPayload,
-  canExecute,
-  readOnly = false,
-  onEdit,
-  isActive = true,
-  sourceDataVersion,
-}: StepInputTabProps) {
+export function StepInputTab({ step, stepIndex, onEdit, isActive = true }: StepInputTabProps) {
+  const { getStepConfig } = useToolConfig();
+  const { canExecuteStep, sourceDataVersion, getStepInput, getStepTemplateData } = useExecution();
+  const canExecute = canExecuteStep(stepIndex);
+  const stepInput = getStepInput(step.id);
+  const { sourceData } = getStepTemplateData(step.id);
+
   const { theme, onMount } = useMonacoTheme();
-  const [currentHeight, setCurrentHeight] = useState("400px");
+  const { height, resizeHandleProps } = useResizable({
+    minHeight: 200,
+    maxHeight: 800,
+    initialHeight: 400,
+  });
+
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [chipPosition, setChipPosition] = useState<{ top: number; left: number } | null>(null);
+  const [chipPosition, setChipPosition] = useState<ChipPosition | null>(null);
 
   const currentItemExpression = step.loopSelector || "(sourceData) => sourceData";
   const cannotExecuteYet = stepIndex > 0 && !canExecute;
-
   const templateString = currentItemExpression.startsWith("<<")
     ? currentItemExpression
     : `<<${currentItemExpression}>>`;
 
   const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
     currentItemExpression,
-    evolvingPayload,
+    sourceData,
     {
-      enabled: isActive && canExecute && !!evolvingPayload,
+      enabled: isActive && canExecute && !!stepInput,
       debounceMs: 300,
-      sourceDataVersion,
       stepId: step.id,
+      sourceDataVersion,
     },
   );
 
-  const inputProcessor = useDataProcessor(evolvingPayload, isActive);
+  const inputProcessor = useDataProcessor(stepInput, isActive);
 
   const displayData = useMemo(() => {
-    if (!isActive) return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE}\n}`;
-    if (cannotExecuteYet) {
+    if (!isActive || cannotExecuteYet) {
       return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE}\n}`;
     }
     const previewStr = inputProcessor.preview?.displayString || "{}";
-    if (previewStr.startsWith("{")) {
-      const inner = previewStr.slice(1).trimStart();
-      if (inner.length <= 1) {
-        return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE}\n}`;
-      }
-      return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE},\n  ${inner.slice(0, -1)}\n}`;
+    if (!previewStr.startsWith("{")) {
+      return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE},\n  "sourceData": ${previewStr}\n}`;
     }
-    return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE},\n  "sourceData": ${previewStr}\n}`;
+    const inner = previewStr.slice(1).trimStart();
+    if (inner.length <= 1) {
+      return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE}\n}`;
+    }
+    return `{\n  ${CURRENT_ITEM_KEY}: ${PLACEHOLDER_VALUE},\n  ${inner.slice(0, -1)}\n}`;
   }, [isActive, cannotExecuteYet, inputProcessor.preview?.displayString]);
 
-  const updateChipPosition = useCallback(() => {
+  const computeChipPosition = useCallback((): ChipPosition | null => {
     const editor = editorRef.current;
-    if (!editor || !containerRef.current) return;
+    if (!editor || !containerRef.current) return null;
 
     const model = editor.getModel();
-    if (!model) return;
+    if (!model) return null;
 
-    const line2 = model.getLineContent(2);
-    const colonIndex = line2.indexOf(":");
-    if (colonIndex < 0) return;
+    const lineContent = model.getLineContent(CHIP_LINE_NUMBER);
+    const colonIndex = lineContent.indexOf(":");
+    if (colonIndex < 0) return null;
 
-    const position = { lineNumber: 2, column: colonIndex + 2 };
-    const coords = editor.getScrolledVisiblePosition(position);
-    const editorHeight = parseInt(currentHeight);
+    const coords = editor.getScrolledVisiblePosition({
+      lineNumber: CHIP_LINE_NUMBER,
+      column: colonIndex + 2,
+    });
+    const editorHeight = parseInt(height);
 
-    if (coords && coords.top >= -10 && coords.top < editorHeight - 10) {
-      setChipPosition({
-        top: coords.top,
-        left: coords.left + 2,
-      });
-    } else {
-      setChipPosition(null);
+    if (!coords || coords.top < -10 || coords.top >= editorHeight - 10) {
+      return null;
     }
-  }, [currentHeight]);
+    return { top: coords.top, left: coords.left + 2 };
+  }, [height]);
+
+  const updateChipPosition = useCallback(() => {
+    setChipPosition(computeChipPosition());
+  }, [computeChipPosition]);
 
   const handleEditorMount = useCallback(
     (editor: Monaco.editor.IStandaloneCodeEditor) => {
@@ -114,12 +118,16 @@ export function StepInputTab({
     [onMount, updateChipPosition],
   );
 
-  const handleUpdate = (newTemplate: string) => {
-    const expression = newTemplate.replace(/^<<|>>$/g, "");
-    if (onEdit) {
-      onEdit(step.id, { ...step, loopSelector: expression }, true);
-    }
-  };
+  const handleUpdate = useCallback(
+    (newTemplate: string) => {
+      const expression = newTemplate.replace(/^<<|>>$/g, "");
+      const latestStep = getStepConfig(step.id);
+      if (latestStep) {
+        onEdit?.(step.id, { ...latestStep, loopSelector: expression }, true);
+      }
+    },
+    [onEdit, step.id, getStepConfig],
+  );
 
   return (
     <div>
@@ -132,49 +140,18 @@ export function StepInputTab({
             </div>
           </div>
         )}
+
         <div className="absolute top-1 right-1 z-10 mr-5 flex items-center gap-1">
           {(isEvaluating || inputProcessor.isComputingPreview) && (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           )}
           <CopyButton text={displayData} />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={() => downloadJson(evolvingPayload, "step_input.json")}
-            title="Download step input as JSON"
-          >
-            <Download className="h-3 w-3" />
-          </Button>
+          <DownloadButton data={stepInput} filename="step_input.json" />
         </div>
 
-        <div
-          className="absolute bottom-1 right-1 w-3 h-3 cursor-se-resize z-10"
-          style={{
-            background: "linear-gradient(135deg, transparent 50%, rgba(100,100,100,0.3) 50%)",
-          }}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            const startY = e.clientY;
-            const startHeight = parseInt(currentHeight);
-            const handleMouseMove = (e: MouseEvent) => {
-              const deltaY = e.clientY - startY;
-              const newHeight = Math.max(200, Math.min(800, startHeight + deltaY));
-              setCurrentHeight(`${newHeight}px`);
-            };
-            const handleMouseUp = () => {
-              document.removeEventListener("mousemove", handleMouseMove);
-              document.removeEventListener("mouseup", handleMouseUp);
-            };
-            document.addEventListener("mousemove", handleMouseMove);
-            document.addEventListener("mouseup", handleMouseUp);
-          }}
-        />
+        <div {...resizeHandleProps} />
 
-        <div
-          className={cn("overflow-hidden relative", "cursor-not-allowed")}
-          style={{ height: currentHeight }}
-        >
+        <div className={cn("overflow-hidden relative cursor-not-allowed")} style={{ height }}>
           {chipPosition && (
             <div
               className="absolute z-20 bg-muted rounded-sm flex items-center"
@@ -185,30 +162,21 @@ export function StepInputTab({
                 pointerEvents: "auto",
               }}
             >
-              <TemplateContextProvider
-                stepData={evolvingPayload}
-                canExecute={canExecute}
-                sourceDataVersion={sourceDataVersion}
+              <TemplateChip
+                template={templateString}
+                evaluatedValue={previewValue}
+                error={previewError ?? undefined}
+                hasResult={hasResult}
+                isEvaluating={isEvaluating}
+                onUpdate={handleUpdate}
+                onDelete={() => {}}
                 stepId={step.id}
-              >
-                <TemplateChip
-                  template={templateString}
-                  evaluatedValue={previewValue}
-                  error={previewError ?? undefined}
-                  stepData={evolvingPayload}
-                  hasResult={hasResult}
-                  canExecute={canExecute}
-                  isEvaluating={isEvaluating}
-                  onUpdate={handleUpdate}
-                  onDelete={() => {}}
-                  readOnly={readOnly}
-                  loopMode={true}
-                  hideDelete={true}
-                  inline={true}
-                  popoverTitle="Data Selector"
-                  popoverHelpText="Returns an array → step loops over items. Returns an object → step runs once. currentItem is either the object returned or the current array item."
-                />
-              </TemplateContextProvider>
+                loopMode={true}
+                hideDelete={true}
+                inline={true}
+                popoverTitle="Data Selector"
+                popoverHelpText="Returns an array → step loops over items. Returns an object → step runs once. currentItem is either the object returned or the current array item."
+              />
             </div>
           )}
           <Editor

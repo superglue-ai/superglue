@@ -1,31 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { evaluateTemplate, DEFAULT_CODE_TEMPLATE } from "@/src/lib/templating-utils";
 
-interface EvaluationCacheEntry {
+interface CacheEntry {
   value: any;
   error: string | null;
 }
 
-const evaluationCache = new Map<string, EvaluationCacheEntry>();
-
-function getCacheKey(codeContent: string, sourceDataVersion?: number, stepId?: string): string {
-  return `${stepId ?? "global"}:${sourceDataVersion ?? "none"}:${codeContent}`;
-}
-
-function cleanupStaleEntries(currentVersion: number | undefined) {
-  for (const key of evaluationCache.keys()) {
-    const versionPart = key.split(":")[1];
-    if (versionPart !== String(currentVersion ?? "none")) {
-      evaluationCache.delete(key);
-    }
-  }
-}
+const templateCache = new Map<string, CacheEntry>();
 
 interface UseTemplatePreviewOptions {
   enabled?: boolean;
   debounceMs?: number;
-  sourceDataVersion?: number;
   stepId?: string;
+  sourceDataVersion?: number;
 }
 
 interface UseTemplatePreviewResult {
@@ -36,32 +23,27 @@ interface UseTemplatePreviewResult {
 }
 
 export function useTemplatePreview(
-  codeContent: string,
+  expression: string,
   sourceData: any,
   options: UseTemplatePreviewOptions = {},
 ): UseTemplatePreviewResult {
-  const { enabled = true, debounceMs = 500, sourceDataVersion, stepId } = options;
+  const { enabled = true, debounceMs = 500, stepId = "global", sourceDataVersion = 0 } = options;
 
-  const isDefaultTemplate = codeContent === DEFAULT_CODE_TEMPLATE;
-  const cacheKey = getCacheKey(codeContent, sourceDataVersion, stepId);
-  const cached = isDefaultTemplate ? undefined : evaluationCache.get(cacheKey);
+  const cacheKey = `${stepId}:${expression}:v${sourceDataVersion}`;
+  const cached = templateCache.get(cacheKey);
 
   const [previewValue, setPreviewValue] = useState<any>(cached?.value);
   const [previewError, setPreviewError] = useState<string | null>(cached?.error ?? null);
   const [isEvaluating, setIsEvaluating] = useState(false);
-  const [hasResult, setHasResult] = useState(isDefaultTemplate || !!cached);
-
+  const [hasResult, setHasResult] = useState(!!cached);
   const evalVersionRef = useRef(0);
   const sourceDataRef = useRef(sourceData);
   sourceDataRef.current = sourceData;
 
   useEffect(() => {
-    if (!enabled) {
-      setIsEvaluating(false);
-      return;
-    }
+    if (!enabled) return;
 
-    if (codeContent === DEFAULT_CODE_TEMPLATE) {
+    if (expression === DEFAULT_CODE_TEMPLATE) {
       setPreviewValue(undefined);
       setPreviewError(null);
       setIsEvaluating(false);
@@ -69,7 +51,8 @@ export function useTemplatePreview(
       return;
     }
 
-    const cached = evaluationCache.get(cacheKey);
+    const cacheKey = `${stepId}:${expression}:v${sourceDataVersion}`;
+    const cached = templateCache.get(cacheKey);
 
     if (cached) {
       setPreviewValue(cached.value);
@@ -80,9 +63,7 @@ export function useTemplatePreview(
     }
 
     setHasResult(false);
-    setPreviewError(null);
     setIsEvaluating(true);
-
     evalVersionRef.current += 1;
     const thisVersion = evalVersionRef.current;
 
@@ -90,27 +71,22 @@ export function useTemplatePreview(
       if (thisVersion !== evalVersionRef.current) return;
 
       try {
-        const result = await evaluateTemplate(codeContent, sourceDataRef.current);
+        const result = await evaluateTemplate(expression, sourceDataRef.current);
         if (thisVersion !== evalVersionRef.current) return;
 
-        const cacheEntry: EvaluationCacheEntry = result.success
+        const entry: CacheEntry = result.success
           ? { value: result.value, error: null }
           : { value: undefined, error: result.error || "Evaluation failed" };
 
-        cleanupStaleEntries(sourceDataVersion);
-        evaluationCache.set(cacheKey, cacheEntry);
-
-        setPreviewValue(cacheEntry.value);
-        setPreviewError(cacheEntry.error);
+        templateCache.set(cacheKey, entry);
+        setPreviewValue(entry.value);
+        setPreviewError(entry.error);
         setHasResult(true);
-      } catch (error) {
+      } catch (err) {
         if (thisVersion !== evalVersionRef.current) return;
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        const cacheEntry: EvaluationCacheEntry = { value: undefined, error: errorMsg };
-
-        cleanupStaleEntries(sourceDataVersion);
-        evaluationCache.set(cacheKey, cacheEntry);
-
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        const entry: CacheEntry = { value: undefined, error: errorMsg };
+        templateCache.set(cacheKey, entry);
         setPreviewValue(undefined);
         setPreviewError(errorMsg);
         setHasResult(true);
@@ -122,7 +98,7 @@ export function useTemplatePreview(
     }, debounceMs);
 
     return () => clearTimeout(timer);
-  }, [codeContent, sourceDataVersion, stepId, enabled, debounceMs]);
+  }, [expression, stepId, debounceMs, sourceDataVersion, enabled]);
 
   return { previewValue, previewError, isEvaluating, hasResult };
 }

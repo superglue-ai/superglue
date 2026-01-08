@@ -282,26 +282,26 @@ export const removeFileKeysFromPayload = (payloadText: string, fileKeys: string[
   }
 };
 
-export const buildEvolvingPayload = (
+export const buildStepInput = (
   initialPayload: any,
   steps: any[],
   stepResults: Record<string, any>,
   upToIndex: number,
 ) => {
-  let evolvingPayload = { ...initialPayload };
+  let stepInput = { ...initialPayload };
 
   for (let i = 0; i <= upToIndex && i < steps.length; i++) {
     const step = steps[i];
     const result = stepResults[step.id];
     if (result !== undefined && result !== null) {
-      evolvingPayload = {
-        ...evolvingPayload,
+      stepInput = {
+        ...stepInput,
         [`${step.id}`]: result,
       };
     }
   }
 
-  return evolvingPayload;
+  return stepInput;
 };
 
 export const buildPreviousStepResults = (
