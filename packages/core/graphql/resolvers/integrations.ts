@@ -60,7 +60,7 @@ export const getIntegrationResolver = async (
 
 export const upsertIntegrationResolver = async (
   _: any,
-  { input, mode = "UPSERT" }: { input: Integration; mode?: "CREATE" | "UPDATE" | "UPSERT" },
+  { input, mode = "UPSERT", credentialMode = "MERGE" }: { input: Integration; mode?: "CREATE" | "UPDATE" | "UPSERT"; credentialMode?: "MERGE" | "REPLACE" },
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ) => {
@@ -128,7 +128,10 @@ export const upsertIntegrationResolver = async (
       documentationPending: shouldFetchDoc
         ? true
         : existingIntegrationOrNull?.documentationPending || false,
-      credentials: mergeCredentials(input.credentials, existingIntegrationOrNull?.credentials),
+      credentials:
+        credentialMode === "REPLACE"
+          ? (input.credentials ?? {})
+          : mergeCredentials(input.credentials, existingIntegrationOrNull?.credentials),
       specificInstructions: resolveField(
         input.specificInstructions?.trim(),
         existingIntegrationOrNull?.specificInstructions,
@@ -353,6 +356,20 @@ function resolveField<T>(
   return defaultValue;
 }
 
+/**
+ * Checks if a credential value looks like a masked placeholder.
+ * Masked values should be skipped during merge to preserve existing real values.
+ */
+function isMaskedValue(value: any): boolean {
+  if (typeof value !== "string") return false;
+  const v = value.trim();
+  // <<...>> pattern (e.g., <<masked_api_key>>, <<MASKED>>)
+  if (v.startsWith("<<") && v.endsWith(">>")) return true;
+  // {masked_...} pattern
+  if (v.startsWith("{masked_") && v.endsWith("}")) return true;
+  return false;
+}
+
 function mergeCredentials(
   newCredentials: Record<string, any> | null | undefined,
   existingCredentials: Record<string, any> | undefined,
@@ -368,10 +385,11 @@ function mergeCredentials(
   const merged = { ...existingCredentials };
 
   for (const [key, value] of Object.entries(newCredentials)) {
-    // Skip if value looks like a placeholder
-    if (!value || (!value.startsWith("<<") && !value.endsWith(">>"))) {
+    // Skip masked values - keep existing real credentials
+    if (isMaskedValue(value)) {
       continue;
     }
+    // Use new value (overrides existing)
     merged[key] = value;
   }
 
