@@ -1,5 +1,5 @@
+import { ServiceMetadata, UserRole } from "@superglue/shared";
 import { DataStore } from "../datastore/types.js";
-import { UserRole, ServiceMetadata } from "@superglue/shared";
 import type { WorkerPools } from "../worker/types.js";
 
 // Re-export for convenience
@@ -12,6 +12,7 @@ export type GraphQLRequestContext = {
   traceId?: string;
   orgId: string;
   userId?: string;
+  userEmail?: string;
   orgName?: string;
   orgRole?: UserRole;
 

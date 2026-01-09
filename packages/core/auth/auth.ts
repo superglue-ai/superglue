@@ -1,14 +1,11 @@
 import { logMessage } from "../utils/logs.js";
-import { AuthManager, AuthResult } from "./types.js";
 import { LocalKeyManager } from "./local-key-manager.js";
-import { SupabaseAuthManager } from "./supabase-auth-manager.js";
+import { AuthManager, AuthResult } from "./types.js";
 
 let _authManager: AuthManager | null = null;
 function getAuthManager(): AuthManager {
   if (!_authManager) {
-    _authManager = process.env.NEXT_PUBLIC_SUPABASE_URL
-      ? new SupabaseAuthManager()
-      : new LocalKeyManager();
+    _authManager = new LocalKeyManager();
   }
   return _authManager;
 }
@@ -65,6 +62,8 @@ export const authMiddleware = async (req: any, res: any, next: any) => {
     userId: authResult.userId,
     orgName: authResult.orgName,
     orgRole: authResult.orgRole,
+    isRestricted: authResult.isRestricted,
+    allowedTools: authResult.allowedTools,
   };
 
   return next();
