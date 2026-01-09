@@ -9,14 +9,15 @@ import { graphqlUploadExpress } from "graphql-upload-ts";
 import { useServer } from "graphql-ws/use/ws";
 import http from "http";
 import { WebSocketServer } from "ws";
+import { checkGraphQLAccess } from "../api/ee/index.js";
 import { authMiddleware, extractTokenFromExpressRequest, validateToken } from "../auth/auth.js";
 import { DataStore } from "../datastore/types.js";
 import { mcpHandler } from "../mcp/mcp-server.js";
 import { logMessage } from "../utils/logs.js";
 import { createTelemetryPlugin, telemetryMiddleware } from "../utils/telemetry.js";
+import { generateTraceId, traceIdMiddleware } from "../utils/trace-id.js";
 import { resolvers, typeDefs } from "./graphql.js";
 import { GraphQLRequestContext, WorkerPools } from "./types.js";
-import { generateTraceId, traceIdMiddleware } from "../utils/trace-id.js";
 
 export const DEFAULT_QUERY = `
 query Query {
@@ -44,6 +45,7 @@ export async function startGraphqlServer(datastore: DataStore, workerPools: Work
       traceId: req.traceId,
       orgId: req.orgId || "",
       userId: req.authInfo?.userId,
+      userEmail: req.authInfo?.userEmail,
       orgName: req.authInfo?.orgName,
       orgRole: req.authInfo?.orgRole,
       toMetadata: function () {
@@ -85,12 +87,27 @@ export async function startGraphqlServer(datastore: DataStore, workerPools: Work
           return false;
         }
 
+        // EE: Block restricted API keys from GraphQL WebSocket subscriptions
+        const wsAccessCheck = checkGraphQLAccess({
+          isRestricted: authResult.isRestricted,
+          allowedTools: authResult.allowedTools,
+        });
+        if (!wsAccessCheck.allowed) {
+          logMessage(
+            "warn",
+            `GraphQL Server: Restricted API key attempted WebSocket subscription`,
+            { traceId, orgId: authResult.orgId },
+          );
+          return false;
+        }
+
         const context: GraphQLRequestContext = {
           datastore,
           workerPools,
           traceId,
           orgId: authResult.orgId,
           userId: authResult.userId,
+          userEmail: authResult.userEmail,
           orgName: authResult.orgName,
           orgRole: authResult.orgRole,
           toMetadata: function () {
@@ -149,11 +166,36 @@ export async function startGraphqlServer(datastore: DataStore, workerPools: Work
       maxFiles: 1,
     }),
   );
+
+  // MCP routes - these allow restricted API keys
   app.post("/mcp", mcpHandler);
   app.get("/mcp", mcpHandler);
   app.delete("/mcp", mcpHandler);
 
-  app.use("/", expressMiddleware(server, { context: buildContextFromRequest }));
+  // EE: Block restricted API keys from GraphQL (they can only use REST/MCP)
+  const graphqlRestrictionMiddleware = (req: any, res: any, next: any) => {
+    const accessCheck = checkGraphQLAccess({
+      isRestricted: req.authInfo?.isRestricted,
+      allowedTools: req.authInfo?.allowedTools,
+    });
+    if (!accessCheck.allowed) {
+      logMessage("warn", `Restricted API key attempted GraphQL access`, {
+        traceId: req.traceId,
+        orgId: req.orgId,
+      });
+      return res.status(403).json({
+        error: "Forbidden",
+        message: accessCheck.error || "Access denied",
+      });
+    }
+    return next();
+  };
+
+  app.use(
+    "/",
+    graphqlRestrictionMiddleware,
+    expressMiddleware(server, { context: buildContextFromRequest }),
+  );
 
   try {
     await new Promise<void>((resolve) => httpServer.listen({ port: PORT }, resolve));

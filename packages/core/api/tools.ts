@@ -5,6 +5,7 @@ import { isSelfHealingEnabled } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
 import { notifyWebhook } from "../utils/webhook.js";
 import type { ToolExecutionPayload } from "../worker/types.js";
+import { checkToolExecutionPermission, filterToolsByPermission } from "./ee/index.js";
 import { registerApiModule } from "./registry.js";
 import {
   addTraceHeader,
@@ -226,6 +227,8 @@ async function executeToolInternal(
       id: runId,
       toolId: tool.id,
       orgId: authReq.authInfo.orgId,
+      userId: authReq.authInfo.userId,
+      userEmail: authReq.authInfo.userEmail,
       status: RunStatus.RUNNING,
       toolConfig: tool,
       toolPayload: payload,
@@ -295,6 +298,32 @@ const listTools: RouteHandler = async (request, reply) => {
 
   const { page, limit, offset } = parsePaginationParams(query);
 
+  const isRestricted = authReq.authInfo.isRestricted;
+
+  if (isRestricted) {
+    // Fetch all tools and filter
+    const result = await authReq.datastore.listWorkflows({
+      limit: 10000, // Fetch all
+      offset: 0,
+      orgId: authReq.authInfo.orgId,
+    });
+
+    const filteredItems = filterToolsByPermission(authReq.authInfo, result.items);
+    const total = filteredItems.length;
+    const paginatedItems = filteredItems.slice(offset, offset + limit);
+    const data = paginatedItems.map(mapToolToOpenAPI);
+    const hasMore = offset + paginatedItems.length < total;
+
+    return addTraceHeader(reply, authReq.traceId).code(200).send({
+      data,
+      page,
+      limit,
+      total,
+      hasMore,
+    });
+  }
+
+  // Unrestricted keys use normal pagination
   const result = await authReq.datastore.listWorkflows({
     limit,
     offset,
@@ -318,6 +347,12 @@ const getTool: RouteHandler = async (request, reply) => {
   const authReq = request as AuthenticatedFastifyRequest;
   const params = request.params as { toolId: string };
 
+  // Check permission before fetching
+  const permCheck = checkToolExecutionPermission(authReq.authInfo, params.toolId);
+  if (!permCheck.allowed) {
+    return sendError(reply, 403, permCheck.error || "Not authorized to access this tool");
+  }
+
   const tool = await authReq.datastore.getWorkflow({
     id: params.toolId,
     orgId: authReq.authInfo.orgId,
@@ -335,6 +370,23 @@ const runTool: RouteHandler = async (request, reply) => {
   const authReq = request as AuthenticatedFastifyRequest;
   const params = request.params as { toolId: string };
   const body = request.body as RunToolRequestBody;
+
+  // EE: Check if this API key is authorized to execute this tool
+  const permCheck = checkToolExecutionPermission(
+    { isRestricted: authReq.authInfo.isRestricted, allowedTools: authReq.authInfo.allowedTools },
+    params.toolId,
+  );
+  if (!permCheck.allowed) {
+    logMessage("warn", `API key not authorized to execute tool ${params.toolId}`, {
+      orgId: authReq.authInfo.orgId,
+      traceId: authReq.traceId,
+    });
+    return sendError(
+      reply,
+      403,
+      permCheck.error || "This API key is not authorized to execute this tool",
+    );
+  }
 
   const traceId = body.options?.traceId || authReq.traceId;
   const metadata = { orgId: authReq.authInfo.orgId, traceId };
@@ -391,6 +443,8 @@ const runTool: RouteHandler = async (request, reply) => {
       id: runId,
       toolId: tool.id,
       orgId: authReq.authInfo.orgId,
+      userId: authReq.authInfo.userId,
+      userEmail: authReq.authInfo.userEmail,
       status: RunStatus.RUNNING,
       toolConfig: tool,
       toolPayload: body.inputs as Record<string, any>,

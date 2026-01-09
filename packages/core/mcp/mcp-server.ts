@@ -6,6 +6,7 @@ import { SelfHealingMode, SuperglueClient, ToolResult } from "@superglue/shared"
 import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import { z } from "zod";
+import { checkToolExecutionPermission, filterToolsByPermission } from "../api/ee/index.js";
 import { validateToken } from "../auth/auth.js";
 import { logMessage } from "../utils/logs.js";
 import { sessionId, telemetryClient } from "../utils/telemetry.js";
@@ -128,6 +129,12 @@ export const toolDefinitions: Record<string, any> = {
   },
 };
 
+interface McpAuthContext {
+  orgId: string;
+  isRestricted?: boolean;
+  allowedTools?: string[];
+}
+
 export const createMcpServer = async (apiKey: string) => {
   const mcpServer = new McpServer(
     {
@@ -144,9 +151,13 @@ export const createMcpServer = async (apiKey: string) => {
 
   const client = createClient(apiKey);
 
-  // Get org ID from the API key
+  // Get org ID and permission info from the API key
   const authResult = await validateToken(apiKey);
-  const orgId = authResult.orgId;
+  const authContext: McpAuthContext = {
+    orgId: authResult.orgId,
+    isRestricted: authResult.isRestricted,
+    allowedTools: authResult.allowedTools,
+  };
 
   // Register tools individually for proper type inference
   mcpServer.registerTool(
@@ -156,17 +167,36 @@ export const createMcpServer = async (apiKey: string) => {
       inputSchema: ExecuteToolInputSchema,
     },
     async (args, extra) => {
+      // EE: Check if this API key is authorized to execute this tool
+      const permCheck = checkToolExecutionPermission(authContext, args.id);
+      if (!permCheck.allowed) {
+        logMessage("warn", `MCP: API key not authorized to execute tool ${args.id}`, {
+          orgId: authContext.orgId,
+        });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                success: false,
+                error: permCheck.error || "This API key is not authorized to execute this tool",
+              }),
+            },
+          ],
+        };
+      }
+
       const result = await toolDefinitions.superglue_execute_tool.execute(
-        { ...args, client, orgId },
+        { ...args, client, orgId: authContext.orgId },
         extra,
       );
-      logMessage("debug", "superglue_execute_tool executed via MCP", { orgId: orgId });
+      logMessage("debug", "superglue_execute_tool executed via MCP", { orgId: authContext.orgId });
       telemetryClient?.capture({
-        distinctId: orgId || sessionId,
+        distinctId: authContext.orgId || sessionId,
         event: "mcp_superglue_execute_tool",
         properties: {
           toolName: "superglue_execute_tool",
-          orgId: orgId,
+          orgId: authContext.orgId,
         },
       });
       return {
@@ -188,16 +218,24 @@ export const createMcpServer = async (apiKey: string) => {
     },
     async (args, extra) => {
       const result = await toolDefinitions.superglue_find_relevant_tools.execute(
-        { ...args, client, orgId },
+        { ...args, client, orgId: authContext.orgId },
         extra,
       );
-      logMessage("debug", "superglue_find_relevant_tools executed via MCP", { orgId: orgId });
+
+      // EE: Filter results to only show tools this API key can execute
+      if (result.success && result.tools) {
+        result.tools = filterToolsByPermission(authContext, result.tools);
+      }
+
+      logMessage("debug", "superglue_find_relevant_tools executed via MCP", {
+        orgId: authContext.orgId,
+      });
       telemetryClient?.capture({
-        distinctId: orgId || sessionId,
+        distinctId: authContext.orgId || sessionId,
         event: "mcp_superglue_find_relevant_tools",
         properties: {
           toolName: "superglue_find_relevant_tools",
-          orgId: orgId,
+          orgId: authContext.orgId,
         },
       });
       return {
