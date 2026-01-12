@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Validator } from "jsonschema";
 import { generateDefaultFromSchema } from "@superglue/shared";
-import { deepEqual } from "@/lib/general-utils";
+import { deepEqual } from "@/src/lib/general-utils";
 
 interface UsePayloadValidationOptions {
   computedPayload: Record<string, any>;
