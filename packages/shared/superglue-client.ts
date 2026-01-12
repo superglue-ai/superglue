@@ -1103,9 +1103,7 @@ export class SuperglueClient {
   }
 
   async listToolSchedules(toolId?: string): Promise<ToolSchedule[]> {
-    const path = toolId
-      ? `/v1/tools/${encodeURIComponent(toolId)}/schedules`
-      : "/v1/schedules";
+    const path = toolId ? `/v1/tools/${encodeURIComponent(toolId)}/schedules` : "/v1/schedules";
     const response = await this.restRequest<{ data: any[] }>("GET", path);
     return response.data.map((s) => this.parseScheduleDates(s));
   }

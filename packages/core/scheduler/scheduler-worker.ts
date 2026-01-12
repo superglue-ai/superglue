@@ -51,11 +51,10 @@ export class ToolSchedulerWorker {
     for (const schedule of schedules) {
       try {
         const traceId = crypto.randomUUID();
-        logMessage(
-          "info",
-          `TOOL SCHEDULER: Running scheduled tool ${schedule.toolId}`,
-          { orgId: schedule.orgId, traceId },
-        );
+        logMessage("info", `TOOL SCHEDULER: Running scheduled tool ${schedule.toolId}`, {
+          orgId: schedule.orgId,
+          traceId,
+        });
 
         const now = new Date(Date.now());
         const nextRun = calculateNextRun(schedule.cronExpression, schedule.timezone, now);

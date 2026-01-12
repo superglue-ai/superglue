@@ -70,9 +70,7 @@ export class ToolScheduler {
     }
 
     const id = existingScheduleOrNull?.id ?? crypto.randomUUID();
-    const toolId = existingScheduleOrNull
-      ? existingScheduleOrNull.toolId
-      : params.toolId; // prevent updating tool id
+    const toolId = existingScheduleOrNull ? existingScheduleOrNull.toolId : params.toolId; // prevent updating tool id
     const cronExpression = params.cronExpression ?? existingScheduleOrNull?.cronExpression;
     const timezone = params.timezone ?? existingScheduleOrNull?.timezone;
     const now = new Date();
@@ -107,13 +105,7 @@ export class ToolScheduler {
     return scheduleToSave;
   }
 
-  public async deleteToolSchedule({
-    id,
-    orgId,
-  }: {
-    id: string;
-    orgId: string;
-  }): Promise<boolean> {
+  public async deleteToolSchedule({ id, orgId }: { id: string; orgId: string }): Promise<boolean> {
     return await this.datastore.deleteToolSchedule({ id, orgId });
   }
 

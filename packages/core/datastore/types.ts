@@ -92,10 +92,7 @@ export interface DataStore {
   }): Promise<boolean>;
 
   // Tool Schedules
-  listToolSchedules(params: {
-    toolId?: string;
-    orgId: string;
-  }): Promise<ToolScheduleInternal[]>;
+  listToolSchedules(params: { toolId?: string; orgId: string }): Promise<ToolScheduleInternal[]>;
   getToolSchedule(params: { id: string; orgId?: string }): Promise<ToolScheduleInternal | null>;
   upsertToolSchedule(params: { schedule: ToolScheduleInternal }): Promise<void>;
   deleteToolSchedule(params: { id: string; orgId: string }): Promise<boolean>;
