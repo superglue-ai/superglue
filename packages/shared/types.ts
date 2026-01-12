@@ -469,7 +469,7 @@ export type IntegrationList = {
 
 export type ToolScheduleInput = {
   id?: string;
-  workflowId?: string; // cannot change to toolId because of graphql
+  toolId?: string;
   cronExpression?: string;
   timezone?: string;
   enabled?: boolean;
@@ -479,7 +479,7 @@ export type ToolScheduleInput = {
 
 export type ToolSchedule = {
   id: string;
-  workflowId: string; // cannot change to toolId because of graphql
+  toolId: string;
   cronExpression: string;
   timezone: string;
   enabled: boolean;
@@ -490,10 +490,6 @@ export type ToolSchedule = {
   createdAt: Date;
   updatedAt: Date;
 };
-
-// Legacy aliases
-export type WorkflowScheduleInput = ToolScheduleInput;
-export type WorkflowSchedule = ToolSchedule;
 
 export enum DiscoveryRunStatus {
   PENDING = "PENDING",

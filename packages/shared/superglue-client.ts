@@ -167,8 +167,10 @@ export class SuperglueClient {
       throw new Error(errorMessage);
     }
 
-    const data = await response.json();
-    return data as T;
+    // Handle empty responses (e.g., 204 No Content)
+    const text = await response.text();
+    if (!text) return undefined as T;
+    return JSON.parse(text) as T;
   }
 
   private async request<T>(query: string, variables?: Record<string, any>): Promise<T> {
@@ -1088,47 +1090,54 @@ export class SuperglueClient {
     return response.listWorkflows;
   }
 
-  // REST API types for schedules
-  private mapRestScheduleToToolSchedule(restSchedule: any): ToolSchedule {
+  // REST API - Tool Schedules (nested under /tools/:toolId/schedules)
+  // JSON returns dates as strings, so we parse them to Date objects
+  private parseScheduleDates(s: any): ToolSchedule {
     return {
-      id: restSchedule.id,
-      workflowId: restSchedule.toolId,
-      cronExpression: restSchedule.cronExpression,
-      timezone: restSchedule.timezone,
-      enabled: restSchedule.enabled,
-      payload: restSchedule.payload,
-      options: restSchedule.options,
-      lastRunAt: restSchedule.lastRunAt ? new Date(restSchedule.lastRunAt) : undefined,
-      nextRunAt: new Date(restSchedule.nextRunAt),
-      createdAt: new Date(restSchedule.createdAt),
-      updatedAt: new Date(restSchedule.updatedAt),
+      ...s,
+      lastRunAt: s.lastRunAt ? new Date(s.lastRunAt) : undefined,
+      nextRunAt: new Date(s.nextRunAt),
+      createdAt: new Date(s.createdAt),
+      updatedAt: new Date(s.updatedAt),
     };
   }
 
   async listToolSchedules(toolId?: string): Promise<ToolSchedule[]> {
-    const path = toolId ? `/v1/schedules?toolId=${encodeURIComponent(toolId)}` : "/v1/schedules";
+    const path = toolId
+      ? `/v1/tools/${encodeURIComponent(toolId)}/schedules`
+      : "/v1/schedules";
     const response = await this.restRequest<{ data: any[] }>("GET", path);
-    return response.data.map((s) => this.mapRestScheduleToToolSchedule(s));
+    return response.data.map((s) => this.parseScheduleDates(s));
   }
 
-  async getToolSchedule(scheduleId: string): Promise<ToolSchedule> {
-    const response = await this.restRequest<any>("GET", `/v1/schedules/${scheduleId}`);
-    return this.mapRestScheduleToToolSchedule(response);
+  async getToolSchedule(toolId: string, scheduleId: string): Promise<ToolSchedule> {
+    const response = await this.restRequest<any>(
+      "GET",
+      `/v1/tools/${encodeURIComponent(toolId)}/schedules/${encodeURIComponent(scheduleId)}`,
+    );
+    return this.parseScheduleDates(response);
   }
 
-  async createToolSchedule(schedule: {
-    toolId: string;
-    cronExpression: string;
-    timezone: string;
-    enabled?: boolean;
-    payload?: Record<string, any>;
-    options?: Record<string, any>;
-  }): Promise<ToolSchedule> {
-    const response = await this.restRequest<any>("POST", "/v1/schedules", schedule);
-    return this.mapRestScheduleToToolSchedule(response);
+  async createToolSchedule(
+    toolId: string,
+    schedule: {
+      cronExpression: string;
+      timezone: string;
+      enabled?: boolean;
+      payload?: Record<string, any>;
+      options?: Record<string, any>;
+    },
+  ): Promise<ToolSchedule> {
+    const response = await this.restRequest<any>(
+      "POST",
+      `/v1/tools/${encodeURIComponent(toolId)}/schedules`,
+      schedule,
+    );
+    return this.parseScheduleDates(response);
   }
 
   async updateToolSchedule(
+    toolId: string,
     scheduleId: string,
     updates: {
       cronExpression?: string;
@@ -1138,45 +1147,19 @@ export class SuperglueClient {
       options?: Record<string, any>;
     },
   ): Promise<ToolSchedule> {
-    const response = await this.restRequest<any>("PUT", `/v1/schedules/${scheduleId}`, updates);
-    return this.mapRestScheduleToToolSchedule(response);
+    const response = await this.restRequest<any>(
+      "PUT",
+      `/v1/tools/${encodeURIComponent(toolId)}/schedules/${encodeURIComponent(scheduleId)}`,
+      updates,
+    );
+    return this.parseScheduleDates(response);
   }
 
-  async deleteToolSchedule(scheduleId: string): Promise<void> {
-    await this.restRequest<void>("DELETE", `/v1/schedules/${scheduleId}`);
-  }
-
-  // Backward-compatible aliases using REST
-  async listWorkflowSchedules(workflowId?: string): Promise<ToolSchedule[]> {
-    return this.listToolSchedules(workflowId);
-  }
-
-  async upsertWorkflowSchedule(schedule: ToolScheduleInput): Promise<ToolSchedule> {
-    if (schedule.id) {
-      return this.updateToolSchedule(schedule.id, {
-        cronExpression: schedule.cronExpression,
-        timezone: schedule.timezone,
-        enabled: schedule.enabled,
-        payload: schedule.payload,
-        options: schedule.options,
-      });
-    }
-    if (!schedule.workflowId || !schedule.cronExpression || !schedule.timezone) {
-      throw new Error("toolId, cronExpression, and timezone are required for new schedules");
-    }
-    return this.createToolSchedule({
-      toolId: schedule.workflowId,
-      cronExpression: schedule.cronExpression,
-      timezone: schedule.timezone,
-      enabled: schedule.enabled,
-      payload: schedule.payload,
-      options: schedule.options,
-    });
-  }
-
-  async deleteWorkflowSchedule(id: string): Promise<boolean> {
-    await this.deleteToolSchedule(id);
-    return true;
+  async deleteToolSchedule(toolId: string, scheduleId: string): Promise<void> {
+    await this.restRequest<void>(
+      "DELETE",
+      `/v1/tools/${encodeURIComponent(toolId)}/schedules/${encodeURIComponent(scheduleId)}`,
+    );
   }
 
   async upsertApi(id: string, input: Partial<ApiConfig>): Promise<ApiConfig> {

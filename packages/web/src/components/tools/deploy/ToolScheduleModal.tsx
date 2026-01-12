@@ -164,6 +164,7 @@ const ToolScheduleModal = ({
       const superglueClient = new SuperglueClient({
         endpoint: config.superglueEndpoint,
         apiKey: tokenRegistry.getToken(),
+        apiEndpoint: config.apiEndpoint,
       });
 
       const cronExpression =
@@ -182,15 +183,19 @@ const ToolScheduleModal = ({
         options.webhookUrl = webhookUrl.trim();
       }
 
-      await superglueClient.upsertWorkflowSchedule({
-        id: schedule?.id,
-        workflowId: toolId,
+      const scheduleData = {
         cronExpression,
         timezone: selectedTimezone.value,
         enabled,
         payload,
         options,
-      });
+      };
+
+      if (schedule?.id) {
+        await superglueClient.updateToolSchedule(toolId, schedule.id, scheduleData);
+      } else {
+        await superglueClient.createToolSchedule(toolId, scheduleData);
+      }
 
       onClose();
       onSave?.();

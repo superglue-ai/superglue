@@ -4,16 +4,16 @@ import { DataStore, ToolScheduleInternal } from "../datastore/types.js";
 import { server_defaults } from "../default.js";
 import { isValidTimezone } from "../utils/timezone.js";
 
-export class WorkflowScheduler {
+export class ToolScheduler {
   private datastore: DataStore;
 
   constructor(datastore: DataStore) {
     this.datastore = datastore;
   }
 
-  public async upsertWorkflowSchedule(params: {
+  public async upsertToolSchedule(params: {
     id?: string;
-    workflowId?: string;
+    toolId?: string;
     orgId: string;
     cronExpression?: string;
     timezone?: string;
@@ -21,40 +21,40 @@ export class WorkflowScheduler {
     payload?: Record<string, any>;
     options?: Record<string, any>;
   }): Promise<ToolScheduleInternal> {
-    if (!params.id && !params.workflowId) {
+    if (!params.id && !params.toolId) {
       throw new Error(
-        "Failed to upsert workflow schedule: Provide either ID (for updates) or Workflow ID (for new schedules)",
+        "Failed to upsert tool schedule: Provide either ID (for updates) or Tool ID (for new schedules)",
       );
     }
 
     if (params.cronExpression !== undefined && !validateCronExpression(params.cronExpression)) {
-      throw new Error("Failed to upsert workflow schedule: Invalid cron expression");
+      throw new Error("Failed to upsert tool schedule: Invalid cron expression");
     }
 
     if (params.timezone !== undefined && !isValidTimezone(params.timezone)) {
-      throw new Error("Failed to upsert workflow schedule: Invalid timezone");
+      throw new Error("Failed to upsert tool schedule: Invalid timezone");
     }
 
     let existingScheduleOrNull = null;
     if (params.id) {
-      existingScheduleOrNull = await this.datastore.getWorkflowSchedule({
+      existingScheduleOrNull = await this.datastore.getToolSchedule({
         id: params.id,
         orgId: params.orgId,
       });
 
       if (!existingScheduleOrNull) {
-        throw new Error("Failed to upsert workflow schedule: Schedule not found");
+        throw new Error("Failed to upsert tool schedule: Schedule not found");
       }
     }
 
     if (!params.cronExpression && !existingScheduleOrNull?.cronExpression) {
       throw new Error(
-        "Failed to upsert workflow schedule: Cron expression is required for new schedule",
+        "Failed to upsert tool schedule: Cron expression is required for new schedule",
       );
     }
 
     if (!params.timezone && !existingScheduleOrNull) {
-      throw new Error("Failed to upsert workflow schedule: Timezone is required for new schedule");
+      throw new Error("Failed to upsert tool schedule: Timezone is required for new schedule");
     }
 
     if (params.options?.retries !== undefined) {
@@ -64,15 +64,15 @@ export class WorkflowScheduler {
         params.options.retries > server_defaults.MAX_CALL_RETRIES
       ) {
         throw new Error(
-          `Failed to upsert workflow schedule: Retries must be between 0 and ${server_defaults.MAX_CALL_RETRIES}`,
+          `Failed to upsert tool schedule: Retries must be between 0 and ${server_defaults.MAX_CALL_RETRIES}`,
         );
       }
     }
 
     const id = existingScheduleOrNull?.id ?? crypto.randomUUID();
-    const workflowId = existingScheduleOrNull
-      ? existingScheduleOrNull.workflowId
-      : params.workflowId; // prevent updating workflow id
+    const toolId = existingScheduleOrNull
+      ? existingScheduleOrNull.toolId
+      : params.toolId; // prevent updating tool id
     const cronExpression = params.cronExpression ?? existingScheduleOrNull?.cronExpression;
     const timezone = params.timezone ?? existingScheduleOrNull?.timezone;
     const now = new Date();
@@ -91,7 +91,7 @@ export class WorkflowScheduler {
     const scheduleToSave: ToolScheduleInternal = {
       id,
       orgId: existingScheduleOrNull?.orgId ?? params.orgId,
-      workflowId,
+      toolId,
       cronExpression: cronExpression,
       timezone: timezone,
       enabled: params.enabled ?? existingScheduleOrNull?.enabled ?? true,
@@ -103,27 +103,27 @@ export class WorkflowScheduler {
       updatedAt: now,
     };
 
-    await this.datastore.upsertWorkflowSchedule({ schedule: scheduleToSave });
+    await this.datastore.upsertToolSchedule({ schedule: scheduleToSave });
     return scheduleToSave;
   }
 
-  public async deleteWorkflowSchedule({
+  public async deleteToolSchedule({
     id,
     orgId,
   }: {
     id: string;
     orgId: string;
   }): Promise<boolean> {
-    return await this.datastore.deleteWorkflowSchedule({ id, orgId });
+    return await this.datastore.deleteToolSchedule({ id, orgId });
   }
 
-  public async listWorkflowSchedules({
-    workflowId,
+  public async listToolSchedules({
+    toolId,
     orgId,
   }: {
-    workflowId?: string;
+    toolId?: string;
     orgId: string;
   }): Promise<ToolScheduleInternal[]> {
-    return await this.datastore.listWorkflowSchedules({ workflowId, orgId });
+    return await this.datastore.listToolSchedules({ toolId, orgId });
   }
 }

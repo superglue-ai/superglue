@@ -6,7 +6,7 @@ import { executeWorkflowResolver } from "../graphql/resolvers/workflow.js";
 import { GraphQLRequestContext, WorkerPools } from "../graphql/types.js";
 import { logMessage } from "../utils/logs.js";
 
-export class WorkflowSchedulerWorker {
+export class ToolSchedulerWorker {
   private datastore: DataStore;
   private workerPools: WorkerPools;
   private intervalId: NodeJS.Timeout;
@@ -27,7 +27,7 @@ export class WorkflowSchedulerWorker {
     this.isRunning = true;
     this.intervalId = setInterval(this.pollAndExecute.bind(this), this.intervalMs);
 
-    logMessage("info", "WORKFLOW SCHEDULER: Async scheduler service started");
+    logMessage("info", "TOOL SCHEDULER: Async scheduler service started");
   }
 
   public stop(): void {
@@ -41,19 +41,19 @@ export class WorkflowSchedulerWorker {
       this.intervalId = null;
     }
 
-    logMessage("info", "WORKFLOW SCHEDULER: Scheduler service stopped");
+    logMessage("info", "TOOL SCHEDULER: Scheduler service stopped");
   }
 
   private async pollAndExecute(): Promise<void> {
-    const schedules = await this.datastore.listDueWorkflowSchedules();
-    logMessage("debug", `WORKFLOW SCHEDULER: Found ${schedules.length} due schedules`);
+    const schedules = await this.datastore.listDueToolSchedules();
+    logMessage("debug", `TOOL SCHEDULER: Found ${schedules.length} due schedules`);
 
     for (const schedule of schedules) {
       try {
         const traceId = crypto.randomUUID();
         logMessage(
           "info",
-          `WORKFLOW SCHEDULER: Running scheduled workflow ${schedule.workflowId}`,
+          `TOOL SCHEDULER: Running scheduled tool ${schedule.toolId}`,
           { orgId: schedule.orgId, traceId },
         );
 
@@ -87,7 +87,7 @@ export class WorkflowSchedulerWorker {
         await executeWorkflowResolver(
           {},
           {
-            input: { id: schedule.workflowId },
+            input: { id: schedule.toolId },
             payload: schedule.payload || {},
             credentials: {},
             options,
@@ -98,7 +98,7 @@ export class WorkflowSchedulerWorker {
       } catch (error) {
         logMessage(
           "error",
-          `WORKFLOW SCHEDULER: Failed to run scheduled workflow ${schedule.workflowId}: ${error}`,
+          `TOOL SCHEDULER: Failed to run scheduled tool ${schedule.toolId}: ${error}`,
           { orgId: schedule.orgId },
         );
       }
