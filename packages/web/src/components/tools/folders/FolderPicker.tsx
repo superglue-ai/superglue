@@ -87,7 +87,8 @@ export function FolderPicker({
   }, [flatFolders, searchValue]);
 
   const isNewFolder =
-    searchValue.trim() && !allFolderPaths.some((f) => f.toLowerCase() === searchValue.toLowerCase());
+    searchValue.trim() &&
+    !allFolderPaths.some((f) => f.toLowerCase() === searchValue.toLowerCase());
 
   const handleSelect = (folder: string | null) => {
     onChange(folder);
@@ -236,7 +237,9 @@ export function FolderPicker({
                     style={{ paddingLeft: `${folder.depth * 12 + 8}px` }}
                   >
                     {renderFolderIcon(folder.fullPath, isSelected)}
-                    <span className={cn("truncate", isSelected && "font-medium")}>{folder.name}</span>
+                    <span className={cn("truncate", isSelected && "font-medium")}>
+                      {folder.name}
+                    </span>
                   </CommandItem>
                 );
               })}

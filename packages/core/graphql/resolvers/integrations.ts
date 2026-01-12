@@ -60,7 +60,15 @@ export const getIntegrationResolver = async (
 
 export const upsertIntegrationResolver = async (
   _: any,
-  { input, mode = "UPSERT", credentialMode = "MERGE" }: { input: Integration; mode?: "CREATE" | "UPDATE" | "UPSERT"; credentialMode?: "MERGE" | "REPLACE" },
+  {
+    input,
+    mode = "UPSERT",
+    credentialMode = "MERGE",
+  }: {
+    input: Integration;
+    mode?: "CREATE" | "UPDATE" | "UPSERT";
+    credentialMode?: "MERGE" | "REPLACE";
+  },
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ) => {
