@@ -82,6 +82,39 @@ const emptyStepTemplateData: StepTemplateData = {
   canExecute: false,
 };
 
+const STATUS_INFO = {
+  running: {
+    text: "Running",
+    color: "text-amber-600 dark:text-amber-400",
+    dotColor: "bg-amber-600 dark:bg-amber-400",
+    animate: true,
+  },
+  fixing: {
+    text: "Fixing",
+    color: "text-amber-600 dark:text-amber-400",
+    dotColor: "bg-amber-600 dark:bg-amber-400",
+    animate: true,
+  },
+  completed: {
+    text: "Completed",
+    color: "text-muted-foreground",
+    dotColor: "bg-green-600 dark:bg-green-400",
+    animate: false,
+  },
+  failed: {
+    text: "Failed",
+    color: "text-red-600 dark:text-red-400",
+    dotColor: "bg-red-600 dark:bg-red-400",
+    animate: false,
+  },
+  pending: {
+    text: "Pending",
+    color: "text-gray-500 dark:text-gray-400",
+    dotColor: "bg-gray-500 dark:bg-gray-400",
+    animate: false,
+  },
+} as const satisfies Record<string, StepStatusInfo>;
+
 export function ExecutionProvider({ children }: ExecutionProviderProps) {
   const { steps, payload, integrations } = useToolConfig();
 
@@ -306,48 +339,21 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
 
   const getStepStatusInfo = useCallback(
     (stepId: string): StepStatusInfo => {
-      const exec = stepExecutions[stepId];
-      const running = exec?.status === "running";
-      const failed = exec?.status === "failed";
-      const completed = exec?.status === "completed";
-      const aborted = exec?.status === "aborted";
+      if (stepId === "__final_transform__") {
+        if (transformStatus === "fixing") return STATUS_INFO.fixing;
+        if (transformStatus === "running") return STATUS_INFO.running;
+        if (transformStatus === "completed") return STATUS_INFO.completed;
+        if (transformStatus === "failed") return STATUS_INFO.failed;
+        return STATUS_INFO.pending;
+      }
 
-      if (running)
-        return {
-          text: "Running",
-          color: "text-amber-600 dark:text-amber-400",
-          dotColor: "bg-amber-600 dark:bg-amber-400",
-          animate: true,
-        };
-      if (aborted)
-        return {
-          text: "Pending",
-          color: "text-gray-500 dark:text-gray-400",
-          dotColor: "bg-gray-500 dark:bg-gray-400",
-          animate: false,
-        };
-      if (failed)
-        return {
-          text: "Failed",
-          color: "text-red-600 dark:text-red-400",
-          dotColor: "bg-red-600 dark:bg-red-400",
-          animate: false,
-        };
-      if (completed)
-        return {
-          text: "Completed",
-          color: "text-muted-foreground",
-          dotColor: "bg-green-600 dark:bg-green-400",
-          animate: false,
-        };
-      return {
-        text: "Pending",
-        color: "text-gray-500 dark:text-gray-400",
-        dotColor: "bg-gray-500 dark:bg-gray-400",
-        animate: false,
-      };
+      const status = stepExecutions[stepId]?.status;
+      if (status === "running") return STATUS_INFO.running;
+      if (status === "completed") return STATUS_INFO.completed;
+      if (status === "failed") return STATUS_INFO.failed;
+      return STATUS_INFO.pending;
     },
-    [stepExecutions],
+    [stepExecutions, transformStatus],
   );
 
   const canExecuteStep = useCallback(
@@ -525,7 +531,11 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
         ...paginationData,
       };
 
-      const credentials = extractCredentials(sourceData);
+      const allIntegrationCredentials = flattenAndNamespaceCredentials(integrations);
+      const credentials = {
+        ...extractCredentials(sourceData),
+        ...allIntegrationCredentials,
+      };
 
       const previousStepResults = buildPreviousStepResults(steps, stepResultsMap, stepIndex - 1);
 

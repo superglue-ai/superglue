@@ -24,11 +24,11 @@ export interface ToolConfigContextValue {
   steps: ExecutionStep[];
   payload: PayloadState;
   integrations: Integration[];
-
+  
   inputSchema: string | null;
   responseSchema: string;
   finalTransform: string;
-
+  
   setToolId: (id: string) => void;
   setInstruction: (instruction: string) => void;
   setFinalTransform: (transform: string) => void;
@@ -36,17 +36,17 @@ export interface ToolConfigContextValue {
   setResponseSchema: (schema: string) => void;
   setFolder: (folder: string | undefined) => void;
   setIsArchived: (archived: boolean) => void;
-
+  
   setPayloadText: (text: string) => void;
   setUploadedFiles: (files: UploadedFileInfo[]) => void;
   setFilePayloads: (payloads: Record<string, any>) => void;
   markPayloadEdited: () => void;
-
+  
   addStep: (step: ExecutionStep, afterIndex?: number) => void;
   removeStep: (stepId: string) => void;
   updateStep: (stepId: string, updates: Partial<ExecutionStep>) => void;
   setSteps: (steps: ExecutionStep[] | ((prev: ExecutionStep[]) => ExecutionStep[])) => void;
-
+  
   getStepConfig: (stepId: string) => ExecutionStep | undefined;
   getStepIndex: (stepId: string) => number;
   getStepIntegration: (stepId: string) => Integration | undefined;
@@ -109,34 +109,34 @@ export interface StepStatusInfo {
   animate: boolean;
 }
 
-export interface ExecutionContextValue {
-  // === PER-STEP EXECUTION STATE ===
+  export interface ExecutionContextValue {
+    // === PER-STEP EXECUTION STATE ===
   stepExecutions: Record<string, StepExecutionState>;
-
+  
   // === TOOL-LEVEL EXECUTION STATE ===
   isExecutingAny: boolean;
   currentExecutingStepIndex: number | null;
   currentRunId: string | null;
   isStopping: boolean;
-
+  
   // === FINAL TRANSFORM STATE ===
   finalResult: any | null;
   finalError: string | null;
   transformStatus: TransformStatus;
-
+  
   // === TRANSFORM STATUS CONVENIENCE GETTERS ===
   isRunningTransform: boolean;
   isFixingTransform: boolean;
   isExecutingTransform: boolean;
   canExecuteTransform: boolean;
-
+  
   // === STEP MUTATIONS ===
   setStepResult: (stepId: string, result: any, status: StepStatus, error?: string) => void;
   setStepRunning: (stepId: string, runId: string) => void;
   clearStepExecution: (stepId: string) => void;
   clearExecutionsFrom: (stepIndex: number) => void;
   clearAllExecutions: () => void;
-
+  
   // === EXECUTION CONTROL ===
   startExecution: (runId: string) => void;
   stopExecution: () => void;
@@ -144,13 +144,13 @@ export interface ExecutionContextValue {
   finishExecution: () => void;
   setCurrentExecutingStepIndex: (index: number | null) => void;
   skipNextHashInvalidation: () => void;
-
+  
   // === TRANSFORM MUTATIONS ===
   setFinalResult: (result: any, status: TransformStatus, error?: string) => void;
   setTransformRunning: (runId: string) => void;
   setTransformStatus: (status: TransformStatus) => void;
   clearFinalResult: () => void;
-
+  
   // === STEP QUERIES ===
   getStepExecution: (stepId: string) => StepExecutionState;
   getStepStatus: (stepId: string) => StepStatus;
@@ -161,7 +161,7 @@ export interface ExecutionContextValue {
   isStepAborted: (stepId: string) => boolean;
   isStepRunning: (stepId: string) => boolean;
   canExecuteStep: (stepIndex: number) => boolean;
-
+  
   // === PAYLOAD HELPERS ===
   getStepInput: (stepId?: string) => Record<string, any>;
   stepResultsMap: Record<string, any>;

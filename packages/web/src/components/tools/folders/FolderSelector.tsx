@@ -13,7 +13,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
 import { cn } from "@/src/lib/general-utils";
 import { Tool } from "@superglue/shared";
-import { Archive, Check, ChevronRight, Folder, FolderOpen } from "lucide-react";
+import { Archive, Check, ChevronRight, Filter, Folder, FolderOpen } from "lucide-react";
 import { useMemo, useState } from "react";
 
 const FOLDER_STORAGE_KEY = "superglue-selected-folder";
@@ -108,10 +108,10 @@ export function FolderSelector({ tools, selectedFolder, onFolderChange }: Folder
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-[220px] justify-between"
+          className="w-[220px] justify-between pl-3 pr-2"
         >
-          <div className="flex items-center gap-2 truncate">
-            <Folder className="h-4 w-4 flex-shrink-0" />
+          <div className="flex items-center gap-2 truncate flex-1">
+            <Filter className="h-4 w-4 flex-shrink-0" />
             <span className="truncate">{displayLabel}</span>
           </div>
           <ChevronRight

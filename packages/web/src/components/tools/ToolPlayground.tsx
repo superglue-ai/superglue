@@ -114,7 +114,7 @@ function ToolPlaygroundInner({
   const { refreshTools } = useTools();
   const toolConfig = useToolConfig();
   const execution = useExecution();
-
+  
   const {
     tool,
     steps,
@@ -132,7 +132,7 @@ function ToolPlaygroundInner({
     setFolder,
     setIsArchived,
   } = toolConfig;
-
+  
   const {
     currentExecutingStepIndex: contextCurrentExecutingStepIndex,
     currentRunId,
@@ -141,8 +141,9 @@ function ToolPlaygroundInner({
     setTransformStatus,
     stepResultsMap,
     isExecutingTransform,
+    isFixingTransform,
   } = execution;
-
+  
   const toolId = tool.id;
   const folder = tool.folder;
   const isArchived = tool.isArchived;
@@ -153,7 +154,7 @@ function ToolPlaygroundInner({
   const manualPayloadText = payload.manualPayloadText;
   const hasUserEditedPayload = payload.hasUserEdited;
   const computedPayload = payload.computedPayload;
-
+  
   const localFileUpload = useFileUpload({
     onPayloadTextUpdate: (updater) => setPayloadText(updater(manualPayloadText)),
     onUserEdit: markPayloadEdited,
@@ -162,7 +163,7 @@ function ToolPlaygroundInner({
   const uploadedFiles = parentUploadedFiles ?? payload.uploadedFiles;
   const totalFileSize = parentTotalFileSize ?? localFileUpload.totalFileSize;
   const isProcessingFiles = parentIsProcessingFiles ?? localFileUpload.isProcessing;
-
+  
   const parsedResponseSchema = useMemo(() => {
     if (!responseSchema) return undefined;
     try {
@@ -171,7 +172,7 @@ function ToolPlaygroundInner({
       return undefined;
     }
   }, [responseSchema]);
-
+  
   const { loading, saving, justSaved, saveTool, setLoading } = useToolData({
     id,
     initialTool,
@@ -179,12 +180,12 @@ function ToolPlaygroundInner({
     embedded,
     onSave,
   });
-
+  
   const [navigateToFinalSignal, setNavigateToFinalSignal] = useState<number>(0);
   const [showStepOutputSignal, setShowStepOutputSignal] = useState<number>(0);
   const [focusStepId, setFocusStepId] = useState<string | null>(null);
 
-  type DialogState =
+  type DialogState = 
     | { type: "none" }
     | { type: "fixStep"; stepIndex: number }
     | { type: "fixTransform" }
@@ -195,14 +196,14 @@ function ToolPlaygroundInner({
   const modifyStepResolveRef = useRef<((shouldContinue: boolean) => void) | null>(null);
   const isExecutingStep = contextCurrentExecutingStepIndex;
   const hasGeneratedDefaultPayloadRef = useRef<boolean>(false);
-
+  
   const { isValid: isPayloadValid } = usePayloadValidation({
     computedPayload,
     inputSchema,
     hasUserEdited: hasUserEditedPayload,
   });
   const [showToolBuilder, setShowToolBuilder] = useState(false);
-
+  
   const {
     executeTool: executeToolFromHook,
     executeStepByIdx,
@@ -217,7 +218,7 @@ function ToolPlaygroundInner({
   useEffect(() => {
     const trimmed = manualPayloadText.trim();
     const isEmptyPayload = trimmed === "" || trimmed === "{}";
-
+    
     if (
       !hasUserEditedPayload &&
       isEmptyPayload &&
@@ -247,7 +248,7 @@ function ToolPlaygroundInner({
     setFolder(rebuiltTool.folder);
     setSteps(
       rebuiltTool.steps?.map((step) => ({
-        ...step,
+      ...step,
         apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id },
       })) || [],
     );
@@ -260,16 +261,16 @@ function ToolPlaygroundInner({
     );
     setInstruction(context.instruction);
     setPayloadText(context.payload);
-
+    
     setContextUploadedFiles(context.uploadedFiles);
     setContextFilePayloads(context.filePayloads);
-
+    
     if (parentOnFilesChange) {
       parentOnFilesChange(context.uploadedFiles, context.filePayloads);
     }
-
+    
     clearAllExecutions();
-
+    
     setShowToolBuilder(false);
     onRebuildEnd?.();
   };
@@ -308,7 +309,7 @@ function ToolPlaygroundInner({
 
   const handleBeforeStepExecution = async (stepIndex: number, step: any): Promise<boolean> => {
     if (shouldAbortRef.current || externalShouldStop) return false;
-
+    
     if (step.modify === true) {
       return new Promise((resolve) => {
         modifyStepResolveRef.current = resolve;
@@ -321,14 +322,14 @@ function ToolPlaygroundInner({
   const handleModifyStepConfirm = () => {
     setActiveDialog({ type: "none" });
     modifyStepResolveRef.current?.(true);
-    modifyStepResolveRef.current = null;
+      modifyStepResolveRef.current = null;
   };
 
   const handleModifyStepCancel = () => {
     const stepIdx = pendingModifyStepIndex;
     setActiveDialog({ type: "none" });
     modifyStepResolveRef.current?.(false);
-    modifyStepResolveRef.current = null;
+      modifyStepResolveRef.current = null;
     if (stepIdx !== null) {
       const stepId = steps[stepIdx]?.id;
       if (stepId) {
@@ -361,21 +362,21 @@ function ToolPlaygroundInner({
   const getCurrentTool = useCallback(
     (): Tool =>
       ({
-        id: toolId,
-        steps: steps.map((step: ExecutionStep) => ({
-          ...step,
-          apiConfig: {
-            id: step.apiConfig.id || step.id,
-            ...step.apiConfig,
+    id: toolId,
+    steps: steps.map((step: ExecutionStep) => ({
+      ...step,
+      apiConfig: {
+        id: step.apiConfig.id || step.id,
+        ...step.apiConfig,
             pagination: step.apiConfig.pagination || null,
           },
-        })),
-        responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
-        inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
-        finalTransform,
-        instruction: instructions,
+    })),
+    responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
+    inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
+    finalTransform,
+    instruction: instructions,
         folder,
-        createdAt: initialTool?.createdAt,
+    createdAt: initialTool?.createdAt,
         updatedAt: initialTool?.updatedAt,
       }) as Tool,
     [toolId, steps, responseSchema, inputSchema, finalTransform, instructions, folder, initialTool],
@@ -384,12 +385,12 @@ function ToolPlaygroundInner({
   useImperativeHandle(
     innerRef,
     () => ({
-      executeTool,
-      saveTool,
-      getCurrentTool,
-      closeRebuild: () => {
-        setShowToolBuilder(false);
-        onRebuildEnd?.();
+    executeTool,
+    saveTool,
+    getCurrentTool,
+    closeRebuild: () => {
+      setShowToolBuilder(false);
+      onRebuildEnd?.();
       },
     }),
     [onRebuildEnd, executeTool, saveTool, getCurrentTool],
@@ -400,7 +401,7 @@ function ToolPlaygroundInner({
       prevSteps.map((step) =>
         step.id === stepId
           ? {
-              ...updatedStep,
+      ...updatedStep,
               apiConfig: {
                 ...updatedStep.apiConfig,
                 id: updatedStep.apiConfig.id || updatedStep.id,
@@ -452,7 +453,7 @@ function ToolPlaygroundInner({
       const client = createSuperglueClient(config.superglueEndpoint);
       await client.archiveWorkflow(toolId, false);
       setIsArchived(false);
-      refreshTools();
+    refreshTools();
     } catch (error: any) {
       console.error("Error unarchiving tool:", error);
       toast({
@@ -468,7 +469,7 @@ function ToolPlaygroundInner({
       <FolderPicker value={folder} onChange={(f) => setFolder(f ?? undefined)} />
       <ToolActionsMenu
         tool={currentTool}
-        disabled={!toolId.trim()}
+              disabled={!toolId.trim()}
         showLabel
         onRenamed={(newId) => {
           setToolId(newId);
@@ -490,70 +491,70 @@ function ToolPlaygroundInner({
         </Button>
       ) : (
         <>
-          {loading ? (
-            <Button
-              variant="outline"
-              onClick={handleStopExecution}
+      {loading ? (
+        <Button
+          variant="outline"
+          onClick={handleStopExecution}
               disabled={saving || isExecutingStep != null || isExecutingTransform}
-              className="h-9 px-4"
-            >
-              <Square className="h-4 w-4" />
-              Stop Execution
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              onClick={handleRunAllSteps}
+          className="h-9 px-4"
+        >
+          <Square className="h-4 w-4" />
+          Stop Execution
+        </Button>
+      ) : (
+        <Button
+          variant="outline"
+          onClick={handleRunAllSteps}
               disabled={
                 loading || saving || isExecutingStep != null || isExecutingTransform || isArchived
               }
-              className="h-9 px-4"
-            >
-              <Play className="h-4 w-4" />
-              Run all Steps
-            </Button>
-          )}
+          className="h-9 px-4"
+        >
+          <Play className="h-4 w-4" />
+          Run all Steps
+          </Button>
+      )}
           {!hideRebuildButton && !isArchived && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                onRebuildStart?.();
-                setShowToolBuilder(true);
-              }}
-              className="h-9 px-5"
-            >
-              <Hammer className="h-4 w-4" />
-              Rebuild
-            </Button>
-          )}
+        <Button
+          variant="outline"
+          onClick={() => {
+            onRebuildStart?.();
+            setShowToolBuilder(true);
+          }}
+          className="h-9 px-5"
+        >
+          <Hammer className="h-4 w-4" />
+          Rebuild
+        </Button>
+      )}
           {!embedded && toolId && !isArchived && (
             <DeployButton
               tool={currentTool}
               payload={computedPayload}
               onBeforeOpen={saveTool}
               size="default"
-              className="h-9 px-5"
-              disabled={saving || loading}
+          className="h-9 px-5"
+          disabled={saving || loading}
             />
-          )}
+      )}
           {!isArchived && (
-            <Button
-              variant="default"
-              onClick={saveTool}
-              disabled={saving || loading}
-              className="h-9 px-5 w-[108px] shadow-md border border-primary/40"
-            >
+      <Button
+        variant="default"
+        onClick={saveTool}
+        disabled={saving || loading}
+        className="h-9 px-5 w-[108px] shadow-md border border-primary/40"
+      >
               {saving ? (
                 "Saving..."
               ) : justSaved ? (
-                <>
-                  <Check className="mr-1 h-3.5 w-3.5" />
-                  Saved
-                </>
+          <>
+            <Check className="mr-1 h-3.5 w-3.5" />
+            Saved
+          </>
               ) : (
                 "Save"
               )}
-            </Button>
+      </Button>
           )}
         </>
       )}
@@ -586,22 +587,22 @@ function ToolPlaygroundInner({
           </div>
         )}
         <div className="flex-1 overflow-hidden">
-          <ToolBuilder
-            initialView="instructions"
-            initialIntegrationIds={extractIntegrationIds(steps)}
-            initialInstruction={tool.instruction}
-            initialPayload={manualPayloadText}
-            initialResponseSchema={responseSchema}
-            initialInputSchema={payloadSchemaString}
-            initialFiles={uploadedFiles}
-            onToolBuilt={handleToolRebuilt}
-            mode="rebuild"
-          />
+        <ToolBuilder
+          initialView="instructions"
+          initialIntegrationIds={extractIntegrationIds(steps)}
+          initialInstruction={tool.instruction}
+          initialPayload={manualPayloadText}
+          initialResponseSchema={responseSchema}
+          initialInputSchema={payloadSchemaString}
+          initialFiles={uploadedFiles}
+          onToolBuilt={handleToolRebuilt}
+          mode="rebuild"
+        />
         </div>
       </div>
     );
   }
-
+  
   return (
     <div
       className={
@@ -609,17 +610,17 @@ function ToolPlaygroundInner({
       }
     >
       {!embedded && !hideHeader && (
-        <div className="flex justify-end items-center mb-1 flex-shrink-0">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="shrink-0"
+          <div className="flex justify-end items-center mb-1 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
             onClick={() => router.push("/configs")}
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
       )}
 
       <div className="w-full flex-1 overflow-hidden">
@@ -677,7 +678,7 @@ function ToolPlaygroundInner({
             <AlertDialogAction
               onClick={() => {
                 setActiveDialog({ type: "none" });
-                executeTool();
+              executeTool();
               }}
             >
               Run Anyway
@@ -726,7 +727,13 @@ function ToolPlaygroundInner({
             : undefined
         }
         onSuccess={handleFixTransformSuccess}
-        onLoadingChange={(loading) => setTransformStatus(loading ? "fixing" : "idle")}
+        onLoadingChange={(loading) => {
+          if (loading) {
+            setTransformStatus("fixing");
+          } else if (isFixingTransform) {
+            setTransformStatus("idle");
+          }
+        }}
       />
     </div>
   );
@@ -735,7 +742,7 @@ function ToolPlaygroundInner({
 const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>((props, ref) => {
   const { integrations: contextIntegrations } = useIntegrations();
   const integrations = props.integrations || contextIntegrations;
-
+  
   return (
     <ToolConfigProvider
       initialTool={props.initialTool}
