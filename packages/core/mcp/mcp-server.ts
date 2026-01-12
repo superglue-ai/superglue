@@ -6,7 +6,7 @@ import { ToolResult } from "@superglue/shared";
 import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import { z } from "zod";
-import { checkToolExecutionPermission, filterToolsByPermission } from "../api/ee/index.js";
+import { checkToolExecutionPermission } from "../api/ee/index.js";
 import { validateToken } from "../auth/auth.js";
 import { logMessage } from "../utils/logs.js";
 import { sessionId, telemetryClient } from "../utils/telemetry.js";
@@ -165,19 +165,15 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: FindRelevantToolsInputSchema,
-    execute: async (
-      args: any & { client: McpRestClient; orgId: string; authContext: McpAuthContext },
-      request,
-    ) => {
+    execute: async (args: any & { client: McpRestClient; orgId: string }, request) => {
       try {
-        // List all tools via REST API (no semantic search for restricted keys)
+        // List all tools via REST API - already filtered by permission at the API level
         const tools = await args.client.listTools();
         const activeTools = tools?.filter((t: any) => !t.archived);
-        const filteredTools = filterToolsByPermission(args.authContext, activeTools);
 
         return {
           success: true,
-          tools: filteredTools.map((t: any) => ({
+          tools: activeTools.map((t: any) => ({
             id: t.id,
             instruction: t.instruction,
             inputSchema: t.inputSchema?.properties?.payload,
@@ -185,7 +181,7 @@ export const toolDefinitions: Record<string, any> = {
             steps: (t.steps || []).map((s: any) => ({
               integrationId: s.systemId,
               stepId: s.id,
-            }))
+            })),
           })),
         };
       } catch (error: any) {
