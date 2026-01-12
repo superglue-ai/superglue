@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Validator } from "jsonschema";
-import isEqual from "lodash.isequal";
 import { generateDefaultFromSchema } from "@superglue/shared";
+import { deepEqual } from "@/lib/general-utils";
 
 interface UsePayloadValidationOptions {
   computedPayload: Record<string, any>;
@@ -49,7 +49,7 @@ function validatePayload(payload: any, payloadSchema: any | null, userHasEdited:
         if (Object.keys(generatedDefault).length === 0 && typeof generatedDefault === "object") {
           return true;
         }
-        if (isEqual(payload, generatedDefault)) {
+        if (deepEqual(payload, generatedDefault)) {
           return false;
         }
       } catch {
