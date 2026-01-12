@@ -299,7 +299,6 @@ export const createMcpServer = async (apiKey: string) => {
         extra,
       );
 
-
       logMessage("debug", "superglue_find_relevant_tools executed via MCP", {
         orgId: authContext.orgId,
       });
