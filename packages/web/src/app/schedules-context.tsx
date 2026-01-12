@@ -45,7 +45,7 @@ export function SchedulesProvider({ children }: { children: ReactNode }) {
       setIsInitiallyLoading(false);
       setIsRefreshing(false);
     }
-  }, [config.superglueEndpoint]);
+  }, [config.superglueEndpoint, config.apiEndpoint]);
 
   const getSchedulesForTool = useCallback(
     (toolId: string): ToolSchedule[] => {
