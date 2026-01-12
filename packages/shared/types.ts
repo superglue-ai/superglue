@@ -156,7 +156,7 @@ export enum UpsertMode {
 
 export enum CredentialMode {
   MERGE = "MERGE",
-  REPLACE = "REPLACE"
+  REPLACE = "REPLACE",
 }
 
 export enum SelfHealingMode {
@@ -368,6 +368,8 @@ export interface Run {
   id: string;
   toolId: string;
   orgId?: string;
+  userId?: string;
+  userEmail?: string;
   status: RunStatus;
   toolConfig?: Tool;
   toolPayload?: Record<string, any>;

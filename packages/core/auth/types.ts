@@ -4,9 +4,14 @@ export interface AuthResult {
   success: boolean;
   orgId: string;
   userId?: string;
+  userEmail?: string;
+  userName?: string;
   orgName?: string;
   orgRole?: UserRole;
   message?: string;
+  // EE: API key permission fields
+  isRestricted?: boolean;
+  allowedTools?: string[];
 }
 
 export interface AuthManager {

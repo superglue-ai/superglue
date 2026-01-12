@@ -2,10 +2,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { SelfHealingMode, SuperglueClient, ToolResult } from "@superglue/shared";
+import { ToolResult } from "@superglue/shared";
 import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import { z } from "zod";
+import { checkToolExecutionPermission, filterToolsByPermission } from "../api/ee/index.js";
 import { validateToken } from "../auth/auth.js";
 import { logMessage } from "../utils/logs.js";
 import { sessionId, telemetryClient } from "../utils/telemetry.js";
@@ -21,17 +22,65 @@ export const ExecuteToolInputSchema = z.object({
   payload: z.record(z.unknown()).optional().describe("JSON payload to pass to the tool"),
 });
 
-// --- Tool Definitions ---
-// Map tool names to their Zod schemas and GraphQL details
-// This remains largely the same, but SuperglueClient will be created with the passed graphqlEndpoint
-const createClient = (apiKey: string) => {
-  const endpoint = process.env.GRAPHQL_ENDPOINT;
+// REST API client for MCP operations
+class McpRestClient {
+  private apiEndpoint: string;
+  private apiKey: string;
 
-  return new SuperglueClient({
-    endpoint,
-    apiKey,
-  });
-};
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+    // Use API_ENDPOINT env var, fallback to localhost
+    const port = process.env.API_PORT || "3002";
+    this.apiEndpoint = process.env.API_ENDPOINT || `http://localhost:${port}`;
+  }
+
+  private async request<T>(method: string, path: string, body?: any): Promise<T> {
+    const url = `${this.apiEndpoint.replace(/\/$/, "")}/v1${path}`;
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${this.apiKey}`,
+    };
+
+    if (body && method !== "GET") {
+      headers["Content-Type"] = "application/json";
+    }
+
+    const response = await fetch(url, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = `HTTP ${response.status}: ${errorText}`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error || errorJson.message || errorMessage;
+      } catch {
+        // ignore parse error
+      }
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
+
+  async runTool(args: { id: string; payload?: Record<string, unknown> }): Promise<any> {
+    const result = await this.request<any>("POST", `/tools/${encodeURIComponent(args.id)}/run`, {
+      inputs: args.payload,
+    });
+    return {
+      success: result.status === "success",
+      data: result.data,
+      error: result.error,
+    };
+  }
+
+  async listTools(): Promise<any[]> {
+    const result = await this.request<{ data: any[] }>("GET", "/tools?limit=1000");
+    return result.data || [];
+  }
+}
 
 // Update execute functions with validation
 export const toolDefinitions: Record<string, any> = {
@@ -48,7 +97,7 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: ExecuteToolInputSchema,
-    execute: async (args: any & { client: SuperglueClient; orgId: string }, request) => {
+    execute: async (args: any & { client: McpRestClient; orgId: string }, request) => {
       const validationErrors = validateWorkflowExecutionArgs(args);
 
       if (validationErrors.length > 0) {
@@ -59,11 +108,9 @@ export const toolDefinitions: Record<string, any> = {
       }
 
       try {
-        const result: ToolResult & { data?: any } = await args.client.executeWorkflow({
+        const result: ToolResult & { data?: any } = await args.client.runTool({
           id: args.id,
           payload: args.payload,
-          options: { selfHealing: SelfHealingMode.DISABLED },
-          verbose: false,
         });
 
         if (!result.success) {
@@ -73,13 +120,21 @@ export const toolDefinitions: Record<string, any> = {
           };
         }
 
-        const dataStr = JSON.stringify(result.data);
+        const data = result.data;
+        if (data === undefined || data === null) {
+          return {
+            success: true,
+            data: null,
+          };
+        }
+
+        const dataStr = JSON.stringify(data);
         const limit = 20000;
 
         if (dataStr.length <= limit) {
           return {
             success: true,
-            data: result.data,
+            data,
           };
         }
 
@@ -110,12 +165,24 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: FindRelevantToolsInputSchema,
-    execute: async (args: any & { client: SuperglueClient; orgId: string }, request) => {
+    execute: async (args: any & { client: McpRestClient; orgId: string }, request) => {
       try {
-        const result = await args.client.findRelevantTools(args.searchTerms);
+        // List all tools via REST API (no semantic search for restricted keys)
+        const tools = await args.client.listTools();
+        const activeTools = tools?.filter((t: any) => !t.archived);
         return {
           success: true,
-          tools: result,
+          tools: activeTools?.map((t: any) => ({
+            id: t.id,
+            instruction: t.instruction,
+            inputSchema: t.inputSchema,
+            responseSchema: t.outputSchema,
+            steps: (t.steps || []).map((s: any) => ({
+              integrationId: s.systemId,
+              stepId: s.id,
+            })),
+            reason: "Listed from available tools",
+          })),
         };
       } catch (error: any) {
         return {
@@ -127,6 +194,12 @@ export const toolDefinitions: Record<string, any> = {
     },
   },
 };
+
+interface McpAuthContext {
+  orgId: string;
+  isRestricted?: boolean;
+  allowedTools?: string[];
+}
 
 export const createMcpServer = async (apiKey: string) => {
   const mcpServer = new McpServer(
@@ -142,11 +215,16 @@ export const createMcpServer = async (apiKey: string) => {
     },
   );
 
-  const client = createClient(apiKey);
+  const client = new McpRestClient(apiKey);
 
-  // Get org ID from the API key
-  const authResult = await validateToken(apiKey);
-  const orgId = authResult.orgId;
+  const getAuthContext = async (): Promise<McpAuthContext> => {
+    const authResult = await validateToken(apiKey);
+    return {
+      orgId: authResult.orgId,
+      isRestricted: authResult.isRestricted,
+      allowedTools: authResult.allowedTools,
+    };
+  };
 
   // Register tools individually for proper type inference
   mcpServer.registerTool(
@@ -156,17 +234,39 @@ export const createMcpServer = async (apiKey: string) => {
       inputSchema: ExecuteToolInputSchema,
     },
     async (args, extra) => {
+      // Re-validate to get fresh permissions on each call
+      const authContext = await getAuthContext();
+
+      // EE: Check if this API key is authorized to execute this tool
+      const permCheck = checkToolExecutionPermission(authContext, args.id);
+      if (!permCheck.allowed) {
+        logMessage("warn", `MCP: API key not authorized to execute tool ${args.id}`, {
+          orgId: authContext.orgId,
+        });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                success: false,
+                error: permCheck.error || "This API key is not authorized to execute this tool",
+              }),
+            },
+          ],
+        };
+      }
+
       const result = await toolDefinitions.superglue_execute_tool.execute(
-        { ...args, client, orgId },
+        { ...args, client, orgId: authContext.orgId },
         extra,
       );
-      logMessage("debug", "superglue_execute_tool executed via MCP", { orgId: orgId });
+      logMessage("debug", "superglue_execute_tool executed via MCP", { orgId: authContext.orgId });
       telemetryClient?.capture({
-        distinctId: orgId || sessionId,
+        distinctId: authContext.orgId || sessionId,
         event: "mcp_superglue_execute_tool",
         properties: {
           toolName: "superglue_execute_tool",
-          orgId: orgId,
+          orgId: authContext.orgId,
         },
       });
       return {
@@ -187,17 +287,34 @@ export const createMcpServer = async (apiKey: string) => {
       inputSchema: FindRelevantToolsInputSchema,
     },
     async (args, extra) => {
+      // Re-validate to get fresh permissions on each call
+      const authContext = await getAuthContext();
+
       const result = await toolDefinitions.superglue_find_relevant_tools.execute(
-        { ...args, client, orgId },
+        { ...args, client, orgId: authContext.orgId },
         extra,
       );
-      logMessage("debug", "superglue_find_relevant_tools executed via MCP", { orgId: orgId });
+
+      // EE: Filter results to only show tools this API key can execute
+      if (result.success && result.tools) {
+        result.tools = filterToolsByPermission(authContext, result.tools);
+        result.tools = result.tools.map((t: any) => ({
+          id: t.id,
+          instruction: t.instruction,
+          inputSchema: t.inputSchema?.properties?.payload,
+          responseSchema: t.responseSchema,
+        }));
+      }
+
+      logMessage("debug", "superglue_find_relevant_tools executed via MCP", {
+        orgId: authContext.orgId,
+      });
       telemetryClient?.capture({
-        distinctId: orgId || sessionId,
+        distinctId: authContext.orgId || sessionId,
         event: "mcp_superglue_find_relevant_tools",
         properties: {
           toolName: "superglue_find_relevant_tools",
-          orgId: orgId,
+          orgId: authContext.orgId,
         },
       });
       return {

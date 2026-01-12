@@ -7,7 +7,7 @@ const findRelevantTools = toolDefinitions.superglue_find_relevant_tools.execute;
 describe("superglue_execute_tool", () => {
   it("executes tool successfully and returns only data", async () => {
     const client = {
-      executeWorkflow: vi.fn().mockResolvedValue({
+      runTool: vi.fn().mockResolvedValue({
         success: true,
         data: { users: [{ id: 1, name: "Alice" }] },
         config: { id: "tool-1", steps: [] },
@@ -26,7 +26,7 @@ describe("superglue_execute_tool", () => {
 
   it("returns only error message on failure", async () => {
     const client = {
-      executeWorkflow: vi.fn().mockResolvedValue({
+      runTool: vi.fn().mockResolvedValue({
         success: false,
         error: "API rate limit exceeded",
         config: {},
@@ -45,7 +45,7 @@ describe("superglue_execute_tool", () => {
 
   it("rejects options parameter", async () => {
     const client = {
-      executeWorkflow: vi.fn(),
+      runTool: vi.fn(),
       listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
     };
     const args = { id: "tool-1", options: { selfHealing: "ENABLED" }, client, orgId: "test-org" };
@@ -57,7 +57,7 @@ describe("superglue_execute_tool", () => {
 
   it("rejects unexpected parameters", async () => {
     const client = {
-      executeWorkflow: vi.fn(),
+      runTool: vi.fn(),
       listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
     };
     const args = { id: "tool-1", unexpectedParam: "value", client, orgId: "test-org" };
@@ -69,7 +69,7 @@ describe("superglue_execute_tool", () => {
 
   it("requires id parameter", async () => {
     const client = {
-      executeWorkflow: vi.fn(),
+      runTool: vi.fn(),
       listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
     };
     const args = { payload: {}, client, orgId: "test-org" };
@@ -82,7 +82,7 @@ describe("superglue_execute_tool", () => {
   it("truncates large results", async () => {
     const largeData = { items: new Array(10000).fill({ id: 1, data: "x".repeat(100) }) };
     const client = {
-      executeWorkflow: vi.fn().mockResolvedValue({
+      runTool: vi.fn().mockResolvedValue({
         success: true,
         data: largeData,
         config: {},
@@ -101,22 +101,25 @@ describe("superglue_execute_tool", () => {
 
 describe("superglue_find_relevant_tools", () => {
   it("returns all tools when searchTerms is wildcard", async () => {
+    // Mock REST API response format (OpenAPITool)
     const mockTools = [
       {
         id: "tool-1",
         instruction: "Fetch users",
-        steps: [{ integrationId: "crm", instruction: "Get users" }],
-        reason: "Available",
+        inputSchema: {},
+        outputSchema: {},
+        steps: [{ systemId: "crm", instruction: "Get users" }],
       },
       {
         id: "tool-2",
         instruction: "Send email",
-        steps: [{ integrationId: "email", instruction: "Send message" }],
-        reason: "Available",
+        inputSchema: {},
+        outputSchema: {},
+        steps: [{ systemId: "email", instruction: "Send message" }],
       },
     ];
     const client = {
-      findRelevantTools: vi.fn().mockResolvedValue(mockTools),
+      listTools: vi.fn().mockResolvedValue(mockTools),
     };
     const args = { searchTerms: "*", client, orgId: "test-org" };
     const result = await findRelevantTools(args, {});
@@ -127,6 +130,8 @@ describe("superglue_find_relevant_tools", () => {
     expect(result.tools[0]).toHaveProperty("instruction");
     expect(result.tools[0]).toHaveProperty("steps");
     expect(result.tools[0]).toHaveProperty("reason");
+    // Verify mapping from REST format
+    expect(result.tools[0].steps[0].integrationId).toBe("crm");
   });
 
   it("returns filtered tools for specific search", async () => {
@@ -134,12 +139,13 @@ describe("superglue_find_relevant_tools", () => {
       {
         id: "slack-tool",
         instruction: "Post to Slack",
-        steps: [{ integrationId: "slack" }],
-        reason: "Matches Slack",
+        inputSchema: {},
+        outputSchema: {},
+        steps: [{ systemId: "slack" }],
       },
     ];
     const client = {
-      findRelevantTools: vi.fn().mockResolvedValue(mockTools),
+      listTools: vi.fn().mockResolvedValue(mockTools),
     };
     const args = { searchTerms: "slack message", client, orgId: "test-org" };
     const result = await findRelevantTools(args, {});
@@ -151,7 +157,7 @@ describe("superglue_find_relevant_tools", () => {
 
   it("returns empty array when no tools match", async () => {
     const client = {
-      findRelevantTools: vi.fn().mockResolvedValue([]),
+      listTools: vi.fn().mockResolvedValue([]),
     };
     const args = { searchTerms: "nonexistent", client, orgId: "test-org" };
     const result = await findRelevantTools(args, {});
@@ -162,7 +168,7 @@ describe("superglue_find_relevant_tools", () => {
 
   it("handles errors gracefully", async () => {
     const client = {
-      findRelevantTools: vi.fn().mockRejectedValue(new Error("Search failed")),
+      listTools: vi.fn().mockRejectedValue(new Error("Search failed")),
     };
     const args = { searchTerms: "test", client, orgId: "test-org" };
     const result = await findRelevantTools(args, {});

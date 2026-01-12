@@ -120,6 +120,8 @@ export const executeWorkflowResolver = async (
         id: runId,
         toolId: workflow.id,
         orgId: context.orgId,
+        userId: context.userId,
+        userEmail: context.userEmail,
         status: RunStatus.RUNNING,
         toolConfig: workflow,
         options: args.options,
