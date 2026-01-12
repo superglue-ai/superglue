@@ -87,20 +87,6 @@ export class SuperglueClient {
         archived
     `;
 
-  private static workflowScheduleQL = `
-      id
-      workflowId
-      cronExpression
-      timezone
-      enabled
-      payload
-      options
-      lastRunAt
-      nextRunAt
-      createdAt
-      updatedAt
-    `;
-
   private static configQL = `
     config {
       ... on ApiConfig {
@@ -1102,42 +1088,95 @@ export class SuperglueClient {
     return response.listWorkflows;
   }
 
+  // REST API types for schedules
+  private mapRestScheduleToToolSchedule(restSchedule: any): ToolSchedule {
+    return {
+      id: restSchedule.id,
+      workflowId: restSchedule.toolId,
+      cronExpression: restSchedule.cronExpression,
+      timezone: restSchedule.timezone,
+      enabled: restSchedule.enabled,
+      payload: restSchedule.payload,
+      options: restSchedule.options,
+      lastRunAt: restSchedule.lastRunAt ? new Date(restSchedule.lastRunAt) : undefined,
+      nextRunAt: new Date(restSchedule.nextRunAt),
+      createdAt: new Date(restSchedule.createdAt),
+      updatedAt: new Date(restSchedule.updatedAt),
+    };
+  }
+
+  async listToolSchedules(toolId?: string): Promise<ToolSchedule[]> {
+    const path = toolId ? `/v1/schedules?toolId=${encodeURIComponent(toolId)}` : "/v1/schedules";
+    const response = await this.restRequest<{ data: any[] }>("GET", path);
+    return response.data.map((s) => this.mapRestScheduleToToolSchedule(s));
+  }
+
+  async getToolSchedule(scheduleId: string): Promise<ToolSchedule> {
+    const response = await this.restRequest<any>("GET", `/v1/schedules/${scheduleId}`);
+    return this.mapRestScheduleToToolSchedule(response);
+  }
+
+  async createToolSchedule(schedule: {
+    toolId: string;
+    cronExpression: string;
+    timezone: string;
+    enabled?: boolean;
+    payload?: Record<string, any>;
+    options?: Record<string, any>;
+  }): Promise<ToolSchedule> {
+    const response = await this.restRequest<any>("POST", "/v1/schedules", schedule);
+    return this.mapRestScheduleToToolSchedule(response);
+  }
+
+  async updateToolSchedule(
+    scheduleId: string,
+    updates: {
+      cronExpression?: string;
+      timezone?: string;
+      enabled?: boolean;
+      payload?: Record<string, any>;
+      options?: Record<string, any>;
+    },
+  ): Promise<ToolSchedule> {
+    const response = await this.restRequest<any>("PUT", `/v1/schedules/${scheduleId}`, updates);
+    return this.mapRestScheduleToToolSchedule(response);
+  }
+
+  async deleteToolSchedule(scheduleId: string): Promise<void> {
+    await this.restRequest<void>("DELETE", `/v1/schedules/${scheduleId}`);
+  }
+
+  // Backward-compatible aliases using REST
   async listWorkflowSchedules(workflowId?: string): Promise<ToolSchedule[]> {
-    const query = `
-        query ListWorkflowSchedules ($workflowId: String) {
-          listWorkflowSchedules(workflowId: $workflowId) {
-            ${SuperglueClient.workflowScheduleQL}
-          }
-        }
-      `;
-    const response = await this.request<{ listWorkflowSchedules: ToolSchedule[] }>(query, {
-      workflowId,
-    });
-    return response.listWorkflowSchedules;
+    return this.listToolSchedules(workflowId);
   }
 
   async upsertWorkflowSchedule(schedule: ToolScheduleInput): Promise<ToolSchedule> {
-    const mutation = `
-        mutation UpsertWorkflowSchedule($schedule: WorkflowScheduleInput!) {
-          upsertWorkflowSchedule(schedule: $schedule) {
-            ${SuperglueClient.workflowScheduleQL}
-          }
-        }
-      `;
-    const response = await this.request<{ upsertWorkflowSchedule: ToolSchedule }>(mutation, {
-      schedule,
+    if (schedule.id) {
+      return this.updateToolSchedule(schedule.id, {
+        cronExpression: schedule.cronExpression,
+        timezone: schedule.timezone,
+        enabled: schedule.enabled,
+        payload: schedule.payload,
+        options: schedule.options,
+      });
+    }
+    if (!schedule.workflowId || !schedule.cronExpression || !schedule.timezone) {
+      throw new Error("toolId, cronExpression, and timezone are required for new schedules");
+    }
+    return this.createToolSchedule({
+      toolId: schedule.workflowId,
+      cronExpression: schedule.cronExpression,
+      timezone: schedule.timezone,
+      enabled: schedule.enabled,
+      payload: schedule.payload,
+      options: schedule.options,
     });
-    return response.upsertWorkflowSchedule;
   }
 
   async deleteWorkflowSchedule(id: string): Promise<boolean> {
-    const mutation = `
-        mutation DeleteWorkflowSchedule($id: ID!) {
-          deleteWorkflowSchedule(id: $id)
-        }
-      `;
-    const response = await this.request<{ deleteWorkflowSchedule: boolean }>(mutation, { id });
-    return response.deleteWorkflowSchedule;
+    await this.deleteToolSchedule(id);
+    return true;
   }
 
   async upsertApi(id: string, input: Partial<ApiConfig>): Promise<ApiConfig> {

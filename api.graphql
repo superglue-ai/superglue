@@ -323,7 +323,6 @@ type Query {
   generateInstructions(integrations: [IntegrationInput!]!): [String!]!
   getTenantInfo: TenantInfo
 
-  listWorkflowSchedules(workflowId: String): [WorkflowSchedule!]!
 }
 
 type TenantInfo {
@@ -410,20 +409,6 @@ type AbortToolExecutionResult {
   runId: ID!
 }
 
-type WorkflowSchedule {
-  id: ID!
-  workflowId: String!
-  cronExpression: String!
-  timezone: String!
-  enabled: Boolean!
-  payload: JSON
-  options: JSON
-  lastRunAt: DateTime
-  nextRunAt: DateTime!
-  createdAt: DateTime!
-  updatedAt: DateTime!
-}
-
 input WorkflowInput {
   id: String!
   steps: [ExecutionStepInput!]
@@ -435,16 +420,6 @@ input WorkflowInput {
   instruction: String
   folder: String
   archived: Boolean
-}
-
-input WorkflowScheduleInput {
-  id: ID
-  workflowId: ID
-  cronExpression: String
-  timezone: String
-  enabled: Boolean
-  payload: JSON
-  options: JSON
 }
 
 type Mutation {
@@ -496,9 +471,6 @@ type Mutation {
   upsertWorkflow(id: ID!, input: JSON!): Workflow!
   deleteWorkflow(id: ID!): Boolean!
   renameWorkflow(oldId: ID!, newId: ID!): Workflow!
-
-  upsertWorkflowSchedule(schedule: WorkflowScheduleInput!): WorkflowSchedule!
-  deleteWorkflowSchedule(id: ID!): Boolean!
 
   upsertApi(id: ID!, input: JSON!): ApiConfig!
   deleteApi(id: ID!): Boolean!
