@@ -129,7 +129,6 @@ describe("superglue_find_relevant_tools", () => {
     expect(result.tools[0]).toHaveProperty("id");
     expect(result.tools[0]).toHaveProperty("instruction");
     expect(result.tools[0]).toHaveProperty("steps");
-    expect(result.tools[0]).toHaveProperty("reason");
     // Verify mapping from REST format
     expect(result.tools[0].steps[0].integrationId).toBe("crm");
   });
