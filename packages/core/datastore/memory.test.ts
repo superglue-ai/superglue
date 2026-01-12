@@ -319,7 +319,7 @@ describe("MemoryStore", () => {
     const testWorkflowSchedule: ToolScheduleInternal = {
       id: "68d51b90-605d-4e85-8c9a-c82bad2c7337",
       orgId: testOrgId,
-      workflowId: testWorkflow.id,
+      toolId: testWorkflow.id,
       payload: null,
       options: null,
       lastRunAt: null,
@@ -333,9 +333,9 @@ describe("MemoryStore", () => {
 
     it("upserting should store new workflow schedule", async () => {
       await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
-      await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
-      const retrieved = await store.listWorkflowSchedules({
-        workflowId: testWorkflow.id,
+      await store.upsertToolSchedule({ schedule: testWorkflowSchedule });
+      const retrieved = await store.listToolSchedules({
+        toolId: testWorkflow.id,
         orgId: testOrgId,
       });
 
@@ -349,15 +349,15 @@ describe("MemoryStore", () => {
 
     it("upserting should update existing workflow schedule", async () => {
       await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
-      await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
+      await store.upsertToolSchedule({ schedule: testWorkflowSchedule });
       const updatedSchedule = {
         ...testWorkflowSchedule,
         cronExpression: "*/15 * * * * *",
       };
 
-      await store.upsertWorkflowSchedule({ schedule: updatedSchedule });
+      await store.upsertToolSchedule({ schedule: updatedSchedule });
 
-      const retrieved = await store.getWorkflowSchedule({
+      const retrieved = await store.getToolSchedule({
         id: testWorkflowSchedule.id,
         orgId: testOrgId,
       });
@@ -370,16 +370,16 @@ describe("MemoryStore", () => {
 
     it("should delete workflow schedules", async () => {
       await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
-      await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
+      await store.upsertToolSchedule({ schedule: testWorkflowSchedule });
 
-      const success = await store.deleteWorkflowSchedule({
+      const success = await store.deleteToolSchedule({
         id: testWorkflowSchedule.id,
         orgId: testOrgId,
       });
       expect(success).toBe(true);
 
-      const retrieved = await store.listWorkflowSchedules({
-        workflowId: testWorkflow.id,
+      const retrieved = await store.listToolSchedules({
+        toolId: testWorkflow.id,
         orgId: testOrgId,
       });
       expect(retrieved).toHaveLength(0);
@@ -393,22 +393,22 @@ describe("MemoryStore", () => {
         orgId: testOrgId2,
       });
 
-      await store.upsertWorkflowSchedule({
+      await store.upsertToolSchedule({
         schedule: {
           ...testWorkflowSchedule,
           orgId: testOrgId,
         },
       });
 
-      await store.upsertWorkflowSchedule({
+      await store.upsertToolSchedule({
         schedule: {
           ...testWorkflowSchedule,
           orgId: testOrgId2,
         },
       });
 
-      const workflowSchedulesFromFirstOrg = await store.listWorkflowSchedules({
-        workflowId: testWorkflow.id,
+      const workflowSchedulesFromFirstOrg = await store.listToolSchedules({
+        toolId: testWorkflow.id,
         orgId: testOrgId,
       });
       expect(workflowSchedulesFromFirstOrg).toHaveLength(1);
@@ -419,8 +419,8 @@ describe("MemoryStore", () => {
         createdAt: expect.any(Date),
       });
 
-      const workflowSchedulesFromSecondOrg = await store.listWorkflowSchedules({
-        workflowId: testWorkflow.id,
+      const workflowSchedulesFromSecondOrg = await store.listToolSchedules({
+        toolId: testWorkflow.id,
         orgId: testOrgId2,
       });
       expect(workflowSchedulesFromSecondOrg).toHaveLength(1);
@@ -432,12 +432,12 @@ describe("MemoryStore", () => {
       });
     });
 
-    it("should list all workflow schedules for org when workflowId is not provided", async () => {
+    it("should list all workflow schedules for org when toolId is not provided", async () => {
       const testWorkflow2 = { ...testWorkflow, id: "test-workflow-2" };
       const testSchedule2: ToolScheduleInternal = {
         ...testWorkflowSchedule,
         id: "schedule-2",
-        workflowId: testWorkflow2.id,
+        toolId: testWorkflow2.id,
       };
 
       await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow, orgId: testOrgId });
@@ -446,10 +446,10 @@ describe("MemoryStore", () => {
         workflow: testWorkflow2,
         orgId: testOrgId,
       });
-      await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
-      await store.upsertWorkflowSchedule({ schedule: testSchedule2 });
+      await store.upsertToolSchedule({ schedule: testWorkflowSchedule });
+      await store.upsertToolSchedule({ schedule: testSchedule2 });
 
-      const allSchedules = await store.listWorkflowSchedules({ orgId: testOrgId });
+      const allSchedules = await store.listToolSchedules({ orgId: testOrgId });
       expect(allSchedules).toHaveLength(2);
 
       const scheduleIds = allSchedules.map((s) => s.id);
@@ -465,10 +465,10 @@ describe("MemoryStore", () => {
       };
 
       await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
-      await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
-      await store.upsertWorkflowSchedule({ schedule: futureSchedule });
+      await store.upsertToolSchedule({ schedule: testWorkflowSchedule });
+      await store.upsertToolSchedule({ schedule: futureSchedule });
 
-      const retrieved = await store.listDueWorkflowSchedules();
+      const retrieved = await store.listDueToolSchedules();
 
       expect(retrieved).toHaveLength(1);
       expect(retrieved[0]).toMatchObject({
@@ -486,10 +486,10 @@ describe("MemoryStore", () => {
       };
 
       await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
-      await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
-      await store.upsertWorkflowSchedule({ schedule: disabledSchedule });
+      await store.upsertToolSchedule({ schedule: testWorkflowSchedule });
+      await store.upsertToolSchedule({ schedule: disabledSchedule });
 
-      const retrieved = await store.listDueWorkflowSchedules();
+      const retrieved = await store.listDueToolSchedules();
       expect(retrieved).toHaveLength(1);
       expect(retrieved[0]).toMatchObject({
         ...testWorkflowSchedule,
@@ -499,7 +499,7 @@ describe("MemoryStore", () => {
     });
 
     it("should return null for missing workflow schedule", async () => {
-      const retrieved = await store.getWorkflowSchedule({
+      const retrieved = await store.getToolSchedule({
         id: "550e8400-e29b-41d4-a716-446655440005",
       });
       expect(retrieved).toBeNull();
@@ -508,7 +508,7 @@ describe("MemoryStore", () => {
     it("should update workflow schedule next run", async () => {
       const newNextRunAt = new Date("2022-01-01T10:00:00.000Z");
       await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
-      await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
+      await store.upsertToolSchedule({ schedule: testWorkflowSchedule });
 
       const success = await store.updateScheduleNextRun({
         id: testWorkflowSchedule.id,
@@ -517,8 +517,8 @@ describe("MemoryStore", () => {
       });
       expect(success).toBe(true);
 
-      const retrieved = await store.listWorkflowSchedules({
-        workflowId: testWorkflow.id,
+      const retrieved = await store.listToolSchedules({
+        toolId: testWorkflow.id,
         orgId: testOrgId,
       });
       expect(retrieved[0].nextRunAt).toEqual(newNextRunAt);
@@ -578,7 +578,7 @@ describe("MemoryStore", () => {
       const testWorkflowSchedule: ToolScheduleInternal = {
         id: "test-schedule",
         orgId: testOrgId,
-        workflowId: testWorkflow.id,
+        toolId: testWorkflow.id,
         payload: null,
         options: null,
         lastRunAt: null,
@@ -594,7 +594,7 @@ describe("MemoryStore", () => {
       await store.createRun({ run: testRunResult });
       await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration });
       await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
-      await store.upsertWorkflowSchedule({ schedule: testWorkflowSchedule });
+      await store.upsertToolSchedule({ schedule: testWorkflowSchedule });
 
       await store.clearAll();
 
@@ -606,8 +606,8 @@ describe("MemoryStore", () => {
         includeDocs: true,
       });
       const { total: workflowTotal } = await store.listWorkflows({ limit: 10, offset: 0 });
-      const workflowSchedules = await store.listWorkflowSchedules({
-        workflowId: testWorkflow.id,
+      const workflowSchedules = await store.listToolSchedules({
+        toolId: testWorkflow.id,
         orgId: testOrgId,
       });
 
