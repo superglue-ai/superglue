@@ -185,7 +185,7 @@ export const toolDefinitions: Record<string, any> = {
             steps: (t.steps || []).map((s: any) => ({
               integrationId: s.systemId,
               stepId: s.id,
-            }))
+            })),
           })),
         };
       } catch (error: any) {
