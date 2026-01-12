@@ -18,8 +18,8 @@ import {
 import Editor from "@monaco-editor/react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { isArrowFunction, maskCredentials } from "@superglue/shared";
-import { AlertCircle, Eye, EyeOff, Loader2, Maximize2, Minimize2 } from "lucide-react";
-import { DownloadButton } from "@/src/components/ui/download-button";
+import { AlertCircle, Loader2, Maximize2, Minimize2 } from "lucide-react";
+import { DownloadButton } from "../shared/download-button";
 import type * as Monaco from "monaco-editor";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTemplatePreview } from "../hooks/use-template-preview";
@@ -162,7 +162,6 @@ export function TemplateEditPopover({
   const { theme, onMount } = useMonacoTheme();
 
   const [codeContent, setCodeContent] = useState(DEFAULT_CODE_TEMPLATE);
-  const [showCredentials, setShowCredentials] = useState(false);
   const [previewTab, setPreviewTab] = useState<"expression" | "currentItem">("currentItem");
   const [codeEditorHeight, setCodeEditorHeight] = useState(DEFAULT_CODE_HEIGHT_PX);
   const codeEditorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -219,14 +218,7 @@ export function TemplateEditPopover({
 
   const isLoading = isEvaluating || !hasResult;
   const previewDisplayRaw = isLoading ? "" : formatValueForDisplay(activePreviewValue);
-  const maskedPreview =
-    Object.keys(credentials).length > 0
-      ? maskCredentials(previewDisplayRaw, credentials)
-      : previewDisplayRaw;
-  const credentialsAreMasked = maskedPreview !== previewDisplayRaw;
-  const isDirectCredentialRef = Object.keys(credentials).includes(templateContent.trim());
-  const showRevealButton = credentialsAreMasked && isDirectCredentialRef;
-  const previewDisplay = showRevealButton && showCredentials ? previewDisplayRaw : maskedPreview;
+  const previewDisplay = maskCredentials(previewDisplayRaw, credentials);
 
   useEffect(() => {
     if (!open) return;
@@ -368,20 +360,11 @@ export function TemplateEditPopover({
               theme={theme}
             />
             <div className="absolute top-1 right-1 flex items-center gap-0.5 z-10">
-              {showRevealButton && (
-                <button
-                  onClick={() => setShowCredentials(!showCredentials)}
-                  className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
-                  title={showCredentials ? "Hide credentials" : "Show credentials"}
-                >
-                  {showCredentials ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                </button>
-              )}
               <CopyButton getData={() => previewDisplay} />
               <DownloadButton
                 data={activePreviewValue}
                 filename="template-result.json"
-                credentials={showCredentials && showRevealButton ? undefined : credentials}
+                credentials={credentials}
               />
             </div>
           </div>

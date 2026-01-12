@@ -141,6 +141,7 @@ function ToolPlaygroundInner({
     setTransformStatus,
     stepResultsMap,
     isExecutingTransform,
+    isFixingTransform,
   } = execution;
 
   const toolId = tool.id;
@@ -726,7 +727,13 @@ function ToolPlaygroundInner({
             : undefined
         }
         onSuccess={handleFixTransformSuccess}
-        onLoadingChange={(loading) => setTransformStatus(loading ? "fixing" : "idle")}
+        onLoadingChange={(loading) => {
+          if (loading) {
+            setTransformStatus("fixing");
+          } else if (isFixingTransform) {
+            setTransformStatus("idle");
+          }
+        }}
       />
     </div>
   );

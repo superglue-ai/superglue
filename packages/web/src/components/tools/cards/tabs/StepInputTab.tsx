@@ -9,7 +9,7 @@ import { useTemplatePreview } from "../../hooks/use-template-preview";
 import { useDataProcessor } from "../../hooks/use-data-processor";
 import { useToolConfig, useExecution } from "../../context";
 import { CopyButton } from "../../shared/CopyButton";
-import { DownloadButton } from "@/src/components/ui/download-button";
+import { DownloadButton } from "../../shared/download-button";
 import { Loader2 } from "lucide-react";
 
 const PLACEHOLDER_VALUE = "";

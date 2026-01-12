@@ -12,5 +12,5 @@
 export {
   checkGraphQLAccess,
   checkToolExecutionPermission,
-  filterToolsByPermission
+  filterToolsByPermission,
 } from "./scope-hooks.js";

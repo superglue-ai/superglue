@@ -145,8 +145,8 @@ export const MiniStepCard = React.memo(
       );
     }
     if (isTransform) {
-      const isRunning = isTesting || isRunningAll;
-      const statusInfo = isRunning ? RUNNING_STATUS : getStepStatusInfo("__final_transform__");
+      const baseStatusInfo = getStepStatusInfo("__final_transform__");
+      const statusInfo = isTesting ? RUNNING_STATUS : baseStatusInfo;
       return (
         <div
           className={cn(
