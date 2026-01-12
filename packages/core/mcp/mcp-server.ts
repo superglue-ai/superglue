@@ -165,23 +165,27 @@ export const toolDefinitions: Record<string, any> = {
     </important_notes>
     `,
     inputSchema: FindRelevantToolsInputSchema,
-    execute: async (args: any & { client: McpRestClient; orgId: string }, request) => {
+    execute: async (
+      args: any & { client: McpRestClient; orgId: string; authContext: McpAuthContext },
+      request,
+    ) => {
       try {
         // List all tools via REST API (no semantic search for restricted keys)
         const tools = await args.client.listTools();
         const activeTools = tools?.filter((t: any) => !t.archived);
+        const filteredTools = filterToolsByPermission(args.authContext, activeTools);
+
         return {
           success: true,
-          tools: activeTools?.map((t: any) => ({
+          tools: filteredTools.map((t: any) => ({
             id: t.id,
             instruction: t.instruction,
-            inputSchema: t.inputSchema,
+            inputSchema: t.inputSchema?.properties?.payload,
             responseSchema: t.outputSchema,
             steps: (t.steps || []).map((s: any) => ({
               integrationId: s.systemId,
               stepId: s.id,
-            })),
-            reason: "Listed from available tools",
+            }))
           })),
         };
       } catch (error: any) {
@@ -295,16 +299,6 @@ export const createMcpServer = async (apiKey: string) => {
         extra,
       );
 
-      // EE: Filter results to only show tools this API key can execute
-      if (result.success && result.tools) {
-        result.tools = filterToolsByPermission(authContext, result.tools);
-        result.tools = result.tools.map((t: any) => ({
-          id: t.id,
-          instruction: t.instruction,
-          inputSchema: t.inputSchema?.properties?.payload,
-          responseSchema: t.responseSchema,
-        }));
-      }
 
       logMessage("debug", "superglue_find_relevant_tools executed via MCP", {
         orgId: authContext.orgId,
