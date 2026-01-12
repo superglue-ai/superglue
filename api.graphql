@@ -251,6 +251,38 @@ enum RunStatus {
   ABORTED
 }
 
+enum FilterTarget {
+  KEYS
+  VALUES
+  BOTH
+}
+
+enum FilterAction {
+  REMOVE
+  MASK
+  FAIL
+}
+
+type ResponseFilter {
+  id: ID!
+  name: String
+  enabled: Boolean!
+  target: FilterTarget!
+  pattern: String!
+  action: FilterAction!
+  maskValue: String
+}
+
+input ResponseFilterInput {
+  id: ID!
+  name: String
+  enabled: Boolean!
+  target: FilterTarget!
+  pattern: String!
+  action: FilterAction!
+  maskValue: String
+}
+
 input ApiInputRequest @oneOf {
   endpoint: ApiInput
   id: ID
@@ -374,6 +406,7 @@ type Workflow implements BaseConfig {
   originalResponseSchema: JSONSchema
   folder: String
   archived: Boolean
+  responseFilters: [ResponseFilter!]
 }
 
 type WorkflowStepResult {
@@ -435,6 +468,7 @@ input WorkflowInput {
   instruction: String
   folder: String
   archived: Boolean
+  responseFilters: [ResponseFilterInput!]
 }
 
 input WorkflowScheduleInput {

@@ -3,25 +3,27 @@ import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
-import { DownloadButton } from "@superglue/web/src/components/tools/shared/download-button";
 import { isEmptyData } from "@/src/lib/general-utils";
+import { DownloadButton } from "@superglue/web/src/components/tools/shared/download-button";
 import {
   Code2,
   FileBracesCorner,
   FileInput,
   FilePlay,
+  Filter,
   Loader2,
   Play,
   Square,
   Wand2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { JavaScriptCodeEditor } from "../../editors/JavaScriptCodeEditor";
 import { JsonCodeEditor } from "../../editors/JsonCodeEditor";
-import { useToolConfig, useExecution } from "../context";
+import { useExecution, useToolConfig } from "../context";
 import { useDataProcessor } from "../hooks/use-data-processor";
 import { CopyButton } from "../shared/CopyButton";
+import { ResponseFiltersCard } from "./ResponseFiltersCard";
 
 interface FinalTransformMiniStepCardProps {
   onExecuteTransform?: (schema: string, transform: string) => void;
@@ -34,8 +36,15 @@ export const FinalTransformMiniStepCard = ({
   onOpenFixTransformDialog,
   onAbort,
 }: FinalTransformMiniStepCardProps) => {
-  const { finalTransform, responseSchema, setFinalTransform, setResponseSchema, steps } =
-    useToolConfig();
+  const {
+    finalTransform,
+    responseSchema,
+    setFinalTransform,
+    setResponseSchema,
+    responseFilters,
+    setResponseFilters,
+    steps,
+  } = useToolConfig();
   const {
     finalResult,
     finalError,
@@ -265,6 +274,12 @@ export const FinalTransformMiniStepCard = ({
               <FileBracesCorner className="h-4 w-4" /> Result Schema
             </TabsTrigger>
             <TabsTrigger
+              value="filters"
+              className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
+            >
+              <Filter className="h-4 w-4" /> Filters
+            </TabsTrigger>
+            <TabsTrigger
               value="output"
               className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
               style={
@@ -356,6 +371,13 @@ export const FinalTransformMiniStepCard = ({
                 showModeToggle={true}
               />
             </div>
+          </TabsContent>
+          <TabsContent value="filters" className="mt-2">
+            <ResponseFiltersCard
+              filters={responseFilters}
+              onChange={setResponseFilters}
+              disabled={isRunningTransform || isFixingTransform}
+            />
           </TabsContent>
           <TabsContent value="output" className="mt-2">
             <>

@@ -4,6 +4,7 @@ import {
   Integration,
   maskCredentials,
   RequestOptions,
+  ResponseFilter,
   ServiceMetadata,
   Tool,
   ToolResult,
@@ -27,6 +28,7 @@ import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { isSelfHealingEnabled, transformData } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
+import { applyResponseFilters, FilterMatchError } from "./response-filters.js";
 import { FTPStepExecutionStrategy } from "./strategies/ftp/ftp.js";
 import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
 import { PostgresStepExecutionStrategy } from "./strategies/postgres/postgres.js";
@@ -50,6 +52,7 @@ export class ToolExecutor implements Tool {
   public instruction?: string;
   public inputSchema?: JSONSchema;
   public integrationIds: string[];
+  public responseFilters?: ResponseFilter[];
   private integrations: Record<string, IntegrationManager>;
   private strategyRegistry: StepExecutionStrategyRegistry;
 
@@ -61,6 +64,7 @@ export class ToolExecutor implements Tool {
     this.instruction = tool.instruction;
     this.metadata = metadata;
     this.inputSchema = tool.inputSchema;
+    this.responseFilters = tool.responseFilters;
 
     this.integrations = integrations.reduce(
       (acc, int) => {
@@ -118,7 +122,7 @@ export class ToolExecutor implements Tool {
         }
       }
 
-      if (this.finalTransform || this.responseSchema) {
+      if (this.finalTransform || this.responseSchema || this.responseFilters?.length) {
         const finalAggregatedStepData = this.buildAggregatedStepData(payload);
 
         const finalTransformResult = await executeAndEvaluateFinalTransform({
@@ -134,7 +138,25 @@ export class ToolExecutor implements Tool {
           return this.completeWithFailure(finalTransformResult.error);
         }
 
-        this.result.data = finalTransformResult.transformedData || {};
+        let finalData = finalTransformResult.transformedData || {};
+
+        // Apply response filters after transform
+        if (this.responseFilters?.length) {
+          const filterResult = applyResponseFilters(finalData, this.responseFilters);
+          if (filterResult.failedFilters.length > 0) {
+            throw new FilterMatchError(filterResult.failedFilters);
+          }
+          finalData = filterResult.data;
+          if (filterResult.matches.length > 0) {
+            logMessage(
+              "info",
+              `Response filters applied: ${filterResult.matches.length} match(es)`,
+              this.metadata,
+            );
+          }
+        }
+
+        this.result.data = finalData;
         this.result.config = {
           id: this.id,
           integrationIds: this.integrationIds,
@@ -143,6 +165,7 @@ export class ToolExecutor implements Tool {
           inputSchema: this.inputSchema,
           responseSchema: this.responseSchema,
           instruction: this.instruction,
+          responseFilters: this.responseFilters,
         } as Tool;
       } else {
         // Always set config to propagate wrapped loopSelectors back to frontend
@@ -153,6 +176,7 @@ export class ToolExecutor implements Tool {
           inputSchema: this.inputSchema,
           responseSchema: this.responseSchema,
           instruction: this.instruction,
+          responseFilters: this.responseFilters,
         } as Tool;
       }
       return this.completeWithSuccess();

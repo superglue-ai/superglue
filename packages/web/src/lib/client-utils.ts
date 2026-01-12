@@ -1,6 +1,7 @@
 import {
   ExecutionStep,
   Integration,
+  ResponseFilter,
   SelfHealingMode,
   SuperglueClient,
   Tool,
@@ -223,7 +224,7 @@ export async function executeToolStepByStep(
     }
   }
 
-  if (tool.finalTransform && state.failedSteps.length === 0) {
+  if ((tool.finalTransform || tool.responseFilters?.length) && state.failedSteps.length === 0) {
     const finalResult = await executeFinalTransform(
       client,
       tool.id || "tool",
@@ -234,6 +235,7 @@ export async function executeToolStepByStep(
       previousResults,
       selfHealing,
       onStepRunIdChange,
+      tool.responseFilters,
     );
 
     state.stepResults["__final_transform__"] = {
@@ -275,6 +277,7 @@ export async function executeFinalTransform(
   previousResults: Record<string, any>,
   selfHealing: boolean = false,
   onRunIdGenerated?: (runId: string) => void,
+  responseFilters?: ResponseFilter[],
 ): Promise<FinalTransformExecutionResult> {
   const transformRunId = generateUUID();
 
@@ -294,6 +297,7 @@ export async function executeFinalTransform(
         finalTransform,
         responseSchema,
         inputSchema: inputSchema,
+        responseFilters,
       },
       payload: finalPayload,
       options: {

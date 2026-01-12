@@ -302,6 +302,7 @@ export const upsertWorkflowResolver = async (
       inputSchema: resolveField(input.inputSchema, oldWorkflow?.inputSchema),
       finalTransform: resolveField(input.finalTransform, oldWorkflow?.finalTransform, "$"),
       responseSchema: resolveField(input.responseSchema, oldWorkflow?.responseSchema),
+      responseFilters: resolveField(input.responseFilters, oldWorkflow?.responseFilters, []),
       instruction: resolveField(input.instruction, oldWorkflow?.instruction),
       folder: resolveField(input.folder, oldWorkflow?.folder),
       archived: resolveField(input.archived, oldWorkflow?.archived, false),
