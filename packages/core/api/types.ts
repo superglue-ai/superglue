@@ -70,6 +70,7 @@ export interface OpenAPITool {
   outputSchema?: Record<string, unknown>;
   steps: OpenAPIToolStep[];
   outputTransform?: string;
+  archived?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

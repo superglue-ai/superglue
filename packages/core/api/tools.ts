@@ -80,6 +80,7 @@ export function mapToolToOpenAPI(tool: Tool): OpenAPITool {
     outputSchema: tool.responseSchema as Record<string, unknown>,
     steps: tool.steps.map(mapStepToOpenAPI),
     outputTransform: tool.finalTransform,
+    archived: tool.archived ?? false,
     createdAt: tool.createdAt?.toISOString?.() || (tool.createdAt as unknown as string),
     updatedAt: tool.updatedAt?.toISOString?.() || (tool.updatedAt as unknown as string),
   };

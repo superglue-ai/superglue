@@ -169,16 +169,17 @@ export const toolDefinitions: Record<string, any> = {
       try {
         // List all tools via REST API (no semantic search for restricted keys)
         const tools = await args.client.listTools();
+        const activeTools = tools?.filter((t: any) => !t.archived);
         return {
           success: true,
-          tools: tools.map((t: any) => ({
+          tools: activeTools?.map((t: any) => ({
             id: t.id,
             instruction: t.instruction,
             inputSchema: t.inputSchema,
             responseSchema: t.outputSchema,
             steps: (t.steps || []).map((s: any) => ({
               integrationId: s.systemId,
-              instruction: s.instruction,
+              stepId: s.id,
             })),
             reason: "Listed from available tools",
           })),
@@ -301,7 +302,7 @@ export const createMcpServer = async (apiKey: string) => {
           id: t.id,
           instruction: t.instruction,
           inputSchema: t.inputSchema?.properties?.payload,
-          responseSchema: t.outputSchema,
+          responseSchema: t.responseSchema,
         }));
       }
 

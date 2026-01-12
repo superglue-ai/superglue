@@ -375,6 +375,10 @@ components:
             JavaScript function for final output transformation.
             Format: (sourceData) => expression
           example: "(sourceData) => sourceData.map(item => ({ id: item.id, title: item.name }))"
+        archived:
+          type: boolean
+          description: Whether this tool is archived (if so, it will not be listed in the UI and cannot be run)
+          default: false
         createdAt:
           type: string
           format: date-time
