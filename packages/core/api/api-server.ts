@@ -1,62 +1,35 @@
 import { ServiceMetadata } from "@superglue/shared";
-import Fastify from "fastify";
+import Fastify, { FastifyRequest } from "fastify";
 import { registerAllRoutes } from "../api/index.js";
 import { extractTokenFromFastifyRequest, validateToken } from "../auth/auth.js";
 import { DataStore } from "../datastore/types.js";
 import { logMessage } from "../utils/logs.js";
 import { generateTraceId } from "../utils/trace-id.js";
 import type { WorkerPools } from "../worker/types.js";
+import { getRoutePermission } from "./registry.js";
 import { AuthenticatedFastifyRequest } from "./types.js";
 
-// Routes allowed for restricted API keys (format: "METHOD:/path" without /v1 prefix)
-const RESTRICTED_KEY_ALLOWLIST = new Set([
-  "GET:/tools",
-  "GET:/tools/:toolId",
-  "POST:/tools/:toolId/run",
-  "GET:/runs",
-  "GET:/runs/:runId",
-  "POST:/runs/:runId/cancel",
-]);
-
-// Routes that require toolId permission check when restricted
-const TOOL_PERMISSION_ROUTES = new Set(["GET:/tools/:toolId", "POST:/tools/:toolId/run"]);
-
-// Convert actual URL to route pattern (e.g., /v1/tools/abc123 -> GET:/tools/:toolId)
-function getRoutePattern(method: string, url: string): string {
-  const path = url.replace(/^\/v1/, "").split("?")[0];
-
-  // Match known route patterns
-  if (/^\/tools\/[^/]+\/run$/.test(path)) return `${method}:/tools/:toolId/run`;
-  if (/^\/tools\/[^/]+\/schedules\/[^/]+$/.test(path))
-    return `${method}:/tools/:toolId/schedules/:scheduleId`;
-  if (/^\/tools\/[^/]+\/schedules$/.test(path)) return `${method}:/tools/:toolId/schedules`;
-  if (/^\/tools\/[^/]+$/.test(path)) return `${method}:/tools/:toolId`;
-  if (/^\/tools$/.test(path)) return `${method}:/tools`;
-  if (/^\/runs\/[^/]+\/cancel$/.test(path)) return `${method}:/runs/:runId/cancel`;
-  if (/^\/runs\/[^/]+$/.test(path)) return `${method}:/runs/:runId`;
-  if (/^\/runs$/.test(path)) return `${method}:/runs`;
-  if (/^\/schedules$/.test(path)) return `${method}:/schedules`;
-
-  return `${method}:${path}`;
-}
-
+// Check if restricted API key can access this route (uses route permissions from registry)
 function checkRestrictedAccess(
   authInfo: AuthenticatedFastifyRequest["authInfo"],
-  method: string,
-  url: string,
-  params: Record<string, string>,
+  request: FastifyRequest,
 ): { allowed: boolean; error?: string } {
   if (!authInfo.isRestricted) return { allowed: true };
 
-  const pattern = getRoutePattern(method, url);
+  // Use Fastify's routeOptions.url which gives us the matched route pattern (e.g., /v1/tools/:toolId)
+  const routePath = request.routeOptions?.url || request.url;
+  const permissions = getRoutePermission(request.method, routePath);
 
-  if (!RESTRICTED_KEY_ALLOWLIST.has(pattern)) {
+  // No permissions defined or not allowed for restricted keys
+  if (!permissions?.allowRestricted) {
     return { allowed: false, error: "This API key cannot access this endpoint" };
   }
 
-  // Check tool-level permissions for tool-specific routes
-  if (TOOL_PERMISSION_ROUTES.has(pattern) && params.toolId) {
-    if (!authInfo.allowedTools?.includes(params.toolId)) {
+  // Check resource-level permission (e.g., toolId must be in allowedTools)
+  if (permissions.checkResourceId) {
+    const params = request.params as Record<string, string>;
+    const resourceId = params[permissions.checkResourceId];
+    if (resourceId && !authInfo.allowedTools?.includes(resourceId)) {
       return { allowed: false, error: "This API key is not authorized for this tool" };
     }
   }
@@ -161,13 +134,8 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
       return { orgId: this.authInfo.orgId, traceId: this.traceId };
     };
 
-    // Check restricted API key access
-    const accessCheck = checkRestrictedAccess(
-      authenticatedRequest.authInfo,
-      request.method,
-      request.url,
-      request.params as Record<string, string>,
-    );
+    // Check restricted API key access (uses route permissions from registry)
+    const accessCheck = checkRestrictedAccess(authenticatedRequest.authInfo, request);
 
     if (!accessCheck.allowed) {
       const metadata: ServiceMetadata = { traceId, orgId: authResult.orgId };

@@ -26,10 +26,12 @@ export interface RouteHandler {
   (request: AuthenticatedFastifyRequest, reply: FastifyReply): Promise<any>;
 }
 
-// Future: scoped permissions by resource/type - currently used for documentation
+// Route-level permission configuration
 export interface RoutePermission {
   type: "read" | "write" | "execute" | "list" | "delete";
-  resource: string;
+  resource: "tool" | "run" | "schedule" | "integration";
+  allowRestricted?: boolean; // Can restricted API keys access this route? (default: false)
+  checkResourceId?: "toolId"; // Which param needs allowedTools validation?
 }
 
 export interface RouteConfig {

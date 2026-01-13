@@ -588,19 +588,19 @@ registerApiModule({
       method: "GET",
       path: "/tools",
       handler: listTools,
-      permissions: { type: "list", resource: "tool" },
+      permissions: { type: "list", resource: "tool", allowRestricted: true },
     },
     {
       method: "GET",
       path: "/tools/:toolId",
       handler: getTool,
-      permissions: { type: "read", resource: "tool" },
+      permissions: { type: "read", resource: "tool", allowRestricted: true, checkResourceId: "toolId" },
     },
     {
       method: "POST",
       path: "/tools/:toolId/run",
       handler: runTool,
-      permissions: { type: "execute", resource: "tool" },
+      permissions: { type: "execute", resource: "tool", allowRestricted: true, checkResourceId: "toolId" },
     },
   ],
 });
