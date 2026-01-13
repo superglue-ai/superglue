@@ -164,16 +164,19 @@ registerApiModule({
       method: "GET",
       path: "/runs/:runId",
       handler: getRun,
+      permissions: { type: "read", resource: "run" },
     },
     {
       method: "GET",
       path: "/runs",
       handler: listRuns,
+      permissions: { type: "list", resource: "run" },
     },
     {
       method: "POST",
       path: "/runs/:runId/cancel",
       handler: cancelRun,
+      permissions: { type: "write", resource: "run" },
     },
   ],
 });

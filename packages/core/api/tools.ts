@@ -5,7 +5,7 @@ import { isSelfHealingEnabled } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
 import { notifyWebhook } from "../utils/webhook.js";
 import type { ToolExecutionPayload } from "../worker/types.js";
-import { checkToolExecutionPermission, filterToolsByPermission } from "./ee/index.js";
+import { filterToolsByPermission } from "./ee/index.js";
 import { registerApiModule } from "./registry.js";
 import {
   addTraceHeader,
@@ -348,12 +348,6 @@ const getTool: RouteHandler = async (request, reply) => {
   const authReq = request as AuthenticatedFastifyRequest;
   const params = request.params as { toolId: string };
 
-  // Check permission before fetching
-  const permCheck = checkToolExecutionPermission(authReq.authInfo, params.toolId);
-  if (!permCheck.allowed) {
-    return sendError(reply, 403, permCheck.error || "Not authorized to access this tool");
-  }
-
   const tool = await authReq.datastore.getWorkflow({
     id: params.toolId,
     orgId: authReq.authInfo.orgId,
@@ -371,23 +365,6 @@ const runTool: RouteHandler = async (request, reply) => {
   const authReq = request as AuthenticatedFastifyRequest;
   const params = request.params as { toolId: string };
   const body = request.body as RunToolRequestBody;
-
-  // EE: Check if this API key is authorized to execute this tool
-  const permCheck = checkToolExecutionPermission(
-    { isRestricted: authReq.authInfo.isRestricted, allowedTools: authReq.authInfo.allowedTools },
-    params.toolId,
-  );
-  if (!permCheck.allowed) {
-    logMessage("warn", `API key not authorized to execute tool ${params.toolId}`, {
-      orgId: authReq.authInfo.orgId,
-      traceId: authReq.traceId,
-    });
-    return sendError(
-      reply,
-      403,
-      permCheck.error || "This API key is not authorized to execute this tool",
-    );
-  }
 
   const traceId = body.options?.traceId || authReq.traceId;
   const metadata = { orgId: authReq.authInfo.orgId, traceId };
@@ -611,16 +588,19 @@ registerApiModule({
       method: "GET",
       path: "/tools",
       handler: listTools,
+      permissions: { type: "list", resource: "tool" },
     },
     {
       method: "GET",
       path: "/tools/:toolId",
       handler: getTool,
+      permissions: { type: "read", resource: "tool" },
     },
     {
       method: "POST",
       path: "/tools/:toolId/run",
       handler: runTool,
+      permissions: { type: "execute", resource: "tool" },
     },
   ],
 });

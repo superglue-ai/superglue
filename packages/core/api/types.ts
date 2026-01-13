@@ -26,11 +26,18 @@ export interface RouteHandler {
   (request: AuthenticatedFastifyRequest, reply: FastifyReply): Promise<any>;
 }
 
+// Future: scoped permissions by resource/type - currently used for documentation
+export interface RoutePermission {
+  type: "read" | "write" | "execute" | "list" | "delete";
+  resource: string;
+}
+
 export interface RouteConfig {
   method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   path: string;
   handler: RouteHandler;
   schema?: any;
+  permissions?: RoutePermission;
 }
 
 export interface ApiModule {
