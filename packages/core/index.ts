@@ -1,7 +1,7 @@
 import { startApiServer } from "./api/api-server.js";
 import { createDataStore } from "./datastore/datastore.js";
 import { startGraphqlServer } from "./graphql/graphql-server.js";
-import { WorkflowSchedulerWorker } from "./scheduler/scheduler-worker.js";
+import { ToolSchedulerWorker } from "./scheduler/scheduler-worker.js";
 import { validateEnvironment } from "./shared/environment.js";
 import { initializeWorkerPools } from "./worker/worker-pool-registry.js";
 
@@ -16,8 +16,8 @@ async function startServer() {
   const workerPools = initializeWorkerPools(datastore);
 
   if (process.env.START_SCHEDULER_SERVER === "true") {
-    const workflowScheduler = new WorkflowSchedulerWorker(datastore, workerPools);
-    workflowScheduler.start();
+    const toolScheduler = new ToolSchedulerWorker(datastore, workerPools);
+    toolScheduler.start();
   }
 
   await Promise.all([

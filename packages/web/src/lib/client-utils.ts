@@ -485,9 +485,10 @@ export function generateUUID(): string {
   });
 }
 
-export function createSuperglueClient(endpoint: string): SuperglueClient {
+export function createSuperglueClient(endpoint: string, apiEndpoint?: string): SuperglueClient {
   return new SuperglueClient({
     endpoint,
     apiKey: tokenRegistry.getToken(),
+    apiEndpoint,
   });
 }

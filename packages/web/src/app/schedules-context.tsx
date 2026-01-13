@@ -29,8 +29,8 @@ export function SchedulesProvider({ children }: { children: ReactNode }) {
   const refreshSchedules = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const client = createSuperglueClient(config.superglueEndpoint);
-      const result = await client.listWorkflowSchedules();
+      const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
+      const result = await client.listToolSchedules();
       setSchedules(result);
 
       const toCache: CachedSchedules = {
@@ -45,11 +45,11 @@ export function SchedulesProvider({ children }: { children: ReactNode }) {
       setIsInitiallyLoading(false);
       setIsRefreshing(false);
     }
-  }, [config.superglueEndpoint]);
+  }, [config.superglueEndpoint, config.apiEndpoint]);
 
   const getSchedulesForTool = useCallback(
     (toolId: string): ToolSchedule[] => {
-      return schedules.filter((s) => s.workflowId === toolId);
+      return schedules.filter((s) => s.toolId === toolId);
     },
     [schedules],
   );

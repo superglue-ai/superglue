@@ -57,9 +57,10 @@ const ToolSchedulesList = ({
     const superglueClient = new SuperglueClient({
       endpoint: config.superglueEndpoint,
       apiKey: tokenRegistry.getToken(),
+      apiEndpoint: config.apiEndpoint,
     });
 
-    await superglueClient.deleteWorkflowSchedule(scheduleId);
+    await superglueClient.deleteToolSchedule(toolId, scheduleId);
     refreshSchedules();
   };
 
@@ -67,10 +68,10 @@ const ToolSchedulesList = ({
     const superglueClient = new SuperglueClient({
       endpoint: config.superglueEndpoint,
       apiKey: tokenRegistry.getToken(),
+      apiEndpoint: config.apiEndpoint,
     });
 
-    await superglueClient.upsertWorkflowSchedule({
-      id: scheduleId,
+    await superglueClient.updateToolSchedule(toolId, scheduleId, {
       enabled: newState,
     });
 
@@ -91,11 +92,12 @@ const ToolSchedulesList = ({
       const superglueClient = new SuperglueClient({
         endpoint: config.superglueEndpoint,
         apiKey: tokenRegistry.getToken(),
+        apiEndpoint: config.apiEndpoint,
       });
 
-      const tool = await superglueClient.getWorkflow(schedule.workflowId);
+      const tool = await superglueClient.getWorkflow(schedule.toolId);
       if (!tool) {
-        throw new Error("Workflow not found");
+        throw new Error("Tool not found");
       }
 
       const result = await superglueClient.executeWorkflow({
@@ -146,6 +148,7 @@ const ToolSchedulesList = ({
     const superglueClient = new SuperglueClient({
       endpoint: config.superglueEndpoint,
       apiKey: tokenRegistry.getToken(),
+      apiEndpoint: config.apiEndpoint,
     });
 
     const success = await abortExecution(superglueClient, runId);

@@ -91,15 +91,12 @@ export interface DataStore {
     orgId?: string;
   }): Promise<boolean>;
 
-  // Workflow Schedule
-  listWorkflowSchedules(params: {
-    workflowId?: string;
-    orgId: string;
-  }): Promise<ToolScheduleInternal[]>;
-  getWorkflowSchedule(params: { id: string; orgId?: string }): Promise<ToolScheduleInternal | null>;
-  upsertWorkflowSchedule(params: { schedule: ToolScheduleInternal });
-  deleteWorkflowSchedule(params: { id: string; orgId: string }): Promise<boolean>;
-  listDueWorkflowSchedules(): Promise<ToolScheduleInternal[]>;
+  // Tool Schedules
+  listToolSchedules(params: { toolId?: string; orgId: string }): Promise<ToolScheduleInternal[]>;
+  getToolSchedule(params: { id: string; orgId?: string }): Promise<ToolScheduleInternal | null>;
+  upsertToolSchedule(params: { schedule: ToolScheduleInternal }): Promise<void>;
+  deleteToolSchedule(params: { id: string; orgId: string }): Promise<boolean>;
+  listDueToolSchedules(): Promise<ToolScheduleInternal[]>;
   updateScheduleNextRun(params: { id: string; nextRunAt: Date; lastRunAt: Date }): Promise<boolean>;
 
   // DiscoveryRun Methods

@@ -19,7 +19,7 @@ export class FileStore implements DataStore {
   private storage: {
     apis: Map<string, ApiConfig>;
     workflows: Map<string, Tool>;
-    workflowSchedules: Map<string, ToolScheduleInternal>;
+    toolSchedules: Map<string, ToolScheduleInternal>;
     integrations: Map<string, Integration>;
     discoveryRuns: Map<string, DiscoveryRun>;
     fileReferences: Map<string, FileReference>;
@@ -38,7 +38,7 @@ export class FileStore implements DataStore {
     this.storage = {
       apis: new Map(),
       workflows: new Map(),
-      workflowSchedules: new Map(),
+      toolSchedules: new Map(),
       integrations: new Map(),
       discoveryRuns: new Map(),
       fileReferences: new Map(),
@@ -100,7 +100,14 @@ export class FileStore implements DataStore {
           ...this.storage,
           apis: new Map(Object.entries(parsed.apis || {})),
           workflows: new Map(Object.entries(parsed.workflows || {})),
-          workflowSchedules: new Map(Object.entries(parsed.workflowSchedules || {})),
+          toolSchedules: new Map(
+            Object.entries(parsed.toolSchedules || parsed.workflowSchedules || {}).map(
+              ([key, schedule]: [string, any]) => [
+                key,
+                { ...schedule, toolId: schedule.toolId ?? schedule.workflowId },
+              ],
+            ),
+          ),
           integrations: new Map(Object.entries(parsed.integrations || {})),
           discoveryRuns: new Map(Object.entries(parsed.discoveryRuns || {})),
           fileReferences: new Map(Object.entries(parsed.fileReferences || {})),
@@ -147,7 +154,7 @@ export class FileStore implements DataStore {
       const serialized = {
         apis: Object.fromEntries(this.storage.apis),
         workflows: Object.fromEntries(this.storage.workflows),
-        workflowSchedules: Object.fromEntries(this.storage.workflowSchedules),
+        toolSchedules: Object.fromEntries(this.storage.toolSchedules),
         integrations: Object.fromEntries(this.storage.integrations),
         discoveryRuns: Object.fromEntries(this.storage.discoveryRuns),
         fileReferences: Object.fromEntries(this.storage.fileReferences),
@@ -457,7 +464,7 @@ export class FileStore implements DataStore {
     await this.ensureInitialized();
     this.storage.apis.clear();
     this.storage.workflows.clear();
-    this.storage.workflowSchedules.clear();
+    this.storage.toolSchedules.clear();
     this.storage.integrations.clear();
     this.storage.discoveryRuns.clear();
     this.storage.fileReferences.clear();
@@ -570,15 +577,15 @@ export class FileStore implements DataStore {
     // Save new workflow
     this.storage.workflows.set(newKey, newWorkflow);
 
-    // Update all workflow schedules that reference this workflow
-    for (const [key, schedule] of this.storage.workflowSchedules.entries()) {
-      if (schedule.workflowId === oldId && schedule.orgId === (orgId || "")) {
+    // Update all tool schedules that reference this tool
+    for (const [key, schedule] of this.storage.toolSchedules.entries()) {
+      if (schedule.toolId === oldId && schedule.orgId === (orgId || "")) {
         const updatedSchedule = {
           ...schedule,
-          workflowId: newId,
+          toolId: newId,
           updatedAt: new Date(),
         };
-        this.storage.workflowSchedules.set(key, updatedSchedule);
+        this.storage.toolSchedules.set(key, updatedSchedule);
       }
     }
 
@@ -690,21 +697,21 @@ export class FileStore implements DataStore {
     return false;
   }
 
-  // Workflow Schedule Methods
-  async listWorkflowSchedules(params: {
-    workflowId?: string;
+  // Tool Schedule Methods
+  async listToolSchedules(params: {
+    toolId?: string;
     orgId: string;
   }): Promise<ToolScheduleInternal[]> {
     await this.ensureInitialized();
-    const { workflowId, orgId } = params;
-    const schedules = this.getOrgItems(this.storage.workflowSchedules, "workflow-schedule", orgId);
-    if (workflowId) {
-      return schedules.filter((schedule) => schedule.workflowId === workflowId);
+    const { toolId, orgId } = params;
+    const schedules = this.getOrgItems(this.storage.toolSchedules, "workflow-schedule", orgId);
+    if (toolId) {
+      return schedules.filter((schedule) => schedule.toolId === toolId);
     }
     return schedules;
   }
 
-  async getWorkflowSchedule(params: {
+  async getToolSchedule(params: {
     id: string;
     orgId?: string;
   }): Promise<ToolScheduleInternal | null> {
@@ -712,33 +719,33 @@ export class FileStore implements DataStore {
     const { id, orgId } = params;
     if (!id) return null;
     const key = this.getKey("workflow-schedule", id, orgId);
-    const schedule = this.storage.workflowSchedules.get(key);
+    const schedule = this.storage.toolSchedules.get(key);
     return schedule ? { ...schedule, id } : null;
   }
 
-  async upsertWorkflowSchedule(params: { schedule: ToolScheduleInternal }): Promise<void> {
+  async upsertToolSchedule(params: { schedule: ToolScheduleInternal }): Promise<void> {
     await this.ensureInitialized();
     const { schedule } = params;
     if (!schedule || !schedule.id) return;
     const key = this.getKey("workflow-schedule", schedule.id, schedule.orgId);
-    this.storage.workflowSchedules.set(key, schedule);
+    this.storage.toolSchedules.set(key, schedule);
     await this.persist();
   }
 
-  async deleteWorkflowSchedule(params: { id: string; orgId: string }): Promise<boolean> {
+  async deleteToolSchedule(params: { id: string; orgId: string }): Promise<boolean> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return false;
     const key = this.getKey("workflow-schedule", id, orgId);
-    const deleted = this.storage.workflowSchedules.delete(key);
+    const deleted = this.storage.toolSchedules.delete(key);
     await this.persist();
     return deleted;
   }
 
-  async listDueWorkflowSchedules(): Promise<ToolScheduleInternal[]> {
+  async listDueToolSchedules(): Promise<ToolScheduleInternal[]> {
     await this.ensureInitialized();
     const now = new Date();
-    return Array.from(this.storage.workflowSchedules.entries())
+    return Array.from(this.storage.toolSchedules.entries())
       .filter(([key]) => key.includes("workflow-schedule:"))
       .map(([key, value]) => ({ ...value, id: key.split(":").pop() }))
       .filter((schedule) => schedule.enabled && schedule.nextRunAt <= now);
@@ -754,7 +761,7 @@ export class FileStore implements DataStore {
     if (!id) return false;
 
     // Find the schedule by searching all orgs since we don't have orgId in params
-    for (const [key, schedule] of this.storage.workflowSchedules.entries()) {
+    for (const [key, schedule] of this.storage.toolSchedules.entries()) {
       if (schedule.id === id) {
         const updatedSchedule = {
           ...schedule,
@@ -762,7 +769,7 @@ export class FileStore implements DataStore {
           lastRunAt,
           updatedAt: new Date(),
         };
-        this.storage.workflowSchedules.set(key, updatedSchedule);
+        this.storage.toolSchedules.set(key, updatedSchedule);
         await this.persist();
         return true;
       }

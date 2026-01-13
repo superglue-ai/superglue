@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DataStore } from "../datastore/types.js";
 import { WorkerPools } from "../graphql/types.js";
-import { WorkflowSchedulerWorker } from "./scheduler-worker.js";
+import { ToolSchedulerWorker } from "./scheduler-worker.js";
 
 vi.mock("../graphql/resolvers/workflow.js", () => ({
   executeWorkflowResolver: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock("@superglue/shared", () => ({
 }));
 
 const mockDatastore = {
-  listDueWorkflowSchedules: vi.fn(),
+  listDueToolSchedules: vi.fn(),
   updateScheduleNextRun: vi.fn(),
 } as unknown as DataStore;
 
@@ -25,12 +25,12 @@ const mockWorkerPools = {
   },
 } as unknown as WorkerPools;
 
-describe("WorkflowScheduler", () => {
-  let scheduler: WorkflowSchedulerWorker;
+describe("ToolScheduler", () => {
+  let scheduler: ToolSchedulerWorker;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    scheduler = new WorkflowSchedulerWorker(mockDatastore, mockWorkerPools, 100);
+    scheduler = new ToolSchedulerWorker(mockDatastore, mockWorkerPools, 100);
   });
 
   it("should start and stop interval correctly", async () => {
@@ -38,39 +38,39 @@ describe("WorkflowScheduler", () => {
 
     const mockSchedule = {
       id: "schedule-1",
-      workflowId: "workflow-1",
+      toolId: "tool-1",
       orgId: "org-1",
       cronExpression: "0 0 * * *",
     };
 
-    mockDatastore.listDueWorkflowSchedules = vi.fn().mockResolvedValue([mockSchedule]);
+    mockDatastore.listDueToolSchedules = vi.fn().mockResolvedValue([mockSchedule]);
     mockDatastore.updateScheduleNextRun = vi.fn().mockResolvedValue(undefined);
 
     scheduler.start();
 
     await vi.advanceTimersByTimeAsync(250);
-    expect(mockDatastore.listDueWorkflowSchedules).toHaveBeenCalledTimes(2);
+    expect(mockDatastore.listDueToolSchedules).toHaveBeenCalledTimes(2);
 
     scheduler.stop();
     await vi.advanceTimersByTimeAsync(250);
 
-    expect(mockDatastore.listDueWorkflowSchedules).toHaveBeenCalledTimes(2);
+    expect(mockDatastore.listDueToolSchedules).toHaveBeenCalledTimes(2);
     vi.useRealTimers();
   });
 
-  it("should execute due workflows when started", async () => {
+  it("should execute due tools when started", async () => {
     vi.useFakeTimers();
 
     const mockSchedule = {
       id: "schedule-1",
-      workflowId: "workflow-1",
+      toolId: "tool-1",
       orgId: "org-1",
       cronExpression: "0 0 * * *",
       payload: { test: "data" },
       options: {},
     };
 
-    mockDatastore.listDueWorkflowSchedules = vi.fn().mockResolvedValue([mockSchedule]);
+    mockDatastore.listDueToolSchedules = vi.fn().mockResolvedValue([mockSchedule]);
     mockDatastore.updateScheduleNextRun = vi.fn().mockResolvedValue(undefined);
 
     const { executeWorkflowResolver } = await import("../graphql/resolvers/workflow.js");
@@ -78,7 +78,7 @@ describe("WorkflowScheduler", () => {
     scheduler.start();
     await vi.advanceTimersByTimeAsync(105);
 
-    expect(mockDatastore.listDueWorkflowSchedules).toHaveBeenCalledOnce();
+    expect(mockDatastore.listDueToolSchedules).toHaveBeenCalledOnce();
     expect(mockDatastore.updateScheduleNextRun).toHaveBeenCalledWith({
       id: "schedule-1",
       nextRunAt: MOCK_NEXT_RUN,
@@ -87,7 +87,7 @@ describe("WorkflowScheduler", () => {
     expect(executeWorkflowResolver).toHaveBeenCalledWith(
       {},
       {
-        input: { id: "workflow-1" },
+        input: { id: "tool-1" },
         payload: { test: "data" },
         credentials: {},
         options: { selfHealing: undefined },
@@ -111,12 +111,12 @@ describe("WorkflowScheduler", () => {
 
     const mockSchedule = {
       id: "schedule-1",
-      workflowId: "workflow-1",
+      toolId: "tool-1",
       orgId: "org-1",
       cronExpression: "0 0 * * *",
     };
 
-    mockDatastore.listDueWorkflowSchedules = vi.fn().mockResolvedValue([mockSchedule]);
+    mockDatastore.listDueToolSchedules = vi.fn().mockResolvedValue([mockSchedule]);
     const { executeWorkflowResolver } = await import("../graphql/resolvers/workflow.js");
     (executeWorkflowResolver as any).mockRejectedValue(new Error("Execution failed"));
 

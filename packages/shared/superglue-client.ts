@@ -87,20 +87,6 @@ export class SuperglueClient {
         archived
     `;
 
-  private static workflowScheduleQL = `
-      id
-      workflowId
-      cronExpression
-      timezone
-      enabled
-      payload
-      options
-      lastRunAt
-      nextRunAt
-      createdAt
-      updatedAt
-    `;
-
   private static configQL = `
     config {
       ... on ApiConfig {
@@ -181,8 +167,10 @@ export class SuperglueClient {
       throw new Error(errorMessage);
     }
 
-    const data = await response.json();
-    return data as T;
+    // Handle empty responses (e.g., 204 No Content)
+    const text = await response.text();
+    if (!text) return undefined as T;
+    return JSON.parse(text) as T;
   }
 
   private async request<T>(query: string, variables?: Record<string, any>): Promise<T> {
@@ -1102,42 +1090,74 @@ export class SuperglueClient {
     return response.listWorkflows;
   }
 
-  async listWorkflowSchedules(workflowId?: string): Promise<ToolSchedule[]> {
-    const query = `
-        query ListWorkflowSchedules ($workflowId: String) {
-          listWorkflowSchedules(workflowId: $workflowId) {
-            ${SuperglueClient.workflowScheduleQL}
-          }
-        }
-      `;
-    const response = await this.request<{ listWorkflowSchedules: ToolSchedule[] }>(query, {
-      workflowId,
-    });
-    return response.listWorkflowSchedules;
+  // REST API - Tool Schedules (nested under /tools/:toolId/schedules)
+  // JSON returns dates as strings, so we parse them to Date objects
+  private parseScheduleDates(s: any): ToolSchedule {
+    return {
+      ...s,
+      lastRunAt: s.lastRunAt ? new Date(s.lastRunAt) : undefined,
+      nextRunAt: new Date(s.nextRunAt),
+      createdAt: new Date(s.createdAt),
+      updatedAt: new Date(s.updatedAt),
+    };
   }
 
-  async upsertWorkflowSchedule(schedule: ToolScheduleInput): Promise<ToolSchedule> {
-    const mutation = `
-        mutation UpsertWorkflowSchedule($schedule: WorkflowScheduleInput!) {
-          upsertWorkflowSchedule(schedule: $schedule) {
-            ${SuperglueClient.workflowScheduleQL}
-          }
-        }
-      `;
-    const response = await this.request<{ upsertWorkflowSchedule: ToolSchedule }>(mutation, {
+  async listToolSchedules(toolId?: string): Promise<ToolSchedule[]> {
+    const path = toolId ? `/v1/tools/${encodeURIComponent(toolId)}/schedules` : "/v1/schedules";
+    const response = await this.restRequest<{ data: any[] }>("GET", path);
+    return response.data.map((s) => this.parseScheduleDates(s));
+  }
+
+  async getToolSchedule(toolId: string, scheduleId: string): Promise<ToolSchedule> {
+    const response = await this.restRequest<any>(
+      "GET",
+      `/v1/tools/${encodeURIComponent(toolId)}/schedules/${encodeURIComponent(scheduleId)}`,
+    );
+    return this.parseScheduleDates(response);
+  }
+
+  async createToolSchedule(
+    toolId: string,
+    schedule: {
+      cronExpression: string;
+      timezone: string;
+      enabled?: boolean;
+      payload?: Record<string, any>;
+      options?: Record<string, any>;
+    },
+  ): Promise<ToolSchedule> {
+    const response = await this.restRequest<any>(
+      "POST",
+      `/v1/tools/${encodeURIComponent(toolId)}/schedules`,
       schedule,
-    });
-    return response.upsertWorkflowSchedule;
+    );
+    return this.parseScheduleDates(response);
   }
 
-  async deleteWorkflowSchedule(id: string): Promise<boolean> {
-    const mutation = `
-        mutation DeleteWorkflowSchedule($id: ID!) {
-          deleteWorkflowSchedule(id: $id)
-        }
-      `;
-    const response = await this.request<{ deleteWorkflowSchedule: boolean }>(mutation, { id });
-    return response.deleteWorkflowSchedule;
+  async updateToolSchedule(
+    toolId: string,
+    scheduleId: string,
+    updates: {
+      cronExpression?: string;
+      timezone?: string;
+      enabled?: boolean;
+      payload?: Record<string, any>;
+      options?: Record<string, any>;
+    },
+  ): Promise<ToolSchedule> {
+    const response = await this.restRequest<any>(
+      "PUT",
+      `/v1/tools/${encodeURIComponent(toolId)}/schedules/${encodeURIComponent(scheduleId)}`,
+      updates,
+    );
+    return this.parseScheduleDates(response);
+  }
+
+  async deleteToolSchedule(toolId: string, scheduleId: string): Promise<void> {
+    await this.restRequest<void>(
+      "DELETE",
+      `/v1/tools/${encodeURIComponent(toolId)}/schedules/${encodeURIComponent(scheduleId)}`,
+    );
   }
 
   async upsertApi(id: string, input: Partial<ApiConfig>): Promise<ApiConfig> {

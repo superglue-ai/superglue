@@ -709,9 +709,9 @@ export class PostgresService implements DataStore {
     }
   }
 
-  // Workflow Schedule Methods
-  async listWorkflowSchedules(params: {
-    workflowId?: string;
+  // Tool Schedule Methods
+  async listToolSchedules(params: {
+    toolId?: string;
     orgId: string;
   }): Promise<ToolScheduleInternal[]> {
     const client = await this.pool.connect();
@@ -720,10 +720,10 @@ export class PostgresService implements DataStore {
       let query: string;
       let queryParams: string[];
 
-      if (params.workflowId) {
+      if (params.toolId) {
         query =
           "SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE workflow_id = $1 AND org_id = $2";
-        queryParams = [params.workflowId, params.orgId];
+        queryParams = [params.toolId, params.orgId];
       } else {
         query =
           "SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE org_id = $1";
@@ -731,13 +731,13 @@ export class PostgresService implements DataStore {
       }
 
       const queryResult = await client.query(query, queryParams);
-      return queryResult.rows.map(this.mapWorkflowSchedule);
+      return queryResult.rows.map(this.mapToolSchedule);
     } finally {
       client.release();
     }
   }
 
-  async getWorkflowSchedule({
+  async getToolSchedule({
     id,
     orgId,
   }: {
@@ -754,13 +754,13 @@ export class PostgresService implements DataStore {
         return null;
       }
 
-      return this.mapWorkflowSchedule(queryResult.rows[0]);
+      return this.mapToolSchedule(queryResult.rows[0]);
     } finally {
       client.release();
     }
   }
 
-  async upsertWorkflowSchedule({ schedule }: { schedule: ToolScheduleInternal }): Promise<void> {
+  async upsertToolSchedule({ schedule }: { schedule: ToolScheduleInternal }): Promise<void> {
     const client = await this.pool.connect();
     try {
       const query = `
@@ -781,7 +781,7 @@ export class PostgresService implements DataStore {
       await client.query(query, [
         schedule.id,
         schedule.orgId,
-        schedule.workflowId,
+        schedule.toolId,
         "workflow",
         schedule.cronExpression,
         schedule.timezone,
@@ -796,7 +796,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async deleteWorkflowSchedule({ id, orgId }: { id: string; orgId: string }): Promise<boolean> {
+  async deleteToolSchedule({ id, orgId }: { id: string; orgId: string }): Promise<boolean> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
@@ -809,7 +809,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async listDueWorkflowSchedules(): Promise<ToolScheduleInternal[]> {
+  async listDueToolSchedules(): Promise<ToolScheduleInternal[]> {
     const client = await this.pool.connect();
 
     // We check for schedules that are enabled and have a next run time that is in the past (all timestamps in the database are in UTC)
@@ -817,7 +817,7 @@ export class PostgresService implements DataStore {
       const query = `SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE enabled = true AND next_run_at <= CURRENT_TIMESTAMP at time zone 'utc'`;
       const queryResult = await client.query(query);
 
-      return queryResult.rows.map(this.mapWorkflowSchedule);
+      return queryResult.rows.map(this.mapToolSchedule);
     } finally {
       client.release();
     }
@@ -843,10 +843,10 @@ export class PostgresService implements DataStore {
     }
   }
 
-  private mapWorkflowSchedule(row: any): ToolScheduleInternal {
+  private mapToolSchedule(row: any): ToolScheduleInternal {
     return {
       id: row.id,
-      workflowId: row.workflow_id,
+      toolId: row.workflow_id,
       orgId: row.org_id,
       cronExpression: row.cron_expression,
       timezone: row.timezone,

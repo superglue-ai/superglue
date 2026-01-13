@@ -26,11 +26,6 @@ import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/s
 import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant.js";
 import { upsertApiResolver } from "./resolvers/upsert.js";
 import {
-  deleteWorkflowScheduleResolver,
-  listWorkflowSchedulesResolver,
-  upsertWorkflowScheduleResolver,
-} from "./resolvers/workflow-scheduler.js";
-import {
   abortToolExecutionResolver,
   buildWorkflowResolver,
   deleteWorkflowResolver,
@@ -59,7 +54,6 @@ export const resolvers = {
     searchIntegrationDocumentation: searchIntegrationDocumentationResolver,
     findRelevantIntegrations: findRelevantIntegrationsResolver,
     findRelevantTools: findRelevantToolsResolver,
-    listWorkflowSchedules: listWorkflowSchedulesResolver,
   },
   Mutation: {
     setTenantInfo: setTenantInfoResolver,
@@ -76,8 +70,6 @@ export const resolvers = {
     cacheOauthClientCredentials: cacheOauthClientCredentialsResolver,
     getOAuthClientCredentials: getOAuthClientCredentialsResolver,
     deleteIntegration: deleteIntegrationResolver,
-    upsertWorkflowSchedule: upsertWorkflowScheduleResolver,
-    deleteWorkflowSchedule: deleteWorkflowScheduleResolver,
     generateStepConfig: generateStepConfigResolver,
     generateTransform: generateTransformResolver,
     callEndpoint: callEndpointResolver,
