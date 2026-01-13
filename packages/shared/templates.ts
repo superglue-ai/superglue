@@ -1133,7 +1133,8 @@ export const integrations: Record<string, IntegrationConfig> = {
       authUrl: "https://auth.atlassian.com/authorize",
       tokenUrl: "https://auth.atlassian.com/oauth/token",
       scopes:
-        "read:jira-work write:jira-work read:jira-user write:jira-user read:jira-work-management write:jira-work-management read:servicedesk-request write:servicedesk-request manage:jira-project manage:jira-configuration manage:jira-data-provider",
+        "read:jira-work write:jira-work read:jira-user write:jira-user read:jira-work-management write:jira-work-management read:servicedesk-request write:servicedesk-request manage:jira-project manage:jira-configuration manage:jira-data-provider offline_access",
+      client_id: "Az7iTb4uWYSv5N4p295PulP8oO2B3PjK",
     },
     keywords: [
       "issues",
@@ -1168,7 +1169,8 @@ export const integrations: Record<string, IntegrationConfig> = {
       authUrl: "https://auth.atlassian.com/authorize",
       tokenUrl: "https://auth.atlassian.com/oauth/token",
       scopes:
-        "read:confluence-content.all write:confluence-content read:confluence-space.summary write:confluence-space read:confluence-props write:confluence-props read:confluence-user write:confluence-user read:confluence-groups write:confluence-groups delete:confluence-content delete:confluence-space",
+        "read:confluence-content.all write:confluence-content read:confluence-space.summary write:confluence-space read:confluence-props write:confluence-props read:confluence-user write:confluence-user read:confluence-groups write:confluence-groups delete:confluence-content delete:confluence-space offline_access",
+      client_id: "Az7iTb4uWYSv5N4p295PulP8oO2B3PjK",
     },
     keywords: [
       "spaces",
