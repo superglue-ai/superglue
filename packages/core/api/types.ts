@@ -28,7 +28,7 @@ export interface RouteHandler {
 
 // Route-level permission configuration
 export interface RoutePermission {
-  type: "read" | "write" | "execute" | "list" | "delete";
+  type: "read" | "write" | "execute" | "delete";
   resource: string;
   allowRestricted?: boolean; // Can restricted API keys access this route? (default: false)
   checkResourceId?: "toolId"; // Which param needs allowedTools validation?

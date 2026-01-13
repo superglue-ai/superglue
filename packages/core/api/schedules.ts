@@ -257,7 +257,7 @@ registerApiModule({
       method: "GET",
       path: "/tools/:toolId/schedules",
       handler: listSchedulesForTool,
-      permissions: { type: "list", resource: "schedule" },
+      permissions: { type: "read", resource: "schedule" },
     },
     {
       method: "GET",
@@ -288,7 +288,7 @@ registerApiModule({
       method: "GET",
       path: "/schedules",
       handler: listAllSchedules,
-      permissions: { type: "list", resource: "schedule" },
+      permissions: { type: "read", resource: "schedule" },
     },
   ],
 });

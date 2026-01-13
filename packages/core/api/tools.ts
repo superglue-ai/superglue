@@ -588,7 +588,7 @@ registerApiModule({
       method: "GET",
       path: "/tools",
       handler: listTools,
-      permissions: { type: "list", resource: "tool", allowRestricted: true },
+      permissions: { type: "read", resource: "tool", allowRestricted: true },
     },
     {
       method: "GET",

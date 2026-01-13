@@ -170,7 +170,7 @@ registerApiModule({
       method: "GET",
       path: "/runs",
       handler: listRuns,
-      permissions: { type: "list", resource: "run", allowRestricted: true },
+      permissions: { type: "read", resource: "run", allowRestricted: true },
     },
     {
       method: "POST",
