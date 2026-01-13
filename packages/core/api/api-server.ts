@@ -17,7 +17,12 @@ function checkRestrictedAccess(
   if (!authInfo.isRestricted) return { allowed: true };
 
   // Use Fastify's routeOptions.url which gives us the matched route pattern (e.g., /v1/tools/:toolId)
-  const routePath = request.routeOptions?.url || request.url;
+  const routePath = request.routeOptions?.url;
+  if (!routePath) {
+    logMessage("warn", `routeOptions.url is undefined for ${request.method} ${request.url}`);
+    return { allowed: false, error: "This API key cannot access this endpoint" };
+  }
+
   const permissions = getRoutePermission(request.method, routePath);
 
   // No permissions defined or not allowed for restricted keys
