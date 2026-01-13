@@ -257,32 +257,38 @@ registerApiModule({
       method: "GET",
       path: "/tools/:toolId/schedules",
       handler: listSchedulesForTool,
+      permissions: { type: "read", resource: "schedule" },
     },
     {
       method: "GET",
       path: "/tools/:toolId/schedules/:scheduleId",
       handler: getSchedule,
+      permissions: { type: "read", resource: "schedule" },
     },
     {
       method: "POST",
       path: "/tools/:toolId/schedules",
       handler: createSchedule,
+      permissions: { type: "write", resource: "schedule" },
     },
     {
       method: "PUT",
       path: "/tools/:toolId/schedules/:scheduleId",
       handler: updateSchedule,
+      permissions: { type: "write", resource: "schedule" },
     },
     {
       method: "DELETE",
       path: "/tools/:toolId/schedules/:scheduleId",
       handler: deleteSchedule,
+      permissions: { type: "delete", resource: "schedule" },
     },
     // Convenience endpoint for listing all schedules
     {
       method: "GET",
       path: "/schedules",
       handler: listAllSchedules,
+      permissions: { type: "read", resource: "schedule" },
     },
   ],
 });

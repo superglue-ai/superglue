@@ -1,12 +1,46 @@
 import { ServiceMetadata } from "@superglue/shared";
-import Fastify from "fastify";
+import Fastify, { FastifyRequest } from "fastify";
 import { registerAllRoutes } from "../api/index.js";
 import { extractTokenFromFastifyRequest, validateToken } from "../auth/auth.js";
 import { DataStore } from "../datastore/types.js";
 import { logMessage } from "../utils/logs.js";
 import { generateTraceId } from "../utils/trace-id.js";
 import type { WorkerPools } from "../worker/types.js";
+import { getRoutePermission } from "./registry.js";
 import { AuthenticatedFastifyRequest } from "./types.js";
+
+// Check if restricted API key can access this route (uses route permissions from registry)
+function checkRestrictedAccess(
+  authInfo: AuthenticatedFastifyRequest["authInfo"],
+  request: FastifyRequest,
+): { allowed: boolean; error?: string } {
+  if (!authInfo.isRestricted) return { allowed: true };
+
+  // Use Fastify's routeOptions.url which gives us the matched route pattern (e.g., /v1/tools/:toolId)
+  const routePath = request.routeOptions?.url;
+  if (!routePath) {
+    logMessage("warn", `routeOptions.url is undefined for ${request.method} ${request.url}`);
+    return { allowed: false, error: "This API key cannot access this endpoint" };
+  }
+
+  const permissions = getRoutePermission(request.method, routePath);
+
+  // No permissions defined or not allowed for restricted keys
+  if (!permissions?.allowRestricted) {
+    return { allowed: false, error: "This API key cannot access this endpoint" };
+  }
+
+  // Check resource-level permission (e.g., toolId must be in allowedTools)
+  if (permissions.checkResourceId) {
+    const params = request.params as Record<string, string>;
+    const resourceId = params[permissions.checkResourceId];
+    if (resourceId && !authInfo.allowedTools?.includes(resourceId)) {
+      return { allowed: false, error: "This API key is not authorized for this tool" };
+    }
+  }
+
+  return { allowed: true };
+}
 
 export async function startApiServer(datastore: DataStore, workerPools: WorkerPools) {
   // Get REST API port
@@ -104,6 +138,22 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
     authenticatedRequest.toMetadata = function () {
       return { orgId: this.authInfo.orgId, traceId: this.traceId };
     };
+
+    // Check restricted API key access (uses route permissions from registry)
+    const accessCheck = checkRestrictedAccess(authenticatedRequest.authInfo, request);
+
+    if (!accessCheck.allowed) {
+      const metadata: ServiceMetadata = { traceId, orgId: authResult.orgId };
+      logMessage(
+        "warn",
+        `(REST API) ${request.method} ${request.url} - Access denied: ${accessCheck.error}`,
+        metadata,
+      );
+      return reply.code(403).send({
+        success: false,
+        error: accessCheck.error,
+      });
+    }
 
     // Single log per request with method, endpoint, using ServiceMetadata
     const metadata = authenticatedRequest.toMetadata();
