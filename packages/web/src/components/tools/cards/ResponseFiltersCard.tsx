@@ -23,7 +23,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 interface ResponseFiltersCardProps {
   filters: ResponseFilter[];
@@ -120,35 +120,39 @@ function detectMatchMode(pattern: string): { mode: MatchMode; simpleValue: strin
   return { mode: "regex", simpleValue: pattern };
 }
 
-// Helper to find if a pattern matches a preset
 function findPresetByPattern(pattern: string): (typeof PRESETS)[0] | undefined {
   return PRESETS.find((p) => p.pattern === pattern);
 }
 
 export function ResponseFiltersCard({ filters, onChange, disabled }: ResponseFiltersCardProps) {
-  const [filterUIStates, setFilterUIStates] = useState<Record<string, FilterUIState>>(() => {
+  const [presetOverrides, setPresetOverrides] = useState<Record<string, boolean>>({});
+
+  const getUIState = useCallback(
+    (filter: ResponseFilter): FilterUIState => {
+      const preset = findPresetByPattern(filter.pattern);
+      const isPresetCustomized = presetOverrides[filter.id] === true;
+
+      if (preset && !isPresetCustomized) {
+        return { matchMode: "regex", simpleValue: preset.pattern, presetId: preset.id };
+      }
+
+      const detected = detectMatchMode(filter.pattern);
+      return { matchMode: detected.mode, simpleValue: detected.simpleValue };
+    },
+    [presetOverrides],
+  );
+
+  // Memoize all UI states for stable references
+  const filterUIStates = useMemo(() => {
     const states: Record<string, FilterUIState> = {};
     for (const f of filters) {
-      const preset = findPresetByPattern(f.pattern);
-      if (preset) {
-        states[f.id] = { matchMode: "regex", simpleValue: preset.pattern, presetId: preset.id };
-      } else {
-        const detected = detectMatchMode(f.pattern);
-        states[f.id] = { matchMode: detected.mode, simpleValue: detected.simpleValue };
-      }
+      states[f.id] = getUIState(f);
     }
     return states;
-  });
+  }, [filters, getUIState]);
 
-  const getUIState = (filterId: string): FilterUIState => {
-    return filterUIStates[filterId] || { matchMode: "contains", simpleValue: "" };
-  };
-
-  const setUIState = (filterId: string, state: Partial<FilterUIState>) => {
-    setFilterUIStates((prev) => ({
-      ...prev,
-      [filterId]: { ...getUIState(filterId), ...state },
-    }));
+  const clearPresetMode = (filterId: string) => {
+    setPresetOverrides((prev) => ({ ...prev, [filterId]: true }));
   };
 
   const addPresetFilter = useCallback(
@@ -163,10 +167,6 @@ export function ResponseFiltersCard({ filters, onChange, disabled }: ResponseFil
         maskValue: "",
       };
       onChange([...filters, newFilter]);
-      setFilterUIStates((prev) => ({
-        ...prev,
-        [newFilter.id]: { matchMode: "regex", simpleValue: preset.pattern, presetId: preset.id },
-      }));
     },
     [filters, onChange],
   );
@@ -182,10 +182,6 @@ export function ResponseFiltersCard({ filters, onChange, disabled }: ResponseFil
       maskValue: "",
     };
     onChange([...filters, newFilter]);
-    setFilterUIStates((prev) => ({
-      ...prev,
-      [newFilter.id]: { matchMode: "contains", simpleValue: "" },
-    }));
   }, [filters, onChange]);
 
   const updateFilter = useCallback(
@@ -198,7 +194,8 @@ export function ResponseFiltersCard({ filters, onChange, disabled }: ResponseFil
   const removeFilter = useCallback(
     (id: string) => {
       onChange(filters.filter((f) => f.id !== id));
-      setFilterUIStates((prev) => {
+      setPresetOverrides((prev) => {
+        if (!(id in prev)) return prev;
         const next = { ...prev };
         delete next[id];
         return next;
@@ -208,16 +205,14 @@ export function ResponseFiltersCard({ filters, onChange, disabled }: ResponseFil
   );
 
   const handleMatchModeChange = (filterId: string, mode: MatchMode) => {
-    const uiState = getUIState(filterId);
-    setUIState(filterId, { matchMode: mode });
-    const newPattern = toRegexPattern(uiState.simpleValue, mode);
+    const uiState = filterUIStates[filterId];
+    const newPattern = toRegexPattern(uiState?.simpleValue || "", mode);
     updateFilter(filterId, { pattern: newPattern });
   };
 
   const handleSimpleValueChange = (filterId: string, value: string) => {
-    const uiState = getUIState(filterId);
-    setUIState(filterId, { simpleValue: value });
-    const newPattern = toRegexPattern(value, uiState.matchMode);
+    const uiState = filterUIStates[filterId];
+    const newPattern = toRegexPattern(value, uiState?.matchMode || "contains");
     updateFilter(filterId, { pattern: newPattern });
   };
 
@@ -270,7 +265,7 @@ export function ResponseFiltersCard({ filters, onChange, disabled }: ResponseFil
       ) : (
         <div className="space-y-2">
           {filters.map((filter) => {
-            const uiState = getUIState(filter.id);
+            const uiState = filterUIStates[filter.id];
             return (
               <div
                 key={filter.id}
@@ -335,9 +330,7 @@ export function ResponseFiltersCard({ filters, onChange, disabled }: ResponseFil
                         return (
                           <button
                             type="button"
-                            onClick={() =>
-                              !disabled && setUIState(filter.id, { presetId: undefined })
-                            }
+                            onClick={() => !disabled && clearPresetMode(filter.id)}
                             disabled={disabled}
                             className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary font-medium hover:bg-primary/20 transition-colors"
                             title="Click to customize"

@@ -139,6 +139,7 @@ function processObject(
 
     // Check value filters (only for string values)
     let currentValue = typeof value === "string" ? value : null;
+    let valueWasMasked = false;
     if (currentValue && !shouldRemove) {
       for (const filter of filters) {
         if (filter.target === FilterTarget.VALUES || filter.target === FilterTarget.BOTH) {
@@ -161,11 +162,13 @@ function processObject(
               const replacement = filter.maskValue || "[filtered]";
               currentValue = replacePattern(currentValue, filter.pattern, replacement);
               shouldMask = true;
+              valueWasMasked = true;
             }
           }
         }
       }
-      if (shouldMask) {
+      // Only use modified value if VALUE filtering changed it (not if only KEY filtering matched)
+      if (valueWasMasked) {
         maskValue = currentValue;
       }
     }
@@ -201,7 +204,8 @@ function replacePattern(value: string, pattern: string, replacement: string): st
     const regex = new RegExp(pattern, "gi"); // Case insensitive, global replace
     return value.replace(regex, replacement);
   } catch {
-    // Invalid regex - treat as literal replacement
-    return value.split(pattern).join(replacement);
+    // Invalid regex - treat as literal replacement (case-insensitive to match matchesPattern behavior)
+    const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return value.replace(new RegExp(escapedPattern, "gi"), replacement);
   }
 }
