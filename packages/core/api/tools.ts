@@ -594,13 +594,23 @@ registerApiModule({
       method: "GET",
       path: "/tools/:toolId",
       handler: getTool,
-      permissions: { type: "read", resource: "tool", allowRestricted: true, checkResourceId: "toolId" },
+      permissions: {
+        type: "read",
+        resource: "tool",
+        allowRestricted: true,
+        checkResourceId: "toolId",
+      },
     },
     {
       method: "POST",
       path: "/tools/:toolId/run",
       handler: runTool,
-      permissions: { type: "execute", resource: "tool", allowRestricted: true, checkResourceId: "toolId" },
+      permissions: {
+        type: "execute",
+        resource: "tool",
+        allowRestricted: true,
+        checkResourceId: "toolId",
+      },
     },
   ],
 });
