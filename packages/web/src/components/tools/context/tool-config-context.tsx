@@ -1,10 +1,10 @@
 "use client";
 
-import { createContext, useContext, useCallback, useMemo, useState, ReactNode } from "react";
-import { ExecutionStep, Integration, Tool } from "@superglue/shared";
-import { computeToolPayload } from "@/src/lib/general-utils";
 import { UploadedFileInfo } from "@/src/lib/file-utils";
-import { ToolConfigContextValue, ToolDefinition, PayloadState } from "./types";
+import { computeToolPayload } from "@/src/lib/general-utils";
+import { ExecutionStep, Integration, ResponseFilter, Tool } from "@superglue/shared";
+import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from "react";
+import { PayloadState, ToolConfigContextValue, ToolDefinition } from "./types";
 
 interface ToolConfigProviderProps {
   initialTool?: Tool;
@@ -54,6 +54,9 @@ export function ToolConfigProvider({
   );
   const [folder, setFolder] = useState<string | undefined>(initialTool?.folder);
   const [isArchived, setIsArchived] = useState(initialTool?.archived || false);
+  const [responseFilters, setResponseFilters] = useState<ResponseFilter[]>(
+    initialTool?.responseFilters || [],
+  );
 
   const [manualPayloadText, setManualPayloadText] = useState(initialPayload);
   const [localUploadedFiles, setLocalUploadedFiles] = useState<UploadedFileInfo[]>([]);
@@ -112,8 +115,18 @@ export function ToolConfigProvider({
       responseSchema: parsedResponseSchema,
       folder,
       isArchived,
+      responseFilters,
     };
-  }, [toolId, instruction, finalTransform, inputSchema, responseSchema, folder, isArchived]);
+  }, [
+    toolId,
+    instruction,
+    finalTransform,
+    inputSchema,
+    responseSchema,
+    folder,
+    isArchived,
+    responseFilters,
+  ]);
 
   const payload = useMemo<PayloadState>(
     () => ({
@@ -178,6 +191,7 @@ export function ToolConfigProvider({
       inputSchema,
       responseSchema,
       finalTransform,
+      responseFilters,
 
       setToolId,
       setInstruction,
@@ -186,6 +200,7 @@ export function ToolConfigProvider({
       setResponseSchema,
       setFolder,
       setIsArchived,
+      setResponseFilters,
 
       setPayloadText: setManualPayloadText,
       setUploadedFiles,
@@ -209,6 +224,7 @@ export function ToolConfigProvider({
       inputSchema,
       responseSchema,
       finalTransform,
+      responseFilters,
       addStep,
       removeStep,
       updateStep,

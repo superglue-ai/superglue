@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from "react";
 import { useConfig } from "@/src/app/config-context";
 import { useToast } from "@/src/hooks/use-toast";
 import { createSuperglueClient } from "@/src/lib/client-utils";
 import { ExecutionStep, Tool } from "@superglue/shared";
-import { useToolConfig, useExecution } from "../context";
+import { useEffect, useState } from "react";
+import { useExecution, useToolConfig } from "../context";
 
 interface UseToolDataOptions {
   id?: string;
@@ -22,6 +22,7 @@ export function useToolData(options: UseToolDataOptions) {
     tool,
     steps,
     payload,
+    responseFilters,
     setToolId,
     setSteps,
     setFinalTransform,
@@ -31,6 +32,7 @@ export function useToolData(options: UseToolDataOptions) {
     setPayloadText,
     setFolder,
     setIsArchived,
+    setResponseFilters,
   } = useToolConfig();
 
   const { clearAllExecutions } = useExecution();
@@ -83,6 +85,7 @@ export function useToolData(options: UseToolDataOptions) {
       setInputSchema(
         loadedTool.inputSchema ? JSON.stringify(loadedTool.inputSchema, null, 2) : null,
       );
+      setResponseFilters(loadedTool.responseFilters || []);
     } catch (error: any) {
       console.error("Error loading tool:", error);
       toast({
@@ -122,6 +125,7 @@ export function useToolData(options: UseToolDataOptions) {
         initialTool.inputSchema ? JSON.stringify(initialTool.inputSchema, null, 2) : null,
       );
       setInstruction(initialInstruction || initialTool.instruction || "");
+      setResponseFilters(initialTool.responseFilters || []);
       setLastToolId(initialTool.id);
     }
   }, [
@@ -136,6 +140,7 @@ export function useToolData(options: UseToolDataOptions) {
     setInstruction,
     setFolder,
     setIsArchived,
+    setResponseFilters,
   ]);
 
   useEffect(() => {
@@ -154,6 +159,7 @@ export function useToolData(options: UseToolDataOptions) {
 }`);
       setResponseSchema("");
       setInputSchema(null);
+      setResponseFilters([]);
       setPayloadText("{}");
       clearAllExecutions();
     }
@@ -195,6 +201,7 @@ export function useToolData(options: UseToolDataOptions) {
         finalTransform,
         instruction: instructions,
         folder: folder ?? null,
+        responseFilters: responseFilters.length > 0 ? responseFilters : undefined,
       } as any;
 
       if (embedded && onSave) {

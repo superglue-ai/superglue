@@ -1,5 +1,5 @@
 import { UploadedFileInfo } from "@/src/lib/file-utils";
-import { ExecutionStep, Integration } from "@superglue/shared";
+import { ExecutionStep, Integration, ResponseFilter } from "@superglue/shared";
 
 export interface PayloadState {
   manualPayloadText: string;
@@ -17,6 +17,7 @@ export interface ToolDefinition {
   responseSchema: any | null;
   folder?: string;
   isArchived: boolean;
+  responseFilters: ResponseFilter[];
 }
 
 export interface ToolConfigContextValue {
@@ -28,6 +29,7 @@ export interface ToolConfigContextValue {
   inputSchema: string | null;
   responseSchema: string;
   finalTransform: string;
+  responseFilters: ResponseFilter[];
 
   setToolId: (id: string) => void;
   setInstruction: (instruction: string) => void;
@@ -36,6 +38,7 @@ export interface ToolConfigContextValue {
   setResponseSchema: (schema: string) => void;
   setFolder: (folder: string | undefined) => void;
   setIsArchived: (archived: boolean) => void;
+  setResponseFilters: (filters: ResponseFilter[]) => void;
 
   setPayloadText: (text: string) => void;
   setUploadedFiles: (files: UploadedFileInfo[]) => void;

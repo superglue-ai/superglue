@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import { useConfig } from "@/src/app/config-context";
 import { useToast } from "@/src/hooks/use-toast";
 import {
@@ -16,7 +15,8 @@ import {
   isAbortError,
   wrapLoopSelectorWithLimit,
 } from "@/src/lib/general-utils";
-import { ExecutionStep, Tool, ToolResult } from "@superglue/shared";
+import { Tool, ToolResult } from "@superglue/shared";
+import { useRef } from "react";
 import { useExecution, useToolConfig } from "../context";
 import type { StepStatus, TransformStatus } from "../context/types";
 
@@ -47,7 +47,7 @@ export function useToolExecution(
 
   const config = useConfig();
   const { toast } = useToast();
-  const { tool, steps, payload, setSteps, setFinalTransform } = useToolConfig();
+  const { tool, steps, payload, setSteps, setFinalTransform, responseFilters } = useToolConfig();
   const toolId = tool.id;
   const finalTransform = tool.finalTransform || "";
   const responseSchema = tool.responseSchema ? JSON.stringify(tool.responseSchema) : "";
@@ -232,6 +232,7 @@ export function useToolExecution(
         (transformRunId) => {
           currentRunIdRef.current = transformRunId;
         },
+        responseFilters,
       );
 
       if (result.success) {
@@ -288,6 +289,7 @@ export function useToolExecution(
         finalTransform,
         responseSchema: currentResponseSchema,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
+        responseFilters,
       } as any;
 
       const originalStepsJson = JSON.stringify(executionSteps);

@@ -85,6 +85,15 @@ export class SuperglueClient {
         instruction
         folder
         archived
+        responseFilters {
+          id
+          name
+          enabled
+          target
+          pattern
+          action
+          maskValue
+        }
     `;
 
   private static configQL = `
@@ -321,6 +330,7 @@ export class SuperglueClient {
         inputSchema: tool.inputSchema,
         responseSchema: tool.responseSchema,
         instruction: tool.instruction,
+        responseFilters: tool.responseFilters,
       };
       Object.keys(toolInput).forEach(
         (key) => (toolInput as any)[key] === undefined && delete (toolInput as any)[key],
@@ -575,6 +585,7 @@ export class SuperglueClient {
       inputSchema: tool.inputSchema,
       responseSchema: tool.responseSchema,
       instruction: tool.instruction,
+      responseFilters: tool.responseFilters,
     };
     Object.keys(toolInput).forEach(
       (key) => (toolInput as any)[key] === undefined && delete (toolInput as any)[key],
@@ -1013,54 +1024,7 @@ export class SuperglueClient {
   async getWorkflow(id: string): Promise<Tool> {
     const query = `
         query GetWorkflow($id: ID!) {
-          getWorkflow(id: $id) {
-            id
-            version
-            createdAt
-            updatedAt
-            steps {
-              id
-              modify
-              apiConfig {
-                id
-                version
-                createdAt
-                updatedAt
-                urlHost
-                urlPath
-                instruction
-                method
-                queryParams
-                headers
-                body
-                documentationUrl
-                responseSchema
-                responseMapping
-                authentication
-                pagination {
-                  type
-                  pageSize
-                  cursorPath
-                  stopCondition
-                }
-                dataPath
-              }
-              integrationId
-              executionMode
-              loopSelector
-              loopMaxIters
-              inputMapping
-              responseMapping
-              failureBehavior
-            }
-            integrationIds
-            finalTransform
-            inputSchema
-            responseSchema
-            instruction
-            folder
-            archived
-          }
+          getWorkflow(id: $id) {${SuperglueClient.workflowQL}}
         }
       `;
     const response = await this.request<{ getWorkflow: Tool }>(query, { id });

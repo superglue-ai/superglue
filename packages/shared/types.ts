@@ -173,6 +173,28 @@ export enum RunStatus {
   ABORTED = "ABORTED",
 }
 
+export enum FilterTarget {
+  KEYS = "KEYS",
+  VALUES = "VALUES",
+  BOTH = "BOTH",
+}
+
+export enum FilterAction {
+  REMOVE = "REMOVE",
+  MASK = "MASK",
+  FAIL = "FAIL",
+}
+
+export interface ResponseFilter {
+  id: string;
+  name?: string;
+  enabled: boolean;
+  target: FilterTarget;
+  pattern: string;
+  action: FilterAction;
+  maskValue?: string;
+}
+
 export interface BaseConfig {
   id: string;
   version?: string;
@@ -252,6 +274,7 @@ export interface Tool extends BaseConfig {
   originalResponseSchema?: JSONSchema;
   folder?: string;
   archived?: boolean;
+  responseFilters?: ResponseFilter[];
 }
 
 export interface ToolStepResult {
