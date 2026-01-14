@@ -48,21 +48,21 @@ export const PayloadSpotlight = ({
 
     const STORAGE_KEY = `superglue-payload:${tool.id}`;
     const MAX_PAYLOAD_SIZE = 100 * 1024; // Only cache small payloads (100KB)
-    
+
     try {
       const trimmed = (payloadText || "").trim();
       if (trimmed === "") {
         localStorage.removeItem(STORAGE_KEY);
         return;
       }
-      
+
       const payloadSize = new Blob([payloadText]).size;
-      
+
       if (payloadSize > MAX_PAYLOAD_SIZE) {
         localStorage.removeItem(STORAGE_KEY);
         return;
       }
-      
+
       localStorage.setItem(STORAGE_KEY, payloadText);
     } catch (error) {
       if (error instanceof DOMException && error.name === "QuotaExceededError") {

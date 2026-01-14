@@ -3,7 +3,15 @@
 import { UploadedFileInfo } from "@/src/lib/file-utils";
 import { computeToolPayload } from "@/src/lib/general-utils";
 import { ExecutionStep, Integration, ResponseFilter, Tool } from "@superglue/shared";
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { PayloadState, ToolConfigContextValue, ToolDefinition } from "./types";
 
 interface ToolConfigProviderProps {
