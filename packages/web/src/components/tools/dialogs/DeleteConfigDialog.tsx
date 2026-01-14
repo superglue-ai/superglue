@@ -10,10 +10,10 @@ import {
   AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog";
 import { tokenRegistry } from "@/src/lib/token-registry";
-import { ApiConfig, SuperglueClient, Tool } from "@superglue/shared";
+import { SuperglueClient, Tool } from "@superglue/shared";
 
 interface DeleteConfigDialogProps {
-  config: ApiConfig | Tool | null;
+  config: Tool | null;
   isOpen: boolean;
   onClose: () => void;
   onDeleted?: (deletedId: string) => void;
@@ -35,19 +35,7 @@ export function DeleteConfigDialog({
         endpoint: superglueConfig.superglueEndpoint,
         apiKey: tokenRegistry.getToken(),
       });
-
-      let deletePromise;
-      const configType = (config as any)?.type;
-
-      if (configType === "api") {
-        deletePromise = superglueClient.deleteApi(config.id);
-      } else {
-        // Default to tool/workflow deletion
-        deletePromise = superglueClient.deleteWorkflow(config.id);
-      }
-
-      await deletePromise;
-
+      await superglueClient.deleteWorkflow(config.id);
       const deletedId = config.id;
       onClose();
 
@@ -58,8 +46,6 @@ export function DeleteConfigDialog({
       console.error("Error deleting config:", error);
     }
   };
-
-  const isApi = (config as any)?.type === "api";
 
   return (
     <AlertDialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -74,8 +60,7 @@ export function DeleteConfigDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete this {isApi ? "configuration" : "tool"}. This action cannot
-            be undone.
+            This will permanently delete this tool. This action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

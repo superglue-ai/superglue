@@ -61,30 +61,52 @@ export class ToolFixer {
   }
 
   /**
-   * Serialize a tool to stable JSON format with sorted keys and consistent formatting
+   * Trim tool to essential fields for LLM context (positive filter)
    */
-  private serializeToStableJSON(tool: Tool): string {
-    const sortedTool = this.sortObjectKeys(tool);
-    return JSON.stringify(sortedTool, null, 2);
+  private trimToolForLLM(tool: Tool): Partial<Tool> {
+    return {
+      id: tool.id,
+      instruction: tool.instruction,
+      inputSchema: tool.inputSchema,
+      responseSchema: tool.responseSchema,
+      finalTransform: tool.finalTransform,
+      steps: tool.steps.map((step) => this.trimStepForLLM(step)),
+    };
   }
 
   /**
-   * Recursively sort object keys for consistent serialization
+   * Trim step to essential fields
    */
-  private sortObjectKeys(obj: any): any {
-    if (obj === null || obj === undefined) return obj;
-    if (Array.isArray(obj)) {
-      return obj.map((item) => this.sortObjectKeys(item));
-    }
-    if (typeof obj === "object") {
-      const sorted: any = {};
-      const keys = Object.keys(obj).sort();
-      for (const key of keys) {
-        sorted[key] = this.sortObjectKeys(obj[key]);
-      }
-      return sorted;
-    }
-    return obj;
+  private trimStepForLLM(step: any): any {
+    return {
+      id: step.id,
+      integrationId: step.integrationId,
+      executionMode: step.executionMode,
+      loopSelector: step.loopSelector,
+      failureBehavior: step.failureBehavior,
+      apiConfig: this.trimApiConfigForLLM(step.apiConfig),
+    };
+  }
+
+  /**
+   * Trim apiConfig to essential fields (drop instruction, documentationUrl, timestamps)
+   */
+  private trimApiConfigForLLM(config: any): any {
+    if (!config) return config;
+    return {
+      id: config.id,
+      urlHost: config.urlHost,
+      urlPath: config.urlPath,
+      method: config.method,
+      queryParams: config.queryParams,
+      headers: config.headers,
+      body: config.body,
+      pagination: config.pagination,
+    };
+  }
+
+  private serializeToolForLLM(): string {
+    return JSON.stringify(this.trimToolForLLM(this.tool));
   }
 
   /**
@@ -131,14 +153,22 @@ ${availableIntegrationIds.join(", ")}
 
   /**
    * Try to normalize a string by escaping newlines for JSON matching
-   * Returns the normalized string if it would help, otherwise null
+   * Returns the normalized string and normalization type if it would help, otherwise null
    */
-  private tryNormalizeForJsonString(str: string, serializedTool: string): string | null {
+  private tryNormalizeForJsonString(
+    str: string,
+    serializedTool: string,
+  ): { normalized: string; type: "escaped" | "collapsed" } | null {
     // If the string contains actual newlines, try escaping them
     if (str.includes("\n")) {
       const escaped = str.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
       if (this.countOccurrences(serializedTool, escaped) === 1) {
-        return escaped;
+        return { normalized: escaped, type: "escaped" };
+      }
+      // Also try collapsing newlines/whitespace entirely (for compact JSON)
+      const collapsed = str.replace(/\s+/g, "");
+      if (this.countOccurrences(serializedTool, collapsed) === 1) {
+        return { normalized: collapsed, type: "collapsed" };
       }
     }
     return null;
@@ -207,20 +237,22 @@ ${availableIntegrationIds.join(", ")}
 
       // If not found, try normalizing for JSON string escaping
       if (occurrences === 0) {
-        const normalized = this.tryNormalizeForJsonString(diff.old_string, serializedTool);
-        if (normalized) {
-          normalizedOldString = normalized;
-          // Also escape the new_string if it contains newlines
-          if (diff.new_string.includes("\n")) {
+        const normResult = this.tryNormalizeForJsonString(diff.old_string, serializedTool);
+        if (normResult) {
+          normalizedOldString = normResult.normalized;
+          // Apply same normalization to new_string
+          if (normResult.type === "escaped" && diff.new_string.includes("\n")) {
             normalizedNewString = diff.new_string
               .replace(/\n/g, "\\n")
               .replace(/\r/g, "\\r")
               .replace(/\t/g, "\\t");
+          } else if (normResult.type === "collapsed") {
+            normalizedNewString = diff.new_string.replace(/\s+/g, "");
           }
           occurrences = 1;
           logMessage(
             "info",
-            `Diff ${i + 1}: Auto-normalized string escaping for JSON match`,
+            `Diff ${i + 1}: Auto-normalized (${normResult.type}) for JSON match`,
             this.metadata,
           );
         }
@@ -353,8 +385,8 @@ ${availableIntegrationIds.join(", ")}
    * Main method to fix the tool using LLM-generated diffs
    */
   public async fixTool(): Promise<ToolFixerResult> {
-    const maxRetries = 3;
-    const serializedTool = this.serializeToStableJSON(this.tool);
+    const maxRetries = 5;
+    const serializedTool = this.serializeToolForLLM();
     let messages = this.prepareFixContext(serializedTool);
     let lastAttemptError: string | null = null;
     let appliedDiffs: ToolDiff[] = [];
@@ -387,14 +419,19 @@ ${availableIntegrationIds.join(", ")}
           throw new Error(`Error generating diffs: ${generateDiffResult.response}`);
         }
 
-        const { diffs: rawDiffs } = generateDiffResult.response;
+        let { diffs: rawDiffs } = generateDiffResult.response;
+
+        // Handle LLM returning single diff object instead of array
+        if (rawDiffs && !Array.isArray(rawDiffs)) {
+          rawDiffs = [rawDiffs];
+        }
 
         if (!rawDiffs || rawDiffs.length === 0) {
           throw new Error("LLM returned no diffs. At least one change is required.");
         }
 
         // Convert to ToolDiff[], validating that required fields are present
-        const diffs: ToolDiff[] = rawDiffs.map((d, i) => {
+        const diffs: ToolDiff[] = rawDiffs.map((d: any, i: number) => {
           if (!d.old_string || d.new_string === undefined) {
             throw new Error(`Diff ${i + 1}: missing required field (old_string or new_string)`);
           }
