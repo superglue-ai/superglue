@@ -89,12 +89,13 @@ export class ToolFixer {
   }
 
   /**
-   * Trim apiConfig to essential fields (drop instruction, documentationUrl, timestamps)
+   * Trim apiConfig to essential fields (drop documentationUrl, timestamps)
    */
   private trimApiConfigForLLM(config: any): any {
     if (!config) return config;
     return {
       id: config.id,
+      instruction: config.instruction,
       urlHost: config.urlHost,
       urlPath: config.urlPath,
       method: config.method,
