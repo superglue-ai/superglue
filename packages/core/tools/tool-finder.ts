@@ -1,6 +1,5 @@
 import { Tool } from "@superglue/shared";
 import { ServiceMetadata } from "@superglue/shared";
-import { logMessage } from "../utils/logs.js";
 
 export interface FoundTool {
   id: string;
@@ -79,21 +78,14 @@ export class ToolFinder {
 
   public async findTools(query: string | undefined, tools: Tool[]): Promise<FoundTool[]> {
     if (!tools || tools.length === 0) {
-      logMessage("info", "No tools available for selection.", this.metadata);
       return [];
     }
 
     if (!query || query.trim() === "" || query.trim() === "*" || query.trim() === "all") {
-      logMessage(
-        "info",
-        "No specific query provided, returning all available tools.",
-        this.metadata,
-      );
       return tools.map((tool) => this.enrichTool(tool, "Available tool"));
     }
 
     const results = this.keywordSearch(query, tools);
-    logMessage("info", `Found ${results.length} tools matching search terms`, this.metadata);
     return results;
   }
 }

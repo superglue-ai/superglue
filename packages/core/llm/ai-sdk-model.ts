@@ -1,4 +1,4 @@
-import { getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
+import { getDateMessage, getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
 import {
   AssistantModelMessage,
   TextPart,
@@ -64,13 +64,6 @@ export class AiSdkModel implements LLM {
           defaultModel: this.modelId,
         })
       : null;
-  }
-
-  private getDateMessage(): LLMMessage {
-    return {
-      role: "system" as const,
-      content: "The current date and time is " + new Date().toISOString(),
-    } as LLMMessage;
   }
 
   private buildTools(
@@ -208,7 +201,7 @@ export class AiSdkModel implements LLM {
   }
 
   async generateText(messages: LLMMessage[], temperature: number = 0): Promise<LLMResponse> {
-    const dateMessage = this.getDateMessage();
+    const dateMessage = getDateMessage();
     messages = [dateMessage, ...messages] as LLMMessage[];
 
     const result = await this.generateTextWithFallback({
@@ -239,7 +232,7 @@ export class AiSdkModel implements LLM {
    If the LLM does not return a submit tool call, we try again.
    */
   async generateObject<T>(input: LLMObjectGeneratorInput): Promise<LLMObjectResponse<T>> {
-    const dateMessage = this.getDateMessage();
+    const dateMessage = getDateMessage();
 
     // Clean schema: remove patternProperties, minItems/maxItems, set strict/additionalProperties
     const schema = this.cleanSchema(input.schema);
