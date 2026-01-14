@@ -1,26 +1,20 @@
-import { anthropic } from "@ai-sdk/anthropic";
-import { google } from "@ai-sdk/google";
-import { openai } from "@ai-sdk/openai";
+import { tavilySearch } from "@tavily/ai-sdk";
 import { Integration, ServiceMetadata } from "@superglue/shared";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { LLMToolDefinition, LLMToolImplementation } from "./llm-tool-utils.js";
 import { sanitizeInstructionSuggestions, runCodeInIVM } from "../utils/helpers.js";
 import { LanguageModel, LLMMessage } from "./llm-base-model.js";
 import { GENERATE_INSTRUCTIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
-import { searchIntegrationDocumentationResolver } from "../graphql/resolvers/integrations.js";
 
 export function getWebSearchTool(): any {
-  const provider = process.env.LLM_PROVIDER?.toLowerCase();
-  switch (provider) {
-    case "openai":
-      return openai.tools.webSearch();
-    case "anthropic":
-      return anthropic.tools.webSearch_20250305({ maxUses: 5 });
-    case "gemini":
-      return google.tools.googleSearch({});
-    default:
-      return null;
+  if (!process.env.TAVILY_API_KEY) {
+    return null;
   }
+  return tavilySearch({
+    searchDepth: "advanced",
+    maxResults: 5,
+    includeAnswer: true,
+  });
 }
 
 export interface searchDocumentationToolContext extends ServiceMetadata {

@@ -2,7 +2,6 @@ import type { ServiceMetadata } from "@superglue/shared";
 import { JSONSchema, RequestOptions } from "@superglue/shared";
 import prettier from "prettier";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { getEvaluateTransformContext, getTransformContext } from "../context/context-builders.js";
 import {
   EVALUATE_TRANSFORM_SYSTEM_PROMPT,
@@ -152,7 +151,7 @@ export async function generateWorkingTransform({
 
     const result = await LanguageModel.generateObject<z.infer<typeof transformSchema>>({
       messages,
-      schema: zodToJsonSchema(transformSchema),
+      schema: z.toJSONSchema(transformSchema),
       temperature: temperature,
       metadata,
     });
@@ -254,7 +253,7 @@ export async function evaluateTransform(
 
     const result = await LanguageModel.generateObject<z.infer<typeof llmResponseSchema>>({
       messages,
-      schema: zodToJsonSchema(llmResponseSchema),
+      schema: z.toJSONSchema(llmResponseSchema),
       temperature: 0,
       metadata,
     });

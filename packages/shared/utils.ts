@@ -418,3 +418,10 @@ export function safeStringify(value: any): string {
     return String(value ?? "");
   }
 }
+
+export function getDateMessage(): { role: "system"; content: string } {
+  return {
+    role: "system" as const,
+    content: "The current date and time is " + new Date().toISOString(),
+  };
+}

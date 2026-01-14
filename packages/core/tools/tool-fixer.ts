@@ -1,6 +1,5 @@
 import { Integration, ServiceMetadata, Tool, ToolDiff, ToolStepResult } from "@superglue/shared";
 import z from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { FIX_TOOL_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { logMessage } from "../utils/logs.js";
@@ -58,7 +57,7 @@ export class ToolFixer {
     this.lastError = options.lastError;
     this.stepResults = options.stepResults;
     this.metadata = options.metadata;
-    this.diffSchemaJson = zodToJsonSchema(diffSchema);
+    this.diffSchemaJson = z.toJSONSchema(diffSchema);
   }
 
   /**

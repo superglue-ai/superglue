@@ -8,7 +8,6 @@ import {
 } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import z from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { getToolBuilderContext } from "../context/context-builders.js";
 import { BUILD_TOOL_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { LanguageModel, LLMMessage, LLMToolWithContext } from "../llm/llm-base-model.js";
@@ -42,7 +41,7 @@ export class ToolBuilder {
     this.initialPayload = initialPayload || {};
     this.metadata = metadata;
     this.responseSchema = responseSchema;
-    this.toolSchema = zodToJsonSchema(toolSchema);
+    this.toolSchema = z.toJSONSchema(toolSchema);
     try {
       const credentials = Object.values(integrations).reduce((acc, int) => {
         return {

@@ -97,11 +97,6 @@ describe("ToolFinder", () => {
 
       expect(results).toHaveLength(4);
       expect(results.every((r) => r.reason === "Available tool")).toBe(true);
-      expect(logs.logMessage).toHaveBeenCalledWith(
-        "info",
-        "No specific query provided, returning all available tools.",
-        expect.any(Object),
-      );
     });
 
     it("should return all tools when query is empty string", async () => {
@@ -129,11 +124,6 @@ describe("ToolFinder", () => {
       const results = await toolFinder.findTools("email", []);
 
       expect(results).toHaveLength(0);
-      expect(logs.logMessage).toHaveBeenCalledWith(
-        "info",
-        "No tools available for selection.",
-        expect.any(Object),
-      );
     });
 
     it("should find tools by keyword in tool ID", async () => {

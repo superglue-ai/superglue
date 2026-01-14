@@ -25,6 +25,10 @@ export function validateEnvironment() {
     throw new Error("ANTHROPIC_API_KEY is not set.");
   }
 
+  if (!process.env.TAVILY_API_KEY) {
+    logMessage("warn", "TAVILY_API_KEY is not set. Web search functionality will be unavailable.");
+  }
+
   if (
     process.env.LLM_PROVIDER?.toUpperCase() === "BEDROCK" &&
     (!process.env.AWS_ACCESS_KEY_ID ||
