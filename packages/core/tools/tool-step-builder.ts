@@ -8,7 +8,6 @@ import {
 } from "../llm/llm-tools.js";
 import { transformData } from "../utils/helpers.js";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 type GenerateStepConfigInput = {
   retryCount: number;
@@ -134,7 +133,7 @@ export async function generateStepConfig({
     z.infer<typeof stepConfigSchema>
   >({
     messages,
-    schema: zodToJsonSchema(stepConfigSchema),
+    schema: z.toJSONSchema(stepConfigSchema),
     temperature,
     tools,
     metadata,

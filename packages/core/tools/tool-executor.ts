@@ -13,7 +13,6 @@ import {
 import { flattenAndNamespaceCredentials } from "@superglue/shared/utils";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import {
   getEvaluateStepResponseContext,
   getGenerateStepConfigContext,
@@ -610,7 +609,7 @@ export class ToolExecutor implements Tool {
 
     const evaluationResult = await LanguageModel.generateObject<z.infer<typeof evaluationSchema>>({
       messages: messages,
-      schema: zodToJsonSchema(evaluationSchema),
+      schema: z.toJSONSchema(evaluationSchema),
       temperature: 0,
       metadata: this.metadata,
     });
