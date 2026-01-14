@@ -11,11 +11,11 @@ import {
   AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog";
 import { createSuperglueClient } from "@/src/lib/client-utils";
-import { ApiConfig, Tool } from "@superglue/shared";
+import { Tool } from "@superglue/shared";
 import { useMemo } from "react";
 
 interface ArchiveConfigDialogProps {
-  config: ApiConfig | Tool | null;
+  config: Tool | null;
   isOpen: boolean;
   onClose: () => void;
   onArchived?: (archivedId: string) => void;

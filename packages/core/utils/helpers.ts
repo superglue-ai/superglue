@@ -1,5 +1,4 @@
-import { RequestOptions, SelfHealingMode } from "@superglue/shared";
-import { assertValidArrowFunction } from "@superglue/shared";
+import { assertValidArrowFunction, RequestOptions, SelfHealingMode } from "@superglue/shared";
 import ivm from "isolated-vm";
 import { Validator } from "jsonschema";
 import { z } from "zod";
@@ -162,7 +161,7 @@ export function addNullableToOptional(schema: any, required: boolean = true): an
   }
 
   if ((schema.type === "object" || schema.type?.includes("object")) && schema.properties) {
-    newSchema.additionalProperties = false;
+    newSchema.additionalProperties = true;
     const allRequired = new Set(Array.isArray(schema.required) ? schema.required : []);
     newSchema.required = Array.from(allRequired);
     newSchema.properties = Object.entries(schema.properties).reduce(
