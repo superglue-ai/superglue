@@ -1,7 +1,7 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
-import { getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
+import { getDateMessage, getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
 import { generateText, jsonSchema, tool } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AiSdkModel } from "./ai-sdk-model.js";
@@ -26,6 +26,10 @@ describe("AiSdkModel", () => {
 
     vi.mocked(initializeAIModel).mockReturnValue("mock-model");
     vi.mocked(getModelContextLength).mockReturnValue(128000);
+    vi.mocked(getDateMessage).mockReturnValue({
+      role: "system",
+      content: "The current date and time is " + MOCK_DATE,
+    });
 
     mockTool.mockImplementation((config: any) => ({ type: "tool", config }) as any);
     mockJsonSchema.mockImplementation((schema: any) => schema as any);
