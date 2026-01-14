@@ -42,33 +42,38 @@ export const PayloadSpotlight = ({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Save payload to localStorage whenever it changes
+  // Save payload to localStorage whenever it changes (debounced)
   useEffect(() => {
     if (!tool.id) return;
 
     const STORAGE_KEY = `superglue-payload:${tool.id}`;
     const MAX_PAYLOAD_SIZE = 100 * 1024; // Only cache small payloads (100KB)
+    const DEBOUNCE_MS = 500;
 
-    try {
-      const trimmed = (payloadText || "").trim();
-      if (trimmed === "") {
-        localStorage.removeItem(STORAGE_KEY);
-        return;
+    const timeoutId = setTimeout(() => {
+      try {
+        const trimmed = (payloadText || "").trim();
+        if (trimmed === "") {
+          localStorage.removeItem(STORAGE_KEY);
+          return;
+        }
+
+        const payloadSize = new Blob([payloadText]).size;
+
+        if (payloadSize > MAX_PAYLOAD_SIZE) {
+          localStorage.removeItem(STORAGE_KEY);
+          return;
+        }
+
+        localStorage.setItem(STORAGE_KEY, payloadText);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "QuotaExceededError") {
+          localStorage.removeItem(STORAGE_KEY);
+        }
       }
+    }, DEBOUNCE_MS);
 
-      const payloadSize = new Blob([payloadText]).size;
-
-      if (payloadSize > MAX_PAYLOAD_SIZE) {
-        localStorage.removeItem(STORAGE_KEY);
-        return;
-      }
-
-      localStorage.setItem(STORAGE_KEY, payloadText);
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "QuotaExceededError") {
-        localStorage.removeItem(STORAGE_KEY);
-      }
-    }
+    return () => clearTimeout(timeoutId);
   }, [tool.id, payloadText]);
 
   useEffect(() => {
