@@ -3,7 +3,7 @@
 import { UploadedFileInfo } from "@/src/lib/file-utils";
 import { computeToolPayload } from "@/src/lib/general-utils";
 import { ExecutionStep, Integration, ResponseFilter, Tool } from "@superglue/shared";
-import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { PayloadState, ToolConfigContextValue, ToolDefinition } from "./types";
 
 interface ToolConfigProviderProps {
@@ -62,6 +62,21 @@ export function ToolConfigProvider({
   const [localUploadedFiles, setLocalUploadedFiles] = useState<UploadedFileInfo[]>([]);
   const [localFilePayloads, setLocalFilePayloads] = useState<Record<string, any>>({});
   const [hasUserEdited, setHasUserEdited] = useState(false);
+
+  // Load saved payload from localStorage on tool load
+  useEffect(() => {
+    if (!toolId) return;
+
+    const STORAGE_KEY = `superglue-payload:${toolId}`;
+    try {
+      const savedPayload = localStorage.getItem(STORAGE_KEY);
+      if (savedPayload && savedPayload !== initialPayload) {
+        setManualPayloadText(savedPayload);
+      }
+    } catch (error) {
+      console.error("Failed to load payload from localStorage:", error);
+    }
+  }, [toolId, initialPayload]);
 
   // Use external state if provided (embedded mode), otherwise use local state
   const uploadedFiles = externalUploadedFiles ?? localUploadedFiles;

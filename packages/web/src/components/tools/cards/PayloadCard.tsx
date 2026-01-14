@@ -31,7 +31,7 @@ export const PayloadSpotlight = ({
   totalFileSize = 0,
   isPayloadValid,
 }: PayloadSpotlightProps) => {
-  const { payload, inputSchema, setPayloadText, setInputSchema, markPayloadEdited } =
+  const { tool, payload, inputSchema, setPayloadText, setInputSchema, markPayloadEdited } =
     useToolConfig();
 
   const payloadText = payload.manualPayloadText;
@@ -41,6 +41,35 @@ export const PayloadSpotlight = ({
   const [localInputSchema, setLocalInputSchema] = useState(inputSchema || null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Save payload to localStorage whenever it changes
+  useEffect(() => {
+    if (!tool.id) return;
+
+    const STORAGE_KEY = `superglue-payload:${tool.id}`;
+    const MAX_PAYLOAD_SIZE = 100 * 1024; // Only cache small payloads (100KB)
+    
+    try {
+      const trimmed = (payloadText || "").trim();
+      if (trimmed === "") {
+        localStorage.removeItem(STORAGE_KEY);
+        return;
+      }
+      
+      const payloadSize = new Blob([payloadText]).size;
+      
+      if (payloadSize > MAX_PAYLOAD_SIZE) {
+        localStorage.removeItem(STORAGE_KEY);
+        return;
+      }
+      
+      localStorage.setItem(STORAGE_KEY, payloadText);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "QuotaExceededError") {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }, [tool.id, payloadText]);
 
   useEffect(() => {
     setLocalPayload(payloadText || "");
