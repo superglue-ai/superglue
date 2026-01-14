@@ -19,7 +19,10 @@ export const FindRelevantToolsInputSchema = z.object({
 
 export const ExecuteToolInputSchema = z.object({
   id: z.string().describe("The ID of the tool to execute"),
-  payload: z.record(z.string(), z.unknown()).optional().describe("JSON payload to pass to the tool"),
+  payload: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("JSON payload to pass to the tool"),
 });
 
 // REST API client for MCP operations
