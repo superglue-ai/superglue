@@ -790,6 +790,37 @@ IMPORTANT - JSON STRING ESCAPING:
 - If matching JSON object structure (not inside a string), normal formatting applies
 </DIFF_FORMAT>
 
+<TOOL_STRUCTURE>
+The tool JSON you receive is trimmed to essential fields only. Here's the exact structure:
+
+TOP-LEVEL TOOL FIELDS (all that's sent):
+- id: string (required) - Unique identifier for the tool
+- instruction: string - Human-readable description of what the tool does
+- inputSchema: object - JSON Schema defining expected input parameters
+- responseSchema: object - JSON Schema defining expected output structure
+- finalTransform: string - JavaScript function to transform combined step results into final output
+- steps: array (required) - Array of execution steps
+
+EACH STEP IN THE "steps" ARRAY HAS:
+- id: string (required) - Unique step identifier, used to access results as sourceData.stepId
+- integrationId: string - Which integration this step uses
+- executionMode: "DIRECT" | "LOOP" - How the step executes (derived from loopSelector return)
+- loopSelector: string - JavaScript function determining execution mode (see LOOP_SELECTOR section)
+- failureBehavior: "FAIL" | "CONTINUE" - Error handling behavior (fail on step failure or continue on step failure)
+- apiConfig: object (required) - The API configuration for this step
+
+EACH STEP'S "apiConfig" CONTAINS:
+- id: string - Config identifier
+- instruction: string - Description of what this API call does
+- urlHost: string - Base URL (e.g., "https://api.example.com")
+- urlPath: string - Path portion (e.g., "/v1/users")
+- method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
+- queryParams: object - Query parameters
+- headers: object - HTTP headers (e.g., {"Authorization": "Bearer <<token>>"})
+- body: string - Request body (JSON as escaped string)
+- pagination: object - Pagination configuration (see PAGINATION section)
+</TOOL_STRUCTURE>
+
 <LOOP_SELECTOR>
 Every step MUST have a loopSelector that determines how it executes:
 
@@ -811,7 +842,11 @@ Every step MUST have a loopSelector that determines how it executes:
 </LOOP_SELECTOR>
 
 <VARIABLES>
-Use <<variable>> syntax to access variables directly OR execute JavaScript expressions formatted as <<(sourceData) => ...>>:
+Use <<variable>> syntax to access variables directly (no child variables allowed!) OR execute JavaScript expressions formatted as <<(sourceData) => ...>>:
+Right: <<userId>>
+Wrong: <<sourceData.userId>>
+Right: <<(sourceData) => sourceData.userId>>
+Wrong: <<(sourceData) => sourceData.payload.userId>>
 
 Basic variable access:
 - URL: https://api.example.com/v1/items?api_key=<<integrationId_api_key>>
