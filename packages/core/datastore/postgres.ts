@@ -519,18 +519,21 @@ export class PostgresService implements DataStore {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        "SELECT id, config_id, data, started_at, completed_at FROM runs WHERE id = $1 AND org_id = $2",
+        "SELECT id, config_id, data, started_at, completed_at, request_source FROM runs WHERE id = $1 AND org_id = $2",
         [id, orgId || ""],
       );
       if (!result.rows[0]) return null;
 
       const row = result.rows[0];
-      return extractRun(row.data, {
+      const run = extractRun(row.data, {
         id: row.id,
         config_id: row.config_id,
         started_at: row.started_at,
         completed_at: row.completed_at,
       });
+      // Source of truth for requestSource is the column, not the JSON
+      run.requestSource = row.request_source || run.requestSource;
+      return run;
     } finally {
       client.release();
     }
@@ -548,9 +551,9 @@ export class PostgresService implements DataStore {
     try {
       let selectQuery = `
                 SELECT 
-                    id, config_id, data, started_at, completed_at,
+                    id, config_id, data, started_at, completed_at, request_source,
                     COUNT(*) OVER() as total_count
-                FROM runs 
+                FROM runs
                 WHERE org_id = $1
             `;
       const queryParams: string[] = [orgId || ""];
@@ -577,14 +580,17 @@ export class PostgresService implements DataStore {
 
       const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
 
-      const items = result.rows.map((row) =>
-        extractRun(row.data, {
+      const items = result.rows.map((row) => {
+        const run = extractRun(row.data, {
           id: row.id,
           config_id: row.config_id,
           started_at: row.started_at,
           completed_at: row.completed_at,
-        }),
-      );
+        });
+        // Source of truth for requestSource is the column, not the JSON
+        run.requestSource = row.request_source || run.requestSource;
+        return run;
+      });
 
       return { items, total };
     } finally {
@@ -630,7 +636,7 @@ export class PostgresService implements DataStore {
     const client = await this.pool.connect();
     try {
       const existingResult = await client.query(
-        "SELECT id, config_id, data, started_at, completed_at FROM runs WHERE id = $1 AND org_id = $2",
+        "SELECT id, config_id, data, started_at, completed_at, request_source FROM runs WHERE id = $1 AND org_id = $2",
         [id, orgId],
       );
 
@@ -645,6 +651,8 @@ export class PostgresService implements DataStore {
         started_at: row.started_at,
         completed_at: row.completed_at,
       });
+      // Source of truth for requestSource is the column, not the JSON
+      existingRun.requestSource = row.request_source || existingRun.requestSource;
 
       const updatedRun: Run = {
         ...existingRun,
@@ -697,13 +705,14 @@ export class PostgresService implements DataStore {
         [orgId],
       );
 
+      const validSources = ["api", "frontend", "scheduler", "mcp", "tool-chain", "webhook"];
       const runsTotal: PrometheusRunMetrics["runsTotal"] = totals.rows
         .map((r: any) => {
           const status = String(r.status || "").toLowerCase() as PrometheusRunStatusLabel;
           const source = String(r.request_source || "api") as PrometheusRunSourceLabel;
           const value = Number(r.count ?? 0);
           if (status !== "success" && status !== "failed" && status !== "aborted") return null;
-          if (!["api", "frontend", "scheduler", "mcp"].includes(source)) return null;
+          if (!validSources.includes(source)) return null;
           return { status, source, value };
         })
         .filter(Boolean) as PrometheusRunMetrics["runsTotal"];
@@ -731,7 +740,7 @@ export class PostgresService implements DataStore {
           const source = String(r.request_source || "api") as PrometheusRunSourceLabel;
           const value = Number(r.p95);
           if (!Number.isFinite(value)) return null;
-          if (!["api", "frontend", "scheduler", "mcp"].includes(source)) return null;
+          if (!validSources.includes(source)) return null;
           return { source, windowSeconds, value };
         })
         .filter(Boolean) as PrometheusRunMetrics["runDurationSecondsP95"];
