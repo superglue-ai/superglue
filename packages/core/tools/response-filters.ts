@@ -27,12 +27,18 @@ export class FilterMatchError extends Error {
 }
 
 // Sentinels to signal actions at ancestor level
+const REMOVE_FIELD = Symbol("REMOVE_FIELD");
 const REMOVE_ITEM = Symbol("REMOVE_ITEM");
 const REMOVE_ENTRY = Symbol("REMOVE_ENTRY");
 const MASK_ITEM = Symbol("MASK_ITEM");
 const MASK_ENTRY = Symbol("MASK_ENTRY");
 
-type ActionSignal = typeof REMOVE_ITEM | typeof REMOVE_ENTRY | typeof MASK_ITEM | typeof MASK_ENTRY;
+type ActionSignal =
+  | typeof REMOVE_FIELD
+  | typeof REMOVE_ITEM
+  | typeof REMOVE_ENTRY
+  | typeof MASK_ITEM
+  | typeof MASK_ENTRY;
 
 interface ProcessContext {
   matches: FilterMatch[];
@@ -131,6 +137,9 @@ function processValue(
         results.push(context.currentMaskValue); // Replace with mask at this level
         continue;
       }
+      if (result === REMOVE_FIELD) {
+        continue; // FIELD removal on primitive array element - skip it
+      }
       if (result !== undefined) {
         results.push(result);
       }
@@ -165,7 +174,7 @@ function processValue(
           if (scope === RemoveScope.ENTRY) return REMOVE_ENTRY;
           if (scope === RemoveScope.ITEM) return REMOVE_ITEM;
           // FIELD scope on a primitive = remove the primitive itself
-          return undefined;
+          return REMOVE_FIELD;
         } else if (filter.action === FilterAction.MASK) {
           const maskValue = filter.maskValue || "[filtered]";
           context.currentMaskValue = maskValue;
@@ -290,6 +299,11 @@ function processObject(
         processed === MASK_ITEM
       ) {
         return processed;
+      }
+
+      // REMOVE_FIELD from a nested primitive means skip this key
+      if (processed === REMOVE_FIELD) {
+        continue;
       }
 
       result[key] = processed;
