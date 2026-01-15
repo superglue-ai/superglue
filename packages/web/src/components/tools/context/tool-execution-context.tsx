@@ -621,6 +621,67 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     [dataSelectorResults],
   );
 
+  const getExecutionStateSummary = useCallback((): string => {
+    const lines: string[] = [];
+
+    if (isExecutingAny) {
+      lines.push(
+        `Execution Status: Running (step ${(currentExecutingStepIndex ?? 0) + 1}/${steps.length})`,
+      );
+    } else if (isStopping) {
+      lines.push("Execution Status: Stopping");
+    } else {
+      lines.push("Execution Status: Idle");
+    }
+
+    // Per-step status summary
+    const stepSummaries: string[] = [];
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const exec = stepExecutions[step.id];
+      const status = exec?.status ?? "pending";
+      const dsResult = dataSelectorResults[step.id];
+
+      let summary = `Step ${i + 1} (${step.id}): ${status}`;
+
+      if (status === "failed" && exec?.error) {
+        summary += ` - Error: ${exec.error.substring(0, 400)}`;
+      }
+
+      if (
+        dsResult?.error &&
+        (status === "completed" || status === "failed" || status === "running")
+      ) {
+        summary += ` - DataSelector Error: ${dsResult.error.substring(0, 400)}`;
+      }
+
+      stepSummaries.push(summary);
+    }
+
+    if (stepSummaries.length > 0) {
+      lines.push("\nStep Status:");
+      lines.push(...stepSummaries);
+    }
+
+    if (transformStatus !== "idle") {
+      lines.push(`\nFinal Transform: ${transformStatus}`);
+      if (finalError) {
+        lines.push(`Transform Error: ${finalError.substring(0, 200)}`);
+      }
+    }
+
+    return lines.join("\n");
+  }, [
+    isExecutingAny,
+    isStopping,
+    currentExecutingStepIndex,
+    steps,
+    stepExecutions,
+    dataSelectorResults,
+    transformStatus,
+    finalError,
+  ]);
+
   const value = useMemo<ExecutionContextValue>(
     () => ({
       stepExecutions,
@@ -668,6 +729,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       getCategorizedVariables,
       getCategorizedSources,
       getDataSelectorResult,
+      getExecutionStateSummary,
     }),
     [
       stepExecutions,
@@ -715,6 +777,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       getCategorizedVariables,
       getCategorizedSources,
       getDataSelectorResult,
+      getExecutionStateSummary,
     ],
   );
 

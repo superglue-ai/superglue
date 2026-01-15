@@ -236,6 +236,8 @@ export class ToolBuilder {
         generatedTool.instruction = this.instruction;
         generatedTool.responseSchema = this.responseSchema;
 
+        logMessage("info", "Tool built successfully", this.metadata);
+
         return {
           id: generatedTool.id,
           steps: generatedTool.steps,

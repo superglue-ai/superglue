@@ -81,7 +81,6 @@ interface ToolBuilderProps {
   initialInputSchema?: string | null;
   initialFiles?: UploadedFileInfo[];
   onToolBuilt: (tool: Tool, context: BuildContext) => void;
-  mode?: "build" | "rebuild";
 }
 
 const FADE_IN_STYLE = { animationDelay: "0ms", animationFillMode: "backwards" } as const;
@@ -137,7 +136,6 @@ export function ToolBuilder({
   initialInputSchema = null,
   initialFiles = [],
   onToolBuilt,
-  mode = "build",
 }: ToolBuilderProps) {
   const [view, setView] = useState<ToolBuilderView>(initialView);
   const [isBuilding, setIsBuilding] = useState(false);
@@ -855,23 +853,17 @@ export function ToolBuilder({
               onClick={handleBuildTool}
               disabled={isBuilding || !instruction.trim() || !isPayloadValid}
               className="h-8 px-4 rounded-full flex-shrink-0 flex items-center gap-2"
-              title={
-                !isPayloadValid
-                  ? "Payload does not match custom input schema"
-                  : mode === "rebuild"
-                    ? "Rebuild Tool"
-                    : "Build Tool"
-              }
+              title={!isPayloadValid ? "Payload does not match custom input schema" : "Build Tool"}
             >
               {isBuilding ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {mode === "rebuild" ? "Rebuilding..." : "Building..."}
+                  Building...
                 </>
               ) : (
                 <>
                   <Wrench className="h-4 w-4" />
-                  {mode === "rebuild" ? "Rebuild" : "Build"}
+                  Build
                 </>
               )}
             </Button>
