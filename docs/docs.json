@@ -45,6 +45,12 @@
           {
             "group": "API Reference",
             "openapi": "openapi.yaml"
+          },
+          {
+            "group": "Enterprise",
+            "pages": [
+              "enterprise/metrics"
+            ]
           }
         ]
       }
