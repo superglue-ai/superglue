@@ -12,7 +12,13 @@ import { Pool, PoolConfig } from "pg";
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
 import { extractRun } from "./migrations/run-migration.js";
-import type { DataStore, ToolScheduleInternal } from "./types.js";
+import type {
+  DataStore,
+  PrometheusRunMetrics,
+  PrometheusRunSourceLabel,
+  PrometheusRunStatusLabel,
+  ToolScheduleInternal,
+} from "./types.js";
 
 type ConfigType = "api" | "workflow";
 type ConfigData = ApiConfig | Tool;
@@ -137,12 +143,63 @@ export class PostgresService implements DataStore {
           id VARCHAR(255) NOT NULL,
           config_id VARCHAR(255),
           org_id VARCHAR(255),
+          status VARCHAR(50),
+          request_source VARCHAR(50) CHECK (request_source IN ('api','frontend','scheduler','mcp')),
           data JSONB NOT NULL,
           started_at TIMESTAMP,
           completed_at TIMESTAMP,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           PRIMARY KEY (id, org_id)
         )
+      `);
+
+      // Backwards-compatible schema updates for existing deployments
+      await client.query(`ALTER TABLE runs ADD COLUMN IF NOT EXISTS status VARCHAR(50)`);
+      await client.query(`ALTER TABLE runs ADD COLUMN IF NOT EXISTS request_source VARCHAR(50)`);
+
+      // Ensure request_source is constrained to allowed enum values (idempotent)
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conname = 'runs_request_source_check'
+          ) THEN
+            ALTER TABLE runs
+              ADD CONSTRAINT runs_request_source_check
+              CHECK (request_source IN ('api','frontend','scheduler','mcp'));
+          END IF;
+        END
+        $$;
+      `);
+
+      // Backfill columns from JSON for existing rows
+      // - New format: data.status = RUNNING|SUCCESS|FAILED|ABORTED
+      // - Legacy format: data.success = true|false (no status field)
+      await client.query(`
+        UPDATE runs
+        SET
+          status = COALESCE(
+            status,
+            NULLIF(data->>'status', ''),
+            CASE
+              WHEN data->>'success' = 'true' THEN 'SUCCESS'
+              WHEN data->>'success' = 'false' THEN 'FAILED'
+              ELSE NULL
+            END
+          ),
+          request_source = COALESCE(
+            request_source,
+            CASE
+              WHEN data->>'requestSource' = 'scheduler' THEN 'scheduler'
+              WHEN data->>'requestSource' = 'scheduled' THEN 'scheduler'
+              WHEN data->>'requestSource' = 'frontend' THEN 'frontend'
+              WHEN data->>'requestSource' = 'mcp' THEN 'mcp'
+              WHEN data->>'requestSource' = 'rest_api' THEN 'api'
+              WHEN data->>'requestSource' = 'api' THEN 'api'
+              ELSE 'frontend'
+            END
+          )
+        WHERE status IS NULL OR request_source IS NULL
       `);
 
       // Integrations table (without large fields)
@@ -273,6 +330,12 @@ export class PostgresService implements DataStore {
         `CREATE INDEX IF NOT EXISTS idx_runs_config_id ON runs(config_id, org_id)`,
       );
       await client.query(`CREATE INDEX IF NOT EXISTS idx_runs_started_at ON runs(started_at)`);
+      await client.query(
+        `CREATE INDEX IF NOT EXISTS idx_runs_org_status_source ON runs(org_id, status, request_source)`,
+      );
+      await client.query(
+        `CREATE INDEX IF NOT EXISTS idx_runs_org_source_completed_at ON runs(org_id, request_source, completed_at) WHERE completed_at IS NOT NULL`,
+      );
       await client.query(
         `CREATE INDEX IF NOT EXISTS idx_integrations_type ON integrations(type, org_id)`,
       );
@@ -533,14 +596,16 @@ export class PostgresService implements DataStore {
     try {
       const result = await client.query(
         `
-                INSERT INTO runs (id, config_id, org_id, data, started_at, completed_at) 
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO runs (id, config_id, org_id, status, request_source, data, started_at, completed_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 ON CONFLICT (id, org_id) DO NOTHING
             `,
         [
           run.id,
           run.toolId,
           run.orgId || "",
+          run.status,
+          run.requestSource ?? "api",
           JSON.stringify(run),
           run.startedAt ? run.startedAt.toISOString() : null,
           run.completedAt ? run.completedAt.toISOString() : null,
@@ -589,18 +654,86 @@ export class PostgresService implements DataStore {
       await client.query(
         `
                 UPDATE runs 
-                SET data = $1, completed_at = $2
-                WHERE id = $3 AND org_id = $4
+                SET data = $1, completed_at = $2, status = $3, request_source = $4
+                WHERE id = $5 AND org_id = $6
             `,
         [
           JSON.stringify(updatedRun),
           updatedRun.completedAt ? updatedRun.completedAt.toISOString() : null,
+          updatedRun.status,
+          updatedRun.requestSource ?? "api",
           id,
           orgId,
         ],
       );
 
       return updatedRun;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getPrometheusRunMetrics(params: {
+    orgId: string;
+    windowSeconds: number;
+  }): Promise<PrometheusRunMetrics> {
+    const { orgId, windowSeconds } = params;
+    const client = await this.pool.connect();
+    try {
+      const totals = await client.query(
+        `
+          SELECT
+            status,
+            request_source,
+            COUNT(*)::bigint AS count
+          FROM runs
+          WHERE org_id = $1
+            AND status IN ('SUCCESS', 'FAILED', 'ABORTED')
+          GROUP BY status, request_source
+        `,
+        [orgId],
+      );
+
+      const runsTotal: PrometheusRunMetrics["runsTotal"] = totals.rows
+        .map((r: any) => {
+          const status = String(r.status || "").toLowerCase() as PrometheusRunStatusLabel;
+          const source = String(r.request_source || "api") as PrometheusRunSourceLabel;
+          const value = Number(r.count ?? 0);
+          if (status !== "success" && status !== "failed" && status !== "aborted") return null;
+          if (!["api", "frontend", "scheduler", "mcp"].includes(source)) return null;
+          return { status, source, value };
+        })
+        .filter(Boolean) as PrometheusRunMetrics["runsTotal"];
+
+      const p95Rows = await client.query(
+        `
+          SELECT
+            request_source,
+            percentile_cont(0.95) WITHIN GROUP (
+              ORDER BY EXTRACT(EPOCH FROM (completed_at - started_at))
+            ) AS p95
+          FROM runs
+          WHERE org_id = $1
+            AND completed_at IS NOT NULL
+            AND started_at IS NOT NULL
+            AND status IN ('SUCCESS', 'FAILED', 'ABORTED')
+            AND completed_at > (NOW() - make_interval(secs => $2))
+          GROUP BY request_source
+        `,
+        [orgId, windowSeconds],
+      );
+
+      const runDurationSecondsP95: PrometheusRunMetrics["runDurationSecondsP95"] = p95Rows.rows
+        .map((r: any) => {
+          const source = String(r.request_source || "api") as PrometheusRunSourceLabel;
+          const value = Number(r.p95);
+          if (!Number.isFinite(value)) return null;
+          if (!["api", "frontend", "scheduler", "mcp"].includes(source)) return null;
+          return { source, windowSeconds, value };
+        })
+        .filter(Boolean) as PrometheusRunMetrics["runDurationSecondsP95"];
+
+      return { runsTotal, runDurationSecondsP95 };
     } finally {
       client.release();
     }

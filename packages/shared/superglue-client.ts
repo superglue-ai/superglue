@@ -884,6 +884,7 @@ export class SuperglueClient {
               id
               toolId
               status
+              requestSource
               toolResult
               stepResults {
                 stepId
@@ -916,6 +917,7 @@ export class SuperglueClient {
             id
             toolId
             status
+            requestSource
             toolResult
             toolPayload
             stepResults {

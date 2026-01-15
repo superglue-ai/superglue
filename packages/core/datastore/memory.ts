@@ -9,7 +9,7 @@ import {
   Tool,
 } from "@superglue/shared";
 import { createHash } from "node:crypto";
-import type { DataStore, ToolScheduleInternal } from "./types.js";
+import type { DataStore, PrometheusRunMetrics, ToolScheduleInternal } from "./types.js";
 
 export class MemoryStore implements DataStore {
   private storage: {
@@ -182,6 +182,14 @@ export class MemoryStore implements DataStore {
 
     const items = filteredRuns.slice(offset, offset + limit);
     return { items, total: filteredRuns.length };
+  }
+
+  async getPrometheusRunMetrics(params: {
+    orgId: string;
+    windowSeconds: number;
+  }): Promise<PrometheusRunMetrics> {
+    // Placeholder implementation (metrics are Postgres-backed in production)
+    return { runsTotal: [], runDurationSecondsP95: [] };
   }
 
   async clearAll(): Promise<void> {

@@ -173,6 +173,13 @@ export enum RunStatus {
   ABORTED = "ABORTED",
 }
 
+export enum RequestSource {
+  API = "api",
+  FRONTEND = "frontend",
+  SCHEDULER = "scheduler",
+  MCP = "mcp",
+}
+
 export enum FilterTarget {
   KEYS = "KEYS",
   VALUES = "VALUES",
@@ -399,7 +406,7 @@ export interface Run {
   toolResult?: any;
   stepResults?: ToolStepResult[];
   options?: RequestOptions;
-  requestSource?: string;
+  requestSource?: RequestSource;
   error?: string;
   traceId?: string;
   startedAt: Date;

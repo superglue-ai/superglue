@@ -1,5 +1,6 @@
 import { SelfHealingMode } from "@superglue/shared";
 import { calculateNextRun } from "@superglue/shared";
+import { RequestSource } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { DataStore } from "../datastore/types.js";
 import { executeWorkflowResolver } from "../graphql/resolvers/workflow.js";
@@ -69,6 +70,7 @@ export class ToolSchedulerWorker {
           workerPools: this.workerPools,
           traceId,
           orgId: schedule.orgId,
+          requestSource: RequestSource.SCHEDULER,
           toMetadata: function () {
             return { orgId: this.orgId, traceId: this.traceId };
           },
