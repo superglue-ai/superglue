@@ -1,9 +1,4 @@
-import {
-  FilterAction,
-  FilterTarget,
-  RemoveScope,
-  ResponseFilter,
-} from "@superglue/shared";
+import { FilterAction, FilterTarget, RemoveScope, ResponseFilter } from "@superglue/shared";
 
 export interface FilterMatch {
   filterId: string;
@@ -305,4 +300,3 @@ function replacePattern(value: string, pattern: string, replacement: string): st
     return value.replace(new RegExp(escapedPattern, "gi"), replacement);
   }
 }
-
