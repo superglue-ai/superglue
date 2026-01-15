@@ -59,7 +59,7 @@ export function ToolCreateStepper({
       const currentToolState = playgroundRef.current?.getCurrentTool();
       setCurrentTool(currentToolState || tool);
       saveResolveRef.current = (success: boolean) =>
-      success ? resolve() : reject(new Error("cancelled"));
+        success ? resolve() : reject(new Error("cancelled"));
       setShowSaveDialog(true);
     });
   };
