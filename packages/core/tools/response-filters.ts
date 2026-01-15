@@ -240,7 +240,8 @@ function processObject(
     }
 
     // Check value filters (for primitive values - strings, numbers, booleans)
-    const isPrimitive = typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+    const isPrimitive =
+      typeof value === "string" || typeof value === "number" || typeof value === "boolean";
     let currentValue = isPrimitive ? String(value) : null;
     let valueWasMasked = false;
     if (currentValue !== null && !shouldRemoveField) {

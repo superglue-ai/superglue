@@ -218,10 +218,7 @@ describe("applyResponseFilters", () => {
     describe("scope: ITEM", () => {
       it("should replace entire containing object with mask value", () => {
         const data = {
-          users: [
-            { name: "John", ssn: "123-45-6789" },
-            { name: "Jane" },
-          ],
+          users: [{ name: "John", ssn: "123-45-6789" }, { name: "Jane" }],
         };
         const filter = createFilter({
           pattern: "ssn",
@@ -335,10 +332,7 @@ describe("applyResponseFilters", () => {
       const data = {
         users: [
           {
-            activities: [
-              { type: "login", secret: "token123" },
-              { type: "logout" },
-            ],
+            activities: [{ type: "login", secret: "token123" }, { type: "logout" }],
           },
         ],
       };
@@ -710,9 +704,7 @@ describe("applyResponseFilters", () => {
             teams: [
               {
                 name: "Enterprise",
-                members: [
-                  { name: "Frank", clearance: "public" },
-                ],
+                members: [{ name: "Frank", clearance: "public" }],
               },
             ],
           },
@@ -837,7 +829,9 @@ describe("applyResponseFilters", () => {
       expect(result.data.data.repository.collaborators.edges[1].node.email).toBe("bob@[REDACTED]");
 
       // Public email preserved
-      expect(result.data.data.repository.collaborators.edges[0].node.email).toBe("alice@public.com");
+      expect(result.data.data.repository.collaborators.edges[0].node.email).toBe(
+        "alice@public.com",
+      );
     });
 
     it("should handle arrays at multiple nesting levels with different scopes", () => {
