@@ -414,6 +414,109 @@ export class SuperglueClient {
     return response.abortToolExecution;
   }
 
+  /**
+   * Execute a single step without creating a run in the database.
+   * Used for individual step testing in the playground.
+   */
+  async executeStep({
+    step,
+    payload,
+    previousResults,
+    credentials,
+    options,
+  }: {
+    step: any;
+    payload?: Record<string, any>;
+    previousResults?: Record<string, any>;
+    credentials?: Record<string, string>;
+    options?: { selfHealing?: boolean; timeout?: number };
+  }): Promise<{
+    stepId: string;
+    success: boolean;
+    data?: any;
+    error?: string;
+    updatedStep?: any;
+  }> {
+    return this.restRequest("POST", "/tools/step/run", {
+      step,
+      payload,
+      previousResults,
+      credentials,
+      options,
+    });
+  }
+
+  /**
+   * Execute a final transform without creating a run in the database.
+   * Used for transform testing in the playground.
+   */
+  async executeTransformOnly({
+    finalTransform,
+    responseSchema,
+    inputSchema,
+    payload,
+    stepResults,
+    responseFilters,
+    options,
+  }: {
+    finalTransform: string;
+    responseSchema?: any;
+    inputSchema?: any;
+    payload?: Record<string, any>;
+    stepResults?: Record<string, any>;
+    responseFilters?: any[];
+    options?: { selfHealing?: boolean; timeout?: number };
+  }): Promise<{
+    success: boolean;
+    data?: any;
+    error?: string;
+    updatedTransform?: string;
+    updatedResponseSchema?: any;
+  }> {
+    return this.restRequest("POST", "/tools/transform/run", {
+      finalTransform,
+      responseSchema,
+      inputSchema,
+      payload,
+      stepResults,
+      responseFilters,
+      options,
+    });
+  }
+
+  /**
+   * Create a run entry in the database after manual tool execution.
+   * Used when "Run All Steps" completes in the playground.
+   */
+  async createRun({
+    toolId,
+    toolConfig,
+    status,
+    error,
+    startedAt,
+    completedAt,
+  }: {
+    toolId: string;
+    toolConfig: Tool;
+    status: "success" | "failed" | "aborted";
+    error?: string;
+    startedAt: Date;
+    completedAt: Date;
+  }): Promise<{
+    runId: string;
+    toolId: string;
+    status: string;
+  }> {
+    return this.restRequest("POST", "/runs", {
+      toolId,
+      toolConfig,
+      status,
+      error,
+      startedAt: startedAt.toISOString(),
+      completedAt: completedAt.toISOString(),
+    });
+  }
+
   async buildWorkflow({
     instruction,
     payload,
