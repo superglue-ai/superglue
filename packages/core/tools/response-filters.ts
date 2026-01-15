@@ -147,18 +147,35 @@ function processValue(
   for (const filter of filters) {
     if (filter.target === FilterTarget.VALUES || filter.target === FilterTarget.BOTH) {
       if (matchesPattern(stringValue, filter.pattern)) {
+        const scope = filter.scope || RemoveScope.FIELD;
         const match: FilterMatch = {
           filterId: filter.id,
           filterName: filter.name,
           action: filter.action,
           path: path || "(root)",
           matchedOn: "value",
-          scope: filter.scope,
+          scope: scope,
         };
         context.matches.push(match);
 
         if (filter.action === FilterAction.FAIL) {
           context.failedFilters.push(match);
+        } else if (filter.action === FilterAction.REMOVE) {
+          // For primitives in arrays, ITEM scope removes this element
+          if (scope === RemoveScope.ENTRY) return REMOVE_ENTRY;
+          if (scope === RemoveScope.ITEM) return REMOVE_ITEM;
+          // FIELD scope on a primitive = remove the primitive itself
+          return undefined;
+        } else if (filter.action === FilterAction.MASK) {
+          const maskValue = filter.maskValue || "[filtered]";
+          context.currentMaskValue = maskValue;
+          if (scope === RemoveScope.ENTRY) return MASK_ENTRY;
+          if (scope === RemoveScope.ITEM) return MASK_ITEM;
+          // FIELD scope on a primitive = mask the value directly
+          if (typeof value === "string") {
+            return replacePattern(value, filter.pattern, maskValue);
+          }
+          return maskValue;
         }
       }
     }
