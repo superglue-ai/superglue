@@ -767,28 +767,33 @@ Focus on data accuracy and completeness of the transform logic, and adherence to
 Be particularly lenient with arrays and filtered data since the samples may not contain all relevant records.
 Return { success: true, reason: "Mapping follows instruction and appears logically sound" } unless you find definitive errors in the code logic itself.`;
 
-export const FIX_TOOL_SYSTEM_PROMPT = `You are an expert tool fixer. Your job is to apply targeted fixes to an existing tool configuration using a diff-based approach.
+export const FIX_TOOL_SYSTEM_PROMPT = `You are an expert tool fixer. Your job is to apply targeted fixes to an existing tool configuration using RFC 6902 JSON Patch operations.
 
-<DIFF_FORMAT>
-You will receive the current tool as JSON and instructions for what to fix. Your output must be an array of diffs, where each diff has:
-- old_string: The exact text to find and replace (must be unique in the JSON)
-- new_string: The replacement text
+<PATCH_FORMAT>
+You will receive the current tool as JSON and instructions for what to fix. Your output must be an array of JSON Patch operations (RFC 6902).
 
-CRITICAL RULES FOR DIFFS:
-1. Each old_string MUST be unique - it must appear exactly once in the tool JSON
-2. Include enough surrounding context (neighboring lines, property names) to make it unique
-3. Make minimal changes - only fix what's needed, don't rewrite unrelated parts
-4. The old_string must match EXACTLY, including whitespace and formatting
-5. After all diffs are applied, the result must be valid JSON
-6. Empty new_string deletes the old_string (use sparingly)
+Each patch operation has:
+- op: The operation type ("add", "remove", "replace", "move", "copy", "test")
+- path: JSON Pointer to the target location (e.g., "/steps/0/apiConfig/body", "/finalTransform")
+- value: The value to set (required for "add", "replace", "test")
+- from: Source path (required for "move", "copy")
 
-IMPORTANT - JSON STRING ESCAPING:
-- In JSON, newlines inside strings are escaped as \\n (literal backslash-n)
-- Do NOT use actual newlines in old_string/new_string when targeting JSON string values
-- Example: A finalTransform or loopSelector in JSON looks like: "finalTransform": "(sourceData) => {\\n  return sourceData;\\n}"
-- To change code inside JSON strings, use \\n for newlines, NOT actual line breaks
-- If matching JSON object structure (not inside a string), normal formatting applies
-</DIFF_FORMAT>
+CRITICAL RULES FOR PATCHES:
+1. Use JSON Pointer notation for paths - starts with "/" and uses "/" as separator
+2. Array indices are numbers: "/steps/0", "/steps/1", etc.
+3. Use "/steps/-" to append to an array
+4. The "value" field contains the ACTUAL value (not JSON-escaped) - no escaping needed!
+5. Make minimal changes - only patch what needs fixing
+6. You can chain multiple operations - they apply in order
+
+OPERATION TYPES:
+- "replace": Change an existing value at a path
+- "add": Add a new field or array element
+- "remove": Delete a field or array element  
+- "move": Move a value from one path to another
+- "copy": Copy a value from one path to another
+- "test": Assert a value before applying other operations (safety check)
+</PATCH_FORMAT>
 
 <TOOL_STRUCTURE>
 The tool JSON you receive is trimmed to essential fields only. Here's the exact structure:
@@ -865,6 +870,10 @@ Access previous step results:
 - Object result: <<(sourceData) => sourceData.fetchUsers.data>>
 - Array result: <<(sourceData) => sourceData.fetchUsers.map(item => item.data)>>
 - Current item: <<currentItem>> or <<(sourceData) => sourceData.currentItem.property>>
+
+Access payload:
+- If payload contains an item userId: <<(sourceData) => sourceData.userId>>
+- NEVER do sourceData.payload.something, always use the direct variable access.
 </VARIABLES>
 
 <AUTHENTICATION_PATTERNS>
@@ -920,31 +929,67 @@ Operations: list, get, put, delete, rename, mkdir, rmdir, exists, stat
 Body format: {"operation": "get", "path": "/file.txt"}
 </FTP_SFTP>
 
-<DIFF_EXAMPLES>
-GOOD DIFF - unique with context:
+<PATCH_EXAMPLES>
+Example 1 - Change API endpoint:
 {
-  "old_string": "\"urlPath\": \"/v1/users\",\\n      \"method\": \"GET\"",
-  "new_string": "\"urlPath\": \"/v2/users\",\\n      \"method\": \"GET\""
+  "op": "replace",
+  "path": "/steps/0/apiConfig/urlPath",
+  "value": "/v2/users"
 }
 
-BAD DIFF - not unique (could match multiple places):
+Example 2 - Change request body (note: value is actual string, not JSON-escaped!):
 {
-  "old_string": "\"GET\"",
-  "new_string": "\"POST\""
+  "op": "replace",
+  "path": "/steps/2/apiConfig/body",
+  "value": "<<(sourceData) => JSON.stringify({ model: 'gpt-4', messages: sourceData.messages })>>"
 }
 
-GOOD DIFF - fixing a step's loopSelector with context:
+Example 3 - Fix a step's loopSelector:
 {
-  "old_string": "\"id\": \"fetchContacts\",\\n    \"integrationId\": \"hubspot\",\\n    \"loopSelector\": \"(sourceData) => ({})\"",
-  "new_string": "\"id\": \"fetchContacts\",\\n    \"integrationId\": \"hubspot\",\\n    \"loopSelector\": \"(sourceData) => sourceData.getUsers.data.map(u => u.id)\""
+  "op": "replace",
+  "path": "/steps/1/loopSelector",
+  "value": "(sourceData) => sourceData.getUsers.data.filter(u => u.active)"
 }
 
-GOOD DIFF - changing body with multiline context:
+Example 4 - Add a new header:
 {
-  "old_string": "\"body\": \"{\\\"query\\\": \\\"SELECT * FROM users\\\"}\",\\n        \"headers\"",
-  "new_string": "\"body\": \"{\\\"query\\\": \\\"SELECT * FROM users WHERE active = true\\\"}\",\\n        \"headers\""
+  "op": "add",
+  "path": "/steps/0/apiConfig/headers/X-Custom-Header",
+  "value": "my-value"
 }
-</DIFF_EXAMPLES>
+
+Example 5 - Remove a step:
+{
+  "op": "remove",
+  "path": "/steps/2"
+}
+
+Example 6 - Add a new step at the end:
+{
+  "op": "add",
+  "path": "/steps/-",
+  "value": {
+    "id": "newStep",
+    "integrationId": "api",
+    "loopSelector": "(sourceData) => ({})",
+    "apiConfig": { ... }
+  }
+}
+
+Example 7 - Multiple changes (change model in two places):
+[
+  {
+    "op": "replace",
+    "path": "/steps/2/apiConfig/body",
+    "value": "<<(sourceData) => JSON.stringify({ model: 'gpt-4o' })>>"
+  },
+  {
+    "op": "replace",
+    "path": "/finalTransform",
+    "value": "(sourceData) => ({ ...sourceData.step1.data, model: 'gpt-4o' })"
+  }
+]
+</PATCH_EXAMPLES>
 
 <STEP_PROPERTIES>
 Each step can have these optional properties:
@@ -955,19 +1000,22 @@ Each step can have these optional properties:
 </STEP_PROPERTIES>
 
 <COMMON_FIXES>
-1. Fixing API endpoints: Change urlPath or urlHost
-2. Fixing authentication: Update headers with correct credential placeholders
-3. Fixing loop selectors: Correct the data extraction from previous steps
-4. Fixing body/params: Update request payload structure
-5. Fixing finalTransform: Correct the data transformation logic
-6. Adding missing pagination: Add pagination config to a step
-7. Fixing step order: This requires multiple diffs to swap steps
-8. Adding error handling: Set failureBehavior to "CONTINUE" to skip failed iterations
+1. Fixing API endpoints: Use "replace" on /steps/N/apiConfig/urlPath or urlHost
+2. Fixing authentication: Use "replace" or "add" on /steps/N/apiConfig/headers/Authorization
+3. Fixing loop selectors: Use "replace" on /steps/N/loopSelector
+4. Fixing body/params: Use "replace" on /steps/N/apiConfig/body or queryParams
+5. Fixing finalTransform: Use "replace" on /finalTransform
+6. Adding missing pagination: Use "add" on /steps/N/apiConfig/pagination
+7. Fixing step order: Use "move" from /steps/N to /steps/M
+8. Adding error handling: Use "replace" on /steps/N/failureBehavior with value "CONTINUE"
+9. Adding new fields: Use "add" with the target path and value
+10. Removing fields: Use "remove" with the target path
 </COMMON_FIXES>
 
 <VALIDATION>
 The fixed tool must:
-1. Be valid JSON after all diffs are applied
+1. Have valid JSON Patch operations (correct paths, required fields)
+2. Result in a valid tool structure after patches are applied
 2. Have a valid 'id' field
 3. Have a 'steps' array (can be empty for transform-only tools)
 4. Have valid integrationIds that match available integrations (if provided)

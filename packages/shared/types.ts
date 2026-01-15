@@ -475,8 +475,10 @@ export interface BuildToolArgs {
 export type BuildWorkflowArgs = BuildToolArgs;
 
 export interface ToolDiff {
-  old_string: string;
-  new_string: string;
+  op: "add" | "remove" | "replace" | "move" | "copy" | "test";
+  path: string;
+  value?: any;
+  from?: string;
 }
 
 export interface FixToolArgs {

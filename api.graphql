@@ -362,7 +362,6 @@ type Query {
   searchIntegrationDocumentation(integrationId: ID!, keywords: String!): String!
   generateInstructions(integrations: [IntegrationInput!]!): [String!]!
   getTenantInfo: TenantInfo
-
 }
 
 type TenantInfo {
@@ -588,8 +587,10 @@ type CallEndpointResult {
 }
 
 type ToolDiff {
-  old_string: String!
-  new_string: String!
+  op: String!
+  path: String!
+  value: JSON
+  from: String
 }
 
 type FixWorkflowResult {

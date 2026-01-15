@@ -4,12 +4,7 @@ import { Card } from "@/src/components/ui/card";
 import { FileChip } from "@/src/components/ui/FileChip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
-import {
-  formatBytes,
-  isAllowedFileType,
-  MAX_TOTAL_FILE_SIZE_TOOLS,
-  type UploadedFileInfo,
-} from "@/src/lib/file-utils";
+import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE_TOOLS } from "@/src/lib/file-utils";
 import { ALLOWED_FILE_EXTENSIONS } from "@superglue/shared";
 import { FileBraces, FileBracesCorner, FileJson, Upload } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";

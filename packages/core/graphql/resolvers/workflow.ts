@@ -1,8 +1,8 @@
 import {
   generateUniqueId,
   Integration,
-  RequestSource,
   RequestOptions,
+  RequestSource,
   RunStatus,
   Tool,
   ToolDiff,
@@ -472,7 +472,7 @@ export const fixWorkflowResolver = async (
   const metadata = context.toMetadata();
 
   try {
-    const { workflow, fixInstructions, lastError, integrationIds } = args;
+    const { workflow, fixInstructions, lastError } = args;
 
     if (!workflow) {
       throw new Error("Workflow configuration is required to fix a workflow.");
@@ -482,33 +482,14 @@ export const fixWorkflowResolver = async (
       throw new Error("Fix instructions are required.");
     }
 
-    // Resolve integrations - either from provided IDs or from the workflow's integrationIds
-    let resolvedIntegrations: Integration[] = [];
-    const idsToResolve = integrationIds || workflow.integrationIds || [];
-
-    if (idsToResolve.length > 0) {
-      const datastoreAdapter = {
-        getIntegration: async (id: string): Promise<Integration | null> => {
-          const result = await context.datastore.getIntegration({
-            id,
-            includeDocs: true,
-            orgId: context.orgId,
-          });
-          return result || null;
-        },
-        getManyIntegrations: async (ids: string[]): Promise<Integration[]> => {
-          return await context.datastore.getManyIntegrations({
-            ids,
-            includeDocs: true,
-            orgId: context.orgId,
-          });
-        },
-      };
-      resolvedIntegrations = await waitForIntegrationProcessing(
-        datastoreAdapter,
-        idsToResolve as string[],
-      );
-    }
+    // Fetch ALL of the customer's configured integrations so the LLM can use any of them
+    const allIntegrations = await context.datastore.listIntegrations({
+      limit: 1000,
+      offset: 0,
+      includeDocs: true,
+      orgId: context.orgId,
+    });
+    const resolvedIntegrations: Integration[] = allIntegrations.items || [];
 
     const fixer = new ToolFixer({
       tool: workflow,
