@@ -239,10 +239,11 @@ function processObject(
       }
     }
 
-    // Check value filters (for string values)
-    let currentValue = typeof value === "string" ? value : null;
+    // Check value filters (for primitive values - strings, numbers, booleans)
+    const isPrimitive = typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+    let currentValue = isPrimitive ? String(value) : null;
     let valueWasMasked = false;
-    if (currentValue && !shouldRemoveField) {
+    if (currentValue !== null && !shouldRemoveField) {
       for (const filter of filters) {
         if (filter.target === FilterTarget.VALUES || filter.target === FilterTarget.BOTH) {
           if (matchesPattern(currentValue, filter.pattern)) {
@@ -268,10 +269,13 @@ function processObject(
               context.currentMaskValue = maskValue;
               if (scope === RemoveScope.ENTRY) return MASK_ENTRY;
               if (scope === RemoveScope.ITEM) return MASK_ITEM;
-              const replacement = filter.maskValue || "[filtered]";
-              currentValue = replacePattern(currentValue, filter.pattern, replacement);
+              // Partial replacement only works for actual strings
+              if (typeof value === "string") {
+                const replacement = filter.maskValue || "[filtered]";
+                currentValue = replacePattern(currentValue, filter.pattern, replacement);
+                valueWasMasked = true;
+              }
               shouldMask = true;
-              valueWasMasked = true;
             }
           }
         }
@@ -287,8 +291,8 @@ function processObject(
 
     if (shouldMask && maskValue !== null) {
       result[key] = maskValue;
-    } else {
-      // Recursively process nested values
+    } else if (typeof value === "object" && value !== null) {
+      // Only recursively process objects and arrays (not primitives)
       const processed = processValue(value, filters, currentPath, context);
 
       // Bubble up signals from nested values
@@ -307,6 +311,9 @@ function processObject(
       }
 
       result[key] = processed;
+    } else {
+      // Primitives: keep as-is (already processed above for value filters)
+      result[key] = value;
     }
   }
 
