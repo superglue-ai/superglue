@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/src/components/ui/select";
 import { Switch } from "@/src/components/ui/switch";
-import { FilterAction, FilterTarget, ResponseFilter } from "@superglue/shared";
+import { FilterAction, FilterTarget, RemoveScope, ResponseFilter } from "@superglue/shared";
 import {
   AlertTriangle,
   CreditCard,
@@ -418,6 +418,26 @@ export function ResponseFiltersCard({ filters, onChange, disabled }: ResponseFil
                     </SelectContent>
                   </Select>
 
+                  {(filter.action === FilterAction.REMOVE ||
+                    filter.action === FilterAction.MASK) && (
+                    <Select
+                      value={filter.scope || RemoveScope.FIELD}
+                      onValueChange={(value) =>
+                        updateFilter(filter.id, { scope: value as RemoveScope })
+                      }
+                      disabled={disabled}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-auto min-w-[110px] font-medium">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={RemoveScope.FIELD}>just this field</SelectItem>
+                        <SelectItem value={RemoveScope.ITEM}>this item</SelectItem>
+                        <SelectItem value={RemoveScope.ENTRY}>entire entry</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+
                   {filter.action === FilterAction.MASK && (
                     <>
                       <span className="text-muted-foreground whitespace-nowrap">with</span>
@@ -426,7 +446,7 @@ export function ResponseFiltersCard({ filters, onChange, disabled }: ResponseFil
                         value={filter.maskValue || ""}
                         onChange={(e) => updateFilter(filter.id, { maskValue: e.target.value })}
                         disabled={disabled}
-                        className="h-7 w-[120px] font-mono !text-xs !p-2"
+                        className="h-7 w-[100px] font-mono !text-xs !p-2"
                       />
                     </>
                   )}

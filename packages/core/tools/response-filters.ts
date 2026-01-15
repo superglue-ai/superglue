@@ -1,4 +1,4 @@
-import { FilterAction, FilterTarget, ResponseFilter } from "@superglue/shared";
+import { FilterAction, FilterTarget, RemoveScope, ResponseFilter } from "@superglue/shared";
 
 export interface FilterMatch {
   filterId: string;
@@ -7,6 +7,7 @@ export interface FilterMatch {
   path: string;
   matchedOn: "key" | "value";
   matchedValue?: string;
+  scope?: RemoveScope;
 }
 
 export interface ApplyFiltersResult {
@@ -25,9 +26,40 @@ export class FilterMatchError extends Error {
   }
 }
 
+// Sentinels to signal actions at ancestor level
+const REMOVE_FIELD = Symbol("REMOVE_FIELD");
+const REMOVE_ITEM = Symbol("REMOVE_ITEM");
+const REMOVE_ENTRY = Symbol("REMOVE_ENTRY");
+const MASK_ITEM = Symbol("MASK_ITEM");
+const MASK_ENTRY = Symbol("MASK_ENTRY");
+
+type ActionSignal =
+  | typeof REMOVE_FIELD
+  | typeof REMOVE_ITEM
+  | typeof REMOVE_ENTRY
+  | typeof MASK_ITEM
+  | typeof MASK_ENTRY;
+
+interface ProcessContext {
+  matches: FilterMatch[];
+  failedFilters: FilterMatch[];
+  entryPath: string | null;
+  currentMaskValue: string;
+}
+
 /**
  * Apply response filters to data, recursively processing objects and arrays.
  * Returns filtered data and information about what was matched.
+ *
+ * Scope behavior for REMOVE:
+ * - FIELD (default): Remove only the matched key-value pair
+ * - ITEM: Remove from the nearest containing array
+ * - ENTRY: Remove from the top-level array
+ *
+ * Scope behavior for MASK:
+ * - FIELD (default): Mask only the matched value
+ * - ITEM: Replace the entire containing object with mask value
+ * - ENTRY: Replace the entire top-level array item with mask value
  */
 export function applyResponseFilters(data: any, filters: ResponseFilter[]): ApplyFiltersResult {
   const enabledFilters = filters.filter((f) => f.enabled);
@@ -35,15 +67,26 @@ export function applyResponseFilters(data: any, filters: ResponseFilter[]): Appl
     return { data, matches: [], failedFilters: [] };
   }
 
-  const matches: FilterMatch[] = [];
-  const failedFilters: FilterMatch[] = [];
+  const context: ProcessContext = {
+    matches: [],
+    failedFilters: [],
+    entryPath: null,
+    currentMaskValue: "[filtered]",
+  };
 
-  const processedData = processValue(data, enabledFilters, "", matches, failedFilters);
+  let processedData = processValue(data, enabledFilters, "", context);
+
+  // Handle signals at root level
+  if (processedData === REMOVE_ITEM || processedData === REMOVE_ENTRY) {
+    processedData = Array.isArray(data) ? [] : {};
+  } else if (processedData === MASK_ITEM || processedData === MASK_ENTRY) {
+    processedData = context.currentMaskValue;
+  }
 
   return {
     data: processedData,
-    matches,
-    failedFilters,
+    matches: context.matches,
+    failedFilters: context.failedFilters,
   };
 }
 
@@ -51,44 +94,97 @@ function processValue(
   value: any,
   filters: ResponseFilter[],
   path: string,
-  matches: FilterMatch[],
-  failedFilters: FilterMatch[],
+  context: ProcessContext,
 ): any {
   if (value === null || value === undefined) {
     return value;
   }
 
   if (Array.isArray(value)) {
-    return value
-      .map((item, index) =>
-        processValue(item, filters, `${path}[${index}]`, matches, failedFilters),
-      )
-      .filter((item) => item !== undefined);
+    const results: any[] = [];
+
+    for (let index = 0; index < value.length; index++) {
+      const itemPath = `${path}[${index}]`;
+      const previousEntryPath = context.entryPath;
+
+      // Track entry path - first array item we enter
+      if (context.entryPath === null) {
+        context.entryPath = itemPath;
+      }
+
+      const result = processValue(value[index], filters, itemPath, context);
+
+      context.entryPath = previousEntryPath;
+
+      // Handle signals at array level
+      if (result === REMOVE_ENTRY) {
+        if (previousEntryPath === null) {
+          continue; // At entry level, skip this item
+        }
+        return REMOVE_ENTRY; // Bubble up
+      }
+      if (result === REMOVE_ITEM) {
+        continue; // Remove from this array
+      }
+      if (result === MASK_ENTRY) {
+        if (previousEntryPath === null) {
+          results.push(context.currentMaskValue); // Replace with mask at entry level
+          continue;
+        }
+        return MASK_ENTRY; // Bubble up
+      }
+      if (result === MASK_ITEM) {
+        results.push(context.currentMaskValue); // Replace with mask at this level
+        continue;
+      }
+      if (result === REMOVE_FIELD) {
+        continue; // FIELD removal on primitive array element - skip it
+      }
+      if (result !== undefined) {
+        results.push(result);
+      }
+    }
+    return results;
   }
 
   if (typeof value === "object") {
-    return processObject(value, filters, path, matches, failedFilters);
+    return processObject(value, filters, path, context);
   }
 
-  // For primitive values at root level, check value filters
-  if (typeof value === "string") {
-    for (const filter of filters) {
-      if (filter.target === FilterTarget.VALUES || filter.target === FilterTarget.BOTH) {
-        if (matchesPattern(value, filter.pattern)) {
-          const match: FilterMatch = {
-            filterId: filter.id,
-            filterName: filter.name,
-            action: filter.action,
-            path: path || "(root)",
-            matchedOn: "value",
-          };
-          matches.push(match);
+  // For primitive values, check value filters
+  const stringValue = typeof value === "string" ? value : String(value);
+  for (const filter of filters) {
+    if (filter.target === FilterTarget.VALUES || filter.target === FilterTarget.BOTH) {
+      if (matchesPattern(stringValue, filter.pattern)) {
+        const scope = filter.scope || RemoveScope.FIELD;
+        const match: FilterMatch = {
+          filterId: filter.id,
+          filterName: filter.name,
+          action: filter.action,
+          path: path || "(root)",
+          matchedOn: "value",
+          scope: scope,
+        };
+        context.matches.push(match);
 
-          if (filter.action === FilterAction.FAIL) {
-            failedFilters.push(match);
+        if (filter.action === FilterAction.FAIL) {
+          context.failedFilters.push(match);
+        } else if (filter.action === FilterAction.REMOVE) {
+          // For primitives in arrays, ITEM scope removes this element
+          if (scope === RemoveScope.ENTRY) return REMOVE_ENTRY;
+          if (scope === RemoveScope.ITEM) return REMOVE_ITEM;
+          // FIELD scope on a primitive = remove the primitive itself
+          return REMOVE_FIELD;
+        } else if (filter.action === FilterAction.MASK) {
+          const maskValue = filter.maskValue || "[filtered]";
+          context.currentMaskValue = maskValue;
+          if (scope === RemoveScope.ENTRY) return MASK_ENTRY;
+          if (scope === RemoveScope.ITEM) return MASK_ITEM;
+          // FIELD scope on a primitive = mask the value directly
+          if (typeof value === "string") {
+            return replacePattern(value, filter.pattern, maskValue);
           }
-          // For REMOVE/MASK on root primitive, we can't remove/mask in place
-          // The caller would need to handle this
+          return maskValue;
         }
       }
     }
@@ -101,14 +197,13 @@ function processObject(
   obj: Record<string, any>,
   filters: ResponseFilter[],
   path: string,
-  matches: FilterMatch[],
-  failedFilters: FilterMatch[],
-): Record<string, any> {
+  context: ProcessContext,
+): Record<string, any> | ActionSignal {
   const result: Record<string, any> = {};
 
   for (const [key, value] of Object.entries(obj)) {
     const currentPath = path ? `${path}.${key}` : key;
-    let shouldRemove = false;
+    let shouldRemoveField = false;
     let shouldMask = false;
     let maskValue = "[filtered]";
 
@@ -116,73 +211,110 @@ function processObject(
     for (const filter of filters) {
       if (filter.target === FilterTarget.KEYS || filter.target === FilterTarget.BOTH) {
         if (matchesPattern(key, filter.pattern)) {
+          const scope = filter.scope ?? RemoveScope.FIELD;
           const match: FilterMatch = {
             filterId: filter.id,
             filterName: filter.name,
             action: filter.action,
             path: currentPath,
             matchedOn: "key",
+            scope: scope,
           };
-          matches.push(match);
+          context.matches.push(match);
 
           if (filter.action === FilterAction.FAIL) {
-            failedFilters.push(match);
+            context.failedFilters.push(match);
           } else if (filter.action === FilterAction.REMOVE) {
-            shouldRemove = true;
+            if (scope === RemoveScope.ENTRY) return REMOVE_ENTRY;
+            if (scope === RemoveScope.ITEM) return REMOVE_ITEM;
+            shouldRemoveField = true;
           } else if (filter.action === FilterAction.MASK) {
-            shouldMask = true;
             maskValue = filter.maskValue || "[filtered]";
+            context.currentMaskValue = maskValue;
+            if (scope === RemoveScope.ENTRY) return MASK_ENTRY;
+            if (scope === RemoveScope.ITEM) return MASK_ITEM;
+            shouldMask = true;
           }
         }
       }
     }
 
-    // Check value filters (only for string values)
-    let currentValue = typeof value === "string" ? value : null;
+    // Check value filters (for primitive values - strings, numbers, booleans)
+    const isPrimitive =
+      typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+    let currentValue = isPrimitive ? String(value) : null;
     let valueWasMasked = false;
-    if (currentValue && !shouldRemove) {
+    if (currentValue !== null && !shouldRemoveField) {
       for (const filter of filters) {
         if (filter.target === FilterTarget.VALUES || filter.target === FilterTarget.BOTH) {
           if (matchesPattern(currentValue, filter.pattern)) {
+            const scope = filter.scope ?? RemoveScope.FIELD;
             const match: FilterMatch = {
               filterId: filter.id,
               filterName: filter.name,
               action: filter.action,
               path: currentPath,
               matchedOn: "value",
+              scope: scope,
             };
-            matches.push(match);
+            context.matches.push(match);
 
             if (filter.action === FilterAction.FAIL) {
-              failedFilters.push(match);
+              context.failedFilters.push(match);
             } else if (filter.action === FilterAction.REMOVE) {
-              shouldRemove = true;
+              if (scope === RemoveScope.ENTRY) return REMOVE_ENTRY;
+              if (scope === RemoveScope.ITEM) return REMOVE_ITEM;
+              shouldRemoveField = true;
             } else if (filter.action === FilterAction.MASK) {
-              // Replace only the matched portion(s), not the entire value
-              const replacement = filter.maskValue || "[filtered]";
-              currentValue = replacePattern(currentValue, filter.pattern, replacement);
+              maskValue = filter.maskValue || "[filtered]";
+              context.currentMaskValue = maskValue;
+              if (scope === RemoveScope.ENTRY) return MASK_ENTRY;
+              if (scope === RemoveScope.ITEM) return MASK_ITEM;
+              // Partial replacement only works for actual strings
+              if (typeof value === "string") {
+                const replacement = filter.maskValue || "[filtered]";
+                currentValue = replacePattern(currentValue, filter.pattern, replacement);
+                valueWasMasked = true;
+              }
               shouldMask = true;
-              valueWasMasked = true;
             }
           }
         }
       }
-      // Only use modified value if VALUE filtering changed it (not if only KEY filtering matched)
       if (valueWasMasked) {
         maskValue = currentValue;
       }
     }
 
-    if (shouldRemove) {
-      // Skip this key entirely
+    if (shouldRemoveField) {
       continue;
     }
 
     if (shouldMask && maskValue !== null) {
       result[key] = maskValue;
+    } else if (typeof value === "object" && value !== null) {
+      // Only recursively process objects and arrays (not primitives)
+      const processed = processValue(value, filters, currentPath, context);
+
+      // Bubble up signals from nested values
+      if (
+        processed === REMOVE_ENTRY ||
+        processed === REMOVE_ITEM ||
+        processed === MASK_ENTRY ||
+        processed === MASK_ITEM
+      ) {
+        return processed;
+      }
+
+      // REMOVE_FIELD from a nested primitive means skip this key
+      if (processed === REMOVE_FIELD) {
+        continue;
+      }
+
+      result[key] = processed;
     } else {
-      // Recursively process nested values
-      result[key] = processValue(value, filters, currentPath, matches, failedFilters);
+      // Primitives: keep as-is (already processed above for value filters)
+      result[key] = value;
     }
   }
 
@@ -191,20 +323,18 @@ function processObject(
 
 function matchesPattern(value: string, pattern: string): boolean {
   try {
-    const regex = new RegExp(pattern, "i"); // Case insensitive by default
+    const regex = new RegExp(pattern, "i");
     return regex.test(value);
   } catch {
-    // Invalid regex - treat as literal match
     return value.toLowerCase().includes(pattern.toLowerCase());
   }
 }
 
 function replacePattern(value: string, pattern: string, replacement: string): string {
   try {
-    const regex = new RegExp(pattern, "gi"); // Case insensitive, global replace
+    const regex = new RegExp(pattern, "gi");
     return value.replace(regex, replacement);
   } catch {
-    // Invalid regex - treat as literal replacement (case-insensitive to match matchesPattern behavior)
     const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     return value.replace(new RegExp(escapedPattern, "gi"), replacement);
   }

@@ -93,6 +93,7 @@ export class SuperglueClient {
           pattern
           action
           maskValue
+          scope
         }
     `;
 
