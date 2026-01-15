@@ -124,12 +124,12 @@ const cancelRun: RouteHandler = async (request, reply) => {
     return sendError(reply, 404, "Run not found");
   }
 
-  if (run.requestSource === RequestSource.SCHEDULER) {
-    return sendError(reply, 400, "Scheduled runs cannot be cancelled");
-  }
-
   if (run.status !== RunStatus.RUNNING) {
     return sendError(reply, 400, `Run is not currently running (status: ${run.status})`);
+  }
+
+  if (run.requestSource === RequestSource.SCHEDULER) {
+    return sendError(reply, 400, "Scheduled runs cannot be cancelled");
   }
 
   logMessage("info", `Cancelling run ${params.runId}`, metadata);
