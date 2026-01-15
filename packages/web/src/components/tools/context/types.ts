@@ -177,4 +177,7 @@ export interface ExecutionContextValue {
   getCategorizedVariables: (stepId: string) => CategorizedVariables;
   getCategorizedSources: (stepId: string) => CategorizedSources;
   getDataSelectorResult: (stepId: string) => DataSelectorResult;
+
+  // === AGENT CONTEXT HELPERS ===
+  getExecutionStateSummary: () => string;
 }

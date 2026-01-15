@@ -28,7 +28,7 @@ const navItems = [
 */
 ];
 
-export function Sidebar() {
+export function LeftSidebar() {
   const pathname = usePathname();
   const [theme, setTheme, resolvedTheme] = useTheme();
   const [mounted, setMounted] = useState(false);

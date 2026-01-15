@@ -233,11 +233,7 @@ export const findRelevantIntegrationsResolver = async (
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ) => {
-  const logSearchTerms = searchTerms
-    ? `searchTerms: ${searchTerms}`
-    : "no searchTerms (returning all integrations)";
   const metadata = context.toMetadata();
-  logMessage("info", `Finding relevant integrations for ${logSearchTerms}`, metadata);
 
   try {
     const allIntegrations = await context.datastore.listIntegrations({

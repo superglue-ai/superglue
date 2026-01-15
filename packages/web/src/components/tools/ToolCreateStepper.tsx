@@ -25,9 +25,7 @@ export function ToolCreateStepper({
   initialView = "integrations",
 }: ToolCreateStepperProps) {
   const [step, setStep] = useState<ToolCreateStep>("build");
-  const [isStopping, setIsStopping] = useState(false);
   const [shouldStopExecution, setShouldStopExecution] = useState(false);
-  const [isRebuildingFromPlayground, setIsRebuildingFromPlayground] = useState(false);
 
   const { toast } = useToast();
   const router = useRouter();
@@ -41,15 +39,13 @@ export function ToolCreateStepper({
   const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
   const [filePayloads, setFilePayloads] = useState<Record<string, any>>({});
   const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [userSelectedIntegrations, setUserSelectedIntegrations] =
-    useState<string[]>(initialIntegrationIds);
+  const saveResolveRef = useRef<((success: boolean) => void) | null>(null);
 
   const handleToolBuilt = (tool: Tool, context: BuildContext) => {
     setCurrentTool(tool);
     setBuildContext(context);
     setUploadedFiles(context.uploadedFiles);
     setFilePayloads(context.filePayloads);
-    setUserSelectedIntegrations(context.integrationIds);
     setStep("run");
   };
 
@@ -58,10 +54,13 @@ export function ToolCreateStepper({
     setFilePayloads(payloads);
   };
 
-  const handleSaveTool = async (tool: Tool, payload: Record<string, any>) => {
-    const currentToolState = playgroundRef.current?.getCurrentTool();
-    setCurrentTool(currentToolState || tool);
-    setShowSaveDialog(true);
+  const handleSaveTool = (tool: Tool, _payload: Record<string, any>): Promise<void> => {
+    return new Promise((resolve) => {
+      const currentToolState = playgroundRef.current?.getCurrentTool();
+      setCurrentTool(currentToolState || tool);
+      saveResolveRef.current = () => resolve();
+      setShowSaveDialog(true);
+    });
   };
 
   const handleStopExecution = () => {
@@ -69,7 +68,6 @@ export function ToolCreateStepper({
 
     lastAbortTimeRef.current = Date.now();
     setShouldStopExecution(true);
-    setIsStopping(true);
     toast({
       title: "Execution aborted",
       description: "Tool execution has been aborted",
@@ -77,16 +75,17 @@ export function ToolCreateStepper({
   };
 
   const handleToolSaved = (savedTool: Tool) => {
+    saveResolveRef.current?.(true);
+    saveResolveRef.current = null;
     router.push(`/tools/${savedTool.id}`);
   };
 
-  const handleClose = () => {
-    if (isRebuildingFromPlayground) {
-      playgroundRef.current?.closeRebuild();
-      setIsRebuildingFromPlayground(false);
-      return;
-    }
+  const handleSaveDialogClose = () => {
+    saveResolveRef.current = null;
+    setShowSaveDialog(false);
+  };
 
+  const handleClose = () => {
     if (onComplete) {
       onComplete();
     } else {
@@ -96,22 +95,17 @@ export function ToolCreateStepper({
 
   return (
     <div className="flex-1 flex flex-col h-full p-6">
-      <div className="flex-none mb-4">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
-          <h1 className="text-2xl font-semibold">Create New Tool</h1>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse shrink-0"
-              onClick={() => window.open("https://cal.com/superglue/onboarding", "_blank")}
-            >
-              ✨ Get help from our team
-            </Button>
-            <Button variant="ghost" size="icon" className="shrink-0" onClick={handleClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+      <div className="flex items-center justify-end gap-2 mb-4">
+        <Button
+          variant="outline"
+          className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse"
+          onClick={() => window.open("https://cal.com/superglue/onboarding", "_blank")}
+        >
+          ✨ Get help from our team
+        </Button>
+        <Button variant="ghost" size="icon" onClick={handleClose}>
+          <X className="h-4 w-4" />
+        </Button>
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col">
@@ -139,13 +133,11 @@ export function ToolCreateStepper({
                 onStopExecution={handleStopExecution}
                 uploadedFiles={uploadedFiles}
                 onFilesChange={handleFilesChange}
-                onRebuildStart={() => setIsRebuildingFromPlayground(true)}
-                onRebuildEnd={() => setIsRebuildingFromPlayground(false)}
               />
               <SaveToolDialog
                 tool={currentTool}
                 isOpen={showSaveDialog}
-                onClose={() => setShowSaveDialog(false)}
+                onClose={handleSaveDialogClose}
                 onSaved={handleToolSaved}
               />
             </div>

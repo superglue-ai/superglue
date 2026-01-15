@@ -1,6 +1,7 @@
 import { Integration, ServiceMetadata, Tool, ToolDiff, ToolStepResult } from "@superglue/shared";
 import z from "zod";
 import { FIX_TOOL_SYSTEM_PROMPT } from "../context/context-prompts.js";
+import { parseJsonResilient } from "../files/parsers/json.js";
 import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { logMessage } from "../utils/logs.js";
 
@@ -60,9 +61,6 @@ export class ToolFixer {
     this.diffSchemaJson = z.toJSONSchema(diffSchema);
   }
 
-  /**
-   * Trim tool to essential fields for LLM context (positive filter)
-   */
   private trimToolForLLM(tool: Tool): Partial<Tool> {
     return {
       id: tool.id,
@@ -74,9 +72,6 @@ export class ToolFixer {
     };
   }
 
-  /**
-   * Trim step to essential fields
-   */
   private trimStepForLLM(step: any): any {
     return {
       id: step.id,
@@ -88,9 +83,6 @@ export class ToolFixer {
     };
   }
 
-  /**
-   * Trim apiConfig to essential fields (drop documentationUrl, timestamps)
-   */
   private trimApiConfigForLLM(config: any): any {
     if (!config) return config;
     return {
@@ -110,9 +102,6 @@ export class ToolFixer {
     return JSON.stringify(this.trimToolForLLM(this.tool));
   }
 
-  /**
-   * Build the context for the LLM to generate diffs
-   */
   private prepareFixContext(serializedTool: string): LLMMessage[] {
     let userContent = `<current_tool_json>
 ${serializedTool}
@@ -152,10 +141,6 @@ ${availableIntegrationIds.join(", ")}
     ];
   }
 
-  /**
-   * Try to normalize a string by escaping newlines for JSON matching
-   * Returns the normalized string and normalization type if it would help, otherwise null
-   */
   private tryNormalizeForJsonString(
     str: string,
     serializedTool: string,
@@ -301,6 +286,17 @@ ${availableIntegrationIds.join(", ")}
         };
       }
 
+      if (
+        normalizedNewString.includes("\n") ||
+        normalizedNewString.includes("\r") ||
+        normalizedNewString.includes("\t")
+      ) {
+        normalizedNewString = normalizedNewString
+          .replace(/\n/g, "\\n")
+          .replace(/\r/g, "\\r")
+          .replace(/\t/g, "\\t");
+      }
+
       normalizedDiffs.push({
         old_string: normalizedOldString,
         new_string: normalizedNewString,
@@ -342,44 +338,48 @@ ${availableIntegrationIds.join(", ")}
     tool?: Tool;
     error?: string;
   } {
-    try {
-      const parsed = JSON.parse(modifiedJson);
+    const parseResult = parseJsonResilient(modifiedJson);
 
-      // Basic validation
-      if (!parsed.id || typeof parsed.id !== "string") {
-        return { valid: false, error: "Tool must have a valid 'id' string" };
-      }
-
-      if (!Array.isArray(parsed.steps)) {
-        return { valid: false, error: "Tool must have a 'steps' array" };
-      }
-
-      // Validate steps
-      const availableIntegrationIds = Object.keys(this.integrations);
-      for (let i = 0; i < parsed.steps.length; i++) {
-        const step = parsed.steps[i];
-        if (!step.id) {
-          return { valid: false, error: `Step ${i + 1}: missing 'id'` };
-        }
-        if (!step.apiConfig) {
-          return { valid: false, error: `Step ${i + 1} (${step.id}): missing 'apiConfig'` };
-        }
-        if (
-          step.integrationId &&
-          availableIntegrationIds.length > 0 &&
-          !availableIntegrationIds.includes(step.integrationId)
-        ) {
-          return {
-            valid: false,
-            error: `Step ${i + 1} (${step.id}): invalid integrationId '${step.integrationId}'. Available: ${availableIntegrationIds.join(", ")}`,
-          };
-        }
-      }
-
-      return { valid: true, tool: parsed as Tool };
-    } catch (error: any) {
-      return { valid: false, error: `Invalid JSON: ${error.message}` };
+    if (!parseResult.success) {
+      return { valid: false, error: `Invalid JSON: ${parseResult.error}` };
     }
+
+    if (parseResult.repairs && parseResult.repairs.length > 0) {
+      logMessage("info", `JSON repaired with: ${parseResult.repairs.join(", ")}`, this.metadata);
+    }
+
+    const parsed = parseResult.data;
+
+    if (!parsed.id || typeof parsed.id !== "string") {
+      return { valid: false, error: "Tool must have a valid 'id' string" };
+    }
+
+    if (!Array.isArray(parsed.steps)) {
+      return { valid: false, error: "Tool must have a 'steps' array" };
+    }
+
+    const availableIntegrationIds = Object.keys(this.integrations);
+    for (let i = 0; i < parsed.steps.length; i++) {
+      const step = parsed.steps[i];
+      if (!step.id) {
+        return { valid: false, error: `Step ${i + 1}: missing 'id'` };
+      }
+      if (!step.apiConfig) {
+        return { valid: false, error: `Step ${i + 1} (${step.id}): missing 'apiConfig'` };
+      }
+      if (
+        step.integrationId &&
+        availableIntegrationIds.length > 0 &&
+        !availableIntegrationIds.includes(step.integrationId)
+      ) {
+        return {
+          valid: false,
+          error: `Step ${i + 1} (${step.id}): invalid integrationId '${step.integrationId}'. Available: ${availableIntegrationIds.join(", ")}`,
+        };
+      }
+    }
+
+    return { valid: true, tool: parsed as Tool };
   }
 
   /**
