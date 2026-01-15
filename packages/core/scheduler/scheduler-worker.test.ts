@@ -9,9 +9,13 @@ vi.mock("../graphql/resolvers/workflow.js", () => ({
 
 const MOCK_NEXT_RUN = new Date("2024-01-02T00:00:00Z");
 
-vi.mock("@superglue/shared", () => ({
-  calculateNextRun: vi.fn(() => MOCK_NEXT_RUN),
-}));
+vi.mock("@superglue/shared", async () => {
+  const actual = await vi.importActual<typeof import("@superglue/shared")>("@superglue/shared");
+  return {
+    ...actual,
+    calculateNextRun: vi.fn(() => MOCK_NEXT_RUN),
+  };
+});
 
 const mockDatastore = {
   listDueToolSchedules: vi.fn(),

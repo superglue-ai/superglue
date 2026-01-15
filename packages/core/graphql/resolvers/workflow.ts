@@ -1,6 +1,7 @@
 import {
   generateUniqueId,
   Integration,
+  RequestSource,
   RequestOptions,
   RunStatus,
   Tool,
@@ -125,6 +126,7 @@ export const executeWorkflowResolver = async (
         status: RunStatus.RUNNING,
         toolConfig: workflow,
         options: args.options,
+        requestSource: context.requestSource ?? RequestSource.FRONTEND,
         startedAt,
       },
     });

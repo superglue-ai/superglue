@@ -13,7 +13,7 @@ import path from "node:path";
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
 import { extractRun } from "./migrations/run-migration.js";
-import type { DataStore, ToolScheduleInternal } from "./types.js";
+import type { DataStore, PrometheusRunMetrics, ToolScheduleInternal } from "./types.js";
 
 export class FileStore implements DataStore {
   private storage: {
@@ -458,6 +458,14 @@ export class FileStore implements DataStore {
 
     const items = validRuns.slice(offset, offset + limit);
     return { items, total: validRuns.length };
+  }
+
+  async getPrometheusRunMetrics(params: {
+    orgId: string;
+    windowSeconds: number;
+  }): Promise<PrometheusRunMetrics> {
+    // Placeholder implementation (metrics are Postgres-backed in production)
+    return { runsTotal: [], runDurationSecondsP95: [] };
   }
 
   async clearAll(): Promise<void> {

@@ -118,6 +118,8 @@ export interface RunToolRequestOptions {
   timeout?: number;
   webhookUrl?: string;
   traceId?: string;
+  // Optional source of the request; currently only 'mcp' is honored; Other sources are derived from the request context.x
+  requestSource?: string;
 }
 
 export interface RunToolRequestBody {

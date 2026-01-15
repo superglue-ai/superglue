@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import { Run, RunStatus, SuperglueClient } from "@superglue/shared";
+import { RequestSource, Run, RunStatus, SuperglueClient } from "@superglue/shared";
 import {
   AlertTriangle,
   Calendar,
@@ -24,6 +24,44 @@ import {
 } from "lucide-react";
 import { CopyButton } from "@/src/components/tools/shared/CopyButton";
 import React from "react";
+
+const getRequestSourceLabel = (source?: RequestSource | string) => {
+  switch (source) {
+    case RequestSource.API:
+      return "API";
+    case RequestSource.FRONTEND:
+      return "Manual";
+    case RequestSource.SCHEDULER:
+      return "Scheduler";
+    case RequestSource.MCP:
+      return "MCP";
+    case RequestSource.TOOL_CHAIN:
+      return "Tool chain";
+    case RequestSource.WEBHOOK:
+      return "Webhook";
+    default:
+      return source ? String(source) : "-";
+  }
+};
+
+const getRequestSourceBadgeClassName = (source?: RequestSource | string) => {
+  switch (source) {
+    case RequestSource.API:
+      return "bg-slate-600 hover:bg-slate-600";
+    case RequestSource.FRONTEND:
+      return "bg-violet-600 hover:bg-violet-600";
+    case RequestSource.SCHEDULER:
+      return "bg-amber-600 hover:bg-amber-600";
+    case RequestSource.MCP:
+      return "bg-cyan-600 hover:bg-cyan-600";
+    case RequestSource.TOOL_CHAIN:
+      return "bg-fuchsia-600 hover:bg-fuchsia-600";
+    case RequestSource.WEBHOOK:
+      return "bg-teal-600 hover:bg-teal-600";
+    default:
+      return "bg-muted-foreground/70 hover:bg-muted-foreground/70";
+  }
+};
 
 // Helper function to recursively remove null values from objects
 const removeNullFields = (obj: any): any => {
@@ -137,6 +175,7 @@ const RunsTable = ({ id }: { id?: string }) => {
             <TableRow>
               <TableHead className="w-[400px]">Tool ID</TableHead>
               <TableHead className="w-[110px]">Status</TableHead>
+              <TableHead className="w-[120px]">Run trigger</TableHead>
               <TableHead className="w-[180px]">Started At</TableHead>
               <TableHead className="w-[180px]">Completed At</TableHead>
               <TableHead className="w-[100px]">Duration</TableHead>
@@ -187,6 +226,15 @@ const RunsTable = ({ id }: { id?: string }) => {
                         </Badge>
                       )}
                     </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="default"
+                        className={`${getRequestSourceBadgeClassName(run.requestSource)} gap-1`}
+                        title={run.requestSource ?? "unknown"}
+                      >
+                        {getRequestSourceLabel(run.requestSource)}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="whitespace-nowrap">
                       {new Date(run.startedAt).toLocaleString()}
                     </TableCell>
@@ -205,7 +253,7 @@ const RunsTable = ({ id }: { id?: string }) => {
                   {/* Expanded Details Row */}
                   {expandedRunId === run.id && (
                     <TableRow>
-                      <TableCell colSpan={5} className="bg-muted/10 p-0">
+                      <TableCell colSpan={6} className="bg-muted/10 p-0">
                         {loadingDetails[run.id] ? (
                           <div className="flex items-center justify-center py-8">
                             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -313,6 +361,18 @@ const RunDetails = ({ run }: { run: any }) => {
           </div>
         </div>
         <div className="space-y-2">
+          <h4 className="text-sm font-medium text-muted-foreground">Run trigger</h4>
+          <div className="flex items-center gap-2">
+            <Badge
+              variant="default"
+              className={`${getRequestSourceBadgeClassName(run.requestSource)} gap-1`}
+              title={run.requestSource ?? "unknown"}
+            >
+              {getRequestSourceLabel(run.requestSource)}
+            </Badge>
+          </div>
+        </div>
+        <div className="space-y-2">
           <h4 className="text-sm font-medium text-muted-foreground">Duration</h4>
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-muted-foreground" />
@@ -323,20 +383,20 @@ const RunDetails = ({ run }: { run: any }) => {
             </span>
           </div>
         </div>
+      </div>
 
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium text-muted-foreground">Timing</h4>
-          <div className="space-y-1 text-sm">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span>Started: {new Date(run.startedAt).toLocaleString()}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-              <span>
-                Completed: {run.completedAt ? new Date(run.completedAt).toLocaleString() : "-"}
-              </span>
-            </div>
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium text-muted-foreground">Timing</h4>
+        <div className="space-y-1 text-sm">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span>Started: {new Date(run.startedAt).toLocaleString()}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            <span>
+              Completed: {run.completedAt ? new Date(run.completedAt).toLocaleString() : "-"}
+            </span>
           </div>
         </div>
       </div>

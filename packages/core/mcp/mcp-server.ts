@@ -2,7 +2,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { ToolResult } from "@superglue/shared";
+import { RequestSource, ToolResult } from "@superglue/shared";
 import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import { z } from "zod";
@@ -71,6 +71,7 @@ class McpRestClient {
   async runTool(args: { id: string; payload?: Record<string, unknown> }): Promise<any> {
     const result = await this.request<any>("POST", `/tools/${encodeURIComponent(args.id)}/run`, {
       inputs: args.payload,
+      options: { requestSource: RequestSource.MCP },
     });
     return {
       success: result.status === "success",

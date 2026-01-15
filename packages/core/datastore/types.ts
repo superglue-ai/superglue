@@ -10,6 +10,28 @@ import type {
   ToolSchedule,
 } from "@superglue/shared";
 
+export type PrometheusRunStatusLabel = "success" | "failed" | "aborted";
+export type PrometheusRunSourceLabel =
+  | "api"
+  | "frontend"
+  | "scheduler"
+  | "mcp"
+  | "tool-chain"
+  | "webhook";
+
+export type PrometheusRunMetrics = {
+  runsTotal: Array<{
+    status: PrometheusRunStatusLabel;
+    source: PrometheusRunSourceLabel;
+    value: number;
+  }>;
+  runDurationSecondsP95: Array<{
+    source: PrometheusRunSourceLabel;
+    windowSeconds: number;
+    value: number;
+  }>;
+};
+
 export interface DataStore {
   // API Config Methods
   getApiConfig(params: { id: string; orgId?: string }): Promise<ApiConfig | null>;
@@ -32,6 +54,10 @@ export interface DataStore {
   }): Promise<{ items: Run[]; total: number }>;
   createRun(params: { run: Run }): Promise<Run>;
   updateRun(params: { id: string; orgId: string; updates: Partial<Run> }): Promise<Run>;
+  getPrometheusRunMetrics(params: {
+    orgId: string;
+    windowSeconds: number;
+  }): Promise<PrometheusRunMetrics>;
 
   // Workflow Methods
   getWorkflow(params: { id: string; orgId?: string }): Promise<Tool | null>;

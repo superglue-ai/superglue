@@ -1,4 +1,11 @@
-import { ExecutionStep, RequestOptions, RunStatus, Tool, ToolResult } from "@superglue/shared";
+import {
+  ExecutionStep,
+  RequestOptions,
+  RequestSource,
+  RunStatus,
+  Tool,
+  ToolResult,
+} from "@superglue/shared";
 import { parseJSON } from "../files/index.js";
 import { IntegrationManager } from "../integrations/integration-manager.js";
 import { isSelfHealingEnabled } from "../utils/helpers.js";
@@ -151,6 +158,7 @@ async function handleWebhook(
   credentials: Record<string, unknown> | undefined,
   options: { timeout?: number } | undefined,
   metadata: { orgId: string; traceId?: string },
+  requestSource: RequestSource,
 ) {
   if (!webhookUrl) return;
 
@@ -170,7 +178,7 @@ async function handleWebhook(
       credentials,
       { ...options, webhookUrl: undefined },
       metadata,
-      "api-chain",
+      RequestSource.TOOL_CHAIN,
     );
   }
 }
@@ -183,7 +191,7 @@ async function executeToolInternal(
   credentials: Record<string, unknown> | undefined,
   options: RequestOptions | undefined,
   metadata: { orgId: string; traceId?: string },
-  requestSource: string,
+  requestSource: RequestSource,
 ): Promise<{ runId: string; result: ToolResult } | null> {
   const tool = await authReq.datastore.getWorkflow({
     id: toolId,
@@ -273,6 +281,7 @@ async function executeToolInternal(
         credentials,
         options,
         metadata,
+        requestSource,
       );
     })
     .catch(async (error) => {
@@ -370,6 +379,18 @@ const runTool: RouteHandler = async (request, reply) => {
   const metadata = { orgId: authReq.authInfo.orgId, traceId };
   const runId = body.runId || crypto.randomUUID();
 
+  // Source attribution:
+  // - default: api
+  // - frontend: if auth indicates a user context (not a raw API key)
+  // - mcp: only if client explicitly asks for it; everything else ignored
+  let requestSource: RequestSource = RequestSource.API;
+  if (authReq.authInfo.userId) {
+    requestSource = RequestSource.FRONTEND;
+  }
+  if (body.options?.requestSource === RequestSource.MCP) {
+    requestSource = RequestSource.MCP;
+  }
+
   // Idempotency check
   if (body.runId) {
     const existingRun = await authReq.datastore.getRun({
@@ -427,7 +448,7 @@ const runTool: RouteHandler = async (request, reply) => {
       toolConfig: tool,
       toolPayload: body.inputs as Record<string, any>,
       options: requestOptions,
-      requestSource: "api",
+      requestSource,
       startedAt,
     },
   });
@@ -471,6 +492,7 @@ const runTool: RouteHandler = async (request, reply) => {
           body.credentials,
           body.options,
           metadata,
+          requestSource,
         );
       })
       .catch(async (error) => {
@@ -495,7 +517,7 @@ const runTool: RouteHandler = async (request, reply) => {
         status: RunStatus.RUNNING,
         toolPayload: body.inputs,
         options: requestOptions,
-        requestSource: "api",
+        requestSource,
         traceId: metadata.traceId,
         startedAt,
       }),
@@ -527,6 +549,7 @@ const runTool: RouteHandler = async (request, reply) => {
       body.credentials,
       body.options,
       metadata,
+      requestSource,
     );
 
     return sendResponse(
@@ -540,7 +563,7 @@ const runTool: RouteHandler = async (request, reply) => {
         error: result.error,
         stepResults: result.stepResults,
         options: requestOptions,
-        requestSource: "api",
+        requestSource,
         traceId: metadata.traceId,
         startedAt,
         completedAt,
@@ -572,7 +595,7 @@ const runTool: RouteHandler = async (request, reply) => {
         toolPayload: body.inputs,
         error: String(error),
         options: requestOptions,
-        requestSource: "api",
+        requestSource,
         traceId: metadata.traceId,
         startedAt,
         completedAt,
