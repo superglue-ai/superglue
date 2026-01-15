@@ -1,4 +1,5 @@
 import { RequestOptions, ServiceMetadata, ApiConfig as StepConfig } from "@superglue/shared";
+import { replaceVariables } from "../../utils/helpers.js";
 
 export interface StepStrategyExecutionResult {
   success: boolean;
@@ -15,23 +16,10 @@ export interface StepExecutionInput {
 }
 
 export interface StepExecutionStrategy {
-  /**
-   * The version of the strategy
-   */
   readonly version: string;
 
-  /**
-   * Detect if this strategy should execute the given step config
-   * @param stepConfig The step config to test
-   * @returns true if this strategy should execute the step config
-   */
-  shouldExecute(stepConfig: StepConfig): Promise<boolean> | boolean;
+  shouldExecute(resolvedUrlHost: string): boolean;
 
-  /**
-   * Execute the given step config
-   * @param stepConfig The step config to execute
-   * @returns the execution result
-   */
   executeStep(
     input: StepExecutionInput,
   ): Promise<StepStrategyExecutionResult> | StepStrategyExecutionResult;
@@ -49,8 +37,12 @@ export class StepExecutionStrategyRegistry {
   }
 
   async routeAndExecute(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
+    // Resolve urlHost template variables once for strategy selection
+    const allVars = { ...input.stepInputData, ...input.credentials };
+    const resolvedUrlHost = await replaceVariables(input.stepConfig.urlHost || "", allVars);
+
     for (const strategy of this.strategies) {
-      if (await strategy.shouldExecute(input.stepConfig)) {
+      if (strategy.shouldExecute(resolvedUrlHost)) {
         try {
           return await strategy.executeStep(input);
         } catch (error) {

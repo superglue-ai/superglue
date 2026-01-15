@@ -29,8 +29,8 @@ import {
 export class HttpStepExecutionStrategy implements StepExecutionStrategy {
   readonly version = "1.0.0";
 
-  async shouldExecute(stepConfig: StepConfig): Promise<boolean> {
-    return stepConfig.method in HttpMethod && stepConfig.urlHost?.startsWith("http");
+  shouldExecute(resolvedUrlHost: string): boolean {
+    return resolvedUrlHost.startsWith("http");
   }
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {

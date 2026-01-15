@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server_defaults } from "../../../default.js";
 import { convertBasicAuthToBase64, isSelfHealingEnabled } from "../../../utils/helpers.js";
 import * as httpModule from "./http.js";
+import { HttpStepExecutionStrategy } from "./http.js";
 
 vi.mock("axios");
 vi.mock("openai");
@@ -619,6 +620,32 @@ describe("Basic Auth Utilities", () => {
     it("should handle undefined or null values", () => {
       expect(convertBasicAuthToBase64(undefined)).toBeUndefined();
       expect(convertBasicAuthToBase64(null)).toBeNull();
+    });
+  });
+});
+
+describe("HttpStepExecutionStrategy", () => {
+  const strategy = new HttpStepExecutionStrategy();
+
+  describe("shouldExecute", () => {
+    it("should return true for http:// URLs", () => {
+      expect(strategy.shouldExecute("http://api.example.com")).toBe(true);
+    });
+
+    it("should return true for https:// URLs", () => {
+      expect(strategy.shouldExecute("https://api.example.com")).toBe(true);
+    });
+
+    it("should return false for postgres:// URLs", () => {
+      expect(strategy.shouldExecute("postgres://user:pass@localhost:5432")).toBe(false);
+    });
+
+    it("should return false for ftp:// URLs", () => {
+      expect(strategy.shouldExecute("ftp://files.example.com")).toBe(false);
+    });
+
+    it("should return false for empty URL", () => {
+      expect(strategy.shouldExecute("")).toBe(false);
     });
   });
 });
