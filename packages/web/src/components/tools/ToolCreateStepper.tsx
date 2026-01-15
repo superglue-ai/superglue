@@ -55,10 +55,11 @@ export function ToolCreateStepper({
   };
 
   const handleSaveTool = (tool: Tool, _payload: Record<string, any>): Promise<void> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const currentToolState = playgroundRef.current?.getCurrentTool();
       setCurrentTool(currentToolState || tool);
-      saveResolveRef.current = () => resolve();
+      saveResolveRef.current = (success: boolean) =>
+      success ? resolve() : reject(new Error("cancelled"));
       setShowSaveDialog(true);
     });
   };
@@ -82,6 +83,7 @@ export function ToolCreateStepper({
 
   const handleSaveDialogClose = () => {
     saveResolveRef.current?.(false);
+    saveResolveRef.current = null;
     setShowSaveDialog(false);
   };
 

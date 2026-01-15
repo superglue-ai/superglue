@@ -87,12 +87,6 @@ export function RightSidebar({ className }: RightSidebarProps) {
     }
   }, [isExpanded]);
 
-  useEffect(() => {
-    if (isExpanded) {
-      setHasNewLogs(false);
-    }
-  }, [isExpanded]);
-
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setTransitionDuration(0);

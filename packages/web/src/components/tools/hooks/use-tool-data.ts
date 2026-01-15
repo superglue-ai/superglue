@@ -222,10 +222,13 @@ export function useToolData(options: UseToolDataOptions) {
       setTimeout(() => setJustSaved(false), 3000);
       return true;
     } catch (error: any) {
+      if (error?.message === "cancelled") {
+        return false;
+      }
       console.error("Error saving tool:", error);
       toast({
         title: "Error saving tool",
-        description: error.message,
+        description: error?.message || "Unknown error",
         variant: "destructive",
       });
       return false;
