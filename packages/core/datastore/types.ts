@@ -11,7 +11,13 @@ import type {
 } from "@superglue/shared";
 
 export type PrometheusRunStatusLabel = "success" | "failed" | "aborted";
-export type PrometheusRunSourceLabel = "api" | "frontend" | "scheduler" | "mcp";
+export type PrometheusRunSourceLabel =
+  | "api"
+  | "frontend"
+  | "scheduler"
+  | "mcp"
+  | "tool-chain"
+  | "webhook";
 
 export type PrometheusRunMetrics = {
   runsTotal: Array<{

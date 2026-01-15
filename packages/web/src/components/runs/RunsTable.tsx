@@ -35,6 +35,10 @@ const getRequestSourceLabel = (source?: RequestSource | string) => {
       return "Scheduler";
     case RequestSource.MCP:
       return "MCP";
+    case RequestSource.TOOL_CHAIN:
+      return "Tool chain";
+    case RequestSource.WEBHOOK:
+      return "Webhook";
     default:
       return source ? String(source) : "-";
   }
@@ -50,6 +54,10 @@ const getRequestSourceBadgeClassName = (source?: RequestSource | string) => {
       return "bg-amber-600 hover:bg-amber-600";
     case RequestSource.MCP:
       return "bg-cyan-600 hover:bg-cyan-600";
+    case RequestSource.TOOL_CHAIN:
+      return "bg-fuchsia-600 hover:bg-fuchsia-600";
+    case RequestSource.WEBHOOK:
+      return "bg-teal-600 hover:bg-teal-600";
     default:
       return "bg-muted-foreground/70 hover:bg-muted-foreground/70";
   }

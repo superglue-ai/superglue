@@ -178,7 +178,7 @@ async function handleWebhook(
       credentials,
       { ...options, webhookUrl: undefined },
       metadata,
-      requestSource,
+      RequestSource.TOOL_CHAIN,
     );
   }
 }

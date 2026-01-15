@@ -144,7 +144,7 @@ export class PostgresService implements DataStore {
           config_id VARCHAR(255),
           org_id VARCHAR(255),
           status VARCHAR(50),
-          request_source VARCHAR(50) CHECK (request_source IN ('api','frontend','scheduler','mcp')),
+          request_source VARCHAR(50) CHECK (request_source IN ('api','frontend','scheduler','mcp','tool-chain','webhook')),
           data JSONB NOT NULL,
           started_at TIMESTAMP,
           completed_at TIMESTAMP,
@@ -166,7 +166,7 @@ export class PostgresService implements DataStore {
           ) THEN
             ALTER TABLE runs
               ADD CONSTRAINT runs_request_source_check
-              CHECK (request_source IN ('api','frontend','scheduler','mcp'));
+              CHECK (request_source IN ('api','frontend','scheduler','mcp','tool-chain','webhook'));
           END IF;
         END
         $$;
@@ -196,6 +196,9 @@ export class PostgresService implements DataStore {
               WHEN data->>'requestSource' = 'mcp' THEN 'mcp'
               WHEN data->>'requestSource' = 'rest_api' THEN 'api'
               WHEN data->>'requestSource' = 'api' THEN 'api'
+              WHEN data->>'requestSource' = 'tool-chain' THEN 'tool-chain'
+              WHEN data->>'requestSource' IN ('api-chain', 'api_chain') THEN 'tool-chain'
+              WHEN data->>'requestSource' = 'webhook' THEN 'webhook'
               ELSE 'frontend'
             END
           )

@@ -178,6 +178,8 @@ export enum RequestSource {
   FRONTEND = "frontend",
   SCHEDULER = "scheduler",
   MCP = "mcp",
+  TOOL_CHAIN = "tool-chain",
+  WEBHOOK = "webhook",
 }
 
 export enum FilterTarget {
