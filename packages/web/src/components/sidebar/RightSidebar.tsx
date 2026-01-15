@@ -177,104 +177,103 @@ export function RightSidebar({ className }: RightSidebarProps) {
 }
 
 interface LogsPanelProps {
-    filteredLogs: Log[];
-    expandedLogs: Set<string>;
-    setExpandedLogs: React.Dispatch<React.SetStateAction<Set<string>>>;
-    showDebug: boolean;
-    setShowDebug: (show: boolean) => void;
-  }
-  
-  function LogsPanel({
-    filteredLogs,
-    expandedLogs,
-    setExpandedLogs,
-    showDebug,
-    setShowDebug,
-  }: LogsPanelProps) {
-    useEffect(() => {
-      const scrollArea = document.querySelector(
-        "[data-sidebar-logs] [data-radix-scroll-area-viewport]",
-      );
-      if (scrollArea && filteredLogs.length > 0) {
-        scrollArea.scrollTop = scrollArea.scrollHeight;
-      }
-    }, [filteredLogs]);
-  
-    return (
-        <div className="flex flex-col h-full min-h-0" data-sidebar-logs>
-        <ScrollArea className="flex-1">
-          <div className="p-4">
-            {filteredLogs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full pt-28 pb-12 text-center">
-                <ScrollText className="h-10 w-10 text-muted-foreground/50 mb-3" />
-                <p className="text-sm text-muted-foreground">No logs yet</p>
-                <p className="text-xs text-muted-foreground/70 mt-2 max-w-[240px]">
-                  Logs will appear here as you execute tools
-                </p>
-              </div>
-            ) : (
-              filteredLogs.map((log) => {
-                const isLogExpanded = expandedLogs.has(log.id);
-                const shouldTruncate = log.message.length > 100;
-                const displayMessage =
-                  shouldTruncate && !isLogExpanded ? log.message.slice(0, 100) + "..." : log.message;
-  
-                return (
-                  <div
-                    key={log.id}
-                    className={cn(
-                      "mb-2 p-2 rounded text-sm overflow-hidden",
-                      log.level === "ERROR"
-                        ? "bg-red-500/10"
-                        : log.level === "WARN"
-                          ? "bg-yellow-500/10"
-                          : "bg-muted",
-                    )}
-                  >
-                    <div className="flex justify-between">
-                      <span className="font-mono text-xs">
-                        {new Date(log.timestamp).toLocaleTimeString()}
-                      </span>
-                      <span
-                        className={cn(
-                          "font-semibold text-xs",
-                          log.level === "ERROR" && "text-red-500",
-                          log.level === "WARN" && "text-yellow-500",
-                        )}
-                      >
-                        {log.level}
-                      </span>
-                    </div>
-                    <p className="max-w-full break-words text-xs mt-1">{displayMessage}</p>
-                    {shouldTruncate && (
-                      <button
-                        onClick={() =>
-                          setExpandedLogs((prev) => {
-                            const newSet = new Set(prev);
-                            isLogExpanded ? newSet.delete(log.id) : newSet.add(log.id);
-                            return newSet;
-                          })
-                        }
-                        className="text-xs text-muted-foreground hover:text-foreground mt-1"
-                      >
-                        {isLogExpanded ? "Show less" : "Show more"}
-                      </button>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </ScrollArea>
-        <div className="px-4 py-2 flex items-center justify-end gap-2">
-          <span className="text-xs text-muted-foreground">Show Debug</span>
-          <Switch
-            checked={showDebug}
-            onCheckedChange={setShowDebug}
-            className="data-[state=checked]:bg-amber-500"
-          />
-        </div>
-      </div>
+  filteredLogs: Log[];
+  expandedLogs: Set<string>;
+  setExpandedLogs: React.Dispatch<React.SetStateAction<Set<string>>>;
+  showDebug: boolean;
+  setShowDebug: (show: boolean) => void;
+}
+
+function LogsPanel({
+  filteredLogs,
+  expandedLogs,
+  setExpandedLogs,
+  showDebug,
+  setShowDebug,
+}: LogsPanelProps) {
+  useEffect(() => {
+    const scrollArea = document.querySelector(
+      "[data-sidebar-logs] [data-radix-scroll-area-viewport]",
     );
-  }
-  
+    if (scrollArea && filteredLogs.length > 0) {
+      scrollArea.scrollTop = scrollArea.scrollHeight;
+    }
+  }, [filteredLogs]);
+
+  return (
+    <div className="flex flex-col h-full min-h-0" data-sidebar-logs>
+      <ScrollArea className="flex-1">
+        <div className="p-4">
+          {filteredLogs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full pt-28 pb-12 text-center">
+              <ScrollText className="h-10 w-10 text-muted-foreground/50 mb-3" />
+              <p className="text-sm text-muted-foreground">No logs yet</p>
+              <p className="text-xs text-muted-foreground/70 mt-2 max-w-[240px]">
+                Logs will appear here as you execute tools
+              </p>
+            </div>
+          ) : (
+            filteredLogs.map((log) => {
+              const isLogExpanded = expandedLogs.has(log.id);
+              const shouldTruncate = log.message.length > 100;
+              const displayMessage =
+                shouldTruncate && !isLogExpanded ? log.message.slice(0, 100) + "..." : log.message;
+
+              return (
+                <div
+                  key={log.id}
+                  className={cn(
+                    "mb-2 p-2 rounded text-sm overflow-hidden",
+                    log.level === "ERROR"
+                      ? "bg-red-500/10"
+                      : log.level === "WARN"
+                        ? "bg-yellow-500/10"
+                        : "bg-muted",
+                  )}
+                >
+                  <div className="flex justify-between">
+                    <span className="font-mono text-xs">
+                      {new Date(log.timestamp).toLocaleTimeString()}
+                    </span>
+                    <span
+                      className={cn(
+                        "font-semibold text-xs",
+                        log.level === "ERROR" && "text-red-500",
+                        log.level === "WARN" && "text-yellow-500",
+                      )}
+                    >
+                      {log.level}
+                    </span>
+                  </div>
+                  <p className="max-w-full break-words text-xs mt-1">{displayMessage}</p>
+                  {shouldTruncate && (
+                    <button
+                      onClick={() =>
+                        setExpandedLogs((prev) => {
+                          const newSet = new Set(prev);
+                          isLogExpanded ? newSet.delete(log.id) : newSet.add(log.id);
+                          return newSet;
+                        })
+                      }
+                      className="text-xs text-muted-foreground hover:text-foreground mt-1"
+                    >
+                      {isLogExpanded ? "Show less" : "Show more"}
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </ScrollArea>
+      <div className="px-4 py-2 flex items-center justify-end gap-2">
+        <span className="text-xs text-muted-foreground">Show Debug</span>
+        <Switch
+          checked={showDebug}
+          onCheckedChange={setShowDebug}
+          className="data-[state=checked]:bg-amber-500"
+        />
+      </div>
+    </div>
+  );
+}
