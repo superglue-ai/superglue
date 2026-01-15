@@ -197,7 +197,11 @@ const createRun: RouteHandler = async (request, reply) => {
   } else if (body.status === "aborted") {
     status = RunStatus.ABORTED;
   } else {
-    return sendError(reply, 400, `Invalid status: ${body.status}. Must be 'success', 'failed', or 'aborted'`);
+    return sendError(
+      reply,
+      400,
+      `Invalid status: ${body.status}. Must be 'success', 'failed', or 'aborted'`,
+    );
   }
 
   const run: Run = {

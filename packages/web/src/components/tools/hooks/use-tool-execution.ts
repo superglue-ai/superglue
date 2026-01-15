@@ -452,14 +452,16 @@ export function useToolExecution(
           const client = createSuperglueClient(config.superglueEndpoint);
           await client.createRun({
             toolId,
-            toolConfig: finalToolConfig || ({
-              id: toolId,
-              steps,
-              finalTransform,
-              responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
-              inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
-              instruction: instructions,
-            } as Tool),
+            toolConfig:
+              finalToolConfig ||
+              ({
+                id: toolId,
+                steps,
+                finalTransform,
+                responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
+                inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
+                instruction: instructions,
+              } as Tool),
             status: runStatus,
             error: runError,
             startedAt,

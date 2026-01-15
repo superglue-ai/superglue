@@ -627,7 +627,9 @@ const runStep: RouteHandler = async (request, reply) => {
 
   const requestOptions: RequestOptions = {
     timeout: body.options?.timeout,
-    selfHealing: body.options?.selfHealing ? SelfHealingMode.REQUEST_ONLY : SelfHealingMode.DISABLED,
+    selfHealing: body.options?.selfHealing
+      ? SelfHealingMode.REQUEST_ONLY
+      : SelfHealingMode.DISABLED,
     testMode: body.options?.selfHealing,
   };
 
@@ -707,7 +709,9 @@ const runTransform: RouteHandler = async (request, reply) => {
 
   const requestOptions: RequestOptions = {
     timeout: body.options?.timeout,
-    selfHealing: body.options?.selfHealing ? SelfHealingMode.TRANSFORM_ONLY : SelfHealingMode.DISABLED,
+    selfHealing: body.options?.selfHealing
+      ? SelfHealingMode.TRANSFORM_ONLY
+      : SelfHealingMode.DISABLED,
     testMode: body.options?.selfHealing,
   };
 
