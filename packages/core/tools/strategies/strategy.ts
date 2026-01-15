@@ -57,7 +57,7 @@ export class StepExecutionStrategyRegistry {
     return {
       success: false,
       strategyExecutionData: {},
-      error: "No strategy found to execute the step.",
+      error: `Unsupported URL protocol: "${resolvedUrlHost}". URL must start with a supported protocol (http://, https://, postgres://, postgresql://, ftp://, ftps://, sftp://).`,
     };
   }
 }
