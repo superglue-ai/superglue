@@ -286,17 +286,6 @@ ${availableIntegrationIds.join(", ")}
         };
       }
 
-      if (
-        normalizedNewString.includes("\n") ||
-        normalizedNewString.includes("\r") ||
-        normalizedNewString.includes("\t")
-      ) {
-        normalizedNewString = normalizedNewString
-          .replace(/\n/g, "\\n")
-          .replace(/\r/g, "\\r")
-          .replace(/\t/g, "\\t");
-      }
-
       normalizedDiffs.push({
         old_string: normalizedOldString,
         new_string: normalizedNewString,
