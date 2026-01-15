@@ -17,7 +17,6 @@ vi.mock("@superglue/shared", async () => {
   };
 });
 
-
 const mockDatastore = {
   listDueToolSchedules: vi.fn(),
   updateScheduleNextRun: vi.fn(),
