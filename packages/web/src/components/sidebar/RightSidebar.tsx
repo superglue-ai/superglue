@@ -33,6 +33,9 @@ export function RightSidebar({ className }: RightSidebarProps) {
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const config = useConfig();
 
+  const isExpandedRef = useRef(isExpanded);
+  isExpandedRef.current = isExpanded;
+
   useEffect(() => {
     const savedExpanded = localStorage.getItem("global-sidebar-expanded") === "true";
     setIsExpanded(savedExpanded);
@@ -62,7 +65,7 @@ export function RightSidebar({ className }: RightSidebarProps) {
     const subscription = client.subscribeToLogs({
       onLog: (log) => {
         setLogs((prev) => [...prev, log].slice(-100));
-        if (!isExpanded) {
+        if (!isExpandedRef.current) {
           setHasNewLogs(true);
         }
       },
@@ -76,7 +79,13 @@ export function RightSidebar({ className }: RightSidebarProps) {
       subscription.then((sub) => sub.unsubscribe());
       client.disconnect();
     };
-  }, [client, isExpanded]);
+  }, [client]);
+
+  useEffect(() => {
+    if (isExpanded) {
+      setHasNewLogs(false);
+    }
+  }, [isExpanded]);
 
   useEffect(() => {
     if (isExpanded) {

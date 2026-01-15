@@ -81,7 +81,7 @@ export function ToolCreateStepper({
   };
 
   const handleSaveDialogClose = () => {
-    saveResolveRef.current = null;
+    saveResolveRef.current?.(false);
     setShowSaveDialog(false);
   };
 
