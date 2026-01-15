@@ -185,6 +185,12 @@ export enum FilterAction {
   FAIL = "FAIL",
 }
 
+export enum RemoveScope {
+  FIELD = "FIELD", // Just this field - remove only the matched key-value
+  ITEM = "ITEM", // This item - remove the containing object
+  ENTRY = "ENTRY", // Entire entry - remove from top-level array
+}
+
 export interface ResponseFilter {
   id: string;
   name?: string;
@@ -193,6 +199,7 @@ export interface ResponseFilter {
   pattern: string;
   action: FilterAction;
   maskValue?: string;
+  scope?: RemoveScope; // Applies to REMOVE and MASK actions
 }
 
 export interface BaseConfig {
