@@ -5,8 +5,8 @@ icon: "chart-line"
 ---
 
 <Warning>
-  **Enterprise Feature** — Metrics & telemetry is only available in Superglue Cloud Enterprise plans. 
-  This feature is not included in the open source version.
+  **Enterprise Feature** — Metrics & telemetry is only available in Superglue Cloud Enterprise
+  plans. This feature is not included in the open source version.
 </Warning>
 
 Superglue exposes **organization-scoped** runtime metrics via a **Prometheus text exposition** endpoint. Use these to build dashboards, SLOs, and alerts for your Superglue usage.
@@ -23,8 +23,9 @@ Superglue exposes **organization-scoped** runtime metrics via a **Prometheus tex
 </Card>
 
 <Info>
-  **OpenTelemetry users**: Superglue exposes metrics in Prometheus format. To integrate with an OpenTelemetry stack, 
-  use an [OpenTelemetry Collector Prometheus receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver) 
+  **OpenTelemetry users**: Superglue exposes metrics in Prometheus format. To integrate with an
+  OpenTelemetry stack, use an [OpenTelemetry Collector Prometheus
+  receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver)
   and export via OTLP to your backend.
 </Info>
 
@@ -58,6 +59,7 @@ Superglue exposes **organization-scoped** runtime metrics via a **Prometheus tex
         bearer_token: "<SUPERGLUE_API_KEY>"
         # or: bearer_token_file: /etc/secrets/superglue_api_key
     ```
+
   </Tab>
   <Tab title="OpenTelemetry Collector">
     Configure the collector to scrape Superglue via the Prometheus receiver:
@@ -86,6 +88,7 @@ Superglue exposes **organization-scoped** runtime metrics via a **Prometheus tex
           receivers: [prometheus]
           exporters: [otlp]
     ```
+
   </Tab>
 </Tabs>
 
@@ -139,6 +142,7 @@ superglue_run_duration_seconds_p95{source="frontend",window="300s"} 1.23
     ```promql
     sum by (source) (increase(superglue_runs_total[5m]))
     ```
+
   </Accordion>
 
   <Accordion title="superglue_run_duration_seconds_p95" icon="clock">
@@ -166,6 +170,7 @@ superglue_run_duration_seconds_p95{source="frontend",window="300s"} 1.23
     ```promql
     superglue_run_duration_seconds_p95
     ```
+
   </Accordion>
 </AccordionGroup>
 

@@ -36,11 +36,7 @@
           },
           {
             "group": "SDK Reference",
-            "pages": [
-              "sdk/overview",
-              "sdk/methods",
-              "sdk/types"
-            ]
+            "pages": ["sdk/overview", "sdk/methods", "sdk/types"]
           },
           {
             "group": "API Reference",
@@ -48,9 +44,7 @@
           },
           {
             "group": "Enterprise",
-            "pages": [
-              "enterprise/metrics"
-            ]
+            "pages": ["enterprise/metrics"]
           }
         ]
       }
