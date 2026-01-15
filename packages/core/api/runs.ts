@@ -1,4 +1,4 @@
-import { Run, RunStatus } from "@superglue/shared";
+import { RequestSource, Run, RunStatus } from "@superglue/shared";
 import { logMessage } from "../utils/logs.js";
 import { registerApiModule } from "./registry.js";
 import {
@@ -126,6 +126,10 @@ const cancelRun: RouteHandler = async (request, reply) => {
 
   if (run.status !== RunStatus.RUNNING) {
     return sendError(reply, 400, `Run is not currently running (status: ${run.status})`);
+  }
+
+  if (run.requestSource === RequestSource.SCHEDULER) {
+    return sendError(reply, 400, "Scheduled runs cannot be cancelled");
   }
 
   logMessage("info", `Cancelling run ${params.runId}`, metadata);
