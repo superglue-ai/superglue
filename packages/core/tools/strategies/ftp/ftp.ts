@@ -22,12 +22,11 @@ import {
 export class FTPStepExecutionStrategy implements StepExecutionStrategy {
   readonly version = "1.0.0";
 
-  async shouldExecute(stepConfig: StepConfig): Promise<boolean> {
+  shouldExecute(resolvedUrlHost: string): boolean {
     return (
-      stepConfig.method === HttpMethod.POST &&
-      (stepConfig.urlHost?.startsWith("ftp://") ||
-        stepConfig.urlHost?.startsWith("ftps://") ||
-        stepConfig.urlHost?.startsWith("sftp://"))
+      resolvedUrlHost.startsWith("ftp://") ||
+      resolvedUrlHost.startsWith("ftps://") ||
+      resolvedUrlHost.startsWith("sftp://")
     );
   }
 

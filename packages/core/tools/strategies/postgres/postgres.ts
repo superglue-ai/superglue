@@ -18,12 +18,8 @@ import {
 export class PostgresStepExecutionStrategy implements StepExecutionStrategy {
   readonly version = "1.0.0";
 
-  async shouldExecute(stepConfig: StepConfig): Promise<boolean> {
-    return (
-      stepConfig.method === HttpMethod.POST &&
-      (stepConfig.urlHost?.startsWith("postgres://") ||
-        stepConfig.urlHost?.startsWith("postgresql://"))
-    );
+  shouldExecute(resolvedUrlHost: string): boolean {
+    return resolvedUrlHost.startsWith("postgres://") || resolvedUrlHost.startsWith("postgresql://");
   }
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
