@@ -996,7 +996,7 @@ Each step can have these optional properties:
 - failureBehavior: "FAIL" | "CONTINUE" - What to do when the step fails. 
   * "FAIL" (default): Stop execution on error
   * "CONTINUE": Continue with next step/iteration even if this one fails
-- loopMaxIters: number - Maximum iterations for loops (default: unlimited)
+- modify: boolean - Whether the step modifies data on the system it operates on (writes, updates, deletes). Read-only operations should be false. Defaults to false.
 </STEP_PROPERTIES>
 
 <COMMON_FIXES>

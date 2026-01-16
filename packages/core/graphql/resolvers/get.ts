@@ -2,30 +2,6 @@ import { GraphQLResolveInfo } from "graphql";
 import { telemetryClient } from "../../utils/telemetry.js";
 import { GraphQLRequestContext } from "../types.js";
 
-export const getApiResolver = async (
-  _: any,
-  { id }: { id: string },
-  context: GraphQLRequestContext,
-  info: GraphQLResolveInfo,
-) => {
-  if (!id) {
-    throw new Error("id is required");
-  }
-
-  const config = await context.datastore.getApiConfig({ id, orgId: context.orgId });
-  if (!config) {
-    telemetryClient?.captureException(
-      new Error(`api config with id ${id} not found`),
-      context.orgId,
-      {
-        id: id,
-      },
-    );
-    throw new Error(`api config with id ${id} not found`);
-  }
-  return config;
-};
-
 export const getRunResolver = async (
   _: any,
   { id }: { id: string },

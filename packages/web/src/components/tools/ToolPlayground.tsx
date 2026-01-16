@@ -440,7 +440,7 @@ function ToolPlaygroundInner({
           refreshTools();
           router.push(`/tools/${encodeURIComponent(newId)}`);
         }}
-        onArchived={() => router.push("/configs")}
+        onArchived={() => router.push("/tools")}
         onUnarchived={() => setIsArchived(false)}
       />
     </div>
@@ -528,7 +528,7 @@ function ToolPlaygroundInner({
               variant="ghost"
               size="icon"
               className="shrink-0"
-              onClick={() => router.push("/configs")}
+              onClick={() => router.push("/tools")}
               aria-label="Close"
             >
               <X className="h-4 w-4" />

@@ -249,7 +249,7 @@ export class ToolExecutor implements Tool {
 
           itemsToExecuteStepOn = itemsToExecuteStepOn.slice(
             0,
-            step.loopMaxIters || server_defaults.DEFAULT_LOOP_MAX_ITERS,
+            server_defaults.DEFAULT_LOOP_MAX_ITERS,
           );
 
           stepResults = [];

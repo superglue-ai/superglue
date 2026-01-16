@@ -244,12 +244,7 @@ export interface ApiConfig extends BaseConfig {
   queryParams?: Record<string, any>;
   headers?: Record<string, any>;
   body?: string;
-  documentationUrl?: string;
-  responseSchema?: JSONSchema;
-  responseMapping?: JSONata;
-  authentication?: AuthType;
   pagination?: Pagination;
-  dataPath?: string;
 }
 
 export interface ExtractConfig extends BaseConfig {
@@ -274,9 +269,6 @@ export interface ExecutionStep {
   integrationId?: string;
   executionMode?: "DIRECT" | "LOOP";
   loopSelector?: string;
-  loopMaxIters?: number;
-  inputMapping?: JSONata;
-  responseMapping?: JSONata;
   failureBehavior?: "FAIL" | "CONTINUE";
 }
 

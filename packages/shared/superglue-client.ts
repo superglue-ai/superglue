@@ -56,24 +56,16 @@ export class SuperglueClient {
             queryParams
             headers
             body
-            documentationUrl
-            responseSchema
-            responseMapping
-            authentication
             pagination {
               type
               pageSize
               cursorPath
               stopCondition
             }
-            dataPath
           }
           integrationId
           executionMode
           loopSelector
-          loopMaxIters
-          inputMapping
-          responseMapping
           failureBehavior
         }
         integrationIds
@@ -110,17 +102,12 @@ export class SuperglueClient {
         queryParams
         headers
         body
-        documentationUrl
-        responseSchema
-        responseMapping
-        authentication
         pagination {
           type
           pageSize
           cursorPath
           stopCondition
         }
-        dataPath
       }
       ... on Workflow {
         ${SuperglueClient.workflowQL}
@@ -280,10 +267,6 @@ export class SuperglueClient {
             queryParams: step.apiConfig.queryParams,
             headers: step.apiConfig.headers,
             body: step.apiConfig.body,
-            documentationUrl: step.apiConfig.documentationUrl,
-            responseSchema: step.apiConfig.responseSchema,
-            responseMapping: step.apiConfig.responseMapping,
-            authentication: step.apiConfig.authentication,
             pagination: step.apiConfig.pagination
               ? {
                   type: step.apiConfig.pagination.type,
@@ -298,7 +281,6 @@ export class SuperglueClient {
                   }),
                 }
               : undefined,
-            dataPath: step.apiConfig.dataPath,
             version: step.apiConfig.version,
           };
           Object.keys(apiConfigInput).forEach(
@@ -313,9 +295,6 @@ export class SuperglueClient {
             integrationId: step.integrationId,
             executionMode: step.executionMode,
             loopSelector: step.loopSelector,
-            loopMaxIters: step.loopMaxIters,
-            inputMapping: step.inputMapping,
-            responseMapping: step.responseMapping,
             failureBehavior: step.failureBehavior,
           };
           Object.keys(executionStepInput).forEach(
@@ -653,10 +632,6 @@ export class SuperglueClient {
           queryParams: step.apiConfig.queryParams,
           headers: step.apiConfig.headers,
           body: step.apiConfig.body,
-          documentationUrl: step.apiConfig.documentationUrl,
-          responseSchema: step.apiConfig.responseSchema,
-          responseMapping: step.apiConfig.responseMapping,
-          authentication: step.apiConfig.authentication,
           pagination: step.apiConfig.pagination
             ? {
                 type: step.apiConfig.pagination.type,
@@ -671,7 +646,6 @@ export class SuperglueClient {
                 }),
               }
             : undefined,
-          dataPath: step.apiConfig.dataPath,
           version: step.apiConfig.version,
         };
         Object.keys(apiConfigInput).forEach(
@@ -686,9 +660,6 @@ export class SuperglueClient {
           integrationId: step.integrationId,
           executionMode: step.executionMode,
           loopSelector: step.loopSelector,
-          loopMaxIters: step.loopMaxIters,
-          inputMapping: step.inputMapping,
-          responseMapping: step.responseMapping,
           failureBehavior: step.failureBehavior,
         };
         Object.keys(executionStepInput).forEach(
@@ -770,17 +741,12 @@ export class SuperglueClient {
               queryParams
               headers
               body
-              documentationUrl
-              responseSchema
-              responseMapping
-              authentication
               pagination {
                 type
                 pageSize
                 cursorPath
                 stopCondition
               }
-              dataPath
             }
             dataSelector
           }
@@ -860,10 +826,6 @@ export class SuperglueClient {
         queryParams: endpoint.queryParams,
         headers: endpoint.headers,
         body: endpoint.body,
-        documentationUrl: endpoint.documentationUrl,
-        responseSchema: endpoint.responseSchema,
-        responseMapping: endpoint.responseMapping,
-        authentication: endpoint.authentication,
         pagination: endpoint.pagination
           ? {
               type: endpoint.pagination.type,
@@ -878,7 +840,6 @@ export class SuperglueClient {
               }),
             }
           : undefined,
-        dataPath: endpoint.dataPath,
         version: endpoint.version,
       };
       Object.keys(apiInput).forEach(
@@ -1066,81 +1027,6 @@ export class SuperglueClient {
     return run;
   }
 
-  async listApis(
-    limit: number = 10,
-    offset: number = 0,
-  ): Promise<{ items: ApiConfig[]; total: number }> {
-    const query = `
-        query ListApis($limit: Int!, $offset: Int!) {
-          listApis(limit: $limit, offset: $offset) {
-            items {
-              id
-              version
-              createdAt
-              updatedAt
-              urlHost
-              urlPath
-              instruction
-              method
-              queryParams
-              headers
-              body
-              documentationUrl
-              responseSchema
-              responseMapping
-              authentication
-              pagination {
-                type
-                pageSize
-                cursorPath
-                stopCondition
-              }
-              dataPath
-            }
-            total
-          }
-        }
-      `;
-    const response = await this.request<{ listApis: { items: ApiConfig[]; total: number } }>(
-      query,
-      { limit, offset },
-    );
-    return response.listApis;
-  }
-
-  async getApi(id: string): Promise<ApiConfig> {
-    const query = `
-        query GetApi($id: ID!) {
-          getApi(id: $id) {
-            id
-            version
-            createdAt
-            updatedAt
-            urlHost
-            urlPath
-            instruction
-            method
-            queryParams
-            headers
-            body
-            documentationUrl
-            responseSchema
-            responseMapping
-            authentication
-            pagination {
-              type
-              pageSize
-              cursorPath
-              stopCondition
-            }
-            dataPath
-          }
-        }
-      `;
-    const response = await this.request<{ getApi: ApiConfig }>(query, { id });
-    return response.getApi;
-  }
-
   async getWorkflow(id: string): Promise<Tool> {
     const query = `
         query GetWorkflow($id: ID!) {
@@ -1242,98 +1128,6 @@ export class SuperglueClient {
       "DELETE",
       `/v1/tools/${encodeURIComponent(toolId)}/schedules/${encodeURIComponent(scheduleId)}`,
     );
-  }
-
-  async upsertApi(id: string, input: Partial<ApiConfig>): Promise<ApiConfig> {
-    const mutation = `
-        mutation UpsertApi($id: ID!, $input: JSON!) {
-          upsertApi(id: $id, input: $input) {
-            id
-            version
-            createdAt
-            updatedAt
-            urlHost
-            urlPath
-            instruction
-            method
-            queryParams
-            headers
-            body
-            documentationUrl
-            responseSchema
-            responseMapping
-            authentication
-            pagination {
-              type
-              pageSize
-              cursorPath
-              stopCondition
-            }
-            dataPath
-          }
-        }
-      `;
-    const response = await this.request<{ upsertApi: ApiConfig }>(mutation, { id, input });
-    return response.upsertApi;
-  }
-
-  async deleteApi(id: string): Promise<boolean> {
-    const mutation = `
-        mutation DeleteApi($id: ID!) {
-          deleteApi(id: $id)
-        }
-      `;
-    const response = await this.request<{ deleteApi: boolean }>(mutation, { id });
-    return response.deleteApi;
-  }
-
-  async updateApiConfigId(oldId: string, newId: string): Promise<ApiConfig> {
-    const mutation = `
-        mutation UpdateApiConfigId($oldId: ID!, $newId: ID!) {
-          updateApiConfigId(oldId: $oldId, newId: $newId) {
-            id
-            version
-            createdAt
-            updatedAt
-            urlHost
-            urlPath
-            instruction
-            method
-            queryParams
-            headers
-            body
-            documentationUrl
-            responseSchema
-            responseMapping
-            authentication
-            pagination {
-              type
-              pageSize
-              cursorPath
-              stopCondition
-            }
-            dataPath
-          }
-        }
-      `;
-    const response = await this.request<{ updateApiConfigId: ApiConfig }>(mutation, {
-      oldId,
-      newId,
-    });
-    return response.updateApiConfigId;
-  }
-
-  async generateSchema(instruction: string, responseData: string): Promise<any> {
-    const query = `
-        query GenerateSchema($instruction: String!, $responseData: String) {
-          generateSchema(instruction: $instruction, responseData: $responseData)
-        }
-      `;
-    const response = await this.request<{ generateSchema: string }>(query, {
-      instruction,
-      responseData,
-    });
-    return response.generateSchema;
   }
 
   async upsertWorkflow(id: string, input: Partial<Tool>): Promise<Tool> {
