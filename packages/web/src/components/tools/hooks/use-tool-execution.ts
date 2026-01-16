@@ -81,11 +81,10 @@ export function useToolExecution(
 
     const runIdToAbort = currentRunIdRef.current;
     if (runIdToAbort) {
+      markAsStopping();
       const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
       await abortExecution(client, runIdToAbort);
     }
-
-    markAsStopping();
 
     if (embedded && onStopExecution) {
       onStopExecution();
