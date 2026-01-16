@@ -623,7 +623,7 @@ const runStep: RouteHandler = async (request, reply) => {
   }
 
   const step = body.step as unknown as ExecutionStep;
-  const runId = crypto.randomUUID();
+  const runId = body.runId || crypto.randomUUID();
 
   const requestOptions: RequestOptions = {
     timeout: body.options?.timeout,
@@ -705,7 +705,7 @@ const runTransform: RouteHandler = async (request, reply) => {
     return sendError(reply, 400, "Either finalTransform or responseFilters is required");
   }
 
-  const runId = crypto.randomUUID();
+  const runId = body.runId || crypto.randomUUID();
 
   const requestOptions: RequestOptions = {
     timeout: body.options?.timeout,

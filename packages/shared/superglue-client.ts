@@ -424,12 +424,14 @@ export class SuperglueClient {
     previousResults,
     credentials,
     options,
+    runId,
   }: {
     step: any;
     payload?: Record<string, any>;
     previousResults?: Record<string, any>;
     credentials?: Record<string, string>;
     options?: { selfHealing?: boolean; timeout?: number };
+    runId?: string;
   }): Promise<{
     stepId: string;
     success: boolean;
@@ -443,6 +445,7 @@ export class SuperglueClient {
       previousResults,
       credentials,
       options,
+      runId,
     });
   }
 
@@ -458,6 +461,7 @@ export class SuperglueClient {
     stepResults,
     responseFilters,
     options,
+    runId,
   }: {
     finalTransform: string;
     responseSchema?: any;
@@ -466,6 +470,7 @@ export class SuperglueClient {
     stepResults?: Record<string, any>;
     responseFilters?: any[];
     options?: { selfHealing?: boolean; timeout?: number };
+    runId?: string;
   }): Promise<{
     success: boolean;
     data?: any;
@@ -481,6 +486,7 @@ export class SuperglueClient {
       stepResults,
       responseFilters,
       options,
+      runId,
     });
   }
 

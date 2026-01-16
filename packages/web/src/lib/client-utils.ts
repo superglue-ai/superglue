@@ -112,6 +112,7 @@ export async function executeSingleStep({
       options: {
         selfHealing,
       },
+      runId: stepRunId,
     });
 
     return {
@@ -283,6 +284,7 @@ export async function executeFinalTransform(
       options: {
         selfHealing,
       },
+      runId: transformRunId,
     });
 
     return {

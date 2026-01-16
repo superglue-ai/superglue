@@ -141,6 +141,7 @@ export interface RunStepRequestBody {
   previousResults?: Record<string, unknown>;
   credentials?: Record<string, unknown>;
   options?: RunStepRequestOptions;
+  runId?: string; // Client-provided runId for abort tracking
 }
 
 // Step execution response
@@ -161,6 +162,7 @@ export interface RunTransformRequestBody {
   stepResults?: Record<string, unknown>;
   responseFilters?: Array<Record<string, unknown>>;
   options?: RunStepRequestOptions;
+  runId?: string; // Client-provided runId for abort tracking
 }
 
 // Transform execution response
