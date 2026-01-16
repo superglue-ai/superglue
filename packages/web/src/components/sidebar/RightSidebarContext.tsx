@@ -7,7 +7,11 @@ interface RightSidebarContextType {
   setShowAgent: (show: boolean) => void;
   agentPortalRef: HTMLDivElement | null;
   setAgentPortalRef: (ref: HTMLDivElement | null) => void;
-  AgentSidebarComponent: ComponentType<{ className?: string }> | null;
+  AgentSidebarComponent: ComponentType<{
+    className?: string;
+    hideHeader?: boolean;
+    initialError?: string;
+  }> | null;
 }
 
 const RightSidebarContext = createContext<RightSidebarContextType>({

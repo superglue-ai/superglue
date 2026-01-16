@@ -98,6 +98,13 @@ export const FinalTransformMiniStepCard = ({
     }
   }, [hasTransformCompleted]);
 
+  // Reset to transform tab when status goes back to idle (e.g., when steps are invalidated)
+  useEffect(() => {
+    if (transformStatus === "idle") {
+      setActiveTab("transform");
+    }
+  }, [transformStatus]);
+
   const inputProcessor = useDataProcessor(stepInputs, activeTab === "inputs");
 
   const outputProcessor = useDataProcessor(transformResult, activeTab === "output");
@@ -240,7 +247,7 @@ export const FinalTransformMiniStepCard = ({
                         variant="ghost"
                         onClick={handleOpenFixTransformDialog}
                         disabled={!canExecute || isRunningTransform || isFixingTransform}
-                        className={`h-8 px-3 gap-2 border-0 ${transformError ? "bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive animate-pulse" : ""}`}
+                        className="h-8 px-3 gap-2 border-0"
                       >
                         <Wand2 className="h-3 w-3" />
                         <span className="font-medium text-[13px]">Fix Transform</span>
