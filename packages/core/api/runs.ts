@@ -1,4 +1,4 @@
-import { RequestSource, Run, RunStatus } from "@superglue/shared";
+import { RequestSource, Run, RunStatus, Tool } from "@superglue/shared";
 import { logMessage } from "../utils/logs.js";
 import { registerApiModule } from "./registry.js";
 import {
@@ -10,6 +10,7 @@ import {
 } from "./response-helpers.js";
 import type {
   AuthenticatedFastifyRequest,
+  CreateRunRequestBody,
   OpenAPIRun,
   OpenAPIRunMetadata,
   RouteHandler,
@@ -161,6 +162,73 @@ const cancelRun: RouteHandler = async (request, reply) => {
   return addTraceHeader(reply, authReq.traceId).code(200).send(mapRunToOpenAPI(updatedRun));
 };
 
+// POST /runs - Create a run entry (for manual tool execution in playground)
+const createRun: RouteHandler = async (request, reply) => {
+  const authReq = request as AuthenticatedFastifyRequest;
+  const body = request.body as CreateRunRequestBody;
+  const metadata = authReq.toMetadata();
+
+  if (!body.toolId) {
+    return sendError(reply, 400, "toolId is required");
+  }
+  if (!body.toolConfig) {
+    return sendError(reply, 400, "toolConfig is required");
+  }
+  if (!body.status) {
+    return sendError(reply, 400, "status is required");
+  }
+  if (!body.startedAt) {
+    return sendError(reply, 400, "startedAt is required");
+  }
+  if (!body.completedAt) {
+    return sendError(reply, 400, "completedAt is required");
+  }
+
+  const runId = crypto.randomUUID();
+  const startedAt = new Date(body.startedAt);
+  const completedAt = new Date(body.completedAt);
+
+  // Map status string to RunStatus enum
+  let status: RunStatus;
+  if (body.status === "success") {
+    status = RunStatus.SUCCESS;
+  } else if (body.status === "failed") {
+    status = RunStatus.FAILED;
+  } else if (body.status === "aborted") {
+    status = RunStatus.ABORTED;
+  } else {
+    return sendError(
+      reply,
+      400,
+      `Invalid status: ${body.status}. Must be 'success', 'failed', or 'aborted'`,
+    );
+  }
+
+  const run: Run = {
+    id: runId,
+    toolId: body.toolId,
+    orgId: authReq.authInfo.orgId,
+    userId: authReq.authInfo.userId,
+    userEmail: authReq.authInfo.userEmail,
+    status,
+    toolConfig: body.toolConfig as unknown as Tool,
+    requestSource: RequestSource.FRONTEND,
+    error: body.error,
+    startedAt,
+    completedAt,
+  };
+
+  try {
+    await authReq.datastore.createRun({ run });
+    logMessage("info", `Created manual run ${runId} for tool ${body.toolId}`, metadata);
+
+    return addTraceHeader(reply, authReq.traceId).code(201).send(mapRunToOpenAPI(run));
+  } catch (error: any) {
+    logMessage("error", `Failed to create run: ${String(error)}`, metadata);
+    return sendError(reply, 500, `Failed to create run: ${error.message}`);
+  }
+};
+
 registerApiModule({
   name: "runs",
   routes: [
@@ -181,6 +249,12 @@ registerApiModule({
       path: "/runs/:runId/cancel",
       handler: cancelRun,
       permissions: { type: "write", resource: "run", allowRestricted: true },
+    },
+    {
+      method: "POST",
+      path: "/runs",
+      handler: createRun,
+      permissions: { type: "write", resource: "run", allowRestricted: false },
     },
   ],
 });

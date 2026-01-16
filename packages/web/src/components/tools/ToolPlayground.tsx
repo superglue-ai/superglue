@@ -455,11 +455,11 @@ function ToolPlaygroundInner({
         </Button>
       ) : (
         <>
-          {loading ? (
+          {loading || currentRunId ? (
             <Button
               variant="outline"
               onClick={handleStopExecution}
-              disabled={saving || isExecutingStep != null || isExecutingTransform}
+              disabled={saving}
               className="h-9 px-4"
             >
               <Square className="h-4 w-4" />
@@ -469,9 +469,7 @@ function ToolPlaygroundInner({
             <Button
               variant="outline"
               onClick={handleRunAllSteps}
-              disabled={
-                loading || saving || isExecutingStep != null || isExecutingTransform || isArchived
-              }
+              disabled={saving || isArchived}
               className="h-9 px-4"
             >
               <Play className="h-4 w-4" />

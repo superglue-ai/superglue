@@ -2,7 +2,6 @@ import {
   ExecutionStep,
   Integration,
   ResponseFilter,
-  SelfHealingMode,
   SuperglueClient,
   Tool,
 } from "@superglue/shared";
@@ -73,10 +72,10 @@ export async function abortExecution(
   if (!runId) return false;
 
   try {
-    const result = await client.abortToolExecution(runId);
+    const result = await client.abortStep(runId);
     return result.success;
   } catch (error) {
-    console.error("Failed to abort execution:", error);
+    console.error("Failed to abort step:", error);
     return false;
   }
 }
@@ -105,35 +104,23 @@ export async function executeSingleStep({
   }
 
   try {
-    const singleStepTool: Tool = {
-      id: `${toolId}_step_${step.id}`,
-      steps: [step],
-      finalTransform: "",
-    } as any;
-
-    const executionPayload = {
-      ...payload,
-      ...previousResults,
-    };
-
-    const result = await client.executeWorkflow({
-      tool: singleStepTool,
-      payload: executionPayload,
+    // Use the new REST endpoint that doesn't create a run
+    const result = await client.executeStep({
+      step,
+      payload,
+      previousResults,
       options: {
-        testMode: selfHealing,
-        selfHealing: selfHealing ? SelfHealingMode.REQUEST_ONLY : SelfHealingMode.DISABLED,
+        selfHealing,
       },
       runId: stepRunId,
     });
 
-    const stepResult = result.stepResults[0];
-
     return {
       stepId: step.id,
       success: result.success,
-      data: stepResult.data,
+      data: result.data,
       error: result.error,
-      updatedStep: result.config?.steps?.[0],
+      updatedStep: result.updatedStep,
       runId: stepRunId,
     };
   } catch (error: any) {
@@ -286,32 +273,26 @@ export async function executeFinalTransform(
   }
 
   try {
-    const finalPayload = {
-      ...payload,
-      ...previousResults,
-    };
-    const result = await client.executeWorkflow({
-      tool: {
-        id: `${toolId}_final_transform`,
-        steps: [],
-        finalTransform,
-        responseSchema,
-        inputSchema: inputSchema,
-        responseFilters,
-      },
-      payload: finalPayload,
+    // Use the new REST endpoint that doesn't create a run
+    const result = await client.executeTransformOnly({
+      finalTransform,
+      responseSchema,
+      inputSchema,
+      payload,
+      stepResults: previousResults,
+      responseFilters,
       options: {
-        testMode: selfHealing,
-        selfHealing: selfHealing ? SelfHealingMode.TRANSFORM_ONLY : SelfHealingMode.DISABLED,
+        selfHealing,
       },
       runId: transformRunId,
     });
+
     return {
       success: result.success,
       data: result.data,
       error: result.error,
-      updatedTransform: result.config?.finalTransform,
-      updatedResponseSchema: result.config?.responseSchema,
+      updatedTransform: result.updatedTransform,
+      updatedResponseSchema: result.updatedResponseSchema,
       runId: transformRunId,
     };
   } catch (error: any) {

@@ -128,3 +128,13 @@ export interface RunToolRequestBody {
   credentials?: Record<string, unknown>;
   options?: RunToolRequestOptions;
 }
+
+// For manual run creation (e.g., playground execution records)
+export interface CreateRunRequestBody {
+  toolId: string;
+  toolConfig: Record<string, unknown>;
+  status: "success" | "failed" | "aborted";
+  error?: string;
+  startedAt: string;
+  completedAt: string;
+}

@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
 import { useToast } from "@/src/hooks/use-toast";
+import { isAbortError } from "@/src/lib/general-utils";
 import { HelpCircle, Loader2, RefreshCw, Square, WandSparkles, X } from "lucide-react";
 import { useState } from "react";
 import { useGenerateStepConfig } from "../hooks/use-generate-step-config";
@@ -102,11 +103,14 @@ export function FixStepDialog({
       await onAutoHeal(instruction.trim());
       handleClose();
     } catch (err: any) {
-      toast({
-        title: "Failed to fix step",
-        description: err.message || "Failed to automatically fix the step.",
-        variant: "destructive",
-      });
+      // Don't show error toast if execution was aborted by user
+      if (!isAbortError(err.message)) {
+        toast({
+          title: "Failed to fix step",
+          description: err.message || "Failed to automatically fix the step.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsAutoHealing(false);
     }
