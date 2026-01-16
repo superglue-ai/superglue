@@ -321,7 +321,7 @@ export const SpotlightStepCard = React.memo(
                       variant="ghost"
                       onClick={onOpenFixStepDialog}
                       disabled={!canExecute || isExecuting || isGlobalExecuting}
-                      className={`h-8 px-3 gap-2 border-0 ${stepFailed ? "bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive animate-pulse" : ""}`}
+                      className="h-8 px-3 gap-2 border-0"
                     >
                       <Wand2 className="h-3 w-3" />
                       <span className="font-medium text-[13px]">Fix Step</span>

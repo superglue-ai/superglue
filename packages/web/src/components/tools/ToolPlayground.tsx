@@ -71,6 +71,7 @@ export interface ToolPlaygroundProps {
   totalFileSize?: number;
   onFilesChange?: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
   renderAgentInline?: boolean;
+  initialError?: string;
 }
 
 export interface ToolPlaygroundHandle {
@@ -102,6 +103,7 @@ function ToolPlaygroundInner({
   totalFileSize: parentTotalFileSize,
   onFilesChange: parentOnFilesChange,
   renderAgentInline = false,
+  initialError,
   innerRef,
 }: ToolPlaygroundInnerProps) {
   const router = useRouter();
@@ -455,11 +457,11 @@ function ToolPlaygroundInner({
         </Button>
       ) : (
         <>
-          {loading || currentRunId ? (
+          {loading ? (
             <Button
               variant="outline"
               onClick={handleStopExecution}
-              disabled={saving}
+              disabled={saving || isExecutingStep != null || isExecutingTransform}
               className="h-9 px-4"
             >
               <Square className="h-4 w-4" />
@@ -469,7 +471,9 @@ function ToolPlaygroundInner({
             <Button
               variant="outline"
               onClick={handleRunAllSteps}
-              disabled={saving || isArchived}
+              disabled={
+                loading || saving || isExecutingStep != null || isExecutingTransform || isArchived
+              }
               className="h-9 px-4"
             >
               <Play className="h-4 w-4" />
@@ -659,18 +663,21 @@ function ToolPlaygroundInner({
           }}
         />
 
-        {/* Portal agent into sidebar (when not inline) */}
+        {/* Portal agent into sidebar (when not inline) - hideHeader since RightSidebar has tabs */}
         {!isArchived &&
           !renderAgentInline &&
           agentPortalRef &&
           AgentSidebarComponent &&
-          createPortal(<AgentSidebarComponent className="h-full" />, agentPortalRef)}
+          createPortal(
+            <AgentSidebarComponent className="h-full" hideHeader initialError={initialError} />,
+            agentPortalRef,
+          )}
       </div>
 
       {/* Inline agent sidebar */}
       {!isArchived && renderAgentInline && AgentSidebarComponent && (
         <div className="w-[420px] border-l border-border flex-shrink-0 h-full overflow-hidden">
-          <AgentSidebarComponent className="h-full" />
+          <AgentSidebarComponent className="h-full" initialError={initialError} />
         </div>
       )}
     </div>
