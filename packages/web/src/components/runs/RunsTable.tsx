@@ -19,7 +19,12 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Code,
+  Cpu,
+  Link,
   Loader2,
+  MousePointerClick,
+  Webhook,
   XCircle,
 } from "lucide-react";
 import { CopyButton } from "@/src/components/tools/shared/CopyButton";
@@ -44,22 +49,27 @@ const getRequestSourceLabel = (source?: RequestSource | string) => {
   }
 };
 
-const getRequestSourceBadgeClassName = (source?: RequestSource | string) => {
+const getRequestSourceBadgeClassName = (_source?: RequestSource | string) => {
+  return "bg-muted-foreground/70 hover:bg-muted-foreground/70";
+};
+
+const RequestSourceIcon = ({ source }: { source?: RequestSource | string }) => {
+  const className = "h-3 w-3";
   switch (source) {
     case RequestSource.API:
-      return "bg-slate-600 hover:bg-slate-600";
+      return <Code className={className} />;
     case RequestSource.FRONTEND:
-      return "bg-violet-600 hover:bg-violet-600";
+      return <MousePointerClick className={className} />;
     case RequestSource.SCHEDULER:
-      return "bg-amber-600 hover:bg-amber-600";
+      return <Clock className={className} />;
     case RequestSource.MCP:
-      return "bg-cyan-600 hover:bg-cyan-600";
+      return <Cpu className={className} />;
     case RequestSource.TOOL_CHAIN:
-      return "bg-fuchsia-600 hover:bg-fuchsia-600";
+      return <Link className={className} />;
     case RequestSource.WEBHOOK:
-      return "bg-teal-600 hover:bg-teal-600";
+      return <Webhook className={className} />;
     default:
-      return "bg-muted-foreground/70 hover:bg-muted-foreground/70";
+      return null;
   }
 };
 
@@ -232,6 +242,7 @@ const RunsTable = ({ id }: { id?: string }) => {
                         className={`${getRequestSourceBadgeClassName(run.requestSource)} gap-1`}
                         title={run.requestSource ?? "unknown"}
                       >
+                        <RequestSourceIcon source={run.requestSource} />
                         {getRequestSourceLabel(run.requestSource)}
                       </Badge>
                     </TableCell>
@@ -368,6 +379,7 @@ const RunDetails = ({ run }: { run: any }) => {
               className={`${getRequestSourceBadgeClassName(run.requestSource)} gap-1`}
               title={run.requestSource ?? "unknown"}
             >
+              <RequestSourceIcon source={run.requestSource} />
               {getRequestSourceLabel(run.requestSource)}
             </Badge>
           </div>

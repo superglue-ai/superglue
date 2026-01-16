@@ -75,28 +75,17 @@ export function useToolExecution(
 
   const handleStopExecution = async () => {
     if (shouldDebounceAbort(lastAbortTimeRef.current)) return;
-    if (!currentRunIdRef.current || executionCompletedRef.current) return;
 
     lastAbortTimeRef.current = Date.now();
     shouldAbortRef.current = true;
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    if (!currentRunIdRef.current || executionCompletedRef.current) return;
-
-    const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
-    const success = await abortExecution(client, currentRunIdRef.current);
-
-    if (executionCompletedRef.current) return;
-
-    if (success) {
-      markAsStopping();
-      currentRunIdRef.current = null;
-      toast({
-        title: "Execution aborted",
-        description: "Tool execution has been aborted",
-      });
+    const runIdToAbort = currentRunIdRef.current;
+    if (runIdToAbort) {
+      const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
+      await abortExecution(client, runIdToAbort);
     }
+
+    markAsStopping();
 
     if (embedded && onStopExecution) {
       onStopExecution();

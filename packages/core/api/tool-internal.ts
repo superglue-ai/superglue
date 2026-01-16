@@ -211,6 +211,19 @@ const runTransform: RouteHandler = async (request, reply) => {
   }
 };
 
+// POST /tools/step/abort - Abort an in-flight step execution by runId
+const abortStep: RouteHandler = async (request, reply) => {
+  const authReq = request as AuthenticatedFastifyRequest;
+  const { runId } = request.body as { runId: string };
+
+  if (!runId) {
+    return sendError(reply, 400, "runId is required");
+  }
+
+  authReq.workerPools.toolExecution.abortTask(runId);
+  return addTraceHeader(reply, authReq.traceId).code(200).send({ success: true, runId });
+};
+
 registerApiModule({
   name: "tool-internal",
   routes: [
@@ -228,6 +241,16 @@ registerApiModule({
       method: "POST",
       path: "/tools/transform/run",
       handler: runTransform,
+      permissions: {
+        type: "execute",
+        resource: "tool",
+        allowRestricted: false,
+      },
+    },
+    {
+      method: "POST",
+      path: "/tools/step/abort",
+      handler: abortStep,
       permissions: {
         type: "execute",
         resource: "tool",

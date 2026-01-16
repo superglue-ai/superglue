@@ -450,6 +450,13 @@ export class SuperglueClient {
   }
 
   /**
+   * Abort an in-flight step execution by runId.
+   */
+  async abortStep(runId: string): Promise<{ success: boolean; runId: string }> {
+    return this.restRequest("POST", "/v1/tools/step/abort", { runId });
+  }
+
+  /**
    * Execute a final transform without creating a run in the database.
    * Used for transform testing in the playground.
    */

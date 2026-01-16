@@ -72,10 +72,10 @@ export async function abortExecution(
   if (!runId) return false;
 
   try {
-    const result = await client.abortToolExecution(runId);
+    const result = await client.abortStep(runId);
     return result.success;
   } catch (error) {
-    console.error("Failed to abort execution:", error);
+    console.error("Failed to abort step:", error);
     return false;
   }
 }
