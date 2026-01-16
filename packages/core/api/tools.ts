@@ -676,7 +676,7 @@ const runStep: RouteHandler = async (request, reply) => {
       success: result.success,
       data: stepResult?.data,
       error: result.error,
-      updatedStep: result.config?.steps?.[0] as Record<string, unknown> | undefined,
+      updatedStep: result.config?.steps?.[0] as unknown as Record<string, unknown> | undefined,
     };
 
     return addTraceHeader(reply, traceId).code(200).send(response);
@@ -722,7 +722,7 @@ const runTransform: RouteHandler = async (request, reply) => {
     finalTransform: body.finalTransform || "",
     responseSchema: body.responseSchema,
     inputSchema: body.inputSchema,
-    responseFilters: body.responseFilters as ResponseFilter[] | undefined,
+    responseFilters: body.responseFilters as unknown as ResponseFilter[] | undefined,
   } as Tool;
 
   // Build the execution payload combining tool input and step results

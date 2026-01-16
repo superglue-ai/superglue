@@ -437,7 +437,7 @@ export class SuperglueClient {
     error?: string;
     updatedStep?: any;
   }> {
-    return this.restRequest("POST", "/tools/step/run", {
+    return this.restRequest("POST", "/v1/tools/step/run", {
       step,
       payload,
       previousResults,
@@ -473,7 +473,7 @@ export class SuperglueClient {
     updatedTransform?: string;
     updatedResponseSchema?: any;
   }> {
-    return this.restRequest("POST", "/tools/transform/run", {
+    return this.restRequest("POST", "/v1/tools/transform/run", {
       finalTransform,
       responseSchema,
       inputSchema,
@@ -507,7 +507,7 @@ export class SuperglueClient {
     toolId: string;
     status: string;
   }> {
-    return this.restRequest("POST", "/runs", {
+    return this.restRequest("POST", "/v1/runs", {
       toolId,
       toolConfig,
       status,
