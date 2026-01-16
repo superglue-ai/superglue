@@ -59,18 +59,15 @@ export class GraphQLStrategy implements DocumentationFetchingStrategy {
     const endpointUrl = composeUrl(config.urlHost, config.urlPath);
 
     const urlIsLikelyGraphQL = this.isLikelyGraphQL(endpointUrl, config);
-    const docUrlIsLikelyGraphQL = this.isLikelyGraphQL(config.documentationUrl, config);
 
-    if (!urlIsLikelyGraphQL && !docUrlIsLikelyGraphQL) return null;
-
-    const url = urlIsLikelyGraphQL ? endpointUrl : config.documentationUrl;
-    if (!url) {
+    if (!urlIsLikelyGraphQL) return null;
+    if (!endpointUrl) {
       return null;
     }
 
-    const schema = await this.fetchGraphQLSchema(url, config, metadata);
+    const schema = await this.fetchGraphQLSchema(endpointUrl, config, metadata);
     if (schema) {
-      logMessage("info", `Successfully fetched GraphQL schema from ${url}.`, metadata);
+      logMessage("info", `Successfully fetched GraphQL schema.`, metadata);
       return JSON.stringify(schema);
     }
     return null;
