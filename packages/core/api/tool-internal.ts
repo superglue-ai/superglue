@@ -68,7 +68,8 @@ const runStep: RouteHandler = async (request, reply) => {
   }
 
   const step = body.step as unknown as ExecutionStep;
-  const runId = body.runId || crypto.randomUUID();
+  const clientRunId = body.runId || crypto.randomUUID();
+  const runId = `${authReq.authInfo.orgId}:${clientRunId}`;
 
   const requestOptions: RequestOptions = {
     timeout: body.options?.timeout,
@@ -150,7 +151,8 @@ const runTransform: RouteHandler = async (request, reply) => {
     return sendError(reply, 400, "Either finalTransform or responseFilters is required");
   }
 
-  const runId = body.runId || crypto.randomUUID();
+  const clientRunId = body.runId || crypto.randomUUID();
+  const runId = `${authReq.authInfo.orgId}:${clientRunId}`;
 
   const requestOptions: RequestOptions = {
     timeout: body.options?.timeout,
@@ -220,7 +222,8 @@ const abortStep: RouteHandler = async (request, reply) => {
     return sendError(reply, 400, "runId is required");
   }
 
-  authReq.workerPools.toolExecution.abortTask(runId);
+  const internalRunId = `${authReq.authInfo.orgId}:${runId}`;
+  authReq.workerPools.toolExecution.abortTask(internalRunId);
   return addTraceHeader(reply, authReq.traceId).code(200).send({ success: true, runId });
 };
 
