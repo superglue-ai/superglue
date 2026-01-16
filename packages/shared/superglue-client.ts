@@ -24,7 +24,6 @@ import {
   ToolInputRequest,
   ToolResult,
   ToolSchedule,
-  ToolScheduleInput,
   ToolStepResult,
   UpsertMode,
 } from "./types.js";
@@ -490,8 +489,10 @@ export class SuperglueClient {
           fixWorkflow(workflow: $workflow, fixInstructions: $fixInstructions, lastError: $lastError, integrationIds: $integrationIds) {
             workflow {${SuperglueClient.workflowQL}}
             diffs {
-              old_string
-              new_string
+              op
+              path
+              value
+              from
             }
           }
         }
