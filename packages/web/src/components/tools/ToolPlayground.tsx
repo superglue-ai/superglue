@@ -461,7 +461,7 @@ function ToolPlaygroundInner({
             <Button
               variant="outline"
               onClick={handleStopExecution}
-              disabled={saving || isExecutingStep != null || isExecutingTransform}
+              disabled={saving}
               className="h-9 px-4"
             >
               <Square className="h-4 w-4" />
