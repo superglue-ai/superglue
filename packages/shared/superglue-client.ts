@@ -1130,8 +1130,6 @@ export class SuperglueClient {
     );
   }
 
-
-
   async upsertWorkflow(id: string, input: Partial<Tool>): Promise<Tool> {
     const mutation = `
         mutation UpsertWorkflow($id: ID!, $input: JSON!) {

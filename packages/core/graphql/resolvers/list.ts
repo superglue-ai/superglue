@@ -1,7 +1,6 @@
 import { GraphQLResolveInfo } from "graphql";
 import { GraphQLRequestContext } from "../types.js";
 
-
 export const listRunsResolver = async (
   _: any,
   { offset, limit, configId }: { offset: number; limit: number; configId: string },

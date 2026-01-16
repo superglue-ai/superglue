@@ -664,7 +664,6 @@ export async function callHttp({
 
       previousResponseHash = currentResponseHash;
       allResults = smartMergeResponses(allResults, parsedResponseData);
-      
     } else {
       if (Array.isArray(parsedResponseData)) {
         const pageSize = parseInt(config.pagination?.pageSize || "50");
