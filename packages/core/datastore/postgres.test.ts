@@ -184,6 +184,70 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         expect(total).toBe(2);
         expect(items.map((run) => run.id).sort()).toEqual(["run1", "run3"]);
       });
+
+      it("should store and retrieve requestSource correctly", async () => {
+        const runWithSource: Run = {
+          ...testRun,
+          id: "run-with-source",
+          requestSource: "api" as any,
+        };
+        await store.createRun({ run: runWithSource });
+        const retrieved = await store.getRun({ id: runWithSource.id, orgId: testOrgId });
+        expect(retrieved?.requestSource).toEqual("api");
+      });
+
+      it("should default requestSource to 'api' when not provided", async () => {
+        const runWithoutSource: Run = {
+          ...testRun,
+          id: "run-without-source",
+          requestSource: undefined,
+        };
+        await store.createRun({ run: runWithoutSource });
+        const retrieved = await store.getRun({ id: runWithoutSource.id, orgId: testOrgId });
+        // Column defaults to 'api', extractRun should return it
+        expect(retrieved?.requestSource).toEqual("api");
+      });
+
+      it("should preserve all valid requestSource values", async () => {
+        const sources = ["api", "frontend", "scheduler", "mcp", "tool-chain", "webhook"] as const;
+        for (const source of sources) {
+          const run: Run = {
+            ...testRun,
+            id: `run-source-${source}`,
+            requestSource: source as any,
+          };
+          await store.createRun({ run });
+          const retrieved = await store.getRun({ id: run.id, orgId: testOrgId });
+          expect(retrieved?.requestSource).toEqual(source);
+        }
+      });
+
+      it("should include requestSource in listRuns results", async () => {
+        const run1: Run = { ...testRun, id: "list-run-1", requestSource: "api" as any };
+        const run2: Run = { ...testRun, id: "list-run-2", requestSource: "scheduler" as any };
+        await store.createRun({ run: run1 });
+        await store.createRun({ run: run2 });
+
+        const { items } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
+        const sources = items.map((r) => r.requestSource).sort();
+        expect(sources).toContain("api");
+        expect(sources).toContain("scheduler");
+      });
+
+      it("should preserve requestSource during updateRun", async () => {
+        const run: Run = { ...testRun, id: "update-source-run", requestSource: "mcp" as any };
+        await store.createRun({ run });
+
+        await store.updateRun({
+          id: run.id,
+          orgId: testOrgId,
+          updates: { status: RunStatus.FAILED, error: "Test error" },
+        });
+
+        const retrieved = await store.getRun({ id: run.id, orgId: testOrgId });
+        expect(retrieved?.requestSource).toEqual("mcp");
+        expect(retrieved?.status).toEqual(RunStatus.FAILED);
+      });
     });
 
     describe("Integration", () => {
