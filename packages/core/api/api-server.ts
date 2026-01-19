@@ -34,7 +34,8 @@ function checkRestrictedAccess(
   if (permissions.checkResourceId) {
     const params = request.params as Record<string, string>;
     const resourceId = params[permissions.checkResourceId];
-    if (resourceId && !authInfo.allowedTools?.includes(resourceId)) {
+    // If allowedTools is null/undefined, it means ALL tools are allowed for this restricted key
+    if (resourceId && authInfo.allowedTools && !authInfo.allowedTools.includes(resourceId)) {
       return { allowed: false, error: "This API key is not authorized for this tool" };
     }
   }
