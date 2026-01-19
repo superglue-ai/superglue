@@ -620,9 +620,7 @@ export class FileStore implements DataStore {
     // Decrypt credentials if encryption is enabled
     const decryptedSystem = { ...system, id };
     if (decryptedSystem.credentials) {
-      decryptedSystem.credentials = credentialEncryption.decrypt(
-        decryptedSystem.credentials,
-      );
+      decryptedSystem.credentials = credentialEncryption.decrypt(decryptedSystem.credentials);
     }
 
     return decryptedSystem;
@@ -665,11 +663,7 @@ export class FileStore implements DataStore {
       .filter((i): i is System => i !== null);
   }
 
-  async upsertSystem(params: {
-    id: string;
-    system: System;
-    orgId?: string;
-  }): Promise<System> {
+  async upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System> {
     await this.ensureInitialized();
     const { id, system, orgId } = params;
     if (!id || !system) return null;

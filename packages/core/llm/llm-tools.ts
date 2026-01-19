@@ -167,8 +167,7 @@ export const generateInstructionsToolImplementation: LLMToolImplementation<
 
 export const generateInstructionsToolDefinition: LLMToolDefinition = {
   name: "generate_instructions",
-  description:
-    "Generate specific, implementable workflow instructions for the available systems.",
+  description: "Generate specific, implementable workflow instructions for the available systems.",
   arguments: {
     type: "object",
     properties: {},

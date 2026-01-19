@@ -22,11 +22,7 @@ export class SystemManager {
   private _basicDataPromise?: Promise<System>;
   private _documentationPromise?: Promise<DocumentationData>;
 
-  constructor(
-    idOrSystem: string | System,
-    dataStore: DataStore | null,
-    metadata: ServiceMetadata,
-  ) {
+  constructor(idOrSystem: string | System, dataStore: DataStore | null, metadata: ServiceMetadata) {
     this.dataStore = dataStore;
     this.metadata = metadata;
     this.orgId = metadata.orgId!;

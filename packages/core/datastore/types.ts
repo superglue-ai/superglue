@@ -75,22 +75,14 @@ export interface DataStore {
   setTenantInfo(params?: { email?: string; emailEntrySkipped?: boolean }): Promise<void>;
 
   // System Methods
-  getSystem(params: {
-    id: string;
-    includeDocs?: boolean;
-    orgId?: string;
-  }): Promise<System | null>;
+  getSystem(params: { id: string; includeDocs?: boolean; orgId?: string }): Promise<System | null>;
   listSystems(params?: {
     limit?: number;
     offset?: number;
     includeDocs?: boolean;
     orgId?: string;
   }): Promise<{ items: System[]; total: number }>;
-  upsertSystem(params: {
-    id: string;
-    system: System;
-    orgId?: string;
-  }): Promise<System>;
+  upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System>;
   deleteSystem(params: { id: string; orgId?: string }): Promise<boolean>;
   getManySystems(params: {
     ids: string[];

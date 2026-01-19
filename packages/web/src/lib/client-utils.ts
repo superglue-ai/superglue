@@ -1,10 +1,4 @@
-import {
-  ExecutionStep,
-  System,
-  ResponseFilter,
-  SuperglueClient,
-  Tool,
-} from "@superglue/shared";
+import { ExecutionStep, System, ResponseFilter, SuperglueClient, Tool } from "@superglue/shared";
 import { isAbortError } from "./general-utils";
 import { tokenRegistry } from "./token-registry";
 
@@ -393,10 +387,7 @@ export const splitUrl = (url: string) => {
   };
 };
 
-export function needsUIToTriggerDocFetch(
-  newSystem: System,
-  oldSystem: System | null,
-): boolean {
+export function needsUIToTriggerDocFetch(newSystem: System, oldSystem: System | null): boolean {
   // If documentation was manually provided, no fetch needed.
   if (newSystem.documentation && newSystem.documentation.trim()) {
     return false;

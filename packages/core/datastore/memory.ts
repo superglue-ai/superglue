@@ -350,11 +350,7 @@ export class MemoryStore implements DataStore {
       .filter((i): i is System => i !== null);
   }
 
-  async upsertSystem(params: {
-    id: string;
-    system: System;
-    orgId?: string;
-  }): Promise<System> {
+  async upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System> {
     const { id, system, orgId } = params;
     if (!id || !system) return null;
     const key = this.getKey("system", id, orgId);

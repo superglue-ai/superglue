@@ -142,8 +142,7 @@ export function ToolBuilder({
   const { toast } = useToast();
   const superglueConfig = useConfig();
 
-  const { systems, pendingDocIds, loading, setPendingDocIds, refreshSystems } =
-    useSystems();
+  const { systems, pendingDocIds, loading, setPendingDocIds, refreshSystems } = useSystems();
 
   const [instruction, setInstruction] = useState(initialInstruction);
   const [payload, setPayload] = useState(initialPayload);
@@ -165,8 +164,7 @@ export function ToolBuilder({
     setUploadedFiles,
   } = useFileUpload();
 
-  const [selectedSystemIds, setSelectedSystemIds] =
-    useState<string[]>(initialSystemIds);
+  const [selectedSystemIds, setSelectedSystemIds] = useState<string[]>(initialSystemIds);
 
   const [systemSearch, setSystemSearch] = useState("");
   const [showSystemForm, setShowSystemForm] = useState(false);
@@ -218,9 +216,7 @@ export function ToolBuilder({
   }, [trimmedPayload]);
 
   const toggleSystem = useCallback((id: string) => {
-    setSelectedSystemIds((ids) =>
-      ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id],
-    );
+    setSelectedSystemIds((ids) => (ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id]));
   }, []);
 
   const initializePayloadIfEmpty = useCallback(() => {
@@ -335,9 +331,7 @@ export function ToolBuilder({
     }
   };
 
-  const handleSystemFormSave = async (
-    system: System,
-  ): Promise<System | null> => {
+  const handleSystemFormSave = async (system: System): Promise<System | null> => {
     setShowSystemForm(false);
     setSystemFormEdit(null);
 
@@ -356,15 +350,11 @@ export function ToolBuilder({
 
         waitForSystemReady([savedSystem.id])
           .then(() => {
-            setPendingDocIds(
-              (prev) => new Set([...prev].filter((id) => id !== savedSystem.id)),
-            );
+            setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== savedSystem.id)));
           })
           .catch((error) => {
             console.error("Error waiting for docs:", error);
-            setPendingDocIds(
-              (prev) => new Set([...prev].filter((id) => id !== savedSystem.id)),
-            );
+            setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== savedSystem.id)));
           });
       }
 

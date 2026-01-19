@@ -1125,11 +1125,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async upsertSystem(params: {
-    id: string;
-    system: System;
-    orgId?: string;
-  }): Promise<System> {
+  async upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System> {
     const { id, system, orgId } = params;
     if (!id || !system) return null;
     const client = await this.pool.connect();

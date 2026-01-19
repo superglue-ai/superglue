@@ -8,10 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/src/components/ui/select";
-import {
-  getSystemIcon as getSystemIconName,
-  getSimpleIcon,
-} from "@/src/lib/general-utils";
+import { getSystemIcon as getSystemIconName, getSimpleIcon } from "@/src/lib/general-utils";
 import { System } from "@superglue/shared";
 import { Globe } from "lucide-react";
 
@@ -84,9 +81,7 @@ export function SystemSelector({
                 )}
                 <span className="flex-grow">{system.id}</span>
                 {system.urlHost && (
-                  <span className="text-muted-foreground text-xs ml-auto">
-                    ({system.urlHost})
-                  </span>
+                  <span className="text-muted-foreground text-xs ml-auto">({system.urlHost})</span>
                 )}
               </div>
             </SelectItem>

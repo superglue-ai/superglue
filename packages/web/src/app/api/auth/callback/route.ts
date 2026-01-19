@@ -421,7 +421,7 @@ export async function GET(request: NextRequest) {
     try {
       if (state) {
         const stateData = JSON.parse(atob(state)) as OAuthState;
-          systemId = stateData.systemId || "unknown";
+        systemId = stateData.systemId || "unknown";
         suppressErrorUI = stateData.suppressErrorUI || false;
       }
       isClientCredentials = grantTypeParam === "client_credentials";

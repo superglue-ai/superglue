@@ -168,9 +168,7 @@ function enhanceSchemaWithData(value: any, schema: any): any {
   return schema;
 }
 
-export function flattenAndNamespaceCredentials(
-  systems: System[],
-): Record<string, string> {
+export function flattenAndNamespaceCredentials(systems: System[]): Record<string, string> {
   return systems.reduce(
     (acc, sys) => {
       Object.entries(sys.credentials || {}).forEach(([key, value]) => {
