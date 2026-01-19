@@ -4,19 +4,18 @@
  * Attempts to fetch GraphQL schema through introspection queries.
  */
 
-import { ApiConfig } from "@superglue/shared";
 import { ServiceMetadata } from "@superglue/shared";
 import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
 import { server_defaults } from "../../default.js";
 import { logMessage } from "../../utils/logs.js";
 import { composeUrl } from "../../utils/helpers.js";
-import { DocumentationFetchingStrategy } from "../types.js";
+import { DocumentationConfig, DocumentationFetchingStrategy } from "../types.js";
 
 export class GraphQLStrategy implements DocumentationFetchingStrategy {
   private async fetchGraphQLSchema(
     url: string,
-    config: ApiConfig,
+    config: DocumentationConfig,
     metadata: ServiceMetadata,
   ): Promise<any | null> {
     const introspectionQuery = getIntrospectionQuery();
@@ -44,7 +43,7 @@ export class GraphQLStrategy implements DocumentationFetchingStrategy {
     }
   }
 
-  private isLikelyGraphQL(url: string, config: ApiConfig): boolean {
+  private isLikelyGraphQL(url: string, config: DocumentationConfig): boolean {
     if (!url) return false;
     return (
       url?.includes("graphql") ||
@@ -54,20 +53,23 @@ export class GraphQLStrategy implements DocumentationFetchingStrategy {
     );
   }
 
-  async tryFetch(config: ApiConfig, metadata: ServiceMetadata): Promise<string | null> {
+  async tryFetch(config: DocumentationConfig, metadata: ServiceMetadata): Promise<string | null> {
     if (!config.urlHost?.startsWith("http")) return null;
     const endpointUrl = composeUrl(config.urlHost, config.urlPath);
 
     const urlIsLikelyGraphQL = this.isLikelyGraphQL(endpointUrl, config);
+    const docUrlIsLikelyGraphQL = this.isLikelyGraphQL(config.documentationUrl, config);
 
-    if (!urlIsLikelyGraphQL) return null;
-    if (!endpointUrl) {
+    if (!urlIsLikelyGraphQL && !docUrlIsLikelyGraphQL) return null;
+
+    const url = urlIsLikelyGraphQL ? endpointUrl : config.documentationUrl;
+    if (!url) {
       return null;
     }
 
-    const schema = await this.fetchGraphQLSchema(endpointUrl, config, metadata);
+    const schema = await this.fetchGraphQLSchema(url, config, metadata);
     if (schema) {
-      logMessage("info", `Successfully fetched GraphQL schema.`, metadata);
+      logMessage("info", `Successfully fetched GraphQL schema from ${url}.`, metadata);
       return JSON.stringify(schema);
     }
     return null;
