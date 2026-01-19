@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { logMessage } from '../../packages/core/utils/logs.js';
+import { logMessage } from '@superglue/core/utils/logs.js';
 
 // Common interfaces
 export interface IntegrationConfig {

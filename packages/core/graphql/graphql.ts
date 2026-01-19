@@ -11,14 +11,14 @@ import {
 import { getApiResolver, getRunResolver } from "./resolvers/get.js";
 import {
   cacheOauthClientCredentialsResolver,
-  deleteIntegrationResolver,
-  findRelevantIntegrationsResolver,
-  getIntegrationResolver,
+  deleteSystemResolver,
+  findRelevantSystemsResolver,
+  getSystemResolver,
   getOAuthClientCredentialsResolver,
-  listIntegrationsResolver,
-  searchIntegrationDocumentationResolver,
-  upsertIntegrationResolver,
-} from "./resolvers/integrations.js";
+  listSystemsResolver,
+  searchSystemDocumentationResolver,
+  upsertSystemResolver,
+} from "./resolvers/systems.js";
 import { listApisResolver, listRunsResolver } from "./resolvers/list.js";
 import { logsResolver } from "./resolvers/logs.js";
 import { renameWorkflowResolver } from "./resolvers/rename-workflow.js";
@@ -35,7 +35,7 @@ import {
   getWorkflowResolver,
   listWorkflowsResolver,
   upsertWorkflowResolver,
-} from "./resolvers/workflow.js";
+} from "./resolvers/tools.js";
 
 export const typeDefs = fs.readFileSync("../../api.graphql", "utf8");
 
@@ -49,10 +49,10 @@ export const resolvers = {
     getWorkflow: getWorkflowResolver,
     listWorkflows: listWorkflowsResolver,
     generateInstructions: generateInstructionsResolver,
-    getIntegration: getIntegrationResolver,
-    listIntegrations: listIntegrationsResolver,
-    searchIntegrationDocumentation: searchIntegrationDocumentationResolver,
-    findRelevantIntegrations: findRelevantIntegrationsResolver,
+    getSystem: getSystemResolver,
+    listSystems: listSystemsResolver,
+    searchSystemDocumentation: searchSystemDocumentationResolver,
+    findRelevantSystems: findRelevantSystemsResolver,
     findRelevantTools: findRelevantToolsResolver,
   },
   Mutation: {
@@ -66,10 +66,10 @@ export const resolvers = {
     renameWorkflow: renameWorkflowResolver,
     upsertApi: upsertApiResolver,
     deleteApi: deleteApiResolver,
-    upsertIntegration: upsertIntegrationResolver,
+    upsertSystem: upsertSystemResolver,
     cacheOauthClientCredentials: cacheOauthClientCredentialsResolver,
     getOAuthClientCredentials: getOAuthClientCredentialsResolver,
-    deleteIntegration: deleteIntegrationResolver,
+    deleteSystem: deleteSystemResolver,
     generateStepConfig: generateStepConfigResolver,
     generateTransform: generateTransformResolver,
     callEndpoint: callEndpointResolver,

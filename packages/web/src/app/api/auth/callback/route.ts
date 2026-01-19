@@ -145,7 +145,7 @@ function buildRedirectUrl(origin: string, path: string, params: Record<string, s
 function createOAuthCallbackHTML(
   type: "success" | "error",
   message: string,
-  integrationId: string,
+  systemId: string,
   origin: string,
   tokens?: any,
   suppressErrorUI?: boolean,
@@ -182,7 +182,7 @@ function createOAuthCallbackHTML(
                     try {
                         window.opener.postMessage({ 
                             type: 'oauth-${type}', 
-                            integrationId: '${integrationId}',
+                            systemId: '${systemId}',
                             message: '${escapedMessage}',
                             tokens: ${tokens ? JSON.stringify(tokens) : "undefined"}
                         }, '${origin}');
@@ -193,7 +193,7 @@ function createOAuthCallbackHTML(
                         setTimeout(() => window.close(), 100);
                     }
                 } else {
-                    window.location.href = '${origin}/integrations?${isError ? "error" : "success"}=oauth_${type}&integration=${integrationId}&message=' + encodeURIComponent('${escapedMessage}');
+                    window.location.href = '${origin}/systems?${isError ? "error" : "success"}=oauth_${type}&system=${systemId}&message=' + encodeURIComponent('${escapedMessage}');
                 }
             </script>
         </body>
@@ -237,12 +237,12 @@ export async function GET(request: NextRequest) {
   // Handle OAuth provider errors
   if (error) {
     const errorMsg = `[OAUTH_STAGE:AUTHORIZATION] OAuth provider returned error during user authorization: ${error}${errorDescription ? ` - ${errorDescription}` : ""}. This error occurred before the token exchange step.`;
-    let integrationId = "unknown";
+    let systemId = "unknown";
     let suppressErrorUI = false;
     try {
       if (state) {
         const stateData = JSON.parse(atob(state)) as OAuthState;
-        integrationId = stateData.integrationId || "unknown";
+        systemId = stateData.systemId || "unknown";
         suppressErrorUI = stateData.suppressErrorUI || false;
       }
     } catch {}
@@ -250,7 +250,7 @@ export async function GET(request: NextRequest) {
     const html = createOAuthCallbackHTML(
       "error",
       errorMsg,
-      integrationId,
+      systemId,
       origin,
       undefined,
       suppressErrorUI,
@@ -264,7 +264,7 @@ export async function GET(request: NextRequest) {
       : "[OAUTH_STAGE:CALLBACK] No state parameter received from OAuth provider. This indicates a malformed OAuth callback.";
 
     return NextResponse.redirect(
-      buildRedirectUrl(origin, "/integrations", {
+      buildRedirectUrl(origin, "/systems", {
         error: !code ? "no_code" : "no_state",
         message: errorMsg,
       }),
@@ -274,7 +274,7 @@ export async function GET(request: NextRequest) {
   try {
     const stateData = JSON.parse(atob(state)) as OAuthState & { token_url?: string };
     const {
-      integrationId,
+      systemId,
       timestamp,
       clientId,
       client_credentials_uid,
@@ -368,7 +368,7 @@ export async function GET(request: NextRequest) {
         JSON.stringify(tokenData, null, 2),
       );
       console.error("[OAUTH_DEBUG] Token URL:", token_url);
-      console.error("[OAUTH_DEBUG] Integration ID:", integrationId);
+      console.error("[OAUTH_DEBUG] System ID:", systemId);
       throw new Error(
         `[OAUTH_STAGE:TOKEN_VALIDATION] No access_token field in OAuth provider response. The provider may require different OAuth configuration or the token_url may be incorrect: ${JSON.stringify(tokenData, null, 2)}`,
       );
@@ -389,7 +389,7 @@ export async function GET(request: NextRequest) {
     if (grantTypeParam === "client_credentials") {
       const response = NextResponse.json({
         type: "oauth-success",
-        integrationId,
+        systemId,
         message: "OAuth connection completed successfully!",
         tokens,
       });
@@ -400,7 +400,7 @@ export async function GET(request: NextRequest) {
       const html = createOAuthCallbackHTML(
         "success",
         "OAuth connection completed successfully!",
-        integrationId,
+        systemId,
         origin,
         tokens,
         suppressErrorUI,
@@ -414,14 +414,14 @@ export async function GET(request: NextRequest) {
     console.error("OAuth callback error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
-    // Try to extract integration ID from state if available
-    let integrationId = "unknown";
+    // Try to extract system ID from state if available
+    let systemId = "unknown";
     let isClientCredentials = false;
     let suppressErrorUI = false;
     try {
       if (state) {
         const stateData = JSON.parse(atob(state)) as OAuthState;
-        integrationId = stateData.integrationId || "unknown";
+          systemId = stateData.systemId || "unknown";
         suppressErrorUI = stateData.suppressErrorUI || false;
       }
       isClientCredentials = grantTypeParam === "client_credentials";
@@ -433,7 +433,7 @@ export async function GET(request: NextRequest) {
       const response = NextResponse.json(
         {
           type: "oauth-error",
-          integrationId,
+          systemId,
           message: errorMessage,
         },
         { status: 400 },
@@ -445,7 +445,7 @@ export async function GET(request: NextRequest) {
       const html = createOAuthCallbackHTML(
         "error",
         errorMessage,
-        integrationId,
+        systemId,
         origin,
         undefined,
         suppressErrorUI,

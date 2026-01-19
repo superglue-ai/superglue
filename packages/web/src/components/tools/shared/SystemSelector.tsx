@@ -1,6 +1,6 @@
 "use client";
 
-import { useIntegrations } from "@/src/app/integrations-context";
+import { useSystems } from "@/src/app/systems-context";
 import {
   Select,
   SelectContent,
@@ -9,40 +9,40 @@ import {
   SelectValue,
 } from "@/src/components/ui/select";
 import {
-  getIntegrationIcon as getIntegrationIconName,
+  getSystemIcon as getSystemIconName,
   getSimpleIcon,
 } from "@/src/lib/general-utils";
-import { Integration } from "@superglue/shared";
+import { System } from "@superglue/shared";
 import { Globe } from "lucide-react";
 
-interface IntegrationSelectorProps {
+interface SystemSelectorProps {
   value: string;
-  onValueChange: (value: string, integration?: Integration) => void;
+  onValueChange: (value: string, system?: System) => void;
   disabled?: boolean;
   placeholder?: string;
   contentClassName?: string;
   triggerClassName?: string;
   showCreateNew?: boolean;
   onCreateNew?: () => void;
-  integrations?: Integration[];
+  systems?: System[];
 }
 
-export function IntegrationSelector({
+export function SystemSelector({
   value,
   onValueChange,
   disabled = false,
-  placeholder = "Select integration",
+  placeholder = "Select system",
   contentClassName,
   triggerClassName = "h-9",
   showCreateNew = false,
   onCreateNew,
-  integrations: providedIntegrations,
-}: IntegrationSelectorProps) {
-  const { integrations: contextIntegrations } = useIntegrations();
-  const integrations = providedIntegrations || contextIntegrations;
+  systems: providedSystems,
+}: SystemSelectorProps) {
+  const { systems: contextSystems } = useSystems();
+  const systems = providedSystems || contextSystems;
 
-  const getIntegrationIcon = (integration: Integration) => {
-    const iconName = getIntegrationIconName(integration);
+  const getSystemIcon = (system: System) => {
+    const iconName = getSystemIconName(system);
     return iconName ? getSimpleIcon(iconName) : null;
   };
 
@@ -50,8 +50,8 @@ export function IntegrationSelector({
     if (selectedValue === "CREATE_NEW" && onCreateNew) {
       onCreateNew();
     } else {
-      const selectedIntegration = integrations?.find((i) => i.id === selectedValue);
-      onValueChange(selectedValue, selectedIntegration);
+      const selectedSystem = systems?.find((i) => i.id === selectedValue);
+      onValueChange(selectedValue, selectedSystem);
     }
   };
 
@@ -64,10 +64,10 @@ export function IntegrationSelector({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent className={`${contentClassName} shadow-none`}>
-        {integrations?.map((integration) => {
-          const icon = getIntegrationIcon(integration);
+        {systems?.map((system) => {
+          const icon = getSystemIcon(system);
           return (
-            <SelectItem key={integration.id} value={integration.id}>
+            <SelectItem key={system.id} value={system.id}>
               <div className="flex items-center gap-2 w-full">
                 {icon ? (
                   <svg
@@ -82,10 +82,10 @@ export function IntegrationSelector({
                 ) : (
                   <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                 )}
-                <span className="flex-grow">{integration.id}</span>
-                {integration.urlHost && (
+                <span className="flex-grow">{system.id}</span>
+                {system.urlHost && (
                   <span className="text-muted-foreground text-xs ml-auto">
-                    ({integration.urlHost})
+                    ({system.urlHost})
                   </span>
                 )}
               </div>
@@ -94,7 +94,7 @@ export function IntegrationSelector({
         })}
         {showCreateNew && onCreateNew && (
           <SelectItem value="CREATE_NEW" className="text-primary">
-            + Add New Integration
+            + Add New System
           </SelectItem>
         )}
       </SelectContent>

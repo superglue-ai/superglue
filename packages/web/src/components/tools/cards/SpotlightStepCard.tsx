@@ -51,7 +51,7 @@ import { TemplateAwareTextEditor } from "../../editors/TemplateAwareTextEditor";
 import { HelpTooltip } from "../../utils/HelpTooltip";
 import { useToolConfig, useExecution } from "../context";
 import { CopyButton } from "../shared/CopyButton";
-import { IntegrationSelector } from "../shared/IntegrationSelector";
+import { SystemSelector } from "../shared/SystemSelector";
 import { StepInputTab } from "./tabs/StepInputTab";
 import { StepResultTab } from "./tabs/StepResultTab";
 
@@ -90,7 +90,7 @@ export const SpotlightStepCard = React.memo(
     isPayloadValid = true,
   }: SpotlightStepCardProps) => {
     // === CONSUME FROM CONTEXTS ===
-    const { integrations } = useToolConfig();
+    const { systems } = useToolConfig();
     const { isExecutingAny, getStepResult, isStepFailed, canExecuteStep, getDataSelectorResult } =
       useExecution();
 
@@ -175,14 +175,14 @@ export const SpotlightStepCard = React.memo(
       [onEdit, onConfigEditingChange, step],
     );
 
-    const handleIntegrationChange = (value: string, selectedIntegration?: any) => {
+    const handleSystemChange = (value: string, selectedSystem?: any) => {
       handleImmediateEdit((s) => ({
         ...s,
         integrationId: value,
         apiConfig: {
           ...s.apiConfig,
-          urlHost: selectedIntegration?.urlHost || s.apiConfig.urlHost,
-          urlPath: selectedIntegration?.urlPath || s.apiConfig.urlPath,
+          urlHost: selectedSystem?.urlHost || s.apiConfig.urlHost,
+          urlPath: selectedSystem?.urlPath || s.apiConfig.urlPath,
         },
       }));
     };
@@ -410,13 +410,13 @@ export const SpotlightStepCard = React.memo(
                     <div className="flex gap-2">
                       <div className="flex-1">
                         <Label className="text-xs flex items-center gap-1">
-                          Integration
-                          <HelpTooltip text="Select an integration to link this step to. This will pre-fill the API configuration with the integration's base URL and credentials." />
+                          System
+                          <HelpTooltip text="Select an system to link this step to. This will pre-fill the API configuration with the system's base URL and credentials." />
                         </Label>
                         <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
-                          <IntegrationSelector
+                          <SystemSelector
                             value={step.integrationId || ""}
-                            onValueChange={handleIntegrationChange}
+                            onValueChange={handleSystemChange}
                             triggerClassName="h-9 border-0 bg-transparent shadow-none"
                           />
                         </div>

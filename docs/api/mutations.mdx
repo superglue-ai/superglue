@@ -395,19 +395,19 @@ Deletes a workflow schedule. Returns `true` if successful.
   </Tab>
 </Tabs>
 
-### upsertIntegration
+### upsertSystem
 
-Creates or updates an integration configuration. Integrations represent connections to external APIs or databases.
+Creates or updates a system configuration. Systems represent connections to external APIs or databases.
 
 **Parameters:**
-- `input`: IntegrationInput! - Integration configuration (required)
+- `input`: SystemInput! - System configuration (required)
 - `mode`: UpsertMode - CREATE, UPDATE, or UPSERT (default: UPSERT)
 
 <Tabs>
   <Tab title="GraphQL">
     ```graphql
-    mutation UpsertIntegration($input: IntegrationInput!, $mode: UpsertMode = UPSERT) {
-      upsertIntegration(input: $input, mode: $mode) {
+    mutation UpsertSystem($input: SystemInput!, $mode: UpsertMode = UPSERT) {
+      upsertSystem(input: $input, mode: $mode) {
         id
         name
         type
@@ -428,7 +428,7 @@ Creates or updates an integration configuration. Integrations represent connecti
   </Tab>
   <Tab title="Client">
     ```typescript
-    const integration = await client.upsertIntegration({
+    const system = await client.upsertSystem({
       id: "github-api",
       name: "GitHub API",
       urlHost: "https://api.github.com",
@@ -442,21 +442,21 @@ Creates or updates an integration configuration. Integrations represent connecti
   </Tab>
 </Tabs>
 
-### deleteIntegration
+### deleteSystem
 
-Deletes an integration configuration. Returns `true` if successful.
+Deletes a system configuration. Returns `true` if successful.
 
 <Tabs>
   <Tab title="GraphQL">
     ```graphql
-    mutation DeleteIntegration($id: ID!) {
-      deleteIntegration(id: $id)
+    mutation DeleteSystem($id: ID!) {
+      deleteSystem(id: $id)
     }
     ```
   </Tab>
   <Tab title="Client">
     ```typescript
-    const success = await client.deleteIntegration("integration-id");
+    const success = await client.deleteSystem("system-id");
     ```
   </Tab>
 </Tabs>

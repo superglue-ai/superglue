@@ -82,7 +82,7 @@ describe('Superglue SDK Integration Tests', () => {
       id: toolId!,
       payload: {},
       credentials: {
-        [`${INTEGRATION_ID}_api_token`]: githubToken
+        [`${INTEGRATION_ID}_api_token`]: githubToken!
       }
     });
 

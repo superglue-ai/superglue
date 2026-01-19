@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, Integration, Run, RunStatus, Tool } from "@superglue/shared";
+import { ApiConfig, HttpMethod, System, Run, RunStatus, Tool } from "@superglue/shared";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PostgresService } from "./postgres.js";
 import { ToolScheduleInternal } from "./types.js";
@@ -250,37 +250,37 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
       });
     });
 
-    describe("Integration", () => {
-      const testIntegration: Integration = {
-        id: "test-int-id",
-        name: "Test Integration",
-        urlHost: "https://integration.test",
+    describe("System", () => {
+      const testSystem: System = {
+        id: "test-system-id",
+        name: "Test System",
+        urlHost: "https://system.test",
         credentials: { apiKey: "secret" },
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      it("should store and retrieve integrations", async () => {
-        await store.upsertIntegration({
-          id: testIntegration.id,
-          integration: testIntegration,
+      it("should store and retrieve systems", async () => {
+        await store.upsertSystem({
+          id: testSystem.id,
+          system: testSystem,
           orgId: testOrgId,
         });
-        const retrieved = await store.getIntegration({
-          id: testIntegration.id,
+        const retrieved = await store.getSystem({
+          id: testSystem.id,
           includeDocs: true,
           orgId: testOrgId,
         });
-        expect(retrieved).toMatchObject({ ...testIntegration, id: testIntegration.id });
+        expect(retrieved).toMatchObject({ ...testSystem, id: testSystem.id });
       });
 
-      it("should list integrations", async () => {
-        await store.upsertIntegration({
-          id: testIntegration.id,
-          integration: testIntegration,
+      it("should list systems", async () => {
+        await store.upsertSystem({
+          id: testSystem.id,
+          system: testSystem,
           orgId: testOrgId,
         });
-        const { items, total } = await store.listIntegrations({
+        const { items, total } = await store.listSystems({
           limit: 10,
           offset: 0,
           includeDocs: true,
@@ -288,48 +288,48 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         });
         expect(items).toHaveLength(1);
         expect(total).toBe(1);
-        expect(items[0]).toMatchObject({ ...testIntegration, id: testIntegration.id });
+        expect(items[0]).toMatchObject({ ...testSystem, id: testSystem.id });
       });
 
-      it("should delete integrations without details", async () => {
-        await store.upsertIntegration({
-          id: testIntegration.id,
-          integration: testIntegration,
+      it("should delete systems without details", async () => {
+        await store.upsertSystem({
+          id: testSystem.id,
+          system: testSystem,
           orgId: testOrgId,
         });
-        await store.deleteIntegration({ id: testIntegration.id, orgId: testOrgId });
-        const retrieved = await store.getIntegration({
-          id: testIntegration.id,
+        await store.deleteSystem({ id: testSystem.id, orgId: testOrgId });
+        const retrieved = await store.getSystem({
+          id: testSystem.id,
           includeDocs: true,
           orgId: testOrgId,
         });
         expect(retrieved).toBeNull();
       });
 
-      it("should delete integrations with details", async () => {
-        const integrationWithDetails: Integration = {
-          ...testIntegration,
+      it("should delete systems with details", async () => {
+        const systemWithDetails: System = {
+          ...testSystem,
           id: "test-int-with-details",
           documentation: "Test documentation content",
           openApiSchema: '{"openapi": "3.0.0", "info": {"title": "Test API"}}',
         };
 
-        await store.upsertIntegration({
-          id: integrationWithDetails.id,
-          integration: integrationWithDetails,
+        await store.upsertSystem({
+          id: systemWithDetails.id,
+          system: systemWithDetails,
           orgId: testOrgId,
         });
-        await store.deleteIntegration({ id: integrationWithDetails.id, orgId: testOrgId });
-        const retrieved = await store.getIntegration({
-          id: integrationWithDetails.id,
+        await store.deleteSystem({ id: systemWithDetails.id, orgId: testOrgId });
+        const retrieved = await store.getSystem({
+          id: systemWithDetails.id,
           includeDocs: true,
           orgId: testOrgId,
         });
         expect(retrieved).toBeNull();
       });
 
-      it("should return null for missing integration", async () => {
-        const retrieved = await store.getIntegration({
+      it("should return null for missing system", async () => {
+        const retrieved = await store.getSystem({
           id: "does-not-exist",
           includeDocs: true,
           orgId: testOrgId,
@@ -337,20 +337,20 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         expect(retrieved).toBeNull();
       });
 
-      it("should get many integrations by ids, skipping missing ones", async () => {
-        const int2 = { ...testIntegration, id: "test-int-id-2", name: "Integration 2" };
-        await store.upsertIntegration({
-          id: testIntegration.id,
-          integration: testIntegration,
+      it("should get many systems by ids, skipping missing ones", async () => {
+        const system2 = { ...testSystem, id: "test-system-id-2", name: "System 2" };
+        await store.upsertSystem({
+          id: testSystem.id,
+          system: testSystem,
           orgId: testOrgId,
         });
-        await store.upsertIntegration({ id: int2.id, integration: int2, orgId: testOrgId });
-        const result = await store.getManyIntegrations({
-          ids: [testIntegration.id, int2.id, "missing-id"],
+        await store.upsertSystem({ id: system2.id, system: system2, orgId: testOrgId });
+        const result = await store.getManySystems({
+          ids: [testSystem.id, system2.id, "missing-id"],
           orgId: testOrgId,
         });
         expect(result).toHaveLength(2);
-        expect(result.map((i) => i.id).sort()).toEqual([testIntegration.id, int2.id].sort());
+        expect(result.map((i) => i.id).sort()).toEqual([testSystem.id, system2.id].sort());
       });
     });
 

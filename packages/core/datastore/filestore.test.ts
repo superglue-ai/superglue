@@ -261,37 +261,37 @@ describe("FileStore", () => {
     });
   });
 
-  describe("Integration", () => {
-    const testIntegration = {
+  describe("System", () => {
+    const testSystem = {
       id: "test-int-id",
-      name: "Test Integration",
-      urlHost: "https://integration.test",
+      name: "Test System",
+      urlHost: "https://system.test",
       credentials: { apiKey: "secret" },
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    it("should store and retrieve integrations", async () => {
-      await store.upsertIntegration({
-        id: testIntegration.id,
-        integration: testIntegration,
+    it("should store and retrieve systems", async () => {
+      await store.upsertSystem({
+        id: testSystem.id,
+        system: testSystem,
         orgId: testOrgId,
       });
-      const retrieved = await store.getIntegration({
-        id: testIntegration.id,
+      const retrieved = await store.getSystem({
+        id: testSystem.id,
         includeDocs: true,
         orgId: testOrgId,
       });
-      expect(retrieved).toEqual({ ...testIntegration, id: testIntegration.id });
+      expect(retrieved).toEqual({ ...testSystem, id: testSystem.id });
     });
 
-    it("should list integrations", async () => {
-      await store.upsertIntegration({
-        id: testIntegration.id,
-        integration: testIntegration,
+    it("should list systems", async () => {
+      await store.upsertSystem({
+        id: testSystem.id,
+        system: testSystem,
         orgId: testOrgId,
       });
-      const { items, total } = await store.listIntegrations({
+      const { items, total } = await store.listSystems({
         limit: 10,
         offset: 0,
         includeDocs: true,
@@ -299,26 +299,26 @@ describe("FileStore", () => {
       });
       expect(items).toHaveLength(1);
       expect(total).toBe(1);
-      expect(items[0]).toEqual({ ...testIntegration, id: testIntegration.id });
+      expect(items[0]).toEqual({ ...testSystem, id: testSystem.id });
     });
 
-    it("should delete integrations", async () => {
-      await store.upsertIntegration({
-        id: testIntegration.id,
-        integration: testIntegration,
+    it("should delete systems", async () => {
+      await store.upsertSystem({
+        id: testSystem.id,
+        system: testSystem,
         orgId: testOrgId,
       });
-      await store.deleteIntegration({ id: testIntegration.id, orgId: testOrgId });
-      const retrieved = await store.getIntegration({
-        id: testIntegration.id,
+      await store.deleteSystem({ id: testSystem.id, orgId: testOrgId });
+      const retrieved = await store.getSystem({
+        id: testSystem.id,
         includeDocs: true,
         orgId: testOrgId,
       });
       expect(retrieved).toBeNull();
     });
 
-    it("should return null for missing integration", async () => {
-      const retrieved = await store.getIntegration({
+    it("should return null for missing system", async () => {
+      const retrieved = await store.getSystem({
         id: "non-existent",
         includeDocs: true,
         orgId: testOrgId,
@@ -326,14 +326,14 @@ describe("FileStore", () => {
       expect(retrieved).toBeNull();
     });
 
-    it("should get many integrations by ids, skipping missing ones", async () => {
-      const int1 = { ...testIntegration, id: "int1" };
-      const int2 = { ...testIntegration, id: "int2" };
+    it("should get many systems by ids, skipping missing ones", async () => {
+      const int1 = { ...testSystem, id: "int1" };
+      const int2 = { ...testSystem, id: "int2" };
 
-      await store.upsertIntegration({ id: int1.id, integration: int1, orgId: testOrgId });
-      await store.upsertIntegration({ id: int2.id, integration: int2, orgId: testOrgId });
+      await store.upsertSystem({ id: int1.id, system: int1, orgId: testOrgId });
+      await store.upsertSystem({ id: int2.id, system: int2, orgId: testOrgId });
 
-      const results = await store.getManyIntegrations({
+      const results = await store.getManySystems({
         ids: ["int1", "missing", "int2"],
         orgId: testOrgId,
       });

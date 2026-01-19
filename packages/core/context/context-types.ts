@@ -1,4 +1,4 @@
-import { Integration, JSONSchema, ApiConfig, ServiceMetadata } from "@superglue/shared";
+import { System, JSONSchema, ApiConfig, ServiceMetadata } from "@superglue/shared";
 
 export type ObjectContextOptions = {
   characterBudget: number;
@@ -13,7 +13,7 @@ export type ObjectContextOptions = {
   };
 };
 
-export type IntegrationContextOptions = {
+export type SystemContextOptions = {
   characterBudget: number;
   include?: { authContext?: boolean; paginationContext?: boolean; generalContext?: boolean };
   tuning?: {
@@ -34,7 +34,7 @@ export type ToolBuilderContextOptions = {
 };
 
 export type ToolBuilderContextInput = {
-  integrations: Integration[];
+  systems: System[];
   payload: any;
   userInstruction: string;
   responseSchema?: JSONSchema;
@@ -79,8 +79,8 @@ export type GenerateStepConfigContextInput = {
   previousStepDataSelector?: string;
   stepInput?: any;
   credentials?: Record<string, string>;
-  integrationDocumentation: string;
-  integrationSpecificInstructions: string;
+  systemDocumentation: string;
+  systemSpecificInstructions: string;
   errorMessage?: string;
 };
 

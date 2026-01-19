@@ -92,7 +92,7 @@ export function ToolStepGallery({
     tool,
     steps,
     payload,
-    integrations,
+    systems,
     inputSchema,
     responseSchema,
     finalTransform,
@@ -321,8 +321,8 @@ export function ToolStepGallery({
   };
 
   const handleConfirmInsertStep = (stepId: string, instruction: string, integrationId?: string) => {
-    const selectedIntegration = integrationId
-      ? integrations?.find((i) => i.id === integrationId)
+    const selectedSystem = integrationId
+      ? systems?.find((s) => s.id === integrationId)
       : undefined;
     const newStep: ExecutionStep = {
       id: stepId,
@@ -330,8 +330,8 @@ export function ToolStepGallery({
       apiConfig: {
         id: stepId,
         instruction,
-        urlHost: selectedIntegration?.urlHost || "",
-        urlPath: selectedIntegration?.urlPath || "",
+          urlHost: selectedSystem?.urlHost || "",
+        urlPath: selectedSystem?.urlPath || "",
         method: "GET" as HttpMethod,
         headers: {},
         queryParams: {},

@@ -1,6 +1,6 @@
-import { Workflow, WorkflowResult } from "@superglue/shared";
+import { Tool, ToolResult } from "@superglue/shared";
 
-export interface IntegrationConfig {
+export interface SystemConfig {
     id: string;
     name: string;
     urlHost: string;
@@ -39,7 +39,7 @@ export interface ValidationLLMConfig {
 }
 
 export interface AgentEvalConfig {
-    integrations: IntegrationConfig[];
+    systems: SystemConfig[];
     tools: ToolConfig[];
     enabledTools: 'all' | string[];
     settings: TestSuiteSettings;
@@ -90,8 +90,8 @@ export interface ToolAttempt {
     status: AttemptStatus;
     validationResult?: ValidationResult;
 
-    workflow?: Workflow;
-    result?: WorkflowResult;
+    workflow?: Tool;
+    result?: ToolResult;
 
     createdAt: Date;
 }

@@ -109,8 +109,8 @@ type WorkflowList {
   total: Int!
 }
 
-type IntegrationList {
-  items: [Integration!]!
+type SystemList {
+  items: [System!]!
   total: Int!
 }
 
@@ -307,7 +307,7 @@ input WorkflowInputRequest @oneOf {
   id: ID
 }
 
-input IntegrationInput {
+input SystemInput {
   id: ID!
   name: String
   urlHost: String
@@ -328,9 +328,9 @@ type Log {
   traceId: ID
 }
 
-type SuggestedIntegration {
+type SuggestedSystem {
   reason: String!
-  integration: Integration!
+  system: System!
 }
 
 type ToolStep {
@@ -351,16 +351,16 @@ type Query {
   listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
   listApis(limit: Int = 10, offset: Int = 0): ApiList!
   listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
-  listIntegrations(limit: Int = 10, offset: Int = 0): IntegrationList!
-  findRelevantIntegrations(searchTerms: String): [SuggestedIntegration!]
+  listSystems(limit: Int = 10, offset: Int = 0): SystemList!
+  findRelevantSystems(searchTerms: String): [SuggestedSystem!]
   findRelevantTools(searchTerms: String): [SuggestedTool!]
 
   getRun(id: ID!): Run
   getApi(id: ID!): ApiConfig
   getWorkflow(id: ID!): Workflow
-  getIntegration(id: ID!): Integration
-  searchIntegrationDocumentation(integrationId: ID!, keywords: String!): String!
-  generateInstructions(integrations: [IntegrationInput!]!): [String!]!
+  getSystem(id: ID!): System
+  searchSystemDocumentation(systemId: ID!, keywords: String!): String!
+  generateInstructions(systems: [SystemInput!]!): [String!]!
   getTenantInfo: TenantInfo
 }
 
@@ -516,12 +516,12 @@ type Mutation {
   upsertApi(id: ID!, input: JSON!): ApiConfig!
   deleteApi(id: ID!): Boolean!
 
-  upsertIntegration(
-    input: IntegrationInput!
+  upsertSystem(
+    input: SystemInput!
     mode: UpsertMode = UPSERT
     credentialMode: CredentialMode = MERGE
-  ): Integration!
-  deleteIntegration(id: ID!): Boolean!
+  ): System!
+  deleteSystem(id: ID!): Boolean!
 
   cacheOauthClientCredentials(
     clientCredentialsUid: String!
@@ -551,7 +551,7 @@ type Subscription {
   logs: Log!
 }
 
-type Integration {
+type System {
   id: ID!
   name: String
   type: String

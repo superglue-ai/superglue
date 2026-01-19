@@ -1,26 +1,26 @@
 ---
-title: "Creating an Integration"
+title: "Creating a System"
 description: "Connect superglue to any system"
 ---
 
-Create an integration in superglue to connect tools with external systems. Integrations handle authentication and documentation retrieval automatically. Learn more about how integrations fit into the overall architecture in the [core concepts](/getting-started/core-concepts) section.
+Create a system in superglue to connect tools with external systems. Systems handle authentication and documentation retrieval automatically. Learn more about how systems fit into the overall architecture in the [core concepts](/getting-started/core-concepts) section.
 
 ## Getting started
 
 <Tabs>
   <Tab title="Via Agent">
-    The fastest way to create an integration is through the agent interface. Visit [app.superglue.cloud](https://app.superglue.cloud) and start chatting with the agent.
+    The fastest way to create a system is through the agent interface. Visit [app.superglue.cloud](https://app.superglue.cloud) and start chatting with the agent.
 
     **Example:**
     ```
-    Create an integration to my ITSM platform under the URL:
+    Create a system for my ITSM platform under the URL:
     https://my-company.itsm.com using the attached PDF as documentation
     ```
 
     superglue will:
     1. Identify the target system
     2. Guide through the authentication flow by collecting all required credentials
-    3. Create the integration and make it available immediately
+    3. Create the system and make it available immediately
     4. Process and analyze the system's documentation automatically in the background
 
     <video
@@ -30,30 +30,30 @@ Create an integration in superglue to connect tools with external systems. Integ
     />
 
     <Card icon="plug" href="https://app.superglue.cloud" horizontal>
-      Start creating integrations with the agent
+      Start creating systems with the agent
     </Card>
 
   </Tab>
 
   <Tab title="Via UI">
-    Integrations can also be created manually using the web application:
+    Systems can also be created manually using the web application:
 
     <Steps>
-      <Step title="Navigate to integrations">
-        Click the "Integrations" button in the sidebar
+      <Step title="Navigate to systems">
+        Click the "Systems" button in the sidebar
       </Step>
       <Step title="Open form">
-        Click **Add Integration** to open the integration form
+        Click **Add System** to open the system form
       </Step>
       <Step title="Fill required fields">
-        - **Template**: Choose from 100+ prebuilt templates or create a custom integration. Templates pre-fill the base URL, documentation URL, and authentication type
+        - **Template**: Choose from 100+ prebuilt templates or create a custom system. Templates pre-fill the base URL, documentation URL, and authentication type
         - **URL**: Base URL of the system (e.g., `https://api.stripe.com`)
         - **Documentation URL**: Optional but recommended link to API documentation
         - **Documentation as a file**: Optionally upload a documentation file (PDF, OpenAPI Specs, .zip files, etc.). If you upload a file, superglue will not crawl a doc URL.
         - **Credentials**: See [authentication and credential management](/guides/creating-an-integration#authentication-and-credential-management) for details
         - **OAuth**: For OAuth systems, click **Connect to system** to complete the flow and let superglue handle the token exchange
       </Step>
-      <Step title="Click 'Add Integration'">
+      <Step title="Click 'Add System'">
         superglue saves your configuration and processes online documentation in the background if a documentation URL was provided
       </Step>
     </Steps>
@@ -67,7 +67,7 @@ Create an integration in superglue to connect tools with external systems. Integ
   </Tab>
 
   <Tab title="Via SDK">
-    For programmatic integration creation, use the SDK.
+    For programmatic system creation, use the SDK.
 
     ```bash
     npm install @superglue/client
@@ -353,7 +353,7 @@ superglue supports many different authentication methods. All credentials are en
 </Card>
 
 <Card title="Not ready to provide credentials?" icon="watch">
-  Integrations can be created without credentials and updated later. Credentials
+  Systems can be created without credentials and updated later. Credentials
   may also be supplied dynamically during tool execution.
 </Card>
 
@@ -364,9 +364,9 @@ superglue supports many different authentication methods. All credentials are en
 
 ## Automatic documentation crawling
 
-superglue automatically crawls and processes documentation upon integration creation. This makes it possible for superglue to reason about endpoints, authentication, and data models without manual setup.
+superglue automatically crawls and processes documentation upon system creation. This makes it possible for superglue to reason about endpoints, authentication, and data models without manual setup.
 
-When creating an integration, the **`documentationUrl`** or uploaded documentation files (like OpenAPI specs, PDFs, or HTML exports) are used as the primary source for this process. The more complete and accurate the provided material, the better superglue’s internal understanding of the system.
+When creating a system, the **`documentationUrl`** or uploaded documentation files (like OpenAPI specs, PDFs, or HTML exports) are used as the primary source for this process. The more complete and accurate the provided material, the better superglue’s internal understanding of the system.
 
 ### Supported documentation formats
 
@@ -403,12 +403,12 @@ Large APIs can have hundreds of endpoints. To improve accuracy and reduce proces
     Connect to Stripe and focus on customer and subscription endpoints
     ```
 
-    This ensures that only relevant documentation is processed and saved to the integration.
+    This ensures that only relevant documentation is processed and saved to the system.
 
   </Tab>
 
   <Tab title="Via SDK">
-    Provide keywords programmatically when creating or updating an integration:
+    Provide keywords programmatically when creating or updating a system:
 
     ```typescript
     const integration = await superglue.upsertIntegration({
@@ -432,7 +432,7 @@ Large APIs can have hundreds of endpoints. To improve accuracy and reduce proces
 ## Next steps
 
 <Card
-  title="Ready to create your first integration?"
+  title="Ready to create your first system?"
   icon="plug"
   href="https://app.superglue.cloud"
 >

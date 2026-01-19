@@ -1,4 +1,4 @@
-import { Integration } from "./types.js";
+import { System } from "./types.js";
 import { toJsonSchema } from "./json-schema.js";
 import { UserRole } from "./types.js";
 
@@ -169,9 +169,9 @@ function enhanceSchemaWithData(value: any, schema: any): any {
 }
 
 export function flattenAndNamespaceCredentials(
-  integrations: Integration[],
+  systems: System[],
 ): Record<string, string> {
-  return integrations.reduce(
+  return systems.reduce(
     (acc, sys) => {
       Object.entries(sys.credentials || {}).forEach(([key, value]) => {
         acc[`${sys.id}_${key}`] = value;
@@ -211,45 +211,45 @@ export async function generateUniqueId({
   }
 }
 
-interface IntegrationGetter {
-  getIntegration(id: string): Promise<Integration | null>;
-  getManyIntegrations?(ids: string[]): Promise<Integration[]>;
+interface SystemGetter {
+  getSystem(id: string): Promise<System | null>;
+  getManySystems?(ids: string[]): Promise<System[]>;
 }
 
-// Generic integration polling utility that works with any integration getter
-// Assumes all integrationIds are valid and exist
-export async function waitForIntegrationProcessing(
-  integrationGetter: IntegrationGetter,
-  integrationIds: string[],
+// Generic system polling utility that works with any system getter
+// Assumes all systemIds are valid and exist
+export async function waitForSystemProcessing(
+  systemGetter: SystemGetter,
+  systemIds: string[],
   timeoutMs: number = 90000,
-): Promise<Integration[]> {
+): Promise<System[]> {
   const start = Date.now();
 
   while (Date.now() - start < timeoutMs) {
-    let integrations: Integration[];
-    if (integrationGetter.getManyIntegrations) {
-      integrations = await integrationGetter.getManyIntegrations(integrationIds);
+    let systems: System[];
+    if (systemGetter.getManySystems) {
+      systems = await systemGetter.getManySystems(systemIds);
     } else {
       const settled = await Promise.allSettled(
-        integrationIds.map(async (id) => {
+        systemIds.map(async (id) => {
           try {
-            return await integrationGetter.getIntegration(id);
+            return await systemGetter.getSystem(id);
           } catch {
             return null;
           }
         }),
       );
-      integrations = settled
+      systems = settled
         .map((r) => (r.status === "fulfilled" ? r.value : null))
-        .filter(Boolean) as Integration[];
+        .filter(Boolean) as System[];
     }
-    const hasPendingDocs = integrations.some((i) => i.documentationPending === true);
-    if (!hasPendingDocs) return integrations;
+    const hasPendingDocs = systems.some((i) => i.documentationPending === true);
+    if (!hasPendingDocs) return systems;
     await new Promise((resolve) => setTimeout(resolve, 4000));
   }
 
   throw new Error(
-    `Waiting for documentation processing to complete timed out after ${timeoutMs / 1000} seconds for: ${integrationIds.join(", ")}. Please try again in a few minutes.`,
+    `Waiting for documentation processing to complete timed out after ${timeoutMs / 1000} seconds for: ${systemIds.join(", ")}. Please try again in a few minutes.`,
   );
 }
 

@@ -7,7 +7,7 @@ import { cn, composeUrl, inputErrorStyles } from "@/src/lib/general-utils";
 import { tokenRegistry } from "@/src/lib/token-registry";
 import { Label } from "@radix-ui/react-label";
 import { ApiConfig, AuthType, CacheMode, SuperglueClient } from "@superglue/shared";
-import { integrations } from "@superglue/shared";
+import { systems as systemTemplates } from "@superglue/shared";
 import { Loader2, Terminal, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -484,12 +484,12 @@ const result = await superglue.call({
     if (!formData.documentationUrl && urlHost) {
       // Check if URL matches any pattern in integrations
       const fullUrl = composeUrl(urlHost, urlPath);
-      for (const pattern in integrations) {
+      for (const pattern in systemTemplates) {
         if (new RegExp(pattern).test(fullUrl)) {
           setFormData((prev) => ({
             ...prev,
             fullUrl,
-            documentationUrl: integrations[pattern].docsUrl,
+            documentationUrl: systemTemplates[pattern].docsUrl,
           }));
           break;
         }

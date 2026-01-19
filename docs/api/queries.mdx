@@ -97,15 +97,15 @@ Returns a paginated list of workflow configurations.
   </Tab>
 </Tabs>
 
-### listIntegrations
+### listSystems
 
-Returns a paginated list of integration configurations.
+Returns a paginated list of system configurations.
 
 <Tabs>
   <Tab title="GraphQL">
     ```graphql
-    query ListIntegrations($limit: Int = 10, $offset: Int = 0) {
-      listIntegrations(limit: $limit, offset: $offset) {
+    query ListSystems($limit: Int = 10, $offset: Int = 0) {
+      listSystems(limit: $limit, offset: $offset) {
         items {
           id
           name
@@ -128,7 +128,7 @@ Returns a paginated list of integration configurations.
   </Tab>
   <Tab title="SDK">
     ```typescript
-    const { items, total } = await client.listIntegrations(10, 0);
+    const { items, total } = await client.listSystems(10, 0);
     ```
   </Tab>
 </Tabs>
@@ -267,15 +267,15 @@ Retrieves a specific workflow configuration by ID.
   </Tab>
 </Tabs>
 
-### getIntegration
+### getSystem
 
-Retrieves a specific integration configuration by ID.
+Retrieves a specific system configuration by ID.
 
 <Tabs>
   <Tab title="GraphQL">
     ```graphql
-    query GetIntegration($id: ID!) {
-      getIntegration(id: $id) {
+    query GetSystem($id: ID!) {
+      getSystem(id: $id) {
         id
         name
         type
@@ -296,7 +296,7 @@ Retrieves a specific integration configuration by ID.
   </Tab>
   <Tab title="SDK">
     ```typescript
-    const integration = await client.getIntegration("integration-id");
+    const system = await client.getSystem("system-id");
     ```
   </Tab>
 </Tabs>

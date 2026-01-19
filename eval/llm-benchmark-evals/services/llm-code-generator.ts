@@ -1,7 +1,7 @@
 import type { ServiceMetadata } from "@superglue/shared";
 import { generateText } from 'ai';
 import { logMessage } from "../../../packages/core/utils/logs.js";
-import type { IntegrationConfig, ToolConfig } from "../../tool-evals/types.js";
+import type { SystemConfig, ToolConfig } from "../../tool-evals/types.js";
 
 const MAX_CODE_SIZE = 10000;
 
@@ -11,7 +11,7 @@ export class LlmCodeGenerator {
     private metadata: ServiceMetadata
   ) {}
 
-  async generate(tool: ToolConfig, integrations: IntegrationConfig[]): Promise<string> {
+  async generate(tool: ToolConfig, integrations: SystemConfig[]): Promise<string> {
     const systemPrompt = this.getSystemPrompt();
     const userPrompt = this.generatePrompt(tool, integrations);
 
@@ -41,7 +41,7 @@ The code should be self-contained and return the requested data.
 Always wrap your code in <<CODE>> and <</CODE>> tags (note the closing tag has a forward slash).`;
   }
 
-  private generatePrompt(tool: ToolConfig, integrations: IntegrationConfig[]): string {
+  private generatePrompt(tool: ToolConfig, integrations: SystemConfig[]): string {
     const integrationDetails = integrations.map(integration => {
       const credentialEntries = Object.entries(integration.credentials || {});
       const credentialPairs = credentialEntries.map(([key, value]) => {

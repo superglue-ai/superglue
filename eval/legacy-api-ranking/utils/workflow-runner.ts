@@ -1,9 +1,9 @@
 import { ToolBuilder } from '@/packages/core/tools/tool-builder.js';
 import { DataStore } from '@core/datastore/types.js';
 import { ToolExecutor } from '@/packages/core/tools/tool-executor.js';
-import { IntegrationManager } from '@core/integrations/integration-manager.js';
+import { SystemManager } from '@core/systems/system-manager.js';
 import { logEmitter, logMessage } from '@core/utils/logs.js';
-import { Integration, Workflow, WorkflowResult } from '@superglue/shared';
+import { System, Tool, ToolResult, RunStatus } from '@superglue/shared';
 import { generateUniqueId } from '@superglue/shared/utils';
 import { BaseWorkflowConfig } from './config-loader.js';
 import { validateWorkflowResult, type SoftValidationResult } from './soft-validator.js';
@@ -16,8 +16,8 @@ export interface WorkflowRunAttempt {
     executionTime: number;
     executionSuccess: boolean;
     executionError?: string;
-    workflowPlan?: Workflow;
-    result?: WorkflowResult;
+    workflowPlan?: Tool;
+    result?: ToolResult;
 }
 
 export interface WorkflowRunResult {
@@ -27,7 +27,7 @@ export interface WorkflowRunResult {
     successfulAttempts: number;
     successRate: number;
     attempts: WorkflowRunAttempt[];
-    finalResult?: WorkflowResult;
+    finalResult?: ToolResult;
     collectedLogs?: any[];
     softValidation?: SoftValidationResult;  // Result of soft validation if enabled
 }
@@ -67,13 +67,13 @@ export class WorkflowRunner {
      */
     async runWorkflow(
         workflowConfig: BaseWorkflowConfig,
-        integrations: Integration[],
+        systems: System[],
         options: WorkflowRunnerOptions
     ): Promise<WorkflowRunResult> {
         const attempts: WorkflowRunAttempt[] = [];
         const collectedLogs: any[] = [];
         let successfulAttempts = 0;
-        let finalResult: WorkflowResult | undefined;
+        let finalResult: ToolResult | undefined;
 
         // Set up log collection if requested
         const logListener = options.collectLogs ? (entry: any) => {
@@ -96,7 +96,7 @@ export class WorkflowRunner {
 
                 const attempt = await this.runSingleAttempt(
                     workflowConfig,
-                    integrations,
+                    systems,
                     attemptNum,
                     options.saveRuns ?? false
                 );
@@ -202,7 +202,7 @@ export class WorkflowRunner {
      */
     private async runSingleAttempt(
         workflowConfig: BaseWorkflowConfig,
-        integrations: Integration[],
+        systems: System[],
         attemptNumber: number,
         saveRun: boolean
     ): Promise<WorkflowRunAttempt> {
@@ -216,14 +216,14 @@ export class WorkflowRunner {
 
         // Build phase
         const buildStart = Date.now();
-        let workflow: Workflow | undefined;
+        let workflow: Tool | undefined;
 
         try {
             logMessage('info', `📝 Building workflow ${workflowConfig.name}...`, this.metadata);
 
             const builder = new ToolBuilder(
                 workflowConfig.instruction,
-                integrations,
+                systems,
                 workflowConfig.payload || {},
                 {},
                 this.metadata
@@ -270,14 +270,14 @@ export class WorkflowRunner {
                 };
 
                 const executor = new ToolExecutor(
-                    { tool: workflow, metadata: metadataWithWorkflowId, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata) }
+                    { tool: workflow, metadata: metadataWithWorkflowId, systems: SystemManager.fromSystems(systems, this.datastore, this.metadata) }
                 );
 
                 // Combine all credentials from integrations
-                const allCredentials = integrations.reduce((acc, integ) => {
-                    if (integ.credentials && typeof integ.credentials === 'object') {
-                        for (const [key, value] of Object.entries(integ.credentials)) {
-                            acc[`${integ.id}_${key}`] = value;
+                const allCredentials = systems.reduce((acc, system) => {
+                    if (system.credentials && typeof system.credentials === 'object') {
+                        for (const [key, value] of Object.entries(system.credentials)) {
+                            acc[`${system.id}_${key}`] = value;
                         }
                     }
                     return acc;
@@ -294,17 +294,17 @@ export class WorkflowRunner {
                 // Save run if requested
                 if (saveRun) {
                     await this.datastore.createRun({
-                        result: {
+                        run: {
                             id: workflowResult.id,
-                            success: workflowResult.success,
+                            toolId: workflow.id,
+                            status: workflowResult.success ? RunStatus.SUCCESS : RunStatus.FAILED,
                             error: workflowResult.error || undefined,
-                            config: workflowResult.config || workflow,
+                            toolConfig: workflowResult.config || workflow,
                             stepResults: workflowResult.stepResults || [],
                             startedAt: workflowResult.startedAt,
                             completedAt: workflowResult.completedAt || new Date(),
-                            data: null
+                            orgId: this.metadata.orgId,
                         },
-                        orgId: this.metadata.orgId
                     });
                 }
 
@@ -347,7 +347,7 @@ export class WorkflowRunner {
      */
     async runWorkflows(
         workflows: BaseWorkflowConfig[],
-        integrations: Integration[],
+        systems: System[],
         options: WorkflowRunnerOptions,
         onWorkflowComplete?: (result: WorkflowRunResult) => void
     ): Promise<WorkflowRunResult[]> {
@@ -355,19 +355,19 @@ export class WorkflowRunner {
 
         for (const workflow of workflows) {
             // Get integrations for this workflow
-            const workflowIntegrations = integrations.filter(i =>
+            const workflowSystems = systems.filter(i =>
                 workflow.integrationIds.includes(i.id)
             );
 
-            if (workflowIntegrations.length !== workflow.integrationIds.length) {
+            if (workflowSystems.length !== workflow.integrationIds.length) {
                 logMessage('warn',
-                    `⚠️  Workflow ${workflow.name} requires integrations that are not available`,
+                    `⚠️  Workflow ${workflow.name} requires systems that are not available`,
                     this.metadata
                 );
                 continue;
             }
 
-            const result = await this.runWorkflow(workflow, workflowIntegrations, options);
+            const result = await this.runWorkflow(workflow, workflowSystems, options);
             results.push(result);
 
             if (onWorkflowComplete) {

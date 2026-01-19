@@ -243,8 +243,8 @@ describe("getObjectContext edge cases for include combinations and strict budget
 });
 
 describe("getWorkflowBuilderContext budget and include combinations", () => {
-  const integration = {
-    id: "test_integration",
+  const system = {
+    id: "test_system",
     urlHost: "https://api.example.com",
     urlPath: "/v1",
     documentation:
@@ -257,7 +257,7 @@ describe("getWorkflowBuilderContext budget and include combinations", () => {
 
   it("zero or negative budget returns empty string", () => {
     const input = {
-      integrations: [integration],
+      systems: [system],
       payload: { x: 1 },
       userInstruction: "Do X",
     } as any;
@@ -267,7 +267,7 @@ describe("getWorkflowBuilderContext budget and include combinations", () => {
 
   it("includes only requested sections and enforces budget", () => {
     const input = {
-      integrations: [integration],
+      systems: [system],
       payload: { x: 1, y: 2 },
       userInstruction: "Fetch items",
     } as any;
@@ -288,7 +288,7 @@ describe("getWorkflowBuilderContext budget and include combinations", () => {
   });
 
   it("no integrations path emits transform-only hint and enforces budget", () => {
-    const input = { integrations: [], payload: { q: 1 }, userInstruction: "Transform data" } as any;
+    const input = { systems: [], payload: { q: 1 }, userInstruction: "Transform data" } as any;
     const out = getToolBuilderContext(input, {
       characterBudget: 500,
       include: {
@@ -302,9 +302,9 @@ describe("getWorkflowBuilderContext budget and include combinations", () => {
     expect(out).toMatch(/No integrations provided\. Build a transform-only workflow/);
   });
 
-  it("available variables include integration credentials and payload keys when requested", () => {
+  it("available variables include system credentials and payload keys when requested", () => {
     const input = {
-      integrations: [{ ...integration, credentials: { apiKey: "xxx" } }],
+      systems: [{ ...system, credentials: { apiKey: "xxx" } }],
       payload: { foo: 1 },
       userInstruction: "N/A",
     } as any;
@@ -312,7 +312,7 @@ describe("getWorkflowBuilderContext budget and include combinations", () => {
       characterBudget: 1000,
       include: { availableVariablesContext: true } as any,
     });
-    expect(out).toMatch(/<<test_integration_apiKey>>/);
+    expect(out).toMatch(/<<test_system_apiKey>>/);
     expect(out).toMatch(/<<foo>>/);
   });
 });

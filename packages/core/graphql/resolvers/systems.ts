@@ -1,23 +1,23 @@
-import { findMatchingIntegration, Integration, integrations } from "@superglue/shared";
+import { findMatchingSystem, System, systems as systemTemplates } from "@superglue/shared";
 import { generateUniqueId } from "@superglue/shared/utils";
 import { GraphQLResolveInfo } from "graphql";
 import { PostgresService } from "../../datastore/postgres.js";
 import { server_defaults } from "../../default.js";
 import { DocumentationFetcher } from "../../documentation/documentation-fetching.js";
 import { DocumentationSearch } from "../../documentation/documentation-search.js";
-import { IntegrationFinder } from "../../integrations/integration-finder.js";
+import { SystemFinder } from "../../systems/system-finder.js";
 import { composeUrl } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
 import { GraphQLRequestContext } from "../types.js";
 
-export const listIntegrationsResolver = async (
+export const listSystemsResolver = async (
   _: any,
   { limit = 100, offset = 0 }: { limit?: number; offset?: number },
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ) => {
   try {
-    const result = await context.datastore.listIntegrations({
+    const result = await context.datastore.listSystems({
       limit,
       offset,
       includeDocs: false,
@@ -28,12 +28,12 @@ export const listIntegrationsResolver = async (
       total: result.total,
     };
   } catch (error) {
-    logMessage("error", `Error listing integrations: ${String(error)}`, context.toMetadata());
+    logMessage("error", `Error listing systems: ${String(error)}`, context.toMetadata());
     throw error;
   }
 };
 
-export const getIntegrationResolver = async (
+export const getSystemResolver = async (
   _: any,
   { id }: { id: string },
   context: GraphQLRequestContext,
@@ -41,31 +41,31 @@ export const getIntegrationResolver = async (
 ) => {
   if (!id) throw new Error("id is required");
   try {
-    const integration = await context.datastore.getIntegration({
+    const system = await context.datastore.getSystem({
       id,
       includeDocs: false,
       orgId: context.orgId,
     });
-    if (!integration) throw new Error("Integration not found");
-    return integration;
+    if (!system) throw new Error("System not found");
+    return system;
   } catch (error) {
     logMessage(
       "error",
-      `Error getting integration with id ${id}: ${String(error)}`,
+      `Error getting system with id ${id}: ${String(error)}`,
       context.toMetadata(),
     );
     throw error;
   }
 };
 
-export const upsertIntegrationResolver = async (
+export const upsertSystemResolver = async (
   _: any,
   {
     input,
     mode = "UPSERT",
     credentialMode = "MERGE",
   }: {
-    input: Integration;
+    input: System;
     mode?: "CREATE" | "UPDATE" | "UPSERT";
     credentialMode?: "MERGE" | "REPLACE";
   },
@@ -78,92 +78,89 @@ export const upsertIntegrationResolver = async (
   try {
     const now = new Date();
 
-    let existingIntegrationOrNull = await context.datastore.getIntegration({
+    let existingSystemOrNull = await context.datastore.getSystem({
       id: input.id,
       includeDocs: false,
       orgId: context.orgId,
     });
 
     if (mode === "UPSERT") {
-      mode = existingIntegrationOrNull ? "UPDATE" : "CREATE";
+      mode = existingSystemOrNull ? "UPDATE" : "CREATE";
     }
 
     if (mode === "CREATE") {
-      if (existingIntegrationOrNull) {
+      if (existingSystemOrNull) {
         input.id = await generateUniqueId({
           baseId: input.id,
           exists: async (id) =>
-            !!(await context.datastore.getIntegration({
+            !!(await context.datastore.getSystem({
               id,
               includeDocs: false,
               orgId: context.orgId,
             })),
         });
-        existingIntegrationOrNull = null;
+        existingSystemOrNull = null;
       }
       input = enrichWithTemplate(input);
     } else if (mode === "UPDATE") {
-      if (!existingIntegrationOrNull) {
-        throw new Error(`Integration with ID '${input.id}' not found.`);
+      if (!existingSystemOrNull) {
+        throw new Error(`System with ID '${input.id}' not found.`);
       }
     }
 
-    let shouldFetchDoc = shouldTriggerDocFetch(input, context, existingIntegrationOrNull);
+    let shouldFetchDoc = shouldTriggerDocFetch(input, context, existingSystemOrNull);
 
-    const integrationToSave = {
+    const systemToSave = {
       id: input.id,
-      name: resolveField(input.name, existingIntegrationOrNull?.name, ""),
-      urlHost: resolveField(input.urlHost, existingIntegrationOrNull?.urlHost, ""),
-      urlPath: resolveField(input.urlPath, existingIntegrationOrNull?.urlPath, ""),
+      name: resolveField(input.name, existingSystemOrNull?.name, ""),
+      urlHost: resolveField(input.urlHost, existingSystemOrNull?.urlHost, ""),
+      urlPath: resolveField(input.urlPath, existingSystemOrNull?.urlPath, ""),
       documentationUrl: resolveField(
         input.documentationUrl,
-        existingIntegrationOrNull?.documentationUrl,
+        existingSystemOrNull?.documentationUrl,
         "",
       ),
       documentation: resolveField(
         input.documentation,
-        existingIntegrationOrNull?.documentation,
+        existingSystemOrNull?.documentation,
         "",
       ),
-      openApiUrl: resolveField(input.openApiUrl, existingIntegrationOrNull?.openApiUrl, ""),
+      openApiUrl: resolveField(input.openApiUrl, existingSystemOrNull?.openApiUrl, ""),
       openApiSchema: resolveField(
         input.openApiSchema,
-        existingIntegrationOrNull?.openApiSchema,
+        existingSystemOrNull?.openApiSchema,
         "",
       ),
-      // If we're starting a new fetch, set pending to true
-      // If we're not starting a new fetch, preserve the existing pending state
       documentationPending: shouldFetchDoc
         ? true
-        : existingIntegrationOrNull?.documentationPending || false,
+        : existingSystemOrNull?.documentationPending || false,
       credentials:
         credentialMode === "REPLACE"
           ? (input.credentials ?? {})
-          : mergeCredentials(input.credentials, existingIntegrationOrNull?.credentials),
+          : mergeCredentials(input.credentials, existingSystemOrNull?.credentials),
       specificInstructions: resolveField(
         input.specificInstructions?.trim(),
-        existingIntegrationOrNull?.specificInstructions,
+        existingSystemOrNull?.specificInstructions,
         "",
       ),
       documentationKeywords: uniqueKeywords(
         resolveField(
           input.documentationKeywords,
-          existingIntegrationOrNull?.documentationKeywords,
+          existingSystemOrNull?.documentationKeywords,
           [],
         ),
       ),
-      createdAt: existingIntegrationOrNull?.createdAt || now,
+      createdAt: existingSystemOrNull?.createdAt || now,
       updatedAt: now,
     };
 
-    const savedIntegration = await context.datastore.upsertIntegration({
+    const savedSystem = await context.datastore.upsertSystem({
       id: input.id,
-      integration: integrationToSave,
+      system: systemToSave,
       orgId: context.orgId,
     });
 
     if (mode === "CREATE") {
-      // If we are creating the integration, and we are on postgres datastore, and there is a template documentation, we copy it to the users integration
       const [doesTemplateDocumentationExists, templateName] = templateDocumentationExists(
         input,
         context,
@@ -171,26 +168,25 @@ export const upsertIntegrationResolver = async (
       if (doesTemplateDocumentationExists) {
         logMessage(
           "debug",
-          `Copying template documentation for template '${templateName}' to user integration '${input.id}'`,
+          `Copying template documentation for template '${templateName}' to user system '${input.id}'`,
           context.toMetadata(),
         );
-        const success = await context.datastore.copyTemplateDocumentationToUserIntegration({
+        const success = await context.datastore.copyTemplateDocumentationToUserSystem({
           templateId: templateName,
-          userIntegrationId: input.id,
+          userSystemId: input.id,
           orgId: context.orgId,
         });
         if (!success) {
           logMessage(
             "warn",
-            `No Template Documentation found for template ${templateName} to copy to user integration ${input.id}`,
+            `No Template Documentation found for template ${templateName} to copy to user system ${input.id}`,
             context.toMetadata(),
           );
-          // set shouldFetchDoc to true to trigger a fetch
           shouldFetchDoc = true;
         } else {
           logMessage(
             "info",
-            `Skipping documentation scrape for integration '${input.id}' - copied from template`,
+            `Skipping documentation scrape for system '${input.id}' - copied from template`,
             context.toMetadata(),
           );
         }
@@ -198,21 +194,21 @@ export const upsertIntegrationResolver = async (
     }
 
     if (shouldFetchDoc) {
-      triggerAsyncDocumentationFetch(input, context); // Fire-and-forget, will fetch docs in background and update integration documentation, documentationPending and metadata fields once its done
+      triggerAsyncDocumentationFetch(input, context);
     }
 
-    return savedIntegration;
+    return savedSystem;
   } catch (error) {
     logMessage(
       "error",
-      `Error upserting integration with id ${input.id}: ${String(error)}`,
+      `Error upserting system with id ${input.id}: ${String(error)}`,
       context.toMetadata(),
     );
     throw error;
   }
 };
 
-export const deleteIntegrationResolver = async (
+export const deleteSystemResolver = async (
   _: any,
   { id }: { id: string },
   context: GraphQLRequestContext,
@@ -220,14 +216,14 @@ export const deleteIntegrationResolver = async (
 ) => {
   if (!id) throw new Error("id is required");
   try {
-    return await context.datastore.deleteIntegration({ id, orgId: context.orgId });
+    return await context.datastore.deleteSystem({ id, orgId: context.orgId });
   } catch (error) {
-    logMessage("error", `Error deleting integration: ${String(error)}`, context.toMetadata());
+    logMessage("error", `Error deleting system: ${String(error)}`, context.toMetadata());
     throw error;
   }
 };
 
-export const findRelevantIntegrationsResolver = async (
+export const findRelevantSystemsResolver = async (
   _: any,
   { searchTerms }: { searchTerms?: string },
   context: GraphQLRequestContext,
@@ -236,17 +232,17 @@ export const findRelevantIntegrationsResolver = async (
   const metadata = context.toMetadata();
 
   try {
-    const allIntegrations = await context.datastore.listIntegrations({
+    const allSystems = await context.datastore.listSystems({
       limit: 1000,
       offset: 0,
       includeDocs: false,
       orgId: context.orgId,
     });
 
-    const selector = new IntegrationFinder(metadata);
-    return await selector.findIntegrations(searchTerms, allIntegrations.items || []);
+    const selector = new SystemFinder(metadata);
+    return await selector.findSystems(searchTerms, allSystems.items || []);
   } catch (error) {
-    logMessage("error", `Error finding relevant integrations: ${String(error)}`, metadata);
+    logMessage("error", `Error finding relevant systems: ${String(error)}`, metadata);
     return [];
   }
 };
@@ -305,20 +301,19 @@ export const getOAuthClientCredentialsResolver = async (
   return creds;
 };
 function templateDocumentationExists(
-  input: Integration,
+  input: System,
   context: GraphQLRequestContext,
 ): [boolean, string] {
   if (!(context.datastore instanceof PostgresService)) {
     return [false, ""];
   }
   const matchingTemplate =
-    integrations[String(input.name || input.id).toLowerCase()] ||
-    findMatchingIntegration(composeUrl(input.urlHost, input.urlPath))?.integration;
+    systemTemplates[String(input.name || input.id).toLowerCase()] ||
+    findMatchingSystem(composeUrl(input.urlHost, input.urlPath))?.system;
 
   if (!matchingTemplate) {
     return [false, ""];
   }
-  // check if all keywords are present in the matchingTemplate.keywords
   const allKeywordsPresent = matchingTemplate.keywords?.every((keyword) =>
     input.documentationKeywords?.includes(keyword),
   );
@@ -327,10 +322,10 @@ function templateDocumentationExists(
   return [allKeywordsPresent && documentationUrlMatches, matchingTemplate.name];
 }
 
-function enrichWithTemplate(input: Integration): Integration {
+function enrichWithTemplate(input: System): System {
   const matchingTemplate =
-    integrations[String(input.name || input.id).toLowerCase()] ||
-    findMatchingIntegration(composeUrl(input.urlHost, input.urlPath))?.integration;
+    systemTemplates[String(input.name || input.id).toLowerCase()] ||
+    findMatchingSystem(composeUrl(input.urlHost, input.urlPath))?.system;
 
   if (!matchingTemplate) {
     return input;
@@ -360,16 +355,10 @@ function resolveField<T>(
   return defaultValue;
 }
 
-/**
- * Checks if a credential value looks like a masked placeholder.
- * Masked values should be skipped during merge to preserve existing real values.
- */
 function isMaskedValue(value: any): boolean {
   if (typeof value !== "string") return false;
   const v = value.trim();
-  // <<...>> pattern (e.g., <<masked_api_key>>, <<MASKED>>)
   if (v.startsWith("<<") && v.endsWith(">>")) return true;
-  // {masked_...} pattern
   if (v.startsWith("{masked_") && v.endsWith("}")) return true;
   return false;
 }
@@ -389,11 +378,9 @@ function mergeCredentials(
   const merged = { ...existingCredentials };
 
   for (const [key, value] of Object.entries(newCredentials)) {
-    // Skip masked values - keep existing real credentials
     if (isMaskedValue(value)) {
       continue;
     }
-    // Use new value (overrides existing)
     merged[key] = value;
   }
 
@@ -401,21 +388,19 @@ function mergeCredentials(
 }
 
 function shouldTriggerDocFetch(
-  input: Integration,
+  input: System,
   context: GraphQLRequestContext,
-  existingIntegration?: Integration | null,
+  existingSystem?: System | null,
 ): boolean {
-  // Early exit conditions
   const isManualRefresh = input.documentationPending === true;
   if (isManualRefresh) return true;
 
-  const isFetchInProgress = existingIntegration?.documentationPending === true;
+  const isFetchInProgress = existingSystem?.documentationPending === true;
   if (isFetchInProgress) return false;
 
   const isFileUrl = input.documentationUrl?.startsWith("file://");
   if (isFileUrl) return false;
 
-  // Check if we have something to fetch
   const hasDocumentationUrl = input.documentationUrl && input.documentationUrl.trim().length > 0;
   const hasApiUrl = input.urlHost && input.urlHost.trim().length > 0;
   const isGraphQLEndpoint = input.urlHost?.includes("graphql");
@@ -426,25 +411,23 @@ function shouldTriggerDocFetch(
   const hasFetchableSource = hasDocumentationUrl || canIntrospect;
   if (!hasFetchableSource) return false;
 
-  // Check if we need to trigger a fetch
-  const isNewIntegration = !existingIntegration;
-  if (isNewIntegration) {
-    // If we are on postgres datastore and there is a template documentation, we don't need to fetch
+  const isNewSystem = !existingSystem;
+  if (isNewSystem) {
     const [doesTemplateDocumentationExists, _] = templateDocumentationExists(input, context);
     if (doesTemplateDocumentationExists) return false;
     return true;
   }
 
-  const docUrlChanged = input.documentationUrl !== existingIntegration.documentationUrl;
-  const hostChanged = input.urlHost !== existingIntegration.urlHost;
-  const pathChanged = input.urlPath !== existingIntegration.urlPath;
+  const docUrlChanged = input.documentationUrl !== existingSystem.documentationUrl;
+  const hostChanged = input.urlHost !== existingSystem.urlHost;
+  const pathChanged = input.urlPath !== existingSystem.urlPath;
   const hasRelevantChanges = docUrlChanged || hostChanged || pathChanged;
 
   return hasRelevantChanges;
 }
 
 async function triggerAsyncDocumentationFetch(
-  input: Integration,
+  input: System,
   context: GraphQLRequestContext,
 ): Promise<void> {
   const metadata = context.toMetadata();
@@ -460,7 +443,7 @@ async function triggerAsyncDocumentationFetch(
       {} as Record<string, any>,
     );
 
-    logMessage("info", `Starting async documentation fetch for integration ${input.id}`, metadata);
+    logMessage("info", `Starting async documentation fetch for system ${input.id}`, metadata);
 
     const docFetcher = new DocumentationFetcher(
       {
@@ -479,27 +462,24 @@ async function triggerAsyncDocumentationFetch(
     const docString = await docFetcher.fetchAndProcess();
     const openApiSchema = await docFetcher.fetchOpenApiDocumentation();
 
-    // CRITICAL: Fetch the latest integration state before updating
-    // This ensures we don't overwrite any changes made since the initial upsert
-    const latestIntegration = await context.datastore.getIntegration({
+    const latestSystem = await context.datastore.getSystem({
       id: input.id,
       includeDocs: false,
       orgId: context.orgId,
     });
-    if (!latestIntegration) {
+    if (!latestSystem) {
       logMessage(
         "warn",
-        `Integration ${input.id} was deleted while fetching documentation. Skipping upsert.`,
+        `System ${input.id} was deleted while fetching documentation. Skipping upsert.`,
         metadata,
       );
       return;
     }
 
-    // Update ONLY the documentation-related fields
-    await context.datastore.upsertIntegration({
+    await context.datastore.upsertSystem({
       id: input.id,
-      integration: {
-        ...latestIntegration,
+      system: {
+        ...latestSystem,
         documentation: docString,
         documentationPending: false,
         openApiSchema: openApiSchema,
@@ -507,26 +487,25 @@ async function triggerAsyncDocumentationFetch(
       },
       orgId: context.orgId,
     });
-    logMessage("info", `Completed documentation fetch for integration ${input.id}`, metadata);
+    logMessage("info", `Completed documentation fetch for system ${input.id}`, metadata);
   } catch (err) {
     logMessage(
       "error",
-      `Documentation fetch failed for integration ${input.id}: ${String(err)}`,
+      `Documentation fetch failed for system ${input.id}: ${String(err)}`,
       metadata,
     );
 
-    // Reset documentationPending to false on failure
     try {
-      const latestIntegration = await context.datastore.getIntegration({
+      const latestSystem = await context.datastore.getSystem({
         id: input.id,
         includeDocs: false,
         orgId: context.orgId,
       });
-      if (latestIntegration) {
-        await context.datastore.upsertIntegration({
+      if (latestSystem) {
+        await context.datastore.upsertSystem({
           id: input.id,
-          integration: {
-            ...latestIntegration,
+          system: {
+            ...latestSystem,
             documentationPending: false,
             updatedAt: new Date(),
           },
@@ -534,14 +513,14 @@ async function triggerAsyncDocumentationFetch(
         });
         logMessage(
           "info",
-          `Reset documentationPending to false for integration ${input.id} after fetch failure`,
+          `Reset documentationPending to false for system ${input.id} after fetch failure`,
           metadata,
         );
       }
     } catch (resetError) {
       logMessage(
         "error",
-        `Failed to reset documentationPending for integration ${input.id}: ${String(resetError)}`,
+        `Failed to reset documentationPending for system ${input.id}: ${String(resetError)}`,
         metadata,
       );
     }
@@ -553,29 +532,29 @@ function uniqueKeywords(keywords: string[] | undefined): string[] {
   return [...new Set(keywords)];
 }
 
-export const searchIntegrationDocumentationResolver = async (
+export const searchSystemDocumentationResolver = async (
   _: any,
-  { integrationId, keywords }: { integrationId: string; keywords: string },
+  { systemId, keywords }: { systemId: string; keywords: string },
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ) => {
-  if (!integrationId) throw new Error("integrationId is required");
+  if (!systemId) throw new Error("systemId is required");
   if (!keywords) throw new Error("keywords is required");
 
   const metadata = context.toMetadata();
 
   try {
-    const integration = await context.datastore.getIntegration({
-      id: integrationId,
+    const system = await context.datastore.getSystem({
+      id: systemId,
       includeDocs: true,
       orgId: context.orgId,
     });
-    if (!integration) throw new Error("Integration not found");
+    if (!system) throw new Error("System not found");
 
     const hasDocumentation =
-      integration.documentation && integration.documentation.trim().length > 0;
+      system.documentation && system.documentation.trim().length > 0;
     const hasOpenApiSchema =
-      integration.openApiSchema && integration.openApiSchema.trim().length > 0;
+      system.openApiSchema && system.openApiSchema.trim().length > 0;
 
     if (!hasDocumentation && !hasOpenApiSchema) {
       return ``;
@@ -583,11 +562,11 @@ export const searchIntegrationDocumentationResolver = async (
 
     const documentationSearch = new DocumentationSearch(metadata);
     const result = documentationSearch.extractRelevantSections(
-      integration.documentation || "",
+      system.documentation || "",
       keywords,
       3,
       2000,
-      integration.openApiSchema || "",
+      system.openApiSchema || "",
     );
 
     if (!result || result.trim().length === 0) {
@@ -598,7 +577,7 @@ export const searchIntegrationDocumentationResolver = async (
   } catch (error) {
     logMessage(
       "error",
-      `Error searching integration documentation for ${integrationId}: ${String(error)}`,
+      `Error searching system documentation for ${systemId}: ${String(error)}`,
       metadata,
     );
     throw error;

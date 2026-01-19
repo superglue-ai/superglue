@@ -1,6 +1,6 @@
 "use client";
 
-import { useIntegrations } from "@/src/app/integrations-context";
+import { useSystems } from "@/src/app/systems-context";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import {
@@ -24,8 +24,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
-import { getIntegrationIcon as getIntegrationIconName } from "@/src/lib/general-utils";
-import { Integration, Tool } from "@superglue/shared";
+import { getSystemIcon as getSystemIconName } from "@/src/lib/general-utils";
+import { System, Tool } from "@superglue/shared";
 import {
   ArrowDown,
   ArrowUp,
@@ -49,7 +49,7 @@ type SortDirection = "asc" | "desc";
 const ConfigTable = () => {
   const router = useRouter();
   const { tools, isInitiallyLoading, isRefreshing, refreshTools } = useTools();
-  const { integrations } = useIntegrations();
+  const { systems } = useSystems();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -156,8 +156,8 @@ const ConfigTable = () => {
     }
   };
 
-  const getIntegrationIcon = (integration: Integration) => {
-    const iconName = getIntegrationIconName(integration);
+  const getSystemIcon = (system: System) => {
+    const iconName = getSystemIconName(system);
     return iconName ? getSimpleIcon(iconName) : null;
   };
 
@@ -320,9 +320,9 @@ const ConfigTable = () => {
                       {integrationIdsArray.length > 0 ? (
                         <div className="flex items-center justify-center gap-1 flex-shrink-0">
                           {integrationIdsArray.map((integrationId: string) => {
-                            const integration = integrations.find((i) => i.id === integrationId);
-                            if (!integration) return null;
-                            const icon = getIntegrationIcon(integration);
+                            const system = systems.find((i) => i.id === integrationId);
+                            if (!system) return null;
+                            const icon = getSystemIcon(system);
                             return icon ? (
                               <TooltipProvider key={integrationId}>
                                 <Tooltip>
@@ -338,7 +338,7 @@ const ConfigTable = () => {
                                     </svg>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    <p>{integration.id}</p>
+                                    <p>{system.id}</p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
@@ -349,7 +349,7 @@ const ConfigTable = () => {
                                     <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    <p>{integration.id}</p>
+                                    <p>{system.id}</p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>

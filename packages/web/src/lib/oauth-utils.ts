@@ -1,4 +1,4 @@
-import type { Integration } from "@superglue/shared";
+import type { System } from "@superglue/shared";
 import { SuperglueClient } from "@superglue/shared";
 import { resolveOAuthCertAndKey } from "@superglue/shared";
 
@@ -14,7 +14,7 @@ type OAuthFields = {
 };
 
 export type OAuthState = {
-  integrationId: string;
+  systemId: string;
   timestamp: number;
   redirectUri: string;
   token_url: string;
@@ -37,14 +37,14 @@ export const getOAuthCallbackUrl = (): string => {
   return `${baseUrl}/api/auth/callback`;
 };
 
-export const buildOAuthFieldsFromIntegration = (integration: Integration) => {
-  const hasRefreshToken = !!integration.credentials?.refresh_token;
+export const buildOAuthFieldsFromSystem = (system: System) => {
+  const hasRefreshToken = !!system.credentials?.refresh_token;
   const derivedGrantType =
-    integration.credentials?.grant_type ||
+    system.credentials?.grant_type ||
     (hasRefreshToken ? "authorization_code" : "client_credentials");
 
-  let oauth_cert = integration.credentials?.oauth_cert;
-  let oauth_key = integration.credentials?.oauth_key;
+  let oauth_cert = system.credentials?.oauth_cert;
+  let oauth_key = system.credentials?.oauth_key;
 
   if (oauth_cert && oauth_key) {
     const { cert, key } = resolveOAuthCertAndKey(oauth_cert, oauth_key);
@@ -53,13 +53,13 @@ export const buildOAuthFieldsFromIntegration = (integration: Integration) => {
   }
 
   return {
-    access_token: integration.credentials?.access_token,
-    refresh_token: integration.credentials?.refresh_token,
-    client_id: integration.credentials?.client_id,
-    client_secret: integration.credentials?.client_secret,
-    scopes: integration.credentials?.scopes,
-    auth_url: integration.credentials?.auth_url,
-    token_url: integration.credentials?.token_url,
+    access_token: system.credentials?.access_token,
+    refresh_token: system.credentials?.refresh_token,
+    client_id: system.credentials?.client_id,
+    client_secret: system.credentials?.client_secret,
+    scopes: system.credentials?.scopes,
+    auth_url: system.credentials?.auth_url,
+    token_url: system.credentials?.token_url,
     grant_type: derivedGrantType,
     oauth_cert,
     oauth_key,
@@ -67,7 +67,7 @@ export const buildOAuthFieldsFromIntegration = (integration: Integration) => {
 };
 
 const buildOAuthState = (params: {
-  integrationId: string;
+  systemId: string;
   apiKey: string;
   tokenUrl: string;
   templateId?: string;
@@ -79,7 +79,7 @@ const buildOAuthState = (params: {
   scopes?: string;
 }): OAuthState => {
   return {
-    integrationId: params.integrationId,
+    systemId: params.systemId,
     timestamp: Date.now(),
     redirectUri: getOAuthCallbackUrl(),
     token_url: params.tokenUrl,
@@ -189,18 +189,18 @@ const executeClientCredentialsFlow = async (params: {
 };
 
 const executeAuthorizationCodeFlow = (params: {
-  integrationId: string;
+  systemId: string;
   oauthFields: OAuthFields;
   state: OAuthState;
   callbacks: OAuthCallbacks;
   apiKey: string;
 }): (() => void) | null => {
-  const { integrationId, oauthFields, state, callbacks, apiKey } = params;
+  const { systemId, oauthFields, state, callbacks, apiKey } = params;
   const { onSuccess, onError } = callbacks;
 
   if (!oauthFields.auth_url) {
     onError?.(
-      "[OAUTH_STAGE:INITIALIZATION] Missing OAuth authorization URL (auth_url). Please configure the auth_url field in your integration credentials.",
+      "[OAUTH_STAGE:INITIALIZATION] Missing OAuth authorization URL (auth_url). Please configure the auth_url field in your system credentials.",
     );
     return null;
   }
@@ -227,7 +227,7 @@ const executeAuthorizationCodeFlow = (params: {
         );
         return;
       }
-      setupPopupMonitoring(popup, integrationId, callbacks);
+      setupPopupMonitoring(popup, systemId, callbacks);
     })
     .catch((err) => {
       console.error("Failed to set OAuth cookie:", err);
@@ -243,7 +243,7 @@ const executeAuthorizationCodeFlow = (params: {
 // Helper to set up popup monitoring
 const setupPopupMonitoring = (
   popup: Window,
-  integrationId: string,
+  systemId: string,
   callbacks: OAuthCallbacks,
 ): void => {
   const { onSuccess, onError } = callbacks;
@@ -268,12 +268,12 @@ const setupPopupMonitoring = (
   const handleMessage = (event: MessageEvent) => {
     if (event.origin !== window.location.origin) return;
 
-    if (event.data?.type === "oauth-success" && event.data?.integrationId === integrationId) {
+    if (event.data?.type === "oauth-success" && event.data?.systemId === systemId) {
       isCompleted = true;
       clearInterval(intervalId);
       window.removeEventListener("message", handleMessage);
       onSuccess?.(event.data.tokens);
-    } else if (event.data?.type === "oauth-error" && event.data?.integrationId === integrationId) {
+    } else if (event.data?.type === "oauth-error" && event.data?.systemId === systemId) {
       isCompleted = true;
       clearInterval(intervalId);
       window.removeEventListener("message", handleMessage);
@@ -288,7 +288,7 @@ const setupPopupMonitoring = (
 };
 
 export const triggerOAuthFlow = (
-  integrationId: string,
+  systemId: string,
   oauthFields: {
     access_token?: string;
     refresh_token?: string;
@@ -301,7 +301,6 @@ export const triggerOAuthFlow = (
     oauth_cert?: string;
     oauth_key?: string;
   },
-  selectedIntegration?: string,
   apiKey?: string,
   authType?: string,
   onError?: (error: string) => void,
@@ -337,7 +336,7 @@ export const triggerOAuthFlow = (
   }
 
   const state = buildOAuthState({
-    integrationId,
+    systemId,
     apiKey,
     tokenUrl: oauthFields.token_url!,
     templateId: templateInfo?.templateId,
@@ -355,7 +354,7 @@ export const triggerOAuthFlow = (
   }
 
   return executeAuthorizationCodeFlow({
-    integrationId,
+    systemId,
     oauthFields: oauthFields as OAuthFields,
     state,
     callbacks,
@@ -364,7 +363,7 @@ export const triggerOAuthFlow = (
 };
 
 export const createOAuthErrorHandler = (
-  integrationId: string,
+  systemId: string,
   toast: (props: {
     title: string;
     description: string;
@@ -372,7 +371,7 @@ export const createOAuthErrorHandler = (
   }) => any,
 ) => {
   return (error: string) => {
-    const errorInfo = parseOAuthError(error, integrationId);
+    const errorInfo = parseOAuthError(error, systemId);
     const fullDescription = errorInfo.action
       ? `${errorInfo.description}\n\nWhat to do next: ${errorInfo.action}`
       : errorInfo.description;
@@ -387,7 +386,7 @@ export const createOAuthErrorHandler = (
 
 export const parseOAuthError = (
   error: string,
-  integrationId: string,
+  systemId: string,
 ): { title: string; description: string; action?: string } => {
   const errorLower = error.toLowerCase();
 
@@ -461,7 +460,7 @@ export const parseOAuthError = (
       title: `Invalid OAuth Scope${stageDisplay}`,
       description: error,
       action:
-        "Please check the OAuth scopes configured for this integration. The requested scope may not be supported by the provider.",
+        "Please check the OAuth scopes configured for this system. The requested scope may not be supported by the provider.",
     };
   }
 

@@ -1,31 +1,30 @@
-import { Integration } from "@superglue/shared";
+import { System } from "@superglue/shared";
 import { ServiceMetadata } from "@superglue/shared";
-import { logMessage } from "../utils/logs.js";
 
-export interface FoundIntegration {
-  integration: Integration;
+export interface FoundSystem {
+  system: System;
   reason: string;
 }
 
-export class IntegrationFinder {
+export class SystemFinder {
   private metadata: ServiceMetadata;
 
   constructor(metadata: ServiceMetadata) {
     this.metadata = metadata;
   }
 
-  private keywordSearch(searchTerms: string, integrations: Integration[]): FoundIntegration[] {
+  private keywordSearch(searchTerms: string, systems: System[]): FoundSystem[] {
     const keywords = searchTerms
       .toLowerCase()
       .split(/\s+/)
       .filter((k) => k.length > 0);
 
-    const scored = integrations.map((integration) => {
+    const scored = systems.map((system) => {
       const searchableText = [
-        integration.id,
-        integration.specificInstructions,
-        integration.documentationUrl,
-        ...(integration.documentationKeywords || []),
+        system.id,
+        system.specificInstructions,
+        system.documentationUrl,
+        ...(system.documentationKeywords || []),
       ]
         .filter(Boolean)
         .join(" ")
@@ -35,7 +34,7 @@ export class IntegrationFinder {
       const score = matchedKeywords.length;
 
       return {
-        integration,
+        system,
         score,
         matchedKeywords,
       };
@@ -44,25 +43,25 @@ export class IntegrationFinder {
     const matches = scored.filter((s) => s.score > 0);
 
     if (matches.length === 0) {
-      return integrations.map((int) => ({
-        integration: int,
-        reason: "No specific match found, but this integration is available",
+      return systems.map((sys) => ({
+        system: sys,
+        reason: "No specific match found, but this system is available",
       }));
     }
 
     matches.sort((a, b) => b.score - a.score);
 
     return matches.map((m) => ({
-      integration: m.integration,
+      system: m.system,
       reason: `Matched keywords: ${m.matchedKeywords.join(", ")}`,
     }));
   }
 
-  public async findIntegrations(
+  public async findSystems(
     instruction: string | undefined,
-    integrations: Integration[],
-  ): Promise<FoundIntegration[]> {
-    if (!integrations || integrations.length === 0) {
+    systems: System[],
+  ): Promise<FoundSystem[]> {
+    if (!systems || systems.length === 0) {
       return [];
     }
 
@@ -72,13 +71,13 @@ export class IntegrationFinder {
       instruction.trim() === "*" ||
       instruction.trim() === "all"
     ) {
-      return integrations.map((int) => ({
-        integration: int,
-        reason: "Available integration",
+      return systems.map((sys) => ({
+        system: sys,
+        reason: "Available system",
       }));
     }
 
-    const results = this.keywordSearch(instruction, integrations);
+    const results = this.keywordSearch(instruction, systems);
     return results;
   }
 }

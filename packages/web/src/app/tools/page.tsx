@@ -5,29 +5,29 @@ import { useSearchParams } from "next/navigation";
 export default function NewToolPage() {
   const searchParams = useSearchParams();
 
-  // - integration=single-id (for preselecting one)
-  // - integrations=id1,id2,id3 (for preselecting multiple)
-  const singleIntegration = searchParams.get("integration");
-  const multipleIntegrations = searchParams.get("integrations");
+  // -  =single-id (for preselecting one)
+  // - systems=id1,id2,id3 (for preselecting multiple)
+  const singleSystem = searchParams.get("system");
+  const multipleSystems = searchParams.get("systems");
 
-  let integrationIds: string[] = [];
-  if (multipleIntegrations) {
-    integrationIds = multipleIntegrations
+  let systemIds: string[] = [];
+  if (multipleSystems) {
+    systemIds = multipleSystems
       .split(",")
       .map((id) => id.trim())
       .filter(Boolean);
-  } else if (singleIntegration) {
-    integrationIds = [singleIntegration.trim()];
+  } else if (singleSystem) {
+    systemIds = [singleSystem.trim()];
   }
 
-  // Parse skip param: skip=integrations means skip integration selection, go straight to instructions
+  // Parse skip param: skip=systems means skip system selection, go straight to instructions
   const skipParam = searchParams.get("skip");
-  const initialView = skipParam === "integrations" ? "instructions" : "integrations";
+  const initialView = skipParam === "systems" ? "instructions" : "systems";
 
   return (
     <ToolCreateStepper
-      initialIntegrationIds={integrationIds}
-      initialView={initialView as "integrations" | "instructions"}
+      initialSystemIds={systemIds}
+      initialView={initialView as "systems" | "instructions"}
     />
   );
 }

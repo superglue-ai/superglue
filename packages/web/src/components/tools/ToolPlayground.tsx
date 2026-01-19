@@ -1,6 +1,6 @@
 "use client";
 import { useConfig } from "@/src/app/config-context";
-import { useIntegrations } from "@/src/app/integrations-context";
+import { useSystems } from "@/src/app/systems-context";
 import { useTools } from "@/src/app/tools-context";
 import { createSuperglueClient } from "@/src/lib/client-utils";
 import { type UploadedFileInfo } from "@/src/lib/file-utils";
@@ -8,7 +8,7 @@ import { buildStepInput, isAbortError } from "@/src/lib/general-utils";
 import {
   ExecutionStep,
   generateDefaultFromSchema,
-  Integration,
+  System,
   Tool,
   ToolResult,
 } from "@superglue/shared";
@@ -56,7 +56,7 @@ export interface ToolPlaygroundProps {
   initialTool?: Tool;
   initialPayload?: string;
   initialInstruction?: string;
-  integrations?: Integration[];
+  systems?: System[];
   onSave?: (tool: Tool, payload: Record<string, any>) => Promise<void>;
   onExecute?: (tool: Tool, result: ToolResult) => void;
   onInstructionEdit?: () => void;
@@ -620,7 +620,7 @@ function ToolPlaygroundInner({
               stepResultsMap,
               fixStepIndex - 1,
             )}
-            integrationId={steps[fixStepIndex]?.integrationId}
+            systemId={steps[fixStepIndex]?.integrationId}
             errorMessage={(() => {
               const result = stepResultsMap[steps[fixStepIndex]?.id];
               const msg = typeof result === "string" ? result : result?.error;
@@ -685,15 +685,15 @@ function ToolPlaygroundInner({
 }
 
 const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>((props, ref) => {
-  const { integrations: contextIntegrations } = useIntegrations();
-  const integrations = props.integrations || contextIntegrations;
+  const { systems: contextSystems } = useSystems();
+  const systems = props.systems || contextSystems;
 
   return (
     <ToolConfigProvider
       initialTool={props.initialTool}
       initialPayload={props.initialPayload}
       initialInstruction={props.initialInstruction}
-      integrations={integrations}
+      systems={systems}
       externalUploadedFiles={props.uploadedFiles}
       onExternalFilesChange={props.onFilesChange}
     >

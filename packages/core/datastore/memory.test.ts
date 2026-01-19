@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, Integration, Run, RunStatus, Tool } from "@superglue/shared";
+import { ApiConfig, HttpMethod, System, Run, RunStatus, Tool } from "@superglue/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryStore } from "./memory.js";
 import { ToolScheduleInternal } from "./types.js";
@@ -212,60 +212,60 @@ describe("MemoryStore", () => {
     });
   });
 
-  describe("Integration", () => {
-    const testIntegration: Integration = {
+  describe("System", () => {
+    const testSystem: System = {
       id: "test-int-id",
-      name: "Test Integration",
-      urlHost: "https://integration.test",
+      name: "Test System",
+      urlHost: "https://system.test",
       credentials: { apiKey: "secret" },
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    it("should store and retrieve integrations", async () => {
-      await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration });
-      const retrieved = await store.getIntegration({ id: testIntegration.id, includeDocs: true });
-      expect(retrieved).toEqual({ ...testIntegration, id: testIntegration.id });
+    it("should store and retrieve systems", async () => {
+      await store.upsertSystem({ id: testSystem.id, system: testSystem });
+      const retrieved = await store.getSystem({ id: testSystem.id, includeDocs: true });
+      expect(retrieved).toEqual({ ...testSystem, id: testSystem.id });
     });
 
-    it("should list integrations", async () => {
-      await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration });
-      const { items, total } = await store.listIntegrations({
+    it("should list systems", async () => {
+      await store.upsertSystem({ id: testSystem.id, system: testSystem });
+      const { items, total } = await store.listSystems({
         limit: 10,
         offset: 0,
         includeDocs: true,
       });
       expect(items).toHaveLength(1);
       expect(total).toBe(1);
-      expect(items[0]).toEqual({ ...testIntegration, id: testIntegration.id });
+      expect(items[0]).toEqual({ ...testSystem, id: testSystem.id });
     });
 
-    it("should delete integrations", async () => {
-      await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration });
-      await store.deleteIntegration({ id: testIntegration.id });
-      const retrieved = await store.getIntegration({ id: testIntegration.id, includeDocs: true });
+    it("should delete systems", async () => {
+      await store.upsertSystem({ id: testSystem.id, system: testSystem });
+      await store.deleteSystem({ id: testSystem.id });
+      const retrieved = await store.getSystem({ id: testSystem.id, includeDocs: true });
       expect(retrieved).toBeNull();
     });
 
-    it("should return null for missing integration", async () => {
-      const retrieved = await store.getIntegration({ id: "does-not-exist", includeDocs: true });
+    it("should return null for missing system", async () => {
+      const retrieved = await store.getSystem({ id: "does-not-exist", includeDocs: true });
       expect(retrieved).toBeNull();
     });
 
-    it("should get many integrations by ids, skipping missing ones", async () => {
-      const int2 = { ...testIntegration, id: "test-int-id-2", name: "Integration 2" };
-      await store.upsertIntegration({
-        id: testIntegration.id,
-        integration: testIntegration,
+    it("should get many systems by ids, skipping missing ones", async () => {
+      const int2 = { ...testSystem, id: "test-int-id-2", name: "System 2" };
+      await store.upsertSystem({
+        id: testSystem.id,
+        system: testSystem,
         orgId: testOrgId,
       });
-      await store.upsertIntegration({ id: int2.id, integration: int2, orgId: testOrgId });
-      const result = await store.getManyIntegrations({
-        ids: [testIntegration.id, int2.id, "missing-id"],
+      await store.upsertSystem({ id: int2.id, system: int2, orgId: testOrgId });
+      const result = await store.getManySystems({
+        ids: [testSystem.id, int2.id, "missing-id"],
         orgId: testOrgId,
       });
       expect(result).toHaveLength(2);
-      expect(result.map((i) => i.id).sort()).toEqual([testIntegration.id, int2.id].sort());
+      expect(result.map((i) => i.id).sort()).toEqual([testSystem.id, int2.id].sort());
     });
   });
 
@@ -557,10 +557,10 @@ describe("MemoryStore", () => {
         error: undefined,
       };
 
-      const testIntegration: Integration = {
+      const testSystem: System = {
         id: "test-int-id",
-        name: "Test Integration",
-        urlHost: "https://integration.test",
+        name: "Test System",
+        urlHost: "https://system.test",
         credentials: { apiKey: "secret" },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -592,7 +592,7 @@ describe("MemoryStore", () => {
 
       await store.upsertApiConfig({ id: "test-api", config: testApiConfig });
       await store.createRun({ run: testRunResult });
-      await store.upsertIntegration({ id: testIntegration.id, integration: testIntegration });
+      await store.upsertSystem({ id: testSystem.id, system: testSystem });
       await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
       await store.upsertToolSchedule({ schedule: testWorkflowSchedule });
 
@@ -600,7 +600,7 @@ describe("MemoryStore", () => {
 
       const { total: apiTotal } = await store.listApiConfigs({ limit: 10, offset: 0 });
       const { total: runTotal } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
-      const { total: integrationTotal } = await store.listIntegrations({
+      const { total: systemTotal } = await store.listSystems({
         limit: 10,
         offset: 0,
         includeDocs: true,
@@ -613,7 +613,7 @@ describe("MemoryStore", () => {
 
       expect(apiTotal).toBe(0);
       expect(runTotal).toBe(0);
-      expect(integrationTotal).toBe(0);
+      expect(systemTotal).toBe(0);
       expect(workflowTotal).toBe(0);
       expect(workflowSchedules).toHaveLength(0);
     });

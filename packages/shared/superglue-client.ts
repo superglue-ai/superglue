@@ -14,7 +14,7 @@ import {
   FixToolArgs,
   FixToolResult,
   GenerateStepConfigArgs,
-  Integration,
+  System,
   Log,
   Run,
   SuggestedTool,
@@ -1370,13 +1370,13 @@ export class SuperglueClient {
     );
   }
 
-  async listIntegrations(
+  async listSystems(
     limit: number = 10,
     offset: number = 0,
-  ): Promise<{ items: Integration[]; total: number }> {
+  ): Promise<{ items: System[]; total: number }> {
     const query = `
-        query ListIntegrations($limit: Int!, $offset: Int!) {
-          listIntegrations(limit: $limit, offset: $offset) {
+        query ListSystems($limit: Int!, $offset: Int!) {
+          listSystems(limit: $limit, offset: $offset) {
             items {
               id
               name
@@ -1400,17 +1400,17 @@ export class SuperglueClient {
         }
       `;
     const response = await this.request<{
-      listIntegrations: { items: Integration[]; total: number };
+      listSystems: { items: System[]; total: number };
     }>(query, { limit, offset });
-    return response.listIntegrations;
+    return response.listSystems;
   }
 
-  async findRelevantIntegrations(searchTerms: string): Promise<Integration[]> {
+  async findRelevantSystems(searchTerms: string): Promise<System[]> {
     const query = `
-        query FindRelevantIntegrations($searchTerms: String) {
-          findRelevantIntegrations(searchTerms: $searchTerms) {
+        query FindRelevantSystems($searchTerms: String) {
+          findRelevantSystems(searchTerms: $searchTerms) {
             reason
-            integration {
+            system {
               id
               name
               type
@@ -1432,10 +1432,10 @@ export class SuperglueClient {
           }
         }
       `;
-    const response = await this.request<{ findRelevantIntegrations: Integration[] }>(query, {
+    const response = await this.request<{ findRelevantSystems: System[] }>(query, {
       searchTerms,
     });
-    return response.findRelevantIntegrations;
+    return response.findRelevantSystems;
   }
 
   async findRelevantTools(searchTerms?: string): Promise<SuggestedTool[]> {
@@ -1460,10 +1460,10 @@ export class SuperglueClient {
     return response.findRelevantTools;
   }
 
-  async getIntegration(id: string): Promise<Integration> {
+  async getSystem(id: string): Promise<System> {
     const query = `
-        query GetIntegration($id: ID!) {
-          getIntegration(id: $id) {
+        query GetSystem($id: ID!) {
+          getSystem(id: $id) {
             id
             name
             type
@@ -1484,19 +1484,19 @@ export class SuperglueClient {
           }
         }
       `;
-    const response = await this.request<{ getIntegration: Integration }>(query, { id });
-    return response.getIntegration;
+    const response = await this.request<{ getSystem: System }>(query, { id });
+    return response.getSystem;
   }
 
-  async upsertIntegration(
+  async upsertSystem(
     id: string,
-    input: Partial<Integration>,
+    input: Partial<System>,
     mode: UpsertMode = UpsertMode.UPSERT,
     credentialMode?: CredentialMode,
-  ): Promise<Integration> {
+  ): Promise<System> {
     const mutation = `
-        mutation UpsertIntegration($input: IntegrationInput!, $mode: UpsertMode, $credentialMode: CredentialMode) {
-          upsertIntegration(input: $input, mode: $mode, credentialMode: $credentialMode) {
+        mutation UpsertSystem($input: SystemInput!, $mode: UpsertMode, $credentialMode: CredentialMode) {
+          upsertSystem(input: $input, mode: $mode, credentialMode: $credentialMode) {
             id
             name
             type
@@ -1517,23 +1517,23 @@ export class SuperglueClient {
           }
         }
       `;
-    const integrationInput = { id, ...input };
-    const response = await this.request<{ upsertIntegration: Integration }>(mutation, {
-      input: integrationInput,
+    const systemInput = { id, ...input };
+    const response = await this.request<{ upsertSystem: System }>(mutation, {
+      input: systemInput,
       mode,
       credentialMode,
     });
-    return response.upsertIntegration;
+    return response.upsertSystem;
   }
 
-  async deleteIntegration(id: string): Promise<boolean> {
+  async deleteSystem(id: string): Promise<boolean> {
     const mutation = `
-        mutation DeleteIntegration($id: ID!) {
-          deleteIntegration(id: $id)
+        mutation DeleteSystem($id: ID!) {
+          deleteSystem(id: $id)
         }
       `;
-    const response = await this.request<{ deleteIntegration: boolean }>(mutation, { id });
-    return response.deleteIntegration;
+    const response = await this.request<{ deleteSystem: boolean }>(mutation, { id });
+    return response.deleteSystem;
   }
 
   async cacheOauthClientCredentials(args: {
@@ -1572,26 +1572,26 @@ export class SuperglueClient {
     return data.getOAuthClientCredentials;
   }
 
-  async searchIntegrationDocumentation(integrationId: string, keywords: string): Promise<string> {
-    const data = await this.graphQL<{ searchIntegrationDocumentation: string }>(
+  async searchSystemDocumentation(systemId: string, keywords: string): Promise<string> {
+    const data = await this.graphQL<{ searchSystemDocumentation: string }>(
       `
-            query SearchIntegrationDocumentation($integrationId: ID!, $keywords: String!) {
-                searchIntegrationDocumentation(integrationId: $integrationId, keywords: $keywords)
+            query SearchSystemDocumentation($systemId: ID!, $keywords: String!) {
+                searchSystemDocumentation(systemId: $systemId, keywords: $keywords)
             }
         `,
-      { integrationId, keywords },
+      { systemId, keywords },
     );
-    return data.searchIntegrationDocumentation;
+    return data.searchSystemDocumentation;
   }
 
-  async generateInstructions(integrations: any[]): Promise<string[]> {
+  async generateInstructions(systems: any[]): Promise<string[]> {
     const data = await this.graphQL<{ generateInstructions: string[] }>(
       `
-            query GenerateInstructions($integrations: [IntegrationInput!]!) {
-                generateInstructions(integrations: $integrations)
+            query GenerateInstructions($systems: [SystemInput!]!) {
+                generateInstructions(systems: $systems)
             }
         `,
-      { integrations },
+      { systems },
     );
 
     const instructions = data.generateInstructions;
