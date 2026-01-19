@@ -186,10 +186,7 @@ export default function SystemsPage() {
       })
       .sort((a, b) => a.id.localeCompare(b.id)) || [];
 
-  const paginatedSystems = filteredSystems.slice(
-    page * PAGE_SIZE,
-    (page + 1) * PAGE_SIZE,
-  );
+  const paginatedSystems = filteredSystems.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const totalPages = Math.ceil(filteredSystems.length / PAGE_SIZE);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -274,10 +271,7 @@ export default function SystemsPage() {
     };
   };
 
-  const handleSave = async (
-    system: System,
-    isOAuthConnect?: boolean,
-  ): Promise<System | null> => {
+  const handleSave = async (system: System, isOAuthConnect?: boolean): Promise<System | null> => {
     try {
       if (system.id) {
         const existingSystem = systems.find((i) => i.id === system.id);
@@ -301,16 +295,12 @@ export default function SystemsPage() {
           waitForSystemReady([savedSystem.id])
             .then(() => {
               // Remove from pending when done
-              setPendingDocIds(
-                (prev) => new Set([...prev].filter((id) => id !== savedSystem.id)),
-              );
+              setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== savedSystem.id)));
             })
             .catch((error) => {
               console.error("Error waiting for docs:", error);
               // Remove from pending on error
-              setPendingDocIds(
-                (prev) => new Set([...prev].filter((id) => id !== savedSystem.id)),
-              );
+              setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== savedSystem.id)));
             });
         }
 
@@ -503,8 +493,7 @@ export default function SystemsPage() {
                         <div className="flex flex-col min-w-0 flex-1">
                           <span className="font-medium truncate">{sys.id}</span>
                           <span className="text-sm text-muted-foreground truncate">
-                            {composeUrl(sys.urlHost, sys.urlPath) ||
-                              "No API endpoint"}
+                            {composeUrl(sys.urlHost, sys.urlPath) || "No API endpoint"}
                           </span>
                         </div>
                       </div>
@@ -581,8 +570,7 @@ export default function SystemsPage() {
                                 ? "Documentation is already being processed"
                                 : sys.documentationUrl?.startsWith("file://")
                                   ? "Cannot refresh file uploads"
-                                  : !sys.documentationUrl ||
-                                      !sys.documentationUrl.trim()
+                                  : !sys.documentationUrl || !sys.documentationUrl.trim()
                                     ? "No documentation URL to refresh"
                                     : "Refresh documentation from URL"
                             }
@@ -643,8 +631,8 @@ export default function SystemsPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete System?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to delete the system "{systemToDelete?.id}"? This
-                  action cannot be undone.
+                  Are you sure you want to delete the system "{systemToDelete?.id}"? This action
+                  cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

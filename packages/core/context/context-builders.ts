@@ -107,18 +107,14 @@ export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
   return combined.slice(0, budget);
 }
 
-function buildSystemContext(
-  system: System,
-  opts: SystemContextOptions,
-): string {
+function buildSystemContext(system: System, opts: SystemContextOptions): string {
   const budget = Math.max(0, opts.characterBudget | 0);
   if (budget === 0) return "";
 
   const authMaxSections =
     opts.tuning?.documentationMaxSections ?? server_defaults.CONTEXT.SYSTEMS.AUTH_MAX_SECTIONS;
   const authSectionSize =
-    opts.tuning?.documentationMaxChars ??
-    server_defaults.CONTEXT.SYSTEMS.AUTH_SECTION_SIZE_CHARS;
+    opts.tuning?.documentationMaxChars ?? server_defaults.CONTEXT.SYSTEMS.AUTH_SECTION_SIZE_CHARS;
   const paginationMaxSections =
     opts.tuning?.documentationMaxSections ??
     server_defaults.CONTEXT.SYSTEMS.PAGINATION_MAX_SECTIONS;
@@ -126,8 +122,7 @@ function buildSystemContext(
     opts.tuning?.documentationMaxChars ??
     server_defaults.CONTEXT.SYSTEMS.PAGINATION_SECTION_SIZE_CHARS;
   const generalMaxSections =
-    opts.tuning?.documentationMaxSections ??
-    server_defaults.CONTEXT.SYSTEMS.GENERAL_MAX_SECTIONS;
+    opts.tuning?.documentationMaxSections ?? server_defaults.CONTEXT.SYSTEMS.GENERAL_MAX_SECTIONS;
   const generalSectionSize =
     opts.tuning?.documentationMaxChars ??
     server_defaults.CONTEXT.SYSTEMS.GENERAL_SECTION_SIZE_CHARS;
@@ -163,8 +158,7 @@ function buildSystemContext(
   );
 
   const xml_opening_tag = `<${system.id}>`;
-  const urlSection =
-    "<base_url>: " + composeUrl(system.urlHost, system.urlPath) + "</base_url>";
+  const urlSection = "<base_url>: " + composeUrl(system.urlHost, system.urlPath) + "</base_url>";
   const specificInstructionsSection =
     "<system_specific_instructions>: " +
     (system.specificInstructions?.length > 0

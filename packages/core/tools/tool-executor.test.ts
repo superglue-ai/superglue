@@ -199,9 +199,7 @@ describe("ToolExecutor Self-Healing Config Propagation", () => {
     });
 
     // Mock searchDocumentation for validation step
-    vi.spyOn(systemManager, "searchDocumentation").mockResolvedValue(
-      "Test docs for validation",
-    );
+    vi.spyOn(systemManager, "searchDocumentation").mockResolvedValue("Test docs for validation");
 
     // Execute with self-healing enabled
     const result = await executor.execute({

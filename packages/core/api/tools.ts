@@ -224,12 +224,9 @@ async function executeToolInternal(
   };
 
   const selfHealingEnabled = isSelfHealingEnabled(requestOptions, "api");
-  const systemManagers = await SystemManager.forToolExecution(
-    tool,
-    authReq.datastore,
-    metadata,
-    { includeDocs: selfHealingEnabled },
-  );
+  const systemManagers = await SystemManager.forToolExecution(tool, authReq.datastore, metadata, {
+    includeDocs: selfHealingEnabled,
+  });
 
   await authReq.datastore.createRun({
     run: {
@@ -430,12 +427,9 @@ const runTool: RouteHandler = async (request, reply) => {
   };
 
   const selfHealingEnabled = isSelfHealingEnabled(requestOptions, "api");
-  const systemManagers = await SystemManager.forToolExecution(
-    tool,
-    authReq.datastore,
-    metadata,
-    { includeDocs: selfHealingEnabled },
-  );
+  const systemManagers = await SystemManager.forToolExecution(tool, authReq.datastore, metadata, {
+    includeDocs: selfHealingEnabled,
+  });
 
   await authReq.datastore.createRun({
     run: {

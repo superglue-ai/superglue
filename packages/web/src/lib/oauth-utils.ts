@@ -241,11 +241,7 @@ const executeAuthorizationCodeFlow = (params: {
 };
 
 // Helper to set up popup monitoring
-const setupPopupMonitoring = (
-  popup: Window,
-  systemId: string,
-  callbacks: OAuthCallbacks,
-): void => {
+const setupPopupMonitoring = (popup: Window, systemId: string, callbacks: OAuthCallbacks): void => {
   const { onSuccess, onError } = callbacks;
 
   // Track if OAuth flow completed (success or error) to prevent "cancelled" error

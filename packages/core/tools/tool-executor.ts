@@ -206,9 +206,7 @@ export class ToolExecutor implements Tool {
       let isLoopStep = false;
       let stepResults: any[] = [];
 
-      const systemManager = step.integrationId
-        ? this.systems[step.integrationId]
-        : undefined;
+      const systemManager = step.integrationId ? this.systems[step.integrationId] : undefined;
       let currentSystem: System | null = null;
       let loopPayload: any = null;
 

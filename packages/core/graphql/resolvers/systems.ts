@@ -120,17 +120,9 @@ export const upsertSystemResolver = async (
         existingSystemOrNull?.documentationUrl,
         "",
       ),
-      documentation: resolveField(
-        input.documentation,
-        existingSystemOrNull?.documentation,
-        "",
-      ),
+      documentation: resolveField(input.documentation, existingSystemOrNull?.documentation, ""),
       openApiUrl: resolveField(input.openApiUrl, existingSystemOrNull?.openApiUrl, ""),
-      openApiSchema: resolveField(
-        input.openApiSchema,
-        existingSystemOrNull?.openApiSchema,
-        "",
-      ),
+      openApiSchema: resolveField(input.openApiSchema, existingSystemOrNull?.openApiSchema, ""),
       documentationPending: shouldFetchDoc
         ? true
         : existingSystemOrNull?.documentationPending || false,
@@ -144,11 +136,7 @@ export const upsertSystemResolver = async (
         "",
       ),
       documentationKeywords: uniqueKeywords(
-        resolveField(
-          input.documentationKeywords,
-          existingSystemOrNull?.documentationKeywords,
-          [],
-        ),
+        resolveField(input.documentationKeywords, existingSystemOrNull?.documentationKeywords, []),
       ),
       createdAt: existingSystemOrNull?.createdAt || now,
       updatedAt: now,
@@ -551,10 +539,8 @@ export const searchSystemDocumentationResolver = async (
     });
     if (!system) throw new Error("System not found");
 
-    const hasDocumentation =
-      system.documentation && system.documentation.trim().length > 0;
-    const hasOpenApiSchema =
-      system.openApiSchema && system.openApiSchema.trim().length > 0;
+    const hasDocumentation = system.documentation && system.documentation.trim().length > 0;
+    const hasOpenApiSchema = system.openApiSchema && system.openApiSchema.trim().length > 0;
 
     if (!hasDocumentation && !hasOpenApiSchema) {
       return ``;

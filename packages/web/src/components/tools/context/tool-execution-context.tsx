@@ -519,9 +519,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
           ? systems.find((sys) => sys.id === step.integrationId)
           : undefined;
 
-      const systemCredentials = flattenAndNamespaceCredentials(
-        linkedSystem ? [linkedSystem] : [],
-      );
+      const systemCredentials = flattenAndNamespaceCredentials(linkedSystem ? [linkedSystem] : []);
       const paginationData = buildPaginationData(step.apiConfig?.pagination);
 
       const sourceData: Record<string, any> = {

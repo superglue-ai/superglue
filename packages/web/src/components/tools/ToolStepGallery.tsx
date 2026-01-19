@@ -88,16 +88,8 @@ export function ToolStepGallery({
   embedded = false,
 }: ToolStepGalleryProps) {
   // === CONTEXT ===
-  const {
-    tool,
-    steps,
-    payload,
-    systems,
-    inputSchema,
-    responseSchema,
-    finalTransform,
-    setSteps,
-  } = useToolConfig();
+  const { tool, steps, payload, systems, inputSchema, responseSchema, finalTransform, setSteps } =
+    useToolConfig();
 
   const {
     isExecutingAny,
@@ -321,16 +313,14 @@ export function ToolStepGallery({
   };
 
   const handleConfirmInsertStep = (stepId: string, instruction: string, integrationId?: string) => {
-    const selectedSystem = integrationId
-      ? systems?.find((s) => s.id === integrationId)
-      : undefined;
+    const selectedSystem = integrationId ? systems?.find((s) => s.id === integrationId) : undefined;
     const newStep: ExecutionStep = {
       id: stepId,
       integrationId: integrationId || "",
       apiConfig: {
         id: stepId,
         instruction,
-          urlHost: selectedSystem?.urlHost || "",
+        urlHost: selectedSystem?.urlHost || "",
         urlPath: selectedSystem?.urlPath || "",
         method: "GET" as HttpMethod,
         headers: {},

@@ -2850,9 +2850,7 @@ export const systemOptions = [
  * @param url - The URL to match against systems
  * @returns The matching system key and details, or null if no match found
  */
-export function findMatchingSystem(
-  url: string,
-): { key: string; system: SystemConfig } | null {
+export function findMatchingSystem(url: string): { key: string; system: SystemConfig } | null {
   // Ensure URL has a scheme for proper matching
   const urlForMatching =
     url.startsWith("http") || url.startsWith("postgres") ? url : `https://${url}`;
@@ -2863,8 +2861,7 @@ export function findMatchingSystem(
     try {
       if (new RegExp(system.regex).test(urlForMatching)) {
         // Calculate specificity: longer, more specific regexes get higher scores
-        const specificity =
-          system.regex.length + (system.regex.includes("(?!") ? 100 : 0);
+        const specificity = system.regex.length + (system.regex.includes("(?!") ? 100 : 0);
         matches.push({ key, system, specificity });
       }
     } catch (e) {

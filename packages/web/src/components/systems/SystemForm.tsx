@@ -99,8 +99,7 @@ export function SystemForm({
     ? systemOptions.find(
         (opt) =>
           opt.value !== "" &&
-          (system.id === opt.value ||
-            (system.urlHost && system.urlHost.includes(opt.value))),
+          (system.id === opt.value || (system.urlHost && system.urlHost.includes(opt.value))),
       )?.value || ""
     : "";
   const [selectedSystem, setSelectedSystem] = useState<string>(initialSelected);
@@ -646,8 +645,7 @@ export function SystemForm({
         Object.entries({
           ...fieldsWithoutGrantType,
           grant_type,
-          scopes:
-            fieldsWithoutGrantType.scopes || systems[selectedSystem]?.oauth?.scopes || "",
+          scopes: fieldsWithoutGrantType.scopes || systems[selectedSystem]?.oauth?.scopes || "",
         }).filter(([_, value]) => value !== ""),
       ) as Record<string, any>;
 
@@ -703,9 +701,7 @@ export function SystemForm({
       )}
     >
       <CardHeader className={cn(modal ? "p-6 pb-0 border-0" : "py-3 px-4", "flex-shrink-0")}>
-        <CardTitle className="text-lg">
-          {system ? "Edit System" : "Add New System"}
-        </CardTitle>
+        <CardTitle className="text-lg">{system ? "Edit System" : "Add New System"}</CardTitle>
       </CardHeader>
       <CardContent
         className={cn(modal ? "p-6 space-y-3 border-0" : "p-4 space-y-3", "flex-1 overflow-y-auto")}
@@ -726,8 +722,7 @@ export function SystemForm({
                     <>
                       {(() => {
                         const icon = getSimpleIcon(
-                          systemOptions.find((opt) => opt.value === selectedSystem)
-                            ?.icon || "",
+                          systemOptions.find((opt) => opt.value === selectedSystem)?.icon || "",
                         );
                         return icon ? (
                           <svg
@@ -744,10 +739,7 @@ export function SystemForm({
                         );
                       })()}
                       <span>
-                        {
-                          systemOptions.find((option) => option.value === selectedSystem)
-                            ?.label
-                        }
+                        {systemOptions.find((option) => option.value === selectedSystem)?.label}
                       </span>
                     </>
                   ) : (
@@ -916,8 +908,7 @@ export function SystemForm({
                     <span className="inline-flex items-center gap-2">
                       {(() => {
                         const icon = getSimpleIcon(
-                          systemOptions.find((opt) => opt.value === selectedSystem)
-                            ?.icon || "",
+                          systemOptions.find((opt) => opt.value === selectedSystem)?.icon || "",
                         );
                         return icon ? (
                           <svg
@@ -941,8 +932,7 @@ export function SystemForm({
                       ) : (
                         <span>
                           Connect to{" "}
-                          {systemOptions.find((option) => option.value === selectedSystem)
-                            ?.label ||
+                          {systemOptions.find((option) => option.value === selectedSystem)?.label ||
                             id ||
                             "system"}
                         </span>
@@ -1273,16 +1263,14 @@ export function SystemForm({
                           ) : (
                             <>
                               Connect to{" "}
-                              {systemOptions.find(
-                                (option) => option.value === selectedSystem,
-                              )?.label ||
+                              {systemOptions.find((option) => option.value === selectedSystem)
+                                ?.label ||
                                 id ||
                                 "system"}
                               {(() => {
                                 const icon = getSimpleIcon(
-                                  systemOptions.find(
-                                    (opt) => opt.value === selectedSystem,
-                                  )?.icon || "",
+                                  systemOptions.find((opt) => opt.value === selectedSystem)?.icon ||
+                                    "",
                                 );
                                 return icon ? (
                                   <svg
