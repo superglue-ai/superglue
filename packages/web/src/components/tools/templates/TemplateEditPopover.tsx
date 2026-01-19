@@ -376,7 +376,7 @@ export function TemplateEditPopover({
               <button
                 type="button"
                 onClick={() => setAutoPreview(!autoPreview)}
-                className={`h-6 px-2 flex items-center gap-1 rounded border transition-colors text-[10px] "border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"`}
+                className="h-6 px-2 flex items-center gap-1 rounded border transition-colors text-[10px] border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"
                 title={
                   autoPreview
                     ? "Preview updates on every keystroke (click to switch to manual)"
