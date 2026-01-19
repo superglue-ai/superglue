@@ -2,8 +2,8 @@
 
 import { useConfig } from "@/src/app/config-context";
 import { tokenRegistry } from "@/src/lib/token-registry";
-import { useIntegrations } from "@/src/app/integrations-context";
-import { IntegrationForm } from "@/src/components/integrations/IntegrationForm";
+import { useSystems } from "@/src/app/systems-context";
+import { SystemForm } from "@/src/components/systems/SystemForm";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,16 +19,16 @@ import { Input } from "@/src/components/ui/input";
 import { DocStatus } from "@/src/components/utils/DocStatusSpinner";
 import { useToast } from "@/src/hooks/use-toast";
 import { createSuperglueClient, needsUIToTriggerDocFetch } from "@/src/lib/client-utils";
-import { composeUrl, getIntegrationIcon as getIntegrationIconName } from "@/src/lib/general-utils";
+import { composeUrl, getSystemIcon as getSystemIconName } from "@/src/lib/general-utils";
 import {
-  buildOAuthFieldsFromIntegration,
+  buildOAuthFieldsFromSystem,
   createOAuthErrorHandler,
   triggerOAuthFlow,
 } from "@/src/lib/oauth-utils";
-import type { Integration } from "@superglue/shared";
+import type { System } from "@superglue/shared";
 import { CredentialMode, UpsertMode } from "@superglue/shared";
-import { integrationOptions } from "@superglue/shared";
-import { waitForIntegrationProcessing } from "@superglue/shared/utils";
+import { systemOptions } from "@superglue/shared";
+import { waitForSystemProcessing } from "@superglue/shared/utils";
 import {
   Clock,
   FileDown,
@@ -70,14 +70,14 @@ export const detectAuthType = (credentials: any): "oauth" | "apikey" | "none" =>
 };
 
 export const getAuthBadge = (
-  integration: Integration,
+  system: System,
 ): {
   type: "oauth-configured" | "oauth-incomplete" | "apikey" | "none";
   label: string;
   color: "blue" | "amber" | "green";
   icon: "key" | "clock";
 } => {
-  const creds = integration.credentials || {};
+  const creds = system.credentials || {};
   const authType = detectAuthType(creds);
 
   if (authType === "none") {
@@ -98,60 +98,59 @@ export const getAuthBadge = (
   return { type: "apikey", label: "API Key", color: "green", icon: "key" };
 };
 
-export default function IntegrationsPage() {
+export default function SystemsPage() {
   const config = useConfig();
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const router = useRouter();
   const {
-    integrations,
+    systems,
     pendingDocIds,
     loading: initialLoading,
     isRefreshing,
-    refreshIntegrations,
+    refreshSystems,
     setPendingDocIds,
-  } = useIntegrations();
+  } = useSystems();
 
   useEffect(() => {
-    refreshIntegrations();
-  }, [refreshIntegrations]);
+    refreshSystems();
+  }, [refreshSystems]);
 
   useEffect(() => {
     const success = searchParams.get("success");
     const error = searchParams.get("error");
-    const integration = searchParams.get("integration");
+    const system = searchParams.get("system");
     const message = searchParams.get("message");
     const description = searchParams.get("description");
 
-    if (success === "oauth_completed" && integration) {
+    if (success === "oauth_completed" && system) {
       toast({
         title: "OAuth Connection Successful",
-        description: `Successfully connected to ${integration}`,
+        description: `Successfully connected to ${system}`,
       });
     } else if (error) {
       const errorMessage = description || message || "Failed to complete OAuth connection";
-      const handleOAuthError = createOAuthErrorHandler(integration || "unknown", toast);
+      const handleOAuthError = createOAuthErrorHandler(system || "unknown", toast);
       handleOAuthError(errorMessage);
     }
   }, [searchParams, toast]);
 
-  const { waitForIntegrationReady } = useMemo(
+  const { waitForSystemReady } = useMemo(
     () => ({
-      waitForIntegrationReady: (integrationIds: string[]) => {
-        // Create adapter for SuperglueClient to work with shared utility
+      waitForSystemReady: (systemIds: string[]) => {
         const clientAdapter = {
-          getIntegration: (id: string) => {
+          getSystem: (id: string) => {
             const client = createSuperglueClient(config.superglueEndpoint);
-            return client.getIntegration(id);
+            return client.getSystem(id);
           },
         };
-        return waitForIntegrationProcessing(clientAdapter, integrationIds);
+        return waitForSystemProcessing(clientAdapter, systemIds);
       },
     }),
     [],
   );
 
-  const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
+  const [editingSystem, setEditingSystem] = useState<System | null>(null);
 
   // OAuth flows now use callbacks directly, no need for message listener
 
@@ -174,85 +173,82 @@ export default function IntegrationsPage() {
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 10;
 
-  const filteredIntegrations =
-    integrations
-      ?.filter((integration) => {
+  const filteredSystems =
+    systems
+      ?.filter((system) => {
         if (!searchQuery) return true;
         const query = searchQuery.toLowerCase();
         return (
-          integration.id.toLowerCase().includes(query) ||
-          integration.urlHost?.toLowerCase().includes(query) ||
-          integration.urlPath?.toLowerCase().includes(query)
+          system.id.toLowerCase().includes(query) ||
+          system.urlHost?.toLowerCase().includes(query) ||
+          system.urlPath?.toLowerCase().includes(query)
         );
       })
       .sort((a, b) => a.id.localeCompare(b.id)) || [];
 
-  const paginatedIntegrations = filteredIntegrations.slice(
+  const paginatedSystems = filteredSystems.slice(
     page * PAGE_SIZE,
     (page + 1) * PAGE_SIZE,
   );
-  const totalPages = Math.ceil(filteredIntegrations.length / PAGE_SIZE);
+  const totalPages = Math.ceil(filteredSystems.length / PAGE_SIZE);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [integrationToDelete, setIntegrationToDelete] = useState<Integration | null>(null);
+  const [systemToDelete, setSystemToDelete] = useState<System | null>(null);
 
   const handleDelete = async (id: string) => {
     try {
       const client = createSuperglueClient(config.superglueEndpoint);
-      await client.deleteIntegration(id);
-      await refreshIntegrations();
+      await client.deleteSystem(id);
+      await refreshSystems();
     } catch (error) {
-      console.error("Error deleting integration:", error);
+      console.error("Error deleting system:", error);
       toast({
         title: "Error",
-        description: "Failed to delete integration",
+        description: "Failed to delete system",
         variant: "destructive",
       });
     }
   };
 
-  const handleEdit = async (integration: Integration) => {
-    setEditingIntegration(integration);
+  const handleEdit = async (system: System) => {
+    setEditingSystem(system);
     setAddFormOpen(true);
   };
   const handleAdd = () => {
-    setEditingIntegration(null);
+    setEditingSystem(null);
     setAddFormOpen(true);
   };
 
-  const handleCompleteOAuth = (integration: Integration) => {
-    const oauthFields = buildOAuthFieldsFromIntegration(integration);
+  const handleCompleteOAuth = (system: System) => {
+    const oauthFields = buildOAuthFieldsFromSystem(system);
 
-    // Determine auth type dynamically
-    const authType = detectAuthType(integration.credentials || {});
+    const authType = detectAuthType(system.credentials || {});
 
-    const handleOAuthError = createOAuthErrorHandler(integration.id, toast);
+    const handleOAuthError = createOAuthErrorHandler(system.id, toast);
 
     const handleOAuthSuccess = (tokens: any) => {
       if (tokens) {
         toast({
           title: "OAuth Connection Successful",
-          description: `Successfully connected to ${integration.id}`,
+          description: `Successfully connected to ${system.id}`,
         });
 
-        if (editingIntegration?.id === integration.id) {
-          const updatedIntegration = {
-            ...editingIntegration,
+        if (editingSystem?.id === system.id) {
+          const updatedSystem = {
+            ...editingSystem,
             credentials: {
-              ...editingIntegration.credentials,
+              ...editingSystem.credentials,
               ...tokens,
             },
           };
-          setEditingIntegration(updatedIntegration);
+          setEditingSystem(updatedSystem);
         }
       }
     };
 
-    // Trigger OAuth flow with callbacks
     triggerOAuthFlow(
-      integration.id,
+      system.id,
       oauthFields,
-      integration.id,
       tokenRegistry.getToken(),
       authType,
       handleOAuthError,
@@ -263,124 +259,115 @@ export default function IntegrationsPage() {
     );
   };
 
-  const cleanIntegrationForInput = (integration: Integration) => {
+  const cleanSystemForInput = (system: System) => {
     return {
-      id: integration.id,
-      urlHost: integration.urlHost,
-      urlPath: integration.urlPath,
-      documentationUrl: integration.documentationUrl,
-      documentation: integration.documentation,
-      specificInstructions: integration.specificInstructions,
-      credentials: integration.credentials,
-      // Include documentationPending if it exists (for refresh docs functionality)
-      ...(integration.documentationPending !== undefined && {
-        documentationPending: integration.documentationPending,
+      id: system.id,
+      urlHost: system.urlHost,
+      urlPath: system.urlPath,
+      documentationUrl: system.documentationUrl,
+      documentation: system.documentation,
+      specificInstructions: system.specificInstructions,
+      credentials: system.credentials,
+      ...(system.documentationPending !== undefined && {
+        documentationPending: system.documentationPending,
       }),
     };
   };
 
   const handleSave = async (
-    integration: Integration,
+    system: System,
     isOAuthConnect?: boolean,
-  ): Promise<Integration | null> => {
+  ): Promise<System | null> => {
     try {
-      if (integration.id) {
-        // Determine mode based on whether integration exists, not edit mode
-        const existingIntegration = integrations.find((i) => i.id === integration.id);
-        const mode = existingIntegration ? UpsertMode.UPDATE : UpsertMode.CREATE;
-        const cleanedIntegration = cleanIntegrationForInput(integration);
+      if (system.id) {
+        const existingSystem = systems.find((i) => i.id === system.id);
+        const mode = existingSystem ? UpsertMode.UPDATE : UpsertMode.CREATE;
+        const cleanedSystem = cleanSystemForInput(system);
 
         const client = createSuperglueClient(config.superglueEndpoint);
-        const savedIntegration = await client.upsertIntegration(
-          integration.id,
-          cleanedIntegration,
+        const savedSystem = await client.upsertSystem(
+          system.id,
+          cleanedSystem,
           mode,
           CredentialMode.REPLACE,
         );
 
-        const willTriggerDocFetch = needsUIToTriggerDocFetch(savedIntegration, existingIntegration);
+        const willTriggerDocFetch = needsUIToTriggerDocFetch(savedSystem, existingSystem);
 
         if (willTriggerDocFetch) {
-          setPendingDocIds((prev) => new Set([...prev, savedIntegration.id]));
+          setPendingDocIds((prev) => new Set([...prev, savedSystem.id]));
 
           // Fire-and-forget poller for background doc fetch
-          waitForIntegrationReady([savedIntegration.id])
+          waitForSystemReady([savedSystem.id])
             .then(() => {
               // Remove from pending when done
               setPendingDocIds(
-                (prev) => new Set([...prev].filter((id) => id !== savedIntegration.id)),
+                (prev) => new Set([...prev].filter((id) => id !== savedSystem.id)),
               );
             })
             .catch((error) => {
               console.error("Error waiting for docs:", error);
               // Remove from pending on error
               setPendingDocIds(
-                (prev) => new Set([...prev].filter((id) => id !== savedIntegration.id)),
+                (prev) => new Set([...prev].filter((id) => id !== savedSystem.id)),
               );
             });
         }
 
         if (isOAuthConnect) {
-          const currentCreds = JSON.stringify(editingIntegration?.credentials || {});
-          const newCreds = JSON.stringify(savedIntegration.credentials || {});
+          const currentCreds = JSON.stringify(editingSystem?.credentials || {});
+          const newCreds = JSON.stringify(savedSystem.credentials || {});
           if (currentCreds !== newCreds) {
-            setEditingIntegration(savedIntegration);
+            setEditingSystem(savedSystem);
           }
         } else {
-          setEditingIntegration(null);
+          setEditingSystem(null);
           setAddFormOpen(false);
         }
 
-        await refreshIntegrations();
+        await refreshSystems();
 
-        return savedIntegration; // Return the saved integration with correct ID
+        return savedSystem;
       }
       return null;
     } catch (error) {
-      console.error("Error saving integration:", error);
+      console.error("Error saving system:", error);
       toast({
         title: "Error",
-        description: "Failed to save integration",
+        description: "Failed to save system",
         variant: "destructive",
       });
       throw error; // Re-throw so the form can handle the error
     }
   };
 
-  // Function to refresh documentation for a specific integration
-  const handleRefreshDocs = async (integrationId: string) => {
-    // Get current integration
-    const integration = integrations.find((i) => i.id === integrationId);
-    if (!integration) return;
-    // Set pending state immediately
-    setPendingDocIds((prev) => new Set([...prev, integrationId]));
+  const handleRefreshDocs = async (systemId: string) => {
+    const system = systems.find((i) => i.id === systemId);
+    if (!system) return;
+    setPendingDocIds((prev) => new Set([...prev, systemId]));
 
     try {
-      // Use documentationPending flag to trigger backend refresh
-      const upsertData = cleanIntegrationForInput({
-        ...integration,
-        documentationPending: true, // Trigger refresh
+      const upsertData = cleanSystemForInput({
+        ...system,
+        documentationPending: true,
       });
 
       const client = createSuperglueClient(config.superglueEndpoint);
-      await client.upsertIntegration(integrationId, upsertData, UpsertMode.UPDATE);
+      await client.upsertSystem(systemId, upsertData, UpsertMode.UPDATE);
 
-      // Use proper polling to wait for docs to be ready
-      const results = await waitForIntegrationReady([integrationId]);
+      const results = await waitForSystemReady([systemId]);
 
       if (results.length > 0 && results[0]?.documentation) {
-        // Success - docs are ready
-        setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== integrationId)));
+        setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== systemId)));
 
         toast({
           title: "Documentation Ready",
-          description: `Documentation for integration "${integrationId}" is now ready!`,
+          description: `Documentation for system "${systemId}" is now ready!`,
           variant: "default",
         });
       } else {
-        // Polling failed - reset documentationPending to false
-        await client.upsertIntegration(
-          integrationId,
+        await client.upsertSystem(
+          systemId,
           {
             ...upsertData,
             documentationPending: false,
@@ -388,45 +375,41 @@ export default function IntegrationsPage() {
           UpsertMode.UPDATE,
         );
 
-        setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== integrationId)));
+        setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== systemId)));
       }
     } catch (error) {
       console.error("Error refreshing docs:", error);
-      // Reset documentationPending to false on error
       try {
-        const integration = integrations.find((i) => i.id === integrationId);
-        if (integration) {
-          const resetData = cleanIntegrationForInput({
-            ...integration,
-            documentation: integration.documentation || "",
+        const sys = systems.find((i) => i.id === systemId);
+        if (sys) {
+          const resetData = cleanSystemForInput({
+            ...sys,
+            documentation: sys.documentation || "",
             documentationPending: false,
           });
 
           const client = createSuperglueClient(config.superglueEndpoint);
-          await client.upsertIntegration(integrationId, resetData, UpsertMode.UPDATE);
+          await client.upsertSystem(systemId, resetData, UpsertMode.UPDATE);
         }
       } catch (resetError) {
         console.error("Error resetting documentationPending:", resetError);
       }
 
-      setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== integrationId)));
+      setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== systemId)));
     }
   };
 
-  // Helper function to determine if integration has documentation
-  const hasDocumentation = (integration: Integration) => {
-    // Check if integration has documentation URL and is not pending
-    return !!(integration.documentationUrl?.trim() && !pendingDocIds.has(integration.id));
+  const hasDocumentation = (system: System) => {
+    return !!(system.documentationUrl?.trim() && !pendingDocIds.has(system.id));
   };
 
-  // Helper to get icon for integration
-  function getIntegrationIcon(integration: Integration) {
-    const iconName = getIntegrationIconName(integration);
+  function getSystemIcon(system: System) {
+    const iconName = getSystemIconName(system);
     return iconName ? getSimpleIcon(iconName) : null;
   }
 
   const handleRefresh = async () => {
-    await refreshIntegrations();
+    await refreshSystems();
   };
 
   const blockAllContent = initialLoading && !addFormOpen;
@@ -436,7 +419,7 @@ export default function IntegrationsPage() {
       {blockAllContent ? null : (
         <>
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-semibold">Integrations</h1>
+            <h1 className="text-2xl font-semibold">Systems</h1>
             <Button
               variant="ghost"
               size="icon"
@@ -449,36 +432,36 @@ export default function IntegrationsPage() {
           {addFormOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
               <div className="bg-background rounded-xl max-w-2xl w-full p-0">
-                <IntegrationForm
+                <SystemForm
                   modal={true}
-                  integration={editingIntegration}
+                  system={editingSystem}
                   onSave={handleSave}
                   onCancel={() => {
                     setAddFormOpen(false);
-                    setEditingIntegration(null);
+                    setEditingSystem(null);
                   }}
-                  integrationOptions={integrationOptions}
+                  systemOptions={systemOptions}
                   getSimpleIcon={getSimpleIcon}
                 />
               </div>
             </div>
           )}
-          {integrations.length === 0 && !addFormOpen ? (
+          {systems.length === 0 && !addFormOpen ? (
             <div className="flex flex-col items-center justify-center flex-1 py-24">
               <Globe className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-lg text-muted-foreground mb-2">No integrations added yet.</p>
+              <p className="text-lg text-muted-foreground mb-2">No systems added yet.</p>
               <p className="text-sm text-muted-foreground mb-6">
-                Integrations let you connect to APIs and data sources for your tools.
+                Systems let you connect to APIs and data sources for your tools.
               </p>
               <Button variant="outline" size="sm" onClick={handleAdd}>
-                <Plus className="mr-2 h-4 w-4" /> Add Integration
+                <Plus className="mr-2 h-4 w-4" /> Add System
               </Button>
             </div>
           ) : (
             <div className="flex flex-col gap-4 w-full">
               <div className="flex items-center gap-3 mb-2">
                 <Input
-                  placeholder="Search integrations..."
+                  placeholder="Search systems..."
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -492,17 +475,17 @@ export default function IntegrationsPage() {
                   onClick={handleAdd}
                   className="hidden sm:inline-flex"
                 >
-                  <Plus className="mr-2 h-4 w-4" /> Add Integration
+                  <Plus className="mr-2 h-4 w-4" /> Add System
                 </Button>
               </div>
-              {paginatedIntegrations.map((integration) => {
-                const badge = getAuthBadge(integration);
+              {paginatedSystems.map((sys) => {
+                const badge = getAuthBadge(sys);
                 return (
-                  <div key={integration.id} className="relative">
+                  <div key={sys.id} className="relative">
                     <div className="flex items-center gap-3 border rounded-lg p-4 bg-card">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         {(() => {
-                          const icon = getIntegrationIcon(integration);
+                          const icon = getSystemIcon(sys);
                           return icon ? (
                             <svg
                               width="20"
@@ -518,9 +501,9 @@ export default function IntegrationsPage() {
                           );
                         })()}
                         <div className="flex flex-col min-w-0 flex-1">
-                          <span className="font-medium truncate">{integration.id}</span>
+                          <span className="font-medium truncate">{sys.id}</span>
                           <span className="text-sm text-muted-foreground truncate">
-                            {composeUrl(integration.urlHost, integration.urlPath) ||
+                            {composeUrl(sys.urlHost, sys.urlPath) ||
                               "No API endpoint"}
                           </span>
                         </div>
@@ -528,8 +511,8 @@ export default function IntegrationsPage() {
                       <div className="hidden sm:flex flex-row items-center gap-3 ml-auto">
                         <div className="flex items-center gap-2">
                           <DocStatus
-                            pending={pendingDocIds.has(integration.id)}
-                            hasDocumentation={hasDocumentation(integration)}
+                            pending={pendingDocIds.has(sys.id)}
+                            hasDocumentation={hasDocumentation(sys)}
                           />
                           {(() => {
                             const colorClasses = {
@@ -559,13 +542,13 @@ export default function IntegrationsPage() {
                             className="text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={() =>
                               badge.type === "oauth-incomplete"
-                                ? handleCompleteOAuth(integration)
-                                : router.push(`/tools?integration=${integration.id}`)
+                                ? handleCompleteOAuth(sys)
+                                : router.push(`/tools?system=${sys.id}`)
                             }
                             title={
                               badge.type === "oauth-incomplete"
                                 ? "Start OAuth flow to complete configuration"
-                                : "Build a tool with this integration"
+                                : "Build a tool with this system"
                             }
                             disabled={false}
                           >
@@ -585,21 +568,21 @@ export default function IntegrationsPage() {
                             variant="outline"
                             size="sm"
                             className="text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={() => handleRefreshDocs(integration.id)}
+                            onClick={() => handleRefreshDocs(sys.id)}
                             disabled={
-                              !integration.documentationUrl ||
-                              !integration.documentationUrl.trim() ||
-                              (pendingDocIds.has(integration.id) &&
-                                Date.now() - new Date(integration.updatedAt).getTime() < 60000) ||
-                              integration.documentationUrl.startsWith("file://")
+                              !sys.documentationUrl ||
+                              !sys.documentationUrl.trim() ||
+                              (pendingDocIds.has(sys.id) &&
+                                Date.now() - new Date(sys.updatedAt).getTime() < 60000) ||
+                              sys.documentationUrl.startsWith("file://")
                             }
                             title={
-                              pendingDocIds.has(integration.id)
+                              pendingDocIds.has(sys.id)
                                 ? "Documentation is already being processed"
-                                : integration.documentationUrl?.startsWith("file://")
+                                : sys.documentationUrl?.startsWith("file://")
                                   ? "Cannot refresh file uploads"
-                                  : !integration.documentationUrl ||
-                                      !integration.documentationUrl.trim()
+                                  : !sys.documentationUrl ||
+                                      !sys.documentationUrl.trim()
                                     ? "No documentation URL to refresh"
                                     : "Refresh documentation from URL"
                             }
@@ -611,7 +594,7 @@ export default function IntegrationsPage() {
                             variant="ghost"
                             size="sm"
                             className="text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={() => handleEdit(integration)}
+                            onClick={() => handleEdit(sys)}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -620,7 +603,7 @@ export default function IntegrationsPage() {
                             size="icon"
                             className="h-8 w-8"
                             onClick={() => {
-                              setIntegrationToDelete(integration);
+                              setSystemToDelete(sys);
                               setDeleteDialogOpen(true);
                             }}
                           >
@@ -658,9 +641,9 @@ export default function IntegrationsPage() {
           <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete Integration?</AlertDialogTitle>
+                <AlertDialogTitle>Delete System?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to delete the integration "{integrationToDelete?.id}"? This
+                  Are you sure you want to delete the system "{systemToDelete?.id}"? This
                   action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
@@ -670,10 +653,10 @@ export default function IntegrationsPage() {
                 </AlertDialogCancel>
                 <AlertDialogAction
                   onClick={async () => {
-                    if (integrationToDelete) {
-                      await handleDelete(integrationToDelete.id);
+                    if (systemToDelete) {
+                      await handleDelete(systemToDelete.id);
                       setDeleteDialogOpen(false);
-                      setIntegrationToDelete(null);
+                      setSystemToDelete(null);
                     }
                   }}
                 >

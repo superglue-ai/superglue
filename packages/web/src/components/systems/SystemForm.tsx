@@ -1,5 +1,5 @@
 import { useConfig } from "@/src/app/config-context";
-import { detectAuthType } from "@/src/app/integrations/page";
+import { detectAuthType } from "@/src/app/systems/page";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/src/components/ui/card";
 import {
@@ -29,28 +29,28 @@ import { URLField } from "@/src/components/utils/URLField";
 import { useToast } from "@/src/hooks/use-toast";
 import { cn, composeUrl, inputErrorStyles } from "@/src/lib/general-utils";
 import { tokenRegistry } from "@/src/lib/token-registry";
-import type { Integration } from "@superglue/shared";
+import type { System } from "@superglue/shared";
 
 import {
   createOAuthErrorHandler,
   getOAuthCallbackUrl,
   triggerOAuthFlow,
 } from "@/src/lib/oauth-utils";
-import { integrations, resolveOAuthCertAndKey } from "@superglue/shared";
+import { systems, resolveOAuthCertAndKey } from "@superglue/shared";
 import { Check, ChevronRight, ChevronsUpDown, Eye, EyeOff, Globe, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CopyButton } from "../tools/shared/CopyButton";
 
-export interface IntegrationFormProps {
-  integration?: Integration;
-  onSave: (integration: Integration) => Promise<Integration | null>;
+export interface SystemFormProps {
+  system?: System;
+  onSave: (system: System) => Promise<System | null>;
   onCancel: () => void;
-  integrationOptions: { value: string; label: string; icon: string }[];
+  systemOptions: { value: string; label: string; icon: string }[];
   getSimpleIcon: (name: string) => any;
   modal?: boolean;
 }
 
-function sanitizeIntegrationId(id: string) {
+function sanitizeSystemId(id: string) {
   // Handle PostgreSQL connection strings specially
   if (id.startsWith("postgres://") || id.startsWith("postgresql://")) {
     try {
@@ -87,43 +87,43 @@ function sanitizeIntegrationId(id: string) {
     .replace(/^-|-$/g, ""); // Remove leading/trailing hyphens
 }
 
-export function IntegrationForm({
-  integration,
+export function SystemForm({
+  system,
   onSave,
   onCancel,
-  integrationOptions,
+  systemOptions,
   getSimpleIcon,
   modal = false,
-}: IntegrationFormProps) {
-  const initialSelected = integration
-    ? integrationOptions.find(
+}: SystemFormProps) {
+  const initialSelected = system
+    ? systemOptions.find(
         (opt) =>
           opt.value !== "" &&
-          (integration.id === opt.value ||
-            (integration.urlHost && integration.urlHost.includes(opt.value))),
+          (system.id === opt.value ||
+            (system.urlHost && system.urlHost.includes(opt.value))),
       )?.value || ""
     : "";
-  const [selectedIntegration, setSelectedIntegration] = useState<string>(initialSelected);
-  const [integrationDropdownOpen, setIntegrationDropdownOpen] = useState(false);
-  const [id, setId] = useState(integration?.id || initialSelected);
-  const [urlHost, setUrlHost] = useState(integration?.urlHost || "");
-  const [urlPath, setUrlPath] = useState(integration?.urlPath || "");
-  const [documentationUrl, setDocumentationUrl] = useState(integration?.documentationUrl || "");
-  const [documentation, setDocumentation] = useState(integration?.documentation || "");
+  const [selectedSystem, setSelectedSystem] = useState<string>(initialSelected);
+  const [systemDropdownOpen, setSystemDropdownOpen] = useState(false);
+  const [id, setId] = useState(system?.id || initialSelected);
+  const [urlHost, setUrlHost] = useState(system?.urlHost || "");
+  const [urlPath, setUrlPath] = useState(system?.urlPath || "");
+  const [documentationUrl, setDocumentationUrl] = useState(system?.documentationUrl || "");
+  const [documentation, setDocumentation] = useState(system?.documentation || "");
   const [specificInstructions, setSpecificInstructions] = useState(
-    integration?.specificInstructions || "",
+    system?.specificInstructions || "",
   );
 
   // Add state to track if user manually edited the ID
   const [isIdManuallyEdited, setIsIdManuallyEdited] = useState(false);
 
   // Initialize auth type
-  const initialAuthType = !integration ? "apikey" : detectAuthType(integration.credentials || {});
+  const initialAuthType = !system ? "apikey" : detectAuthType(system.credentials || {});
   const [authType, setAuthType] = useState<"none" | "oauth" | "apikey">(initialAuthType);
 
   // Initialize OAuth fields
   const [oauthFields, setOauthFields] = useState(() => {
-    const creds = integration?.credentials || {};
+    const creds = system?.credentials || {};
     return {
       client_id: creds.client_id || "",
       client_secret: creds.client_secret || "",
@@ -143,7 +143,7 @@ export function IntegrationForm({
 
   // Track initial OAuth field values to detect changes
   const [initialOAuthFields, setInitialOAuthFields] = useState(() => {
-    const creds = integration?.credentials || {};
+    const creds = system?.credentials || {};
     return {
       client_id: creds.client_id || "",
       client_secret: creds.client_secret || "",
@@ -156,8 +156,8 @@ export function IntegrationForm({
 
   // Track initial API credentials to detect changes
   const [initialApiCredentials, setInitialApiCredentials] = useState(() => {
-    const creds = integration?.credentials || {};
-    if (initialAuthType === "oauth" && integration) {
+    const creds = system?.credentials || {};
+    if (initialAuthType === "oauth" && system) {
       const {
         client_id,
         client_secret,
@@ -183,9 +183,9 @@ export function IntegrationForm({
 
   // Initialize API key credentials as JSON string for CredentialsManager
   const [apiKeyCredentials, setApiKeyCredentials] = useState(() => {
-    const creds = integration?.credentials || {};
-    // For OAuth integrations, only include non-OAuth fields in the additional credentials
-    if (initialAuthType === "oauth" && integration) {
+    const creds = system?.credentials || {};
+    // For OAuth systems, only include non-OAuth fields in the additional credentials
+    if (initialAuthType === "oauth" && system) {
       const {
         client_id,
         client_secret,
@@ -216,8 +216,8 @@ export function IntegrationForm({
   const [connectLoading, setConnectLoading] = useState(false);
   const [showClientSecret, setShowClientSecret] = useState(false);
   const [hasUploadedFile, setHasUploadedFile] = useState(
-    // Check if existing integration has file upload
-    integration?.documentationUrl?.startsWith("file://") || false,
+    // Check if existing system has file upload
+    system?.documentationUrl?.startsWith("file://") || false,
   );
   const [certFileName, setCertFileName] = useState<string>("");
   const [keyFileName, setKeyFileName] = useState<string>("");
@@ -225,23 +225,23 @@ export function IntegrationForm({
   const { toast } = useToast();
 
   useEffect(() => {
-    if (integration?.credentials?.oauth_cert && integration?.credentials?.oauth_key) {
+    if (system?.credentials?.oauth_cert && system?.credentials?.oauth_key) {
       const { cert, key } = resolveOAuthCertAndKey(
-        integration.credentials.oauth_cert,
-        integration.credentials.oauth_key,
+        system.credentials.oauth_cert,
+        system.credentials.oauth_key,
       );
       setCertFileName(cert?.filename || "Certificate loaded");
       setKeyFileName(key?.filename || "Private key loaded");
     }
-  }, [integration]);
+  }, [system]);
 
   useEffect(() => {
     const handleOAuthMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      const messageIntegrationId = event.data?.integrationId;
+      const messageSystemId = event.data?.systemId;
       if (
-        !messageIntegrationId ||
-        (integration?.id && messageIntegrationId !== integration.id && messageIntegrationId !== id)
+        !messageSystemId ||
+        (system?.id && messageSystemId !== system.id && messageSystemId !== id)
       ) {
         return;
       }
@@ -279,17 +279,17 @@ export function IntegrationForm({
     };
     window.addEventListener("message", handleOAuthMessage);
     return () => window.removeEventListener("message", handleOAuthMessage);
-  }, [id, integration?.id, oauthFields.grant_type, toast]);
+  }, [id, system?.id, oauthFields.grant_type, toast]);
 
   const urlFieldRef = useRef<any>(null);
-  const isEditing = !!integration;
+  const isEditing = !!system;
   const config = useConfig();
 
   // Pre-fill OAuth fields when auth type/template changes; enable SG toggle if template has client_id
   useEffect(() => {
-    if (authType !== "oauth" || !selectedIntegration) return;
-    const integrationTemplate = integrations[selectedIntegration];
-    const templateOAuth: any = integrationTemplate?.oauth;
+    if (authType !== "oauth" || !selectedSystem) return;
+    const systemTemplate = systems[selectedSystem];
+    const templateOAuth: any = systemTemplate?.oauth;
     setUseSuperglueOAuth((prev) =>
       isEditing
         ? prev
@@ -306,16 +306,16 @@ export function IntegrationForm({
         prev.grant_type ||
         "authorization_code",
     }));
-  }, [authType, selectedIntegration]);
+  }, [authType, selectedSystem]);
 
   useEffect(() => {
-    if (!isEditing || authType !== "oauth" || !selectedIntegration) return;
-    const templateClientId = integrations[selectedIntegration]?.oauth?.client_id;
-    const savedClientId = (integration?.credentials || {}).client_id || oauthFields.client_id;
+    if (!isEditing || authType !== "oauth" || !selectedSystem) return;
+    const templateClientId = systems[selectedSystem]?.oauth?.client_id;
+    const savedClientId = (system?.credentials || {}).client_id || oauthFields.client_id;
     if (templateClientId && savedClientId && savedClientId === templateClientId) {
       setUseSuperglueOAuth(true);
     }
-  }, [isEditing, authType, selectedIntegration, integration, oauthFields.client_id]);
+  }, [isEditing, authType, selectedSystem, system, oauthFields.client_id]);
 
   // Function to handle file upload
   const handleFileUpload = (extractedText: string) => {
@@ -373,8 +373,8 @@ export function IntegrationForm({
   const handleRemoveCert = handleRemoveOAuthFile("oauth_cert", setCertFileName, "cert-file-upload");
   const handleRemoveKey = handleRemoveOAuthFile("oauth_key", setKeyFileName, "key-file-upload");
 
-  const handleIntegrationSelect = (value: string) => {
-    setSelectedIntegration(value);
+  const handleSystemSelect = (value: string) => {
+    setSelectedSystem(value);
 
     if (!value) {
       setUrlHost("");
@@ -384,16 +384,16 @@ export function IntegrationForm({
       setSpecificInstructions("");
       // Set custom as ID if not editing
       if (!isEditing) {
-        setId("new-integration");
+        setId("new-system");
       }
       return;
     }
 
-    // Use integrations from shared package
-    const integrationTemplate = integrations[value];
+    // Use systems from shared package
+    const systemTemplate = systems[value];
 
-    if (integrationTemplate) {
-      const apiUrl = integrationTemplate.apiUrl || "";
+    if (systemTemplate) {
+      const apiUrl = systemTemplate.apiUrl || "";
       let urlHost = "";
       let urlPath = "";
       try {
@@ -408,22 +408,22 @@ export function IntegrationForm({
       setUrlPath(urlPath);
       // Only set documentation URL if no file is uploaded
       if (!hasUploadedFile) {
-        setDocumentationUrl(integrationTemplate.docsUrl || "");
+        setDocumentationUrl(systemTemplate.docsUrl || "");
         setDocumentation("");
       }
       setSpecificInstructions("");
-      // Always set ID to dropdown value for new integrations
+      // Always set ID to dropdown value for new systems
       if (!isEditing) {
         setId(value);
       }
 
-      if (integrationTemplate.preferredAuthType) {
-        setAuthType(integrationTemplate.preferredAuthType);
+      if (systemTemplate.preferredAuthType) {
+        setAuthType(systemTemplate.preferredAuthType);
       }
 
       // Pre-fill OAuth fields if OAuth is preferred/available
-      if (integrationTemplate.oauth && integrationTemplate.preferredAuthType === "oauth") {
-        const templateOAuth: any = integrationTemplate.oauth;
+      if (systemTemplate.oauth && systemTemplate.preferredAuthType === "oauth") {
+        const templateOAuth: any = systemTemplate.oauth;
         setOauthFields((prev) => ({
           ...prev,
           client_id: templateOAuth?.client_id || prev.client_id,
@@ -448,11 +448,11 @@ export function IntegrationForm({
     setUrlHost(host);
     setUrlPath(path);
 
-    // Auto-update ID when URL changes (only for new integrations and if not manually edited)
+    // Auto-update ID when URL changes (only for new systems and if not manually edited)
     if (!isEditing && !isIdManuallyEdited) {
       const fullUrl = composeUrl(host, path);
       if (fullUrl) {
-        const sanitizedId = sanitizeIntegrationId(fullUrl);
+        const sanitizedId = sanitizeSystemId(fullUrl);
         if (sanitizedId) {
           setId(sanitizedId);
         }
@@ -480,8 +480,8 @@ export function IntegrationForm({
   };
 
   const getTemplateOAuth = () => {
-    if (!selectedIntegration) return null as any;
-    return (integrations[selectedIntegration]?.oauth as any) || null;
+    if (!selectedSystem) return null as any;
+    return (systems[selectedSystem]?.oauth as any) || null;
   };
 
   const getResolvedOAuthFields = (): typeof oauthFields => {
@@ -503,9 +503,9 @@ export function IntegrationForm({
 
   const effectiveGrantType = oauthFields.grant_type || "authorization_code";
   const effectiveAccessToken =
-    (integration?.credentials as any)?.access_token || oauthFields.access_token;
+    (system?.credentials as any)?.access_token || oauthFields.access_token;
   const effectiveRefreshToken =
-    (integration?.credentials as any)?.refresh_token || oauthFields.refresh_token;
+    (system?.credentials as any)?.refresh_token || oauthFields.refresh_token;
   const isOAuthConfigured: boolean =
     effectiveGrantType === "client_credentials"
       ? Boolean(effectiveAccessToken)
@@ -571,27 +571,27 @@ export function IntegrationForm({
       creds = { ...resolvedFields };
     }
 
-    const integrationData = {
-      id: isEditing ? integration!.id : (id || "").trim(),
+    const systemData = {
+      id: isEditing ? system!.id : (id || "").trim(),
       urlHost: urlHost.trim(),
       urlPath: urlPath.trim(),
       documentationUrl: documentationUrl.trim(),
       documentation: documentation.trim(),
       specificInstructions: specificInstructions.trim(),
       credentials: creds,
-    } as Integration;
+    } as System;
 
     try {
       const templateInfo = useSuperglueOAuth
         ? {
-            templateId: selectedIntegration,
+            templateId: selectedSystem,
             clientId: resolvedFields.client_id,
           }
         : undefined;
 
       const handleOAuthError = (error: string) => {
         setConnectLoading(false);
-        const errorHandler = createOAuthErrorHandler(integrationData.id, toast);
+        const errorHandler = createOAuthErrorHandler(systemData.id, toast);
         errorHandler(error);
       };
 
@@ -614,12 +614,11 @@ export function IntegrationForm({
       };
 
       triggerOAuthFlow(
-        integrationData.id,
+        systemData.id,
         resolvedFields,
-        selectedIntegration,
         tokenRegistry.getToken(),
         authType,
-        handleOAuthError,
+        handleOAuthError as (error: string) => void,
         true,
         templateInfo,
         handleOAuthSuccess,
@@ -648,7 +647,7 @@ export function IntegrationForm({
           ...fieldsWithoutGrantType,
           grant_type,
           scopes:
-            fieldsWithoutGrantType.scopes || integrations[selectedIntegration]?.oauth?.scopes || "",
+            fieldsWithoutGrantType.scopes || systems[selectedSystem]?.oauth?.scopes || "",
         }).filter(([_, value]) => value !== ""),
       ) as Record<string, any>;
 
@@ -670,9 +669,9 @@ export function IntegrationForm({
     setValidationErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
-    // Create the integration object
-    const integrationData = {
-      id: isEditing ? integration!.id : id.trim(),
+    // Create the system object
+    const systemData = {
+      id: isEditing ? system!.id : id.trim(),
       urlHost: urlHost.trim(),
       urlPath: urlPath.trim(),
       documentationUrl: documentationUrl.trim(),
@@ -682,13 +681,13 @@ export function IntegrationForm({
     };
 
     try {
-      // Save the integration first and get the resolved integration ID back from backend
-      const savedIntegration = await onSave(integrationData);
+      // Save the system first and get the resolved system ID back from backend
+      const savedSystem = await onSave(systemData);
 
-      if (!savedIntegration) {
+      if (!savedSystem) {
         toast({
           title: "Error",
-          description: "Failed to save integration",
+          description: "Failed to save system",
           variant: "destructive",
         });
         return;
@@ -705,29 +704,29 @@ export function IntegrationForm({
     >
       <CardHeader className={cn(modal ? "p-6 pb-0 border-0" : "py-3 px-4", "flex-shrink-0")}>
         <CardTitle className="text-lg">
-          {integration ? "Edit Integration" : "Add New Integration"}
+          {system ? "Edit System" : "Add New System"}
         </CardTitle>
       </CardHeader>
       <CardContent
         className={cn(modal ? "p-6 space-y-3 border-0" : "p-4 space-y-3", "flex-1 overflow-y-auto")}
       >
         <div>
-          <Label htmlFor="integrationSelect">Integration Template</Label>
+          <Label htmlFor="systemSelect">System Template</Label>
           <HelpTooltip text="Choose a pre-configured template to get started quickly, or select 'Custom API' to set up any API manually. Templates are optional but make setup easier." />
-          <Popover open={integrationDropdownOpen} onOpenChange={setIntegrationDropdownOpen}>
+          <Popover open={systemDropdownOpen} onOpenChange={setSystemDropdownOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 role="combobox"
-                aria-expanded={integrationDropdownOpen}
+                aria-expanded={systemDropdownOpen}
                 className="w-full justify-between"
               >
                 <div className="flex items-center gap-2">
-                  {selectedIntegration ? (
+                  {selectedSystem ? (
                     <>
                       {(() => {
                         const icon = getSimpleIcon(
-                          integrationOptions.find((opt) => opt.value === selectedIntegration)
+                          systemOptions.find((opt) => opt.value === selectedSystem)
                             ?.icon || "",
                         );
                         return icon ? (
@@ -746,13 +745,13 @@ export function IntegrationForm({
                       })()}
                       <span>
                         {
-                          integrationOptions.find((option) => option.value === selectedIntegration)
+                          systemOptions.find((option) => option.value === selectedSystem)
                             ?.label
                         }
                       </span>
                     </>
                   ) : (
-                    <span>Select integration...</span>
+                    <span>Select system...</span>
                   )}
                 </div>
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -765,18 +764,18 @@ export function IntegrationForm({
                   <div className="text-center py-4">
                     <div className="text-sm text-muted-foreground mb-2">No template found</div>
                     <div className="text-xs text-muted-foreground">
-                      Don't worry! You can still create this integration using "Custom API"
+                      Don't worry! You can still create this system using "Custom API"
                     </div>
                   </div>
                 </CommandEmpty>
                 <CommandGroup className="max-h-[300px] overflow-y-auto">
-                  {integrationOptions.map((option) => (
+                  {systemOptions.map((option) => (
                     <CommandItem
                       key={option.value}
                       value={option.value}
                       onSelect={() => {
-                        handleIntegrationSelect(option.value);
-                        setIntegrationDropdownOpen(false);
+                        handleSystemSelect(option.value);
+                        setSystemDropdownOpen(false);
                       }}
                       className="flex items-center py-2"
                     >
@@ -803,7 +802,7 @@ export function IntegrationForm({
                         <Check
                           className={cn(
                             "h-4 w-4 flex-shrink-0",
-                            selectedIntegration === option.value ? "opacity-100" : "opacity-0",
+                            selectedSystem === option.value ? "opacity-100" : "opacity-0",
                           )}
                         />
                       </div>
@@ -816,10 +815,10 @@ export function IntegrationForm({
         </div>
         {!isEditing && (
           <div>
-            <Label htmlFor="integrationId">Integration ID*</Label>
-            <HelpTooltip text="A unique identifier for this integration within the tool. You cannot change this after saving." />
+            <Label htmlFor="systemId">System ID*</Label>
+            <HelpTooltip text="A unique identifier for this system. You cannot change this after saving." />
             <Input
-              id="integrationId"
+              id="systemId"
               value={id || ""}
               onChange={(e) => {
                 setId(e.target.value);
@@ -830,13 +829,13 @@ export function IntegrationForm({
             />
             {validationErrors.id && (
               <p className="text-sm text-destructive mt-1">
-                Integration ID is required and must be unique.
+                System ID is required and must be unique.
               </p>
             )}
           </div>
         )}
         <div>
-          <Label htmlFor="integrationFullUrl">API Endpoint*</Label>
+          <Label htmlFor="systemFullUrl">API Endpoint*</Label>
           <HelpTooltip text="The base URL of the API (e.g., https://api.example.com/v1)." />
           <URLField
             ref={urlFieldRef}
@@ -917,7 +916,7 @@ export function IntegrationForm({
                     <span className="inline-flex items-center gap-2">
                       {(() => {
                         const icon = getSimpleIcon(
-                          integrationOptions.find((opt) => opt.value === selectedIntegration)
+                          systemOptions.find((opt) => opt.value === selectedSystem)
                             ?.icon || "",
                         );
                         return icon ? (
@@ -942,7 +941,7 @@ export function IntegrationForm({
                       ) : (
                         <span>
                           Connect to{" "}
-                          {integrationOptions.find((option) => option.value === selectedIntegration)
+                          {systemOptions.find((option) => option.value === selectedSystem)
                             ?.label ||
                             id ||
                             "system"}
@@ -967,7 +966,7 @@ export function IntegrationForm({
               {showOAuth && (
                 <div className="space-y-4">
                   {(() => {
-                    const template = integrations[selectedIntegration as keyof typeof integrations];
+                    const template = systems[selectedSystem as keyof typeof systems];
                     const templateOAuth: any = template?.oauth || null;
                     const hasTemplateClient = !!(
                       templateOAuth?.client_id && String(templateOAuth.client_id).trim().length > 0
@@ -978,7 +977,7 @@ export function IntegrationForm({
                           <div className="font-medium">Use superglue OAuth client</div>
                           <div className="text-xs text-muted-foreground">
                             Preconfigured client for{" "}
-                            {integrationOptions.find((o) => o.value === selectedIntegration)?.label}
+                            {systemOptions.find((o) => o.value === selectedSystem)?.label}
                           </div>
                         </div>
                         <Switch
@@ -1274,15 +1273,15 @@ export function IntegrationForm({
                           ) : (
                             <>
                               Connect to{" "}
-                              {integrationOptions.find(
-                                (option) => option.value === selectedIntegration,
+                              {systemOptions.find(
+                                (option) => option.value === selectedSystem,
                               )?.label ||
                                 id ||
                                 "system"}
                               {(() => {
                                 const icon = getSimpleIcon(
-                                  integrationOptions.find(
-                                    (opt) => opt.value === selectedIntegration,
+                                  systemOptions.find(
+                                    (opt) => opt.value === selectedSystem,
                                   )?.icon || "",
                                 );
                                 return icon ? (
@@ -1322,7 +1321,7 @@ export function IntegrationForm({
                       return (
                         <div className="pt-2 text-xs text-muted-foreground">
                           OAuth access token expired: {dateStr} {timeStr}. Execute a tool with this
-                          integration to refresh automatically.
+                          system to refresh automatically.
                         </div>
                       );
                     })()}
@@ -1335,7 +1334,7 @@ export function IntegrationForm({
             <div className="space-y-2">
               <Label htmlFor="credentials" className="flex items-center gap-2">
                 API Credentials
-                <HelpTooltip text="Add API keys or tokens needed for this integration. You can add multiple key-value pairs. Common keys include: api_key, bearer_token, api_secret, username, password." />
+                <HelpTooltip text="Add API keys or tokens needed for this system. You can add multiple key-value pairs. Common keys include: api_key, bearer_token, api_secret, username, password." />
               </Label>
               <div className="w-full">
                 <CredentialsManager
@@ -1399,7 +1398,7 @@ export function IntegrationForm({
 
             <div>
               <Label htmlFor="specificInstructions">Specific Instructions</Label>
-              <HelpTooltip text="Provide specific guidance on how to use this integration (e.g., rate limits, special endpoints, authentication details). Max 2000 characters." />
+              <HelpTooltip text="Provide specific guidance on how to use this system (e.g., rate limits, special endpoints, authentication details). Max 2000 characters." />
               <div className="relative">
                 <Textarea
                   id="specificInstructions"
@@ -1430,11 +1429,11 @@ export function IntegrationForm({
           <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit}>{integration ? "Save Changes" : "Add Integration"}</Button>
+          <Button onClick={handleSubmit}>{system ? "Save Changes" : "Add System"}</Button>
         </div>
       </CardFooter>
     </Card>
   );
 }
 
-export default IntegrationForm;
+export default SystemForm;

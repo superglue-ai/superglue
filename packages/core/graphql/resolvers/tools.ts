@@ -1,6 +1,6 @@
 import {
   generateUniqueId,
-  Integration,
+  System,
   RequestOptions,
   RequestSource,
   RunStatus,
@@ -8,12 +8,12 @@ import {
   ToolDiff,
   ToolResult,
   ToolStepResult,
-  waitForIntegrationProcessing,
+  waitForSystemProcessing,
 } from "@superglue/shared";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { parseJSON } from "../../files/index.js";
-import { IntegrationManager } from "../../integrations/integration-manager.js";
+import { SystemManager } from "../../systems/system-manager.js";
 import { ToolBuilder } from "../../tools/tool-builder.js";
 import { ToolFinder } from "../../tools/tool-finder.js";
 import { ToolFixer } from "../../tools/tool-fixer.js";
@@ -109,7 +109,7 @@ export const executeWorkflowResolver = async (
 
     const selfHealingEnabled = isSelfHealingEnabled(args.options, "api");
 
-    const integrationManagers = await IntegrationManager.forToolExecution(
+    const systemManagers = await SystemManager.forToolExecution(
       workflow,
       context.datastore,
       metadata,
@@ -137,7 +137,7 @@ export const executeWorkflowResolver = async (
       payload: args.payload,
       credentials: args.credentials,
       options: args.options,
-      integrations: integrationManagers.map((m) => m.toIntegrationSync()),
+      systems: systemManagers.map((m) => m.toSystemSync()),
       orgId: context.orgId,
       traceId: metadata.traceId,
     };
@@ -420,31 +420,31 @@ export const buildWorkflowResolver = async (
       throw new Error("Instruction is required to build a workflow.");
     }
 
-    let resolvedIntegrations: Integration[] = [];
+    let resolvedSystems: System[] = [];
     if (integrationIds && integrationIds.length > 0) {
       const datastoreAdapter = {
-        getIntegration: async (id: string): Promise<Integration | null> => {
-          const result = await context.datastore.getIntegration({
+        getSystem: async (id: string): Promise<System | null> => {
+          const result = await context.datastore.getSystem({
             id,
             includeDocs: true,
             orgId: context.orgId,
           });
           return result || null;
         },
-        getManyIntegrations: async (ids: string[]): Promise<Integration[]> => {
-          return await context.datastore.getManyIntegrations({
+        getManySystems: async (ids: string[]): Promise<System[]> => {
+          return await context.datastore.getManySystems({
             ids,
             includeDocs: true,
             orgId: context.orgId,
           });
         },
       };
-      resolvedIntegrations = await waitForIntegrationProcessing(datastoreAdapter, integrationIds);
+      resolvedSystems = await waitForSystemProcessing(datastoreAdapter, integrationIds);
     }
 
     const builder = new ToolBuilder(
       instruction,
-      resolvedIntegrations,
+      resolvedSystems,
       payload,
       responseSchema,
       metadata,
@@ -483,18 +483,18 @@ export const fixWorkflowResolver = async (
     }
 
     // Fetch ALL of the customer's configured integrations so the LLM can use any of them
-    const allIntegrations = await context.datastore.listIntegrations({
+    const allSystems = await context.datastore.listSystems({
       limit: 1000,
       offset: 0,
       includeDocs: true,
       orgId: context.orgId,
     });
-    const resolvedIntegrations: Integration[] = allIntegrations.items || [];
+    const resolvedSystems: System[] = allSystems.items || [];
 
     const fixer = new ToolFixer({
       tool: workflow,
       fixInstructions,
-      integrations: resolvedIntegrations,
+      systems: resolvedSystems,
       lastError,
       metadata,
     });

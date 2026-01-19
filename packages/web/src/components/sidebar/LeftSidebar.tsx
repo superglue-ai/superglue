@@ -19,7 +19,7 @@ import { useEffect, useState } from "react";
 
 const navItems = [
   { icon: Hammer, label: "Tools", href: "/" },
-  { icon: Blocks, label: "Integrations", href: "/integrations" },
+  { icon: Blocks, label: "Systems", href: "/systems" },
   { icon: History, label: "Runs", href: "/runs" },
   { icon: Book, label: "Documentation", href: "https://docs.superglue.cloud", target: "_blank" },
   /*  { icon: AlertCircle, label: 'Error Monitoring', href: '/analytics' },

@@ -271,7 +271,7 @@ export function sanitizeInstructionSuggestions(raw: unknown): string[] {
 
   // Remove empty, header, or markdown lines
   const headerRegex =
-    /^(\s*[#>*-]+\s*)?((integration suggestions|individual suggestions|example output|example:|output:)[^a-zA-Z0-9]*|[\-*#_]{2,}|\s*)$/i;
+    /^(\s*[#>*-]+\s*)?((system suggestions|individual suggestions|example output|example:|output:)[^a-zA-Z0-9]*|[\-*#_]{2,}|\s*)$/i;
 
   // Remove lines that are just markdown separators or bullets
   const isSeparator = (line: string) => {

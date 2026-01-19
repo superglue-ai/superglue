@@ -2,12 +2,12 @@ import {
   ApiConfig,
   GenerateStepConfigArgs,
   GenerateTransformArgs,
-  Integration,
+  System,
 } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { getGenerateStepConfigContext } from "../../context/context-builders.js";
 import { GENERATE_STEP_CONFIG_SYSTEM_PROMPT } from "../../context/context-prompts.js";
-import { IntegrationManager } from "../../integrations/integration-manager.js";
+import { SystemManager } from "../../systems/system-manager.js";
 import { LLMMessage } from "../../llm/llm-base-model.js";
 import { executeLLMTool, LLMToolCall } from "../../llm/llm-tool-utils.js";
 import { InstructionGenerationContext } from "../../llm/llm-tools.js";
@@ -19,7 +19,7 @@ import { GraphQLRequestContext } from "../types.js";
 
 export const generateInstructionsResolver = async (
   _: any,
-  { integrations }: { integrations: Integration[] },
+  { systems }: { systems: System[] },
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ) => {
@@ -32,7 +32,7 @@ export const generateInstructionsResolver = async (
 
     const toolContext: InstructionGenerationContext = {
       ...context.toMetadata(),
-      integrations: integrations,
+      systems: systems,
     };
 
     const callResult = await executeLLMTool(toolCall, toolContext);
@@ -49,7 +49,7 @@ export const generateInstructionsResolver = async (
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
       traceId: context.traceId,
-      integrations: integrations,
+      systems: systems,
     });
     throw error;
   }
@@ -77,27 +77,27 @@ export const generateStepConfigResolver = async (
       throw new Error("Instruction is required in currentStepConfig");
     }
 
-    let integration: Integration | undefined;
-    let integrationDocs = "";
-    let integrationSpecificInstructions = "";
-    let integrationCredentials: Record<string, string> = {};
+    let system: System | undefined;
+    let systemDocs = "";
+    let systemSpecificInstructions = "";
+    let systemCredentials: Record<string, string> = {};
 
     if (integrationId) {
       try {
         logMessage("info", `Generating step config for integration ${integrationId}`, metadata);
-        const integrationManager = new IntegrationManager(
+        const systemManager = new SystemManager(
           integrationId,
           context.datastore,
           context.toMetadata(),
         );
-        integration = await integrationManager.getIntegration();
-        integrationDocs = (await integrationManager.getDocumentation())?.content || "";
-        integrationSpecificInstructions = integration.specificInstructions || "";
+        system = await systemManager.getSystem();
+        systemDocs = (await systemManager.getDocumentation())?.content || "";
+        systemSpecificInstructions = system.specificInstructions || "";
 
-        // Get integration credentials and prefix keys with integration ID
-        if (integration?.credentials) {
-          Object.entries(integration.credentials).forEach(([key, value]) => {
-            integrationCredentials[`${integrationId}_${key}`] = String(value);
+        // Get system credentials and prefix keys with integration ID
+        if (system?.credentials) {
+          Object.entries(system.credentials).forEach(([key, value]) => {
+            systemCredentials[`${integrationId}_${key}`] = String(value);
           });
         }
       } catch (error) {
@@ -107,9 +107,9 @@ export const generateStepConfigResolver = async (
       }
     }
 
-    // Merge provided credentials with integration credentials (provided credentials take precedence)
+    // Merge provided credentials with system credentials (provided credentials take precedence)
     const mergedCredentials = {
-      ...integrationCredentials,
+      ...systemCredentials,
       ...(credentials || {}),
     };
 
@@ -123,8 +123,8 @@ export const generateStepConfigResolver = async (
         previousStepDataSelector: currentDataSelector,
         stepInput,
         credentials: mergedCredentials,
-        integrationDocumentation: integrationDocs,
-        integrationSpecificInstructions: integrationSpecificInstructions,
+        systemDocumentation: systemDocs,
+        systemSpecificInstructions: systemSpecificInstructions,
         errorMessage,
       },
       { characterBudget: 50000, mode },
@@ -145,7 +145,7 @@ export const generateStepConfigResolver = async (
       stepInput,
       credentials: mergedCredentials,
       dataSelector: currentDataSelector,
-      integrationUrlHost: integration?.urlHost,
+      integrationUrlHost: system?.urlHost,
       paginationPageSize: currentStepConfig?.pagination?.pageSize,
     });
 
@@ -153,7 +153,7 @@ export const generateStepConfigResolver = async (
       retryCount: 0,
       messages,
       sourceData,
-      integration,
+      system,
       metadata,
     });
 

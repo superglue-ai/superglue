@@ -2,7 +2,7 @@
 
 import { UploadedFileInfo } from "@/src/lib/file-utils";
 import { computeToolPayload } from "@/src/lib/general-utils";
-import { ExecutionStep, Integration, ResponseFilter, Tool } from "@superglue/shared";
+import { ExecutionStep, System, ResponseFilter, Tool } from "@superglue/shared";
 import {
   createContext,
   ReactNode,
@@ -18,7 +18,7 @@ interface ToolConfigProviderProps {
   initialTool?: Tool;
   initialPayload?: string;
   initialInstruction?: string;
-  integrations?: Integration[];
+  systems?: System[];
   // External state for embedded mode
   externalUploadedFiles?: UploadedFileInfo[];
   externalFilePayloads?: Record<string, any>;
@@ -40,7 +40,7 @@ export function ToolConfigProvider({
   initialTool,
   initialPayload = "{}",
   initialInstruction,
-  integrations = [],
+  systems = [],
   externalUploadedFiles,
   externalFilePayloads,
   onExternalFilesChange,
@@ -195,13 +195,13 @@ export function ToolConfigProvider({
     [steps],
   );
 
-  const getStepIntegration = useCallback(
+  const getStepSystem = useCallback(
     (stepId: string) => {
       const step = steps.find((s) => s.id === stepId);
       if (!step?.integrationId) return undefined;
-      return integrations.find((i) => i.id === step.integrationId);
+      return systems.find((i) => i.id === step.integrationId);
     },
-    [steps, integrations],
+    [steps, systems],
   );
 
   const value = useMemo<ToolConfigContextValue>(
@@ -209,7 +209,7 @@ export function ToolConfigProvider({
       tool,
       steps,
       payload,
-      integrations,
+      systems,
 
       inputSchema,
       responseSchema,
@@ -237,13 +237,13 @@ export function ToolConfigProvider({
 
       getStepConfig,
       getStepIndex,
-      getStepIntegration,
+      getStepSystem,
     }),
     [
       tool,
       steps,
       payload,
-      integrations,
+      systems,
       inputSchema,
       responseSchema,
       finalTransform,
@@ -253,7 +253,7 @@ export function ToolConfigProvider({
       updateStep,
       getStepConfig,
       getStepIndex,
-      getStepIntegration,
+      getStepSystem,
     ],
   );
 

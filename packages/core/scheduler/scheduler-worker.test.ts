@@ -3,7 +3,7 @@ import { DataStore } from "../datastore/types.js";
 import { WorkerPools } from "../graphql/types.js";
 import { ToolSchedulerWorker } from "./scheduler-worker.js";
 
-vi.mock("../graphql/resolvers/workflow.js", () => ({
+vi.mock("../graphql/resolvers/tools.js", () => ({
   executeWorkflowResolver: vi.fn(),
 }));
 
@@ -77,7 +77,7 @@ describe("ToolScheduler", () => {
     mockDatastore.listDueToolSchedules = vi.fn().mockResolvedValue([mockSchedule]);
     mockDatastore.updateScheduleNextRun = vi.fn().mockResolvedValue(undefined);
 
-    const { executeWorkflowResolver } = await import("../graphql/resolvers/workflow.js");
+    const { executeWorkflowResolver } = await import("../graphql/resolvers/tools.js");
 
     scheduler.start();
     await vi.advanceTimersByTimeAsync(105);
@@ -121,7 +121,7 @@ describe("ToolScheduler", () => {
     };
 
     mockDatastore.listDueToolSchedules = vi.fn().mockResolvedValue([mockSchedule]);
-    const { executeWorkflowResolver } = await import("../graphql/resolvers/workflow.js");
+    const { executeWorkflowResolver } = await import("../graphql/resolvers/tools.js");
     (executeWorkflowResolver as any).mockRejectedValue(new Error("Execution failed"));
 
     scheduler.start();

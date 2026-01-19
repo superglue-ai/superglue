@@ -183,7 +183,7 @@ export const toolDefinitions: Record<string, any> = {
             inputSchema: t.inputSchema?.properties?.payload,
             responseSchema: t.outputSchema,
             steps: (t.steps || []).map((s: any) => ({
-              integrationId: s.systemId,
+              systemId: s.systemId,
               stepId: s.id,
             })),
           })),

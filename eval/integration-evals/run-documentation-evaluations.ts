@@ -32,7 +32,7 @@ async function main() {
     const scriptDir = __dirname;
     const isCompiledDist = scriptDir.includes(`${path.sep}dist${path.sep}`);
     const benchmarkDir = isCompiledDist
-      ? path.join(scriptDir, '../../../eval/integration-evals/benchmark')
+      ? path.join(scriptDir, '../../../eval/system-evals/benchmark')
       : path.join(scriptDir, 'benchmark');
     const comparer = new BenchmarkComparer(benchmarkDir);
     

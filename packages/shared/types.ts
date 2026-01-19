@@ -316,7 +316,7 @@ export interface CallEndpointResult {
   duration: number;
 }
 
-export interface Integration extends BaseConfig {
+export interface System extends BaseConfig {
   name?: string;
   type?: string;
   urlHost?: string;
@@ -332,7 +332,7 @@ export interface Integration extends BaseConfig {
   icon?: string;
 }
 
-export interface IntegrationInput {
+export interface SystemInput {
   id: string;
   urlHost?: string;
   urlPath?: string;
@@ -379,7 +379,7 @@ export type ExtractInputRequest = {
 
 export type ToolInputRequest = {
   id?: string;
-  workflow?: Tool; // cannot change to tool because of graphql
+  workflow?: Tool;
 };
 
 // Legacy alias
@@ -495,8 +495,8 @@ export interface GenerateStepConfigArgs {
   errorMessage?: string;
 }
 
-export type IntegrationList = {
-  items: Integration[];
+export type SystemList = {
+  items: System[];
   total: number;
 };
 
@@ -532,7 +532,7 @@ export enum DiscoveryRunStatus {
   ABORTED = "ABORTED",
 }
 
-export type DiscoverySourceType = "file" | "url" | "integration";
+export type DiscoverySourceType = "file" | "url" | "system";
 
 export interface DiscoverySource {
   id: string;
@@ -542,7 +542,7 @@ export interface DiscoverySource {
 export interface DiscoveryRunData {
   title?: string;
   description?: string;
-  systems?: ExtendedIntegration[];
+  systems?: ExtendedSystem[];
   error?: string;
 }
 
@@ -593,7 +593,7 @@ export interface BatchFileUploadResponse {
   }>;
 }
 
-export interface ExtendedIntegration extends Omit<Integration, "icon"> {
+export interface ExtendedSystem extends Omit<System, "icon"> {
   icon?: {
     name: string;
     source: "simpleicons" | "lucide";
@@ -603,11 +603,11 @@ export interface ExtendedIntegration extends Omit<Integration, "icon"> {
   confidence: "high" | "medium" | "low";
   evidence: string;
   systemDetails?: string;
-  matchedIntegrationId?: string; // If set, discovered system matches this existing integration
+  matchedSystemId?: string; // If set, discovered system matches this existing system
 }
 
 export interface DiscoveryResult {
   title: string;
   description: string;
-  systems: ExtendedIntegration[];
+  systems: ExtendedSystem[];
 }

@@ -26,7 +26,7 @@ interface FixStepDialogProps {
   onClose: () => void;
   step: any;
   stepInput?: Record<string, any>;
-  integrationId?: string;
+  systemId?: string;
   errorMessage?: string;
   onSuccess: (newConfig: any) => void;
   onAutoHeal?: (updatedInstruction: string) => Promise<void>;
@@ -38,7 +38,7 @@ export function FixStepDialog({
   onClose,
   step,
   stepInput,
-  integrationId,
+  systemId,
   errorMessage,
   onSuccess,
   onAutoHeal,
@@ -68,7 +68,7 @@ export function FixStepDialog({
       const result = await generateConfig({
         currentStepConfig: updatedStepConfig,
         stepInput,
-        integrationId,
+        integrationId: systemId,
         errorMessage,
       });
 

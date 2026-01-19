@@ -1,5 +1,5 @@
 import { Card } from "@/src/components/ui/card";
-import { cn, getIntegrationIcon, getSimpleIcon } from "@/src/lib/general-utils";
+import { cn, getSystemIcon, getSimpleIcon } from "@/src/lib/general-utils";
 import { FileJson, FilePlay, Globe, OctagonAlert, RotateCw } from "lucide-react";
 import React from "react";
 import { useToolConfig, useExecution } from "../context";
@@ -54,7 +54,7 @@ export const MiniStepCard = React.memo(
     payloadData,
     isLoopStep = false,
   }: MiniStepCardProps) => {
-    const { integrations } = useToolConfig();
+    const { systems } = useToolConfig();
     const { transformStatus, getStepStatusInfo } = useExecution();
 
     const isTransformCompleted = transformStatus === "completed";
@@ -208,12 +208,12 @@ export const MiniStepCard = React.memo(
         };
     const statusInfo = isRunning ? RUNNING_STATUS : baseStatusInfo;
 
-    const linkedIntegration =
-      step.integrationId && integrations
-        ? integrations.find((integration) => integration.id === step.integrationId)
+    const linkedSystem =
+      step.integrationId && systems
+        ? systems.find((sys) => sys.id === step.integrationId)
         : undefined;
 
-    const iconName = linkedIntegration ? getIntegrationIcon(linkedIntegration) : null;
+    const iconName = linkedSystem ? getSystemIcon(linkedSystem) : null;
     const simpleIcon = iconName ? getSimpleIcon(iconName) : null;
 
     return (
@@ -275,8 +275,8 @@ export const MiniStepCard = React.memo(
                 >
                   {step.id || `Step ${index}`}
                 </span>
-                {linkedIntegration && (
-                  <span className="text-[9px] text-muted-foreground">{linkedIntegration.id}</span>
+                {linkedSystem && (
+                  <span className="text-[9px] text-muted-foreground">{linkedSystem.id}</span>
                 )}
               </div>
               <div className="flex items-center gap-1 mt-1">

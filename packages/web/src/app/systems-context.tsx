@@ -1,62 +1,60 @@
-import { Integration, SuperglueClient } from "@superglue/shared";
+import { System, SuperglueClient } from "@superglue/shared";
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react";
 import { useConfig } from "./config-context";
 import { tokenRegistry } from "@/src/lib/token-registry";
 import { loadFromCache, saveToCache } from "@/src/lib/cache-utils";
 
-interface IntegrationsContextType {
-  integrations: Integration[];
+interface SystemsContextType {
+  systems: System[];
   pendingDocIds: Set<string>;
   loading: boolean;
   isRefreshing: boolean;
-  refreshIntegrations: () => Promise<void>;
+  refreshSystems: () => Promise<void>;
   setPendingDocIds: (updater: (prev: Set<string>) => Set<string>) => void;
 }
 
-const IntegrationsContext = createContext<IntegrationsContextType | null>(null);
+const SystemsContext = createContext<SystemsContextType | null>(null);
 
-const CACHE_PREFIX = "superglue-integrations-cache";
+const CACHE_PREFIX = "superglue-systems-cache";
 
-interface CachedIntegrations {
-  integrations: Integration[];
+interface CachedSystems {
+  systems: System[];
   pendingDocIds: string[];
   timestamp: number;
 }
 
-export function IntegrationsProvider({ children }: { children: ReactNode }) {
+export function SystemsProvider({ children }: { children: ReactNode }) {
   const config = useConfig();
-  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [systems, setSystems] = useState<System[]>([]);
   const [pendingDocIds, setPendingDocIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const refreshIntegrations = useCallback(async () => {
+  const refreshSystems = useCallback(async () => {
     setIsRefreshing(true);
     try {
       const client = new SuperglueClient({
         endpoint: config.superglueEndpoint,
         apiKey: tokenRegistry.getToken(),
       });
-      const { items } = await client.listIntegrations(100, 0);
-      setIntegrations(items);
+      const { items } = await client.listSystems(100, 0);
+      setSystems(items);
 
-      // Sync pendingDocIds with backend state
       const pendingIds = items
-        .filter((integration) => integration.documentationPending)
-        .map((integration) => integration.id);
+        .filter((system) => system.documentationPending)
+        .map((system) => system.id);
       const newPendingDocIds = new Set(pendingIds);
       setPendingDocIds(newPendingDocIds);
 
-      // Strip heavy fields from cache (documentation and openApiSchema can be massive)
-      const integrationsForCache = items.map(({ documentation, openApiSchema, ...rest }) => rest);
+      const systemsForCache = items.map(({ documentation, openApiSchema, ...rest }) => rest);
 
       saveToCache(CACHE_PREFIX, {
-        integrations: integrationsForCache,
+        systems: systemsForCache,
         pendingDocIds: Array.from(newPendingDocIds),
         timestamp: Date.now(),
       });
     } catch (error) {
-      console.error("Error loading integrations:", error);
+      console.error("Error loading systems:", error);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -64,37 +62,37 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
   }, [config.superglueEndpoint]);
 
   useEffect(() => {
-    const cachedData = loadFromCache<CachedIntegrations>(CACHE_PREFIX);
+    const cachedData = loadFromCache<CachedSystems>(CACHE_PREFIX);
     if (cachedData) {
-      setIntegrations(cachedData.integrations);
+      setSystems(cachedData.systems);
       setPendingDocIds(new Set(cachedData.pendingDocIds || []));
       setLoading(false);
     } else {
       setLoading(true);
     }
-    refreshIntegrations();
+    refreshSystems();
   }, [config.superglueEndpoint]);
 
   return (
-    <IntegrationsContext.Provider
+    <SystemsContext.Provider
       value={{
-        integrations,
+        systems,
         pendingDocIds,
         loading,
         isRefreshing,
-        refreshIntegrations,
+        refreshSystems,
         setPendingDocIds,
       }}
     >
       {children}
-    </IntegrationsContext.Provider>
+    </SystemsContext.Provider>
   );
 }
 
-export function useIntegrations() {
-  const context = useContext(IntegrationsContext);
+export function useSystems() {
+  const context = useContext(SystemsContext);
   if (!context) {
-    throw new Error("useIntegrations must be used within an IntegrationsProvider");
+    throw new Error("useSystems must be used within a SystemsProvider");
   }
   return context;
 }

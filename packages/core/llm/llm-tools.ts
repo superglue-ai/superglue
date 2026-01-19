@@ -1,5 +1,5 @@
 import { tavilySearch } from "@tavily/ai-sdk";
-import { Integration, ServiceMetadata } from "@superglue/shared";
+import { System, ServiceMetadata } from "@superglue/shared";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { LLMToolDefinition, LLMToolImplementation } from "./llm-tool-utils.js";
 import { sanitizeInstructionSuggestions, runCodeInIVM } from "../utils/helpers.js";
@@ -18,49 +18,49 @@ export function getWebSearchTool(): any {
 }
 
 export interface searchDocumentationToolContext extends ServiceMetadata {
-  integration: Integration;
+  system: System;
 }
 
 export const searchDocumentationToolImplementation: LLMToolImplementation<
   searchDocumentationToolContext
 > = async (args, context) => {
   const { query } = args;
-  const { integration, ...metadata } = context;
+  const { system, ...metadata } = context;
 
-  if (!integration) {
+  if (!system) {
     return {
       success: false,
       error:
-        "Integration not provided in context. The search_documentation tool requires an integration to be passed in the tool executor context.",
+        "System not provided in context. The search_documentation tool requires a system to be passed in the tool executor context.",
     };
   }
 
   try {
-    if (!integration.documentation || integration.documentation.length <= 50) {
+    if (!system.documentation || system.documentation.length <= 50) {
       return {
         success: true,
         data: {
-          integrationId: integration.id,
+          systemId: system.id,
           query,
           summary:
-            "No documentation available for this integration. Try to execute the API call without documentation using your own knowledge or web search. Do not use the search_documentation tool.",
+            "No documentation available for this system. Try to execute the API call without documentation using your own knowledge or web search. Do not use the search_documentation tool.",
         },
       };
     }
 
     const documentationSearch = new DocumentationSearch(metadata);
     const searchResults = documentationSearch.extractRelevantSections(
-      integration.documentation,
+      system.documentation,
       query,
       5,
       2000,
-      integration.openApiSchema,
+      system.openApiSchema,
     );
 
     return {
       success: true,
       data: {
-        integrationId: integration.id,
+        systemId: system.id,
         query,
         summary: searchResults || "No matches found for your query.",
       },
@@ -92,43 +92,43 @@ export const searchDocumentationToolDefinition: LLMToolDefinition = {
 };
 
 export interface InstructionGenerationContext extends ServiceMetadata {
-  integrations: Integration[];
+  systems: System[];
 }
 
 export const generateInstructionsToolImplementation: LLMToolImplementation<
   InstructionGenerationContext
 > = async (args, context) => {
-  const { integrations } = context;
+  const { systems } = context;
   const metadata = context as ServiceMetadata;
 
-  if (!integrations || integrations.length === 0) {
+  if (!systems || systems.length === 0) {
     return {
       success: false,
-      error: "No integrations provided in context",
+      error: "No systems provided in context",
     };
   }
 
-  // Prepare integration summaries with smart documentation truncation
-  const integrationSummaries = integrations.map((integration) => {
+  // Prepare system summaries with smart documentation truncation
+  const systemSummaries = systems.map((system) => {
     // Use DocumentationSearch to intelligently truncate documentation
     // Focus on getting started, authentication, and basic operations
     const documentationSearch = new DocumentationSearch(metadata);
-    const truncatedDocs = integration.documentation
+    const truncatedDocs = system.documentation
       ? documentationSearch.extractRelevantSections(
-          integration.documentation,
+          system.documentation,
           "getting started overview endpoints reference",
           10, // max_chunks
           1000, // chunk_size - smaller chunks for summaries
-          integration.openApiSchema,
+          system.openApiSchema,
         )
       : "";
 
     return {
-      id: integration.id,
-      urlHost: integration.urlHost,
-      urlPath: integration.urlPath,
+      id: system.id,
+      urlHost: system.urlHost,
+      urlPath: system.urlPath,
       documentation: truncatedDocs.slice(0, 1000) + (truncatedDocs.length > 1000 ? "..." : ""),
-      documentationUrl: integration.documentationUrl,
+      documentationUrl: system.documentationUrl,
     };
   });
 
@@ -139,7 +139,7 @@ export const generateInstructionsToolImplementation: LLMToolImplementation<
     },
     {
       role: "user",
-      content: `<integrations>${JSON.stringify(integrationSummaries, null, 2)}</integrations>`,
+      content: `<systems>${JSON.stringify(systemSummaries, null, 2)}</systems>`,
     },
   ];
 
@@ -168,7 +168,7 @@ export const generateInstructionsToolImplementation: LLMToolImplementation<
 export const generateInstructionsToolDefinition: LLMToolDefinition = {
   name: "generate_instructions",
   description:
-    "Generate specific, implementable workflow instructions for the available integrations.",
+    "Generate specific, implementable workflow instructions for the available systems.",
   arguments: {
     type: "object",
     properties: {},

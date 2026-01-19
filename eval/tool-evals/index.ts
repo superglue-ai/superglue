@@ -4,7 +4,7 @@ import { FileStore } from "../../packages/core/datastore/filestore.js";
 import { join } from "path";
 import { dirname } from "path";
 import { fileURLToPath } from "node:url";
-import { IntegrationSetupService } from "./services/integration-setup.js";
+import { SystemSetupService } from "./services/system-setup.js";
 import { ToolRunnerService } from "./services/tool-runner.js";
 import path from "node:path";
 import { config } from "dotenv";
@@ -33,16 +33,16 @@ async function main(): Promise<void> {
     const storePath = join(dirname(fileURLToPath(import.meta.url)), "./.data");
     store = new FileStore(storePath);
 
-    const integrationSetupService = new IntegrationSetupService(store, config, metadata);
-    const integrations = await integrationSetupService.setupIntegrations();
+    const systemSetupService = new SystemSetupService(store, config, metadata);
+    const systems = await systemSetupService.setupSystems();
   
     const enabledTools = config.enabledTools === 'all' ? config.tools : config.tools.filter(tool => config.enabledTools.includes(tool.id));
 
     const enabledToolsCount = config.enabledTools === 'all' ? config.tools.length : config.enabledTools.length;
-    logMessage("info", `Integrations setup: ${integrations.length}, Tools: ${config.tools.length}, Enabled tools: ${enabledToolsCount}`, metadata);
+    logMessage("info", `Systems setup: ${systems.length}, Tools: ${config.tools.length}, Enabled tools: ${enabledToolsCount}`, metadata);
 
     const agentEvalRunner = new ToolRunnerService(store, metadata, config.validationLlmConfig);
-    const toolAttempts = await agentEvalRunner.runTools(enabledTools, integrations, config.settings);
+    const toolAttempts = await agentEvalRunner.runTools(enabledTools, systems, config.settings);
 
     const metricsCalculatorService = new MetricsCalculator();
     const metrics = metricsCalculatorService.calculateMetrics(toolAttempts);

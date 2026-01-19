@@ -5,14 +5,14 @@ import { z } from "zod";
 import { parseFile } from "../../../packages/core/files/index.js";
 import type { AgentEvalConfig } from "../types.js";
 
-const IntegrationConfigSchema = z.object({
+const SystemConfigSchema = z.object({
     id: z.string(),
     name: z.string(),
     urlHost: z.string(),
     urlPath: z.string().optional(),
     documentationUrl: z.string().optional(),
     openApiUrl: z.string().optional(),
-    credentials: z.record(z.string()),
+    credentials: z.record(z.string(), z.string()),
     description: z.string().optional(),
     keywords: z.array(z.string()),
 });
@@ -22,7 +22,7 @@ const ToolConfigSchema = z.object({
     name: z.string(),
     type: z.enum(['retrieval', 'action', 'upsert']),
     instruction: z.string(),
-    integrationIds: z.array(z.string()).min(0),
+    systemIds: z.array(z.string()).min(0),
     validationFunction: z.string().optional(),
     skipValidationFunction: z.boolean().optional(),
     expectedResultDescription: z.string().optional(),
@@ -42,7 +42,7 @@ const ValidationLLMConfigSchema = z.object({
 });
 
 const AgentEvalConfigSchema = z.object({
-    integrations: z.array(IntegrationConfigSchema).min(1),
+    systems: z.array(SystemConfigSchema).min(1),
     tools: z.array(ToolConfigSchema).min(1),
     enabledTools: z.union([z.literal('all'), z.array(z.string()).min(1)]),
     settings: TestSuiteSettingsSchema,
@@ -84,7 +84,7 @@ export async function loadConfig(path: string): Promise<AgentEvalConfig> {
 
     const config = result.data as AgentEvalConfig;
 
-    validateIntegrationIds(config);
+    validateSystemIds(config);
     validateEnabledWorkflows(config);
 
     await processFilePayloads(config);
@@ -119,13 +119,13 @@ async function processFilePayloads(config: AgentEvalConfig): Promise<void> {
     }
 }
 
-function validateIntegrationIds(config: z.infer<typeof AgentEvalConfigSchema>): void {
-    const integrationIds = new Set(config.integrations.map(i => i.id));
+function validateSystemIds(config: z.infer<typeof AgentEvalConfigSchema>): void {
+    const systemIds = new Set(config.systems.map(i => i.id));
 
     for (const tool of config.tools) {
-        const invalidIds = tool.integrationIds.filter(id => !integrationIds.has(id));
+        const invalidIds = tool.systemIds.filter(id => !systemIds.has(id));
         if (invalidIds.length > 0) {
-            throw new Error(`Invalid integration IDs: ${invalidIds.join(", ")}`);
+            throw new Error(`Invalid system IDs in tool's systemIds: ${invalidIds.join(", ")}`);
         }
     }
 }

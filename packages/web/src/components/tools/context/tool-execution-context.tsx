@@ -116,7 +116,7 @@ const STATUS_INFO = {
 } as const satisfies Record<string, StepStatusInfo>;
 
 export function ExecutionProvider({ children }: ExecutionProviderProps) {
-  const { steps, payload, integrations } = useToolConfig();
+  const { steps, payload, systems } = useToolConfig();
 
   const [stepExecutions, setStepExecutions] = useState<Record<string, StepExecutionState>>({});
   const [isExecutingAny, setIsExecutingAny] = useState(false);
@@ -514,27 +514,27 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       const dsResult = dataSelectorResults[stepId] || { output: null, error: null };
       const currentItemObj = deriveCurrentItem(dsResult.output);
 
-      const linkedIntegration =
-        step.integrationId && integrations
-          ? integrations.find((int) => int.id === step.integrationId)
+      const linkedSystem =
+        step.integrationId && systems
+          ? systems.find((sys) => sys.id === step.integrationId)
           : undefined;
 
-      const integrationCredentials = flattenAndNamespaceCredentials(
-        linkedIntegration ? [linkedIntegration] : [],
+      const systemCredentials = flattenAndNamespaceCredentials(
+        linkedSystem ? [linkedSystem] : [],
       );
       const paginationData = buildPaginationData(step.apiConfig?.pagination);
 
       const sourceData: Record<string, any> = {
-        ...integrationCredentials,
+        ...systemCredentials,
         ...stepInput,
         ...(currentItemObj != null ? { currentItem: currentItemObj } : {}),
         ...paginationData,
       };
 
-      const allIntegrationCredentials = flattenAndNamespaceCredentials(integrations);
+      const allSystemCredentials = flattenAndNamespaceCredentials(systems);
       const credentials = {
         ...extractCredentials(sourceData),
-        ...allIntegrationCredentials,
+        ...allSystemCredentials,
       };
 
       const previousStepResults = buildPreviousStepResults(steps, stepResultsMap, stepIndex - 1);
@@ -548,7 +548,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       };
 
       const categorizedVariables: CategorizedVariables = {
-        credentials: Object.keys(integrationCredentials),
+        credentials: Object.keys(systemCredentials),
         toolInputs: Object.keys(manualPayload),
         fileInputs: Object.keys(payload.filePayloads || {}),
         currentStepData: ["currentItem"],
@@ -573,7 +573,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     stepExecutions,
     stepInputs,
     dataSelectorResults,
-    integrations,
+    systems,
     manualPayload,
     payload.filePayloads,
     stepResultsMap,

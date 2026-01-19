@@ -3,7 +3,7 @@ import {
   DiscoveryRun,
   FileReference,
   FileStatus,
-  Integration,
+  System,
   Run,
   RunStatus,
   Tool,
@@ -18,7 +18,7 @@ export class MemoryStore implements DataStore {
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
     workflows: Map<string, Tool>;
     toolSchedules: Map<string, ToolScheduleInternal>;
-    integrations: Map<string, Integration>;
+    systems: Map<string, System>;
     discoveryRuns: Map<string, DiscoveryRun>;
     fileReferences: Map<string, FileReference>;
   };
@@ -35,7 +35,7 @@ export class MemoryStore implements DataStore {
       runsIndex: new Map(),
       workflows: new Map(),
       toolSchedules: new Map(),
-      integrations: new Map(),
+      systems: new Map(),
       discoveryRuns: new Map(),
       fileReferences: new Map(),
     };
@@ -198,7 +198,7 @@ export class MemoryStore implements DataStore {
     this.storage.runsIndex.clear();
     this.storage.workflows.clear();
     this.storage.toolSchedules.clear();
-    this.storage.integrations.clear();
+    this.storage.systems.clear();
     this.storage.discoveryRuns.clear();
     this.storage.fileReferences.clear();
   }
@@ -307,71 +307,71 @@ export class MemoryStore implements DataStore {
     return newWorkflow;
   }
 
-  // Integration Methods
-  async getIntegration(params: {
+  // System Methods
+  async getSystem(params: {
     id: string;
     includeDocs?: boolean;
     orgId?: string;
-  }): Promise<Integration | null> {
+  }): Promise<System | null> {
     const { id, includeDocs = true, orgId } = params;
     if (!id) return null;
-    const key = this.getKey("integration", id, orgId);
-    const integration = this.storage.integrations.get(key);
-    return integration ? { ...integration, id } : null;
+    const key = this.getKey("system", id, orgId);
+    const system = this.storage.systems.get(key);
+    return system ? { ...system, id } : null;
   }
 
-  async listIntegrations(params?: {
+  async listSystems(params?: {
     limit?: number;
     offset?: number;
     includeDocs?: boolean;
     orgId?: string;
-  }): Promise<{ items: Integration[]; total: number }> {
+  }): Promise<{ items: System[]; total: number }> {
     const { limit = 10, offset = 0, includeDocs = true, orgId } = params || {};
-    const items = this.getOrgItems(this.storage.integrations, "integration", orgId).slice(
+    const items = this.getOrgItems(this.storage.systems, "system", orgId).slice(
       offset,
       offset + limit,
     );
-    const total = this.getOrgItems(this.storage.integrations, "integration", orgId).length;
+    const total = this.getOrgItems(this.storage.systems, "system", orgId).length;
     return { items, total };
   }
 
-  async getManyIntegrations(params: {
+  async getManySystems(params: {
     ids: string[];
     includeDocs?: boolean;
     orgId?: string;
-  }): Promise<Integration[]> {
+  }): Promise<System[]> {
     const { ids, orgId } = params;
     return ids
       .map((id) => {
-        const key = this.getKey("integration", id, orgId);
-        const integration = this.storage.integrations.get(key);
-        return integration ? { ...integration, id } : null;
+        const key = this.getKey("system", id, orgId);
+        const system = this.storage.systems.get(key);
+        return system ? { ...system, id } : null;
       })
-      .filter((i): i is Integration => i !== null);
+      .filter((i): i is System => i !== null);
   }
 
-  async upsertIntegration(params: {
+  async upsertSystem(params: {
     id: string;
-    integration: Integration;
+    system: System;
     orgId?: string;
-  }): Promise<Integration> {
-    const { id, integration, orgId } = params;
-    if (!id || !integration) return null;
-    const key = this.getKey("integration", id, orgId);
-    this.storage.integrations.set(key, integration);
-    return { ...integration, id };
+  }): Promise<System> {
+    const { id, system, orgId } = params;
+    if (!id || !system) return null;
+    const key = this.getKey("system", id, orgId);
+    this.storage.systems.set(key, system);
+    return { ...system, id };
   }
 
-  async deleteIntegration(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteSystem(params: { id: string; orgId?: string }): Promise<boolean> {
     const { id, orgId } = params;
     if (!id) return false;
-    const key = this.getKey("integration", id, orgId);
-    return this.storage.integrations.delete(key);
+    const key = this.getKey("system", id, orgId);
+    return this.storage.systems.delete(key);
   }
 
-  async copyTemplateDocumentationToUserIntegration(params: {
+  async copyTemplateDocumentationToUserSystem(params: {
     templateId: string;
-    userIntegrationId: string;
+    userSystemId: string;
     orgId?: string;
   }): Promise<boolean> {
     // Not supported for memory store

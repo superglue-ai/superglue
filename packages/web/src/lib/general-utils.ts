@@ -1,4 +1,4 @@
-import { assertValidArrowFunction, findMatchingIntegration, integrations } from "@superglue/shared";
+import { assertValidArrowFunction, findMatchingSystem, systems } from "@superglue/shared";
 import { clsx, type ClassValue } from "clsx";
 import prettierPluginBabel from "prettier/plugins/babel";
 import prettierPluginEstree from "prettier/plugins/estree";
@@ -62,23 +62,23 @@ export function composeUrl(host: string, path: string | undefined) {
   return `${cleanHost}/${cleanPath}`;
 }
 
-export function getIntegrationIcon(integration: { id: string; urlHost?: string }): string | null {
-  // First try exact ID match with known integrations
-  if (integrations[integration.id]) {
-    return integrations[integration.id].icon;
+export function getSystemIcon(system: { id: string; urlHost?: string }): string | null {
+  // First try exact ID match with known systems
+  if (systems[system.id]) {
+    return systems[system.id].icon;
   }
 
   // Second try: strip any numeric suffix (e.g., "firebase-1" -> "firebase")
-  const baseId = integration.id.replace(/-\d+$/, "");
-  if (baseId !== integration.id && integrations[baseId]) {
-    return integrations[baseId].icon;
+  const baseId = system.id.replace(/-\d+$/, "");
+  if (baseId !== system.id && systems[baseId]) {
+    return systems[baseId].icon;
   }
 
   // Finally try using the proper regex-based matching
-  if (integration.urlHost) {
-    const match = findMatchingIntegration(integration.urlHost);
+  if (system.urlHost) {
+    const match = findMatchingSystem(system.urlHost);
     if (match) {
-      return match.integration.icon;
+      return match.system.icon;
     }
   }
 

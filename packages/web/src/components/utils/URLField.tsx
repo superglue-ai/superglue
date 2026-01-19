@@ -4,7 +4,7 @@ import { Badge } from "@/src/components/ui/badge";
 import { Input } from "@/src/components/ui/input";
 import { splitUrl } from "@/src/lib/client-utils";
 import { cn, getSimpleIcon } from "@/src/lib/general-utils";
-import { integrations } from "@superglue/shared";
+import { systems as systemTemplates } from "@superglue/shared";
 import { Link } from "lucide-react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
@@ -54,10 +54,10 @@ export const URLField = forwardRef<URLFieldHandle, URLFieldProps>(function URLFi
       const urlObj = new URL(url);
       const fullPath = `${urlObj.hostname}${urlObj.pathname}`;
 
-      for (const [name, integration] of Object.entries(integrations)) {
-        const regex = new RegExp(integration.regex);
+      for (const [name, system] of Object.entries(systemTemplates)) {
+        const regex = new RegExp(system.apiUrl);
         if (regex.test(fullPath)) {
-          return integration.icon as string;
+          return system.icon;
         }
       }
       return null;

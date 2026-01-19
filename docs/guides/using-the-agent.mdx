@@ -3,7 +3,7 @@ title: "Using the Agent"
 description: "How to interact with the superglue agent"
 ---
 
-The superglue agent handles integration setup, API discovery, and tool building through a chat interface. Talk to it in natural language — it handles the technical details.
+The superglue agent handles system setup, API discovery, and tool building through a chat interface. Talk to it in natural language — it handles the technical details.
 
 <Note>
   The agent is available in the hosted version at [app.superglue.cloud](https://app.superglue.cloud). For self-hosted MCP usage, see the [MCP guide](/mcp/using-the-mcp).
@@ -13,19 +13,19 @@ The superglue agent handles integration setup, API discovery, and tool building 
 
 ## Available superglue agent tools
 
-The agent uses a broad range of tools to help you manage your integrations and tools:
+The agent uses a broad range of tools to help you manage your systems and tools:
 
 <AccordionGroup>
-  <Accordion title="Integration Tools" icon="plug">
-    **`find_integrations`** - Search available integrations by natural language query
+  <Accordion title="System Tools" icon="plug">
+    **`find_integrations`** - Search available systems by natural language query
     
-    **`create_integration`** - Create new integrations with auth and docs
+    **`create_integration`** - Create new systems with auth and docs
     
-    **`modify_integration`** - Update existing integrations (credentials, docs, configuration)
+    **`modify_integration`** - Update existing systems (credentials, docs, configuration)
     
-    **`find_integration_templates`** - Get pre-configured setups for popular integrations
+    **`find_integration_templates`** - Get pre-configured setups for popular systems
     
-    **`search_documentation`** - Search integration docs and OpenAPI specs by keywords
+    **`search_documentation`** - Search system docs and OpenAPI specs by keywords
     
     **`call_endpoint`** - Test API endpoints directly with credential injection
   </Accordion>
@@ -49,9 +49,9 @@ The agent uses a broad range of tools to help you manage your integrations and t
 
 ---
 
-## Setting up an integration via OAuth
+## Setting up a system via OAuth
 
-Configure OAuth flows without touching code. The agent walks you through integration setup, handles the authorization code flow and stores your credentials securely.
+Configure OAuth flows without touching code. The agent walks you through system setup, handles the authorization code flow and stores your credentials securely.
 
  <video
       autoPlay
@@ -61,11 +61,11 @@ Configure OAuth flows without touching code. The agent walks you through integra
 
 **What this shows:**
 - You can set up and run the OAuth 2.0 authorization code flow in the chat with one click
-- The agent checks your existing integrations to prevent duplicate setup
+- The agent checks your existing systems to prevent duplicate setup
 - The agent automatically stores your credentials and automatically verifies your setup
 
 <Card icon="plug" href="https://app.superglue.cloud" horizontal>
-      Start creating integrations with the agent
+      Start creating systems with the agent
 </Card>
 
 ---
@@ -92,10 +92,10 @@ Point the agent at your custom APIs. It can test endpoints, authentication, and 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Create an Integration" href="/guides/creating-an-integration" icon="plug">
+  <Card title="Create a System" href="/guides/creating-an-integration" icon="plug">
     Connect your first API, database, or file system
   </Card>
   <Card title="Create a Tool" href="/guides/creating-a-tool" icon="hammer">
-    Build executable workflows across your integrations
+    Build executable workflows across your systems
   </Card>
 </CardGroup>

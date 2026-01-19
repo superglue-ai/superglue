@@ -18,12 +18,12 @@ import { ExecutionStep } from "@superglue/shared";
 import { AlertTriangle, Loader2, WandSparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useGenerateStepConfig } from "../hooks/use-generate-step-config";
-import { IntegrationSelector } from "../shared/IntegrationSelector";
+import { SystemSelector } from "../shared/SystemSelector";
 
 interface AddStepDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (stepId: string, instruction: string, integrationId?: string) => void;
+  onConfirm: (stepId: string, instruction: string, systemId?: string) => void;
   onConfirmTool?: (steps: ExecutionStep[]) => void;
   onConfirmGenerate?: (step: ExecutionStep) => void;
   existingStepIds: string[];
@@ -43,7 +43,7 @@ export function AddStepDialog({
 }: AddStepDialogProps) {
   const [stepId, setStepId] = useState("");
   const [instruction, setInstruction] = useState("");
-  const [selectedIntegrationId, setSelectedIntegrationId] = useState<string>("");
+  const [selectedSystemId, setSelectedSystemId] = useState<string>("");
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<"scratch" | "tool">("scratch");
   const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
@@ -59,7 +59,7 @@ export function AddStepDialog({
     if (open) {
       setStepId("");
       setInstruction("");
-      setSelectedIntegrationId("");
+      setSelectedSystemId("");
       setError("");
     }
   }, [open]);
@@ -68,7 +68,7 @@ export function AddStepDialog({
     if (!newOpen) {
       setError("");
       setInstruction("");
-      setSelectedIntegrationId("");
+      setSelectedSystemId("");
       setSelectedToolId(null);
       setActiveTab("scratch");
       setSearchQuery("");
@@ -102,12 +102,12 @@ export function AddStepDialog({
       return;
     }
 
-    if (!selectedIntegrationId) {
-      setError("Please select an integration");
+    if (!selectedSystemId) {
+      setError("Please select a system");
       return;
     }
 
-    onConfirm(trimmedId, instruction.trim(), selectedIntegrationId);
+    onConfirm(trimmedId, instruction.trim(), selectedSystemId);
     setError("");
   };
 
@@ -167,8 +167,8 @@ export function AddStepDialog({
       return;
     }
 
-    if (!selectedIntegrationId) {
-      setError("Please select an integration");
+    if (!selectedSystemId) {
+      setError("Please select a system");
       return;
     }
 
@@ -185,12 +185,12 @@ export function AddStepDialog({
           instruction: trimmedInstruction,
         },
         stepInput: stepInput,
-        integrationId: selectedIntegrationId,
+        integrationId: selectedSystemId,
       });
 
       const newStep: ExecutionStep = {
         id: trimmedId,
-        integrationId: selectedIntegrationId,
+        integrationId: selectedSystemId,
         apiConfig: {
           ...result.config,
           id: trimmedId,
@@ -244,11 +244,11 @@ export function AddStepDialog({
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Integration</label>
-              <IntegrationSelector
-                value={selectedIntegrationId}
+              <label className="text-sm font-medium">System</label>
+              <SystemSelector
+                value={selectedSystemId}
                 onValueChange={(value) => {
-                  setSelectedIntegrationId(value);
+                  setSelectedSystemId(value);
                   setError("");
                 }}
               />

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { IntegrationsProvider } from "./integrations-context";
+import { SystemsProvider } from "./systems-context";
 import { SchedulesProvider } from "./schedules-context";
 import { ToolsProvider } from "./tools-context";
 
@@ -16,9 +16,9 @@ export function ConditionalDataProvider({ children }: { children: React.ReactNod
 
   return (
     <ToolsProvider>
-      <IntegrationsProvider>
+      <SystemsProvider>
         <SchedulesProvider>{children}</SchedulesProvider>
-      </IntegrationsProvider>
+      </SystemsProvider>
     </ToolsProvider>
   );
 }

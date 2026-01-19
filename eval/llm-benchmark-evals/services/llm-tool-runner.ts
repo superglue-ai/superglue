@@ -1,7 +1,7 @@
 import type { ServiceMetadata } from "@superglue/shared";
 import { logMessage } from "../../../packages/core/utils/logs.js";
 import { ToolValidationService } from "../../tool-evals/services/tool-validation.js";
-import { AttemptStatus, type IntegrationConfig, type ToolAttempt, type ToolConfig, ToolFailureReason } from "../../tool-evals/types.js";
+import { AttemptStatus, type SystemConfig, type ToolAttempt, type ToolConfig, ToolFailureReason } from "../../tool-evals/types.js";
 import { CodeExecutor, type ExecutionResult } from "./code-executor.js";
 import { LlmCodeGenerator } from "./llm-code-generator.js";
 
@@ -21,7 +21,7 @@ export class LlmToolRunner {
     providerModel: any,
     providerName: string,
     tools: ToolConfig[],
-    integrations: IntegrationConfig[]
+    integrations: SystemConfig[]
   ): Promise<ToolAttempt[]> {
     const codeGenerator = new LlmCodeGenerator(providerModel, this.metadata);
     const attempts: ToolAttempt[] = [];
@@ -29,8 +29,8 @@ export class LlmToolRunner {
     for (const tool of tools) {
       logMessage('info', `Running tool ${tool.id} with provider ${providerName}`, this.metadata);
       
-      const toolIntegrations = integrations.filter(i => tool.integrationIds.includes(i.id));
-      const attempt = await this.runSingleAttempt(tool, toolIntegrations, codeGenerator);
+      const toolSystems = integrations.filter(i => tool.integrationIds.includes(i.id));
+      const attempt = await this.runSingleAttempt(tool, toolSystems, codeGenerator);
       attempts.push(attempt);
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -41,7 +41,7 @@ export class LlmToolRunner {
 
   private async runSingleAttempt(
     tool: ToolConfig,
-    integrations: IntegrationConfig[],
+    integrations: SystemConfig[],
     codeGenerator: LlmCodeGenerator
   ): Promise<ToolAttempt> {
     const attempt: ToolAttempt = {

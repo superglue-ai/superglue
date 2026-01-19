@@ -1,4 +1,4 @@
-import { Integration } from "@superglue/shared";
+import { System } from "@superglue/shared";
 import { ServiceMetadata } from "@superglue/shared";
 import { DataStore } from "../../../packages/core/datastore/types.js";
 import { TestSuiteSettings, ToolAttempt, ToolConfig, ValidationLLMConfig } from "../types.js";
@@ -13,7 +13,7 @@ export class ToolRunnerService {
     ) {
     }
 
-    public async runTools(tools: ToolConfig[], integrations: Integration[], settings: TestSuiteSettings): Promise<ToolAttempt[]> {
+    public async runTools(tools: ToolConfig[], systems: System[], settings: TestSuiteSettings): Promise<ToolAttempt[]> {
         const toolAttemptService = new SuperglueToolAttemptService(this.metadata, this.datastore, this.validationLlmConfig, settings.selfHealingRetries);
         const queue = settings.maxConcurrentWorkers ? new PromiseQueue(settings.maxConcurrentWorkers) : null;
         const timeoutMs = settings.toolAttemptTimeoutMs ?? 300000;
@@ -47,19 +47,19 @@ export class ToolRunnerService {
         const promises: Promise<ToolAttempt>[] = [];
 
         for (const tool of tools) {
-            const toolIntegrations = integrations.filter(i => tool.integrationIds.includes(i.id));
+            const toolSystems = systems.filter(i => tool.integrationIds.includes(i.id));
             for (let i = 0; i < settings.attemptsEachMode; i++) {
                 // If one-shot mode is enabled, run one-shot attempts
                 if (settings.runOneShotMode) {
                     promises.push(
-                        runAttempt(() => toolAttemptService.runToolAttempt(tool, toolIntegrations, false), tool.id)
+                        runAttempt(() => toolAttemptService.runToolAttempt(tool, toolSystems, false), tool.id)
                     );
                 }
 
                 // If self-healing mode is enabled, run self-healing attempts
                 if (settings.runSelfHealingMode) {
                     promises.push(
-                        runAttempt(() => toolAttemptService.runToolAttempt(tool, toolIntegrations, true), tool.id)
+                        runAttempt(() => toolAttemptService.runToolAttempt(tool, toolSystems, true), tool.id)
                     );
                 }
             }

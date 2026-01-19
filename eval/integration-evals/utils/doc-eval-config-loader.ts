@@ -19,14 +19,14 @@ export class DocumentationEvaluationConfigLoader {
    * Load documentation evaluation configuration
    */
   async loadConfig(configPath?: string): Promise<DocumentationEvaluationConfig> {
-    const defaultPath = path.join(process.cwd(), 'eval/integration-evals/config/doc-eval-config.json');
+    const defaultPath = path.join(process.cwd(), 'eval/system-evals/config/doc-eval-config.json');
     const finalPath = configPath || defaultPath;
 
     const rawConfig = await this.loadJsonConfig<any>(
       finalPath,
       'doc-eval-config.json',
       [
-        'eval/integration-evals/config/doc-eval-config.json',
+        'eval/system-evals/config/doc-eval-config.json',
         'packages/core/eval/documentation-crawl-and-fetch/config/doc-eval-config.json',
         'doc-eval-config.json'
       ]
@@ -57,7 +57,7 @@ export class DocumentationEvaluationConfigLoader {
   ): Promise<T> {
     const possiblePaths = [
       providedPath,
-      path.join(process.cwd(), 'eval/integration-evals/config', defaultFileName),
+      path.join(process.cwd(), 'eval/system-evals/config', defaultFileName),
       path.join(process.cwd(), 'packages/core/eval/documentation-crawl-and-fetch/config', defaultFileName),
       path.join(process.cwd(), defaultFileName),
     ];

@@ -1,6 +1,6 @@
 import {
   ExecutionStep,
-  Integration,
+  System,
   ResponseFilter,
   SuperglueClient,
   Tool,
@@ -394,24 +394,24 @@ export const splitUrl = (url: string) => {
 };
 
 export function needsUIToTriggerDocFetch(
-  newIntegration: Integration,
-  oldIntegration: Integration | null,
+  newSystem: System,
+  oldSystem: System | null,
 ): boolean {
   // If documentation was manually provided, no fetch needed.
-  if (newIntegration.documentation && newIntegration.documentation.trim()) {
+  if (newSystem.documentation && newSystem.documentation.trim()) {
     return false;
   }
 
-  // If it's a new integration with a doc URL, fetch is needed.
-  if (!oldIntegration) {
+  // If it's a new system with a doc URL, fetch is needed.
+  if (!oldSystem) {
     return true;
   }
 
   // If any of the relevant URLs have changed, fetch is needed.
   if (
-    newIntegration.urlHost !== oldIntegration.urlHost ||
-    newIntegration.urlPath !== oldIntegration.urlPath ||
-    newIntegration.documentationUrl !== oldIntegration.documentationUrl
+    newSystem.urlHost !== oldSystem.urlHost ||
+    newSystem.urlPath !== oldSystem.urlPath ||
+    newSystem.documentationUrl !== oldSystem.documentationUrl
   ) {
     return true;
   }
