@@ -663,14 +663,7 @@ export async function callHttp({
       }
 
       previousResponseHash = currentResponseHash;
-
-      if (Array.isArray(parsedResponseData)) {
-        allResults = allResults.concat(parsedResponseData);
-      } else if (!config.dataPath) {
-        allResults = smartMergeResponses(allResults, parsedResponseData);
-      } else if (parsedResponseData) {
-        allResults.push(parsedResponseData);
-      }
+      allResults = smartMergeResponses(allResults, parsedResponseData);
     } else {
       if (Array.isArray(parsedResponseData)) {
         const pageSize = parseInt(config.pagination?.pageSize || "50");
