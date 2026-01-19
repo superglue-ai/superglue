@@ -18,7 +18,16 @@ import {
 import Editor from "@monaco-editor/react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { isArrowFunction, maskCredentials } from "@superglue/shared";
-import { AlertCircle, CirclePause, CirclePlay, Loader2, Maximize2, Minimize2, Pause, Play } from "lucide-react";
+import {
+  AlertCircle,
+  CirclePause,
+  CirclePlay,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  Pause,
+  Play,
+} from "lucide-react";
 import { DownloadButton } from "../shared/download-button";
 import type * as Monaco from "monaco-editor";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -93,7 +102,7 @@ interface TemplateEditPopoverProps {
   externalOpen?: boolean;
   onExternalOpenChange?: (open: boolean) => void;
   onOpenChange?: (open: boolean) => void;
-  anchorRect?: { left: number; top: number; } | (() => { left: number; top: number; } | null) | null;
+  anchorRect?: { left: number; top: number } | (() => { left: number; top: number } | null) | null;
   loopMode?: boolean;
   title?: string;
   helpText?: string;
@@ -186,7 +195,11 @@ export function TemplateEditPopover({
   const { previewValue, previewError, isEvaluating, hasResult } = useTemplatePreview(
     effectivePreviewCode,
     sourceData ?? {},
-    { enabled: shouldRunPreview, stepId, sourceDataVersion: autoPreview ? sourceDataVersion : manualPreviewVersion },
+    {
+      enabled: shouldRunPreview,
+      stepId,
+      sourceDataVersion: autoPreview ? sourceDataVersion : manualPreviewVersion,
+    },
   );
 
   const handleRunPreview = useCallback(() => {
@@ -253,7 +266,11 @@ export function TemplateEditPopover({
 
   const isLoading = shouldRunPreview && (isEvaluating || !hasResult);
   const showNoDataHint = !canExecute && !hasResult;
-  const previewDisplayRaw = isLoading ? "" : showNoDataHint ? "// No step input data available yet" : formatValueForDisplay(activePreviewValue);
+  const previewDisplayRaw = isLoading
+    ? ""
+    : showNoDataHint
+      ? "// No step input data available yet"
+      : formatValueForDisplay(activePreviewValue);
   const previewDisplay = maskCredentials(previewDisplayRaw, credentials);
 
   useEffect(() => {
@@ -360,9 +377,17 @@ export function TemplateEditPopover({
                 type="button"
                 onClick={() => setAutoPreview(!autoPreview)}
                 className={`h-6 px-2 flex items-center gap-1 rounded border transition-colors text-[10px] "border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"`}
-                title={autoPreview ? "Preview updates on every keystroke (click to switch to manual)" : "Preview only updates when you click Run (click to enable auto-refresh)"}
+                title={
+                  autoPreview
+                    ? "Preview updates on every keystroke (click to switch to manual)"
+                    : "Preview only updates when you click Run (click to enable auto-refresh)"
+                }
               >
-                {autoPreview ? <CirclePlay className="h-3 w-3" /> : <CirclePause className="h-3 w-3" />}
+                {autoPreview ? (
+                  <CirclePlay className="h-3 w-3" />
+                ) : (
+                  <CirclePause className="h-3 w-3" />
+                )}
                 <span>{autoPreview ? "Auto Refresh" : "Manual Refresh"}</span>
               </button>
             </div>
@@ -406,15 +431,15 @@ export function TemplateEditPopover({
         </div>
       ) : (
         <div
-            className="relative rounded-md border bg-muted/30 overflow-hidden transition-[height] duration-150 flex-1"
-            style={{ height: isFullscreen ? undefined : effectivePreviewHeight }}
-          >
-            {isLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-muted/30 z-20">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            )}
-            <Editor
+          className="relative rounded-md border bg-muted/30 overflow-hidden transition-[height] duration-150 flex-1"
+          style={{ height: isFullscreen ? undefined : effectivePreviewHeight }}
+        >
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted/30 z-20">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          <Editor
             height={isFullscreen ? "100%" : effectivePreviewHeight}
             defaultLanguage="json"
             value={previewDisplay}
@@ -464,12 +489,7 @@ export function TemplateEditPopover({
       <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="h-8 text-xs">
         Cancel
       </Button>
-      <Button
-        size="sm"
-        onClick={handleSave}
-        disabled={!codeContent}
-        className="h-8 text-xs"
-      >
+      <Button size="sm" onClick={handleSave} disabled={!codeContent} className="h-8 text-xs">
         Save
       </Button>
     </div>
