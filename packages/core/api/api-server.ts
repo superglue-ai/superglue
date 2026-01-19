@@ -10,7 +10,7 @@ import { getRoutePermission } from "./registry.js";
 import { AuthenticatedFastifyRequest } from "./types.js";
 
 // Check if restricted API key can access this route (uses route permissions from registry)
-function checkRestrictedAccess(
+export function checkRestrictedAccess(
   authInfo: AuthenticatedFastifyRequest["authInfo"],
   request: FastifyRequest,
 ): { allowed: boolean; error?: string } {
