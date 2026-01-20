@@ -214,12 +214,12 @@ Every step MUST have a loopSelector that determines how it executes:
 <VARIABLES>
 - Use <<variable>> syntax to access variables directly (no JS just plain variables) OR execute JavaScript expressions formatted as <<(sourceData) => sourceData.variable>>:
    Basic variable access:
-   e.g. https://api.example.com/v1/items?api_key=<<systemId_api_key>>
+   e.g. https://api.example.com/v1/items?api_key=<<integrationId_api_key>>
    e.g. headers: {
-        "Authorization": "Bearer <<systemId_access_token>>"
+        "Authorization": "Bearer <<integrationId_access_token>>"
    }
    e.g. headers: {
-        "Authorization": "Basic <<systemId_username>>:<<systemId_password>>"
+        "Authorization": "Basic <<integrationId_username>>:<<integrationId_password>>"
    }
    
    JavaScript expressions:
@@ -229,9 +229,9 @@ Every step MUST have a loopSelector that determines how it executes:
    e.g. urlPath: /api/<<(sourceData) => sourceData.version || 'v1'>>/users
    e.g. queryParams: { "active": "<<(sourceData) => sourceData.includeInactive ? 'all' : 'true'>>" }
    
-- Note: For Basic Authentication, format as "Basic <<systemId_username>>:<<systemId_password>>" and the system will automatically convert it to Base64.
+- Note: For Basic Authentication, format as "Basic <<integrationId_username>>:<<integrationId_password>>" and the integration will automatically convert it to Base64.
 - Headers provided starting with 'x-' are probably headers.
-- Credentials are prefixed with system ID: <<systemId_credentialName>>
+- Credentials are prefixed with integration ID: <<integrationId_credentialName>>
 - Don't hardcode pagination values - use Superglue's variables: <<page>>, <<offset>>, <<cursor>>, <<limit>>
 - Access previous step results: depends on what loopSelector returned
   * If returned object: <<(sourceData) => sourceData.fetchUsers.data>> (single result)
@@ -854,16 +854,16 @@ Right: <<(sourceData) => sourceData.userId>>
 Wrong: <<(sourceData) => sourceData.payload.userId>>
 
 Basic variable access:
-- URL: https://api.example.com/v1/items?api_key=<<systemId_api_key>>
-- Headers: { "Authorization": "Bearer <<systemId_access_token>>" }
-- Basic Auth: { "Authorization": "Basic <<systemId_username>>:<<systemId_password>>" }
+- URL: https://api.example.com/v1/items?api_key=<<integrationId_api_key>>
+- Headers: { "Authorization": "Bearer <<integrationId_access_token>>" }
+- Basic Auth: { "Authorization": "Basic <<integrationId_username>>:<<integrationId_password>>" }
 
 JavaScript expressions:
 - body: { "userIds": <<(sourceData) => JSON.stringify(sourceData.users.map(u => u.id))>> }
 - urlPath: /api/<<(sourceData) => sourceData.version || 'v1'>>/users
 - queryParams: { "active": "<<(sourceData) => sourceData.includeInactive ? 'all' : 'true'>>" }
 
-Credentials are prefixed with system ID: <<systemId_credentialName>>
+Credentials are prefixed with integration ID: <<integrationId_credentialName>>
 Pagination variables: <<page>>, <<offset>>, <<cursor>>, <<limit>>
 
 Access previous step results:
