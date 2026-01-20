@@ -50,7 +50,7 @@ Create a system in superglue to connect tools with external systems. Systems han
         - **URL**: Base URL of the system (e.g., `https://api.stripe.com`)
         - **Documentation URL**: Optional but recommended link to API documentation
         - **Documentation as a file**: Optionally upload a documentation file (PDF, OpenAPI Specs, .zip files, etc.). If you upload a file, superglue will not crawl a doc URL.
-        - **Credentials**: See [authentication and credential management](/guides/creating-an-integration#authentication-and-credential-management) for details
+        - **Credentials**: See [authentication and credential management](/guides/creating-a-system#authentication-and-credential-management) for details
         - **OAuth**: For OAuth systems, click **Connect to system** to complete the flow and let superglue handle the token exchange
       </Step>
       <Step title="Click 'Add System'">
@@ -63,50 +63,6 @@ Create a system in superglue to connect tools with external systems. Systems han
       className="w-full rounded-lg"
       src="../resources/create-integration-via-form.mp4"
     />
-
-  </Tab>
-
-  <Tab title="Via SDK">
-    For programmatic system creation, use the SDK.
-
-    ```bash
-    npm install @superglue/client
-    ```
-
-    Example:
-
-    ```typescript
-    import { SuperglueClient } from "@superglue/client";
-
-    const superglue = new SuperglueClient({
-      apiKey: "your_api_key_here"
-    });
-
-    const integration = await superglue.upsertIntegration({
-      id: "my-stripe",
-      urlHost: "https://api.stripe.com",
-      documentationUrl: "https://docs.stripe.com/api",
-      credentials: {
-        apiKey: "sk_test_..."
-      }
-    });
-    ```
-
-    **With OAuth:**
-    ```typescript
-    const integration = await superglue.upsertIntegration({
-      id: "my-hubspot",
-      urlHost: "https://api.hubapi.com",
-      documentationUrl: "https://developers.hubspot.com/docs/api",
-      credentials: {
-        clientId: "your_client_id",
-        clientSecret: "your_client_secret",
-        redirectUri: "https://your-app.com/oauth/callback"
-      }
-    });
-    ```
-
-    See the [SDK documentation](/sdk/overview) for more details.
 
   </Tab>
 </Tabs>
@@ -145,22 +101,6 @@ superglue supports many different authentication methods. All credentials are en
 
     **Examples:** Twilio, Auth0 Management API, Microsoft Graph
 
-    ### Configuration example
-    ```typescript
-    await superglue.upsertIntegration({
-      id: "custom-oauth",
-      urlHost: "https://api.example.com",
-      documentationUrl: "https://docs.example.com/quickstart",
-      credentials: {
-        clientId: "your_client_id",
-        clientSecret: "your_client_secret",
-        authorizationUrl: "https://auth.example.com/oauth/authorize",
-        tokenUrl: "https://auth.example.com/oauth/token",
-        scopes: "read:users write:data",
-      }
-    });
-    ```
-
     **Required fields:**
     - `clientId`, `clientSecret`, `authorizationUrl`, `tokenUrl`
 
@@ -184,79 +124,11 @@ superglue supports many different authentication methods. All credentials are en
 
     ### Examples
 
-    <Tabs>
-      <Tab title="SendGrid">
-        ```typescript
-        await superglue.upsertIntegration({
-          id: "sendgrid",
-          urlHost: "https://api.sendgrid.com",
-          documentationUrl: "https://docs.sendgrid.com/api-reference",
-          credentials: {
-            apiKey: "SG.xxx..."
-          }
-        });
-        ```
-
-        SendGrid requires the API key in a custom Authorization header with Bearer prefix.
-      </Tab>
-      <Tab title="Airtable">
-        ```typescript
-        await superglue.upsertIntegration({
-          id: "airtable",
-          urlHost: "https://api.airtable.com",
-          documentationUrl: "https://airtable.com/developers/web/api/introduction",
-          credentials: {
-            apiKey: "pat..." // Personal access token
-          }
-        });
-        ```
-
-        Airtable uses a personal access token passed as a Bearer token in the Authorization header.
-      </Tab>
-      <Tab title="Zendesk">
-        ```typescript
-        await superglue.upsertIntegration({
-          id: "zendesk",
-          urlHost: "https://yourcompany.zendesk.com",
-          documentationUrl: "https://developer.zendesk.com/api-reference",
-          credentials: {
-            email: "admin@yourcompany.com",
-            apiKey: "your_api_token"
-          }
-        });
-        ```
-
-        Zendesk requires both email and API token, combined as basic auth: `{email}/token:{apiKey}`.
-      </Tab>
-      <Tab title="Shopify">
-        ```typescript
-        await superglue.upsertIntegration({
-          id: "shopify",
-          urlHost: "https://yourstore.myshopify.com",
-          documentationUrl: "https://shopify.dev/docs/api",
-          credentials: {
-            apiKey: "shpat_..." // Admin API access token
-          }
-        });
-        ```
-
-        Shopify uses a custom header `X-Shopify-Access-Token` for API authentication.
-      </Tab>
-      <Tab title="Mailchimp">
-        ```typescript
-        await superglue.upsertIntegration({
-          id: "mailchimp",
-          urlHost: "https://us1.api.mailchimp.com", // datacenter varies
-          documentationUrl: "https://mailchimp.com/developer/marketing/api",
-          credentials: {
-            apiKey: "xxxxxxxxxxxxxx-us1" // includes datacenter suffix
-          }
-        });
-        ```
-
-        Mailchimp uses basic auth with `anystring` as username and API key as password.
-      </Tab>
-    </Tabs>
+    - **SendGrid**: API key in Authorization header with Bearer prefix
+    - **Airtable**: Personal access token as Bearer token
+    - **Zendesk**: Email + API token combined as basic auth (`{email}/token:{apiKey}`)
+    - **Shopify**: Custom header `X-Shopify-Access-Token`
+    - **Mailchimp**: Basic auth with `anystring` as username and API key as password
 
   </Accordion>
 
@@ -265,36 +137,9 @@ superglue supports many different authentication methods. All credentials are en
 
     ### Configuration
 
-    <Tabs>
-      <Tab title="PostgreSQL">
-        ```typescript
-        await superglue.upsertIntegration({
-          id: "main-db",
-          urlHost: "postgresql://<<user>>:<<password>>@<<host>>:<<port>>",
-          urlPath: "/<<database>>",
-          credentials: {
-            user: "db_user",
-            password: "db_password",
-            host: "db.example.com",
-            port: 5432,
-            database: "production_db"
-          }
-        });
-        ```
-        </Tab>
-      <Tab title="FTP/SFTP">
-        ```typescript
-        await superglue.upsertIntegration({
-          id: "my-sftp-server",
-          urlHost: "sftp://<<host>>:<<port>>",
-          credentials: {
-            username: "sftp_user",
-            password: "sftp_password"
-          }
-        });
-        ```
-      </Tab>
-    </Tabs>
+    **PostgreSQL** requires a connection URL in the format `postgresql://<<user>>:<<password>>@<<host>>:<<port>>/<<database>>` with credentials for `user`, `password`, `host`, `port`, and `database`.
+
+    **FTP/SFTP** requires a URL in the format `sftp://<<host>>:<<port>>` with `username` and `password` credentials.
 
   </Accordion>
 
@@ -393,41 +238,17 @@ superglue’s fetchers handle most modern and legacy documentation types:
 
 ### Documentation filtering with keywords
 
-Large APIs can have hundreds of endpoints. To improve accuracy and reduce processing time, you can provide specific keywords vai the agent or SDK that describe what parts of the documentation are most relevant.
+Large APIs can have hundreds of endpoints. To improve accuracy and reduce processing time, you can provide specific keywords via the agent that describe what parts of the documentation are most relevant.
 
-<Tabs>
-  <Tab title="Via Chat/Agent">
-    The agent automatically adjusts documentation processing based on your instructions:
+The agent automatically adjusts documentation processing based on your instructions:
 
-    ```
-    Connect to Stripe and focus on customer and subscription endpoints
-    ```
+```
+Connect to Stripe and focus on customer and subscription endpoints
+```
 
-    This ensures that only relevant documentation is processed and saved to the system.
-
-  </Tab>
-
-  <Tab title="Via SDK">
-    Provide keywords programmatically when creating or updating a system:
-
-    ```typescript
-    const integration = await superglue.upsertIntegration({
-      id: "stripe",
-      urlHost: "https://api.stripe.com",
-      documentationUrl: "https://docs.stripe.com/api",
-      keywords: ["customers", "subscriptions", "invoices"],
-      credentials: {
-        apiKey: "sk_test_..."
-      }
-    });
-    ```
-
-    Keywords are used to:
-    - Guide crawling and processing to retain only the most relevant documentation sections
-    - Improve ranking and retrieval relevance at runtime
-
-  </Tab>
-</Tabs>
+This ensures that only relevant documentation is processed and saved to the system. Keywords are used to:
+- Guide crawling and processing to retain only the most relevant documentation sections
+- Improve ranking and retrieval relevance at runtime
 
 ## Next steps
 

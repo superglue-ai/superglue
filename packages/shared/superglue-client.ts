@@ -1226,10 +1226,10 @@ export class SuperglueClient {
           }
         }
       `;
-    const response = await this.request<{ findRelevantSystems: System[] }>(query, {
+    const response = await this.request<{ findRelevantSystems: { system: System }[] }>(query, {
       searchTerms,
     });
-    return response.findRelevantSystems;
+    return response.findRelevantSystems.map((s) => s.system);
   }
 
   async findRelevantTools(searchTerms?: string): Promise<SuggestedTool[]> {
