@@ -7,6 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/src/components/ui/popover";
+import { Switch } from "@/src/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
 import { useMonacoTheme } from "@superglue/web/src/hooks/use-monaco-theme";
@@ -18,16 +19,7 @@ import {
 import Editor from "@monaco-editor/react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { isArrowFunction, maskCredentials } from "@superglue/shared";
-import {
-  AlertCircle,
-  CirclePause,
-  CirclePlay,
-  Loader2,
-  Maximize2,
-  Minimize2,
-  Pause,
-  Play,
-} from "lucide-react";
+import { AlertCircle, Loader2, Maximize2, Minimize2, Play } from "lucide-react";
 import { DownloadButton } from "../shared/download-button";
 import type * as Monaco from "monaco-editor";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -309,7 +301,7 @@ export function TemplateEditPopover({
     : previewEditorHeight;
 
   const codeEditorSection = (showHeader = true) => (
-    <div className={isFullscreen ? "flex flex-col min-w-0 h-full" : ""}>
+    <div className={isFullscreen ? "flex flex-col min-w-0 min-h-0 flex-1 overflow-hidden" : ""}>
       {showHeader && (
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1">
@@ -320,11 +312,10 @@ export function TemplateEditPopover({
             <button
               type="button"
               onClick={() => setIsFullscreen(!isFullscreen)}
-              className="h-7 px-2 flex items-center gap-1.5 rounded border border-border bg-muted/50 hover:bg-muted transition-colors text-xs text-muted-foreground hover:text-foreground"
-              title="Fullscreen"
+              className="h-6 w-6 flex items-center justify-center rounded bg-muted/50 hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+              title="Expand"
             >
               <Maximize2 className="h-3.5 w-3.5" />
-              <span>Expand</span>
             </button>
           )}
         </div>
@@ -358,38 +349,36 @@ export function TemplateEditPopover({
   );
 
   const previewSection = (
-    <div className={isFullscreen ? "flex flex-col min-w-0 h-full" : ""}>
-      <div className="flex items-center justify-between mb-1 gap-2">
-        <Label className="text-xs text-muted-foreground">Preview</Label>
+    <div className={isFullscreen ? "flex flex-col min-w-0 min-h-0 flex-1 overflow-hidden" : ""}>
+      <div className="flex items-center justify-between mb-1 gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground">Preview</Label>
+          {!canExecute && (
+            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded text-[10px] text-amber-600 dark:text-amber-400">
+              <AlertCircle className="h-3 w-3 shrink-0" />
+              <span>Step inputs not available yet</span>
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {isFullscreen && (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handleRunPreview}
-                className="h-6 px-2 flex items-center gap-1 rounded border border-border bg-primary/10 hover:bg-primary/20 transition-colors text-[10px] text-primary"
-                title="Run preview"
-              >
-                <Play className="h-3 w-3" />
-                <span>Run</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setAutoPreview(!autoPreview)}
-                className="h-6 px-2 flex items-center gap-1 rounded border transition-colors text-[10px] border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"
-                title={
-                  autoPreview
-                    ? "Preview updates on every keystroke (click to switch to manual)"
-                    : "Preview only updates when you click Run (click to enable auto-refresh)"
-                }
-              >
-                {autoPreview ? (
-                  <CirclePlay className="h-3 w-3" />
-                ) : (
-                  <CirclePause className="h-3 w-3" />
-                )}
-                <span>{autoPreview ? "Auto Refresh" : "Manual Refresh"}</span>
-              </button>
+            <div className="flex items-center gap-3 h-5">
+              {!autoPreview && (
+                <button
+                  type="button"
+                  onClick={handleRunPreview}
+                  className="h-5 px-2 flex items-center gap-1 rounded bg-primary/10 hover:bg-primary/20 transition-colors text-[10px] text-primary"
+                >
+                  <Play className="h-3 w-3" />
+                  <span>Execute</span>
+                </button>
+              )}
+              <div className="flex items-center gap-1.5">
+                <Switch checked={autoPreview} onCheckedChange={setAutoPreview} />
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                  Live Preview
+                </span>
+              </div>
             </div>
           )}
           {isLoopArray && (
@@ -416,12 +405,6 @@ export function TemplateEditPopover({
           )}
         </div>
       </div>
-      {!canExecute && (
-        <div className="flex items-center gap-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-md text-xs text-amber-600 dark:text-amber-400 mb-2">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-          <span>Step inputs not available yet - preview may show errors</span>
-        </div>
-      )}
       {previewError ? (
         <div
           className="p-3 bg-destructive/10 rounded-md text-xs text-destructive overflow-auto flex-1"
@@ -485,7 +468,7 @@ export function TemplateEditPopover({
   }, []);
 
   const footerSection = (
-    <div className="flex justify-end gap-2 pt-1">
+    <div className="flex justify-end gap-2 pt-4">
       <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="h-8 text-xs">
         Cancel
       </Button>
@@ -496,9 +479,9 @@ export function TemplateEditPopover({
   );
 
   const popoverContent = isFullscreen ? (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header with minimize button */}
-      <div className="flex items-center justify-between mb-3 pb-2 border-b">
+      <div className="flex items-center justify-between mb-3 flex-shrink-0">
         <div className="flex items-center gap-1">
           <Label className="text-sm font-medium">{title}</Label>
           {helpText && <HelpTooltip text={helpText} />}
@@ -506,16 +489,19 @@ export function TemplateEditPopover({
         <button
           type="button"
           onClick={() => setIsFullscreen(false)}
-          className="h-7 px-2 flex items-center gap-1.5 rounded border border-border bg-muted/50 hover:bg-muted transition-colors text-xs text-muted-foreground hover:text-foreground"
-          title="Exit fullscreen"
+          className="h-6 w-6 flex items-center justify-center rounded bg-muted/50 hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+          title="Collapse"
         >
           <Minimize2 className="h-3.5 w-3.5" />
-          <span>Collapse</span>
         </button>
       </div>
       {/* Split panes */}
-      <div className="flex flex-1 min-h-0 gap-0">
-        <div style={{ width: `${splitRatio * 100}%` }} className="flex flex-col min-w-0 pr-2">
+      <div className="flex flex-1 min-h-0 gap-0 overflow-hidden">
+        <div
+          style={{ width: `${splitRatio * 100}%` }}
+          className="flex flex-col min-w-0 min-h-0 pr-2"
+        >
+          <Label className="text-xs text-muted-foreground mb-1 flex-shrink-0">Code</Label>
           {codeEditorSection(false)}
         </div>
         {/* Draggable splitter */}
@@ -523,11 +509,14 @@ export function TemplateEditPopover({
           className="w-1 cursor-col-resize bg-border hover:bg-primary/50 transition-colors flex-shrink-0 rounded"
           onMouseDown={handleSplitterMouseDown}
         />
-        <div style={{ width: `${(1 - splitRatio) * 100}%` }} className="flex flex-col min-w-0 pl-2">
+        <div
+          style={{ width: `${(1 - splitRatio) * 100}%` }}
+          className="flex flex-col min-w-0 min-h-0 pl-2"
+        >
           {previewSection}
         </div>
       </div>
-      {footerSection}
+      <div className="flex-shrink-0">{footerSection}</div>
     </div>
   ) : (
     <div className="space-y-4">
@@ -570,13 +559,12 @@ export function TemplateEditPopover({
         )}
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent
-            className="p-6 max-w-none border border-border/60"
+            className="p-6 max-w-none border border-border/60 overflow-hidden"
             style={{
-              width: "calc(100vw - 48px)",
-              height: "calc(100vh - 48px)",
+              width: "calc(100vw - 120px)",
+              height: "calc(100vh - 120px)",
               maxWidth: "none",
               maxHeight: "none",
-              overflowY: "auto",
               zIndex: POPOVER_Z_INDEX,
             }}
             onEscapeKeyDown={(e) => e.preventDefault()}
