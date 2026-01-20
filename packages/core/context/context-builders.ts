@@ -160,11 +160,11 @@ function buildSystemContext(system: System, opts: SystemContextOptions): string 
   const xml_opening_tag = `<${system.id}>`;
   const urlSection = "<base_url>: " + composeUrl(system.urlHost, system.urlPath) + "</base_url>";
   const specificInstructionsSection =
-    "<system_specific_instructions>: " +
+    "<integration_specific_instructions>: " +
     (system.specificInstructions?.length > 0
       ? system.specificInstructions
-      : "No system-specific instructions provided.") +
-    "</system_specific_instructions>";
+      : "No integration-specific instructions provided.") +
+    "</integration_specific_instructions>";
   const xml_closing_tag = `</${system.id}>`;
   const newlineCount = 2;
   const availableBudget = budget - xml_opening_tag.length - xml_closing_tag.length - newlineCount;
@@ -458,14 +458,14 @@ export function getGenerateStepConfigContext(
 
   const documentationWrapperLength = "<documentation>".length + "</documentation>".length;
   const stepInputWrapperLength = "<step_input>".length + "</step_input>".length;
-  const systemInstructionsWrapperLength =
-    "<system_specific_instructions>".length + "</system_specific_instructions>".length;
+  const integrationInstructionsWrapperLength =
+    "<integration_specific_instructions>".length + "</integration_specific_instructions>".length;
   const credentialsWrapperLength =
     "<available_credentials>".length + "</available_credentials>".length;
   const totalWrapperLength =
     documentationWrapperLength +
     stepInputWrapperLength +
-    systemInstructionsWrapperLength +
+    integrationInstructionsWrapperLength +
     credentialsWrapperLength;
 
   let newlineCount = 6;
@@ -498,14 +498,14 @@ export function getGenerateStepConfigContext(
   const remainingBudget = budget - essentialLength;
   const documentationBudget = Math.floor(remainingBudget * 0.4);
   const stepInputBudget = Math.floor(remainingBudget * 0.4);
-  const systemInstructionsBudget = Math.floor(remainingBudget * 0.1);
+  const integrationInstructionsBudget = Math.floor(remainingBudget * 0.1);
   const credentialsBudget = Math.floor(remainingBudget * 0.1);
 
   const documentationContent = sanitizeUnpairedSurrogates(
     input.systemDocumentation.slice(0, documentationBudget),
   );
-  const systemSpecificInstructions = sanitizeUnpairedSurrogates(
-    input.systemSpecificInstructions.slice(0, systemInstructionsBudget),
+  const integrationSpecificInstructions = sanitizeUnpairedSurrogates(
+    input.systemSpecificInstructions.slice(0, integrationInstructionsBudget),
   );
   const credentialsContent = Object.keys(input.credentials || {})
     .map((v) => `<<${v}>>`)
@@ -514,7 +514,7 @@ export function getGenerateStepConfigContext(
 
   const documentationContext = `<documentation>${documentationContent}</documentation>`;
   const stepInputContext = `<step_input>${getObjectContext(input.stepInput || {}, { include: { schema: true, preview: false, samples: true }, characterBudget: stepInputBudget })}</step_input>`;
-  const systemInstructionsContext = `<system_specific_instructions>${systemSpecificInstructions}</system_specific_instructions>`;
+  const integrationInstructionsContext = `<integration_specific_instructions>${integrationSpecificInstructions}</integration_specific_instructions>`;
   const credentialsContext = `<available_credentials>${credentialsContent}</available_credentials>`;
 
   let contextParts = [promptStart, instructionContext];
@@ -524,7 +524,7 @@ export function getGenerateStepConfigContext(
   contextParts.push(
     documentationContext,
     stepInputContext,
-    systemInstructionsContext,
+    integrationInstructionsContext,
     credentialsContext,
   );
 
