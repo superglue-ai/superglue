@@ -164,14 +164,14 @@ export class DocumentationEvaluator {
 
     try {
       // Get stored documentation for this site
-      const integrationId = `doc-eval-${site.id}`;
-      const integration = await this.datastore.getIntegration({ 
-        id: integrationId, 
+      const systemId = `doc-eval-${site.id}`;
+      const system = await this.datastore.getSystem({ 
+        id: systemId, 
         includeDocs: true, 
         orgId: this.orgId 
       });
 
-      if (!integration || (!integration.documentation && !integration.openApiSchema)) {
+      if (!system || (!system.documentation && !system.openApiSchema)) {
         // No documentation found - mark all questions as failed
         for (const question of site.testQuestions) {
           const result = {
@@ -187,7 +187,7 @@ export class DocumentationEvaluator {
       } else {
         // Evaluate each question
         for (const question of site.testQuestions) {
-          const result = await this.evaluateQuestion(question, integration.documentation, integration.openApiSchema);
+          const result = await this.evaluateQuestion(question, system.documentation, system.openApiSchema);
           details.push(result);
           
           // Log to CSV for debugging

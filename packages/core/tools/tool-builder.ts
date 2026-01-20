@@ -78,7 +78,7 @@ export class ToolBuilder {
       {
         characterBudget: 120000,
         include: {
-          integrationContext: true,
+          systemContext: true,
           availableVariablesContext: true,
           payloadContext: true,
           userInstruction: true,
@@ -94,7 +94,7 @@ export class ToolBuilder {
 
   private validateTool(tool: Tool): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
-    const availableIntegrationIds = Object.keys(this.systems);
+    const availableSystemIds = Object.keys(this.systems);
     const hasSteps = tool.steps && tool.steps.length > 0;
     const hasFinalTransform =
       tool.finalTransform &&
@@ -105,19 +105,19 @@ export class ToolBuilder {
       errors.push("Tool must have either steps or a finalTransform to process data");
     }
 
-    if (hasSteps && availableIntegrationIds.length === 0) {
+    if (hasSteps && availableSystemIds.length === 0) {
       errors.push(
-        "Tool has steps but no integrations are available. Either provide integrations or use a transform-only tool.",
+        "Tool has steps but no systems are available. Either provide systems or use a transform-only tool.",
       );
     }
 
     if (hasSteps) {
       tool.steps?.forEach((step, index) => {
-        if (!step.integrationId) {
-          errors.push(`Step ${index + 1} (${step.id}): Missing integrationId`);
-        } else if (!availableIntegrationIds.includes(step.integrationId)) {
+        if (!step.systemId) {
+          errors.push(`Step ${index + 1} (${step.id}): Missing systemId`);
+        } else if (!availableSystemIds.includes(step.systemId)) {
           errors.push(
-            `Step ${index + 1} (${step.id}): Invalid integrationId '${step.integrationId}'. Available integrations: ${availableIntegrationIds.join(", ")}`,
+            `Step ${index + 1} (${step.id}): Invalid systemId '${step.systemId}'. Available systems: ${availableSystemIds.join(", ")}`,
           );
         }
         if (!step.apiConfig?.urlHost) {
@@ -144,14 +144,14 @@ export class ToolBuilder {
     let lastError: string | null = null;
 
     const webSearchTool = getWebSearchTool();
-    const firstIntegration = Object.values(this.systems)[0];
+    const firstSystem = Object.values(this.systems)[0];
     const tools: LLMToolWithContext[] = [
       {
         toolDefinition: searchDocumentationToolDefinition,
         toolContext: {
           orgId: this.metadata.orgId,
           traceId: this.metadata.traceId,
-          integration: firstIntegration,
+          system: firstSystem,
         },
         maxUses: 3,
       },
@@ -219,7 +219,7 @@ export class ToolBuilder {
               id: generatedTool.id,
               steps: generatedTool.steps?.map((s) => ({
                 id: s.id,
-                integrationId: s.integrationId,
+                systemId: s.systemId,
                 urlHost: s.apiConfig?.urlHost,
                 urlPath: s.apiConfig?.urlPath,
               })),
@@ -241,7 +241,7 @@ export class ToolBuilder {
         return {
           id: generatedTool.id,
           steps: generatedTool.steps,
-          integrationIds: Object.keys(this.systems),
+          systemIds: Object.keys(this.systems),
           instruction: this.instruction,
           finalTransform: generatedTool.finalTransform,
           responseSchema: this.responseSchema,
@@ -273,10 +273,10 @@ const toolSchema = z.object({
         id: z
           .string()
           .describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails')"),
-        integrationId: z
+        systemId: z
           .string()
           .describe(
-            "REQUIRED: The integration ID for this step (must match one of the available integration IDs)",
+            "REQUIRED: The system ID for this step (must match one of the available system IDs)",
           ),
         loopSelector: z
           .string()

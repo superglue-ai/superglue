@@ -160,11 +160,11 @@ function buildSystemContext(system: System, opts: SystemContextOptions): string 
   const xml_opening_tag = `<${system.id}>`;
   const urlSection = "<base_url>: " + composeUrl(system.urlHost, system.urlPath) + "</base_url>";
   const specificInstructionsSection =
-    "<integration_specific_instructions>: " +
+    "<system_specific_instructions>: " +
     (system.specificInstructions?.length > 0
       ? system.specificInstructions
-      : "No integration-specific instructions provided.") +
-    "</integration_specific_instructions>";
+      : "No system-specific instructions provided.") +
+    "</system_specific_instructions>";
   const xml_closing_tag = `</${system.id}>`;
   const newlineCount = 2;
   const availableBudget = budget - xml_opening_tag.length - xml_closing_tag.length - newlineCount;
@@ -201,8 +201,8 @@ export function getToolBuilderContext(
 
   const prompt_start = `Build a complete workflow to fulfill the user's instruction.`;
   const prompt_end = hasSystems
-    ? "Ensure that the final output matches the instruction and you use ONLY the available integration ids."
-    : "Since no integrations are available, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.";
+    ? "Ensure that the final output matches the instruction and you use ONLY the available system ids."
+    : "Since no systems are available, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.";
   const userInstructionContext = options.include.userInstruction
     ? `<instruction>${input.userInstruction}</instruction>`
     : "";
@@ -210,15 +210,15 @@ export function getToolBuilderContext(
   const availableVariablesWrapperLength =
     "<available_variables>".length + "</available_variables>".length;
   const payloadWrapperLength = "<workflow_input>".length + "</workflow_input>".length;
-  const integrationWrapperLength =
-    "<available_integrations_and_documentation>".length +
-    "</available_integrations_and_documentation>".length;
+  const systemWrapperLength =
+    "<available_systems_and_documentation>".length +
+    "</available_systems_and_documentation>".length;
 
   const newlineCount = 5;
   const totalWrapperLength =
     (options.include?.availableVariablesContext ? availableVariablesWrapperLength : 0) +
     (options.include?.payloadContext ? payloadWrapperLength : 0) +
-    (options.include?.integrationContext ? integrationWrapperLength : 0);
+    (options.include?.systemContext ? systemWrapperLength : 0);
   const essentialLength =
     prompt_start.length +
     prompt_end.length +
@@ -238,25 +238,25 @@ export function getToolBuilderContext(
   const remainingBudget = budget - essentialLength;
   const availableVariablesBudget = Math.floor(remainingBudget * 0.1);
   const payloadBudget = Math.floor(remainingBudget * 0.2);
-  const integrationBudget = Math.floor(remainingBudget * 0.7);
+  const systemBudget = Math.floor(remainingBudget * 0.7);
 
   const availableVariablesContent = buildAvailableVariableContext(
     input.payload,
     input.systems,
   ).slice(0, availableVariablesBudget);
-  const integrationContent = hasSystems
+  const systemContent = hasSystems
     ? input.systems
         .map((int) =>
           buildSystemContext(int, {
-            characterBudget: Math.floor(integrationBudget / input.systems.length),
+            characterBudget: Math.floor(systemBudget / input.systems.length),
             metadata: input.metadata,
           }),
         )
         .join("\n")
-        .slice(0, integrationBudget)
-    : "No integrations provided. Build a transform-only workflow using finalTransform to process the payload data.".slice(
+        .slice(0, systemBudget)
+    : "No systems provided. Build a transform-only workflow using finalTransform to process the payload data.".slice(
         0,
-        integrationBudget,
+        systemBudget,
       );
 
   const availableVariablesContext = options.include?.availableVariablesContext
@@ -265,8 +265,8 @@ export function getToolBuilderContext(
   const payloadContext = options.include?.payloadContext
     ? `<workflow_input>${getObjectContext(input.payload, { include: { schema: true, preview: false, samples: true }, characterBudget: payloadBudget })}</workflow_input>`
     : "";
-  const integrationContext = options.include?.integrationContext
-    ? `<available_integrations_and_documentation>${integrationContent}</available_integrations_and_documentation>`
+  const systemContext = options.include?.systemContext
+    ? `<available_systems_and_documentation>${systemContent}</available_systems_and_documentation>`
     : "";
 
   return (
@@ -274,7 +274,7 @@ export function getToolBuilderContext(
     "\n" +
     userInstructionContext +
     "\n" +
-    integrationContext +
+    systemContext +
     "\n" +
     availableVariablesContext +
     "\n" +
@@ -458,14 +458,14 @@ export function getGenerateStepConfigContext(
 
   const documentationWrapperLength = "<documentation>".length + "</documentation>".length;
   const stepInputWrapperLength = "<step_input>".length + "</step_input>".length;
-  const integrationInstructionsWrapperLength =
-    "<integration_specific_instructions>".length + "</integration_specific_instructions>".length;
+  const systemInstructionsWrapperLength =
+    "<system_specific_instructions>".length + "</system_specific_instructions>".length;
   const credentialsWrapperLength =
     "<available_credentials>".length + "</available_credentials>".length;
   const totalWrapperLength =
     documentationWrapperLength +
     stepInputWrapperLength +
-    integrationInstructionsWrapperLength +
+    systemInstructionsWrapperLength +
     credentialsWrapperLength;
 
   let newlineCount = 6;
@@ -498,14 +498,14 @@ export function getGenerateStepConfigContext(
   const remainingBudget = budget - essentialLength;
   const documentationBudget = Math.floor(remainingBudget * 0.4);
   const stepInputBudget = Math.floor(remainingBudget * 0.4);
-  const integrationInstructionsBudget = Math.floor(remainingBudget * 0.1);
+  const systemInstructionsBudget = Math.floor(remainingBudget * 0.1);
   const credentialsBudget = Math.floor(remainingBudget * 0.1);
 
   const documentationContent = sanitizeUnpairedSurrogates(
     input.systemDocumentation.slice(0, documentationBudget),
   );
-  const integrationSpecificInstructions = sanitizeUnpairedSurrogates(
-    input.systemSpecificInstructions.slice(0, integrationInstructionsBudget),
+  const systemSpecificInstructions = sanitizeUnpairedSurrogates(
+    input.systemSpecificInstructions.slice(0, systemInstructionsBudget),
   );
   const credentialsContent = Object.keys(input.credentials || {})
     .map((v) => `<<${v}>>`)
@@ -514,7 +514,7 @@ export function getGenerateStepConfigContext(
 
   const documentationContext = `<documentation>${documentationContent}</documentation>`;
   const stepInputContext = `<step_input>${getObjectContext(input.stepInput || {}, { include: { schema: true, preview: false, samples: true }, characterBudget: stepInputBudget })}</step_input>`;
-  const integrationInstructionsContext = `<integration_specific_instructions>${integrationSpecificInstructions}</integration_specific_instructions>`;
+  const systemInstructionsContext = `<system_specific_instructions>${systemSpecificInstructions}</system_specific_instructions>`;
   const credentialsContext = `<available_credentials>${credentialsContent}</available_credentials>`;
 
   let contextParts = [promptStart, instructionContext];
@@ -524,7 +524,7 @@ export function getGenerateStepConfigContext(
   contextParts.push(
     documentationContext,
     stepInputContext,
-    integrationInstructionsContext,
+    systemInstructionsContext,
     credentialsContext,
   );
 

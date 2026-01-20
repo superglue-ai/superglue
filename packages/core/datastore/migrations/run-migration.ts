@@ -1,4 +1,4 @@
-import { Run, RunStatus } from "@superglue/shared";
+import { Run, RunStatus, Tool } from "@superglue/shared";
 
 export interface LegacyRunRow {
   id: string;
@@ -53,5 +53,24 @@ export function extractRun(data: any, row: LegacyRunRow): Run {
       : data.completedAt
         ? new Date(data.completedAt)
         : undefined,
+  };
+}
+
+export function normalizeTool(tool: any): Tool {
+  if (!tool) return tool;
+
+  const normalizedSteps = tool.steps?.map((step: any) => {
+    const { integrationId, ...rest } = step;
+    return {
+      ...rest,
+      systemId: step.systemId ?? integrationId,
+    };
+  });
+
+  const { integrationIds, ...rest } = tool;
+  return {
+    ...rest,
+    systemIds: tool.systemIds ?? integrationIds,
+    steps: normalizedSteps,
   };
 }

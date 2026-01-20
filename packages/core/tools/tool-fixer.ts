@@ -82,7 +82,7 @@ export class ToolFixer {
   private trimStepForLLM(step: any): any {
     return {
       id: step.id,
-      integrationId: step.integrationId,
+      systemId: step.systemId,
       executionMode: step.executionMode,
       loopSelector: step.loopSelector,
       failureBehavior: step.failureBehavior,
@@ -135,11 +135,11 @@ ${JSON.stringify(stepResultsSummary, null, 2)}
 </step_results>`;
     }
 
-    const availableIntegrationIds = Object.keys(this.systems);
-    if (availableIntegrationIds.length > 0) {
-      userContent += `\n\n<available_integration_ids>
-${availableIntegrationIds.join(", ")}
-</available_integration_ids>`;
+    const availableSystemIds = Object.keys(this.systems);
+    if (availableSystemIds.length > 0) {
+      userContent += `\n\n<available_system_ids>
+${availableSystemIds.join(", ")}
+</available_system_ids>`;
     }
 
     return [
@@ -228,7 +228,7 @@ ${availableIntegrationIds.join(", ")}
       }
 
       // Validate steps
-      const availableIntegrationIds = Object.keys(this.systems);
+      const availableSystemIds = Object.keys(this.systems);
       for (let i = 0; i < tool.steps.length; i++) {
         const step = tool.steps[i];
         if (!step.id) {
@@ -238,13 +238,13 @@ ${availableIntegrationIds.join(", ")}
           return { valid: false, error: `Step ${i + 1} (${step.id}): missing 'apiConfig'` };
         }
         if (
-          step.integrationId &&
-          availableIntegrationIds.length > 0 &&
-          !availableIntegrationIds.includes(step.integrationId)
+          step.systemId &&
+          availableSystemIds.length > 0 &&
+          !availableSystemIds.includes(step.systemId)
         ) {
           return {
             valid: false,
-            error: `Step ${i + 1} (${step.id}): invalid integrationId '${step.integrationId}'. Available: ${availableIntegrationIds.join(", ")}`,
+            error: `Step ${i + 1} (${step.id}): invalid systemId '${step.systemId}'. Available: ${availableSystemIds.join(", ")}`,
           };
         }
       }
@@ -361,7 +361,7 @@ ${availableIntegrationIds.join(", ")}
         const fixedTool: Tool = {
           ...patchResult.tool!,
           instruction: this.tool.instruction,
-          integrationIds: this.tool.integrationIds,
+          systemIds: this.tool.systemIds,
           createdAt: this.tool.createdAt,
           updatedAt: new Date(),
         };

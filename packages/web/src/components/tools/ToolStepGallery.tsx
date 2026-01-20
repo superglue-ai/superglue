@@ -312,11 +312,11 @@ export function ToolStepGallery({
     setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
   };
 
-  const handleConfirmInsertStep = (stepId: string, instruction: string, integrationId?: string) => {
-    const selectedSystem = integrationId ? systems?.find((s) => s.id === integrationId) : undefined;
+  const handleConfirmInsertStep = (stepId: string, instruction: string, systemId?: string) => {
+    const selectedSystem = systemId ? systems?.find((s) => s.id === systemId) : undefined;
     const newStep: ExecutionStep = {
       id: stepId,
-      integrationId: integrationId || "",
+      systemId: systemId || "",
       apiConfig: {
         id: stepId,
         instruction,

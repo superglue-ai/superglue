@@ -1,23 +1,23 @@
-import { Integration } from '@superglue/shared';
-import { waitForIntegrationProcessing } from '@superglue/shared/utils';
+import { System } from '@superglue/shared';
+import { waitForSystemProcessing } from '@superglue/shared/utils';
 import fs from 'fs';
 import { FileStore } from '@core/datastore/filestore.js';
 import { DataStore } from '@core/datastore/types.js';
 import { server_defaults } from '@core/default.js';
 import { logMessage } from '@core/utils/logs.js';
 import { DocumentationFetcher } from '@core/documentation/index.js';
-import { IntegrationConfig } from './config-loader.js';
+import { SystemConfig } from './config-loader.js';
 
 export interface SetupResult {
     datastore: DataStore;
-    integrations: Integration[];
+    systems: System[];
     setupTime: number;
     documentationProcessingTime: number;
     cleanupFunction: () => Promise<void>;
 }
 
-export interface IntegrationSetupResult {
-    integrationId: string;
+export interface SystemSetupResult {
+    systemId: string;
     name: string;
     setupTime: number;
     documentationProcessingTime?: number;
@@ -37,19 +37,19 @@ export class SetupManager {
     }
 
     /**
-     * Complete setup for testing: datastore + integrations
+     * Complete setup for testing: datastore + systems
      */
     async setupTestEnvironment(
-        integrationConfigs: IntegrationConfig[]
+        systemConfigs: SystemConfig[]
     ): Promise<SetupResult> {
         const startTime = Date.now();
 
         // Initialize datastore
         const datastore = await this.initializeDatastore();
 
-        // Setup integrations
-        const { integrations, setupResults, documentationProcessingTime } =
-            await this.setupIntegrations(datastore, integrationConfigs);
+        // Setup systems
+        const { systems, setupResults, documentationProcessingTime } =
+            await this.setupSystems(datastore, systemConfigs);
 
         const setupTime = Date.now() - startTime;
 
@@ -57,7 +57,7 @@ export class SetupManager {
 
         return {
             datastore,
-            integrations,
+            systems,
             setupTime,
             documentationProcessingTime,
             cleanupFunction: () => this.cleanup()
@@ -82,69 +82,69 @@ export class SetupManager {
     }
 
     /**
-     * Setup integrations with documentation processing
+     * Setup systems with documentation processing
      */
-    private async setupIntegrations(
+    private async setupSystems(
         datastore: DataStore,
-        integrationConfigs: IntegrationConfig[]
+        systemConfigs: SystemConfig[]
     ): Promise<{
-        integrations: Integration[];
-        setupResults: IntegrationSetupResult[];
+        systems: System[];
+        setupResults: SystemSetupResult[];
         documentationProcessingTime: number;
     }> {
         const startTime = Date.now();
-        logMessage('info', `🔧 Setting up ${integrationConfigs.length} integrations...`, this.metadata);
+        logMessage('info', `🔧 Setting up ${systemConfigs.length} systems...`, this.metadata);
 
-        const integrations: Integration[] = [];
-        const setupResults: IntegrationSetupResult[] = [];
-        const pendingIntegrations: string[] = [];
+        const systems: System[] = [];
+        const setupResults: SystemSetupResult[] = [];
+        const pendingSystems: string[] = [];
 
-        for (const config of integrationConfigs) {
-            const integrationStartTime = Date.now();
-            logMessage('info', `⚙️  Setting up integration: ${config.name}`, this.metadata);
+        for (const config of systemConfigs) {
+            const systemStartTime = Date.now();
+            logMessage('info', `⚙️  Setting up system: ${config.name}`, this.metadata);
 
             try {
-                const integration = this.makeIntegrationObject(config);
+                const system = this.makeSystemObject(config);
 
                 // Start async documentation fetch if documentation is pending
-                if (integration.documentationPending) {
+                if (system.documentationPending) {
                     this.startDocumentationFetch(
                         datastore,
-                        integration,
+                        system,
                         config
                     );
-                    pendingIntegrations.push(integration.id);
+                    pendingSystems.push(system.id);
                 }
 
                 // Save to datastore
-                const saved = await datastore.upsertIntegration({
-                    id: integration.id,
-                    integration,
+                const saved = await datastore.upsertSystem({
+                    id: system.id,
+                    system,
                     orgId: this.metadata.orgId
                 });
 
-                integrations.push(saved);
+                systems.push(saved);
 
-                const setupTime = Date.now() - integrationStartTime;
+                const setupTime = Date.now() - systemStartTime;
                 setupResults.push({
-                    integrationId: config.id,
+                    systemId: config.id,
                     name: config.name,
                     setupTime,
                     success: true
                 });
 
                 logMessage('info',
-                    `✅ Integration ${config.name} setup in ${setupTime}ms` +
+                    `✅ System ${config.name} setup in ${setupTime}ms` +
                     (saved.documentationPending ? ' (documentation pending)' : ''),
                     this.metadata
                 );
 
             } catch (error) {
-                const setupTime = Date.now() - integrationStartTime;
+                const setupTime = Date.now() - systemStartTime;
                 const errorMsg = error instanceof Error ? error.message : String(error);
 
                 setupResults.push({
-                    integrationId: config.id,
+                    systemId: config.id,
                     name: config.name,
                     setupTime,
                     success: false,
@@ -157,35 +157,35 @@ export class SetupManager {
 
         // Wait for documentation processing
         let documentationProcessingTime = 0;
-        if (pendingIntegrations.length > 0) {
+        if (pendingSystems.length > 0) {
             documentationProcessingTime = await this.waitForDocumentation(
                 datastore,
-                pendingIntegrations,
+                pendingSystems,
                 setupResults
             );
         }
 
-        // Refresh integrations to get the latest state after documentation processing
-        const refreshedIntegrations: Integration[] = [];
-        for (const integration of integrations) {
-            const updated = await datastore.getIntegration({ id: integration.id, includeDocs: true, orgId: this.metadata.orgId });
+        // Refresh systems to get the latest state after documentation processing
+        const refreshedSystems: System[] = [];
+        for (const system of systems) {
+            const updated = await datastore.getSystem({ id: system.id, includeDocs: true, orgId: this.metadata.orgId });
             if (updated) {
-                refreshedIntegrations.push(updated);
+                refreshedSystems.push(updated);
             } else {
-                // If integration was deleted, keep the original
-                refreshedIntegrations.push(integration);
+                // If system was deleted, keep the original
+                refreshedSystems.push(system);
             }
         }
 
         const totalSetupTime = Date.now() - startTime;
         logMessage('info',
-            `🔧 Integration setup completed in ${totalSetupTime}ms ` +
+            `🔧 System setup completed in ${totalSetupTime}ms ` +
             `(documentation: ${documentationProcessingTime}ms)`,
             this.metadata
         );
 
         return {
-            integrations: refreshedIntegrations,
+            systems: refreshedSystems,
             setupResults,
             documentationProcessingTime
         };
@@ -196,12 +196,12 @@ export class SetupManager {
      */
     private startDocumentationFetch(
         datastore: DataStore,
-        integration: Integration,
-        config: IntegrationConfig
+        system: System,
+        config: SystemConfig
     ): void {
         (async () => {
             try {
-                logMessage('info', `📚 Starting documentation fetch for ${integration.id}`, this.metadata);
+                logMessage('info', `📚 Starting documentation fetch for ${system.id}`, this.metadata);
 
                 const docFetcher = new DocumentationFetcher(
                     {
@@ -215,21 +215,21 @@ export class SetupManager {
 
                 const docString = await docFetcher.fetchAndProcess();
 
-                // Check if integration still exists
-                const stillExists = await datastore.getIntegration({ id: integration.id, includeDocs: false, orgId: this.metadata.orgId });
+                // Check if system still exists
+                const stillExists = await datastore.getSystem({ id: system.id, includeDocs: false, orgId: this.metadata.orgId });
                 if (!stillExists) {
                     logMessage('warn',
-                        `Integration ${integration.id} was deleted during documentation fetch`,
+                        `System ${system.id} was deleted during documentation fetch`,
                         this.metadata
                     );
                     return;
                 }
 
                 // Update with documentation
-                await datastore.upsertIntegration({
-                    id: integration.id,
-                    integration: {
-                        ...integration,
+                await datastore.upsertSystem({
+                    id: system.id,
+                    system: {
+                        ...system,
                         documentation: docString,
                         documentationPending: false,
                         updatedAt: new Date()
@@ -237,33 +237,33 @@ export class SetupManager {
                     orgId: this.metadata.orgId
                 });
 
-                logMessage('info', `✅ Documentation fetched for ${integration.id}`, this.metadata);
+                logMessage('info', `✅ Documentation fetched for ${system.id}`, this.metadata);
 
             } catch (error) {
                 logMessage('error',
-                    `❌ Failed to fetch documentation for ${integration.id}: ${error}`,
+                    `❌ Failed to fetch documentation for ${system.id}: ${error}`,
                     this.metadata
                 );
 
                 // Always update documentationPending to false even on failure
                 try {
-                    const stillExists = await datastore.getIntegration({ id: integration.id, includeDocs: false, orgId: this.metadata.orgId });
+                    const stillExists = await datastore.getSystem({ id: system.id, includeDocs: false, orgId: this.metadata.orgId });
                     if (stillExists) {
-                        await datastore.upsertIntegration({
-                            id: integration.id,
-                            integration: {
-                                ...integration,
+                        await datastore.upsertSystem({
+                            id: system.id,
+                            system: {
+                                ...system,
                                 documentation: '',
                                 documentationPending: false,
                                 updatedAt: new Date()
                             },
                             orgId: this.metadata.orgId
                         });
-                        logMessage('info', `📝 Marked documentation as processed (failed) for ${integration.id}`, this.metadata);
+                        logMessage('info', `📝 Marked documentation as processed (failed) for ${system.id}`, this.metadata);
                     }
                 } catch (updateError) {
                     logMessage('error',
-                        `❌ Failed to update documentationPending status for ${integration.id}: ${updateError}`,
+                        `❌ Failed to update documentationPending status for ${system.id}: ${updateError}`,
                         this.metadata
                     );
                 }
@@ -276,11 +276,11 @@ export class SetupManager {
      */
     private async waitForDocumentation(
         datastore: DataStore,
-        pendingIntegrations: string[],
-        setupResults: IntegrationSetupResult[]
+        pendingSystems: string[],
+        setupResults: SystemSetupResult[]
     ): Promise<number> {
         logMessage('info',
-            `⏳ Waiting for documentation processing for ${pendingIntegrations.length} integrations...`,
+            `⏳ Waiting for documentation processing for ${pendingSystems.length} systems...`,
             this.metadata
         );
 
@@ -288,14 +288,14 @@ export class SetupManager {
 
         try {
             const datastoreAdapter = {
-                getIntegration: async (id: string): Promise<Integration | null> => {
-                    return await datastore.getIntegration({ id, includeDocs: false, orgId: this.metadata.orgId });
+                getSystem: async (id: string): Promise<System | null> => {
+                    return await datastore.getSystem({ id, includeDocs: false, orgId: this.metadata.orgId });
                 }
             };
 
-            await waitForIntegrationProcessing(
+            await waitForSystemProcessing(
                 datastoreAdapter,
-                pendingIntegrations,
+                pendingSystems,
                 server_defaults.DOCUMENTATION.TIMEOUTS.EVAL_DOC_PROCESSING_TIMEOUT
             );
 
@@ -306,11 +306,11 @@ export class SetupManager {
             );
 
             // Update setup results with documentation times
-            const timePerIntegration = documentationProcessingTime / pendingIntegrations.length;
-            for (const integrationId of pendingIntegrations) {
-                const result = setupResults.find(r => r.integrationId === integrationId);
+            const timePerSystem = documentationProcessingTime / pendingSystems.length;
+            for (const systemId of pendingSystems) {
+                const result = setupResults.find(r => r.systemId === systemId);
                 if (result) {
-                    result.documentationProcessingTime = timePerIntegration;
+                    result.documentationProcessingTime = timePerSystem;
                 }
             }
 
@@ -323,29 +323,29 @@ export class SetupManager {
                 this.metadata
             );
 
-            // Update all pending integrations to have documentationPending: false
+            // Update all pending systems to have documentationPending: false
             // to prevent "still being fetched" warnings later
-            for (const integrationId of pendingIntegrations) {
+            for (const systemId of pendingSystems) {
                 try {
-                    const integration = await datastore.getIntegration({ id: integrationId, includeDocs: false, orgId: this.metadata.orgId });
-                    if (integration && integration.documentationPending) {
-                        await datastore.upsertIntegration({
-                            id: integrationId,
-                            integration: {
-                                ...integration,
+                    const system = await datastore.getSystem({ id: systemId, includeDocs: false, orgId: this.metadata.orgId });
+                    if (system && system.documentationPending) {
+                        await datastore.upsertSystem({
+                            id: systemId,
+                            system: {
+                                ...system,
                                 documentationPending: false,
                                 updatedAt: new Date()
                             },
                             orgId: this.metadata.orgId
                         });
                         logMessage('info',
-                            `📝 Marked documentation as processed (timeout) for ${integrationId}`,
+                            `📝 Marked documentation as processed (timeout) for ${systemId}`,
                             this.metadata
                         );
                     }
                 } catch (updateError) {
                     logMessage('error',
-                        `❌ Failed to update documentationPending status for ${integrationId}: ${updateError}`,
+                        `❌ Failed to update documentationPending status for ${systemId}: ${updateError}`,
                         this.metadata
                     );
                 }
@@ -356,9 +356,9 @@ export class SetupManager {
     }
 
     /**
-     * Convert IntegrationConfig to Integration object
+     * Convert SystemConfig to System object
      */
-    private makeIntegrationObject(config: IntegrationConfig): Integration {
+    private makeSystemObject(config: SystemConfig): System {
         const now = new Date();
         return {
             id: config.id,

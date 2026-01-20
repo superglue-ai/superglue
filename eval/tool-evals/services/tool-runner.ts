@@ -47,7 +47,7 @@ export class ToolRunnerService {
         const promises: Promise<ToolAttempt>[] = [];
 
         for (const tool of tools) {
-            const toolSystems = systems.filter(i => tool.integrationIds.includes(i.id));
+            const toolSystems = systems.filter(s => tool.systemIds.includes(s.id));
             for (let i = 0; i < settings.attemptsEachMode; i++) {
                 // If one-shot mode is enabled, run one-shot attempts
                 if (settings.runOneShotMode) {

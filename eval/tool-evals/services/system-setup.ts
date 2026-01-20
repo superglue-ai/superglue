@@ -19,7 +19,7 @@ export class SystemSetupService {
       : this.config.tools.filter(tool => this.config.enabledTools.includes(tool.id));
     
     const usedSystemIds = new Set(
-      enabledTools.flatMap(tool => tool.integrationIds)
+      enabledTools.flatMap(tool => tool.systemIds)
     );
     
     const systemConfigs = this.config.systems.filter(system => 

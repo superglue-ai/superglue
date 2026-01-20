@@ -15,7 +15,7 @@ export const callEndpointResolver = async (
   const startTime = Date.now();
   const metadata = context.toMetadata();
 
-  const { integrationId, method, url, headers = {}, body, timeout = 30000 } = args;
+  const { systemId, method, url, headers = {}, body, timeout = 30000 } = args;
   const validMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
 
   if (!method || !url || !validMethods.includes(method.toUpperCase())) {
@@ -29,17 +29,17 @@ export const callEndpointResolver = async (
   let system: System | null = null;
   let systemFetchFailed = false;
 
-  if (integrationId) {
+  if (systemId) {
     try {
-      const systemManager = new SystemManager(integrationId, context.datastore, metadata);
+      const systemManager = new SystemManager(systemId, context.datastore, metadata);
       await systemManager.refreshTokenIfNeeded();
       system = await systemManager.getSystem();
-      logMessage("debug", `Loaded system ${integrationId}`, metadata);
+      logMessage("debug", `Loaded system ${systemId}`, metadata);
     } catch (error) {
       systemFetchFailed = true;
       logMessage(
         "warn",
-        `System ${integrationId} not found or failed to load: ${error}. Proceeding without credentials.`,
+        `System ${systemId} not found or failed to load: ${error}. Proceeding without credentials.`,
         metadata,
       );
     }
@@ -62,11 +62,11 @@ export const callEndpointResolver = async (
     let contextMessage = "";
 
     if (systemFetchFailed) {
-      contextMessage = ` The system '${integrationId}' could not be found or loaded.`;
-    } else if (integrationId && system) {
+      contextMessage = ` The system '${systemId}' could not be found or loaded.`;
+    } else if (systemId && system) {
       const availableKeys = Object.keys(credentialVariables || {});
-      contextMessage = ` Available credentials in system '${integrationId}': ${availableKeys.length > 0 ? availableKeys.join(", ") : "(none)"}`;
-    } else if (!integrationId) {
+      contextMessage = ` Available credentials in system '${systemId}': ${availableKeys.length > 0 ? availableKeys.join(", ") : "(none)"}`;
+    } else if (!systemId) {
       contextMessage = ` No systemId was provided. To use credential placeholders, specify a systemId.`;
     }
 

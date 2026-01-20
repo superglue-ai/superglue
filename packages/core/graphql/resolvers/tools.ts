@@ -45,7 +45,7 @@ interface ExecuteWorkflowArgs {
 interface BuildWorkflowArgs {
   instruction: string;
   payload?: Record<string, unknown>;
-  integrationIds?: string[];
+  systemIds?: string[];
   responseSchema?: JSONSchema;
 }
 
@@ -53,7 +53,7 @@ interface FixWorkflowArgs {
   workflow: Tool;
   fixInstructions: string;
   lastError?: string;
-  integrationIds?: string[];
+  systemIds?: string[];
 }
 
 interface FixWorkflowResult {
@@ -300,7 +300,7 @@ export const upsertWorkflowResolver = async (
     const workflow = {
       id,
       steps: resolveField(input.steps, oldWorkflow?.steps, []),
-      integrationIds: resolveField(input.integrationIds, oldWorkflow?.integrationIds, []),
+      systemIds: resolveField(input.systemIds, oldWorkflow?.systemIds, []),
       inputSchema: resolveField(input.inputSchema, oldWorkflow?.inputSchema),
       finalTransform: resolveField(input.finalTransform, oldWorkflow?.finalTransform, "$"),
       responseSchema: resolveField(input.responseSchema, oldWorkflow?.responseSchema),
@@ -414,14 +414,14 @@ export const buildWorkflowResolver = async (
   const metadata = context.toMetadata();
 
   try {
-    const { instruction, payload = {}, integrationIds, responseSchema } = args;
+    const { instruction, payload = {}, systemIds, responseSchema } = args;
 
     if (!instruction || instruction.trim() === "") {
       throw new Error("Instruction is required to build a workflow.");
     }
 
     let resolvedSystems: System[] = [];
-    if (integrationIds && integrationIds.length > 0) {
+    if (systemIds && systemIds.length > 0) {
       const datastoreAdapter = {
         getSystem: async (id: string): Promise<System | null> => {
           const result = await context.datastore.getSystem({
@@ -439,7 +439,7 @@ export const buildWorkflowResolver = async (
           });
         },
       };
-      resolvedSystems = await waitForSystemProcessing(datastoreAdapter, integrationIds);
+      resolvedSystems = await waitForSystemProcessing(datastoreAdapter, systemIds);
     }
 
     const builder = new ToolBuilder(
@@ -482,7 +482,7 @@ export const fixWorkflowResolver = async (
       throw new Error("Fix instructions are required.");
     }
 
-    // Fetch ALL of the customer's configured integrations so the LLM can use any of them
+    // Fetch ALL of the customer's configured systems so the LLM can use any of them
     const allSystems = await context.datastore.listSystems({
       limit: 1000,
       offset: 0,

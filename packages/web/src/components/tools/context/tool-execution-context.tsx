@@ -199,7 +199,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
         id: s.id,
         executionMode: s.executionMode,
         loopSelector: s.loopSelector,
-        integrationId: s.integrationId,
+        systemId: s.systemId,
         apiConfig: s.apiConfig,
         modify: s.modify,
         failureBehavior: s.failureBehavior,
@@ -515,9 +515,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       const currentItemObj = deriveCurrentItem(dsResult.output);
 
       const linkedSystem =
-        step.integrationId && systems
-          ? systems.find((sys) => sys.id === step.integrationId)
-          : undefined;
+        step.systemId && systems ? systems.find((sys) => sys.id === step.systemId) : undefined;
 
       const systemCredentials = flattenAndNamespaceCredentials(linkedSystem ? [linkedSystem] : []);
       const paginationData = buildPaginationData(step.apiConfig?.pagination);

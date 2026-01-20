@@ -68,7 +68,7 @@ export function FixStepDialog({
       const result = await generateConfig({
         currentStepConfig: updatedStepConfig,
         stepInput,
-        integrationId: systemId,
+        systemId: systemId,
         errorMessage,
       });
 

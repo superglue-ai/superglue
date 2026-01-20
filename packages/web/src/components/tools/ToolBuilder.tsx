@@ -62,7 +62,7 @@ import { Textarea } from "../ui/textarea";
 type ToolBuilderView = "systems" | "instructions";
 
 export interface BuildContext {
-  integrationIds: string[];
+  systemIds: string[];
   instruction: string;
   payload: string;
   responseSchema: string;
@@ -420,7 +420,7 @@ export function ToolBuilder({
       const response = await client.buildWorkflow({
         instruction: instruction,
         payload: effectivePayload,
-        integrationIds: selectedSystemIds,
+        systemIds: selectedSystemIds,
         responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
         save: false,
       });
@@ -430,7 +430,7 @@ export function ToolBuilder({
       }
 
       const context: BuildContext = {
-        integrationIds: selectedSystemIds,
+        systemIds: selectedSystemIds,
         instruction,
         payload,
         responseSchema,

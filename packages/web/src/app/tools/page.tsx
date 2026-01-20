@@ -298,33 +298,33 @@ const ToolsTable = () => {
               </TableRow>
             ) : (
               currentConfigs.map((tool) => {
-                const allIntegrationIds = new Set<string>();
+                const allSystemIds = new Set<string>();
 
-                if (tool.integrationIds) {
-                  tool.integrationIds.forEach((id) => allIntegrationIds.add(id));
+                if (tool.systemIds) {
+                  tool.systemIds.forEach((id) => allSystemIds.add(id));
                 }
 
                 if (tool.steps) {
                   tool.steps.forEach((step: any) => {
-                    if (step.integrationId) {
-                      allIntegrationIds.add(step.integrationId);
+                    if (step.systemId) {
+                      allSystemIds.add(step.systemId);
                     }
                   });
                 }
 
-                const integrationIdsArray = Array.from(allIntegrationIds);
+                const systemIdsArray = Array.from(allSystemIds);
 
                 return (
                   <TableRow key={tool.id} className="hover:bg-secondary">
                     <TableCell className="w-[60px]">
-                      {integrationIdsArray.length > 0 ? (
+                      {systemIdsArray.length > 0 ? (
                         <div className="flex items-center justify-center gap-1 flex-shrink-0">
-                          {integrationIdsArray.map((integrationId: string) => {
-                            const system = systems.find((s) => s.id === integrationId);
+                          {systemIdsArray.map((systemId: string) => {
+                            const system = systems.find((s) => s.id === systemId);
                             if (!system) return null;
                             const icon = getSystemIcon(system);
                             return icon ? (
-                              <TooltipProvider key={integrationId}>
+                              <TooltipProvider key={systemId}>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <svg
@@ -343,7 +343,7 @@ const ToolsTable = () => {
                                 </Tooltip>
                               </TooltipProvider>
                             ) : (
-                              <TooltipProvider key={integrationId}>
+                              <TooltipProvider key={systemId}>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />

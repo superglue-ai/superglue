@@ -8,7 +8,7 @@ import { MemoryStore } from "../datastore/memory.js";
 import type { DataStore } from "../datastore/types.js";
 
 /**
- * Creates and manages a mock HTTP server for integration tests
+ * Creates and manages a mock HTTP server for system tests
  */
 export class MockServerFactory {
   private server: any;

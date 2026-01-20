@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { SuperglueClient, Integration, Workflow, WorkflowResult, IntegrationList } from '@superglue/client';
+import { SuperglueClient, System, Workflow, WorkflowResult, SystemList } from '@superglue/client';
 
-const INTEGRATION_ID = 'github-test';
+const SYSTEM_ID = 'github-test';
 let client: SuperglueClient;
 let toolId: string | null = null;
 
@@ -26,15 +26,15 @@ afterAll(async () => {
     if (toolId) {
       await client.deleteWorkflow(toolId).catch(() => {});
     }
-    await client.deleteIntegration(INTEGRATION_ID).catch(() => {});
+    await client.deleteSystem(SYSTEM_ID).catch(() => {});
   }
 });
 
-describe('Superglue SDK Integration Tests', () => {
-  it('should create GitHub integration', async () => {
+describe('Superglue SDK System Tests', () => {
+  it('should create GitHub system', async () => {
     const githubToken = process.env.GITHUB_API_TOKEN!;
     
-    const result = await client.upsertIntegration(INTEGRATION_ID, {
+    const result = await client.upsertSystem(SYSTEM_ID, {
       name: 'GitHub',
       urlHost: 'https://api.github.com',
       urlPath: '',
@@ -45,36 +45,36 @@ describe('Superglue SDK Integration Tests', () => {
       documentationKeywords: ['repositories', 'issues', 'pull_requests', 'commits']
     });
 
-    const integration: Integration = result;
-    expect(integration.id).toBe(INTEGRATION_ID);
-    expect(integration.name).toBe('GitHub');
+    const system: System = result;
+    expect(system.id).toBe(SYSTEM_ID);
+    expect(system.name).toBe('GitHub');
   });
 
-  it('should list integrations and find created one', async () => {
-    const result = await client.listIntegrations(50, 0);
+  it('should list systems and find created one', async () => {
+    const result = await client.listSystems(50, 0);
     
-    const integrationsList: IntegrationList = result;
-    const foundIntegration = integrationsList.items.find(i => i.id === INTEGRATION_ID);
+    const systemsList: SystemList = result;
+    const foundSystem = systemsList.items.find(i => i.id === SYSTEM_ID);
 
-    expect(foundIntegration).toBeDefined();
-    expect(foundIntegration?.id).toBe(INTEGRATION_ID);
-    expect(foundIntegration?.name).toBe('GitHub');
+    expect(foundSystem).toBeDefined();
+    expect(foundSystem?.id).toBe(SYSTEM_ID);
+    expect(foundSystem?.name).toBe('GitHub');
   });
 
-  it('should update integration', async () => {
-    const result = await client.upsertIntegration(INTEGRATION_ID, {
+  it('should update system', async () => {
+    const result = await client.upsertSystem(SYSTEM_ID, {
       name: 'GitHub Updated',
       documentationKeywords: ['repositories', 'issues', 'pull_requests', 'commits', 'branches']
     });
 
-    const integration: Integration = result;
-    expect(integration.name).toBe('GitHub Updated');
+    const system: System = result;
+    expect(system.name).toBe('GitHub Updated');
   });
 
   it('should build a workflow', async () => {
     const result = await client.buildWorkflow({
       instruction: 'List all repositories for the authenticated user. I want the final output to be a JSON object with the following structure: { repositories: [{id: number, name: string, isPublic: boolean}] }.',
-      integrationIds: [INTEGRATION_ID],
+      systemIds: [SYSTEM_ID],
       payload: {},
       save: true
     });
@@ -94,7 +94,7 @@ describe('Superglue SDK Integration Tests', () => {
       id: toolId!,
       payload: {},
       credentials: {
-        [`${INTEGRATION_ID}_api_token`]: githubToken
+        [`${SYSTEM_ID}_api_token`]: githubToken
       }
     });
 
@@ -103,13 +103,13 @@ describe('Superglue SDK Integration Tests', () => {
     expect(workflowResult.data).toBeDefined();
   });
 
-  it('should verify integration modifications', async () => {
-    const result = await client.listIntegrations(50, 0);
+  it('should verify system modifications', async () => {
+    const result = await client.listSystems(50, 0);
     
-    const integrationsList: IntegrationList = result;
-    const verifiedIntegration = integrationsList.items.find(i => i.id === INTEGRATION_ID);
+    const systemsList: SystemList = result;
+    const verifiedSystem = systemsList.items.find(i => i.id === SYSTEM_ID);
 
-    expect(verifiedIntegration?.name).toBe('GitHub Updated');
+    expect(verifiedSystem?.name).toBe('GitHub Updated');
   });
 
   it('should list workflows and find created one', async () => {
@@ -132,15 +132,15 @@ describe('Superglue SDK Integration Tests', () => {
     toolId = null;
   });
 
-  it('should delete integration', async () => {
-    const deleted = await client.deleteIntegration(INTEGRATION_ID);
+  it('should delete system', async () => {
+    const deleted = await client.deleteSystem(SYSTEM_ID);
     expect(deleted).toBe(true);
   });
 
   it('should verify cleanup', async () => {
-    const integrationsResult = await client.listIntegrations(50, 0);
-    const integrationsList: IntegrationList = integrationsResult;
-    const stillExists = integrationsList.items.find(i => i.id === INTEGRATION_ID);
+    const systemsResult = await client.listSystems(50, 0);
+    const systemsList: SystemList = systemsResult;
+    const stillExists = systemsList.items.find(i => i.id === SYSTEM_ID);
 
     expect(stillExists).toBeUndefined();
 

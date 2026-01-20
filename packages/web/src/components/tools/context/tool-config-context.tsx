@@ -198,8 +198,8 @@ export function ToolConfigProvider({
   const getStepSystem = useCallback(
     (stepId: string) => {
       const step = steps.find((s) => s.id === stepId);
-      if (!step?.integrationId) return undefined;
-      return systems.find((i) => i.id === step.integrationId);
+      if (!step?.systemId) return undefined;
+      return systems.find((i) => i.id === step.systemId);
     },
     [steps, systems],
   );

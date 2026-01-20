@@ -63,7 +63,7 @@ export interface OpenAPIToolStep {
   headers?: Record<string, unknown>;
   body?: string;
   pagination?: OpenAPIPagination;
-  integrationId?: string;
+  systemId?: string;
   instruction?: string;
   modify?: boolean;
   dataSelector?: string;

@@ -274,32 +274,32 @@ describe("getWorkflowBuilderContext budget and include combinations", () => {
     const out = getToolBuilderContext(input, {
       characterBudget: 800,
       include: {
-        integrationContext: true,
+        systemContext: true,
         availableVariablesContext: true,
         payloadContext: true,
         userInstruction: true,
       },
     });
     expect(out.length).toBeLessThanOrEqual(820);
-    expect(out).toMatch(/<available_integrations_and_documentation>/);
+    expect(out).toMatch(/<available_systems_and_documentation>/);
     expect(out).toMatch(/<available_variables>/);
     expect(out).toMatch(/<workflow_input>/);
     expect(out).toMatch(/<instruction>/);
   });
 
-  it("no integrations path emits transform-only hint and enforces budget", () => {
+  it("no systems path emits transform-only hint and enforces budget", () => {
     const input = { systems: [], payload: { q: 1 }, userInstruction: "Transform data" } as any;
     const out = getToolBuilderContext(input, {
       characterBudget: 500,
       include: {
-        integrationContext: true,
+        systemContext: true,
         availableVariablesContext: false,
         payloadContext: false,
         userInstruction: true,
       },
     });
     expect(out.length).toBeLessThanOrEqual(500);
-    expect(out).toMatch(/No integrations provided\. Build a transform-only workflow/);
+    expect(out).toMatch(/No systems provided\. Build a transform-only workflow/);
   });
 
   it("available variables include system credentials and payload keys when requested", () => {

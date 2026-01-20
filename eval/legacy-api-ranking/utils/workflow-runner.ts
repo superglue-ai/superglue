@@ -273,7 +273,7 @@ export class WorkflowRunner {
                     { tool: workflow, metadata: metadataWithWorkflowId, systems: SystemManager.fromSystems(systems, this.datastore, this.metadata) }
                 );
 
-                // Combine all credentials from integrations
+                // Combine all credentials from systems
                 const allCredentials = systems.reduce((acc, system) => {
                     if (system.credentials && typeof system.credentials === 'object') {
                         for (const [key, value] of Object.entries(system.credentials)) {
@@ -354,12 +354,12 @@ export class WorkflowRunner {
         const results: WorkflowRunResult[] = [];
 
         for (const workflow of workflows) {
-            // Get integrations for this workflow
+            // Get systems for this workflow
             const workflowSystems = systems.filter(i =>
-                workflow.integrationIds.includes(i.id)
+                workflow.systemIds.includes(i.id)
             );
 
-            if (workflowSystems.length !== workflow.integrationIds.length) {
+            if (workflowSystems.length !== workflow.systemIds.length) {
                 logMessage('warn',
                     `⚠️  Workflow ${workflow.name} requires systems that are not available`,
                     this.metadata

@@ -620,7 +620,7 @@ function ToolPlaygroundInner({
               stepResultsMap,
               fixStepIndex - 1,
             )}
-            systemId={steps[fixStepIndex]?.integrationId}
+            systemId={steps[fixStepIndex]?.systemId}
             errorMessage={(() => {
               const result = stepResultsMap[steps[fixStepIndex]?.id];
               const msg = typeof result === "string" ? result : result?.error;

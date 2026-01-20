@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { SuperglueClient } from '@superglue/client';
 
-const INTEGRATION_ID = 'github-test';
+const SYSTEM_ID = 'github-test';
 let client: SuperglueClient;
 let toolId: string | null = null;
 
@@ -24,12 +24,12 @@ afterAll(async () => {
   if (toolId) {
     await client.deleteWorkflow(toolId).catch(() => {});
   }
-  await client.deleteIntegration(INTEGRATION_ID).catch(() => {});
+  await client.deleteSystem(SYSTEM_ID).catch(() => {});
 });
 
 describe('Superglue SDK Integration Tests', () => {
-  it('should create GitHub integration', async () => {
-    const integration = await client.upsertIntegration(INTEGRATION_ID, {
+  it('should create GitHub system', async () => {
+    const system = await client.upsertSystem(SYSTEM_ID, {
       name: 'GitHub',
       urlHost: 'https://api.github.com',
       urlPath: '',
@@ -40,32 +40,32 @@ describe('Superglue SDK Integration Tests', () => {
       documentationKeywords: ['repositories', 'issues', 'pull_requests', 'commits']
     });
 
-    expect(integration.id).toBe(INTEGRATION_ID);
-    expect(integration.name).toBe('GitHub');
+    expect(system.id).toBe(SYSTEM_ID);
+    expect(system.name).toBe('GitHub');
   });
 
-  it('should list integrations and find created one', async () => {
-    const integrationsList = await client.listIntegrations(50, 0);
-    const foundIntegration = integrationsList.items.find(i => i.id === INTEGRATION_ID);
+  it('should list systems and find created one', async () => {
+    const systemsList = await client.listSystems(50, 0);
+    const foundSystem = systemsList.items.find(s => s.id === SYSTEM_ID);
 
-    expect(foundIntegration).toBeDefined();
-    expect(foundIntegration?.id).toBe(INTEGRATION_ID);
-    expect(foundIntegration?.name).toBe('GitHub');
+    expect(foundSystem).toBeDefined();
+    expect(foundSystem?.id).toBe(SYSTEM_ID);
+    expect(foundSystem?.name).toBe('GitHub');
   });
 
-  it('should update integration', async () => {
-    const updatedIntegration = await client.upsertIntegration(INTEGRATION_ID, {
+  it('should update system', async () => {
+    const updatedSystem = await client.upsertSystem(SYSTEM_ID, {
       name: 'GitHub Updated',
       documentationKeywords: ['repositories', 'issues', 'pull_requests', 'commits', 'branches']
     });
 
-    expect(updatedIntegration.name).toBe('GitHub Updated');
+    expect(updatedSystem.name).toBe('GitHub Updated');
   });
 
   it('should build a workflow', async () => {
     const tool = await client.buildWorkflow({
       instruction: 'List all repositories for the authenticated user. I want the final output to be a JSON object with the following structure: { repositories: [{id: number, name: string, isPublic: boolean}] }.',
-      integrationIds: [INTEGRATION_ID],
+      systemIds: [SYSTEM_ID],
       payload: {},
       save: true
     });
@@ -82,7 +82,7 @@ describe('Superglue SDK Integration Tests', () => {
       id: toolId!,
       payload: {},
       credentials: {
-        [`${INTEGRATION_ID}_api_token`]: githubToken!
+        [`${SYSTEM_ID}_api_token`]: githubToken!
       }
     });
 
@@ -90,11 +90,11 @@ describe('Superglue SDK Integration Tests', () => {
     expect(result.data).toBeDefined();
   });
 
-  it('should verify integration modifications', async () => {
-    const verifyList = await client.listIntegrations(50, 0);
-    const verifiedIntegration = verifyList.items.find(i => i.id === INTEGRATION_ID);
+  it('should verify system modifications', async () => {
+    const verifyList = await client.listSystems(50, 0);
+    const verifiedSystem = verifyList.items.find(i => i.id === SYSTEM_ID);
 
-    expect(verifiedIntegration?.name).toBe('GitHub Updated');
+    expect(verifiedSystem?.name).toBe('GitHub Updated');
   });
 
   it('should list workflows and find created one', async () => {
@@ -115,14 +115,14 @@ describe('Superglue SDK Integration Tests', () => {
     toolId = null;
   });
 
-  it('should delete integration', async () => {
-    const deleted = await client.deleteIntegration(INTEGRATION_ID);
+  it('should delete system', async () => {
+    const deleted = await client.deleteSystem(SYSTEM_ID);
     expect(deleted).toBe(true);
   });
 
   it('should verify cleanup', async () => {
-    const finalIntegrationsList = await client.listIntegrations(50, 0);
-    const stillExists = finalIntegrationsList.items.find(i => i.id === INTEGRATION_ID);
+    const finalSystemsList = await client.listSystems(50, 0);
+    const stillExists = finalSystemsList.items.find(i => i.id === SYSTEM_ID);
 
     expect(stillExists).toBeUndefined();
 

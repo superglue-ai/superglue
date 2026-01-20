@@ -88,7 +88,7 @@ describe("tools API helpers", () => {
           body: '{"name": "test"}',
           instruction: "Fetch users",
         },
-        integrationId: "system-123",
+        systemId: "system-123",
         modify: true,
         loopSelector: "$.data[*]",
         failureBehavior: "CONTINUE",
@@ -100,7 +100,7 @@ describe("tools API helpers", () => {
       expect(result.headers).toEqual({ "X-Api-Key": "secret" });
       expect(result.body).toBe('{"name": "test"}');
       expect(result.instruction).toBe("Fetch users");
-      expect(result.integrationId).toBe("system-123");
+      expect(result.systemId).toBe("system-123");
       expect(result.modify).toBe(true);
       expect(result.dataSelector).toBe("$.data[*]");
       expect(result.failureBehavior).toBe("continue");
