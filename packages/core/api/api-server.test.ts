@@ -173,27 +173,10 @@ describe("checkRestrictedAccess", () => {
       expect(result.error).toBe("This API key is not authorized for this tool");
     });
 
-    it("should allow access when allowedTools is undefined (all tools allowed)", () => {
+    it("should allow access when allowedTools is ['*'] (all tools allowed)", () => {
       const authInfo = createAuthInfo({
         isRestricted: true,
-        allowedTools: undefined,
-      });
-      const request = createMockRequest({
-        routeOptions: { url: "/v1/tools/:toolId/run" },
-        params: { toolId: "any-tool-id" },
-      });
-      mockGetRoutePermission.mockReturnValue(toolPermissions);
-
-      const result = checkRestrictedAccess(authInfo, request);
-
-      expect(result.allowed).toBe(true);
-      expect(result.error).toBeUndefined();
-    });
-
-    it("should allow access when allowedTools is null (all tools allowed)", () => {
-      const authInfo = createAuthInfo({
-        isRestricted: true,
-        allowedTools: null as unknown as string[],
+        allowedTools: ["*"],
       });
       const request = createMockRequest({
         routeOptions: { url: "/v1/tools/:toolId/run" },
@@ -309,10 +292,8 @@ describe("checkRestrictedAccess", () => {
   });
 
   describe("regression tests", () => {
-    it("should allow execute permission when allowedTools is undefined - bug fix for all tools allowed", () => {
-      // This test specifically covers the bug where restricted keys with
-      // "all tools allowed" (allowedTools: undefined) were incorrectly denied
-      // access to the execute endpoint.
+    it("should allow execute permission when allowedTools is ['*'] - all tools allowed", () => {
+      // This test covers restricted keys with "all tools allowed" (allowedTools: ['*'])
       const toolPermissions: RoutePermission = {
         type: "execute",
         resource: "tool",
@@ -321,7 +302,7 @@ describe("checkRestrictedAccess", () => {
       };
       const authInfo = createAuthInfo({
         isRestricted: true,
-        allowedTools: undefined, // "all tools allowed"
+        allowedTools: ["*"], // "all tools allowed"
       });
       const request = createMockRequest({
         method: "POST",
@@ -332,13 +313,11 @@ describe("checkRestrictedAccess", () => {
 
       const result = checkRestrictedAccess(authInfo, request);
 
-      // Before the fix, this would return { allowed: false }
-      // because !undefined?.includes(x) is true
       expect(result.allowed).toBe(true);
       expect(result.error).toBeUndefined();
     });
 
-    it("should allow read permission when allowedTools is undefined", () => {
+    it("should allow read permission when allowedTools is ['*']", () => {
       const toolPermissions: RoutePermission = {
         type: "read",
         resource: "tool",
@@ -347,7 +326,7 @@ describe("checkRestrictedAccess", () => {
       };
       const authInfo = createAuthInfo({
         isRestricted: true,
-        allowedTools: undefined,
+        allowedTools: ["*"],
       });
       const request = createMockRequest({
         method: "GET",

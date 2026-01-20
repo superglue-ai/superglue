@@ -7,7 +7,7 @@
 
 export interface ScopeContext {
   isRestricted?: boolean;
-  allowedTools?: string[] | null;
+  allowedTools?: string[]; // ['*'] means all tools allowed
 }
 
 // Default implementations (allow everything)

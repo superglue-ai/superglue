@@ -34,8 +34,10 @@ export function checkRestrictedAccess(
   if (permissions.checkResourceId) {
     const params = request.params as Record<string, string>;
     const resourceId = params[permissions.checkResourceId];
-    // If allowedTools is null/undefined, it means ALL tools are allowed for this restricted key
-    if (resourceId && authInfo.allowedTools && !authInfo.allowedTools.includes(resourceId)) {
+    // ['*'] means ALL tools are allowed for this restricted key
+    const isAllToolsAllowed =
+      authInfo.allowedTools?.length === 1 && authInfo.allowedTools[0] === "*";
+    if (resourceId && !isAllToolsAllowed && !authInfo.allowedTools?.includes(resourceId)) {
       return { allowed: false, error: "This API key is not authorized for this tool" };
     }
   }
@@ -158,7 +160,7 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
 
     // Single log per request with method, endpoint, using ServiceMetadata
     const metadata = authenticatedRequest.toMetadata();
-    logMessage("info", `(REST API) ${request.method} ${request.url}`, metadata);
+    logMessage("debug", `(REST API) ${request.method} ${request.url}`, metadata);
   });
 
   // Register all API routes from modules
