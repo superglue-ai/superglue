@@ -16,7 +16,7 @@ import { InstructionDisplay } from "./shared/InstructionDisplay";
 
 interface PayloadItem {
   type: "payload";
-  data: { payloadText: string; inputSchema: string | null; };
+  data: { payloadText: string; inputSchema: string | null };
   stepResult: undefined;
   transformError: undefined;
   categorizedSources: ReturnType<typeof buildCategorizedSources>;
@@ -32,7 +32,7 @@ interface StepItem {
 
 interface TransformItem {
   type: "transform";
-  data: { transform: string; responseSchema: string; };
+  data: { transform: string; responseSchema: string };
   stepResult: any;
   transformError: any;
   hasTransformCompleted: boolean;
@@ -181,23 +181,23 @@ export function ToolStepGallery({
       ),
       ...(finalTransform !== undefined
         ? [
-          {
-            type: "transform",
-            data: { transform: finalTransform, responseSchema },
-            stepResult: finalResult,
-            transformError: hasTransformFailed ? stepResultsMap["__final_transform__"] : null,
-            hasTransformCompleted,
-            categorizedSources: buildCategorizedSources({
-              manualPayload,
-              filePayloads: filePayloads || {},
-              previousStepResults: buildPreviousStepResults(
-                steps,
-                stepResultsMap,
-                steps.length - 1,
-              ),
-            }),
-          } as TransformItem,
-        ]
+            {
+              type: "transform",
+              data: { transform: finalTransform, responseSchema },
+              stepResult: finalResult,
+              transformError: hasTransformFailed ? stepResultsMap["__final_transform__"] : null,
+              hasTransformCompleted,
+              categorizedSources: buildCategorizedSources({
+                manualPayload,
+                filePayloads: filePayloads || {},
+                previousStepResults: buildPreviousStepResults(
+                  steps,
+                  stepResultsMap,
+                  steps.length - 1,
+                ),
+              }),
+            } as TransformItem,
+          ]
         : []),
     ],
     [
@@ -408,8 +408,8 @@ export function ToolStepGallery({
                 className={cn(
                   "shrink-0 h-9 w-9",
                   hiddenLeftCount > 0 &&
-                  !isPayloadValid &&
-                  "ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30 animate-pulse",
+                    !isPayloadValid &&
+                    "ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30 animate-pulse",
                 )}
                 title="Previous"
               >
