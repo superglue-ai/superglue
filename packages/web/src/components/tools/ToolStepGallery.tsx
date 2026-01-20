@@ -1,15 +1,15 @@
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
-import { buildStepInput, buildPreviousStepResults, cn } from "@/src/lib/general-utils";
+import { buildPreviousStepResults, buildStepInput, cn } from "@/src/lib/general-utils";
 import { buildCategorizedSources } from "@/src/lib/templating-utils";
-import { AuthType, ExecutionStep, HttpMethod } from "@superglue/shared";
+import { ExecutionStep, HttpMethod } from "@superglue/shared";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FinalTransformMiniStepCard } from "./cards/FinalTransformCard";
 import { MiniStepCard } from "./cards/MiniStepCard";
 import { PayloadMiniStepCard } from "./cards/PayloadCard";
 import { SpotlightStepCard } from "./cards/SpotlightStepCard";
-import { useToolConfig, useExecution } from "./context";
+import { useExecution, useToolConfig } from "./context";
 import { AddStepDialog } from "./dialogs/AddStepDialog";
 import { useGalleryNavigation } from "./hooks/use-gallery-navigation";
 import { InstructionDisplay } from "./shared/InstructionDisplay";
@@ -372,7 +372,7 @@ export function ToolStepGallery({
             {typeof toolId !== "undefined" && (
               <div className="flex w-full items-center justify-between gap-3 mb-2">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <h1 className="text-2xl font-bold truncate">{toolId || "Untitled Tool"}</h1>
+                  <h1 className="text-xl font-semibold truncate">{toolId || "Untitled Tool"}</h1>
                   {toolActionButtons}
                 </div>
                 <div className="flex items-center gap-2">{headerActions ?? null}</div>

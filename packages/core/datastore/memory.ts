@@ -307,6 +307,24 @@ export class MemoryStore implements DataStore {
     return newWorkflow;
   }
 
+  // Tool History Methods (no-op for MemoryStore)
+  async listToolHistory(_params: {
+    toolId: string;
+    orgId?: string;
+  }): Promise<import("./types.js").ToolHistoryEntry[]> {
+    return [];
+  }
+
+  async restoreToolVersion(params: {
+    toolId: string;
+    version: number;
+    orgId?: string;
+    userId?: string;
+    userEmail?: string;
+  }): Promise<Tool> {
+    throw new Error("Tool history not supported in MemoryStore");
+  }
+
   // System Methods
   async getSystem(params: {
     id: string;

@@ -604,7 +604,25 @@ export class FileStore implements DataStore {
     return newWorkflow;
   }
 
-  // System Methods (uses 'integration' key internally for backward compat)
+  // Tool History Methods (no-op for FileStore)
+  async listToolHistory(_params: {
+    toolId: string;
+    orgId?: string;
+  }): Promise<import("./types.js").ToolHistoryEntry[]> {
+    return [];
+  }
+
+  async restoreToolVersion(params: {
+    toolId: string;
+    version: number;
+    orgId?: string;
+    userId?: string;
+    userEmail?: string;
+  }): Promise<Tool> {
+    throw new Error("Tool history not supported in FileStore");
+  }
+
+  // Integration Methods
   async getSystem(params: {
     id: string;
     includeDocs?: boolean;

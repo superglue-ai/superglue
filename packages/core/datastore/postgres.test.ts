@@ -407,6 +407,133 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
       });
     });
 
+    describe("Tool History", () => {
+      const testWorkflow: Tool = {
+        id: "test-history-workflow",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        instruction: "Test workflow v1",
+        steps: [],
+        inputSchema: {},
+      };
+
+      it("should archive previous version on upsert", async () => {
+        // First save
+        await store.upsertWorkflow({
+          id: testWorkflow.id,
+          workflow: testWorkflow,
+          orgId: testOrgId,
+          userId: "user-1",
+          userEmail: "user1@test.com",
+        });
+
+        // Second save with changes
+        const updatedWorkflow = { ...testWorkflow, instruction: "Test workflow v2" };
+        await store.upsertWorkflow({
+          id: testWorkflow.id,
+          workflow: updatedWorkflow,
+          orgId: testOrgId,
+          userId: "user-2",
+          userEmail: "user2@test.com",
+        });
+
+        // Check history
+        const history = await store.listToolHistory({
+          toolId: testWorkflow.id,
+          orgId: testOrgId,
+        });
+
+        expect(history).toHaveLength(1);
+        expect(history[0].version).toBe(1);
+        expect(history[0].tool.instruction).toBe("Test workflow v1");
+        expect(history[0].createdByUserId).toBe("user-2");
+        expect(history[0].createdByEmail).toBe("user2@test.com");
+      });
+
+      it("should return empty history for new tool", async () => {
+        await store.upsertWorkflow({
+          id: "brand-new-tool",
+          workflow: { ...testWorkflow, id: "brand-new-tool" },
+          orgId: testOrgId,
+        });
+
+        const history = await store.listToolHistory({
+          toolId: "brand-new-tool",
+          orgId: testOrgId,
+        });
+
+        expect(history).toHaveLength(0);
+      });
+
+      it("should restore a previous version", async () => {
+        // Create initial version
+        await store.upsertWorkflow({
+          id: testWorkflow.id,
+          workflow: { ...testWorkflow, instruction: "Original" },
+          orgId: testOrgId,
+        });
+
+        // Update to v2
+        await store.upsertWorkflow({
+          id: testWorkflow.id,
+          workflow: { ...testWorkflow, instruction: "Updated" },
+          orgId: testOrgId,
+        });
+
+        // Update to v3
+        await store.upsertWorkflow({
+          id: testWorkflow.id,
+          workflow: { ...testWorkflow, instruction: "Updated again" },
+          orgId: testOrgId,
+        });
+
+        // History should have 2 entries (v1 and v2)
+        let history = await store.listToolHistory({
+          toolId: testWorkflow.id,
+          orgId: testOrgId,
+        });
+        expect(history).toHaveLength(2);
+
+        // Restore v1
+        const restored = await store.restoreToolVersion({
+          toolId: testWorkflow.id,
+          version: 1,
+          orgId: testOrgId,
+          userId: "restorer",
+          userEmail: "restorer@test.com",
+        });
+
+        expect(restored.instruction).toBe("Original");
+
+        // Current should now be "Original"
+        const current = await store.getWorkflow({ id: testWorkflow.id, orgId: testOrgId });
+        expect(current?.instruction).toBe("Original");
+
+        // History should now have 3 entries (v1, v2, v3 - the "Updated again" that was current)
+        history = await store.listToolHistory({
+          toolId: testWorkflow.id,
+          orgId: testOrgId,
+        });
+        expect(history).toHaveLength(3);
+      });
+
+      it("should throw error when restoring non-existent version", async () => {
+        await store.upsertWorkflow({
+          id: testWorkflow.id,
+          workflow: testWorkflow,
+          orgId: testOrgId,
+        });
+
+        await expect(
+          store.restoreToolVersion({
+            toolId: testWorkflow.id,
+            version: 999,
+            orgId: testOrgId,
+          }),
+        ).rejects.toThrow("Version 999 not found");
+      });
+    });
+
     describe("Workflow Schedule", () => {
       const testWorkflow: Tool = {
         id: "test-workflow-id",

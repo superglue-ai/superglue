@@ -66,9 +66,25 @@ export interface DataStore {
     offset?: number;
     orgId?: string;
   }): Promise<{ items: Tool[]; total: number }>;
-  upsertWorkflow(params: { id: string; workflow: Tool; orgId?: string }): Promise<Tool>;
+  upsertWorkflow(params: {
+    id: string;
+    workflow: Tool;
+    orgId?: string;
+    userId?: string;
+    userEmail?: string;
+  }): Promise<Tool>;
   deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean>;
   renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Tool>;
+
+  // Tool History Methods (Postgres-only, returns empty for other stores)
+  listToolHistory(params: { toolId: string; orgId?: string }): Promise<ToolHistoryEntry[]>;
+  restoreToolVersion(params: {
+    toolId: string;
+    version: number;
+    orgId?: string;
+    userId?: string;
+    userEmail?: string;
+  }): Promise<Tool>;
 
   // Tenant Information Methods
   getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }>;
@@ -152,4 +168,12 @@ export interface DataStore {
 
 export type ToolScheduleInternal = ToolSchedule & {
   orgId: string;
+};
+
+export type ToolHistoryEntry = {
+  version: number;
+  createdAt: Date;
+  createdByUserId?: string;
+  createdByEmail?: string;
+  tool: Tool;
 };
