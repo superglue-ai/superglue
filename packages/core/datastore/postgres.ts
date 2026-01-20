@@ -34,8 +34,8 @@ export class PostgresService implements DataStore {
       min: 2,
       ssl:
         config.ssl === false ||
-          config.host.includes("localhost") ||
-          config.host.includes("127.0.0.1")
+        config.host.includes("localhost") ||
+        config.host.includes("127.0.0.1")
           ? false
           : { rejectUnauthorized: false },
     });
@@ -56,7 +56,7 @@ export class PostgresService implements DataStore {
         logMessage(
           "error",
           "[CRITICAL] Postgres connection failed: " +
-          (err instanceof Error ? err.message : String(err)),
+            (err instanceof Error ? err.message : String(err)),
         );
         process.exit(1);
       })
@@ -440,7 +440,7 @@ export class PostgresService implements DataStore {
     limit = 10,
     offset = 0,
     orgId?: string,
-  ): Promise<{ items: T[]; total: number; }> {
+  ): Promise<{ items: T[]; total: number }> {
     const client = await this.pool.connect();
     try {
       const countResult = await client.query(
@@ -503,7 +503,7 @@ export class PostgresService implements DataStore {
   }
 
   // API Config Methods
-  async getApiConfig(params: { id: string; orgId?: string; }): Promise<ApiConfig | null> {
+  async getApiConfig(params: { id: string; orgId?: string }): Promise<ApiConfig | null> {
     const { id, orgId } = params;
     return this.getConfig<ApiConfig>(id, "api", orgId);
   }
@@ -512,7 +512,7 @@ export class PostgresService implements DataStore {
     limit?: number;
     offset?: number;
     orgId?: string;
-  }): Promise<{ items: ApiConfig[]; total: number; }> {
+  }): Promise<{ items: ApiConfig[]; total: number }> {
     const { limit = 10, offset = 0, orgId } = params || {};
     return this.listConfigs<ApiConfig>("api", limit, offset, orgId);
   }
@@ -526,13 +526,13 @@ export class PostgresService implements DataStore {
     return this.upsertConfig(id, config, "api", orgId);
   }
 
-  async deleteApiConfig(params: { id: string; orgId?: string; }): Promise<boolean> {
+  async deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean> {
     const { id, orgId } = params;
     return this.deleteConfig(id, "api", orgId);
   }
 
   // Run Methods
-  async getRun(params: { id: string; orgId?: string; }): Promise<Run | null> {
+  async getRun(params: { id: string; orgId?: string }): Promise<Run | null> {
     const { id, orgId } = params;
     if (!id) return null;
     const client = await this.pool.connect();
@@ -564,7 +564,7 @@ export class PostgresService implements DataStore {
     configId?: string;
     status?: RunStatus;
     orgId?: string;
-  }): Promise<{ items: Run[]; total: number; }> {
+  }): Promise<{ items: Run[]; total: number }> {
     const { limit = 10, offset = 0, configId, status, orgId } = params || {};
     const client = await this.pool.connect();
     try {
@@ -617,7 +617,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async createRun(params: { run: Run; }): Promise<Run> {
+  async createRun(params: { run: Run }): Promise<Run> {
     const { run } = params;
     if (!run) throw new Error("Run is required");
     const client = await this.pool.connect();
@@ -650,7 +650,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async updateRun(params: { id: string; orgId: string; updates: Partial<Run>; }): Promise<Run> {
+  async updateRun(params: { id: string; orgId: string; updates: Partial<Run> }): Promise<Run> {
     const { id, orgId, updates } = params;
     const client = await this.pool.connect();
     try {
@@ -770,7 +770,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async getWorkflow(params: { id: string; orgId?: string; }): Promise<Tool | null> {
+  async getWorkflow(params: { id: string; orgId?: string }): Promise<Tool | null> {
     const { id, orgId } = params;
     return this.getConfig<Tool>(id, "workflow", orgId);
   }
@@ -779,7 +779,7 @@ export class PostgresService implements DataStore {
     limit?: number;
     offset?: number;
     orgId?: string;
-  }): Promise<{ items: Tool[]; total: number; }> {
+  }): Promise<{ items: Tool[]; total: number }> {
     const { limit = 10, offset = 0, orgId } = params || {};
     return this.listConfigs<Tool>("workflow", limit, offset, orgId);
   }
@@ -858,12 +858,12 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async deleteWorkflow(params: { id: string; orgId?: string; }): Promise<boolean> {
+  async deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean> {
     const { id, orgId } = params;
     return this.deleteConfig(id, "workflow", orgId);
   }
 
-  async renameWorkflow(params: { oldId: string; newId: string; orgId?: string; }): Promise<Tool> {
+  async renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Tool> {
     const { oldId, newId, orgId = "" } = params;
     const client = await this.pool.connect();
 
@@ -948,7 +948,7 @@ export class PostgresService implements DataStore {
   }
 
   // Tool History Methods
-  async listToolHistory(params: { toolId: string; orgId?: string; }): Promise<ToolHistoryEntry[]> {
+  async listToolHistory(params: { toolId: string; orgId?: string }): Promise<ToolHistoryEntry[]> {
     const { toolId, orgId = "" } = params;
     const client = await this.pool.connect();
     try {
@@ -1097,7 +1097,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async upsertToolSchedule({ schedule }: { schedule: ToolScheduleInternal; }): Promise<void> {
+  async upsertToolSchedule({ schedule }: { schedule: ToolScheduleInternal }): Promise<void> {
     const client = await this.pool.connect();
     try {
       const query = `
@@ -1133,7 +1133,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async deleteToolSchedule({ id, orgId }: { id: string; orgId: string; }): Promise<boolean> {
+  async deleteToolSchedule({ id, orgId }: { id: string; orgId: string }): Promise<boolean> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
@@ -1258,7 +1258,7 @@ export class PostgresService implements DataStore {
     offset?: number;
     includeDocs?: boolean;
     orgId?: string;
-  }): Promise<{ items: System[]; total: number; }> {
+  }): Promise<{ items: System[]; total: number }> {
     const { limit = 10, offset = 0, includeDocs = false, orgId } = params || {};
     const client = await this.pool.connect();
     try {
@@ -1317,7 +1317,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async upsertSystem(params: { id: string; system: System; orgId?: string; }): Promise<System> {
+  async upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System> {
     const { id, system, orgId } = params;
     if (!id || !system) return null;
     const client = await this.pool.connect();
@@ -1401,7 +1401,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async deleteSystem(params: { id: string; orgId?: string; }): Promise<boolean> {
+  async deleteSystem(params: { id: string; orgId?: string }): Promise<boolean> {
     const { id, orgId } = params;
     if (!id) return false;
     const client = await this.pool.connect();
@@ -1445,7 +1445,7 @@ export class PostgresService implements DataStore {
   }
 
   // Tenant Information Methods
-  async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean; }> {
+  async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
@@ -1467,7 +1467,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async setTenantInfo(params?: { email?: string; emailEntrySkipped?: boolean; }): Promise<void> {
+  async setTenantInfo(params?: { email?: string; emailEntrySkipped?: boolean }): Promise<void> {
     const { email, emailEntrySkipped } = params || {};
     const client = await this.pool.connect();
     try {
@@ -1524,7 +1524,7 @@ export class PostgresService implements DataStore {
 
   async getTemplateOAuthCredentials(params: {
     templateId: string;
-  }): Promise<{ client_id: string; client_secret: string; } | null> {
+  }): Promise<{ client_id: string; client_secret: string } | null> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
@@ -1546,7 +1546,7 @@ export class PostgresService implements DataStore {
       logMessage(
         "debug",
         `No template OAuth credentials found for ${params.templateId}: ` +
-        (error instanceof Error ? error.message : String(error)),
+          (error instanceof Error ? error.message : String(error)),
       );
       return null;
     } finally {
@@ -1582,7 +1582,7 @@ export class PostgresService implements DataStore {
 
   async getOAuthSecret(params: {
     uid: string;
-  }): Promise<{ clientId: string; clientSecret: string; } | null> {
+  }): Promise<{ clientId: string; clientSecret: string } | null> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
@@ -1615,7 +1615,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string; }): Promise<DiscoveryRun> {
+  async createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string }): Promise<DiscoveryRun> {
     const { run, orgId = "" } = params;
     const client = await this.pool.connect();
     try {
@@ -1630,7 +1630,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async getDiscoveryRun(params: { id: string; orgId?: string; }): Promise<DiscoveryRun | null> {
+  async getDiscoveryRun(params: { id: string; orgId?: string }): Promise<DiscoveryRun | null> {
     const { id, orgId = "" } = params;
     const client = await this.pool.connect();
     try {
@@ -1698,7 +1698,7 @@ export class PostgresService implements DataStore {
     limit?: number;
     offset?: number;
     orgId?: string;
-  }): Promise<{ items: DiscoveryRun[]; total: number; }> {
+  }): Promise<{ items: DiscoveryRun[]; total: number }> {
     const { limit = 10, offset = 0, orgId = "" } = params || {};
     const client = await this.pool.connect();
     try {
@@ -1729,7 +1729,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async deleteDiscoveryRun(params: { id: string; orgId?: string; }): Promise<boolean> {
+  async deleteDiscoveryRun(params: { id: string; orgId?: string }): Promise<boolean> {
     const { id, orgId = "" } = params;
     const client = await this.pool.connect();
     try {
@@ -1772,7 +1772,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async getFileReference(params: { id: string; orgId?: string; }): Promise<FileReference | null> {
+  async getFileReference(params: { id: string; orgId?: string }): Promise<FileReference | null> {
     const { id, orgId = "" } = params;
     const client = await this.pool.connect();
     try {
@@ -1852,7 +1852,7 @@ export class PostgresService implements DataStore {
     limit?: number;
     offset?: number;
     orgId?: string;
-  }): Promise<{ items: FileReference[]; total: number; }> {
+  }): Promise<{ items: FileReference[]; total: number }> {
     const { fileIds, status, limit = 10, offset = 0, orgId = "" } = params || {};
     const client = await this.pool.connect();
     try {
@@ -1899,7 +1899,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async deleteFileReference(params: { id: string; orgId?: string; }): Promise<boolean> {
+  async deleteFileReference(params: { id: string; orgId?: string }): Promise<boolean> {
     const { id, orgId = "" } = params;
     const client = await this.pool.connect();
     try {
