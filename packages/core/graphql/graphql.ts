@@ -16,7 +16,7 @@ import {
   getOAuthClientCredentialsResolver,
   listSystemsResolver,
   searchSystemDocumentationResolver,
-  upsertSystemResolver
+  upsertSystemResolver,
 } from "./resolvers/systems.js";
 import { listRunsResolver } from "./resolvers/list.js";
 import { logsResolver } from "./resolvers/logs.js";
