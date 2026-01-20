@@ -30,7 +30,7 @@ export interface BuildSourceDataInput {
   credentials: Record<string, any>;
   dataSelector?: string;
   currentItem?: any;
-  integrationUrlHost: string;
+  systemUrlHost: string;
   paginationPageSize?: string | number;
 }
 
@@ -186,7 +186,7 @@ export async function buildSourceData(input: BuildSourceDataInput): Promise<Reco
     credentials,
     dataSelector,
     currentItem: providedCurrentItem,
-    integrationUrlHost,
+    systemUrlHost,
     paginationPageSize,
   } = input;
 
@@ -204,7 +204,7 @@ export async function buildSourceData(input: BuildSourceDataInput): Promise<Reco
     currentItem,
   };
 
-  const isHttp = integrationUrlHost?.startsWith("http");
+  const isHttp = systemUrlHost?.startsWith("http");
 
   if (isHttp) {
     const pageSize = String(paginationPageSize ?? 50);

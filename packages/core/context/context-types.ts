@@ -26,7 +26,7 @@ export type SystemContextOptions = {
 export type ToolBuilderContextOptions = {
   characterBudget: number;
   include?: {
-    integrationContext?: boolean;
+    systemContext?: boolean;
     availableVariablesContext?: boolean;
     payloadContext?: boolean;
     userInstruction?: boolean;

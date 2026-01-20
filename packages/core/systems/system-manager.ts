@@ -221,13 +221,13 @@ export class SystemManager {
   ): Promise<SystemManager[]> {
     const allIds = new Set<string>();
 
-    if (Array.isArray(tool.integrationIds)) {
-      tool.integrationIds.forEach((id) => allIds.add(id));
+    if (Array.isArray(tool.systemIds)) {
+      tool.systemIds.forEach((id) => allIds.add(id));
     }
     if (Array.isArray(tool.steps)) {
       tool.steps.forEach((step) => {
-        if (step.integrationId) {
-          allIds.add(step.integrationId);
+        if (step.systemId) {
+          allIds.add(step.systemId);
         }
       });
     }

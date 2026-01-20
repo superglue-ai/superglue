@@ -50,7 +50,7 @@ export class ToolExecutor implements Tool {
   public metadata: ServiceMetadata;
   public instruction?: string;
   public inputSchema?: JSONSchema;
-  public integrationIds: string[];
+  public systemIds: string[];
   public responseFilters?: ResponseFilter[];
   private systems: Record<string, SystemManager>;
   private strategyRegistry: StepExecutionStrategyRegistry;
@@ -73,7 +73,7 @@ export class ToolExecutor implements Tool {
       {} as Record<string, SystemManager>,
     );
 
-    this.integrationIds = tool.integrationIds;
+    this.systemIds = tool.systemIds;
 
     this.result = {
       id: crypto.randomUUID(),
@@ -158,7 +158,7 @@ export class ToolExecutor implements Tool {
         this.result.data = finalData;
         this.result.config = {
           id: this.id,
-          integrationIds: this.integrationIds,
+          systemIds: this.systemIds,
           steps: this.steps,
           finalTransform: finalTransformResult.finalTransform,
           inputSchema: this.inputSchema,
@@ -206,17 +206,17 @@ export class ToolExecutor implements Tool {
       let isLoopStep = false;
       let stepResults: any[] = [];
 
-      const systemManager = step.integrationId ? this.systems[step.integrationId] : undefined;
+      const systemManager = step.systemId ? this.systems[step.systemId] : undefined;
       let currentSystem: System | null = null;
       let loopPayload: any = null;
 
-      if (step.integrationId && !systemManager) {
+      if (step.systemId && !systemManager) {
         throw new Error(
-          `System '${step.integrationId}' not found. Available systems: ${Object.keys(this.systems).join(", ")}`,
+          `System '${step.systemId}' not found. Available systems: ${Object.keys(this.systems).join(", ")}`,
         );
       }
 
-      // Get integration early so it's available for self-healing even if data selector fails
+      // Get system early so it's available for self-healing even if data selector fails
       await systemManager?.refreshTokenIfNeeded();
       currentSystem = await systemManager?.getSystem();
 
@@ -264,7 +264,7 @@ export class ToolExecutor implements Tool {
 
             loopPayload = { currentItem, ...stepInput };
 
-            // Refresh integration token if needed (important for long-running loops)
+            // Refresh system token if needed (important for long-running loops)
             await systemManager?.refreshTokenIfNeeded();
             currentSystem = await systemManager?.getSystem();
 
@@ -375,7 +375,7 @@ export class ToolExecutor implements Tool {
               stepInput,
               credentials: stepCredentials,
               currentItem: loopPayload?.currentItem,
-              integrationUrlHost: currentSystem.urlHost,
+              systemUrlHost: currentSystem.urlHost,
               paginationPageSize: currentConfig?.pagination?.pageSize,
             });
 

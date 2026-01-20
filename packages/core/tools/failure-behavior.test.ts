@@ -24,7 +24,7 @@ describe("ToolExecutor - Failure Behavior", () => {
         id: "test-tool",
         steps: [step],
         finalTransform: "(sourceData) => sourceData",
-        integrationIds: [],
+        systemIds: [],
       };
 
       const executor = new ToolExecutor({
@@ -78,7 +78,7 @@ describe("ToolExecutor - Failure Behavior", () => {
         id: "test-tool",
         steps: [step],
         finalTransform: "(sourceData) => sourceData",
-        integrationIds: [],
+        systemIds: [],
       };
 
       const executor = new ToolExecutor({
@@ -163,7 +163,7 @@ describe("ToolExecutor - Failure Behavior", () => {
         id: "test-tool",
         steps: [step],
         finalTransform: "(sourceData) => sourceData",
-        integrationIds: [],
+        systemIds: [],
       };
 
       const executor = new ToolExecutor({
@@ -226,7 +226,7 @@ describe("ToolExecutor - Failure Behavior", () => {
         id: "test-tool",
         steps: [step],
         finalTransform: "(sourceData) => sourceData",
-        integrationIds: [],
+        systemIds: [],
       };
 
       const executor = new ToolExecutor({
@@ -297,7 +297,7 @@ describe("ToolExecutor - Failure Behavior", () => {
         id: "test-tool",
         steps: [step1, step2],
         finalTransform: "(sourceData) => sourceData",
-        integrationIds: [],
+        systemIds: [],
       };
 
       const executor = new ToolExecutor({
@@ -374,7 +374,7 @@ describe("ToolExecutor - Failure Behavior", () => {
         id: "test-tool",
         steps: [step1, step2],
         finalTransform: "(sourceData) => sourceData",
-        integrationIds: [],
+        systemIds: [],
       };
 
       const executor = new ToolExecutor({
@@ -431,7 +431,7 @@ describe("ToolExecutor - Failure Behavior", () => {
         id: "test-tool",
         steps: [step],
         finalTransform: "(sourceData) => sourceData",
-        integrationIds: [],
+        systemIds: [],
       };
 
       const executor = new ToolExecutor({

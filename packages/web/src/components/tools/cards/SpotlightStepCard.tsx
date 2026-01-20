@@ -178,7 +178,7 @@ export const SpotlightStepCard = React.memo(
     const handleSystemChange = (value: string, selectedSystem?: any) => {
       handleImmediateEdit((s) => ({
         ...s,
-        integrationId: value,
+        systemId: value,
         apiConfig: {
           ...s.apiConfig,
           urlHost: selectedSystem?.urlHost || s.apiConfig.urlHost,
@@ -415,7 +415,7 @@ export const SpotlightStepCard = React.memo(
                         </Label>
                         <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
                           <SystemSelector
-                            value={step.integrationId || ""}
+                            value={step.systemId || ""}
                             onValueChange={handleSystemChange}
                             triggerClassName="h-9 border-0 bg-transparent shadow-none"
                           />

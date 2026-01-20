@@ -63,12 +63,12 @@ export class SuperglueClient {
               stopCondition
             }
           }
-          integrationId
+          systemId
           executionMode
           loopSelector
           failureBehavior
         }
-        integrationIds
+        systemIds
         responseSchema
         originalResponseSchema
         finalTransform
@@ -292,7 +292,7 @@ export class SuperglueClient {
             id: step.id,
             modify: step.modify,
             apiConfig: apiConfigInput,
-            integrationId: step.integrationId,
+            systemId: step.systemId,
             executionMode: step.executionMode,
             loopSelector: step.loopSelector,
             failureBehavior: step.failureBehavior,
@@ -304,7 +304,7 @@ export class SuperglueClient {
           );
           return executionStepInput;
         }),
-        integrationIds: tool.integrationIds,
+        systemIds: tool.systemIds,
         finalTransform: tool.finalTransform,
         inputSchema: tool.inputSchema,
         responseSchema: tool.responseSchema,
@@ -511,15 +511,15 @@ export class SuperglueClient {
   async buildWorkflow({
     instruction,
     payload,
-    integrationIds,
+    systemIds,
     responseSchema,
     save = true,
     verbose = true,
     traceId,
   }: BuildToolArgs): Promise<Tool> {
     const mutation = `
-        mutation BuildWorkflow($instruction: String!, $payload: JSON, $integrationIds: [ID!], $responseSchema: JSONSchema, $traceId: ID) {
-          buildWorkflow(instruction: $instruction, payload: $payload, integrationIds: $integrationIds, responseSchema: $responseSchema, traceId: $traceId) {${SuperglueClient.workflowQL}}
+        mutation BuildWorkflow($instruction: String!, $payload: JSON, $systemIds: [ID!], $responseSchema: JSONSchema, $traceId: ID) {
+          buildWorkflow(instruction: $instruction, payload: $payload, systemIds: $systemIds, responseSchema: $responseSchema, traceId: $traceId) {${SuperglueClient.workflowQL}}
         }
       `;
 
@@ -553,7 +553,7 @@ export class SuperglueClient {
       const workflow = await this.request<{ buildWorkflow: Tool }>(mutation, {
         instruction,
         payload,
-        integrationIds,
+        systemIds,
         responseSchema: responseSchema ?? {},
         traceId,
       }).then((data) => data.buildWorkflow);
@@ -576,12 +576,12 @@ export class SuperglueClient {
     tool,
     fixInstructions,
     lastError,
-    integrationIds,
+    systemIds,
     verbose = true,
   }: FixToolArgs & { verbose?: boolean }): Promise<FixToolResult> {
     const mutation = `
-        mutation FixWorkflow($workflow: WorkflowInput!, $fixInstructions: String!, $lastError: String, $integrationIds: [ID!]) {
-          fixWorkflow(workflow: $workflow, fixInstructions: $fixInstructions, lastError: $lastError, integrationIds: $integrationIds) {
+        mutation FixWorkflow($workflow: WorkflowInput!, $fixInstructions: String!, $lastError: String, $systemIds: [ID!]) {
+          fixWorkflow(workflow: $workflow, fixInstructions: $fixInstructions, lastError: $lastError, systemIds: $systemIds) {
             workflow {${SuperglueClient.workflowQL}}
             diffs {
               op
@@ -657,7 +657,7 @@ export class SuperglueClient {
           id: step.id,
           modify: step.modify,
           apiConfig: apiConfigInput,
-          integrationId: step.integrationId,
+          systemId: step.systemId,
           executionMode: step.executionMode,
           loopSelector: step.loopSelector,
           failureBehavior: step.failureBehavior,
@@ -669,7 +669,7 @@ export class SuperglueClient {
         );
         return executionStepInput;
       }),
-      integrationIds: tool.integrationIds,
+      systemIds: tool.systemIds,
       finalTransform: tool.finalTransform,
       inputSchema: tool.inputSchema,
       responseSchema: tool.responseSchema,
@@ -687,7 +687,7 @@ export class SuperglueClient {
           workflow: toolInput,
           fixInstructions,
           lastError,
-          integrationIds,
+          systemIds,
         },
       ).then((data) => data.fixWorkflow);
 
@@ -705,7 +705,7 @@ export class SuperglueClient {
   }
 
   async generateStepConfig({
-    integrationId,
+    systemId,
     currentStepConfig,
     currentDataSelector,
     stepInput,
@@ -714,7 +714,7 @@ export class SuperglueClient {
   }: GenerateStepConfigArgs): Promise<{ config: ApiConfig; dataSelector: string }> {
     const mutation = `
         mutation GenerateStepConfig(
-          $integrationId: String,
+          $systemId: String,
           $currentStepConfig: JSON,
           $currentDataSelector: String,
           $stepInput: JSON,
@@ -722,7 +722,7 @@ export class SuperglueClient {
           $errorMessage: String
         ) {
           generateStepConfig(
-            integrationId: $integrationId,
+            systemId: $systemId,
             currentStepConfig: $currentStepConfig,
             currentDataSelector: $currentDataSelector,
             stepInput: $stepInput,
@@ -756,7 +756,7 @@ export class SuperglueClient {
     const result = await this.request<{
       generateStepConfig: { config: ApiConfig; dataSelector: string };
     }>(mutation, {
-      integrationId,
+      systemId,
       currentStepConfig,
       currentDataSelector,
       stepInput,
@@ -772,8 +772,8 @@ export class SuperglueClient {
 
   async callEndpoint(args: CallEndpointArgs): Promise<CallEndpointResult> {
     const mutation = `
-        mutation CallEndpoint($integrationId: ID, $method: HttpMethod!, $url: String!, $headers: JSON, $body: String, $timeout: Int) {
-          callEndpoint(integrationId: $integrationId, method: $method, url: $url, headers: $headers, body: $body, timeout: $timeout) {
+        mutation CallEndpoint($systemId: ID, $method: HttpMethod!, $url: String!, $headers: JSON, $body: String, $timeout: Int) {
+          callEndpoint(systemId: $systemId, method: $method, url: $url, headers: $headers, body: $body, timeout: $timeout) {
             success
             status
             statusText
@@ -1241,7 +1241,7 @@ export class SuperglueClient {
             inputSchema
             responseSchema
             steps {
-              integrationId
+              systemId
               instruction
             }
             reason

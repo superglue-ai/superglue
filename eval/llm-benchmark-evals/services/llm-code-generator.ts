@@ -11,9 +11,9 @@ export class LlmCodeGenerator {
     private metadata: ServiceMetadata
   ) {}
 
-  async generate(tool: ToolConfig, integrations: SystemConfig[]): Promise<string> {
+  async generate(tool: ToolConfig, systems: SystemConfig[]): Promise<string> {
     const systemPrompt = this.getSystemPrompt();
-    const userPrompt = this.generatePrompt(tool, integrations);
+    const userPrompt = this.generatePrompt(tool, systems);
 
     logMessage('info', `Generating code for tool ${tool.id}`, this.metadata);
 
@@ -36,30 +36,30 @@ export class LlmCodeGenerator {
 
   private getSystemPrompt(): string {
     return `You are an expert JavaScript developer tasked with writing code to integrate with APIs.
-Generate clean, working JavaScript code that fulfills the given task using the provided API integrations.
+Generate clean, working JavaScript code that fulfills the given task using the provided API systems.
 The code should be self-contained and return the requested data.
 Always wrap your code in <<CODE>> and <</CODE>> tags (note the closing tag has a forward slash).`;
   }
 
-  private generatePrompt(tool: ToolConfig, integrations: SystemConfig[]): string {
-    const integrationDetails = integrations.map(integration => {
-      const credentialEntries = Object.entries(integration.credentials || {});
+  private generatePrompt(tool: ToolConfig, systems: SystemConfig[]): string {
+    const systemDetails = systems.map(system => {
+      const credentialEntries = Object.entries(system.credentials || {});
       const credentialPairs = credentialEntries.map(([key, value]) => {
         if (!value || value === '') {
-          logMessage('warn', `Missing credential ${key} for integration ${integration.id}`, this.metadata);
+          logMessage('warn', `Missing credential ${key} for system ${system.id}`, this.metadata);
           return `    const ${key} = "MISSING_CREDENTIAL";`;
         }
         return `    const ${key} = "${value}";`;
       });
 
-      const codeSnippet = `// ${integration.name} Configuration
-const ${integration.id}_config = {
-    baseUrl: "${integration.urlHost}"
+      const codeSnippet = `// ${system.name} Configuration
+const ${system.id}_config = {
+    baseUrl: "${system.urlHost}"
 };
 ${credentialPairs.join('\n')};`;
 
-      return `Integration: ${integration.name}
-Base URL: ${integration.urlHost}
+      return `System: ${system.name}
+Base URL: ${system.urlHost}
 
 Ready-to-use configuration:
 ${codeSnippet}`;
@@ -67,8 +67,8 @@ ${codeSnippet}`;
 
     return `Task: ${tool.instruction}
 
-Available Integrations:
-${integrationDetails}
+Available Systems:
+${systemDetails}
 
 Input Payload (already defined as 'payload'):
 const payload = ${JSON.stringify(tool.payload || {}, null, 2)};

@@ -266,7 +266,7 @@ export interface ExecutionStep {
   id: string;
   modify?: boolean;
   apiConfig: ApiConfig;
-  integrationId?: string;
+  systemId?: string;
   executionMode?: "DIRECT" | "LOOP";
   loopSelector?: string;
   failureBehavior?: "FAIL" | "CONTINUE";
@@ -274,7 +274,7 @@ export interface ExecutionStep {
 
 export interface Tool extends BaseConfig {
   steps: ExecutionStep[];
-  integrationIds?: string[];
+  systemIds?: string[];
   finalTransform?: JSONata;
   inputSchema?: JSONSchema;
   responseSchema?: JSONSchema;
@@ -298,7 +298,7 @@ export interface ToolResult extends BaseResult {
 }
 
 export interface CallEndpointArgs {
-  integrationId?: string;
+  systemId?: string;
   method: HttpMethod;
   url: string;
   headers?: Record<string, string>;
@@ -350,7 +350,7 @@ export interface SuggestedTool {
   inputSchema?: JSONSchema;
   responseSchema?: JSONSchema;
   steps: Array<{
-    integrationId?: string;
+    systemId?: string;
     instruction?: string;
   }>;
   reason: string;
@@ -456,7 +456,7 @@ export type WorkflowArgs = ToolArgs;
 export interface BuildToolArgs {
   instruction: string;
   payload?: Record<string, any>;
-  integrationIds?: string[];
+  systemIds?: string[];
   responseSchema?: JSONSchema;
   save?: boolean;
   verbose?: boolean;
@@ -478,7 +478,7 @@ export interface FixToolArgs {
   fixInstructions: string;
   lastError?: string;
   stepResults?: ToolStepResult[];
-  integrationIds?: string[];
+  systemIds?: string[];
 }
 
 export interface FixToolResult {
@@ -487,7 +487,7 @@ export interface FixToolResult {
 }
 
 export interface GenerateStepConfigArgs {
-  integrationId?: string;
+  systemId?: string;
   currentDataSelector?: string;
   currentStepConfig?: Partial<ApiConfig>;
   stepInput?: Record<string, any>;

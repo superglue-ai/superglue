@@ -37,7 +37,7 @@ export async function validateWorkflowResult(
             isExpectedJson = false;
         }
 
-        const systemPrompt = `You are a workflow result validator for integration testing. Your job is to determine if the actual workflow result meets the expected criteria.
+        const systemPrompt = `You are a workflow result validator for system testing. Your job is to determine if the actual workflow result meets the expected criteria.
 
 IMPORTANT CONSIDERATIONS:
 - For operations that create, update, delete, or send data (non-retrieval operations), minimal or empty responses often indicate success

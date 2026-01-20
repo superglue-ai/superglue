@@ -59,7 +59,7 @@ export function mapStepToOpenAPI(step: ExecutionStep): OpenAPIToolStep {
   if (apiConfig.queryParams) result.queryParams = apiConfig.queryParams;
   if (apiConfig.headers) result.headers = apiConfig.headers;
   if (apiConfig.body) result.body = apiConfig.body;
-  if (step.integrationId) result.integrationId = step.integrationId;
+  if (step.systemId) result.systemId = step.systemId;
   if (apiConfig.instruction) result.instruction = apiConfig.instruction;
   if (step.modify !== undefined) result.modify = step.modify;
   if (step.loopSelector) result.dataSelector = step.loopSelector;

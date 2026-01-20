@@ -21,7 +21,7 @@ export class LlmToolRunner {
     providerModel: any,
     providerName: string,
     tools: ToolConfig[],
-    integrations: SystemConfig[]
+    systems: SystemConfig[]
   ): Promise<ToolAttempt[]> {
     const codeGenerator = new LlmCodeGenerator(providerModel, this.metadata);
     const attempts: ToolAttempt[] = [];
@@ -29,7 +29,7 @@ export class LlmToolRunner {
     for (const tool of tools) {
       logMessage('info', `Running tool ${tool.id} with provider ${providerName}`, this.metadata);
       
-      const toolSystems = integrations.filter(i => tool.integrationIds.includes(i.id));
+      const toolSystems = systems.filter(s => tool.systemIds.includes(s.id));
       const attempt = await this.runSingleAttempt(tool, toolSystems, codeGenerator);
       attempts.push(attempt);
 
@@ -41,7 +41,7 @@ export class LlmToolRunner {
 
   private async runSingleAttempt(
     tool: ToolConfig,
-    integrations: SystemConfig[],
+    systems: SystemConfig[],
     codeGenerator: LlmCodeGenerator
   ): Promise<ToolAttempt> {
     const attempt: ToolAttempt = {
@@ -58,7 +58,7 @@ export class LlmToolRunner {
     // Build phase: generate code
     const buildStart = Date.now();
     try {
-      const generatedCode = await codeGenerator.generate(tool, integrations);
+      const generatedCode = await codeGenerator.generate(tool, systems);
       attempt.buildTime = Date.now() - buildStart;
       attempt.buildSuccess = true;
 

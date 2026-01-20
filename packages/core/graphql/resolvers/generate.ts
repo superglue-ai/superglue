@@ -58,7 +58,7 @@ export const generateInstructionsResolver = async (
 export const generateStepConfigResolver = async (
   _: any,
   {
-    integrationId,
+    systemId,
     currentStepConfig,
     currentDataSelector,
     stepInput,
@@ -71,7 +71,6 @@ export const generateStepConfigResolver = async (
   try {
     const metadata = context.toMetadata();
 
-    // Extract instruction from currentStepConfig
     const instruction = currentStepConfig?.instruction;
     if (!instruction) {
       throw new Error("Instruction is required in currentStepConfig");
@@ -82,11 +81,11 @@ export const generateStepConfigResolver = async (
     let systemSpecificInstructions = "";
     let systemCredentials: Record<string, string> = {};
 
-    if (integrationId) {
+    if (systemId) {
       try {
-        logMessage("info", `Generating step config for integration ${integrationId}`, metadata);
+        logMessage("info", `Generating step config for system ${systemId}`, metadata);
         const systemManager = new SystemManager(
-          integrationId,
+          systemId,
           context.datastore,
           context.toMetadata(),
         );
@@ -94,15 +93,14 @@ export const generateStepConfigResolver = async (
         systemDocs = (await systemManager.getDocumentation())?.content || "";
         systemSpecificInstructions = system.specificInstructions || "";
 
-        // Get system credentials and prefix keys with integration ID
         if (system?.credentials) {
           Object.entries(system.credentials).forEach(([key, value]) => {
-            systemCredentials[`${integrationId}_${key}`] = String(value);
+            systemCredentials[`${systemId}_${key}`] = String(value);
           });
         }
       } catch (error) {
         telemetryClient?.captureException(error, context.orgId, {
-          integrationId,
+          systemId,
         });
       }
     }
@@ -145,7 +143,7 @@ export const generateStepConfigResolver = async (
       stepInput,
       credentials: mergedCredentials,
       dataSelector: currentDataSelector,
-      integrationUrlHost: system?.urlHost,
+      systemUrlHost: system?.urlHost,
       paginationPageSize: currentStepConfig?.pagination?.pageSize,
     });
 
@@ -173,7 +171,7 @@ export const generateStepConfigResolver = async (
   } catch (error) {
     telemetryClient?.captureException(error, context.orgId, {
       traceId: context.traceId,
-      integrationId,
+      systemId,
     });
 
     throw error;

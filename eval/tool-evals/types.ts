@@ -17,7 +17,7 @@ export interface ToolConfig {
     name: string;
     type: 'retrieval' | 'action' | 'upsert';
     instruction: string;
-    integrationIds: string[];
+    systemIds: string[];
     validationFunction?: string;
     skipValidationFunction?: boolean;
     expectedResultDescription?: string;

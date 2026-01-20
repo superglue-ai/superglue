@@ -86,7 +86,7 @@ describe("ToolExecutor Self-Healing Config Propagation", () => {
     dataStore = new MemoryStore();
 
     mockSystem = {
-      id: "test-integration",
+      id: "test-system",
       name: "Test System",
       credentials: { apiKey: "test-key" },
       specificInstructions: "Test instructions",
@@ -117,11 +117,11 @@ describe("ToolExecutor Self-Healing Config Propagation", () => {
 
     const tool = {
       id: "test-tool",
-      integrationIds: ["test-integration"],
+      systemIds: ["test-system"],
       steps: [
         {
           id: "step-1",
-          integrationId: "test-integration",
+          systemId: "test-system",
           apiConfig: originalConfig,
           loopSelector: originalDataSelector,
         },
@@ -235,11 +235,11 @@ describe("ToolExecutor Self-Healing Config Propagation", () => {
 
     const tool = {
       id: "test-tool",
-      integrationIds: ["test-integration"],
+      systemIds: ["test-system"],
       steps: [
         {
           id: "step-1",
-          integrationId: "test-integration",
+          systemId: "test-system",
           apiConfig: originalConfig,
           loopSelector: "(sourceData) => sourceData",
         },

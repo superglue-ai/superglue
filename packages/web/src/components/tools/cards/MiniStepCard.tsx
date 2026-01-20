@@ -209,8 +209,8 @@ export const MiniStepCard = React.memo(
     const statusInfo = isRunning ? RUNNING_STATUS : baseStatusInfo;
 
     const linkedSystem =
-      step.integrationId && systems
-        ? systems.find((sys) => sys.id === step.integrationId)
+      step.systemId && systems
+        ? systems.find((sys) => sys.id === step.systemId)
         : undefined;
 
     const iconName = linkedSystem ? getSystemIcon(linkedSystem) : null;

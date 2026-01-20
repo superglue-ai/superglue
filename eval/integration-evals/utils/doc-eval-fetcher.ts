@@ -141,10 +141,10 @@ export class DocumentationEvalFetcher {
    * Store documentation in datastore
    */
   private async storeDocumentation(site: DocumentationSite, documentation: string, openApiSchema: string): Promise<void> {
-    const integrationId = `doc-eval-${site.id}`;
+    const systemId = `doc-eval-${site.id}`;
     
     const system = {
-      id: integrationId,
+      id: systemId,
       name: `${site.name} Documentation`,
       urlHost: site.urlHost,
       urlPath: site.urlPath || '',
@@ -158,12 +158,12 @@ export class DocumentationEvalFetcher {
     };
 
     await this.datastore.upsertSystem({
-      id: integrationId,
+      id: systemId,
       system,
       orgId: this.orgId
     });
 
-    this.createdSystemIds.push(integrationId);
+    this.createdSystemIds.push(systemId);
   }
 
   /**
@@ -273,11 +273,11 @@ export class DocumentationEvalFetcher {
     if (this.createdSystemIds.length > 0) {
       logMessage('info', `Cleaned up ${this.createdSystemIds.length} systems`, this.metadata);
       
-      for (const integrationId of this.createdSystemIds) {
+      for (const systemId of this.createdSystemIds) {
         try {
-          await this.datastore.deleteSystem({ id: integrationId, orgId: this.orgId });
+          await this.datastore.deleteSystem({ id: systemId, orgId: this.orgId });
         } catch (error) {
-          logMessage('warn', `Failed to delete system ${integrationId}: ${error}`, this.metadata);
+          logMessage('warn', `Failed to delete system ${systemId}: ${error}`, this.metadata);
         }
       }
     }

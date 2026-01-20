@@ -324,7 +324,7 @@ type SuggestedSystem {
 }
 
 type ToolStep {
-  integrationId: String
+  systemId: String
   instruction: String
 }
 
@@ -361,7 +361,7 @@ type ExecutionStep {
   id: String!
   modify: Boolean
   apiConfig: ApiConfig!
-  integrationId: ID
+  systemId: ID
   executionMode: String # DIRECT | LOOP
   loopSelector: JSONata
   failureBehavior: FailureBehavior
@@ -371,7 +371,7 @@ input ExecutionStepInput {
   id: String!
   modify: Boolean
   apiConfig: ApiInput!
-  integrationId: ID
+  systemId: ID
   executionMode: String # DIRECT | LOOP
   loopSelector: JSONata
   failureBehavior: FailureBehavior
@@ -386,7 +386,7 @@ type Workflow implements BaseConfig {
 
   # Specific implementation
   steps: [ExecutionStep!]
-  integrationIds: [ID]
+  systemIds: [ID]
   instruction: String
   finalTransform: JSONata
   responseSchema: JSONSchema
@@ -434,7 +434,7 @@ type AbortToolExecutionResult {
 input WorkflowInput {
   id: String!
   steps: [ExecutionStepInput!]
-  integrationIds: [ID!]
+  systemIds: [ID!]
   finalTransform: JSONata
   inputSchema: JSONSchema
   responseSchema: JSONSchema
@@ -469,13 +469,13 @@ type Mutation {
   buildWorkflow(
     instruction: String!
     payload: JSON
-    integrationIds: [ID!]
+    systemIds: [ID!]
     responseSchema: JSONSchema
     traceId: ID
   ): Workflow!
 
   generateStepConfig(
-    integrationId: String
+    systemId: String
     currentStepConfig: JSON
     currentDataSelector: String
     stepInput: JSON
@@ -513,7 +513,7 @@ type Mutation {
   getOAuthClientCredentials(templateId: ID, clientCredentialsUid: String): OAuthClientCredentials!
 
   callEndpoint(
-    integrationId: ID
+    systemId: ID
     method: HttpMethod!
     url: String!
     headers: JSON
@@ -525,7 +525,7 @@ type Mutation {
     workflow: WorkflowInput!
     fixInstructions: String!
     lastError: String
-    integrationIds: [ID!]
+    systemIds: [ID!]
   ): FixWorkflowResult!
 }
 

@@ -3,7 +3,7 @@ import * as path from 'path';
 import { logMessage } from '@superglue/core/utils/logs.js';
 
 // Common interfaces
-export interface IntegrationConfig {
+export interface SystemConfig {
     id: string;
     name: string;
     urlHost: string;
@@ -17,13 +17,13 @@ export interface BaseWorkflowConfig {
     id: string;
     name: string;
     instruction: string;
-    integrationIds: string[];
+    systemIds: string[];
     payload?: Record<string, any>;
 }
 
-// Integration Testing specific
+// System Testing specific
 export interface TestWorkflowConfig extends BaseWorkflowConfig {
-    integrationIds: string[];
+    systemIds: string[];
     payload: any;
     complexityLevel: 'low' | 'medium' | 'high';
     category: 'single-system' | 'multi-system';
@@ -31,10 +31,10 @@ export interface TestWorkflowConfig extends BaseWorkflowConfig {
     expectedResult?: string; // Can be a description or stringified JSON of expected result
 }
 
-export interface IntegrationTestConfig {
-    integrations: {
+export interface SystemTestConfig {
+    systems: {
         enabled: string[];
-        definitions: Record<string, IntegrationConfig>;
+        definitions: Record<string, SystemConfig>;
     };
     workflows: {
         enabled: string[];
@@ -55,7 +55,7 @@ export interface ApiRankingWorkflowConfig extends BaseWorkflowConfig {
 }
 
 export interface ApiRankingConfig {
-    integrations: Record<string, IntegrationConfig>;
+    systems: Record<string, SystemConfig>;
     workflows: Record<string, ApiRankingWorkflowConfig>;
     workflowsToRank: string[];  // Changed from apiRankingWorkflowIds
     settings: {
@@ -75,25 +75,25 @@ export class ConfigLoader {
     private metadata = { orgId: 'config-loader', userId: 'system' };
 
     /**
-     * Load integration test configuration
+     * Load system test configuration
      */
-    async loadIntegrationTestConfig(
+    async loadSystemTestConfig(
         configPath?: string
-    ): Promise<IntegrationTestConfig> {
-        const defaultPath = path.join(process.cwd(), 'packages/core/eval/integration-testing/integration-test-config.json');
+    ): Promise<SystemTestConfig> {
+        const defaultPath = path.join(process.cwd(), 'packages/core/eval/system-testing/system-test-config.json');
         const finalPath = configPath || defaultPath;
 
-        const config = await this.loadJsonConfig<IntegrationTestConfig>(
+        const config = await this.loadJsonConfig<SystemTestConfig>(
             finalPath,
-            'integration-test-config.json',
+            'system-test-config.json',
             [
-                'packages/core/tests/integration-test-config.json',
-                'integration-test-config.json'
+                'packages/core/tests/system-test-config.json',
+                'system-test-config.json'
             ]
         );
 
         // Validate structure
-        this.validateIntegrationTestConfig(config);
+        this.validateSystemTestConfig(config);
 
         return config;
     }
@@ -123,14 +123,14 @@ export class ConfigLoader {
     }
 
     /**
-     * Validate and load credentials for integration test config
+     * Validate and load credentials for system test config
      */
-    validateIntegrationTestCredentials(config: IntegrationTestConfig): CredentialValidationResult {
-        const enabledIntegrations = config.integrations.enabled;
-        const definitions = config.integrations.definitions;
+    validateSystemTestCredentials(config: SystemTestConfig): CredentialValidationResult {
+        const enabledSystems = config.systems.enabled;
+        const definitions = config.systems.definitions;
 
         return this.validateCredentials(
-            enabledIntegrations.map(id => definitions[id]).filter(Boolean)
+            enabledSystems.map(id => definitions[id]).filter(Boolean)
         );
     }
 
@@ -138,24 +138,24 @@ export class ConfigLoader {
      * Validate and load credentials for API ranking config
      */
     validateApiRankingCredentials(config: ApiRankingConfig): CredentialValidationResult {
-        // For API ranking, all integrations are considered enabled
-        const integrations = Object.values(config.integrations);
-        return this.validateCredentials(integrations);
+        // For API ranking, all systems are considered enabled
+        const systems = Object.values(config.systems);
+        return this.validateCredentials(systems);
     }
 
     /**
-     * Get enabled integrations from integration test config
+     * Get enabled systems from system test config
      */
-    getEnabledIntegrations(config: IntegrationTestConfig): IntegrationConfig[] {
-        return config.integrations.enabled
-            .map(id => config.integrations.definitions[id])
-            .filter((integration): integration is IntegrationConfig => integration !== undefined);
+    getEnabledSystems(config: SystemTestConfig): SystemConfig[] {
+        return config.systems.enabled
+            .map(id => config.systems.definitions[id])
+            .filter((system): system is SystemConfig => system !== undefined);
     }
 
     /**
-     * Get enabled workflows from integration test config
+     * Get enabled workflows from system test config
      */
-    getEnabledWorkflows(config: IntegrationTestConfig): TestWorkflowConfig[] {
+    getEnabledWorkflows(config: SystemTestConfig): TestWorkflowConfig[] {
         return config.workflows.enabled
             .map(id => config.workflows.definitions[id])
             .filter((workflow): workflow is TestWorkflowConfig => workflow !== undefined);
@@ -179,7 +179,7 @@ export class ConfigLoader {
         additionalPaths: string[]
     ): Promise<T> {
         // Determine which eval type based on the filename
-        const evalType = defaultFileName.includes('api-ranking') ? 'api-ranking' : 'integration-testing';
+        const evalType = defaultFileName.includes('api-ranking') ? 'api-ranking' : 'system-testing';
 
         // Try multiple possible paths for the config file
         const possiblePaths = [
@@ -212,14 +212,14 @@ export class ConfigLoader {
     }
 
     /**
-     * Validate integration test config structure
+     * Validate system test config structure
      */
-    private validateIntegrationTestConfig(config: any): asserts config is IntegrationTestConfig {
-        if (!config.integrations?.enabled || !Array.isArray(config.integrations.enabled)) {
-            throw new Error('Invalid config: missing integrations.enabled array');
+    private validateSystemTestConfig(config: any): asserts config is SystemTestConfig {
+        if (!config.systems?.enabled || !Array.isArray(config.systems.enabled)) {
+            throw new Error('Invalid config: missing systems.enabled array');
         }
-        if (!config.integrations?.definitions || typeof config.integrations.definitions !== 'object') {
-            throw new Error('Invalid config: missing integrations.definitions object');
+        if (!config.systems?.definitions || typeof config.systems.definitions !== 'object') {
+            throw new Error('Invalid config: missing systems.definitions object');
         }
         if (!config.workflows?.enabled || !Array.isArray(config.workflows.enabled)) {
             throw new Error('Invalid config: missing workflows.enabled array');
@@ -236,8 +236,8 @@ export class ConfigLoader {
      * Validate API ranking config structure
      */
     private validateApiRankingConfig(config: any): asserts config is ApiRankingConfig {
-        if (!config.integrations || typeof config.integrations !== 'object') {
-            throw new Error('Invalid config: missing integrations object');
+        if (!config.systems || typeof config.systems !== 'object') {
+            throw new Error('Invalid config: missing systems object');
         }
         if (!config.workflows || typeof config.workflows !== 'object') {
             throw new Error('Invalid config: missing workflows object');
@@ -253,43 +253,43 @@ export class ConfigLoader {
     /**
      * Common credential validation logic
      */
-    private validateCredentials(integrations: IntegrationConfig[]): CredentialValidationResult {
+    private validateCredentials(systems: SystemConfig[]): CredentialValidationResult {
         const missingEnvVars: string[] = [];
         const loadedCredentials = new Map<string, Record<string, string>>();
 
-        for (const integration of integrations) {
-            if (!integration) continue;
+        for (const system of systems) {
+            if (!system) continue;
 
-            const integrationCredentials: Record<string, string> = {};
+            const systemCredentials: Record<string, string> = {};
 
-            if (!integration.credentials || Object.keys(integration.credentials).length === 0) {
-                logMessage('info', `Integration ${integration.id} requires no credentials`, this.metadata);
-                loadedCredentials.set(integration.id, {});
+            if (!system.credentials || Object.keys(system.credentials).length === 0) {
+                logMessage('info', `System ${system.id} requires no credentials`, this.metadata);
+                loadedCredentials.set(system.id, {});
                 continue;
             }
 
-            // Process each credential key for this integration
-            for (const credentialKey of Object.keys(integration.credentials)) {
+            // Process each credential key for this system
+            for (const credentialKey of Object.keys(system.credentials)) {
                 // Generate the expected environment variable name
-                const envVarName = `${integration.id.toUpperCase().replace(/-/g, '_')}_${credentialKey.toUpperCase()}`;
+                const envVarName = `${system.id.toUpperCase().replace(/-/g, '_')}_${credentialKey.toUpperCase()}`;
                 const envValue = process.env[envVarName];
 
                 if (envValue) {
-                    integrationCredentials[credentialKey] = envValue;
+                    systemCredentials[credentialKey] = envValue;
                     logMessage('info', `✓ Found ${envVarName}`, this.metadata);
                 } else {
                     // Check if there's a default value in the config
-                    const defaultValue = integration.credentials[credentialKey];
+                    const defaultValue = system.credentials[credentialKey];
                     if (defaultValue && defaultValue !== '') {
-                        integrationCredentials[credentialKey] = defaultValue;
-                        logMessage('info', `✓ Using default value for ${integration.id}.${credentialKey}`, this.metadata);
+                        systemCredentials[credentialKey] = defaultValue;
+                        logMessage('info', `✓ Using default value for ${system.id}.${credentialKey}`, this.metadata);
                     } else {
                         missingEnvVars.push(envVarName);
                     }
                 }
             }
 
-            loadedCredentials.set(integration.id, integrationCredentials);
+            loadedCredentials.set(system.id, systemCredentials);
         }
 
         return {
@@ -300,20 +300,20 @@ export class ConfigLoader {
     }
 
     /**
-     * Apply loaded credentials to integration configs
+     * Apply loaded credentials to system configs
      */
     applyCredentials(
-        integrations: IntegrationConfig[],
+        systems: SystemConfig[],
         loadedCredentials: Map<string, Record<string, string>>
     ): void {
-        for (const integration of integrations) {
-            const creds = loadedCredentials.get(integration.id);
+        for (const system of systems) {
+            const creds = loadedCredentials.get(system.id);
             if (creds) {
-                integration.credentials = { ...integration.credentials, ...creds };
+                system.credentials = { ...system.credentials, ...creds };
 
                 // Special handling for postgres connection strings
-                if (integration.id === 'postgres-lego' && creds.connection_string) {
-                    integration.urlHost = creds.connection_string;
+                if (system.id === 'postgres-lego' && creds.connection_string) {
+                    system.urlHost = creds.connection_string;
                 }
             }
         }

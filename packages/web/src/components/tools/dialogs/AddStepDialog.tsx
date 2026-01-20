@@ -185,12 +185,12 @@ export function AddStepDialog({
           instruction: trimmedInstruction,
         },
         stepInput: stepInput,
-        integrationId: selectedSystemId,
+        systemId: selectedSystemId,
       });
 
       const newStep: ExecutionStep = {
         id: trimmedId,
-        integrationId: selectedSystemId,
+        systemId: selectedSystemId,
         apiConfig: {
           ...result.config,
           id: trimmedId,

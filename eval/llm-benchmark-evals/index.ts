@@ -76,7 +76,7 @@ async function main(): Promise<void> {
 
     // Filter systems to only those used by enabled tools
     const usedSystemIds = new Set(
-      enabledTools.flatMap(tool => tool.integrationIds)
+      enabledTools.flatMap(tool => tool.systemIds)
     );
     const systems = evalConfig.systems.filter(system => 
       usedSystemIds.has(system.id)

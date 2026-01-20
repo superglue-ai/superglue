@@ -6,7 +6,7 @@ export interface FoundTool {
   instruction?: string;
   inputSchema?: any;
   steps: Array<{
-    integrationId?: string;
+    systemId?: string;
     instruction?: string;
   }>;
   responseSchema?: any;
@@ -27,7 +27,7 @@ export class ToolFinder {
       inputSchema: tool.inputSchema,
       responseSchema: tool.responseSchema,
       steps: tool.steps.map((s) => ({
-        integrationId: s.integrationId,
+        systemId: s.systemId,
         instruction: s.apiConfig?.instruction,
       })),
       reason,
@@ -45,7 +45,7 @@ export class ToolFinder {
         tool.id,
         tool.instruction,
         ...tool.steps.map((s) => s.apiConfig?.instruction),
-        ...tool.steps.map((s) => s.integrationId),
+        ...tool.steps.map((s) => s.systemId),
       ]
         .filter(Boolean)
         .join(" ")

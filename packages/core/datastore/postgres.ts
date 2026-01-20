@@ -11,7 +11,7 @@ import type {
 import { Pool, PoolConfig } from "pg";
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
-import { extractRun } from "./migrations/run-migration.js";
+import { extractRun, normalizeTool } from "./migrations/run-migration.js";
 import type {
   DataStore,
   PrometheusRunMetrics,
@@ -772,7 +772,8 @@ export class PostgresService implements DataStore {
 
   async getWorkflow(params: { id: string; orgId?: string }): Promise<Tool | null> {
     const { id, orgId } = params;
-    return this.getConfig<Tool>(id, "workflow", orgId);
+    const workflow = await this.getConfig<Tool>(id, "workflow", orgId);
+    return workflow ? normalizeTool(workflow) : null;
   }
 
   async listWorkflows(params?: {
@@ -781,9 +782,10 @@ export class PostgresService implements DataStore {
     orgId?: string;
   }): Promise<{ items: Tool[]; total: number }> {
     const { limit = 10, offset = 0, orgId } = params || {};
-    return this.listConfigs<Tool>("workflow", limit, offset, orgId);
+    const result = await this.listConfigs<Tool>("workflow", limit, offset, orgId);
+    return { items: result.items.map(normalizeTool), total: result.total };
   }
-
+  
   async upsertWorkflow(params: {
     id: string;
     workflow: Tool;

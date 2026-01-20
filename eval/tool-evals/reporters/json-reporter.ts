@@ -109,14 +109,14 @@ export class JsonReporter {
     const secrets: string[] = [];
     const credentialPairs: Array<{ email?: string; token?: string; api_token?: string; username?: string; password?: string }> = [];
 
-    for (const integrationConfig of config.systems) {
-      if (!integrationConfig.credentials || !integrationConfig.id) {
+    for (const systemConfig of config.systems) {
+      if (!systemConfig.credentials || !systemConfig.id) {
         continue;
       }
 
       const creds: any = {};
-      for (const [key, _] of Object.entries(integrationConfig.credentials)) {
-        const envVarName = `${integrationConfig.id.toUpperCase().replace(/-/g, '_')}_${key.toUpperCase()}`;
+      for (const [key, _] of Object.entries(systemConfig.credentials)) {
+        const envVarName = `${systemConfig.id.toUpperCase().replace(/-/g, '_')}_${key.toUpperCase()}`;
         const envValue = process.env[envVarName];
 
         if (envValue && envValue.length > 5) {
