@@ -254,6 +254,84 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /hooks/{toolId}:
+    post:
+      summary: Handle incoming webhook
+      operationId: triggerWebhook
+      tags:
+        - Webhooks
+      description: |
+        **Enterprise feature.**
+
+        Trigger a tool execution from an external webhook (Stripe, GitHub, etc.).
+
+        The request body becomes the tool's input payload.
+        Returns 202 Accepted immediately and executes the tool asynchronously.
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID of the tool to trigger
+          example: handle-stripe-webhook
+      requestBody:
+        required: false
+        description: Webhook payload from the external service. Becomes the tool's input.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              example:
+                id: evt_1234
+                type: customer.created
+                data:
+                  object:
+                    id: cus_abc123
+                    email: user@example.com
+      responses:
+        "202":
+          description: Webhook accepted, tool execution started
+          headers:
+            X-Trace-Id:
+              schema:
+                type: string
+              description: Trace ID for this request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - runId
+                  - status
+                  - toolId
+                properties:
+                  runId:
+                    type: string
+                    description: ID of the created run
+                    example: 7f3e9c1a-2b4d-4e8f-9a3b-1c5d7e9f2a4b
+                  status:
+                    type: string
+                    enum: [accepted]
+                    example: accepted
+                  toolId:
+                    type: string
+                    description: ID of the triggered tool
+                    example: handle-stripe-webhook
+        "400":
+          description: Tool is archived
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Tool not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /runs:
     get:
       summary: List runs
@@ -319,8 +397,9 @@ components:
       bearerFormat: Static API Key
       description: |
         Static API key authentication using Bearer token scheme.
-        Include your API key in the Authorization header:
-        `Authorization: Bearer YOUR_API_KEY`
+        Include your API key in the Authorization header: `Authorization: Bearer YOUR_API_KEY`
+
+        Alternatively, you can use the `token` query parameter to authenticate.
 
         API keys can be generated in your superglue dashboard.
 
