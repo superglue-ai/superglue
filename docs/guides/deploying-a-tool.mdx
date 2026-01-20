@@ -1,9 +1,9 @@
 ---
 title: "Deploying a Tool"
-description: "Execute tools on-demand or schedule them for automated runs"
+description: "Execute tools on-demand, schedule them, or trigger via incoming webhooks"
 ---
 
-Once you've created a tool, you can deploy it in two ways: execute it on-demand when you need it, or schedule it to run automatically on a recurring basis.
+Once you've created a tool, you can deploy it in three ways: execute it on-demand, schedule it to run automatically, or trigger it via incoming webhooks from external services.
 
 ## On-demand execution
 
@@ -322,3 +322,94 @@ Schedule tools to run automatically at specific times or intervals.
 
   </Tab>
 </Tabs>
+
+## Incoming webhooks
+
+Trigger tools from external services like Stripe, GitHub, Shopify, or any system that can send HTTP webhooks.
+
+<Note>
+  Incoming webhooks are an Enterprise feature.
+</Note>
+
+### How it works
+
+When you enable webhooks for a tool, superglue provides a unique webhook URL:
+
+```
+POST https://api.superglue.ai/v1/hooks/{toolId}?token={your_api_key}
+```
+
+External services send HTTP POST requests to this URL. The request body becomes the tool's input payload, and superglue executes the tool asynchronously.
+
+### Setting up a webhook
+
+<Steps>
+  <Step title="Get your webhook URL">
+    Your webhook URL follows this pattern:
+    ```
+    https://api.superglue.ai/v1/hooks/{toolId}?token={your_api_key}
+    ```
+    
+    Replace `{toolId}` with your tool's ID and `{your_api_key}` with a valid API key. You can create API keys at https://app.superglue.cloud/api-keys.
+  </Step>
+  <Step title="Configure the external service">
+    Add the webhook URL to your external service (Stripe, GitHub, etc.). Most services have a webhooks section in their dashboard.
+  </Step>
+  <Step title="Design your tool for webhook payloads">
+    Your tool receives the raw webhook payload as input. Design your steps to extract the data you need:
+    
+    ```typescript
+    // Example: Stripe webhook payload
+    {
+      "id": "evt_1234",
+      "type": "customer.created",
+      "data": {
+        "object": {
+          "id": "cus_abc123",
+          "email": "user@example.com"
+        }
+      }
+    }
+    ```
+    
+    Use template expressions to access nested fields: `<<(sourceData) => sourceData.data.object.email>>`
+  </Step>
+</Steps>
+
+### Webhook behavior
+
+- **Asynchronous execution**: Returns `202 Accepted` immediately, executes the tool in the background
+- **Run tracking**: Each webhook trigger creates a run record you can view in the dashboard
+- **Request source**: Runs triggered via webhook are labeled with source `WEBHOOK` in the runs table
+
+### Example: Stripe webhook integration
+
+```typescript
+// Tool configuration for handling Stripe customer.created events
+{
+  id: "handle-stripe-customer",
+  steps: [
+    {
+      id: "addToMailchimp",
+      integrationId: "mailchimp",
+      apiConfig: {
+        method: "POST",
+        urlPath: "/lists/{list_id}/members",
+        body: {
+          email_address: "<<(sourceData) => sourceData.data.object.email>>",
+          status: "subscribed"
+        }
+      }
+    }
+  ]
+}
+```
+
+Webhook URL: `https://api.superglue.ai/v1/hooks/handle-stripe-customer?token={your_api_key}`
+
+### Security considerations
+
+- Always use HTTPS and keep your API token secret. Consider using restricted API keys with minimal permissions for webhook endpoints.
+- Use restricted API keys that only have permission on specific tools
+- Validate webhook signatures at your tool level if the source service provides them (e.g., Stripe's `stripe-signature` header)
+- Monitor your runs dashboard for unexpected webhook activity
