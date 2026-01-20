@@ -1,7 +1,7 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
-const copyToClipboard = async (text: string): Promise<boolean> => {
+export const copyToClipboard = async (text: string): Promise<boolean> => {
   if (navigator.clipboard && window.isSecureContext) {
     try {
       await navigator.clipboard.writeText(text);
