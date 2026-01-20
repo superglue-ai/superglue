@@ -84,11 +84,7 @@ export const generateStepConfigResolver = async (
     if (systemId) {
       try {
         logMessage("info", `Generating step config for system ${systemId}`, metadata);
-        const systemManager = new SystemManager(
-          systemId,
-          context.datastore,
-          context.toMetadata(),
-        );
+        const systemManager = new SystemManager(systemId, context.datastore, context.toMetadata());
         system = await systemManager.getSystem();
         systemDocs = (await systemManager.getDocumentation())?.content || "";
         systemSpecificInstructions = system.specificInstructions || "";

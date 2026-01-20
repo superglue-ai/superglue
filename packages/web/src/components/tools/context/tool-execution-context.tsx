@@ -515,9 +515,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       const currentItemObj = deriveCurrentItem(dsResult.output);
 
       const linkedSystem =
-        step.systemId && systems
-          ? systems.find((sys) => sys.id === step.systemId)
-          : undefined;
+        step.systemId && systems ? systems.find((sys) => sys.id === step.systemId) : undefined;
 
       const systemCredentials = flattenAndNamespaceCredentials(linkedSystem ? [linkedSystem] : []);
       const paginationData = buildPaginationData(step.apiConfig?.pagination);

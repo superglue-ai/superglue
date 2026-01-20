@@ -785,7 +785,7 @@ export class PostgresService implements DataStore {
     const result = await this.listConfigs<Tool>("workflow", limit, offset, orgId);
     return { items: result.items.map(normalizeTool), total: result.total };
   }
-  
+
   async upsertWorkflow(params: {
     id: string;
     workflow: Tool;
