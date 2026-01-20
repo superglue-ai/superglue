@@ -326,7 +326,6 @@ export function ToolStepGallery({
         headers: {},
         queryParams: {},
         body: "",
-        authentication: "NONE" as AuthType,
       },
       executionMode: "DIRECT",
     };

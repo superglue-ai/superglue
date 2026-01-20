@@ -1,14 +1,13 @@
 import { GraphQLUpload } from "graphql-upload-ts";
 import fs from "node:fs";
 import { callEndpointResolver } from "./resolvers/call-endpoint.js";
-import { deleteApiResolver } from "./resolvers/delete.js";
 import { extractResolver } from "./resolvers/extract.js";
 import {
   generateInstructionsResolver,
   generateStepConfigResolver,
   generateTransformResolver,
 } from "./resolvers/generate.js";
-import { getApiResolver, getRunResolver } from "./resolvers/get.js";
+import { getRunResolver } from "./resolvers/get.js";
 import {
   cacheOauthClientCredentialsResolver,
   deleteSystemResolver,
@@ -19,12 +18,11 @@ import {
   searchSystemDocumentationResolver,
   upsertSystemResolver,
 } from "./resolvers/systems.js";
-import { listApisResolver, listRunsResolver } from "./resolvers/list.js";
+import { listRunsResolver } from "./resolvers/list.js";
 import { logsResolver } from "./resolvers/logs.js";
 import { renameWorkflowResolver } from "./resolvers/rename-workflow.js";
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
 import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant.js";
-import { upsertApiResolver } from "./resolvers/upsert.js";
 import {
   abortToolExecutionResolver,
   buildWorkflowResolver,
@@ -43,8 +41,6 @@ export const resolvers = {
   Query: {
     listRuns: listRunsResolver,
     getRun: getRunResolver,
-    listApis: listApisResolver,
-    getApi: getApiResolver,
     getTenantInfo: getTenantInfoResolver,
     getWorkflow: getWorkflowResolver,
     listWorkflows: listWorkflowsResolver,
@@ -64,8 +60,6 @@ export const resolvers = {
     upsertWorkflow: upsertWorkflowResolver,
     deleteWorkflow: deleteWorkflowResolver,
     renameWorkflow: renameWorkflowResolver,
-    upsertApi: upsertApiResolver,
-    deleteApi: deleteApiResolver,
     upsertSystem: upsertSystemResolver,
     cacheOauthClientCredentials: cacheOauthClientCredentialsResolver,
     getOAuthClientCredentials: getOAuthClientCredentialsResolver,

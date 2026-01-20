@@ -29,12 +29,7 @@ type ApiConfig implements BaseConfig {
   queryParams: JSON
   headers: JSON
   body: String
-  documentationUrl: String
-  responseSchema: JSONSchema
-  responseMapping: JSONata
-  authentication: AuthType
   pagination: Pagination
-  dataPath: String
 }
 
 # used by the tool creation for file content extraction
@@ -201,12 +196,7 @@ input ApiInput {
   method: HttpMethod
   headers: JSON
   body: String
-  documentationUrl: String
-  responseSchema: JSONSchema
-  responseMapping: JSONata
-  authentication: AuthType
   pagination: PaginationInput
-  dataPath: String
   version: String
 }
 
@@ -349,14 +339,12 @@ type SuggestedTool {
 
 type Query {
   listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
-  listApis(limit: Int = 10, offset: Int = 0): ApiList!
   listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
   listSystems(limit: Int = 10, offset: Int = 0): SystemList!
   findRelevantSystems(searchTerms: String): [SuggestedSystem!]
   findRelevantTools(searchTerms: String): [SuggestedTool!]
 
   getRun(id: ID!): Run
-  getApi(id: ID!): ApiConfig
   getWorkflow(id: ID!): Workflow
   getSystem(id: ID!): System
   searchSystemDocumentation(systemId: ID!, keywords: String!): String!
@@ -376,9 +364,6 @@ type ExecutionStep {
   integrationId: ID
   executionMode: String # DIRECT | LOOP
   loopSelector: JSONata
-  loopMaxIters: Int
-  inputMapping: JSONata
-  responseMapping: JSONata
   failureBehavior: FailureBehavior
 }
 
@@ -389,9 +374,6 @@ input ExecutionStepInput {
   integrationId: ID
   executionMode: String # DIRECT | LOOP
   loopSelector: JSONata
-  loopMaxIters: Int
-  inputMapping: JSONata
-  responseMapping: JSONata
   failureBehavior: FailureBehavior
 }
 
