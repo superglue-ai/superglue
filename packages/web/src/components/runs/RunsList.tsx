@@ -15,7 +15,7 @@ import {
   Loader2,
   MousePointerClick,
   Webhook,
-  XCircle
+  XCircle,
 } from "lucide-react";
 import React from "react";
 
@@ -66,7 +66,7 @@ export const getRequestSourceBadgeClassName = (_source?: RequestSource | string)
   return "bg-muted-foreground/70 hover:bg-muted-foreground/70";
 };
 
-export const RequestSourceIcon = ({ source }: { source?: RequestSource | string; }) => {
+export const RequestSourceIcon = ({ source }: { source?: RequestSource | string }) => {
   const className = "h-3 w-3";
   switch (source) {
     case RequestSource.API:
@@ -86,7 +86,7 @@ export const RequestSourceIcon = ({ source }: { source?: RequestSource | string;
   }
 };
 
-export const StatusBadge = ({ status }: { status?: RunStatus | string; }) => {
+export const StatusBadge = ({ status }: { status?: RunStatus | string }) => {
   const statusUpper = status?.toString().toUpperCase();
 
   if (statusUpper === "SUCCESS" || status === RunStatus.SUCCESS) {
@@ -121,7 +121,7 @@ export const StatusBadge = ({ status }: { status?: RunStatus | string; }) => {
   );
 };
 
-export const RequestSourceBadge = ({ source }: { source?: RequestSource | string; }) => {
+export const RequestSourceBadge = ({ source }: { source?: RequestSource | string }) => {
   return (
     <Badge
       variant="default"
@@ -169,7 +169,7 @@ const CollapsibleSection = ({
   );
 };
 
-export const RunDetails = ({ run }: { run: any; }) => {
+export const RunDetails = ({ run }: { run: any }) => {
   if (!run) return null;
 
   const cleanedToolConfig = run.toolConfig ? removeNullFields(run.toolConfig) : null;
@@ -186,7 +186,8 @@ export const RunDetails = ({ run }: { run: any; }) => {
       : Object.keys(cleanedToolResult).length > 0);
   const hasToolPayload = cleanedToolPayload && Object.keys(cleanedToolPayload).length > 0;
   const hasStepResults = run.stepResults && run.stepResults.length > 0;
-  const isFailed = run.status === RunStatus.FAILED || run.status?.toString().toUpperCase() === "FAILED";
+  const isFailed =
+    run.status === RunStatus.FAILED || run.status?.toString().toUpperCase() === "FAILED";
 
   return (
     <div className="p-4 space-y-4 max-h-[400px] overflow-y-auto [scrollbar-gutter:stable]">
@@ -326,7 +327,12 @@ export const RunDetails = ({ run }: { run: any; }) => {
               </div>
             ),
           },
-        ].filter(Boolean) as { key: string; title: string; content: React.ReactNode; defaultOpen?: boolean; }[];
+        ].filter(Boolean) as {
+          key: string;
+          title: string;
+          content: React.ReactNode;
+          defaultOpen?: boolean;
+        }[];
 
         if (sections.length === 0) return null;
 
@@ -356,7 +362,11 @@ interface RunsListProps {
   emptyMessage?: string;
 }
 
-export function RunsList({ runs, loading = false, emptyMessage = "No runs found." }: RunsListProps) {
+export function RunsList({
+  runs,
+  loading = false,
+  emptyMessage = "No runs found.",
+}: RunsListProps) {
   const [expandedRunId, setExpandedRunId] = React.useState<string | null>(null);
 
   if (loading) {
@@ -371,15 +381,11 @@ export function RunsList({ runs, loading = false, emptyMessage = "No runs found.
   }
 
   if (!runs || runs.length === 0) {
-    return (
-      <div className="text-sm text-muted-foreground py-4 text-center">
-        {emptyMessage}
-      </div>
-    );
+    return <div className="text-sm text-muted-foreground py-4 text-center">{emptyMessage}</div>;
   }
 
   const sortedRuns = [...runs].sort(
-    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
   );
 
   return (

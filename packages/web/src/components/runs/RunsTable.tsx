@@ -11,18 +11,11 @@ import {
 } from "@/src/components/ui/table";
 import { tokenRegistry } from "@/src/lib/token-registry";
 import { Run, SuperglueClient } from "@superglue/shared";
-import {
-  ChevronRight,
-  Loader2,
-} from "lucide-react";
+import { ChevronRight, Loader2 } from "lucide-react";
 import React from "react";
-import {
-  RequestSourceBadge,
-  RunDetails,
-  StatusBadge,
-} from "./RunsList";
+import { RequestSourceBadge, RunDetails, StatusBadge } from "./RunsList";
 
-const RunsTable = ({ id }: { id?: string; }) => {
+const RunsTable = ({ id }: { id?: string }) => {
   const [runs, setRuns] = React.useState<Run[]>([]);
   const [expandedRunId, setExpandedRunId] = React.useState<string | null>(null);
   const [runDetails, setRunDetails] = React.useState<Record<string, any>>({});
@@ -150,8 +143,8 @@ const RunsTable = ({ id }: { id?: string; }) => {
                     <TableCell className="whitespace-nowrap">
                       {run.completedAt
                         ? new Date(run.completedAt).getTime() -
-                        new Date(run.startedAt).getTime() +
-                        "ms"
+                          new Date(run.startedAt).getTime() +
+                          "ms"
                         : "-"}
                     </TableCell>
                   </TableRow>
