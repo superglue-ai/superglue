@@ -1,10 +1,7 @@
 name: Sync to Hosted Repo
 
 on:
-  pull_request:
-    types: [closed]
-    branches:
-      - main
+  workflow_dispatch: # Manual trigger only - automatic sync paused
 
 jobs:
   sync-to-hosted:
