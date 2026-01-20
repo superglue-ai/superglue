@@ -1,6 +1,6 @@
 ---
 title: "Using Template Expressions"
-description: "Understand how template expressions work across integrations, tools, and steps."
+description: "Understand how template expressions work across systems, tools, and steps."
 ---
 
 Most of the time you don't have to write template expressions yourself—the agent generates them for you. Still, understanding how they work helps when you're debugging or tweaking a tool.
@@ -11,7 +11,7 @@ At their core, template expressions use the `<<expression>>` pattern, where `exp
 
 The same template engine is used across superglue:
 
-- **Integrations** – connection strings and URL templates
+- **Systems** – connection strings and URL templates
 - **Step configuration** – `urlHost`, `urlPath`, `headers`, `queryParams`, `body`
 - **Transforms** – final transforms and data selectors
 
@@ -41,7 +41,7 @@ queryParams: {
 }
 ```
 
-or in an integration:
+or in a system:
 
 ```text
 postgres://<<username>>:<<password>>@<<host>>:<<port>>/<<database>>
@@ -95,16 +95,16 @@ body: {
 
 ## Template context
 
-Template expressions evaluate against a **context object** that depends on where they're used (step config, integration, or transform).
+Template expressions evaluate against a **context object** that depends on where they're used (step config, system, or transform).
 
 - **Arrow function expressions** – context is passed as the function parameter (typically `sourceData`)
 - **Simple expressions** – the string inside `<< >>` is resolved against the same context object
 
 The context looks different depending on where the expression is used:
 
-### Integration context
+### System context
 
-The context is built from the integration credentials (for example, `username`, `password`, `access_token`).
+The context is built from the system credentials (for example, `username`, `password`, `access_token`).
 
 The `sourceData` might look like this:
 
@@ -119,7 +119,7 @@ The `sourceData` might look like this:
 ```
 
 <Note>
-  Integration templates are only resolved at tool execution time and get merged
+  System templates are only resolved at tool execution time and get merged
   with tool-specific credentials.
 </Note>
 
@@ -128,7 +128,7 @@ The `sourceData` might look like this:
 The context is the **aggregated step input**, which includes:
 
 - `payload` – workflow input payload
-- `credentials` – resolved credentials for the integration
+- `credentials` – resolved credentials for the system
 - Previous step results keyed by step ID (for example, `getCustomers`)
 - `currentItem` – current iteration data when the step runs in a loop
 

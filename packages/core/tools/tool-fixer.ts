@@ -1,4 +1,4 @@
-import { Integration, ServiceMetadata, Tool, ToolDiff, ToolStepResult } from "@superglue/shared";
+import { System, ServiceMetadata, Tool, ToolDiff, ToolStepResult } from "@superglue/shared";
 import jsonpatch from "fast-json-patch";
 import z from "zod";
 import { FIX_TOOL_SYSTEM_PROMPT } from "../context/context-prompts.js";
@@ -10,7 +10,7 @@ type Operation = jsonpatch.Operation;
 export interface ToolFixerOptions {
   tool: Tool;
   fixInstructions: string;
-  integrations: Integration[];
+  systems: System[];
   lastError?: string;
   stepResults?: ToolStepResult[];
   metadata: ServiceMetadata;
@@ -46,7 +46,7 @@ const patchSchema = z.object({
 export class ToolFixer {
   private tool: Tool;
   private fixInstructions: string;
-  private integrations: Record<string, Integration>;
+  private systems: Record<string, System>;
   private lastError?: string;
   private stepResults?: ToolStepResult[];
   private metadata: ServiceMetadata;
@@ -55,12 +55,12 @@ export class ToolFixer {
   constructor(options: ToolFixerOptions) {
     this.tool = options.tool;
     this.fixInstructions = options.fixInstructions;
-    this.integrations = options.integrations.reduce(
+    this.systems = options.systems.reduce(
       (acc, int) => {
         acc[int.id] = int;
         return acc;
       },
-      {} as Record<string, Integration>,
+      {} as Record<string, System>,
     );
     this.lastError = options.lastError;
     this.stepResults = options.stepResults;
@@ -135,7 +135,7 @@ ${JSON.stringify(stepResultsSummary, null, 2)}
 </step_results>`;
     }
 
-    const availableIntegrationIds = Object.keys(this.integrations);
+    const availableIntegrationIds = Object.keys(this.systems);
     if (availableIntegrationIds.length > 0) {
       userContent += `\n\n<available_integration_ids>
 ${availableIntegrationIds.join(", ")}
@@ -228,7 +228,7 @@ ${availableIntegrationIds.join(", ")}
       }
 
       // Validate steps
-      const availableIntegrationIds = Object.keys(this.integrations);
+      const availableIntegrationIds = Object.keys(this.systems);
       for (let i = 0; i < tool.steps.length; i++) {
         const step = tool.steps[i];
         if (!step.id) {

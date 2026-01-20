@@ -1,10 +1,10 @@
 import { ServiceMetadata } from "@superglue/shared";
-import { Integration, SelfHealingMode, Tool, ToolResult } from "@superglue/shared";
+import { System, SelfHealingMode, Tool, ToolResult } from "@superglue/shared";
 import { generateUniqueId } from "@superglue/shared/utils";
 import { ToolBuilder } from "../../../packages/core/tools/tool-builder.js";
 import { DataStore } from "../../../packages/core/datastore/types.js";
 import { ToolExecutor } from "../../../packages/core/tools/tool-executor.js";
-import { IntegrationManager } from "../../../packages/core/integrations/integration-manager.js";
+import { SystemManager } from "../../../packages/core/systems/system-manager.js";
 import { AttemptStatus, ToolAttempt, ToolConfig, ToolFailureReason, ValidationLLMConfig } from "../types.js";
 import { ToolValidationService } from "./tool-validation.js";
 
@@ -24,7 +24,7 @@ export class SuperglueToolAttemptService {
 
     public async runToolAttempt(
         toolConfig: ToolConfig,
-        integrations: Integration[],
+        systems: System[],
         selfHealingEnabled: boolean = true
     ): Promise<ToolAttempt> {
         const attempt: ToolAttempt = {
@@ -41,7 +41,7 @@ export class SuperglueToolAttemptService {
         const buildStart = Date.now();
         let workflow: Tool | undefined;
         try {
-            workflow = await this.buildWorkflow(toolConfig, integrations);
+            workflow = await this.buildWorkflow(toolConfig, systems);
 
             attempt.buildSuccess = true;
             attempt.workflow = workflow;
@@ -57,7 +57,7 @@ export class SuperglueToolAttemptService {
 
         const execStart = Date.now();
         try {
-            const workflowResult = await this.executeWorkflow(toolConfig, workflow, integrations, selfHealingEnabled);
+            const workflowResult = await this.executeWorkflow(toolConfig, workflow, systems, selfHealingEnabled);
             attempt.executionTime = Date.now() - execStart;
             attempt.result = workflowResult;
 
@@ -96,11 +96,11 @@ export class SuperglueToolAttemptService {
 
     private async buildWorkflow(
         toolConfig: ToolConfig,
-        integrations: Integration[]
+        systems: System[]
     ): Promise<Tool> {
         const builder = new ToolBuilder(
             toolConfig.instruction,
-            integrations,
+            systems,
             toolConfig.payload || {},
             {},
             this.metadata
@@ -122,18 +122,18 @@ export class SuperglueToolAttemptService {
     private async executeWorkflow(
         toolConfig: ToolConfig,
         workflow: Tool,
-        integrations: Integration[],
+        systems: System[],
         selfHealingEnabled: boolean
     ): Promise<ToolResult> {
         const executor = new ToolExecutor(
-            { tool: workflow, metadata: this.metadata, integrations: IntegrationManager.fromIntegrations(integrations, this.datastore, this.metadata) }
+            { tool: workflow, metadata: this.metadata, systems: SystemManager.fromSystems(systems, this.datastore, this.metadata) }
         );
 
-        const allCredentials = integrations.reduce(
-            (acc, integ) => {
-                if (integ.credentials && typeof integ.credentials === "object") {
-                    for (const [key, value] of Object.entries(integ.credentials)) {
-                        acc[`${integ.id}_${key}`] = value;
+        const allCredentials = systems.reduce(
+            (acc, system) => {
+                if (system.credentials && typeof system.credentials === "object") {
+                    for (const [key, value] of Object.entries(system.credentials)) {
+                        acc[`${system.id}_${key}`] = value;
                     }
                 }
                 return acc;

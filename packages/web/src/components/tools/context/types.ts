@@ -1,5 +1,5 @@
 import { UploadedFileInfo } from "@/src/lib/file-utils";
-import { ExecutionStep, Integration, ResponseFilter } from "@superglue/shared";
+import { ExecutionStep, System, ResponseFilter } from "@superglue/shared";
 
 export interface PayloadState {
   manualPayloadText: string;
@@ -24,7 +24,7 @@ export interface ToolConfigContextValue {
   tool: ToolDefinition;
   steps: ExecutionStep[];
   payload: PayloadState;
-  integrations: Integration[];
+  systems: System[];
 
   inputSchema: string | null;
   responseSchema: string;
@@ -52,7 +52,7 @@ export interface ToolConfigContextValue {
 
   getStepConfig: (stepId: string) => ExecutionStep | undefined;
   getStepIndex: (stepId: string) => number;
-  getStepIntegration: (stepId: string) => Integration | undefined;
+  getStepSystem: (stepId: string) => System | undefined;
 }
 
 export type StepStatus = "pending" | "running" | "completed" | "failed" | "aborted";

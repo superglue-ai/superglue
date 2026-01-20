@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, Integration, Pagination, ServiceMetadata } from "@superglue/shared";
+import { ApiConfig, HttpMethod, System, Pagination, ServiceMetadata } from "@superglue/shared";
 import { LLMMessage, LLMToolWithContext } from "../llm/llm-base-model.js";
 import { LanguageModel } from "../llm/llm-base-model.js";
 import {
@@ -13,7 +13,7 @@ type GenerateStepConfigInput = {
   retryCount: number;
   messages: LLMMessage[];
   sourceData: any;
-  integration: Integration;
+  system: System;
   metadata: ServiceMetadata;
 };
 
@@ -108,7 +108,7 @@ export async function generateStepConfig({
   retryCount,
   messages,
   sourceData,
-  integration,
+  system,
   metadata,
 }: GenerateStepConfigInput): Promise<GenerateStepConfigResult> {
   const temperature = Math.min(retryCount * 0.1, 1);
@@ -116,7 +116,7 @@ export async function generateStepConfig({
   const tools: LLMToolWithContext[] = [
     {
       toolDefinition: searchDocumentationToolDefinition,
-      toolContext: { orgId: metadata.orgId, traceId: metadata.traceId, integration },
+      toolContext: { orgId: metadata.orgId, traceId: metadata.traceId, system },
       maxUses: 1,
     },
     { toolDefinition: inspectSourceDataToolDefinition, toolContext: { sourceData }, maxUses: 3 },

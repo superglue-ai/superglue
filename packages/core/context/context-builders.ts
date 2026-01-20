@@ -1,4 +1,4 @@
-import { Integration } from "@superglue/shared";
+import { System } from "@superglue/shared";
 import { server_defaults } from "../default.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { composeUrl, sanitizeUnpairedSurrogates } from "../utils/helpers.js";
@@ -17,7 +17,7 @@ import {
   EvaluateTransformContextOptions,
   GenerateStepConfigContextInput,
   GenerateStepConfigContextOptions,
-  IntegrationContextOptions,
+  SystemContextOptions,
   ObjectContextOptions,
   ToolBuilderContextInput,
   ToolBuilderContextOptions,
@@ -107,71 +107,65 @@ export function getObjectContext(obj: any, opts: ObjectContextOptions): string {
   return combined.slice(0, budget);
 }
 
-function buildIntegrationContext(
-  integration: Integration,
-  opts: IntegrationContextOptions,
-): string {
+function buildSystemContext(system: System, opts: SystemContextOptions): string {
   const budget = Math.max(0, opts.characterBudget | 0);
   if (budget === 0) return "";
 
   const authMaxSections =
-    opts.tuning?.documentationMaxSections ?? server_defaults.CONTEXT.INTEGRATIONS.AUTH_MAX_SECTIONS;
+    opts.tuning?.documentationMaxSections ?? server_defaults.CONTEXT.SYSTEMS.AUTH_MAX_SECTIONS;
   const authSectionSize =
-    opts.tuning?.documentationMaxChars ??
-    server_defaults.CONTEXT.INTEGRATIONS.AUTH_SECTION_SIZE_CHARS;
+    opts.tuning?.documentationMaxChars ?? server_defaults.CONTEXT.SYSTEMS.AUTH_SECTION_SIZE_CHARS;
   const paginationMaxSections =
     opts.tuning?.documentationMaxSections ??
-    server_defaults.CONTEXT.INTEGRATIONS.PAGINATION_MAX_SECTIONS;
+    server_defaults.CONTEXT.SYSTEMS.PAGINATION_MAX_SECTIONS;
   const paginationSectionSize =
     opts.tuning?.documentationMaxChars ??
-    server_defaults.CONTEXT.INTEGRATIONS.PAGINATION_SECTION_SIZE_CHARS;
+    server_defaults.CONTEXT.SYSTEMS.PAGINATION_SECTION_SIZE_CHARS;
   const generalMaxSections =
-    opts.tuning?.documentationMaxSections ??
-    server_defaults.CONTEXT.INTEGRATIONS.GENERAL_MAX_SECTIONS;
+    opts.tuning?.documentationMaxSections ?? server_defaults.CONTEXT.SYSTEMS.GENERAL_MAX_SECTIONS;
   const generalSectionSize =
     opts.tuning?.documentationMaxChars ??
-    server_defaults.CONTEXT.INTEGRATIONS.GENERAL_SECTION_SIZE_CHARS;
+    server_defaults.CONTEXT.SYSTEMS.GENERAL_SECTION_SIZE_CHARS;
 
   const docSearch = new DocumentationSearch(opts.metadata);
   const authSection = sanitizeUnpairedSurrogates(
     docSearch.extractRelevantSections(
-      integration.documentation,
+      system.documentation,
       "authentication authorization key token bearer basic oauth credentials",
       authMaxSections,
       authSectionSize,
-      integration.openApiSchema,
+      system.openApiSchema,
     ),
   );
 
   const paginationSection = sanitizeUnpairedSurrogates(
     docSearch.extractRelevantSections(
-      integration.documentation,
+      system.documentation,
       "pagination page offset cursor limit per_page pageSize",
       paginationMaxSections,
       paginationSectionSize,
-      integration.openApiSchema,
+      system.openApiSchema,
     ),
   );
   const generalDocSection = sanitizeUnpairedSurrogates(
     docSearch.extractRelevantSections(
-      integration.documentation,
+      system.documentation,
       "reference object endpoints methods properties values fields enums search query filter list create update delete get put post patch",
       generalMaxSections,
       generalSectionSize,
-      integration.openApiSchema,
+      system.openApiSchema,
     ),
   );
 
-  const xml_opening_tag = `<${integration.id}>`;
-  const urlSection =
-    "<base_url>: " + composeUrl(integration.urlHost, integration.urlPath) + "</base_url>";
+  const xml_opening_tag = `<${system.id}>`;
+  const urlSection = "<base_url>: " + composeUrl(system.urlHost, system.urlPath) + "</base_url>";
   const specificInstructionsSection =
-    "<integration_specific_instructions>: " +
-    (integration.specificInstructions?.length > 0
-      ? integration.specificInstructions
-      : "No integration-specific instructions provided.") +
-    "</integration_specific_instructions>";
-  const xml_closing_tag = `</${integration.id}>`;
+    "<system_specific_instructions>: " +
+    (system.specificInstructions?.length > 0
+      ? system.specificInstructions
+      : "No system-specific instructions provided.") +
+    "</system_specific_instructions>";
+  const xml_closing_tag = `</${system.id}>`;
   const newlineCount = 2;
   const availableBudget = budget - xml_opening_tag.length - xml_closing_tag.length - newlineCount;
   return (
@@ -186,9 +180,9 @@ function buildIntegrationContext(
   );
 }
 
-function buildAvailableVariableContext(payload: any, integrations: Integration[]): string {
+function buildAvailableVariableContext(payload: any, systems: System[]): string {
   const availableVariables = [
-    ...integrations.flatMap((int) =>
+    ...systems.flatMap((int) =>
       Object.keys(int.credentials || {}).map((k) => `<<${int.id}_${k}>>`),
     ),
     ...Object.keys(payload || {}).map((k) => `<<${k}>>`),
@@ -203,10 +197,10 @@ export function getToolBuilderContext(
 ): string {
   const budget = Math.max(0, options.characterBudget | 0);
   if (budget === 0) return "";
-  const hasIntegrations = input.integrations.length > 0;
+  const hasSystems = input.systems.length > 0;
 
   const prompt_start = `Build a complete workflow to fulfill the user's instruction.`;
-  const prompt_end = hasIntegrations
+  const prompt_end = hasSystems
     ? "Ensure that the final output matches the instruction and you use ONLY the available integration ids."
     : "Since no integrations are available, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.";
   const userInstructionContext = options.include.userInstruction
@@ -248,13 +242,13 @@ export function getToolBuilderContext(
 
   const availableVariablesContent = buildAvailableVariableContext(
     input.payload,
-    input.integrations,
+    input.systems,
   ).slice(0, availableVariablesBudget);
-  const integrationContent = hasIntegrations
-    ? input.integrations
+  const integrationContent = hasSystems
+    ? input.systems
         .map((int) =>
-          buildIntegrationContext(int, {
-            characterBudget: Math.floor(integrationBudget / input.integrations.length),
+          buildSystemContext(int, {
+            characterBudget: Math.floor(integrationBudget / input.systems.length),
             metadata: input.metadata,
           }),
         )
@@ -464,14 +458,14 @@ export function getGenerateStepConfigContext(
 
   const documentationWrapperLength = "<documentation>".length + "</documentation>".length;
   const stepInputWrapperLength = "<step_input>".length + "</step_input>".length;
-  const integrationInstructionsWrapperLength =
-    "<integration_specific_instructions>".length + "</integration_specific_instructions>".length;
+  const systemInstructionsWrapperLength =
+    "<system_specific_instructions>".length + "</system_specific_instructions>".length;
   const credentialsWrapperLength =
     "<available_credentials>".length + "</available_credentials>".length;
   const totalWrapperLength =
     documentationWrapperLength +
     stepInputWrapperLength +
-    integrationInstructionsWrapperLength +
+    systemInstructionsWrapperLength +
     credentialsWrapperLength;
 
   let newlineCount = 6;
@@ -504,14 +498,14 @@ export function getGenerateStepConfigContext(
   const remainingBudget = budget - essentialLength;
   const documentationBudget = Math.floor(remainingBudget * 0.4);
   const stepInputBudget = Math.floor(remainingBudget * 0.4);
-  const integrationInstructionsBudget = Math.floor(remainingBudget * 0.1);
+  const systemInstructionsBudget = Math.floor(remainingBudget * 0.1);
   const credentialsBudget = Math.floor(remainingBudget * 0.1);
 
   const documentationContent = sanitizeUnpairedSurrogates(
-    input.integrationDocumentation.slice(0, documentationBudget),
+    input.systemDocumentation.slice(0, documentationBudget),
   );
-  const integrationSpecificInstructions = sanitizeUnpairedSurrogates(
-    input.integrationSpecificInstructions.slice(0, integrationInstructionsBudget),
+  const systemSpecificInstructions = sanitizeUnpairedSurrogates(
+    input.systemSpecificInstructions.slice(0, systemInstructionsBudget),
   );
   const credentialsContent = Object.keys(input.credentials || {})
     .map((v) => `<<${v}>>`)
@@ -520,7 +514,7 @@ export function getGenerateStepConfigContext(
 
   const documentationContext = `<documentation>${documentationContent}</documentation>`;
   const stepInputContext = `<step_input>${getObjectContext(input.stepInput || {}, { include: { schema: true, preview: false, samples: true }, characterBudget: stepInputBudget })}</step_input>`;
-  const integrationInstructionsContext = `<integration_specific_instructions>${integrationSpecificInstructions}</integration_specific_instructions>`;
+  const systemInstructionsContext = `<system_specific_instructions>${systemSpecificInstructions}</system_specific_instructions>`;
   const credentialsContext = `<available_credentials>${credentialsContent}</available_credentials>`;
 
   let contextParts = [promptStart, instructionContext];
@@ -530,7 +524,7 @@ export function getGenerateStepConfigContext(
   contextParts.push(
     documentationContext,
     stepInputContext,
-    integrationInstructionsContext,
+    systemInstructionsContext,
     credentialsContext,
   );
 

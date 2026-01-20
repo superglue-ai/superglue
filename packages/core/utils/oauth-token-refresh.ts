@@ -1,4 +1,4 @@
-import type { Integration, ServiceMetadata } from "@superglue/shared";
+import type { System, ServiceMetadata } from "@superglue/shared";
 import { getOAuthTokenUrl, resolveOAuthCertAndKey } from "@superglue/shared";
 import axios from "axios";
 import https from "https";
@@ -12,8 +12,8 @@ export interface OAuthTokens {
   expires_in?: number;
 }
 
-export function isTokenExpired(integration: Integration): boolean {
-  const { expires_at } = integration.credentials || {};
+export function isTokenExpired(system: System): boolean {
+  const { expires_at } = system.credentials || {};
   if (!expires_at) return false;
 
   const expiryTime = new Date(expires_at).getTime();
@@ -24,7 +24,7 @@ export function isTokenExpired(integration: Integration): boolean {
 }
 
 export async function refreshOAuthToken(
-  integration: Integration,
+  system: System,
   metadata: ServiceMetadata,
 ): Promise<{ success: boolean; newCredentials: Record<string, any> }> {
   const {
@@ -36,7 +36,7 @@ export async function refreshOAuthToken(
     oauth_cert,
     oauth_key,
     scopes,
-  } = integration.credentials || {};
+  } = system.credentials || {};
   const isClientCredentials = grant_type === "client_credentials";
 
   if (!client_id) {
@@ -62,9 +62,9 @@ export async function refreshOAuthToken(
   }
 
   try {
-    const tokenUrl = getOAuthTokenUrl(integration);
+    const tokenUrl = getOAuthTokenUrl(system);
     if (!tokenUrl) {
-      throw new Error("Could not determine token URL for integration");
+      throw new Error("Could not determine token URL for system");
     }
 
     let certContent: string | undefined;
@@ -113,7 +113,7 @@ export async function refreshOAuthToken(
         typeof response.data === "string" ? response.data : JSON.stringify(response.data);
       if (access_token === refresh_token) {
         throw new Error(
-          `OAuth access token was unable to refresh. This integration likely uses a long-lived access token in its OAuth flow. Please reauthenticate with the OAuth provider to refresh the access token manually.`,
+          `OAuth access token was unable to refresh. This system likely uses a long-lived access token in its OAuth flow. Please reauthenticate with the OAuth provider to refresh the access token manually.`,
         );
       }
       throw new Error(`Token refresh failed: ${response.status} - ${errorText}`);
@@ -121,8 +121,8 @@ export async function refreshOAuthToken(
 
     const tokenData: OAuthTokens = response.data;
 
-    integration.credentials = {
-      ...integration.credentials,
+    system.credentials = {
+      ...system.credentials,
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token || refresh_token,
       token_type: tokenData.token_type || "Bearer",
@@ -139,7 +139,7 @@ export async function refreshOAuthToken(
       metadata,
     );
 
-    return { success: true, newCredentials: integration.credentials };
+    return { success: true, newCredentials: system.credentials };
   } catch (error) {
     logMessage(
       "error",

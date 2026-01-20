@@ -3,7 +3,7 @@ import { calculateNextRun } from "@superglue/shared";
 import { RequestSource } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { DataStore } from "../datastore/types.js";
-import { executeWorkflowResolver } from "../graphql/resolvers/workflow.js";
+import { executeWorkflowResolver } from "../graphql/resolvers/tools.js";
 import { GraphQLRequestContext, WorkerPools } from "../graphql/types.js";
 import { logMessage } from "../utils/logs.js";
 

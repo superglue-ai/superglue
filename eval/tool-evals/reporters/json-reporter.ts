@@ -109,7 +109,7 @@ export class JsonReporter {
     const secrets: string[] = [];
     const credentialPairs: Array<{ email?: string; token?: string; api_token?: string; username?: string; password?: string }> = [];
 
-    for (const integrationConfig of config.integrations) {
+    for (const integrationConfig of config.systems) {
       if (!integrationConfig.credentials || !integrationConfig.id) {
         continue;
       }

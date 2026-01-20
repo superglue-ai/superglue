@@ -33,25 +33,25 @@ function initializeToolExecutionPool(
       messageHandlers: {
         credential_update: async (message: CredentialUpdateMessage) => {
           try {
-            const current = await datastore.getIntegration({
-              id: message.integrationId,
+            const current = await datastore.getSystem({
+              id: message.systemId,
               orgId: message.orgId,
             });
             if (current) {
               current.credentials = message.credentials;
-              await datastore.upsertIntegration({
-                id: message.integrationId,
-                integration: current,
+              await datastore.upsertSystem({
+                id: message.systemId,
+                system: current,
                 orgId: message.orgId,
               });
-              logMessage("info", `Credentials updated for integration ${message.integrationId}`, {
+              logMessage("info", `Credentials updated for system ${message.systemId}`, {
                 orgId: message.orgId,
               });
             }
           } catch (error) {
             logMessage(
               "error",
-              `Failed to update credentials for integration ${message.integrationId}: ${error}`,
+              `Failed to update credentials for system ${message.systemId}: ${error}`,
               { orgId: message.orgId },
             );
           }

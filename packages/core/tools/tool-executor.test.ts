@@ -1,7 +1,7 @@
-import { ApiConfig, HttpMethod, Integration, SelfHealingMode } from "@superglue/shared";
+import { ApiConfig, HttpMethod, System, SelfHealingMode } from "@superglue/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryStore } from "../datastore/memory.js";
-import { IntegrationManager } from "../integrations/integration-manager.js";
+import { SystemManager } from "../systems/system-manager.js";
 import { LanguageModel } from "../llm/llm-base-model.js";
 import { isSelfHealingEnabled } from "../utils/helpers.js";
 import { ToolExecutor } from "./tool-executor.js";
@@ -79,19 +79,19 @@ describe("WorkflowExecutor Self-Healing Logic", () => {
 
 describe("ToolExecutor Self-Healing Config Propagation", () => {
   let dataStore: MemoryStore;
-  let mockIntegration: Integration;
+  let mockSystem: System;
 
   beforeEach(() => {
     vi.clearAllMocks();
     dataStore = new MemoryStore();
 
-    mockIntegration = {
+    mockSystem = {
       id: "test-integration",
-      name: "Test Integration",
+      name: "Test System",
       credentials: { apiKey: "test-key" },
       specificInstructions: "Test instructions",
       orgId: "test-org",
-    } as Integration;
+    } as System;
   });
 
   it("should propagate updated config and dataSelector from self-healing back to result", async () => {
@@ -128,13 +128,13 @@ describe("ToolExecutor Self-Healing Config Propagation", () => {
       ],
     };
 
-    const integrationManager = IntegrationManager.fromIntegration(mockIntegration, dataStore, {
+    const systemManager = SystemManager.fromSystem(mockSystem, dataStore, {
       orgId: "test-org",
     });
     const executor = new ToolExecutor({
       tool,
       metadata: { orgId: "test-org", traceId: "test-user" },
-      integrations: [integrationManager],
+      systems: [systemManager],
     });
 
     let apiCallCount = 0;
@@ -193,15 +193,13 @@ describe("ToolExecutor Self-Healing Config Propagation", () => {
       });
 
     // Mock getDocumentation
-    vi.spyOn(integrationManager, "getDocumentation").mockResolvedValue({
+    vi.spyOn(systemManager, "getDocumentation").mockResolvedValue({
       content: "Test docs",
       isFetched: true,
     });
 
     // Mock searchDocumentation for validation step
-    vi.spyOn(integrationManager, "searchDocumentation").mockResolvedValue(
-      "Test docs for validation",
-    );
+    vi.spyOn(systemManager, "searchDocumentation").mockResolvedValue("Test docs for validation");
 
     // Execute with self-healing enabled
     const result = await executor.execute({
@@ -248,13 +246,13 @@ describe("ToolExecutor Self-Healing Config Propagation", () => {
       ],
     };
 
-    const integrationManager = IntegrationManager.fromIntegration(mockIntegration, dataStore, {
+    const systemManager = SystemManager.fromSystem(mockSystem, dataStore, {
       orgId: "test-org",
     });
     const executor = new ToolExecutor({
       tool,
       metadata: { orgId: "test-org", traceId: "test-user" },
-      integrations: [integrationManager],
+      systems: [systemManager],
     });
 
     // Mock strategy to fail

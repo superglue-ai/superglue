@@ -3,7 +3,7 @@ import type {
   DiscoveryRun,
   FileReference,
   FileStatus,
-  Integration,
+  System,
   Run,
   RunStatus,
   Tool,
@@ -65,11 +65,11 @@ export class PostgresService implements DataStore {
 
     this.initializeTables();
   }
-  async getManyIntegrations(params: {
+  async getManySystems(params: {
     ids: string[];
     includeDocs?: boolean;
     orgId?: string;
-  }): Promise<Integration[]> {
+  }): Promise<System[]> {
     const { ids, includeDocs = true, orgId } = params;
     const client = await this.pool.connect();
     try {
@@ -92,7 +92,7 @@ export class PostgresService implements DataStore {
       const result = await client.query(query, [ids, orgId || ""]);
 
       return result.rows.map((row: any) => {
-        const integration: Integration = {
+        const system: System = {
           id: row.id,
           name: row.name,
           type: row.type,
@@ -112,7 +112,7 @@ export class PostgresService implements DataStore {
           updatedAt: row.updated_at,
         };
 
-        return integration;
+        return system;
       });
     } finally {
       client.release();
@@ -1005,12 +1005,12 @@ export class PostgresService implements DataStore {
     };
   }
 
-  // Integration Methods
-  async getIntegration(params: {
+  // System Methods
+  async getSystem(params: {
     id: string;
     includeDocs?: boolean;
     orgId?: string;
-  }): Promise<Integration | null> {
+  }): Promise<System | null> {
     const { id, includeDocs = true, orgId } = params;
     if (!id) return null;
     const client = await this.pool.connect();
@@ -1035,7 +1035,7 @@ export class PostgresService implements DataStore {
       if (!result.rows[0]) return null;
 
       const row = result.rows[0] as any;
-      const integration: Integration = {
+      const system: System = {
         id: row.id,
         name: row.name,
         type: row.type,
@@ -1055,18 +1055,18 @@ export class PostgresService implements DataStore {
         updatedAt: row.updated_at,
       };
 
-      return integration;
+      return system;
     } finally {
       client.release();
     }
   }
 
-  async listIntegrations(params?: {
+  async listSystems(params?: {
     limit?: number;
     offset?: number;
     includeDocs?: boolean;
     orgId?: string;
-  }): Promise<{ items: Integration[]; total: number }> {
+  }): Promise<{ items: System[]; total: number }> {
     const { limit = 10, offset = 0, includeDocs = false, orgId } = params || {};
     const client = await this.pool.connect();
     try {
@@ -1097,7 +1097,7 @@ export class PostgresService implements DataStore {
       const result = await client.query(query, [orgId || "", limit, offset]);
 
       const items = result.rows.map((row: any) => {
-        const integration: Integration = {
+        const system: System = {
           id: row.id,
           name: row.name,
           type: row.type,
@@ -1117,7 +1117,7 @@ export class PostgresService implements DataStore {
           updatedAt: row.updated_at,
         };
 
-        return integration;
+        return system;
       });
       return { items, total };
     } finally {
@@ -1125,23 +1125,19 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async upsertIntegration(params: {
-    id: string;
-    integration: Integration;
-    orgId?: string;
-  }): Promise<Integration> {
-    const { id, integration, orgId } = params;
-    if (!id || !integration) return null;
+  async upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System> {
+    const { id, system, orgId } = params;
+    if (!id || !system) return null;
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
 
       // Encrypt credentials if provided
-      const encryptedCredentials = integration.credentials
-        ? credentialEncryption.encrypt(integration.credentials)
+      const encryptedCredentials = system.credentials
+        ? credentialEncryption.encrypt(system.credentials)
         : null;
 
-      // Insert/update main integration record
+      // Insert/update main system record (uses integrations table)
       await client.query(
         `
         INSERT INTO integrations (
@@ -1170,25 +1166,25 @@ export class PostgresService implements DataStore {
         [
           id,
           orgId || "",
-          integration.name,
-          integration.type,
-          integration.urlHost,
-          integration.urlPath,
+          system.name,
+          system.type,
+          system.urlHost,
+          system.urlPath,
           encryptedCredentials,
-          integration.documentationUrl,
-          integration.documentationPending,
-          integration.openApiUrl,
-          integration.specificInstructions,
-          integration.documentationKeywords,
-          integration.icon,
-          integration.version,
-          integration.createdAt || new Date(),
-          integration.updatedAt || new Date(),
+          system.documentationUrl,
+          system.documentationPending,
+          system.openApiUrl,
+          system.specificInstructions,
+          system.documentationKeywords,
+          system.icon,
+          system.version,
+          system.createdAt || new Date(),
+          system.updatedAt || new Date(),
         ],
       );
 
       // Insert/update details if any large fields are provided
-      if (integration.documentation || integration.openApiSchema) {
+      if (system.documentation || system.openApiSchema) {
         await client.query(
           `
             INSERT INTO integration_details (
@@ -1199,12 +1195,12 @@ export class PostgresService implements DataStore {
                 documentation = COALESCE($3, integration_details.documentation),
                 open_api_schema = COALESCE($4, integration_details.open_api_schema)
           `,
-          [id, orgId || "", integration.documentation, integration.openApiSchema],
+          [id, orgId || "", system.documentation, system.openApiSchema],
         );
       }
 
       await client.query("COMMIT");
-      return { ...integration, id };
+      return { ...system, id };
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -1213,7 +1209,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async deleteIntegration(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteSystem(params: { id: string; orgId?: string }): Promise<boolean> {
     const { id, orgId } = params;
     if (!id) return false;
     const client = await this.pool.connect();
@@ -1224,7 +1220,7 @@ export class PostgresService implements DataStore {
         [id, orgId || ""],
       );
 
-      // Then delete the integration
+      // Then delete the system (from integrations table)
       const result = await client.query("DELETE FROM integrations WHERE id = $1 AND org_id = $2", [
         id,
         orgId || "",
@@ -1235,19 +1231,19 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async copyTemplateDocumentationToUserIntegration(params: {
+  async copyTemplateDocumentationToUserSystem(params: {
     templateId: string;
-    userIntegrationId: string;
+    userSystemId: string;
     orgId?: string;
   }): Promise<boolean> {
-    const { templateId, userIntegrationId, orgId } = params;
-    if (!templateId || !userIntegrationId) return false;
+    const { templateId, userSystemId, orgId } = params;
+    if (!templateId || !userSystemId) return false;
     const client = await this.pool.connect();
     try {
-      // Copy the template documentation (identified by the org_id == 'template') to the user integration
+      // Copy the template documentation (identified by the org_id == 'template') to the user system
       const result = await client.query(
         "INSERT INTO integration_details (integration_id, org_id, documentation, open_api_schema) SELECT $1::text, $2::text, documentation, open_api_schema FROM integration_details WHERE integration_id = $3 AND org_id = $4",
-        [userIntegrationId, orgId || "", templateId, "template"],
+        [userSystemId, orgId || "", templateId, "template"],
       );
       // return true, if we inserted at least one row
       return result.rowCount > 0;

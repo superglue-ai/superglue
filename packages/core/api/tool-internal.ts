@@ -5,7 +5,7 @@ import {
   SelfHealingMode,
   Tool,
 } from "@superglue/shared";
-import { IntegrationManager } from "../integrations/integration-manager.js";
+import { SystemManager } from "../systems/system-manager.js";
 import { logMessage } from "../utils/logs.js";
 import type { ToolExecutionPayload } from "../worker/types.js";
 import { registerApiModule } from "./registry.js";
@@ -94,8 +94,8 @@ const runStep: RouteHandler = async (request, reply) => {
     ...(body.previousResults || {}),
   };
 
-  // Get integration manager if step has an integration
-  const integrationManagers = await IntegrationManager.forToolExecution(
+  // Get system managers for tool execution
+  const systemManagers = await SystemManager.forToolExecution(
     tempTool,
     authReq.datastore,
     metadata,
@@ -108,7 +108,7 @@ const runStep: RouteHandler = async (request, reply) => {
     payload: executionPayload,
     credentials: body.credentials as Record<string, string> | undefined,
     options: requestOptions,
-    integrations: integrationManagers.map((m) => m.toIntegrationSync()),
+    systems: systemManagers.map((m) => m.toSystemSync()),
     orgId: authReq.authInfo.orgId,
     traceId,
   };
@@ -184,7 +184,7 @@ const runTransform: RouteHandler = async (request, reply) => {
     payload: executionPayload,
     credentials: undefined,
     options: requestOptions,
-    integrations: [],
+    systems: [],
     orgId: authReq.authInfo.orgId,
     traceId,
   };

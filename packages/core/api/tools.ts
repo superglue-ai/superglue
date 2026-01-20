@@ -7,7 +7,7 @@ import {
   ToolResult,
 } from "@superglue/shared";
 import { parseJSON } from "../files/index.js";
-import { IntegrationManager } from "../integrations/integration-manager.js";
+import { SystemManager } from "../systems/system-manager.js";
 import { isSelfHealingEnabled } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
 import { notifyWebhook } from "../utils/webhook.js";
@@ -59,7 +59,7 @@ export function mapStepToOpenAPI(step: ExecutionStep): OpenAPIToolStep {
   if (apiConfig.queryParams) result.queryParams = apiConfig.queryParams;
   if (apiConfig.headers) result.headers = apiConfig.headers;
   if (apiConfig.body) result.body = apiConfig.body;
-  if (step.integrationId) result.systemId = step.integrationId;
+  if (step.integrationId) result.integrationId = step.integrationId;
   if (apiConfig.instruction) result.instruction = apiConfig.instruction;
   if (step.modify !== undefined) result.modify = step.modify;
   if (step.loopSelector) result.dataSelector = step.loopSelector;
@@ -224,12 +224,9 @@ async function executeToolInternal(
   };
 
   const selfHealingEnabled = isSelfHealingEnabled(requestOptions, "api");
-  const integrationManagers = await IntegrationManager.forToolExecution(
-    tool,
-    authReq.datastore,
-    metadata,
-    { includeDocs: selfHealingEnabled },
-  );
+  const systemManagers = await SystemManager.forToolExecution(tool, authReq.datastore, metadata, {
+    includeDocs: selfHealingEnabled,
+  });
 
   await authReq.datastore.createRun({
     run: {
@@ -253,7 +250,7 @@ async function executeToolInternal(
     payload,
     credentials: credentials as Record<string, string> | undefined,
     options: requestOptions,
-    integrations: integrationManagers.map((m) => m.toIntegrationSync()),
+    systems: systemManagers.map((m) => m.toSystemSync()),
     orgId: authReq.authInfo.orgId,
     traceId: metadata.traceId,
   };
@@ -430,12 +427,9 @@ const runTool: RouteHandler = async (request, reply) => {
   };
 
   const selfHealingEnabled = isSelfHealingEnabled(requestOptions, "api");
-  const integrationManagers = await IntegrationManager.forToolExecution(
-    tool,
-    authReq.datastore,
-    metadata,
-    { includeDocs: selfHealingEnabled },
-  );
+  const systemManagers = await SystemManager.forToolExecution(tool, authReq.datastore, metadata, {
+    includeDocs: selfHealingEnabled,
+  });
 
   await authReq.datastore.createRun({
     run: {
@@ -459,7 +453,7 @@ const runTool: RouteHandler = async (request, reply) => {
     payload: body.inputs,
     credentials: body.credentials as Record<string, string> | undefined,
     options: requestOptions,
-    integrations: integrationManagers.map((m) => m.toIntegrationSync()),
+    systems: systemManagers.map((m) => m.toSystemSync()),
     orgId: authReq.authInfo.orgId,
     traceId: metadata.traceId,
   };

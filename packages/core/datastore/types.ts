@@ -3,7 +3,7 @@ import type {
   DiscoveryRun,
   FileReference,
   FileStatus,
-  Integration,
+  System,
   Run,
   RunStatus,
   Tool,
@@ -74,29 +74,21 @@ export interface DataStore {
   getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }>;
   setTenantInfo(params?: { email?: string; emailEntrySkipped?: boolean }): Promise<void>;
 
-  // Integration Methods
-  getIntegration(params: {
-    id: string;
-    includeDocs?: boolean;
-    orgId?: string;
-  }): Promise<Integration | null>;
-  listIntegrations(params?: {
+  // System Methods
+  getSystem(params: { id: string; includeDocs?: boolean; orgId?: string }): Promise<System | null>;
+  listSystems(params?: {
     limit?: number;
     offset?: number;
     includeDocs?: boolean;
     orgId?: string;
-  }): Promise<{ items: Integration[]; total: number }>;
-  upsertIntegration(params: {
-    id: string;
-    integration: Integration;
-    orgId?: string;
-  }): Promise<Integration>;
-  deleteIntegration(params: { id: string; orgId?: string }): Promise<boolean>;
-  getManyIntegrations(params: {
+  }): Promise<{ items: System[]; total: number }>;
+  upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System>;
+  deleteSystem(params: { id: string; orgId?: string }): Promise<boolean>;
+  getManySystems(params: {
     ids: string[];
     includeDocs?: boolean;
     orgId?: string;
-  }): Promise<Integration[]>;
+  }): Promise<System[]>;
   getTemplateOAuthCredentials(params: {
     templateId: string;
   }): Promise<{ client_id: string; client_secret: string } | null>;
@@ -111,9 +103,9 @@ export interface DataStore {
   getOAuthSecret(params: {
     uid: string;
   }): Promise<{ clientId: string; clientSecret: string } | null>;
-  copyTemplateDocumentationToUserIntegration(params: {
+  copyTemplateDocumentationToUserSystem(params: {
     templateId: string;
-    userIntegrationId: string;
+    userSystemId: string;
     orgId?: string;
   }): Promise<boolean>;
 

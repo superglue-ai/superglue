@@ -58,7 +58,7 @@ superglue uses a role-based access control (RBAC) model with three layers:
 | ---------------- | --------------------------------------------- |
 | **Organization** | Top-level access to the superglue instance    |
 | **Tool**         | Which tools a user/agent can view and execute |
-| **Integration**  | Which API credentials a user/agent can use    |
+| **System**       | Which API credentials a user/agent can use    |
 
 ### Defining permissions
 
@@ -101,7 +101,7 @@ await superglue.grantPermission({
 
 ## Controlling agent access
 
-AI agents accessing superglue through the SDK or MCP can be scoped to specific tools and integrations:
+AI agents accessing superglue through the SDK or MCP can be scoped to specific tools and systems:
 
 ### SDK authentication
 

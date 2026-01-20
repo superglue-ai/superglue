@@ -13,7 +13,7 @@ import { ConsoleReporter } from "../tool-evals/reporters/console-reporter.js";
 import { CsvReporter } from "../tool-evals/reporters/csv-reporter.js";
 import { JsonReporter } from "../tool-evals/reporters/json-reporter.js";
 import { MetricsCalculator } from "../tool-evals/services/metrics-calculator.js";
-import type { IntegrationConfig } from "../tool-evals/types.js";
+import type { SystemConfig } from "../tool-evals/types.js";
 import { LlmToolRunner } from "./services/llm-tool-runner.js";
 
 // Load environment variables
@@ -33,33 +33,33 @@ const PROVIDERS = [
 ];
 
 function applyEnvironmentVariablesToCredentials(
-  integrations: IntegrationConfig[],
+  systems: SystemConfig[],
   metadata: ServiceMetadata
 ): void {
-  for (const integration of integrations) {
-    if (!integration.credentials || !integration.id) {
+  for (const system of systems) {
+    if (!system.credentials || !system.id) {
       continue;
     }
 
-    for (const [key] of Object.entries(integration.credentials)) {
-      const expectedEnvVarName = `${integration.id.toUpperCase().replace(/-/g, '_')}_${key.toUpperCase()}`;
+    for (const [key] of Object.entries(system.credentials)) {
+      const expectedEnvVarName = `${system.id.toUpperCase().replace(/-/g, '_')}_${key.toUpperCase()}`;
       const envValue = process.env[expectedEnvVarName];
 
       if (envValue) {
-        integration.credentials[key] = envValue;
+        system.credentials[key] = envValue;
       } else {
-        logMessage('warn', `Missing credential: ${integration.id}.${key} (${expectedEnvVarName})`, metadata);
+        logMessage('warn', `Missing credential: ${system.id}.${key} (${expectedEnvVarName})`, metadata);
       }
     }
 
     // Special handling for postgres-lego: replace placeholders in urlHost
-    if (integration.id === "postgres-lego") {
-      integration.urlHost = integration.urlHost
-        .replace("<<username>>", integration.credentials.username)
-        .replace("<<password>>", integration.credentials.password)
-        .replace("<<host>>", integration.credentials.host)
-        .replace("<<port>>", integration.credentials.port)
-        .replace("<<database>>", integration.credentials.database);
+    if (system.id === "postgres-lego") {
+      system.urlHost = system.urlHost
+        .replace("<<username>>", system.credentials.username)
+        .replace("<<password>>", system.credentials.password)
+        .replace("<<host>>", system.credentials.host)
+        .replace("<<port>>", system.credentials.port)
+        .replace("<<database>>", system.credentials.database);
     }
   }
 }
@@ -74,18 +74,18 @@ async function main(): Promise<void> {
       ? evalConfig.tools 
       : evalConfig.tools.filter(tool => evalConfig.enabledTools.includes(tool.id));
 
-    // Filter integrations to only those used by enabled tools
-    const usedIntegrationIds = new Set(
+    // Filter systems to only those used by enabled tools
+    const usedSystemIds = new Set(
       enabledTools.flatMap(tool => tool.integrationIds)
     );
-    const integrations = evalConfig.integrations.filter(integration => 
-      usedIntegrationIds.has(integration.id)
+    const systems = evalConfig.systems.filter(system => 
+      usedSystemIds.has(system.id)
     );
 
     // Apply environment variables to credentials
-    applyEnvironmentVariablesToCredentials(integrations, metadata);
+    applyEnvironmentVariablesToCredentials(systems, metadata);
 
-    logMessage("info", `Loaded ${integrations.length} integrations, ${enabledTools.length} enabled tools`, metadata);
+    logMessage("info", `Loaded ${systems.length} systems, ${enabledTools.length} enabled tools`, metadata);
 
     const baseDir = dirname(fileURLToPath(import.meta.url));
 
@@ -110,7 +110,7 @@ async function main(): Promise<void> {
         providerModel,
         provider.name,
         enabledTools,
-        integrations
+        systems
       );
 
       const metricsCalculator = new MetricsCalculator();

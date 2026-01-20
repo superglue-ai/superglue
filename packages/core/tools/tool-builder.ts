@@ -1,7 +1,7 @@
 import {
   convertRequiredToArray,
   HttpMethod,
-  Integration,
+  System,
   ServiceMetadata,
   toJsonSchema,
   Tool,
@@ -15,7 +15,7 @@ import { getWebSearchTool, searchDocumentationToolDefinition } from "../llm/llm-
 import { logMessage } from "../utils/logs.js";
 
 export class ToolBuilder {
-  private integrations: Record<string, Integration>;
+  private systems: Record<string, System>;
   private instruction: string;
   private initialPayload: Record<string, unknown>;
   private metadata: ServiceMetadata;
@@ -25,17 +25,17 @@ export class ToolBuilder {
 
   constructor(
     instruction: string,
-    integrations: Integration[],
+    systems: System[],
     initialPayload: Record<string, unknown>,
     responseSchema: JSONSchema,
     metadata: ServiceMetadata,
   ) {
-    this.integrations = integrations.reduce(
+    this.systems = systems.reduce(
       (acc, int) => {
         acc[int.id] = int;
         return acc;
       },
-      {} as Record<string, Integration>,
+      {} as Record<string, System>,
     );
     this.instruction = instruction;
     this.initialPayload = initialPayload || {};
@@ -43,7 +43,7 @@ export class ToolBuilder {
     this.responseSchema = responseSchema;
     this.toolSchema = z.toJSONSchema(toolSchema);
     try {
-      const credentials = Object.values(integrations).reduce((acc, int) => {
+      const credentials = Object.values(this.systems).reduce((acc, int) => {
         return {
           ...acc,
           ...Object.entries(int.credentials || {}).reduce(
@@ -69,7 +69,7 @@ export class ToolBuilder {
   private prepareBuildingContext(): LLMMessage[] {
     const buildingPromptForAgent = getToolBuilderContext(
       {
-        integrations: Object.values(this.integrations),
+        systems: Object.values(this.systems),
         payload: this.initialPayload,
         userInstruction: this.instruction,
         responseSchema: this.responseSchema,
@@ -94,7 +94,7 @@ export class ToolBuilder {
 
   private validateTool(tool: Tool): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
-    const availableIntegrationIds = Object.keys(this.integrations);
+    const availableIntegrationIds = Object.keys(this.systems);
     const hasSteps = tool.steps && tool.steps.length > 0;
     const hasFinalTransform =
       tool.finalTransform &&
@@ -144,7 +144,7 @@ export class ToolBuilder {
     let lastError: string | null = null;
 
     const webSearchTool = getWebSearchTool();
-    const firstIntegration = Object.values(this.integrations)[0];
+    const firstIntegration = Object.values(this.systems)[0];
     const tools: LLMToolWithContext[] = [
       {
         toolDefinition: searchDocumentationToolDefinition,
@@ -241,7 +241,7 @@ export class ToolBuilder {
         return {
           id: generatedTool.id,
           steps: generatedTool.steps,
-          integrationIds: Object.keys(this.integrations),
+          integrationIds: Object.keys(this.systems),
           instruction: this.instruction,
           finalTransform: generatedTool.finalTransform,
           responseSchema: this.responseSchema,

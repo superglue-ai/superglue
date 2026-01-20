@@ -1,6 +1,6 @@
-import { Integration } from "./types";
+import { System } from "./types";
 
-export interface IntegrationConfig {
+export interface SystemConfig {
   name: string;
   apiUrl: string;
   regex: string;
@@ -19,7 +19,7 @@ export interface IntegrationConfig {
   keywords?: string[];
 }
 
-export const integrations: Record<string, IntegrationConfig> = {
+export const systems: Record<string, SystemConfig> = {
   // Important: keys and names are the same and do not change without updating the integration and integration_details table with the template entries
   postgres: {
     name: "postgres",
@@ -2833,42 +2833,39 @@ export const integrations: Record<string, IntegrationConfig> = {
   },
 };
 
-export const integrationOptions = [
+export const systemOptions = [
   { value: "manual", label: "Custom API", icon: "default" },
-  ...Object.entries(integrations).map(([key, integration]) => ({
+  ...Object.entries(systems).map(([key, system]) => ({
     value: key,
     label: key
       .replace(/([A-Z])/g, " $1") // Add space before capital letters
       .replace(/^./, (str) => str.toUpperCase()) // Capitalize first letter
       .trim(), // Remove leading space
-    icon: integration.icon || "default",
+    icon: system.icon || "default",
   })),
 ];
 
 /**
- * Find matching integration for a given URL
- * @param url - The URL to match against integrations
- * @returns The matching integration key and details, or null if no match found
+ * Find matching system for a given URL
+ * @param url - The URL to match against systems
+ * @returns The matching system key and details, or null if no match found
  */
-export function findMatchingIntegration(
-  url: string,
-): { key: string; integration: IntegrationConfig } | null {
+export function findMatchingSystem(url: string): { key: string; system: SystemConfig } | null {
   // Ensure URL has a scheme for proper matching
   const urlForMatching =
     url.startsWith("http") || url.startsWith("postgres") ? url : `https://${url}`;
 
-  const matches: { key: string; integration: IntegrationConfig; specificity: number }[] = [];
+  const matches: { key: string; system: SystemConfig; specificity: number }[] = [];
 
-  for (const [key, integration] of Object.entries(integrations)) {
+  for (const [key, system] of Object.entries(systems)) {
     try {
-      if (new RegExp(integration.regex).test(urlForMatching)) {
+      if (new RegExp(system.regex).test(urlForMatching)) {
         // Calculate specificity: longer, more specific regexes get higher scores
-        const specificity =
-          integration.regex.length + (integration.regex.includes("(?!") ? 100 : 0);
-        matches.push({ key, integration, specificity });
+        const specificity = system.regex.length + (system.regex.includes("(?!") ? 100 : 0);
+        matches.push({ key, system, specificity });
       }
     } catch (e) {
-      console.error(`Invalid regex pattern for integration: ${key}`);
+      console.error(`Invalid regex pattern for system: ${key}`);
     }
   }
 
@@ -2876,48 +2873,48 @@ export function findMatchingIntegration(
 
   // Return the most specific match (highest specificity score)
   const bestMatch = matches.sort((a, b) => b.specificity - a.specificity)[0];
-  return { key: bestMatch.key, integration: bestMatch.integration };
+  return { key: bestMatch.key, system: bestMatch.system };
 }
 
 /**
- * Get OAuth configuration for an integration
- * @param integrationKey - The key of the integration
+ * Get OAuth configuration for a system
+ * @param systemKey - The key of the system
  * @returns OAuth config or null if not available
  */
-export function getOAuthConfig(integrationKey: string): IntegrationConfig["oauth"] | null {
-  return integrations[integrationKey]?.oauth || null;
+export function getOAuthConfig(systemKey: string): SystemConfig["oauth"] | null {
+  return systems[systemKey]?.oauth || null;
 }
 
 /**
- * Get OAuth token URL for an integration
- * @param integration - The integration object with credentials and URL info
+ * Get OAuth token URL for an system
+ * @param system - The system object with credentials and URL info
  * @returns The token URL for OAuth token exchange
  */
-export function getOAuthTokenUrl(integration: Integration): string {
+export function getOAuthTokenUrl(system: System): string {
   // First priority: User-provided token URL in credentials
-  if (integration.credentials?.token_url) {
-    return integration.credentials.token_url;
+  if (system.credentials?.token_url) {
+    return system.credentials.token_url;
   }
 
-  // Second priority: Known integration template token URL
-  const knownIntegration = Object.entries(integrations).find(
-    ([key]) => integration.id === key || integration.urlHost?.includes(key),
+  // Second priority: Known system template token URL
+  const knownSystem = Object.entries(systems).find(
+    ([key]) => system.id === key || system.urlHost?.includes(key),
   );
 
-  if (knownIntegration) {
-    const [_, config] = knownIntegration;
+  if (knownSystem) {
+    const [_, config] = knownSystem;
     if (config.oauth?.tokenUrl) {
       return config.oauth.tokenUrl;
     }
   }
 
   // Fallback: Default OAuth token endpoint
-  if (!integration.urlHost) {
+  if (!system.urlHost) {
     throw new Error(
-      `Cannot determine OAuth token URL for integration ${integration.id}: no urlHost or token_url provided`,
+      `Cannot determine OAuth token URL for system ${system.id}: no urlHost or token_url provided`,
     );
   }
-  return `${integration.urlHost}/oauth/token`;
+  return `${system.urlHost}/oauth/token`;
 }
 
 export interface SdkCodegenOptions {

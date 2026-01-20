@@ -1,7 +1,7 @@
 import {
   ApiConfig,
   ExecutionStep,
-  Integration,
+  System,
   maskCredentials,
   RequestOptions,
   ResponseFilter,
@@ -22,7 +22,7 @@ import {
   GENERATE_STEP_CONFIG_SYSTEM_PROMPT,
 } from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
-import { IntegrationManager } from "../integrations/integration-manager.js";
+import { SystemManager } from "../systems/system-manager.js";
 import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { isSelfHealingEnabled, transformData } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
@@ -38,7 +38,7 @@ import { executeAndEvaluateFinalTransform } from "./tool-transform.js";
 export interface ToolExecutorOptions {
   tool: Tool;
   metadata: ServiceMetadata;
-  integrations: IntegrationManager[];
+  systems: SystemManager[];
 }
 
 export class ToolExecutor implements Tool {
@@ -52,10 +52,10 @@ export class ToolExecutor implements Tool {
   public inputSchema?: JSONSchema;
   public integrationIds: string[];
   public responseFilters?: ResponseFilter[];
-  private integrations: Record<string, IntegrationManager>;
+  private systems: Record<string, SystemManager>;
   private strategyRegistry: StepExecutionStrategyRegistry;
 
-  constructor({ tool, metadata, integrations }: ToolExecutorOptions) {
+  constructor({ tool, metadata, systems }: ToolExecutorOptions) {
     this.id = tool.id;
     this.steps = tool.steps;
     this.finalTransform = tool.finalTransform;
@@ -65,12 +65,12 @@ export class ToolExecutor implements Tool {
     this.inputSchema = tool.inputSchema;
     this.responseFilters = tool.responseFilters;
 
-    this.integrations = integrations.reduce(
-      (acc, int) => {
-        acc[int.id] = int;
+    this.systems = systems.reduce(
+      (acc, sys) => {
+        acc[sys.id] = sys;
         return acc;
       },
-      {} as Record<string, IntegrationManager>,
+      {} as Record<string, SystemManager>,
     );
 
     this.integrationIds = tool.integrationIds;
@@ -206,26 +206,24 @@ export class ToolExecutor implements Tool {
       let isLoopStep = false;
       let stepResults: any[] = [];
 
-      const integrationManager = step.integrationId
-        ? this.integrations[step.integrationId]
-        : undefined;
-      let currentIntegration: Integration | null = null;
+      const systemManager = step.integrationId ? this.systems[step.integrationId] : undefined;
+      let currentSystem: System | null = null;
       let loopPayload: any = null;
 
-      if (step.integrationId && !integrationManager) {
+      if (step.integrationId && !systemManager) {
         throw new Error(
-          `Integration '${step.integrationId}' not found. Available integrations: ${Object.keys(this.integrations).join(", ")}`,
+          `System '${step.integrationId}' not found. Available systems: ${Object.keys(this.systems).join(", ")}`,
         );
       }
 
       // Get integration early so it's available for self-healing even if data selector fails
-      await integrationManager?.refreshTokenIfNeeded();
-      currentIntegration = await integrationManager?.getIntegration();
+      await systemManager?.refreshTokenIfNeeded();
+      currentSystem = await systemManager?.getSystem();
 
-      if (currentIntegration) {
+      if (currentSystem) {
         stepCredentials = {
           ...credentials,
-          ...flattenAndNamespaceCredentials([currentIntegration]),
+          ...flattenAndNamespaceCredentials([currentSystem]),
         } as Record<string, string>;
       }
 
@@ -267,14 +265,14 @@ export class ToolExecutor implements Tool {
             loopPayload = { currentItem, ...stepInput };
 
             // Refresh integration token if needed (important for long-running loops)
-            await integrationManager?.refreshTokenIfNeeded();
-            currentIntegration = await integrationManager?.getIntegration();
+            await systemManager?.refreshTokenIfNeeded();
+            currentSystem = await systemManager?.getSystem();
 
             // Repeated to update the credentials with the latest OAuth token
-            if (currentIntegration) {
+            if (currentSystem) {
               stepCredentials = {
                 ...credentials,
-                ...flattenAndNamespaceCredentials([currentIntegration]),
+                ...flattenAndNamespaceCredentials([currentSystem]),
               } as Record<string, string>;
             }
 
@@ -334,7 +332,7 @@ export class ToolExecutor implements Tool {
             await this.validateStepResponse(
               isLoopStep ? stepResults : stepResults[0] || null,
               currentConfig,
-              integrationManager,
+              systemManager,
             );
           }
 
@@ -364,12 +362,12 @@ export class ToolExecutor implements Tool {
 
             if (messages.length === 0) {
               messages = await this.initializeSelfHealingContext(
-                integrationManager,
+                systemManager,
                 currentConfig,
                 currentDataSelector,
                 loopPayload,
                 stepCredentials,
-                currentIntegration,
+                currentSystem,
               );
             }
 
@@ -377,7 +375,7 @@ export class ToolExecutor implements Tool {
               stepInput,
               credentials: stepCredentials,
               currentItem: loopPayload?.currentItem,
-              integrationUrlHost: currentIntegration.urlHost,
+              integrationUrlHost: currentSystem.urlHost,
               paginationPageSize: currentConfig?.pagination?.pageSize,
             });
 
@@ -385,7 +383,7 @@ export class ToolExecutor implements Tool {
               retryCount,
               messages,
               sourceData,
-              integration: currentIntegration,
+              system: currentSystem,
               metadata: this.metadata,
             });
 
@@ -439,14 +437,14 @@ export class ToolExecutor implements Tool {
   }
 
   private async initializeSelfHealingContext(
-    integrationManager: IntegrationManager,
+    systemManager: SystemManager,
     config: ApiConfig,
     loopSelector: string,
     payload: any,
     credentials: Record<string, string>,
-    integration: Integration,
+    system: System,
   ): Promise<LLMMessage[]> {
-    const docs = await integrationManager.getDocumentation();
+    const docs = await systemManager.getDocumentation();
 
     const userPrompt = getGenerateStepConfigContext(
       {
@@ -455,8 +453,8 @@ export class ToolExecutor implements Tool {
         previousStepDataSelector: loopSelector,
         stepInput: payload,
         credentials,
-        integrationDocumentation: docs?.content || "",
-        integrationSpecificInstructions: integration.specificInstructions || "",
+        systemDocumentation: docs?.content || "",
+        systemSpecificInstructions: system.specificInstructions || "",
       },
       { characterBudget: 50000, mode: "self-healing" },
     );
@@ -470,12 +468,12 @@ export class ToolExecutor implements Tool {
   private async validateStepResponse(
     data: any,
     config: ApiConfig,
-    integrationManager: IntegrationManager,
+    systemManager: SystemManager,
   ): Promise<void> {
     const evaluation = await this.evaluateStepResponse({
       data,
       config,
-      docSearchResultsForStepInstruction: await integrationManager?.searchDocumentation(
+      docSearchResultsForStepInstruction: await systemManager?.searchDocumentation(
         config.instruction,
       ),
     });

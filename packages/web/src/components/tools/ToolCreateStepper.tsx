@@ -1,7 +1,7 @@
-import { useIntegrations } from "@/src/app/integrations-context";
+import { useSystems } from "@/src/app/systems-context";
 import { useToast } from "@/src/hooks/use-toast";
 import { shouldDebounceAbort } from "@/src/lib/client-utils";
-import { Tool } from "@superglue/shared";
+import { System, Tool } from "@superglue/shared";
 import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
@@ -11,18 +11,18 @@ import ToolPlayground, { ToolPlaygroundHandle } from "./ToolPlayground";
 import { SaveToolDialog } from "./dialogs/SaveToolDialog";
 
 type ToolCreateStep = "build" | "run";
-type ToolBuilderView = "integrations" | "instructions";
+type ToolBuilderView = "systems" | "instructions";
 
 interface ToolCreateStepperProps {
   onComplete?: () => void;
-  initialIntegrationIds?: string[];
+  initialSystemIds?: string[];
   initialView?: ToolBuilderView;
 }
 
 export function ToolCreateStepper({
   onComplete,
-  initialIntegrationIds = [],
-  initialView = "integrations",
+  initialSystemIds = [],
+  initialView = "systems",
 }: ToolCreateStepperProps) {
   const [step, setStep] = useState<ToolCreateStep>("build");
   const [shouldStopExecution, setShouldStopExecution] = useState(false);
@@ -32,7 +32,7 @@ export function ToolCreateStepper({
   const playgroundRef = useRef<ToolPlaygroundHandle>(null);
   const lastAbortTimeRef = useRef<number>(0);
 
-  const { integrations } = useIntegrations();
+  const { systems } = useSystems();
 
   const [currentTool, setCurrentTool] = useState<Tool | null>(null);
   const [buildContext, setBuildContext] = useState<BuildContext | null>(null);
@@ -115,7 +115,7 @@ export function ToolCreateStepper({
           {step === "build" && (
             <ToolBuilder
               initialView={initialView}
-              initialIntegrationIds={initialIntegrationIds}
+              initialSystemIds={initialSystemIds}
               onToolBuilt={handleToolBuilt}
             />
           )}
@@ -128,7 +128,7 @@ export function ToolCreateStepper({
                 initialTool={currentTool}
                 initialPayload={buildContext.payload}
                 initialInstruction={buildContext.instruction}
-                integrations={integrations}
+                systems={systems}
                 onSave={handleSaveTool}
                 onInstructionEdit={() => setStep("build")}
                 shouldStopExecution={shouldStopExecution}

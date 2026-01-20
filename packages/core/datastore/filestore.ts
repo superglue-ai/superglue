@@ -3,7 +3,7 @@ import type {
   DiscoveryRun,
   FileReference,
   FileStatus,
-  Integration,
+  System,
   Run,
   RunStatus,
   Tool,
@@ -20,7 +20,7 @@ export class FileStore implements DataStore {
     apis: Map<string, ApiConfig>;
     workflows: Map<string, Tool>;
     toolSchedules: Map<string, ToolScheduleInternal>;
-    integrations: Map<string, Integration>;
+    systems: Map<string, System>;
     discoveryRuns: Map<string, DiscoveryRun>;
     fileReferences: Map<string, FileReference>;
     tenant: {
@@ -39,7 +39,7 @@ export class FileStore implements DataStore {
       apis: new Map(),
       workflows: new Map(),
       toolSchedules: new Map(),
-      integrations: new Map(),
+      systems: new Map(),
       discoveryRuns: new Map(),
       fileReferences: new Map(),
       tenant: {
@@ -108,7 +108,7 @@ export class FileStore implements DataStore {
               ],
             ),
           ),
-          integrations: new Map(Object.entries(parsed.integrations || {})),
+          systems: new Map(Object.entries(parsed.integrations || {})),
           discoveryRuns: new Map(Object.entries(parsed.discoveryRuns || {})),
           fileReferences: new Map(Object.entries(parsed.fileReferences || {})),
           tenant: {
@@ -155,7 +155,7 @@ export class FileStore implements DataStore {
         apis: Object.fromEntries(this.storage.apis),
         workflows: Object.fromEntries(this.storage.workflows),
         toolSchedules: Object.fromEntries(this.storage.toolSchedules),
-        integrations: Object.fromEntries(this.storage.integrations),
+        integrations: Object.fromEntries(this.storage.systems),
         discoveryRuns: Object.fromEntries(this.storage.discoveryRuns),
         fileReferences: Object.fromEntries(this.storage.fileReferences),
         tenant: this.storage.tenant,
@@ -473,7 +473,7 @@ export class FileStore implements DataStore {
     this.storage.apis.clear();
     this.storage.workflows.clear();
     this.storage.toolSchedules.clear();
-    this.storage.integrations.clear();
+    this.storage.systems.clear();
     this.storage.discoveryRuns.clear();
     this.storage.fileReferences.clear();
     await this.persist();
@@ -604,41 +604,39 @@ export class FileStore implements DataStore {
     return newWorkflow;
   }
 
-  // Integration Methods
-  async getIntegration(params: {
+  // System Methods (uses 'integration' key internally for backward compat)
+  async getSystem(params: {
     id: string;
     includeDocs?: boolean;
     orgId?: string;
-  }): Promise<Integration | null> {
+  }): Promise<System | null> {
     await this.ensureInitialized();
     const { id, includeDocs = true, orgId } = params;
     if (!id) return null;
     const key = this.getKey("integration", id, orgId);
-    const integration = this.storage.integrations.get(key);
-    if (!integration) return null;
+    const system = this.storage.systems.get(key);
+    if (!system) return null;
 
     // Decrypt credentials if encryption is enabled
-    const decryptedIntegration = { ...integration, id };
-    if (decryptedIntegration.credentials) {
-      decryptedIntegration.credentials = credentialEncryption.decrypt(
-        decryptedIntegration.credentials,
-      );
+    const decryptedSystem = { ...system, id };
+    if (decryptedSystem.credentials) {
+      decryptedSystem.credentials = credentialEncryption.decrypt(decryptedSystem.credentials);
     }
 
-    return decryptedIntegration;
+    return decryptedSystem;
   }
 
-  async listIntegrations(params?: {
+  async listSystems(params?: {
     limit?: number;
     offset?: number;
     includeDocs?: boolean;
     orgId?: string;
-  }): Promise<{ items: Integration[]; total: number }> {
+  }): Promise<{ items: System[]; total: number }> {
     await this.ensureInitialized();
     const { limit = 10, offset = 0, includeDocs = true, orgId } = params || {};
-    const orgItems = this.getOrgItems(this.storage.integrations, "integration", orgId);
-    const items = orgItems.slice(offset, offset + limit).map((integration) => {
-      const decrypted = { ...integration };
+    const orgItems = this.getOrgItems(this.storage.systems, "integration", orgId);
+    const items = orgItems.slice(offset, offset + limit).map((system) => {
+      const decrypted = { ...system };
       if (decrypted.credentials) {
         decrypted.credentials = credentialEncryption.decrypt(decrypted.credentials);
       }
@@ -648,57 +646,53 @@ export class FileStore implements DataStore {
     return { items, total };
   }
 
-  async getManyIntegrations(params: { ids: string[]; orgId?: string }): Promise<Integration[]> {
+  async getManySystems(params: { ids: string[]; orgId?: string }): Promise<System[]> {
     await this.ensureInitialized();
     const { ids, orgId } = params;
     return ids
       .map((id) => {
         const key = this.getKey("integration", id, orgId);
-        const integration = this.storage.integrations.get(key);
-        if (!integration) return null;
-        const decrypted = { ...integration, id };
+        const system = this.storage.systems.get(key);
+        if (!system) return null;
+        const decrypted = { ...system, id };
         if (decrypted.credentials) {
           decrypted.credentials = credentialEncryption.decrypt(decrypted.credentials);
         }
         return decrypted;
       })
-      .filter((i): i is Integration => i !== null);
+      .filter((i): i is System => i !== null);
   }
 
-  async upsertIntegration(params: {
-    id: string;
-    integration: Integration;
-    orgId?: string;
-  }): Promise<Integration> {
+  async upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System> {
     await this.ensureInitialized();
-    const { id, integration, orgId } = params;
-    if (!id || !integration) return null;
+    const { id, system, orgId } = params;
+    if (!id || !system) return null;
     const key = this.getKey("integration", id, orgId);
 
     // Encrypt credentials if encryption is enabled and credentials exist
-    const toStore = { ...integration };
+    const toStore = { ...system };
     if (toStore.credentials) {
       toStore.credentials = credentialEncryption.encrypt(toStore.credentials);
     }
 
-    this.storage.integrations.set(key, toStore);
+    this.storage.systems.set(key, toStore);
     await this.persist();
-    return { ...integration, id };
+    return { ...system, id };
   }
 
-  async deleteIntegration(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteSystem(params: { id: string; orgId?: string }): Promise<boolean> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return false;
     const key = this.getKey("integration", id, orgId);
-    const deleted = this.storage.integrations.delete(key);
+    const deleted = this.storage.systems.delete(key);
     await this.persist();
     return deleted;
   }
 
-  async copyTemplateDocumentationToUserIntegration(params: {
+  async copyTemplateDocumentationToUserSystem(params: {
     templateId: string;
-    userIntegrationId: string;
+    userSystemId: string;
     orgId?: string;
   }): Promise<boolean> {
     // Not supported for file store
