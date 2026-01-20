@@ -339,7 +339,7 @@ export class FileStore implements DataStore {
   }
 
   // API Config Methods
-  async getApiConfig(params: { id: string; orgId?: string }): Promise<ApiConfig | null> {
+  async getApiConfig(params: { id: string; orgId?: string; }): Promise<ApiConfig | null> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return null;
@@ -352,7 +352,7 @@ export class FileStore implements DataStore {
     limit?: number;
     offset?: number;
     orgId?: string;
-  }): Promise<{ items: ApiConfig[]; total: number }> {
+  }): Promise<{ items: ApiConfig[]; total: number; }> {
     await this.ensureInitialized();
     const { limit = 10, offset = 0, orgId } = params || {};
     const orgItems = this.getOrgItems(this.storage.apis, "api", orgId);
@@ -375,7 +375,7 @@ export class FileStore implements DataStore {
     return { ...config, id };
   }
 
-  async deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteApiConfig(params: { id: string; orgId?: string; }): Promise<boolean> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return false;
@@ -386,7 +386,7 @@ export class FileStore implements DataStore {
   }
 
   // Run Methods
-  async getRun(params: { id: string; orgId?: string }): Promise<Run | null> {
+  async getRun(params: { id: string; orgId?: string; }): Promise<Run | null> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return null;
@@ -395,7 +395,7 @@ export class FileStore implements DataStore {
     return runs.find((r) => r.id === id) || null;
   }
 
-  async createRun(params: { run: Run }): Promise<Run> {
+  async createRun(params: { run: Run; }): Promise<Run> {
     await this.ensureInitialized();
     const { run } = params;
     if (!run) throw new Error("Run is required");
@@ -412,7 +412,7 @@ export class FileStore implements DataStore {
     return run;
   }
 
-  async updateRun(params: { id: string; orgId: string; updates: Partial<Run> }): Promise<Run> {
+  async updateRun(params: { id: string; orgId: string; updates: Partial<Run>; }): Promise<Run> {
     await this.ensureInitialized();
     const { id, orgId, updates } = params;
 
@@ -443,7 +443,7 @@ export class FileStore implements DataStore {
     configId?: string;
     status?: RunStatus;
     orgId?: string;
-  }): Promise<{ items: Run[]; total: number }> {
+  }): Promise<{ items: Run[]; total: number; }> {
     await this.ensureInitialized();
     const { limit = 10, offset = 0, configId, status, orgId } = params || {};
     const allRuns = await this.readRunsFromLogs(orgId, configId);
@@ -496,12 +496,12 @@ export class FileStore implements DataStore {
     return true;
   }
 
-  async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }> {
+  async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean; }> {
     await this.ensureInitialized();
     return this.storage.tenant;
   }
 
-  async setTenantInfo(params?: { email?: string; emailEntrySkipped?: boolean }): Promise<void> {
+  async setTenantInfo(params?: { email?: string; emailEntrySkipped?: boolean; }): Promise<void> {
     await this.ensureInitialized();
     const { email, emailEntrySkipped } = params || {};
     const currentInfo = this.storage.tenant;
@@ -514,7 +514,7 @@ export class FileStore implements DataStore {
   }
 
   // Workflow Methods
-  async getWorkflow(params: { id: string; orgId?: string }): Promise<Tool | null> {
+  async getWorkflow(params: { id: string; orgId?: string; }): Promise<Tool | null> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return null;
@@ -527,7 +527,7 @@ export class FileStore implements DataStore {
     limit?: number;
     offset?: number;
     orgId?: string;
-  }): Promise<{ items: Tool[]; total: number }> {
+  }): Promise<{ items: Tool[]; total: number; }> {
     await this.ensureInitialized();
     const { limit = 10, offset = 0, orgId } = params || {};
     const items = this.getOrgItems(this.storage.workflows, "workflow", orgId).slice(
@@ -538,7 +538,7 @@ export class FileStore implements DataStore {
     return { items, total };
   }
 
-  async upsertWorkflow(params: { id: string; workflow: Tool; orgId?: string }): Promise<Tool> {
+  async upsertWorkflow(params: { id: string; workflow: Tool; orgId?: string; }): Promise<Tool> {
     await this.ensureInitialized();
     const { id, workflow, orgId } = params;
     if (!id || !workflow) return null;
@@ -548,7 +548,7 @@ export class FileStore implements DataStore {
     return { ...workflow, id };
   }
 
-  async deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteWorkflow(params: { id: string; orgId?: string; }): Promise<boolean> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return false;
@@ -558,7 +558,7 @@ export class FileStore implements DataStore {
     return deleted;
   }
 
-  async renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Tool> {
+  async renameWorkflow(params: { oldId: string; newId: string; orgId?: string; }): Promise<Tool> {
     await this.ensureInitialized();
     const { oldId, newId, orgId } = params;
 
@@ -604,7 +604,25 @@ export class FileStore implements DataStore {
     return newWorkflow;
   }
 
-  // System Methods (uses 'integration' key internally for backward compat)
+  // Tool History Methods (no-op for FileStore)
+  async listToolHistory(_params: {
+    toolId: string;
+    orgId?: string;
+  }): Promise<import("./types.js").ToolHistoryEntry[]> {
+    return [];
+  }
+
+  async restoreToolVersion(params: {
+    toolId: string;
+    version: number;
+    orgId?: string;
+    userId?: string;
+    userEmail?: string;
+  }): Promise<Tool> {
+    throw new Error("Tool history not supported in FileStore");
+  }
+
+  // Integration Methods
   async getSystem(params: {
     id: string;
     includeDocs?: boolean;
@@ -631,7 +649,7 @@ export class FileStore implements DataStore {
     offset?: number;
     includeDocs?: boolean;
     orgId?: string;
-  }): Promise<{ items: System[]; total: number }> {
+  }): Promise<{ items: System[]; total: number; }> {
     await this.ensureInitialized();
     const { limit = 10, offset = 0, includeDocs = true, orgId } = params || {};
     const orgItems = this.getOrgItems(this.storage.systems, "integration", orgId);
@@ -646,7 +664,7 @@ export class FileStore implements DataStore {
     return { items, total };
   }
 
-  async getManySystems(params: { ids: string[]; orgId?: string }): Promise<System[]> {
+  async getManySystems(params: { ids: string[]; orgId?: string; }): Promise<System[]> {
     await this.ensureInitialized();
     const { ids, orgId } = params;
     return ids
@@ -663,7 +681,7 @@ export class FileStore implements DataStore {
       .filter((i): i is System => i !== null);
   }
 
-  async upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System> {
+  async upsertSystem(params: { id: string; system: System; orgId?: string; }): Promise<System> {
     await this.ensureInitialized();
     const { id, system, orgId } = params;
     if (!id || !system) return null;
@@ -680,7 +698,7 @@ export class FileStore implements DataStore {
     return { ...system, id };
   }
 
-  async deleteSystem(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteSystem(params: { id: string; orgId?: string; }): Promise<boolean> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return false;
@@ -725,7 +743,7 @@ export class FileStore implements DataStore {
     return schedule ? { ...schedule, id } : null;
   }
 
-  async upsertToolSchedule(params: { schedule: ToolScheduleInternal }): Promise<void> {
+  async upsertToolSchedule(params: { schedule: ToolScheduleInternal; }): Promise<void> {
     await this.ensureInitialized();
     const { schedule } = params;
     if (!schedule || !schedule.id) return;
@@ -734,7 +752,7 @@ export class FileStore implements DataStore {
     await this.persist();
   }
 
-  async deleteToolSchedule(params: { id: string; orgId: string }): Promise<boolean> {
+  async deleteToolSchedule(params: { id: string; orgId: string; }): Promise<boolean> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     if (!id) return false;
@@ -781,11 +799,11 @@ export class FileStore implements DataStore {
 
   async getTemplateOAuthCredentials(params: {
     templateId: string;
-  }): Promise<{ client_id: string; client_secret: string } | null> {
+  }): Promise<{ client_id: string; client_secret: string; } | null> {
     return null;
   }
 
-  private oauthSecrets: Map<string, { clientId: string; clientSecret: string; expiresAt: number }> =
+  private oauthSecrets: Map<string, { clientId: string; clientSecret: string; expiresAt: number; }> =
     new Map();
 
   async cacheOAuthSecret(params: {
@@ -803,7 +821,7 @@ export class FileStore implements DataStore {
 
   async getOAuthSecret(params: {
     uid: string;
-  }): Promise<{ clientId: string; clientSecret: string } | null> {
+  }): Promise<{ clientId: string; clientSecret: string; } | null> {
     const entry = this.oauthSecrets.get(params.uid);
 
     if (!entry || entry.expiresAt <= Date.now()) {
@@ -820,7 +838,7 @@ export class FileStore implements DataStore {
     };
   }
 
-  async createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string }): Promise<DiscoveryRun> {
+  async createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string; }): Promise<DiscoveryRun> {
     await this.ensureInitialized();
     const { run, orgId } = params;
     const key = this.getKey("discovery-run", run.id, orgId);
@@ -829,7 +847,7 @@ export class FileStore implements DataStore {
     return run;
   }
 
-  async getDiscoveryRun(params: { id: string; orgId?: string }): Promise<DiscoveryRun | null> {
+  async getDiscoveryRun(params: { id: string; orgId?: string; }): Promise<DiscoveryRun | null> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     const key = this.getKey("discovery-run", id, orgId);
@@ -858,7 +876,7 @@ export class FileStore implements DataStore {
     limit?: number;
     offset?: number;
     orgId?: string;
-  }): Promise<{ items: DiscoveryRun[]; total: number }> {
+  }): Promise<{ items: DiscoveryRun[]; total: number; }> {
     await this.ensureInitialized();
     const { limit = 10, offset = 0, orgId } = params || {};
     const items = this.getOrgItems(this.storage.discoveryRuns, "discovery-run", orgId);
@@ -869,7 +887,7 @@ export class FileStore implements DataStore {
     return { items: paginatedItems, total };
   }
 
-  async deleteDiscoveryRun(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteDiscoveryRun(params: { id: string; orgId?: string; }): Promise<boolean> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     const key = this.getKey("discovery-run", id, orgId);
@@ -896,7 +914,7 @@ export class FileStore implements DataStore {
     return fileWithTimestamp;
   }
 
-  async getFileReference(params: { id: string; orgId?: string }): Promise<FileReference | null> {
+  async getFileReference(params: { id: string; orgId?: string; }): Promise<FileReference | null> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     const key = this.getKey("file-reference", id, orgId);
@@ -927,7 +945,7 @@ export class FileStore implements DataStore {
     limit?: number;
     offset?: number;
     orgId?: string;
-  }): Promise<{ items: FileReference[]; total: number }> {
+  }): Promise<{ items: FileReference[]; total: number; }> {
     await this.ensureInitialized();
     const { fileIds, status, limit = 10, offset = 0, orgId } = params || {};
     let items = this.getOrgItems(this.storage.fileReferences, "file-reference", orgId);
@@ -945,7 +963,7 @@ export class FileStore implements DataStore {
     return { items: paginatedItems, total };
   }
 
-  async deleteFileReference(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteFileReference(params: { id: string; orgId?: string; }): Promise<boolean> {
     await this.ensureInitialized();
     const { id, orgId } = params;
     const key = this.getKey("file-reference", id, orgId);

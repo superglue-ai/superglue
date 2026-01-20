@@ -17,6 +17,7 @@ import type {
   PrometheusRunMetrics,
   PrometheusRunSourceLabel,
   PrometheusRunStatusLabel,
+  ToolHistoryEntry,
   ToolScheduleInternal,
 } from "./types.js";
 
@@ -33,8 +34,8 @@ export class PostgresService implements DataStore {
       min: 2,
       ssl:
         config.ssl === false ||
-        config.host.includes("localhost") ||
-        config.host.includes("127.0.0.1")
+          config.host.includes("localhost") ||
+          config.host.includes("127.0.0.1")
           ? false
           : { rejectUnauthorized: false },
     });
@@ -55,7 +56,7 @@ export class PostgresService implements DataStore {
         logMessage(
           "error",
           "[CRITICAL] Postgres connection failed: " +
-            (err instanceof Error ? err.message : String(err)),
+          (err instanceof Error ? err.message : String(err)),
         );
         process.exit(1);
       })
@@ -320,6 +321,21 @@ export class PostgresService implements DataStore {
                 )
             `);
 
+      // Tool version history table (stores previous versions on each save)
+      await client.query(`
+                CREATE TABLE IF NOT EXISTS tool_history (
+                    id SERIAL PRIMARY KEY,
+                    tool_id VARCHAR(255) NOT NULL,
+                    org_id VARCHAR(255) NOT NULL,
+                    version INTEGER NOT NULL,
+                    data JSONB NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_by_user_id VARCHAR(255),
+                    created_by_email VARCHAR(255),
+                    UNIQUE(tool_id, org_id, version)
+                )
+            `);
+
       await client.query(
         `CREATE INDEX IF NOT EXISTS idx_configurations_type_org ON configurations(type, org_id)`,
       );
@@ -362,6 +378,9 @@ export class PostgresService implements DataStore {
       );
       await client.query(
         `CREATE INDEX IF NOT EXISTS idx_file_references_org_status ON file_references(org_id, status)`,
+      );
+      await client.query(
+        `CREATE INDEX IF NOT EXISTS idx_tool_history_lookup ON tool_history(tool_id, org_id, version DESC)`,
       );
     } finally {
       client.release();
@@ -421,7 +440,7 @@ export class PostgresService implements DataStore {
     limit = 10,
     offset = 0,
     orgId?: string,
-  ): Promise<{ items: T[]; total: number }> {
+  ): Promise<{ items: T[]; total: number; }> {
     const client = await this.pool.connect();
     try {
       const countResult = await client.query(
@@ -484,7 +503,7 @@ export class PostgresService implements DataStore {
   }
 
   // API Config Methods
-  async getApiConfig(params: { id: string; orgId?: string }): Promise<ApiConfig | null> {
+  async getApiConfig(params: { id: string; orgId?: string; }): Promise<ApiConfig | null> {
     const { id, orgId } = params;
     return this.getConfig<ApiConfig>(id, "api", orgId);
   }
@@ -493,7 +512,7 @@ export class PostgresService implements DataStore {
     limit?: number;
     offset?: number;
     orgId?: string;
-  }): Promise<{ items: ApiConfig[]; total: number }> {
+  }): Promise<{ items: ApiConfig[]; total: number; }> {
     const { limit = 10, offset = 0, orgId } = params || {};
     return this.listConfigs<ApiConfig>("api", limit, offset, orgId);
   }
@@ -507,13 +526,13 @@ export class PostgresService implements DataStore {
     return this.upsertConfig(id, config, "api", orgId);
   }
 
-  async deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteApiConfig(params: { id: string; orgId?: string; }): Promise<boolean> {
     const { id, orgId } = params;
     return this.deleteConfig(id, "api", orgId);
   }
 
   // Run Methods
-  async getRun(params: { id: string; orgId?: string }): Promise<Run | null> {
+  async getRun(params: { id: string; orgId?: string; }): Promise<Run | null> {
     const { id, orgId } = params;
     if (!id) return null;
     const client = await this.pool.connect();
@@ -545,7 +564,7 @@ export class PostgresService implements DataStore {
     configId?: string;
     status?: RunStatus;
     orgId?: string;
-  }): Promise<{ items: Run[]; total: number }> {
+  }): Promise<{ items: Run[]; total: number; }> {
     const { limit = 10, offset = 0, configId, status, orgId } = params || {};
     const client = await this.pool.connect();
     try {
@@ -598,7 +617,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async createRun(params: { run: Run }): Promise<Run> {
+  async createRun(params: { run: Run; }): Promise<Run> {
     const { run } = params;
     if (!run) throw new Error("Run is required");
     const client = await this.pool.connect();
@@ -631,7 +650,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async updateRun(params: { id: string; orgId: string; updates: Partial<Run> }): Promise<Run> {
+  async updateRun(params: { id: string; orgId: string; updates: Partial<Run>; }): Promise<Run> {
     const { id, orgId, updates } = params;
     const client = await this.pool.connect();
     try {
@@ -751,7 +770,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async getWorkflow(params: { id: string; orgId?: string }): Promise<Tool | null> {
+  async getWorkflow(params: { id: string; orgId?: string; }): Promise<Tool | null> {
     const { id, orgId } = params;
     return this.getConfig<Tool>(id, "workflow", orgId);
   }
@@ -760,23 +779,91 @@ export class PostgresService implements DataStore {
     limit?: number;
     offset?: number;
     orgId?: string;
-  }): Promise<{ items: Tool[]; total: number }> {
+  }): Promise<{ items: Tool[]; total: number; }> {
     const { limit = 10, offset = 0, orgId } = params || {};
     return this.listConfigs<Tool>("workflow", limit, offset, orgId);
   }
 
-  async upsertWorkflow(params: { id: string; workflow: Tool; orgId?: string }): Promise<Tool> {
-    const { id, workflow, orgId } = params;
-    const integrationIds: string[] = [];
-    return this.upsertConfig(id, workflow, "workflow", orgId, integrationIds);
+  async upsertWorkflow(params: {
+    id: string;
+    workflow: Tool;
+    orgId?: string;
+    userId?: string;
+    userEmail?: string;
+  }): Promise<Tool> {
+    const { id, workflow, orgId = "", userId, userEmail } = params;
+    if (!id || !workflow) return null;
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Check if tool already exists - if so, archive current version
+      const existingResult = await client.query(
+        "SELECT data FROM configurations WHERE id = $1 AND type = $2 AND org_id = $3",
+        [id, "workflow", orgId],
+      );
+
+      if (existingResult.rows.length > 0) {
+        const existingTool = existingResult.rows[0].data as Tool;
+
+        // Compare tools (excluding volatile fields like updatedAt)
+        const normalize = (t: Tool) => {
+          const { updatedAt, createdAt, ...rest } = t as any;
+          return JSON.stringify(rest, Object.keys(rest).sort());
+        };
+        const hasChanges = normalize(existingTool) !== normalize(workflow);
+
+        if (hasChanges) {
+          // Get next version number
+          const versionResult = await client.query(
+            "SELECT COALESCE(MAX(version), 0) + 1 as next_version FROM tool_history WHERE tool_id = $1 AND org_id = $2",
+            [id, orgId],
+          );
+          const nextVersion = versionResult.rows[0].next_version;
+
+          // Archive the existing version
+          await client.query(
+            `INSERT INTO tool_history (tool_id, org_id, version, data, created_by_user_id, created_by_email)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+              id,
+              orgId,
+              nextVersion,
+              JSON.stringify(existingTool),
+              userId || null,
+              userEmail || null,
+            ],
+          );
+        }
+      }
+
+      // Now upsert the new version
+      const version = this.extractVersion(workflow);
+      await client.query(
+        `INSERT INTO configurations (id, org_id, type, version, data, integration_ids, updated_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+         ON CONFLICT (id, type, org_id) 
+         DO UPDATE SET data = $5, version = $4, integration_ids = $6, updated_at = CURRENT_TIMESTAMP`,
+        [id, orgId, "workflow", version, JSON.stringify(workflow), []],
+      );
+
+      await client.query("COMMIT");
+      return { ...workflow, id };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
-  async deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteWorkflow(params: { id: string; orgId?: string; }): Promise<boolean> {
     const { id, orgId } = params;
     return this.deleteConfig(id, "workflow", orgId);
   }
 
-  async renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Tool> {
+  async renameWorkflow(params: { oldId: string; newId: string; orgId?: string; }): Promise<Tool> {
     const { oldId, newId, orgId = "" } = params;
     const client = await this.pool.connect();
 
@@ -837,7 +924,13 @@ export class PostgresService implements DataStore {
         [newId, oldId, orgId],
       );
 
-      // 5. Delete old workflow
+      // 5. Migrate tool_history to new tool_id
+      await client.query(
+        `UPDATE tool_history SET tool_id = $1 WHERE tool_id = $2 AND org_id = $3`,
+        [newId, oldId, orgId],
+      );
+
+      // 6. Delete old workflow
       await client.query("DELETE FROM configurations WHERE id = $1 AND type = $2 AND org_id = $3", [
         oldId,
         "workflow",
@@ -846,6 +939,105 @@ export class PostgresService implements DataStore {
 
       await client.query("COMMIT");
       return newWorkflow;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Tool History Methods
+  async listToolHistory(params: { toolId: string; orgId?: string; }): Promise<ToolHistoryEntry[]> {
+    const { toolId, orgId = "" } = params;
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `SELECT version, data, created_at, created_by_user_id, created_by_email
+         FROM tool_history
+         WHERE tool_id = $1 AND org_id = $2
+         ORDER BY version DESC`,
+        [toolId, orgId],
+      );
+
+      return result.rows.map((row) => ({
+        version: row.version,
+        createdAt: row.created_at,
+        createdByUserId: row.created_by_user_id || undefined,
+        createdByEmail: row.created_by_email || undefined,
+        tool: row.data as Tool,
+      }));
+    } finally {
+      client.release();
+    }
+  }
+
+  async restoreToolVersion(params: {
+    toolId: string;
+    version: number;
+    orgId?: string;
+    userId?: string;
+    userEmail?: string;
+  }): Promise<Tool> {
+    const { toolId, version, orgId = "", userId, userEmail } = params;
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Get the archived version to restore
+      const archiveResult = await client.query(
+        `SELECT data FROM tool_history WHERE tool_id = $1 AND org_id = $2 AND version = $3`,
+        [toolId, orgId, version],
+      );
+
+      if (archiveResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        throw new Error(`Version ${version} not found for tool ${toolId}`);
+      }
+
+      const toolToRestore = archiveResult.rows[0].data as Tool;
+
+      // Get current tool to archive it first
+      const currentResult = await client.query(
+        `SELECT data FROM configurations WHERE id = $1 AND org_id = $2 AND type = 'workflow'`,
+        [toolId, orgId],
+      );
+
+      if (currentResult.rows.length > 0) {
+        const currentTool = currentResult.rows[0].data as Tool;
+
+        // Always archive the current version before restore
+        const versionResult = await client.query(
+          "SELECT COALESCE(MAX(version), 0) + 1 as next_version FROM tool_history WHERE tool_id = $1 AND org_id = $2",
+          [toolId, orgId],
+        );
+        const nextVersion = versionResult.rows[0].next_version;
+
+        await client.query(
+          `INSERT INTO tool_history (tool_id, org_id, version, data, created_by_user_id, created_by_email)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            toolId,
+            orgId,
+            nextVersion,
+            JSON.stringify(currentTool),
+            userId || null,
+            userEmail || null,
+          ],
+        );
+      }
+
+      // Save the restored version
+      const restoredWorkflow = { ...toolToRestore, updatedAt: new Date() };
+      const toolVersion = this.extractVersion(restoredWorkflow);
+      await client.query(
+        `UPDATE configurations SET data = $1, version = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3 AND org_id = $4 AND type = 'workflow'`,
+        [JSON.stringify(restoredWorkflow), toolVersion, toolId, orgId],
+      );
+
+      await client.query("COMMIT");
+      return restoredWorkflow;
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -905,7 +1097,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async upsertToolSchedule({ schedule }: { schedule: ToolScheduleInternal }): Promise<void> {
+  async upsertToolSchedule({ schedule }: { schedule: ToolScheduleInternal; }): Promise<void> {
     const client = await this.pool.connect();
     try {
       const query = `
@@ -941,7 +1133,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async deleteToolSchedule({ id, orgId }: { id: string; orgId: string }): Promise<boolean> {
+  async deleteToolSchedule({ id, orgId }: { id: string; orgId: string; }): Promise<boolean> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
@@ -1066,7 +1258,7 @@ export class PostgresService implements DataStore {
     offset?: number;
     includeDocs?: boolean;
     orgId?: string;
-  }): Promise<{ items: System[]; total: number }> {
+  }): Promise<{ items: System[]; total: number; }> {
     const { limit = 10, offset = 0, includeDocs = false, orgId } = params || {};
     const client = await this.pool.connect();
     try {
@@ -1125,7 +1317,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System> {
+  async upsertSystem(params: { id: string; system: System; orgId?: string; }): Promise<System> {
     const { id, system, orgId } = params;
     if (!id || !system) return null;
     const client = await this.pool.connect();
@@ -1209,7 +1401,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async deleteSystem(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteSystem(params: { id: string; orgId?: string; }): Promise<boolean> {
     const { id, orgId } = params;
     if (!id) return false;
     const client = await this.pool.connect();
@@ -1253,7 +1445,7 @@ export class PostgresService implements DataStore {
   }
 
   // Tenant Information Methods
-  async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }> {
+  async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean; }> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
@@ -1275,7 +1467,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async setTenantInfo(params?: { email?: string; emailEntrySkipped?: boolean }): Promise<void> {
+  async setTenantInfo(params?: { email?: string; emailEntrySkipped?: boolean; }): Promise<void> {
     const { email, emailEntrySkipped } = params || {};
     const client = await this.pool.connect();
     try {
@@ -1332,7 +1524,7 @@ export class PostgresService implements DataStore {
 
   async getTemplateOAuthCredentials(params: {
     templateId: string;
-  }): Promise<{ client_id: string; client_secret: string } | null> {
+  }): Promise<{ client_id: string; client_secret: string; } | null> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
@@ -1354,7 +1546,7 @@ export class PostgresService implements DataStore {
       logMessage(
         "debug",
         `No template OAuth credentials found for ${params.templateId}: ` +
-          (error instanceof Error ? error.message : String(error)),
+        (error instanceof Error ? error.message : String(error)),
       );
       return null;
     } finally {
@@ -1390,7 +1582,7 @@ export class PostgresService implements DataStore {
 
   async getOAuthSecret(params: {
     uid: string;
-  }): Promise<{ clientId: string; clientSecret: string } | null> {
+  }): Promise<{ clientId: string; clientSecret: string; } | null> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
@@ -1423,7 +1615,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string }): Promise<DiscoveryRun> {
+  async createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string; }): Promise<DiscoveryRun> {
     const { run, orgId = "" } = params;
     const client = await this.pool.connect();
     try {
@@ -1438,7 +1630,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async getDiscoveryRun(params: { id: string; orgId?: string }): Promise<DiscoveryRun | null> {
+  async getDiscoveryRun(params: { id: string; orgId?: string; }): Promise<DiscoveryRun | null> {
     const { id, orgId = "" } = params;
     const client = await this.pool.connect();
     try {
@@ -1506,7 +1698,7 @@ export class PostgresService implements DataStore {
     limit?: number;
     offset?: number;
     orgId?: string;
-  }): Promise<{ items: DiscoveryRun[]; total: number }> {
+  }): Promise<{ items: DiscoveryRun[]; total: number; }> {
     const { limit = 10, offset = 0, orgId = "" } = params || {};
     const client = await this.pool.connect();
     try {
@@ -1537,7 +1729,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async deleteDiscoveryRun(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteDiscoveryRun(params: { id: string; orgId?: string; }): Promise<boolean> {
     const { id, orgId = "" } = params;
     const client = await this.pool.connect();
     try {
@@ -1580,7 +1772,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async getFileReference(params: { id: string; orgId?: string }): Promise<FileReference | null> {
+  async getFileReference(params: { id: string; orgId?: string; }): Promise<FileReference | null> {
     const { id, orgId = "" } = params;
     const client = await this.pool.connect();
     try {
@@ -1660,7 +1852,7 @@ export class PostgresService implements DataStore {
     limit?: number;
     offset?: number;
     orgId?: string;
-  }): Promise<{ items: FileReference[]; total: number }> {
+  }): Promise<{ items: FileReference[]; total: number; }> {
     const { fileIds, status, limit = 10, offset = 0, orgId = "" } = params || {};
     const client = await this.pool.connect();
     try {
@@ -1707,7 +1899,7 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async deleteFileReference(params: { id: string; orgId?: string }): Promise<boolean> {
+  async deleteFileReference(params: { id: string; orgId?: string; }): Promise<boolean> {
     const { id, orgId = "" } = params;
     const client = await this.pool.connect();
     try {
