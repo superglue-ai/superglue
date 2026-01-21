@@ -46,7 +46,7 @@ Once you've created a tool, you can deploy it in three ways: execute it on-deman
     // Configure the SDK
     configure({
       baseUrl: "https://api.superglue.cloud", // or your self-hosted URL
-      token: "your_api_token"
+      apiKey: "your_api_key"
     });
 
     // Run a tool with input payload
@@ -58,7 +58,7 @@ Once you've created a tool, you can deploy it in three ways: execute it on-deman
     });
 
     // For synchronous runs, result is available immediately
-    if (run.status === "completed") {
+    if (run.status === "success") {
       console.log(run.data); // Final output
       console.log(run.stepResults); // Step-by-step details
     }
@@ -75,11 +75,11 @@ Once you've created a tool, you can deploy it in three ways: execute it on-deman
 
     // Poll for completion
     let status = run.status;
-    while (status === "running" || status === "pending") {
+    while (status === "running") {
       await new Promise(r => setTimeout(r, 1000));
       const { data: updated } = await getRun(run.runId);
       status = updated.status;
-      if (status === "completed") {
+      if (status === "success") {
         console.log(updated.data);
       }
     }
@@ -88,12 +88,12 @@ Once you've created a tool, you can deploy it in three ways: execute it on-deman
     **List recent runs:**
 
     ```typescript
-    const { data: runs } = await listRuns({ 
+    const response = await listRuns({ 
       toolId: "sync-customers",
       limit: 10 
     });
     
-    runs.items.forEach(run => {
+    response.data.data.forEach(run => {
       console.log(`${run.runId}: ${run.status}`);
     });
     ```
