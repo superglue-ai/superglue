@@ -35,6 +35,8 @@ export interface Tool {
 Format: (sourceData) => expression
  */
   outputTransform?: string;
+  /** Whether this tool is archived (if so, it will not be listed in the UI and cannot be run) */
+  archived?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
