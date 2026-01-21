@@ -5,10 +5,6 @@ description: "Execute tools on-demand, schedule them, or trigger via incoming we
 
 Once you've created a tool, you can deploy it in three ways: execute it on-demand, schedule it to run automatically, or trigger it via incoming webhooks from external services.
 
-## On-demand execution
-
-Run your tools immediately whenever you need them.
-
 <Tabs>
   <Tab title="Via UI">
     Execute tools directly from the tool details page:
@@ -27,7 +23,7 @@ Run your tools immediately whenever you need them.
         Enter any required input parameters in JSON format. If your tool doesn't require input, use `{}`
       </Step>
       <Step title="Execute">
-        Click "Run" to execute immediately. You'll see real-time logs and step-by-step progress
+        Click "Run All Steps" to execute immediately. You'll see real-time logs and step-by-step progress
       </Step>
       <Step title="Review results">
         Check the output data and individual step results. All executions are logged for debugging.
@@ -36,380 +32,96 @@ Run your tools immediately whenever you need them.
 
   </Tab>
   <Tab title="Via SDK">
-    For programmatic execution, use the SDK:
+    For programmatic execution, use the REST SDK:
 
     ```bash
     npm install @superglue/client
     ```
 
-    **Execute a saved tool:**
+    **Run a saved tool:**
 
     ```typescript
-    import { SuperglueClient } from "@superglue/client";
+    import { configure, runTool, getRun, listRuns } from "@superglue/client";
 
-    const superglue = new SuperglueClient({
-      apiKey: "your_api_key_here",
-      endpoint: "https://graphql.superglue.ai"
+    // Configure the SDK
+    configure({
+      baseUrl: "https://api.superglue.cloud", // or your self-hosted URL
+      apiKey: "your_api_key"
     });
 
-    const result = await superglue.executeWorkflow({
-      id: "sync-customers",
-      payload: {
+    // Run a tool with input payload
+    const { data: run } = await runTool("sync-customers", {
+      inputs: {
         startDate: "2025-01-01",
         userId: "user_123"
       }
     });
 
-    if (result.success) {
-      console.log(result.data); // Final output
-      console.log(result.stepResults); // Step-by-step details
-    } else {
-      console.error(result.error);
+    // For synchronous runs, result is available immediately
+    if (run.status === "success") {
+      console.log(run.data); // Final output
+      console.log(run.stepResults); // Step-by-step details
     }
     ```
 
-    **Execute with advanced options:**
+    **Run asynchronously and poll for results:**
 
     ```typescript
-    const result = await superglue.executeWorkflow({
-      id: "sync-customers",
-      payload: {},
-      options: {
-        selfHealing: "ENABLED",    // Auto-fix configuration errors
-        retries: 3,                 // Retry failed steps up to 3 times
-        timeout: 120000,            // 2 minute timeout
-        webhookUrl: "https://example.com/webhook" // Send results to webhook URL
-      }
+    // Start an async run
+    const { data: run } = await runTool("sync-customers", {
+      inputs: { startDate: "2025-01-01" },
+      options: { async: true }
     });
-    ```
 
-    **Chain tools together:**
-
-    Trigger another tool when this one completes using the `tool:` prefix:
-
-    ```typescript
-    const result = await superglue.executeWorkflow({
-      id: "sync-customers",
-      payload: {},
-      options: {
-        webhookUrl: "tool:send-email-report" // Trigger another tool with results
-      }
-    });
-    ```
-
-    The output of the first tool becomes the payload for the chained tool. This enables powerful multi-stage workflows.
-
-    **Execute an inline workflow (without saving it):**
-
-    ```typescript
-    const result = await superglue.executeWorkflow({
-      workflow: {
-        id: "temp-workflow",
-        integrationIds: ["stripe"],
-        steps: [
-          {
-            id: "getCustomers",
-            integrationId: "stripe",
-            apiConfig: {
-              method: "GET",
-              urlPath: "/v1/customers",
-              queryParams: { limit: "100" }
-            }
-          }
-        ],
-        finalTransform: "(sourceData) => sourceData.getCustomers.data"
-      },
-      payload: {}
-    });
-    ```
-
-  </Tab>
-  <Tab title="Via GraphQL">
-    Execute tools using the GraphQL API:
-
-    **Endpoint:** `https://graphql.superglue.ai`
-
-    ```graphql
-    mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON) {
-      executeWorkflow(
-        input: $input
-        payload: $payload
-        options: {
-          selfHealing: ENABLED
-          retries: 3
-          timeout: 60000
-        }
-      ) {
-        success
-        data
-        error
-        stepResults {
-          stepId
-          success
-          data
-          error
-        }
-        startedAt
-        completedAt
+    // Poll for completion
+    let status = run.status;
+    while (status === "running") {
+      await new Promise(r => setTimeout(r, 1000));
+      const { data: updated } = await getRun(run.runId);
+      status = updated.status;
+      if (status === "success") {
+        console.log(updated.data);
       }
     }
     ```
 
-    **Variables:**
-    ```json
-    {
-      "input": {
-        "id": "sync-customers"
-      },
-      "payload": {
-        "startDate": "2025-01-01"
-      }
-    }
+    **List recent runs:**
+
+    ```typescript
+    const response = await listRuns({ 
+      toolId: "sync-customers",
+      limit: 10 
+    });
+    
+    response.data.data.forEach(run => {
+      console.log(`${run.runId}: ${run.status}`);
+    });
     ```
 
-    **Headers:**
-    ```
-    Authorization: Bearer your_superglue_api_key
-    Content-Type: application/json
+    **Pass credentials at runtime:**
+
+    ```typescript
+    const { data: run } = await runTool("sync-customers", {
+      inputs: { userId: "user_123" },
+      credentials: {
+        stripe_api_key: "sk_live_xxx",
+        hubspot_access_token: "pat-xxx"
+      }
+    });
     ```
 
   </Tab>
 </Tabs>
 
-## Scheduled execution
+## Enterprise deployment options
 
-Schedule tools to run automatically at specific times or intervals.
+superglue Enterprise offers additional deployment capabilities for automated and event-driven execution:
 
-<Tabs>
-  <Tab title="Via UI">
-
-{" "}
-
-<video autoPlay className="w-full rounded-lg">
-  <source src="/resources/schedule-tool.mp4" type="video/mp4" />
-</video>
-
-    Create schedules from the dashboard:
-
-    <Steps>
-      <Step title="Open schedule modal">
-        Navigate to your tool and click "Add Schedule"
-      </Step>
-      <Step title="Configure frequency">
-        Choose from preset intervals (every 5 minutes, hourly, daily, weekly, monthly) or enter a custom cron expression
-
-        **Common cron examples:**
-        - `*/5 * * * *` - Every 5 minutes
-        - `0 9 * * 1-5` - Weekdays at 9 AM
-        - `0 0 1 * *` - First day of every month
-        - `0 */6 * * *` - Every 6 hours
-
-        <Tip>
-          Visit [crontab.guru](https://crontab.guru) to build and validate cron expressions
-        </Tip>
-      </Step>
-      <Step title="Select timezone">
-        Choose your timezone to ensure the schedule runs at the correct local time
-      </Step>
-      <Step title="Set input payload (optional)">
-        Provide JSON input data that will be passed to each execution.
-      </Step>
-      <Step title="Configure advanced options (optional)">
-        Expand "Advanced Options" to configure:
-
-        - **Self-Healing**: Automatically fix API configuration errors
-
-        - **Retries**: Number of retry attempts (0-10) for failed API calls
-
-        - **Timeout**: Maximum execution time in milliseconds
-
-        - **Webhook**: Send execution results to a URL or trigger another tool
-      </Step>
-      <Step title="Save and enable">
-        Click "Add Schedule" to save. The schedule will start running at the next scheduled time. You can pause it anytime by toggling "Enable schedule" off.
-      </Step>
-    </Steps>
-
-  </Tab>
-  <Tab title="Via SDK">
-    Create and manage schedules programmatically:
-
-    **Create a schedule:**
-
-    ```typescript
-    import { SuperglueClient } from "@superglue/client";
-
-    const superglue = new SuperglueClient({
-      apiKey: "your_api_key_here",
-      endpoint: "https://graphql.superglue.ai"
-    });
-
-    const schedule = await superglue.upsertWorkflowSchedule({
-      workflowId: "sync-customers",
-      cronExpression: "0 0 * * *",  // Daily at midnight
-      timezone: "America/New_York",
-      enabled: true,
-      payload: {
-        date: "<<(sourceData) => new Date().toISOString()>>",
-        environment: "production"
-      },
-      options: {
-        selfHealing: "ENABLED",
-        retries: 3,
-        timeout: 120000,
-        webhookUrl: "https://example.com/webhook" // Send to external URL
-      }
-    });
-
-    console.log(`Next run: ${schedule.nextRunAt}`);
-    ```
-
-    **Create a schedule that chains tools:**
-
-    ```typescript
-    const schedule = await superglue.upsertWorkflowSchedule({
-      workflowId: "sync-customers",
-      cronExpression: "0 0 * * *",
-      timezone: "America/New_York",
-      enabled: true,
-      payload: {},
-      options: {
-        webhookUrl: "tool:send-email-report" // Trigger another tool
-      }
-    });
-    ```
-
-  </Tab>
-  <Tab title="Via GraphQL">
-    Manage schedules using GraphQL:
-
-    **Create a schedule:**
-
-    ```graphql
-    mutation UpsertWorkflowSchedule($schedule: WorkflowScheduleInput!) {
-      upsertWorkflowSchedule(schedule: $schedule) {
-        id
-        workflowId
-        cronExpression
-        timezone
-        enabled
-        nextRunAt
-        lastRunAt
-      }
-    }
-    ```
-
-    **Variables:**
-    ```json
-    {
-      "schedule": {
-        "workflowId": "sync-customers",
-        "cronExpression": "0 0 * * *",
-        "timezone": "America/New_York",
-        "enabled": true,
-        "payload": {
-          "environment": "production"
-        },
-        "options": {
-          "selfHealing": "ENABLED",
-          "retries": 3,
-          "timeout": 120000,
-          "webhookUrl": "https://example.com/webhook"
-        }
-      }
-    }
-    ```
-
-  </Tab>
-</Tabs>
-
-## Incoming webhooks
-
-Trigger tools from external services like Stripe, GitHub, Shopify, or any system that can send HTTP webhooks.
-
-<Note>
-  Incoming webhooks are an Enterprise feature.
-</Note>
-
-### How it works
-
-When you enable webhooks for a tool, superglue provides a unique webhook URL:
-
-```
-POST https://api.superglue.ai/v1/hooks/{toolId}?token={your_api_key}
-```
-
-External services send HTTP POST requests to this URL. The request body becomes the tool's input payload, and superglue executes the tool asynchronously.
-
-### Setting up a webhook
-
-<Steps>
-  <Step title="Get your webhook URL">
-    Your webhook URL follows this pattern:
-    ```
-    https://api.superglue.ai/v1/hooks/{toolId}?token={your_api_key}
-    ```
-    
-    Replace `{toolId}` with your tool's ID and `{your_api_key}` with a valid API key. You can create API keys at https://app.superglue.cloud/api-keys.
-  </Step>
-  <Step title="Configure the external service">
-    Add the webhook URL to your external service (Stripe, GitHub, etc.). Most services have a webhooks section in their dashboard.
-  </Step>
-  <Step title="Design your tool for webhook payloads">
-    Your tool receives the raw webhook payload as input. Design your steps to extract the data you need:
-    
-    ```typescript
-    // Example: Stripe webhook payload
-    {
-      "id": "evt_1234",
-      "type": "customer.created",
-      "data": {
-        "object": {
-          "id": "cus_abc123",
-          "email": "user@example.com"
-        }
-      }
-    }
-    ```
-    
-    Use template expressions to access nested fields: `<<(sourceData) => sourceData.data.object.email>>`
-  </Step>
-</Steps>
-
-### Webhook behavior
-
-- **Asynchronous execution**: Returns `202 Accepted` immediately, executes the tool in the background
-- **Run tracking**: Each webhook trigger creates a run record you can view in the dashboard
-- **Request source**: Runs triggered via webhook are labeled with source `WEBHOOK` in the runs table
-
-### Example: Stripe webhook integration
-
-```typescript
-// Tool configuration for handling Stripe customer.created events
-{
-  id: "handle-stripe-customer",
-  steps: [
-    {
-      id: "addToMailchimp",
-      integrationId: "mailchimp",
-      apiConfig: {
-        method: "POST",
-        urlPath: "/lists/{list_id}/members",
-        body: {
-          email_address: "<<(sourceData) => sourceData.data.object.email>>",
-          status: "subscribed"
-        }
-      }
-    }
-  ]
-}
-```
-
-Webhook URL: `https://api.superglue.ai/v1/hooks/handle-stripe-customer?token={your_api_key}`
-
-### Security considerations
-
-- Always use HTTPS and keep your API token secret. Consider using restricted API keys with minimal permissions for webhook endpoints.
-- Use restricted API keys that only have permission on specific tools
-- Validate webhook signatures at your tool level if the source service provides them (e.g., Stripe's `stripe-signature` header)
-- Monitor your runs dashboard for unexpected webhook activity
+<CardGroup cols={2}>
+  <Card title="Scheduled Execution" icon="clock" href="/enterprise/scheduling">
+    Automate tool runs with cron-based scheduling. Run tools at specific times or intervals.
+  </Card>
+  <Card title="Incoming Webhooks" icon="webhook" href="/enterprise/webhooks">
+    Trigger tools from external services like Stripe, GitHub, or Shopify via HTTP webhooks.
+  </Card>
+</CardGroup>

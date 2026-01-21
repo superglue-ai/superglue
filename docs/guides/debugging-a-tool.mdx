@@ -5,13 +5,32 @@ description: "Use the tool playground to debug your tool"
 
 The tool playground is a developer-friendly interface for testing, debugging, and refining your tools. It provides granular control over execution and visibility into every step of your workflow.
 
+## Tool Playground Agent
+
+The tool playground includes an AI agent that helps you debug and modify tools through natural language. Access it via the chat interface in the playground.
+
+<video autoPlay muted loop playsInline className="w-full rounded-lg">
+  <source src="../resources/using-tp-agent.mp4" type="video/mp4" />
+</video>
+
+### Available tools
+
+The playground agent has two specialized tools:
+
+- **`edit_tool`** – Modify the tool configuration, steps, or final transform. Describe what you want to change and the agent updates the tool directly.
+- **`edit_payload`** – Update the test payload without manual JSON editing. Ask the agent to add fields, change values, or restructure the input data.
+
+The agent sees the current tool configuration and step results, so it can make targeted edits based on the actual data flowing through your tool.
+
 ## Tool Input
 
-The playground starts with a **Tool Input** card where you define the data your tool will process.
+The playground starts with a **Tool Input** card where you define the data your tool will process. We refer to this as the tool payload.
 
-<video autoPlay className="w-full rounded-lg">
-  <source src="/resources/tool-input-demo.mp4" type="video/mp4" />
-</video>
+<img
+  src="../resources/tool-input.png"
+  alt="Tool input"
+  className="w-full rounded-lg"
+/>
 
 ### Manual JSON Input
 
@@ -39,7 +58,7 @@ When you upload a file named `customers.csv`, it becomes available in your paylo
 
 ### Schema Validation
 
-The input card shows a red border if your payload doesn't match the input schema. Click "Run Anyway" to proceed despite validation errors, or fix your payload to match the schema requirements.
+The input card shows an amber-colored warning if your current payload doesn't match the input schema. Click "Run Anyway" to proceed despite validation errors, or fix your payload to match the schema requirements.
 
 ## Run All Steps
 
@@ -66,9 +85,12 @@ Click **Stop Execution** to halt the run after the current step completes.
 
 The **Step Input** section shows exactly what data flows into the step and how it is shaped:
 
-- **Aggregated Step Input**: A merged JSON containing previous step results, original payload fields, and processed file data
-- **Step Data Selector (JavaScript)**: a selector function that receives the aggregated input as `sourceData` and returns the slice of data this step should operate on.
-- **Step Data**: the result of the selector and the exact data passed into the step (also available in config as `sourceData.currentItem`)
+- **currentItem**: This is the evaluated result of the data selector showing as a template chip. See [Using Template Expressions](/guides/using-template-expressions) for more.
+- **Aggregated Step Data**: All previous step results, payload objects and other input data.
+
+<Note>
+  Some data selectors may reference results from previous steps and may not be evaluated yet. Run all previous steps to inspect the evaluated data selector expression.
+</Note>
 
 ### Step Config
 
@@ -92,14 +114,9 @@ The **Step Config** tab shows how this step calls the external system:
 
 ### Template Chips
 
-<video
-  autoPlay
-  muted
-  loop
-  playsInline
-  className="w-full rounded-lg"
-  src="../resources/step-config-video.mp4"
-/>
+<video autoPlay muted loop playsInline className="w-full rounded-lg">
+  <source src="../resources/step-config-video.mp4" type="video/mp4" />
+</video>
 
 Dynamic values in the config appear as **template chips** – small badges showing a preview of the evaluated expression. Click a chip to open its **the templating popover**, where you can edit the JavaScript expression and see a live preview of your code expression. Note that previews are only available if the previous step has completed successfully.
 
@@ -121,8 +138,6 @@ After execution, the **Output** section shows:
 
 Click on nested objects to expand and inspect their contents. Use this to verify your step is receiving and returning the expected data structure.
 
-## Run or Fix a Step
-
 ### Run Step
 
 Executes just this one step using the current configuration and previous step results. Use this to:
@@ -131,28 +146,7 @@ Executes just this one step using the current configuration and previous step re
 - Debug a specific failure in isolation
 - Verify your instruction changes work
 
-If the **Step Data Selector** returns an array, the step becomes iterational—it runs once for each item in the array. In this case, you can choose to run a single iteration using the dropdown on the **Run Step** button.   
-
-### Fix Step
-
-Opens a modal where you can refine the **step-specific instruction** and trigger an LLM-powered repair for this step. The modal provides two actions:
-
-- **Fix Step & Execute** – uses the LLM to update the step configuration and immediately runs the step with the fixed version
-- **Fix Step** – uses the LLM to update the step configuration but does not run it yet (you can execute it later with **Run Step**)
-
-<video autoPlay className="w-full rounded-lg">
-  <source src="/resources/fix-step.mp4" type="video/mp4" />
-</video>
-
-Use this when:
-
-- A step is failing and you want the LLM to find and apply a fix
-- You've made manual changes but they're not working as expected
-
-<Note>
-  A fixed step will update the step configuration in the view but will not save
-  it. You need to publish the tool to persist changes.
-</Note>
+If the **Step Data Selector** returns an array, the step turns into a loop step, running once for each item in the data selector output array. In this case, you can choose to run a single iteration using the dropdown on the **Run Step** button.   
 
 ## Final Transform
 
@@ -188,15 +182,3 @@ The transform runs in a sandboxed environment with access to common utilities. I
 ### Response Schema
 
 Define a JSON schema to validate your final output structure. The playground highlights schema violations and prevents invalid outputs from being returned.
-
-## Debugging Workflow
-
-When a tool fails, follow this workflow:
-
-1. **Check the failed step** - Look at the step marked with a red X
-2. **Inspect the error** - Read the error message in the Output section
-3. **Review the input** - Verify the step received the expected data
-4. **Try Fix Step** - Let auto-repair suggest a configuration change
-5. **Edit instruction** - Manually refine the step instruction if needed
-6. **Run Step** - Test your changes on just this step
-7. **Run All Steps** - Verify the entire tool works end-to-end

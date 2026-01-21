@@ -17,14 +17,10 @@ superglue is an AI-powered **tool builder** that builds on top of a user's syste
 Tool inputs can include the systems that this tool will use, a payload of tool variables (e.g. a timestamp, a user ID or something similar) or files.
 Tools will **execute deterministically** once they are saved, but are built and auto-evaluated using large language models. For more details on tool building, please check out our [tool guide](guides/creating-a-tool).
 
-<Note>
-    In some places in the [client SDK](sdk/overview) and documentation we may still be referring to **workflows**, which is the now **deprecated** legacy naming for tools. For all intents and purposes, the two phrases **refer to the same** concept.
-</Note>
 
+## <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline-block mr-2 mb-1"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg> Agents
 
-## <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 25 25" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline-block mr-2 mb-1"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg> Self-Healing
-
-Self-healing is a functionality within superglue that **auto-repairs broken tools.** A tool built by superglue can contain broken or misconfigured steps if user instructions are inaccurate, the documentation is incomplete, or the build agent is missing context.
-
-When executing a built tool, superglue has an auto-repair mode that lets it "self-heal" broken tool steps **during execution**. Enabling this mode will re-generate individual tool steps to fix issues like deprecated endpoints, misconfigured authentication, inaccurate use of query params, or data mapping errors. Self-healing takes place **at workflow step level** and uses generated step instructions for guidance. Self-healing is only invoked if a step fails to execute successfully. Self-healing can be enabled anytime you execute a tool, but makes execution **non-deterministic**.
+Definitions of what constitutes an agent vary. When we speak about the superglue agent, we are referring to a chat UI that is powered by an LLM with access to a set of custom tools that it can execute on our user's behalf. 
+The superglue agent is designed to help you understand what superglue is, how to set up your systems in superglue and how to build tools tailored exactly to your needs and specifications. 
+Different agents in superglue may have slightly different tool calling capabilities and context about your tools and systems, but the core concept remains the same.
 
