@@ -40,11 +40,11 @@ export function ToolCallWrapper({
       return statusOverride;
     }
 
-    if (
-      tool.status !== "pending" &&
-      tool.status !== "running" &&
-      tool.status !== "awaiting_confirmation"
-    ) {
+    if (tool.status === "awaiting_confirmation") {
+      return tool.status;
+    }
+
+    if (tool.status !== "pending" && tool.status !== "running") {
       return tool.status;
     }
 

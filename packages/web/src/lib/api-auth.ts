@@ -8,15 +8,8 @@ export async function authenticateNextJSApiRequest(request: NextRequest): Promis
   const authHeader = request.headers.get("authorization");
   const token = authHeader?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
 
-  if (!token) {
+  if (!token || !process.env.AUTH_TOKEN) {
     return null;
   }
-
-  // If AUTH_TOKEN is set, validate against it
-  if (process.env.AUTH_TOKEN) {
-    return token === process.env.AUTH_TOKEN ? token : null;
-  }
-
-  // If no AUTH_TOKEN is set, accept any token (for local dev)
-  return token;
+  return token === process.env.AUTH_TOKEN ? token : null;
 }
