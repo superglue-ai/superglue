@@ -89,6 +89,7 @@ export function AuthenticateOAuthComponent({
           const client = new SuperglueClient({
             endpoint: config.superglueEndpoint,
             apiKey: tokenRegistry.getToken(),
+            apiEndpoint: config.apiEndpoint,
           });
 
           try {
@@ -148,6 +149,8 @@ export function AuthenticateOAuthComponent({
         templateInfo,
         handleOAuthSuccess,
         config.superglueEndpoint,
+        undefined, // suppressErrorUI
+        config.apiEndpoint,
       );
     } catch (error: any) {
       setButtonState("error");

@@ -1,5 +1,7 @@
 // Import API endpoint modules
 import "./runs.js";
+import "./schedules.js";
+import "./systems.js";
 import "./tools.js";
 import "./tool-internal.js";
 

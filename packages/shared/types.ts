@@ -330,10 +330,12 @@ export interface System extends BaseConfig {
   specificInstructions?: string;
   documentationKeywords?: string[];
   icon?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface SystemInput {
   id: string;
+  name?: string;
   urlHost?: string;
   urlPath?: string;
   documentationUrl?: string;
@@ -341,7 +343,9 @@ export interface SystemInput {
   documentationPending?: boolean;
   specificInstructions?: string;
   documentationKeywords?: string[];
+  icon?: string;
   credentials?: Record<string, string>;
+  metadata?: Record<string, any>;
 }
 
 export interface SuggestedTool {
@@ -604,6 +608,7 @@ export interface ExtendedSystem extends Omit<System, "icon"> {
   evidence: string;
   systemDetails?: string;
   matchedSystemId?: string; // If set, discovered system matches this existing system
+  potentialConnections?: string[];
 }
 
 export interface DiscoveryResult {

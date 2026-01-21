@@ -308,6 +308,8 @@ input SystemInput {
   documentationPending: Boolean
   specificInstructions: String
   documentationKeywords: [String!]
+  icon: String
+  metadata: JSON
 }
 
 type Log {
@@ -316,11 +318,6 @@ type Log {
   level: LogLevel!
   timestamp: DateTime!
   traceId: ID
-}
-
-type SuggestedSystem {
-  reason: String!
-  system: System!
 }
 
 type ToolStep {
@@ -341,7 +338,6 @@ type Query {
   listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
   listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
   listSystems(limit: Int = 10, offset: Int = 0): SystemList!
-  findRelevantSystems(searchTerms: String): [SuggestedSystem!]
   findRelevantTools(searchTerms: String): [SuggestedTool!]
 
   getRun(id: ID!): Run
@@ -548,6 +544,7 @@ type System {
   specificInstructions: String
   documentationKeywords: [String!]
   icon: String
+  metadata: JSON
   version: String
   createdAt: DateTime
   updatedAt: DateTime

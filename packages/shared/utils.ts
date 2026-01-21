@@ -423,3 +423,65 @@ export function getDateMessage(): { role: "system"; content: string } {
     content: "The current date and time is " + new Date().toISOString(),
   };
 }
+
+// Icon utilities for handling both SimpleIcons and Lucide icons
+// Format: "source:name" (e.g., "simpleicons:salesforce" or "lucide:database")
+// For backwards compatibility, strings without prefix are assumed to be SimpleIcons
+
+export type IconSource = "simpleicons" | "lucide";
+
+export interface ParsedIcon {
+  source: IconSource;
+  name: string;
+}
+
+/**
+ * Parse an icon string into its source and name components.
+ * Supports formats:
+ * - "simpleicons:salesforce" -> { source: "simpleicons", name: "salesforce" }
+ * - "lucide:database" -> { source: "lucide", name: "database" }
+ * - "salesforce" -> { source: "simpleicons", name: "salesforce" } (backwards compat)
+ */
+export function parseIconString(icon: string | null | undefined): ParsedIcon | null {
+  if (!icon) return null;
+
+  const colonIndex = icon.indexOf(":");
+  if (colonIndex === -1) {
+    // No prefix - assume SimpleIcons for backwards compatibility
+    return { source: "simpleicons", name: icon };
+  }
+
+  const source = icon.substring(0, colonIndex) as IconSource;
+  const name = icon.substring(colonIndex + 1);
+
+  if (source !== "simpleicons" && source !== "lucide") {
+    // Unknown source - fallback to treating the whole string as SimpleIcon name
+    return { source: "simpleicons", name: icon };
+  }
+
+  return { source, name };
+}
+
+/**
+ * Serialize an icon object into a storable string format.
+ * @param icon - Object with name and source, or a simple string name
+ * @returns Serialized icon string in "source:name" format
+ */
+export function serializeIcon(
+  icon: { name: string; source: IconSource } | string | null | undefined,
+): string | null {
+  if (!icon) return null;
+
+  if (typeof icon === "string") {
+    // Already a string - check if it has a prefix
+    const colonIndex = icon.indexOf(":");
+    if (colonIndex !== -1) {
+      return icon; // Already in correct format
+    }
+    // No prefix - add simpleicons prefix for consistency
+    return `simpleicons:${icon}`;
+  }
+
+  // Object format from discovery
+  return `${icon.source}:${icon.name}`;
+}

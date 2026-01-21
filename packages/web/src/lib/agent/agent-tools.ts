@@ -791,6 +791,11 @@ export const createSystemDefinition = (): ToolDefinition => ({
         description:
           "Credentials for accessing the system. Flat Object, no nested objects, all keys in snake_case and top level only. Example keys (all optional): api_key, access_token, client_id, client_secret, auth_url, token_url, scopes, grant_type, bot_token, etc...",
       },
+      metadata: {
+        type: "object",
+        description:
+          "Optional metadata object for storing additional system information such as capabilities, systemDetails and possible tools that can be built with this system.",
+      },
     },
     required: ["id", "credentials"],
   },
