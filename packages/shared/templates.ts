@@ -1,4 +1,4 @@
-import { System } from "./types";
+import { System } from "./types.js";
 
 export interface SystemConfig {
   name: string;
