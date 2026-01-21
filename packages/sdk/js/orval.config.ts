@@ -10,7 +10,7 @@ export default defineConfig({
       client: "fetch",
       clean: true,
       prettier: true,
-      namingConvention: 'camelCase', 
+      namingConvention: "camelCase",
       override: {
         mutator: {
           path: "./src/fetcher.ts",
