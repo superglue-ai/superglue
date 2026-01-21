@@ -38,7 +38,7 @@ export function SystemsProvider({ children }: { children: ReactNode }) {
         apiKey: tokenRegistry.getToken(),
         apiEndpoint: config.apiEndpoint,
       });
-      const { items } = await client.listSystems(100, 0);
+      const { items } = await client.listSystems(100);
       setSystems(items);
 
       const pendingIds = items

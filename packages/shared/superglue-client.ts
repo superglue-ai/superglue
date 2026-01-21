@@ -1096,12 +1096,12 @@ export class SuperglueClient {
 
   async listSystems(
     limit: number = 10,
-    offset: number = 0,
+    page: number = 1,
     options?: { includeDocs?: boolean },
   ): Promise<{ items: System[]; total: number }> {
     const params = new URLSearchParams({
       limit: String(limit),
-      offset: String(offset),
+      page: String(page),
     });
     if (options?.includeDocs) {
       params.set("includeDocs", "true");

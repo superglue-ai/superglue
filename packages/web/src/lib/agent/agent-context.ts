@@ -76,7 +76,7 @@ export const getToolsForContext = async (client: SuperglueClient) => {
 
 export const getSystemsForContext = async (client: SuperglueClient) => {
   try {
-    const result = await client.listSystems(1000, 0);
+    const result = await client.listSystems(1000);
 
     const formattedSystems = result.items.map((system: any) => {
       const credentialKeys = system?.credentials ? Object.keys(system.credentials) : [];
