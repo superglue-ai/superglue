@@ -101,7 +101,7 @@ function DiscoverySystemsLandscapeImpl({ systems }: DiscoverySystemsLandscapeImp
           apiEndpoint: config.apiEndpoint,
         });
         // Fetch with high limit to get all systems
-        const result = await client.listSystems(1000, 0);
+        const result = await client.listSystems(1000);
         const ids = new Set(result.items.map((i) => i.id).filter((id): id is string => !!id));
         setExistingSystemIds(ids);
       } catch (error) {
