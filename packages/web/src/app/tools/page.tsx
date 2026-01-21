@@ -137,7 +137,7 @@ const ToolsTable = () => {
     }
   };
 
-  const SortIcon = ({ column }: { column: SortColumn; }) => {
+  const SortIcon = ({ column }: { column: SortColumn }) => {
     if (sortColumn !== column) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
     return sortDirection === "asc" ? (
       <ArrowUp className="ml-1 h-3 w-3" />
