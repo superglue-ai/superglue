@@ -236,6 +236,7 @@ export class AgentClient {
                 switch (part.tool.status) {
                   case "pending":
                     output = { type: "error-text", value: "Tool pending" };
+                    break;
                   case "declined":
                     output = { type: "error-text", value: "Tool execution declined by user" };
                     break;
