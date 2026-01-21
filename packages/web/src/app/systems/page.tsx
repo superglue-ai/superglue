@@ -381,7 +381,6 @@ export default function SystemsPage() {
     return !!(system.documentationUrl?.trim() && !pendingDocIds.has(system.id));
   };
 
-
   const handleRefresh = async () => {
     await refreshSystems();
   };

@@ -144,7 +144,6 @@ const ToolsTable = () => {
     );
   };
 
-
   useEffect(() => {
     if (!isInitiallyLoading && !hasCompletedInitialLoad) {
       setHasCompletedInitialLoad(true);
