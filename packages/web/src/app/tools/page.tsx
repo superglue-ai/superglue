@@ -37,7 +37,7 @@ import {
   RotateCw,
   Search,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { SimpleIcon } from "simple-icons";
 import * as simpleIcons from "simple-icons";
@@ -48,12 +48,15 @@ type SortDirection = "asc" | "desc";
 
 const ToolsTable = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { tools, isInitiallyLoading, isRefreshing, refreshTools } = useTools();
   const { systems } = useSystems();
 
+  const systemFromUrl = searchParams.get("system");
+
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
-  const [manuallyOpenedStepper, setManuallyOpenedStepper] = useState(false);
+  const [manuallyOpenedStepper, setManuallyOpenedStepper] = useState(!!systemFromUrl);
 
   const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
   const [sortColumn, setSortColumn] = useState<SortColumn>("updatedAt");
@@ -176,8 +179,14 @@ const ToolsTable = () => {
         <ToolCreateStepper
           onComplete={() => {
             setManuallyOpenedStepper(false);
+            // Clear the system param from URL when closing
+            if (systemFromUrl) {
+              router.replace("/tools");
+            }
             refreshConfigs();
           }}
+          initialSystemIds={systemFromUrl ? [systemFromUrl] : []}
+          initialView={systemFromUrl ? "instructions" : "systems"}
         />
       </div>
     );
