@@ -11,11 +11,7 @@ import {
 } from "@/src/components/ui/dialog";
 import { useToast } from "@/src/hooks/use-toast";
 import { useSystemActions } from "@/src/hooks/use-system-actions";
-import {
-  composeUrl,
-  getSystemIcon as getSystemIconName,
-  getSimpleIcon,
-} from "@/src/lib/general-utils";
+import { composeUrl, getSimpleIcon, getSystemSimpleIcon } from "@/src/lib/general-utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible";
 import { systemOptions, ToolCall } from "@superglue/shared";
 import {
@@ -334,8 +330,7 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
                   return <Globe className="h-6 w-6 text-foreground" />;
                 }
 
-                const iconName = getSystemIconName(displaySystem);
-                const icon = iconName ? getSimpleIcon(iconName) : null;
+                const icon = getSystemSimpleIcon(displaySystem);
                 return icon ? (
                   <svg width="24" height="24" viewBox="0 0 24 24" fill={`#${icon.hex}`}>
                     <path d={icon.path} />

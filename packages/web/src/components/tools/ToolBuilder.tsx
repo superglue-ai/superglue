@@ -14,8 +14,8 @@ import { useFileUpload } from "./hooks/use-file-upload";
 import {
   cn,
   composeUrl,
-  getSystemIcon as getSystemIconName,
   getSimpleIcon,
+  getSystemSimpleIcon,
   inputErrorStyles,
 } from "@/src/lib/general-utils";
 import { tokenRegistry } from "@/src/lib/token-registry";
@@ -185,8 +185,9 @@ export function ToolBuilder({
       new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
         apiKey: tokenRegistry.getToken(),
+        apiEndpoint: superglueConfig.apiEndpoint,
       }),
-    [superglueConfig.superglueEndpoint],
+    [superglueConfig.superglueEndpoint, superglueConfig.apiEndpoint],
   );
 
   const waitForSystemReady = useCallback(
@@ -538,8 +539,7 @@ export function ToolBuilder({
                         {filteredSystems.map((sys) => {
                           const selected = selectedSystemIds.includes(sys.id);
                           const badge = getAuthBadge(sys);
-                          const iconName = getSystemIconName(sys);
-                          const icon = iconName ? getSimpleIcon(iconName) : null;
+                          const icon = getSystemSimpleIcon(sys);
 
                           return (
                             <div
@@ -715,8 +715,7 @@ export function ToolBuilder({
             const system = systems.find((i) => i.id === id);
             if (!system) return null;
 
-            const iconName = getSystemIconName(system);
-            const icon = iconName ? getSimpleIcon(iconName) : null;
+            const icon = getSystemSimpleIcon(system);
 
             return (
               <button

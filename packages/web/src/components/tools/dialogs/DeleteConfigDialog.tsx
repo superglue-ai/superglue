@@ -34,6 +34,7 @@ export function DeleteConfigDialog({
       const superglueClient = new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
         apiKey: tokenRegistry.getToken(),
+        apiEndpoint: superglueConfig.apiEndpoint,
       });
       await superglueClient.deleteWorkflow(config.id);
       const deletedId = config.id;

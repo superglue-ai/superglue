@@ -54,9 +54,13 @@ export class AgentClient {
     if (!process.env.GRAPHQL_ENDPOINT) {
       throw new Error("GRAPHQL_ENDPOINT is not set");
     }
+    if (!process.env.API_ENDPOINT) {
+      throw new Error("API_ENDPOINT is not set");
+    }
     this.superglueClient = new SuperglueClient({
       endpoint: process.env.GRAPHQL_ENDPOINT,
       apiKey: superglueKey,
+      apiEndpoint: process.env.API_ENDPOINT,
     });
     this.subscriptionClient = new GraphQLSubscriptionClient(
       process.env.GRAPHQL_ENDPOINT,

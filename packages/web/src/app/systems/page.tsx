@@ -19,7 +19,7 @@ import { Input } from "@/src/components/ui/input";
 import { DocStatus } from "@/src/components/utils/DocStatusSpinner";
 import { useToast } from "@/src/hooks/use-toast";
 import { createSuperglueClient, needsUIToTriggerDocFetch } from "@/src/lib/client-utils";
-import { composeUrl, getSystemIcon as getSystemIconName } from "@/src/lib/general-utils";
+import { composeUrl, getSimpleIcon, getSystemSimpleIcon } from "@/src/lib/general-utils";
 import {
   buildOAuthFieldsFromSystem,
   createOAuthErrorHandler,
@@ -42,8 +42,6 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import type { SimpleIcon } from "simple-icons";
-import * as simpleIcons from "simple-icons";
 
 export const detectAuthType = (credentials: any): "oauth" | "apikey" | "none" => {
   if (!credentials || Object.keys(credentials).length === 0) return "none";
@@ -140,7 +138,7 @@ export default function SystemsPage() {
       waitForSystemReady: (systemIds: string[]) => {
         const clientAdapter = {
           getSystem: (id: string) => {
-            const client = createSuperglueClient(config.superglueEndpoint);
+            const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
             return client.getSystem(id);
           },
         };
@@ -153,19 +151,6 @@ export default function SystemsPage() {
   const [editingSystem, setEditingSystem] = useState<System | null>(null);
 
   // OAuth flows now use callbacks directly, no need for message listener
-
-  const getSimpleIcon = (name: string): SimpleIcon | null => {
-    if (!name || name === "default") return null;
-    const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-    const iconKey = `si${formatted}`;
-    try {
-      // @ts-ignore
-      let icon = simpleIcons[iconKey];
-      return icon || null;
-    } catch (e) {
-      return null;
-    }
-  };
 
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -253,6 +238,8 @@ export default function SystemsPage() {
       undefined,
       handleOAuthSuccess,
       config.superglueEndpoint,
+      undefined, // suppressErrorUI
+      config.apiEndpoint,
     );
   };
 
@@ -393,10 +380,7 @@ export default function SystemsPage() {
     return !!(system.documentationUrl?.trim() && !pendingDocIds.has(system.id));
   };
 
-  function getSystemIcon(system: System) {
-    const iconName = getSystemIconName(system);
-    return iconName ? getSimpleIcon(iconName) : null;
-  }
+  const getSystemIcon = (system: System) => getSystemSimpleIcon(system);
 
   const handleRefresh = async () => {
     await refreshSystems();

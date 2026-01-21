@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
     const superglueClient = new SuperglueClient({
       endpoint: process.env.GRAPHQL_ENDPOINT!,
       apiKey: token,
+      apiEndpoint: process.env.API_ENDPOINT,
     });
     const context = await generateInitialContext(superglueClient);
     messages = injectContextIntoMessages(messages, context);

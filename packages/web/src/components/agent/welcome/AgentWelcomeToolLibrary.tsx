@@ -143,6 +143,7 @@ export function AgentWelcomeToolLibrary({
       const client = new SuperglueClient({
         endpoint: config.superglueEndpoint,
         apiKey: tokenRegistry.getToken(),
+        apiEndpoint: config.apiEndpoint,
       });
 
       const prefixedId = `template-${template.id}`;

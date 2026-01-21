@@ -27,7 +27,7 @@ import {
   formatTargetLabel,
 } from "@/src/lib/config-diff-utils";
 import { useSystems } from "@/src/app/systems-context";
-import { getSystemIcon, getSimpleIcon } from "@/src/lib/general-utils";
+import { getSystemSimpleIcon } from "@/src/lib/general-utils";
 
 type DiffApprovalState = "pending" | "approved" | "rejected";
 
@@ -53,9 +53,7 @@ function SystemIcon({ systemId }: { systemId?: string }) {
   const simpleIcon = useMemo(() => {
     if (!systemId) return null;
     const system = systems.find((i) => i.id === systemId);
-    if (!system) return null;
-    const iconName = getSystemIcon(system);
-    return iconName ? getSimpleIcon(iconName) : null;
+    return system ? getSystemSimpleIcon(system) : null;
   }, [systemId, systems]);
 
   if (simpleIcon) {

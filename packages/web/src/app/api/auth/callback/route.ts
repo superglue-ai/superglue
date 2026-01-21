@@ -311,7 +311,7 @@ export async function GET(request: NextRequest) {
         client_secret: "",
       };
     } else {
-      const client = new SuperglueClient({ endpoint, apiKey: apiKey });
+      const client = new SuperglueClient({ endpoint, apiKey: apiKey, apiEndpoint: process.env.API_ENDPOINT });
       resolved = await client.getOAuthClientCredentials({
         templateId,
         clientCredentialsUid: client_credentials_uid,
