@@ -331,6 +331,7 @@ export interface System extends BaseConfig {
   documentationKeywords?: string[];
   icon?: string;
   metadata?: Record<string, any>;
+  templateName?: string;
 }
 
 export interface SystemInput {
@@ -346,6 +347,7 @@ export interface SystemInput {
   icon?: string;
   credentials?: Record<string, string>;
   metadata?: Record<string, any>;
+  templateName?: string;
 }
 
 export interface SuggestedTool {

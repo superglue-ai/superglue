@@ -1,14 +1,16 @@
 "use client";
 
 import { resolveSystemIcon } from "@/src/lib/general-utils";
-import { icons, Globe, LucideIcon } from "lucide-react";
+import { Globe, icons, LucideIcon } from "lucide-react";
 import { memo } from "react";
 
 interface SystemIconProps {
   system: {
     id?: string;
+    name?: string;
     urlHost?: string;
     icon?: string | null;
+    templateName?: string;
   };
   size?: number;
   className?: string;

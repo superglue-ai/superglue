@@ -1,4 +1,4 @@
-import { System, ServiceMetadata, Tool } from "@superglue/shared";
+import { findTemplateForSystem, ServiceMetadata, System, Tool } from "@superglue/shared";
 import { isMainThread, parentPort } from "worker_threads";
 import { DataStore } from "../datastore/types.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
@@ -21,6 +21,7 @@ export class SystemManager {
   private orgId: string;
   private _basicDataPromise?: Promise<System>;
   private _documentationPromise?: Promise<DocumentationData>;
+  private _enrichedFromTemplate = false; // Track if credentials came from template
 
   constructor(idOrSystem: string | System, dataStore: DataStore | null, metadata: ServiceMetadata) {
     this.dataStore = dataStore;
@@ -148,19 +149,24 @@ export class SystemManager {
     if (refreshResult.success) {
       this._system.credentials = refreshResult.newCredentials;
 
+      // Strip template credentials before persisting - they should stay in the template table
+      const credentialsToStore = this._enrichedFromTemplate
+        ? (({ client_id, client_secret, ...rest }) => rest)(refreshResult.newCredentials)
+        : refreshResult.newCredentials;
+
       if (!isMainThread && parentPort) {
         parentPort.postMessage({
           type: "credential_update",
           payload: {
             systemId: this.id,
             orgId: this.orgId,
-            credentials: refreshResult.newCredentials,
+            credentials: credentialsToStore,
           },
         });
       } else if (this.dataStore) {
         await this.dataStore.upsertSystem({
           id: this.id,
-          system: this._system,
+          system: { ...this._system, credentials: credentialsToStore },
           orgId: this.orgId,
         });
       }
@@ -171,6 +177,42 @@ export class SystemManager {
     }
 
     return refreshResult.success;
+  }
+
+  /**
+   * Enriches the system with OAuth credentials from its matching template.
+   * If client_id or client_secret is missing, fetches both from the template.
+   */
+  async enrichWithTemplateCredentials(): Promise<boolean> {
+    await this.getSystem();
+
+    if (this._system.credentials?.client_id && this._system.credentials?.client_secret) {
+      return false;
+    }
+    if (!this.dataStore) return false;
+
+    const match = findTemplateForSystem(this._system);
+    if (!match) return false;
+
+    const templateCreds = await this.dataStore
+      .getTemplateOAuthCredentials({ templateId: match.key })
+      .catch(() => null);
+    if (!templateCreds) return false;
+
+    this._system.credentials = {
+      ...this._system.credentials,
+      client_id: templateCreds.client_id,
+      client_secret: templateCreds.client_secret,
+    };
+    this._enrichedFromTemplate = true;
+
+    logMessage(
+      "debug",
+      `Enriched system ${this.id} with template credentials from ${match.key}`,
+      this.metadata,
+    );
+
+    return true;
   }
 
   static fromSystem(
@@ -244,9 +286,13 @@ export class SystemManager {
 
     const managers = systems.map((i) => new SystemManager(i, dataStore, metadata));
 
-    for (const manager of managers) {
-      await manager.refreshTokenIfNeeded();
-    }
+    // Enrich with template credentials and refresh tokens (workers don't have datastore access)
+    await Promise.all(
+      managers.map(async (manager) => {
+        await manager.enrichWithTemplateCredentials();
+        await manager.refreshTokenIfNeeded();
+      }),
+    );
 
     return managers;
   }

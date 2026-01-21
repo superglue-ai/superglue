@@ -1,11 +1,10 @@
-import { findMatchingSystem, System, systems as systemTemplates } from "@superglue/shared";
+import { findTemplateForSystem, System } from "@superglue/shared";
 import { generateUniqueId } from "@superglue/shared/utils";
 import { GraphQLResolveInfo } from "graphql";
 import { PostgresService } from "../../datastore/postgres.js";
 import { server_defaults } from "../../default.js";
 import { DocumentationFetcher } from "../../documentation/documentation-fetching.js";
 import { DocumentationSearch } from "../../documentation/documentation-search.js";
-import { composeUrl } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
 import { GraphQLRequestContext } from "../types.js";
 
@@ -139,6 +138,7 @@ export const upsertSystemResolver = async (
       ),
       icon: resolveField(input.icon, existingSystemOrNull?.icon, ""),
       metadata: resolveField(input.metadata, existingSystemOrNull?.metadata, {}),
+      templateName: resolveField(input.templateName, existingSystemOrNull?.templateName, ""),
       createdAt: existingSystemOrNull?.createdAt || now,
       updatedAt: now,
     };
@@ -272,13 +272,12 @@ function templateDocumentationExists(
   if (!(context.datastore instanceof PostgresService)) {
     return [false, ""];
   }
-  const matchingTemplate =
-    systemTemplates[String(input.name || input.id).toLowerCase()] ||
-    findMatchingSystem(composeUrl(input.urlHost, input.urlPath))?.system;
+  const match = findTemplateForSystem(input);
 
-  if (!matchingTemplate) {
+  if (!match) {
     return [false, ""];
   }
+  const { template: matchingTemplate } = match;
   const allKeywordsPresent = matchingTemplate.keywords?.every((keyword) =>
     input.documentationKeywords?.includes(keyword),
   );
@@ -288,13 +287,13 @@ function templateDocumentationExists(
 }
 
 function enrichWithTemplate(input: System): System {
-  const matchingTemplate =
-    systemTemplates[String(input.name || input.id).toLowerCase()] ||
-    findMatchingSystem(composeUrl(input.urlHost, input.urlPath))?.system;
+  const match = findTemplateForSystem(input);
 
-  if (!matchingTemplate) {
+  if (!match) {
     return input;
   }
+
+  const { key: templateKey, template: matchingTemplate } = match;
 
   const mergedUniqueKeywords = uniqueKeywords([
     ...(input.documentationKeywords || []),
@@ -306,6 +305,10 @@ function enrichWithTemplate(input: System): System {
   input.documentationUrl = input.documentationUrl || matchingTemplate.docsUrl;
   input.urlHost = input.urlHost || matchingTemplate.apiUrl;
   input.documentationKeywords = mergedUniqueKeywords;
+  // Set templateName if not already set, for future lookups (OAuth, icons, etc.)
+  if (!input.templateName) {
+    input.templateName = templateKey;
+  }
   return input;
 }
 

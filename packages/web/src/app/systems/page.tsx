@@ -1,7 +1,6 @@
 "use client";
 
 import { useConfig } from "@/src/app/config-context";
-import { tokenRegistry } from "@/src/lib/token-registry";
 import { useSystems } from "@/src/app/systems-context";
 import { SystemForm } from "@/src/components/systems/SystemForm";
 import {
@@ -16,19 +15,19 @@ import {
 } from "@/src/components/ui/alert-dialog";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
+import { SystemIcon } from "@/src/components/ui/system-icon";
 import { DocStatus } from "@/src/components/utils/DocStatusSpinner";
 import { useToast } from "@/src/hooks/use-toast";
 import { createSuperglueClient, needsUIToTriggerDocFetch } from "@/src/lib/client-utils";
-import { SystemIcon } from "@/src/components/ui/system-icon";
 import { composeUrl, getSimpleIcon } from "@/src/lib/general-utils";
 import {
   buildOAuthFieldsFromSystem,
   createOAuthErrorHandler,
   triggerOAuthFlow,
 } from "@/src/lib/oauth-utils";
+import { tokenRegistry } from "@/src/lib/token-registry";
 import type { System } from "@superglue/shared";
-import { CredentialMode, UpsertMode } from "@superglue/shared";
-import { systemOptions } from "@superglue/shared";
+import { CredentialMode, systemOptions, UpsertMode } from "@superglue/shared";
 import { waitForSystemProcessing } from "@superglue/shared/utils";
 import {
   Clock,
@@ -253,6 +252,7 @@ export default function SystemsPage() {
       documentation: system.documentation,
       specificInstructions: system.specificInstructions,
       credentials: system.credentials,
+      templateName: system.templateName,
       ...(system.documentationPending !== undefined && {
         documentationPending: system.documentationPending,
       }),

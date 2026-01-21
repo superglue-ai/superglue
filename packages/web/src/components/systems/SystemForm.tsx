@@ -36,7 +36,7 @@ import {
   getOAuthCallbackUrl,
   triggerOAuthFlow,
 } from "@/src/lib/oauth-utils";
-import { systems, resolveOAuthCertAndKey } from "@superglue/shared";
+import { findTemplateForSystem, resolveOAuthCertAndKey, systems } from "@superglue/shared";
 import { Check, ChevronRight, ChevronsUpDown, Eye, EyeOff, Globe, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CopyButton } from "../tools/shared/CopyButton";
@@ -95,13 +95,7 @@ export function SystemForm({
   getSimpleIcon,
   modal = false,
 }: SystemFormProps) {
-  const initialSelected = system
-    ? systemOptions.find(
-        (opt) =>
-          opt.value !== "" &&
-          (system.id === opt.value || (system.urlHost && system.urlHost.includes(opt.value))),
-      )?.value || ""
-    : "";
+  const initialSelected = system ? (findTemplateForSystem(system)?.key ?? "") : "";
   const [selectedSystem, setSelectedSystem] = useState<string>(initialSelected);
   const [systemDropdownOpen, setSystemDropdownOpen] = useState(false);
   const [id, setId] = useState(system?.id || initialSelected);
@@ -678,6 +672,8 @@ export function SystemForm({
       documentation: documentation.trim(),
       specificInstructions: specificInstructions.trim(),
       credentials: creds,
+      // Include templateName if a template is selected
+      ...(selectedSystem && { templateName: selectedSystem }),
     };
 
     try {

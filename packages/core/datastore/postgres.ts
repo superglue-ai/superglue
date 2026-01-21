@@ -3,9 +3,9 @@ import type {
   DiscoveryRun,
   FileReference,
   FileStatus,
-  System,
   Run,
   RunStatus,
+  System,
   Tool,
 } from "@superglue/shared";
 import { Pool, PoolConfig } from "pg";
@@ -243,8 +243,11 @@ export class PostgresService implements DataStore {
     )
   `);
 
-      // Backwards-compatible schema update for integrations table - add metadata column
+      // Backwards-compatible schema updates for integrations table
       await client.query(`ALTER TABLE integrations ADD COLUMN IF NOT EXISTS metadata JSONB`);
+      await client.query(
+        `ALTER TABLE integrations ADD COLUMN IF NOT EXISTS template_name VARCHAR(255)`,
+      );
 
       // Integration templates table for Superglue OAuth credentials (and potentially further fields in the future)
       await client.query(`
@@ -1219,7 +1222,7 @@ export class PostgresService implements DataStore {
       if (includeDocs) {
         query = `SELECT i.id, i.name, i.type, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
-                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.version, i.created_at, i.updated_at,
+                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.version, i.created_at, i.updated_at,
                         d.documentation, d.open_api_schema
                  FROM integrations i
                  LEFT JOIN integration_details d ON i.id = d.integration_id AND i.org_id = d.org_id
@@ -1227,7 +1230,7 @@ export class PostgresService implements DataStore {
       } else {
         query = `SELECT id, name, type, url_host, url_path, credentials, 
                         documentation_url, documentation_pending,
-                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, version, created_at, updated_at
+                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, version, created_at, updated_at
                  FROM integrations WHERE id = $1 AND org_id = $2`;
       }
 
@@ -1251,6 +1254,7 @@ export class PostgresService implements DataStore {
         documentationKeywords: row.documentation_keywords,
         icon: row.icon,
         metadata: row.metadata,
+        templateName: row.template_name,
         version: row.version,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -1281,7 +1285,7 @@ export class PostgresService implements DataStore {
       if (includeDocs) {
         query = `SELECT i.id, i.name, i.type, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
-                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.version, i.created_at, i.updated_at,
+                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.version, i.created_at, i.updated_at,
                         d.documentation, d.open_api_schema
                  FROM integrations i
                  LEFT JOIN integration_details d ON i.id = d.integration_id AND i.org_id = d.org_id
@@ -1290,7 +1294,7 @@ export class PostgresService implements DataStore {
       } else {
         query = `SELECT id, name, type, url_host, url_path, credentials, 
                         documentation_url, documentation_pending,
-                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, version, created_at, updated_at
+                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, version, created_at, updated_at
                  FROM integrations WHERE org_id = $1 
                  ORDER BY created_at DESC LIMIT $2 OFFSET $3`;
       }
@@ -1314,6 +1318,7 @@ export class PostgresService implements DataStore {
           documentationKeywords: row.documentation_keywords,
           icon: row.icon,
           metadata: row.metadata,
+          templateName: row.template_name,
           version: row.version,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
@@ -1345,9 +1350,9 @@ export class PostgresService implements DataStore {
         INSERT INTO integrations (
             id, org_id, name, type, url_host, url_path, credentials,
             documentation_url, documentation_pending,
-            open_api_url, specific_instructions, documentation_keywords, icon, metadata, version, created_at, updated_at
+            open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, version, created_at, updated_at
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
         )
         ON CONFLICT (id, org_id) 
         DO UPDATE SET 
@@ -1363,8 +1368,9 @@ export class PostgresService implements DataStore {
             documentation_keywords = $12,
             icon = $13,
             metadata = $14,
-            version = $15,
-            updated_at = $17
+            template_name = $15,
+            version = $16,
+            updated_at = $18
       `,
         [
           id,
@@ -1381,6 +1387,7 @@ export class PostgresService implements DataStore {
           system.documentationKeywords,
           system.icon,
           system.metadata ? JSON.stringify(system.metadata) : null,
+          system.templateName,
           system.version,
           system.createdAt || new Date(),
           system.updatedAt || new Date(),

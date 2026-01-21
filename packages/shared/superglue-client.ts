@@ -14,16 +14,15 @@ import {
   FixToolArgs,
   FixToolResult,
   GenerateStepConfigArgs,
-  System,
   Log,
   Run,
   SuggestedTool,
+  System,
   Tool,
   ToolArgs,
   ToolDiff,
   ToolInputRequest,
   ToolResult,
-  ToolSchedule,
   ToolStepResult,
   UpsertMode,
 } from "./types.js";
@@ -965,6 +964,7 @@ export class SuperglueClient {
               status
               requestSource
               toolResult
+              toolPayload
               stepResults {
                 stepId
                 success
@@ -1171,6 +1171,7 @@ export class SuperglueClient {
             documentationKeywords
             icon
             metadata
+            templateName
             version
             createdAt
             updatedAt
