@@ -1,8 +1,11 @@
-import React from "react";
-import ConfigTable from "@/src/app/tools/page";
+"use client";
 
-const Main = () => {
-  return <ConfigTable />;
-};
+import { AgentInterface } from "@/src/components/agent/AgentInterface";
 
-export default Main;
+export default function HomePage() {
+  return (
+    <div className="p-6 w-full h-full">
+      <AgentInterface />
+    </div>
+  );
+}
