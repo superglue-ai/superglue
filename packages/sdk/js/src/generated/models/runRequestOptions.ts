@@ -9,7 +9,7 @@
 export type RunRequestOptions = {
   /** If true, return immediately (202) and execute asynchronously. If false, wait for completion (200). */
   async?: boolean;
-  /** Request timeout in seconds (only for synchronous execution) */
+  /** Request timeout in milliseconds */
   timeout?: number;
   /** URL to receive completion webhook when run finishes (for both sync and async executions).
 Webhook receives POST request with Run object (same schema as getRun response) in body.

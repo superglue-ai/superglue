@@ -14,6 +14,8 @@ import type {
   Run,
   RunRequest,
   Tool,
+  TriggerWebhook202,
+  TriggerWebhookBody,
 } from "./models";
 
 import { customFetch } from "../fetcher";
@@ -140,7 +142,7 @@ export const getRunToolUrl = (toolId: string) => {
 
 export const runTool = async (
   toolId: string,
-  runRequest: RunRequest,
+  runRequest?: RunRequest,
   options?: RequestInit,
 ): Promise<runToolResponse> => {
   return customFetch<runToolResponse>(getRunToolUrl(toolId), {
@@ -217,6 +219,60 @@ export const cancelRun = async (
   return customFetch<cancelRunResponse>(getCancelRunUrl(runId), {
     ...options,
     method: "POST",
+  });
+};
+
+/**
+ * **Enterprise feature.**
+
+Trigger a tool execution from an external webhook (Stripe, GitHub, etc.).
+
+The request body becomes the tool's input payload.
+Returns 202 Accepted immediately and executes the tool asynchronously.
+
+ * @summary Handle incoming webhook
+ */
+export type triggerWebhookResponse202 = {
+  data: TriggerWebhook202;
+  status: 202;
+};
+
+export type triggerWebhookResponse400 = {
+  data: Error;
+  status: 400;
+};
+
+export type triggerWebhookResponse404 = {
+  data: Error;
+  status: 404;
+};
+
+export type triggerWebhookResponseSuccess = triggerWebhookResponse202 & {
+  headers: Headers;
+};
+export type triggerWebhookResponseError = (
+  | triggerWebhookResponse400
+  | triggerWebhookResponse404
+) & {
+  headers: Headers;
+};
+
+export type triggerWebhookResponse = triggerWebhookResponseSuccess | triggerWebhookResponseError;
+
+export const getTriggerWebhookUrl = (toolId: string) => {
+  return `/hooks/${toolId}`;
+};
+
+export const triggerWebhook = async (
+  toolId: string,
+  triggerWebhookBody?: TriggerWebhookBody,
+  options?: RequestInit,
+): Promise<triggerWebhookResponse> => {
+  return customFetch<triggerWebhookResponse>(getTriggerWebhookUrl(toolId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(triggerWebhookBody),
   });
 };
 

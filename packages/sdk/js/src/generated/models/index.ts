@@ -36,3 +36,6 @@ export * from "./toolStepFailureBehavior";
 export * from "./toolStepHeaders";
 export * from "./toolStepMethod";
 export * from "./toolStepQueryParams";
+export * from "./triggerWebhook202";
+export * from "./triggerWebhook202Status";
+export * from "./triggerWebhookBody";
