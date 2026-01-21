@@ -15,9 +15,9 @@ import {
 import { useEffect, useState } from "react";
 import { CodeSnippet } from "../../editors/ReadonlyCodeEditor";
 import { Button } from "../../ui/button";
+import { Card } from "../../ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
-import ToolSchedulesList from "./ToolSchedulesList";
 
 interface ToolDeployModalProps {
   currentTool: Tool;
@@ -35,14 +35,6 @@ export function ToolDeployModal({
   const superglueConfig = useConfig();
   const [activeTab, setActiveTab] = useState("schedule");
   const [expandedSdk, setExpandedSdk] = useState<string | null>("typescript");
-  const [scheduleSuccess, setScheduleSuccess] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setScheduleSuccess(false);
-      setActiveTab("schedule");
-    }
-  }, [isOpen]);
 
   // JavaScript/TypeScript SDK code
   const typescriptCode = `import { configure, runTool } from '@superglue/client';
@@ -149,76 +141,23 @@ await runTool("${currentTool.id}", {
             className="w-full flex-1 flex flex-col overflow-hidden"
           >
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="schedule" className="gap-2">
-                <Calendar className="h-4 w-4" />
-                <span className="hidden sm:inline">Schedule</span>
-              </TabsTrigger>
               <TabsTrigger value="sdk" className="gap-2">
                 <Code className="h-4 w-4" />
                 <span className="hidden sm:inline">SDK/API</span>
-              </TabsTrigger>
-              <TabsTrigger value="webhook" className="gap-2">
-                <Webhook className="h-4 w-4" />
-                <span className="hidden sm:inline">Webhooks</span>
               </TabsTrigger>
               <TabsTrigger value="mcp" className="gap-2">
                 <Bot className="h-4 w-4" />
                 <span className="hidden sm:inline">MCP</span>
               </TabsTrigger>
+              <TabsTrigger value="webhook" className="gap-2">
+                <Webhook className="h-4 w-4" />
+                <span className="hidden sm:inline">Webhooks</span>
+              </TabsTrigger>
+              <TabsTrigger value="schedule" className="gap-2">
+                <Calendar className="h-4 w-4" />
+                <span className="hidden sm:inline">Schedule</span>
+              </TabsTrigger>
             </TabsList>
-
-            {/* Schedule Tab */}
-            {activeTab === "schedule" && (
-              <TabsContent
-                value="schedule"
-                className="flex flex-col gap-6 mt-4 overflow-y-auto flex-1"
-              >
-                <div className="space-y-2">
-                  <p className="text-muted-foreground">
-                    Automate your workflow by scheduling it to run at specific times or intervals.
-                  </p>
-                </div>
-
-                <AnimatePresence initial={false}>
-                  {scheduleSuccess && (
-                    <motion.div
-                      key="success"
-                      initial={{ opacity: 0, height: 0, overflow: "hidden" }}
-                      animate={{ opacity: 1, height: "auto", overflow: "visible" }}
-                      exit={{ opacity: 0, height: 0, overflow: "hidden" }}
-                      transition={{ duration: 0.3, ease: "easeInOut" }}
-                    >
-                      <div className="flex items-center gap-2 rounded-md border bg-muted text-muted-foreground text-base px-3 py-2">
-                        <CheckCircle className="h-4 w-4 text-foreground text-green-600" />
-                        <span>Schedule created successfully.</span>
-                      </div>
-                    </motion.div>
-                  )}
-                  {!scheduleSuccess && (
-                    <motion.div
-                      key="form"
-                      initial={{ opacity: 1 }}
-                      exit={{ opacity: 0, height: 0, overflow: "hidden" }}
-                      transition={{ duration: 0.3, ease: "easeInOut" }}
-                    >
-                      <ToolSchedulesList toolId={currentTool.id} />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <div className="text-sm text-muted-foreground ">
-                  <a
-                    href="https://docs.superglue.cloud/guides/deploying-a-tool#scheduled-execution"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 hover:underline"
-                  >
-                    Learn more about scheduling tools
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
-              </TabsContent>
-            )}
 
             {/* SDK/API Tab */}
             {activeTab === "sdk" && (
@@ -360,29 +299,42 @@ await runTool("${currentTool.id}", {
                 value="webhook"
                 className="flex flex-col gap-4 mt-4 overflow-y-auto flex-1"
               >
-                <div className="space-y-2">
-                  <p className="text-muted-foreground">
-                    Get notified when your tool execution completes. Specify a webhook when
-                    executing the tool, and superglue will send the results to that endpoint
-                    automatically.
+                <Card className="border-destructive/50 bg-destructive/10 p-4">
+                  <p className="text-sm">
+                    This is an enterprise feature.{" "}
+                    <a
+                      href="https://cal.com/superglue/superglue-demo"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-destructive"
+                    >
+                      Get in touch with us
+                    </a>{" "}
+                    to enable it.
                   </p>
-                </div>
-
-                <div className="space-y-2">
-                  <CodeSnippet code={webhookExample} language="javascript" />
-                </div>
-
-                <div className="text-sm text-muted-foreground mt-2">
-                  <a
-                    href="https://docs.superglue.cloud/api/overview#webhooks"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 hover:underline"
-                  >
-                    Learn more about webhooks in superglue
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
+                </Card>
+              </TabsContent>
+            )}
+            {/* Schedule Tab */}
+            {activeTab === "schedule" && (
+              <TabsContent
+                value="schedule"
+                className="flex flex-col gap-6 mt-4 overflow-y-auto flex-1"
+              >
+                <Card className="border-destructive/50 bg-destructive/10 p-4">
+                  <p className="text-sm">
+                    This is an enterprise feature.{" "}
+                    <a
+                      href="https://cal.com/superglue/superglue-demo"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-destructive"
+                    >
+                      Get in touch with us
+                    </a>{" "}
+                    to enable it.
+                  </p>
+                </Card>
               </TabsContent>
             )}
 
