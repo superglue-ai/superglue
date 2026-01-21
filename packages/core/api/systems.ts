@@ -31,10 +31,12 @@ const getSystem: RouteHandler = async (request, reply) => {
     return sendError(reply, 404, "System not found");
   }
 
-  return addTraceHeader(reply, authReq.traceId).code(200).send({
-    success: true,
-    data: transformSystemDates(system),
-  });
+  return addTraceHeader(reply, authReq.traceId)
+    .code(200)
+    .send({
+      success: true,
+      data: transformSystemDates(system),
+    });
 };
 
 // GET /systems - List systems
