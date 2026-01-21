@@ -25,7 +25,7 @@
           {
             "group": "Guides",
             "pages": [
-              "guides/creating-an-integration",
+              "guides/creating-a-system",
               "guides/creating-a-tool",
               "guides/debugging-a-tool",
               "guides/deploying-a-tool",
@@ -44,7 +44,12 @@
           },
           {
             "group": "Enterprise",
-            "pages": ["enterprise/metrics"]
+            "pages": [
+              "enterprise/metrics",
+              "enterprise/scheduling",
+              "enterprise/webhooks",
+              "enterprise/permissioning"
+            ]
           }
         ]
       }

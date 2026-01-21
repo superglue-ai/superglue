@@ -11,11 +11,9 @@ Learn more about how tools fit into the bigger picture in our [core concepts](/g
   <Tab title="Via Agent">
     The fastest way to create a tool is by talking to our agent. Describe what you want to accomplish and the agent will build the tool for you.
 
-    <video
-      autoPlay
-      className="w-full rounded-lg"
-      src="../resources/create-tool.mp4"
-    />
+    <video autoPlay muted loop playsInline className="w-full rounded-lg">
+      <source src="../resources/create-tool-via-agent.mp4" type="video/mp4" />
+    </video>
 
     **Simple example:**
     ```
@@ -23,7 +21,7 @@ Learn more about how tools fit into the bigger picture in our [core concepts](/g
     ```
 
     superglue will:
-    1. Identify which integration to use (or create one if needed)
+    1. Identify which system to use (or create one if needed)
     2. Find the relevant API endpoint from the documentation
     3. Configure the API call with appropriate parameters
     4. Test it and make it available for execution
@@ -49,18 +47,16 @@ Learn more about how tools fit into the bigger picture in our [core concepts](/g
   <Tab title="Via UI">
     Build tools in the UI:
 
-    <video
-      autoPlay
-      className="w-full rounded-lg"
-      src="../resources/create-tool-ui.mp4"
-    />
+    <video autoPlay muted loop playsInline className="w-full rounded-lg">
+      <source src="../resources/create-tool-via-ui.mp4" type="video/mp4" />
+    </video>
 
     <Steps>
       <Step title="Navigate to tools">
         Go to Tools in your superglue dashboard and click "Create Tool"
       </Step>
-      <Step title="Select integrations">
-        Choose which API integrations this tool will use
+      <Step title="Select systems">
+        Choose which systems this tool will use
       </Step>
       <Step title="Add instruction">
         Describe what the tool should do in natural language. superglue will build the workflow steps automatically.
@@ -72,137 +68,47 @@ Learn more about how tools fit into the bigger picture in our [core concepts](/g
 
   </Tab>
   <Tab title="Via SDK">
-    For programmatic tool creation, use the SDK:
+    Use the REST SDK to run tools you've already created:
 
     ```bash
     npm install @superglue/client
     ```
 
-    **Build a tool with natural language:**
+    **Configure and run a tool:**
 
-    <Tabs>
-      <Tab title="SDK">
-        ```typescript
-        import { SuperglueClient } from "@superglue/client";
+    ```typescript
+    import { configure, runTool, getTool, listTools } from "@superglue/client";
 
-        const superglue = new SuperglueClient({
-          apiKey: "your_api_key_here"
-        });
+    // Configure the SDK with your API endpoint and token
+    configure({
+      baseUrl: "https://api.superglue.cloud", // or your self-hosted URL
+      token: "your_api_token"
+    });
 
-        // Let superglue build the workflow from your instruction
-        const tool = await superglue.buildWorkflow({
-          integrationIds: ["stripe"],
-          instruction: "Fetch all active customers from Stripe"
-        });
+    // List available tools
+    const { data: tools } = await listTools();
+    console.log(tools);
 
-        console.log(tool); // Tool with auto-generated steps
-        ```
-      </Tab>
-      <Tab title="GraphQL">
-        ```graphql
-        mutation BuildWorkflow {
-          buildWorkflow(
-            integrationIds: ["stripe"]
-            instruction: "Fetch all active customers from Stripe"
-          ) {
-            id
-            instruction
-            steps {
-              id
-              integrationId
-              apiConfig {
-                method
-                urlPath
-              }
-            }
-            finalTransform
-          }
-        }
-        ```
-      </Tab>
-    </Tabs>
+    // Get a specific tool
+    const { data: tool } = await getTool("my-tool-id");
 
-    **Build and execute a tool with natural language:**
+    // Run a tool with input payload
+    const { data: run } = await runTool("my-tool-id", {
+      inputs: {
+        userId: "user_123",
+        startDate: "2024-01-01"
+      },
+      credentials: {
+        stripe_api_key: "sk_live_xxx"
+      }
+    });
 
-    <Tabs>
-      <Tab title="SDK">
-        ```typescript
-        // Build the workflow from natural language
-        const tool = await superglue.buildWorkflow({
-          integrationIds: ["hubspot"],
-          instruction: `Get all contacts from HubSpot where the email domain is
-                        @company.com and update their lifecycle stage to 'customer'`
-        });
+    console.log(run.data); // Tool execution result
+    ```
 
-        // Test it with sample data
-        const result = await superglue.executeWorkflow({
-          workflow: tool,
-          payload: {}
-        });
-
-        console.log(result); // { success: true, data: { updated: 5, contacts: [...] } }
-
-        // Save it for reuse
-        await superglue.upsertWorkflow({
-          ...result.config,
-          id: "update-company-contacts"
-        });
-        ```
-      </Tab>
-      <Tab title="GraphQL">
-        ```graphql
-        # Step 1: Build the workflow
-        mutation BuildWorkflow {
-          buildWorkflow(
-            integrationIds: ["hubspot"]
-            instruction: """
-            Get all contacts from HubSpot where the email domain is
-            @company.com and update their lifecycle stage to 'customer'
-            """
-          ) {
-            id
-            steps {
-              id
-              integrationId
-              apiConfig {
-                method
-                urlPath
-                body
-              }
-            }
-            finalTransform
-          }
-        }
-
-        # Step 2: Execute the workflow
-        mutation ExecuteWorkflow($workflow: WorkflowInput!) {
-          executeWorkflow(
-            workflow: $workflow
-            payload: {}
-          ) {
-            success
-            data
-            config {
-              id
-              steps {
-                id
-              }
-            }
-          }
-        }
-
-        # Step 3: Save for reuse
-        mutation SaveWorkflow($workflow: WorkflowInput!) {
-          upsertWorkflow(workflow: $workflow) {
-            id
-            instruction
-          }
-        }
-        ```
-      </Tab>
-    </Tabs>
-
-    See the [SDK documentation](/sdk/overview) for more details.
+    <Note>
+      The REST SDK is for **executing existing tools**. To build new tools, use the agent interface or the UI. See the [SDK documentation](/sdk/overview) for more details.
+    </Note>
 
   </Tab>
 </Tabs>
@@ -235,7 +141,7 @@ Each step in a tool represents a single API call with the following configuratio
 ```typescript
 {
   id: "stepId",                    // Unique identifier for this step
-  integrationId: "stripe",         // Which integration to use
+  systemId: "stripe",         // Which system to use
   loopSelector: "(sourceData) => { return [\"one\", \"two\"]}",  // The data selector for the current step
   apiConfig: {
     method: "POST",                 // HTTP method
@@ -256,7 +162,7 @@ Use `<<variable>>` to access dynamic values:
 ```typescript
 {
   headers: {
-    "Authorization": "Bearer <<integrationId_access_token>>"
+    "Authorization": "Bearer <<systemId_access_token>>"
   }
 }
 ```
@@ -300,8 +206,6 @@ Use `<<variable>>` to access dynamic values:
   JavaScript expressions must use the arrow function syntax `(sourceData) => ...`. Direct property access like `<<userId>>` works for simple variables, but not for nested properties or transformations.
 </Note>
 
-## Data transformations
-
 ### Data selector
 
 Extract an array to iterate over:
@@ -315,6 +219,10 @@ Extract an array to iterate over:
   }`;
 }
 ```
+
+<Note>
+  Whether a step loops through more than one request is determined by the data selector. If the data selector returns an Array, the request will execute once for each item in that array. The item of the current iteration is available in the config as `<<currentItem>>` or accessible in code via `sourceData.currentItem`.
+</Note>
 
 ### Final transform
 
@@ -339,7 +247,7 @@ Shape the final output of the entire tool:
 }
 ```
 
-## Special integrations
+## Special systems
 
 ### PostgreSQL
 
@@ -348,7 +256,7 @@ Query databases using the postgres:// URL scheme:
 ```typescript
 {
   id: "queryDatabase",
-  integrationId: "postgres_db",
+  systemId: "postgres_db",
   apiConfig: {
     urlHost: "postgres://<<postgres_db_username>>:<<postgres_db_password>>@<<postgres_db_hostname>>:5432",
     urlPath: "<<postgres_db_database>>",
@@ -369,9 +277,9 @@ Access files on FTP servers:
 ```typescript
 {
   id: "listFiles",
-  integrationId: "ftp-server",
+  systemId: "ftp-server",
   apiConfig: {
-    urlHost: "sftp://<<integrationId_username>>:<<integrationId_password>>@<<integrationId_hostname>>:22",
+    urlHost: "sftp://<<systemId_username>>:<<systemId_password>>@<<systemId_hostname>>:22",
     urlPath: "/data",
     body: {
       operation: "list",
@@ -397,13 +305,13 @@ Access files on FTP servers:
 
 <CardGroup cols={2}>
   <Card title="Automatic retries" icon="rotate">
-    Failed steps are automatically retried with exponential backoff
+    Failed steps can be automatically retried with exponential backoff
   </Card>
   <Card title="Self-healing" icon="wand-magic-sparkles">
-    When enabled, superglue attempts to fix configuration errors automatically
+    When enabled via the API, superglue attempts to fix configuration errors automatically
   </Card>
   <Card title="Validation" icon="shield-check">
-    Response data is validated against expected schemas
+    Response data is validated against response schemas if specified
   </Card>
   <Card title="Graceful degradation" icon="life-ring">
     Handle missing data with optional chaining and defaults in transformations
@@ -411,7 +319,7 @@ Access files on FTP servers:
 </CardGroup>
 
 <Tip>
-**Keep steps focused** - Each step should make a single API call. Use transformations to prepare data, not additional steps.
+**Keep steps focused** - Each step should make a single API call. Use transformations to prepare data, not as additional steps.
 
 **Use descriptive IDs** - Step IDs are used to reference data in later steps. Use clear names like `getCustomers`, `updateOrder`, `sendEmail`.
 

@@ -5,10 +5,6 @@ description: "How to interact with the superglue agent"
 
 The superglue agent handles system setup, API discovery, and tool building through a chat interface. Talk to it in natural language — it handles the technical details.
 
-<Note>
-  The agent is available in the hosted version at [app.superglue.cloud](https://app.superglue.cloud). For self-hosted MCP usage, see the [MCP guide](/mcp/using-the-mcp).
-</Note>
-
 ---
 
 ## Available superglue agent tools
@@ -17,33 +13,21 @@ The agent uses a broad range of tools to help you manage your systems and tools:
 
 <AccordionGroup>
   <Accordion title="System Tools" icon="plug">
-    **`find_integrations`** - Search available systems by natural language query
-    
-    **`create_integration`** - Create new systems with auth and docs
+    **`create_integration`** - Create new systems with authentication and documentation
     
     **`modify_integration`** - Update existing systems (credentials, docs, configuration)
     
-    **`find_integration_templates`** - Get pre-configured setups for popular systems
-    
-    **`search_documentation`** - Search system docs and OpenAPI specs by keywords
-    
     **`call_endpoint`** - Test API endpoints directly with credential injection
+    
+    **`authenticate_oauth`** - Complete OAuth authorization flows for systems
   </Accordion>
 
   <Accordion title="Tool Building & Execution" icon="wrench">
-    **`find_tools`** - Search for existing saved tools by natural language query
+    **`build_tool`** - Build a new tool from natural language instructions
     
-    **`build_and_execute_tool`** - Build and test tools from natural language instructions
+    **`edit_tool`** - Modify an existing tool's configuration or steps
     
-    **`execute_tool`** - Execute previously saved tools by ID with optional payloads
-  </Accordion>
-
-  <Accordion title="Scheduling" icon="clock">
-    **`list_tool_schedules`** - View all schedules for a specific tool
-    
-    **`create_tool_schedule`** - Set up cron-based automatic execution
-    
-    **`update_tool_schedule`** - Modify schedule timing, timezone, or enable/disable
+    **`run_tool`** - Execute a saved tool with optional input payload
   </Accordion>
 </AccordionGroup>
 
@@ -53,11 +37,9 @@ The agent uses a broad range of tools to help you manage your systems and tools:
 
 Configure OAuth flows without touching code. The agent walks you through system setup, handles the authorization code flow and stores your credentials securely.
 
- <video
-      autoPlay
-      className="w-full rounded-lg"
-      src="../resources/using-agent-oauth.mp4"
-    />
+<video autoPlay muted loop playsInline className="w-full rounded-lg">
+  <source src="../resources/using-agent-oauth.mp4" type="video/mp4" />
+</video>
 
 **What this shows:**
 - You can set up and run the OAuth 2.0 authorization code flow in the chat with one click
@@ -74,7 +56,7 @@ Configure OAuth flows without touching code. The agent walks you through system 
 
 Point the agent at your custom APIs. It can test endpoints, authentication, and build working tools based on exploration.
 
-<video autoPlay className="w-full rounded-lg">
+<video autoPlay muted loop playsInline className="w-full rounded-lg">
   <source src="../resources/using-agent-talk-to-APIs.mp4" type="video/mp4" />
 </video>
 
@@ -92,10 +74,10 @@ Point the agent at your custom APIs. It can test endpoints, authentication, and 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Create a System" href="/guides/creating-an-integration" icon="plug">
+  <Card title="Create a System" href="/guides/creating-a-system" icon="plug">
     Connect your first API, database, or file system
   </Card>
   <Card title="Create a Tool" href="/guides/creating-a-tool" icon="hammer">
-    Build executable workflows across your systems
+    Build executable tools that work across your systems
   </Card>
 </CardGroup>
