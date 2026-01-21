@@ -231,7 +231,7 @@ export class AgentClient {
               }
 
               if (part.tool?.id && part.tool?.name) {
-                let output: { type: "error-text" | "json" | "text"; value: string; };
+                let output: { type: "error-text" | "json" | "text"; value: string };
 
                 switch (part.tool.status) {
                   case "pending":
@@ -331,7 +331,7 @@ export class AgentClient {
     };
   }> {
     // Declare subscription outside try so it's accessible in finally
-    let logSubscription: { unsubscribe: () => void; } | null = null;
+    let logSubscription: { unsubscribe: () => void } | null = null;
 
     try {
       // Special treatment for create_system tool - normalize credentials (flatten object and convert to snake case) and handle OAuth detection
@@ -585,12 +585,12 @@ export class AgentClient {
 
   async *streamLLMResponse(messages: Array<Message>): AsyncGenerator<{
     type:
-    | "content"
-    | "tool_call_start"
-    | "tool_call_complete"
-    | "tool_call_error"
-    | "tool_call_update"
-    | "done";
+      | "content"
+      | "tool_call_start"
+      | "tool_call_complete"
+      | "tool_call_error"
+      | "tool_call_update"
+      | "done";
     content?: string;
     toolCall?: {
       id: string;

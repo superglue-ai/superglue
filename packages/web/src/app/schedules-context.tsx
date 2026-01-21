@@ -11,12 +11,12 @@ interface SchedulesContextType {
 
 const SchedulesContext = createContext<SchedulesContextType | null>(null);
 
-export function SchedulesProvider({ children }: { children: ReactNode; }) {
+export function SchedulesProvider({ children }: { children: ReactNode }) {
   const context: SchedulesContextType = {
     schedules: [],
     isInitiallyLoading: false,
     isRefreshing: false,
-    refreshSchedules: async () => { },
+    refreshSchedules: async () => {},
     getSchedulesForTool: () => [],
   };
 

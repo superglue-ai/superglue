@@ -60,13 +60,13 @@ export async function POST(request: NextRequest) {
           }
           try {
             controller.close();
-          } catch { }
+          } catch {}
         } catch (error) {
           // Don't log abort errors - they're expected
           if (error instanceof Error && error.name === "AbortError") {
             try {
               controller.close();
-            } catch { }
+            } catch {}
             return;
           }
           console.error("Streaming error:", error);
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
             })}\n\n`;
             controller.enqueue(encoder.encode(errorData));
             controller.close();
-          } catch (closeError) { }
+          } catch (closeError) {}
         }
       },
     });
