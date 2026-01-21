@@ -1,10 +1,6 @@
 import { logMessage } from "../utils/logs.js";
 
 export function validateEnvironment() {
-  if (!process.env.START_SCHEDULER_SERVER) {
-    logMessage("warn", "START_SCHEDULER_SERVER is not set defaulting to false.");
-  }
-
   if (!process.env.API_PORT) {
     logMessage("warn", "API_PORT is not set defaulting to 3002.");
   }
