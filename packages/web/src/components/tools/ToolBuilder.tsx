@@ -547,7 +547,11 @@ export function ToolBuilder({
                               onClick={() => toggleSystem(sys.id)}
                             >
                               <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <SystemIcon system={sys} size={20} fallbackClassName="text-foreground" />
+                                <SystemIcon
+                                  system={sys}
+                                  size={20}
+                                  fallbackClassName="text-foreground"
+                                />
                                 <div className="flex flex-col min-w-0">
                                   <span className="font-medium text-sm truncate">{sys.id}</span>
                                   <span className="text-xs text-muted-foreground truncate">
