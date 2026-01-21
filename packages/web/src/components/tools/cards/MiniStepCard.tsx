@@ -1,5 +1,6 @@
 import { Card } from "@/src/components/ui/card";
-import { cn, getSystemSimpleIcon } from "@/src/lib/general-utils";
+import { SystemIcon } from "@/src/components/ui/system-icon";
+import { cn } from "@/src/lib/general-utils";
 import { FileJson, FilePlay, Globe, OctagonAlert, RotateCw } from "lucide-react";
 import React from "react";
 import { useToolConfig, useExecution } from "../context";
@@ -211,8 +212,6 @@ export const MiniStepCard = React.memo(
     const linkedSystem =
       step.systemId && systems ? systems.find((sys) => sys.id === step.systemId) : undefined;
 
-    const simpleIcon = linkedSystem ? getSystemSimpleIcon(linkedSystem) : null;
-
     return (
       <div
         className={cn(
@@ -252,16 +251,8 @@ export const MiniStepCard = React.memo(
             <div className="flex-1 flex flex-col items-center justify-between leading-tight">
               <div className="flex-1 flex flex-col items-center justify-center">
                 <div className="p-2 rounded-full bg-white dark:bg-gray-100 border border-border/50">
-                  {simpleIcon ? (
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill={`#${simpleIcon.hex}`}
-                      className="flex-shrink-0"
-                    >
-                      <path d={simpleIcon.path} />
-                    </svg>
+                  {linkedSystem ? (
+                    <SystemIcon system={linkedSystem} size={16} />
                   ) : (
                     <Globe className="h-4 w-4 text-muted-foreground" />
                   )}

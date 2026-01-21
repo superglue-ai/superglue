@@ -309,22 +309,6 @@ export function resolveSystemIcon(system: {
   return null;
 }
 
-/**
- * Convenience function that returns just the SimpleIcon if resolved, or null.
- * Use this when you only care about SimpleIcons and want to ignore Lucide icons.
- */
-export function getSystemSimpleIcon(system: {
-  id?: string;
-  urlHost?: string;
-  icon?: string | null;
-}): SimpleIcon | null {
-  const resolved = resolveSystemIcon(system);
-  if (resolved?.type === "simpleicons") {
-    return resolved.icon;
-  }
-  return null;
-}
-
 // Computes the execution-ready payload by merging manual JSON with file payloads
 export const computeToolPayload = (
   manualPayloadText: string,

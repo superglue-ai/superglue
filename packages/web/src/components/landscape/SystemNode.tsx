@@ -1,9 +1,10 @@
 "use client";
 
 import { Button } from "@/src/components/ui/button";
-import { composeUrl, getSystemSimpleIcon } from "@/src/lib/general-utils";
+import { SystemIcon } from "@/src/components/ui/system-icon";
+import { composeUrl } from "@/src/lib/general-utils";
 import { System, Tool } from "@superglue/shared";
-import { Globe, Hammer, Pencil, X } from "lucide-react";
+import { Hammer, Pencil, X } from "lucide-react";
 import { useMemo } from "react";
 import { Handle, Position } from "reactflow";
 
@@ -19,7 +20,6 @@ interface SystemNodeData {
 
 export const SystemNode = ({ data }: { data: SystemNodeData }) => {
   const { system, isExpanded, tools = [] } = data;
-  const icon = system ? getSystemSimpleIcon(system) : null;
 
   // Find tools that use this system
   const dependentTools = useMemo(() => {
@@ -86,19 +86,7 @@ export const SystemNode = ({ data }: { data: SystemNodeData }) => {
         <div className="bg-card border-2 border-border rounded-lg shadow-xl w-80 animate-in fade-in zoom-in-95 duration-200 relative z-[9999]">
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
             <div className="flex items-center gap-2 min-w-0">
-              {icon ? (
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill={`#${icon.hex}`}
-                  className="flex-shrink-0"
-                >
-                  <path d={icon.path || ""} />
-                </svg>
-              ) : (
-                <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              )}
+              <SystemIcon system={system} size={16} />
               <span className="font-medium text-sm truncate">{data.label}</span>
             </div>
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={data.onClose}>
@@ -219,19 +207,7 @@ export const SystemNode = ({ data }: { data: SystemNodeData }) => {
         onClick={data.onClick}
       >
         <div className="flex flex-col items-center gap-2">
-          {icon ? (
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill={`#${icon.hex}`}
-              className="flex-shrink-0"
-            >
-              <path d={icon.path || ""} />
-            </svg>
-          ) : (
-            <Globe className="h-6 w-6 text-muted-foreground" />
-          )}
+          {system && <SystemIcon system={system} size={24} />}
           <div className="text-base font-medium text-center break-words max-w-[150px]">
             {data.label}
           </div>

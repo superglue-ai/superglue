@@ -4,7 +4,7 @@ import { JsonCodeEditor } from "@/src/components/editors/JsonCodeEditor";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
-import { getSystemSimpleIcon } from "@/src/lib/general-utils";
+import { SystemIcon } from "@/src/components/ui/system-icon";
 import {
   AlertCircle,
   CheckCircle,
@@ -12,7 +12,6 @@ import {
   Code,
   Copy,
   Database,
-  Globe,
   RotateCcw,
   Save,
 } from "lucide-react";
@@ -111,15 +110,6 @@ export function ToolCallToolDisplay({
 
   // Get the effective tool ID - either from props or from the tool object
   const effectiveToolId = toolId || tool?.id || tool?.config?.id;
-
-  // Helper to get icon for system
-  const getStepSystemIcon = (step: ToolStep) => {
-    if (!step.systemId) return null;
-    return getSystemSimpleIcon({
-      id: step.systemId,
-      urlHost: step.apiConfig?.urlHost,
-    });
-  };
 
   const copyToClipboard = async (content: string, id: string) => {
     try {
@@ -251,22 +241,10 @@ export function ToolCallToolDisplay({
                     <div className="mb-3">
                       <div className="flex items-center gap-2 mb-2">
                         {/* System Icon - Left of Step ID */}
-                        {(() => {
-                          const icon = getStepSystemIcon(step);
-                          return icon ? (
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill={`#${icon.hex}`}
-                              className="flex-shrink-0"
-                            >
-                              <path d={icon.path || ""} />
-                            </svg>
-                          ) : (
-                            <Globe className="w-4 h-4 text-muted-foreground" />
-                          );
-                        })()}
+                        <SystemIcon
+                          system={{ id: step.systemId, urlHost: step.apiConfig?.urlHost }}
+                          size={16}
+                        />
                         <span className="font-medium text-sm">{step.id || "New Step"}</span>
 
                         {/* Loop Icon - Right side (if LOOP) */}
