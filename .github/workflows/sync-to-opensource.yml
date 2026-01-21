@@ -1,0 +1,186 @@
+name: Sync to Open Source Repo
+
+on:
+  # TODO: Revert to pull_request trigger after testing
+  push:
+    branches: [feat/add_system_metadata]
+  # pull_request:
+  #   types: [closed]
+  #   branches: [main]
+
+jobs:
+  sync-to-opensource:
+    # if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repo (hosted)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Clone open source repo
+        env:
+          OPENSOURCE_TOKEN: ${{ secrets.OPENSOURCE_REPO_TOKEN }}
+        run: |
+          git clone https://x-access-token:${OPENSOURCE_TOKEN}@github.com/superglue-ai/superglue.git opensource-repo
+
+      - name: Create branch and sync changes
+        working-directory: opensource-repo
+        run: |
+          git remote add source ..
+          git fetch source
+
+          BRANCH_NAME="sync-from-hosted-$(date +%s)"
+          git checkout -b "${BRANCH_NAME}"
+
+          # Cherry-pick the commit, allowing empty commits (in case all changes are to hosted-only files)
+          # -X theirs = prefer the hosted changes being cherry-picked over open source version
+          # TODO: Revert to github.event.pull_request.merge_commit_sha after testing
+          git cherry-pick ${{ github.sha }} --allow-empty -X theirs || {
+            echo "Cherry-pick had conflicts, handling them..."
+            
+            # Auto-resolve package-lock.json conflicts by keeping open source version
+            if [ -f package-lock.json ]; then
+              echo "Resetting package-lock.json to avoid merge conflicts"
+              git checkout --ours package-lock.json 2>/dev/null || true
+            fi
+            
+            # Stage all resolved files
+            git add -A
+            
+            # Continue cherry-pick (allow empty in case all changes were conflicts)
+            git cherry-pick --continue --no-edit || {
+              # If continue fails, just commit what we have
+              git commit --allow-empty --no-edit -m "Sync from hosted (auto-resolved conflicts)" || true
+            }
+          }
+
+          # =============================================================================
+          # STEP 1: Restore files/folders that exist in BOTH repos but should keep
+          #         their open source version (different content in hosted vs opensource)
+          # =============================================================================
+          echo "Restoring open source versions of shared files..."
+          
+          # Eval folder - completely ignore any changes from hosted
+          git checkout origin/main -- eval 2>/dev/null || git rm -rf eval 2>/dev/null || true
+          
+          # EE files that exist in both repos with different content - keep open source version
+          git checkout origin/main -- packages/core/api/ee/index.ts 2>/dev/null || true
+          git checkout origin/main -- packages/core/api/ee/scope-hooks.ts 2>/dev/null || true
+          
+          # =============================================================================
+          # STEP 2: Remove hosted-only files that don't exist in open source
+          # =============================================================================
+          echo "Removing hosted-only files..."
+          
+          # EE (Enterprise Edition) - remove hosted-only files (but keep files that exist in open source)
+          rm -rf packages/core/ee 2>/dev/null || true
+          # Remove all ee api files except those that exist in open source
+          find packages/core/api/ee -type f ! -name 'index.ts' ! -name 'scope-hooks.ts' -delete 2>/dev/null || true
+          
+          # Supabase related
+          rm -rf packages/web/src/supabase 2>/dev/null || true
+          rm -rf packages/web/supabase 2>/dev/null || true
+          
+          # Scheduler (hosted-only feature)
+          rm -rf packages/core/scheduler 2>/dev/null || true
+          
+          # Discovery and Landscape (hosted-only features)
+          rm -rf packages/web/src/app/discovery 2>/dev/null || true
+          rm -rf packages/web/src/app/landscape 2>/dev/null || true
+          rm -rf packages/web/src/app/agent/discovery 2>/dev/null || true
+          rm -rf packages/web/src/components/discovery 2>/dev/null || true
+          
+          # Auth pages (hosted uses Supabase auth)
+          rm -rf packages/web/src/app/auth 2>/dev/null || true
+          rm -rf packages/web/src/app/api-keys 2>/dev/null || true
+          rm -rf packages/web/src/app/login 2>/dev/null || true
+          
+          # Organization management (hosted-only)
+          rm -rf packages/web/src/app/actions/organizations 2>/dev/null || true
+          rm -f packages/web/src/app/actions/login.ts 2>/dev/null || true
+          
+          # Hosted-only hooks
+          rm -f packages/web/src/hooks/use-supabase-token.ts 2>/dev/null || true
+          rm -f packages/web/src/hooks/use-discovery-polling.ts 2>/dev/null || true
+          rm -f packages/web/src/hooks/use-discovery-cache.ts 2>/dev/null || true
+          
+          # Hosted-only lib files
+          rm -f packages/web/src/lib/ee-superglue-client.ts 2>/dev/null || true
+          rm -f packages/web/src/lib/agent/discovery-prompts.ts 2>/dev/null || true
+          rm -f packages/web/src/lib/api-auth.ts 2>/dev/null || true
+        
+          
+          # Embedded auth (hosted-only)
+          rm -f packages/web/src/components/embedded/EmbeddedLoginView.tsx 2>/dev/null || true
+          
+          # Auth components (hosted-only)
+          rm -rf packages/web/src/components/auth 2>/dev/null || true
+          
+          # Sidebar org switcher (hosted-only)
+          rm -f packages/web/src/components/sidebar/OrgSwitcher.tsx 2>/dev/null || true
+          
+          # Scripts (hosted-only migrations)
+          rm -f scripts/org_management_migration.up.sql 2>/dev/null || true
+          
+          # API routes (hosted-only auth routes)
+          rm -rf packages/web/src/app/api/auth 2>/dev/null || true
+          
+          # Schedules context (hosted-only feature)
+          rm -f packages/web/src/app/schedules-context.tsx 2>/dev/null || true
+          
+          # Systems page and context (hosted-only if not in open source)
+          rm -f packages/web/src/app/systems-context.tsx 2>/dev/null || true
+          rm -rf packages/web/src/app/systems 2>/dev/null || true
+          
+          # Check if there are any changes after cleanup
+          if git status --porcelain | grep -q .; then
+            echo "Committing cleanup of hosted-only files..."
+            git add -A
+            git commit -m "Remove hosted-only files from sync" || true
+          fi
+
+          # Check if there are any actual changes compared to main
+          CHANGES=$(git diff origin/main --name-only | wc -l)
+          if [ "$CHANGES" -eq 0 ]; then
+            echo "No changes to sync after removing hosted-only files. Skipping PR creation."
+            echo "SKIP_PR=true" >> $GITHUB_ENV
+          else
+            echo "Found $CHANGES file(s) with changes to sync."
+            git push origin "${BRANCH_NAME}"
+            echo "SKIP_PR=false" >> $GITHUB_ENV
+          fi
+
+          echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
+
+      - name: Create Pull Request
+        if: success() && env.SKIP_PR != 'true'
+        env:
+          OPENSOURCE_TOKEN: ${{ secrets.OPENSOURCE_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.OPENSOURCE_REPO_TOKEN }}
+          # TODO: Revert PR_BODY after testing
+          PR_BODY: |
+            **Auto-synced from hosted repository (TEST RUN)**
+
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref_name }}
+
+            ---
+
+            > ⚠️ **Note:** Hosted-only files (ee/, supabase/, scheduler/, discovery/, etc.) have been automatically excluded from this sync.
+        run: |
+          cd opensource-repo
+          echo "$PR_BODY" > pr_body.txt
+
+          gh pr create \
+            --repo superglue-ai/superglue \
+            --base main \
+            --head "${BRANCH_NAME}" \
+            --title "Sync TEST: ${{ github.ref_name }} - ${{ github.sha }}" \
+            --body-file pr_body.txt
