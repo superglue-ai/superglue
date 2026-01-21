@@ -672,8 +672,8 @@ export function SystemForm({
       documentation: documentation.trim(),
       specificInstructions: specificInstructions.trim(),
       credentials: creds,
-      // Include templateName if a template is selected
-      ...(selectedSystem && { templateName: selectedSystem }),
+      // Only set templateName for real templates; "Custom API" uses the "manual" option which isn't a valid template key
+      ...(selectedSystem && selectedSystem !== "manual" && { templateName: selectedSystem }),
     };
 
     try {
