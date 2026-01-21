@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, ReactNode, ComponentType } from "react";
+import { createContext, useContext, useState, ReactNode, ComponentType } from "react";
+import { PlaygroundAgentSidebar } from "../tools/agent/PlaygroundAgentSidebar";
 
 interface RightSidebarContextType {
   showAgent: boolean;
@@ -23,14 +24,16 @@ const RightSidebarContext = createContext<RightSidebarContextType>({
 });
 
 export function RightSidebarProvider({ children }: { children: ReactNode }) {
+  const [showAgent, setShowAgent] = useState(false);
+  const [agentPortalRef, setAgentPortalRef] = useState<HTMLDivElement | null>(null);
   return (
     <RightSidebarContext.Provider
       value={{
-        showAgent: false,
-        setShowAgent: () => {},
-        agentPortalRef: null,
-        setAgentPortalRef: () => {},
-        AgentSidebarComponent: null,
+        showAgent,
+        setShowAgent,
+        agentPortalRef,
+        setAgentPortalRef,
+        AgentSidebarComponent: PlaygroundAgentSidebar,
       }}
     >
       {children}

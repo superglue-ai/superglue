@@ -5,6 +5,7 @@ import { useTheme } from "@/src/hooks/use-theme";
 import {
   Blocks,
   Book,
+  Bot,
   ExternalLink,
   Hammer,
   History,
@@ -18,9 +19,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const navItems = [
-  { icon: Hammer, label: "Tools", href: "/" },
+  { icon: Bot, label: "Agent", href: "/" },
+  { icon: Hammer, label: "Tools", href: "/tools" },
   { icon: Blocks, label: "Systems", href: "/systems" },
-  { icon: History, label: "Runs", href: "/runs" },
   { icon: Book, label: "Documentation", href: "https://docs.superglue.cloud", target: "_blank" },
   /*  { icon: AlertCircle, label: 'Error Monitoring', href: '/analytics' },
   { icon: Shield, label: 'Access Control', href: '/access-control' },
