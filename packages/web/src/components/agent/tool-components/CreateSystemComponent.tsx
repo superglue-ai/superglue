@@ -11,7 +11,8 @@ import {
 } from "@/src/components/ui/dialog";
 import { useToast } from "@/src/hooks/use-toast";
 import { useSystemActions } from "@/src/hooks/use-system-actions";
-import { composeUrl, getSimpleIcon, getSystemSimpleIcon } from "@/src/lib/general-utils";
+import { SystemIcon } from "@/src/components/ui/system-icon";
+import { composeUrl, getSimpleIcon } from "@/src/lib/general-utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible";
 import { systemOptions, ToolCall } from "@superglue/shared";
 import {
@@ -325,20 +326,11 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
           <div className="flex items-start gap-4">
             {/* Icon */}
             <div className="flex-shrink-0">
-              {(() => {
-                if (!displaySystem?.id) {
-                  return <Globe className="h-6 w-6 text-foreground" />;
-                }
-
-                const icon = getSystemSimpleIcon(displaySystem);
-                return icon ? (
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill={`#${icon.hex}`}>
-                    <path d={icon.path} />
-                  </svg>
-                ) : (
-                  <Globe className="h-6 w-6 text-foreground" />
-                );
-              })()}
+              {displaySystem?.id ? (
+                <SystemIcon system={displaySystem} size={24} fallbackClassName="text-foreground" />
+              ) : (
+                <Globe className="h-6 w-6 text-foreground" />
+              )}
             </div>
 
             {/* Details */}

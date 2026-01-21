@@ -19,7 +19,8 @@ import { Input } from "@/src/components/ui/input";
 import { DocStatus } from "@/src/components/utils/DocStatusSpinner";
 import { useToast } from "@/src/hooks/use-toast";
 import { createSuperglueClient, needsUIToTriggerDocFetch } from "@/src/lib/client-utils";
-import { composeUrl, getSimpleIcon, getSystemSimpleIcon } from "@/src/lib/general-utils";
+import { SystemIcon } from "@/src/components/ui/system-icon";
+import { composeUrl, getSimpleIcon } from "@/src/lib/general-utils";
 import {
   buildOAuthFieldsFromSystem,
   createOAuthErrorHandler,
@@ -380,7 +381,6 @@ export default function SystemsPage() {
     return !!(system.documentationUrl?.trim() && !pendingDocIds.has(system.id));
   };
 
-  const getSystemIcon = (system: System) => getSystemSimpleIcon(system);
 
   const handleRefresh = async () => {
     await refreshSystems();
@@ -458,22 +458,7 @@ export default function SystemsPage() {
                   <div key={sys.id} className="relative">
                     <div className="flex items-center gap-3 border rounded-lg p-4 bg-card">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {(() => {
-                          const icon = getSystemIcon(sys);
-                          return icon ? (
-                            <svg
-                              width="20"
-                              height="20"
-                              viewBox="0 0 24 24"
-                              fill={`#${icon.hex}`}
-                              className="flex-shrink-0"
-                            >
-                              <path d={icon.path || ""} />
-                            </svg>
-                          ) : (
-                            <Globe className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-                          );
-                        })()}
+                        <SystemIcon system={sys} size={20} />
                         <div className="flex flex-col min-w-0 flex-1">
                           <span className="font-medium truncate">{sys.id}</span>
                           <span className="text-sm text-muted-foreground truncate">

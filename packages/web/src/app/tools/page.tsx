@@ -24,7 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
-import { getSystemSimpleIcon } from "@/src/lib/general-utils";
+import { SystemIcon } from "@/src/components/ui/system-icon";
 import { System, Tool } from "@superglue/shared";
 import {
   ArrowDown,
@@ -144,7 +144,6 @@ const ToolsTable = () => {
     );
   };
 
-  const getSystemIcon = (system: System) => getSystemSimpleIcon(system);
 
   useEffect(() => {
     if (!isInitiallyLoading && !hasCompletedInitialLoad) {
@@ -313,31 +312,13 @@ const ToolsTable = () => {
                           {systemIdsArray.map((systemId: string) => {
                             const system = systems.find((s) => s.id === systemId);
                             if (!system) return null;
-                            const icon = getSystemIcon(system);
-                            return icon ? (
+                            return (
                               <TooltipProvider key={systemId}>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <svg
-                                      width="14"
-                                      height="14"
-                                      viewBox="0 0 24 24"
-                                      fill={`#${icon.hex}`}
-                                      className="flex-shrink-0"
-                                    >
-                                      <path d={icon.path} />
-                                    </svg>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>{system.id}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            ) : (
-                              <TooltipProvider key={systemId}>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                                    <span>
+                                      <SystemIcon system={system} size={14} />
+                                    </span>
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <p>{system.id}</p>
