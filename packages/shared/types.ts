@@ -330,6 +330,7 @@ export interface System extends BaseConfig {
   specificInstructions?: string;
   documentationKeywords?: string[];
   icon?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface SystemInput {
@@ -342,6 +343,7 @@ export interface SystemInput {
   specificInstructions?: string;
   documentationKeywords?: string[];
   credentials?: Record<string, string>;
+  metadata?: Record<string, any>;
 }
 
 export interface SuggestedTool {

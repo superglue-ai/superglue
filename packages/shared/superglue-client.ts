@@ -1097,69 +1097,23 @@ export class SuperglueClient {
   async listSystems(
     limit: number = 10,
     offset: number = 0,
+    options?: { includeDocs?: boolean },
   ): Promise<{ items: System[]; total: number }> {
-    const query = `
-        query ListSystems($limit: Int!, $offset: Int!) {
-          listSystems(limit: $limit, offset: $offset) {
-            items {
-              id
-              name
-              type
-              urlHost
-              urlPath
-              credentials
-              documentationUrl
-              documentationPending
-              openApiSchema
-              openApiUrl
-              specificInstructions
-              documentationKeywords
-              icon
-              version
-              createdAt
-              updatedAt
-            }
-            total
-          }
-        }
-      `;
-    const response = await this.request<{
-      listSystems: { items: System[]; total: number };
-    }>(query, { limit, offset });
-    return response.listSystems;
-  }
-
-  async findRelevantSystems(searchTerms: string): Promise<System[]> {
-    const query = `
-        query FindRelevantSystems($searchTerms: String) {
-          findRelevantSystems(searchTerms: $searchTerms) {
-            reason
-            system {
-              id
-              name
-              type
-              urlHost
-              urlPath
-              credentials
-              documentationUrl
-              documentation
-              documentationPending
-              openApiUrl
-              openApiSchema
-              specificInstructions
-              documentationKeywords
-              icon
-              version
-              createdAt
-              updatedAt
-            }
-          }
-        }
-      `;
-    const response = await this.request<{ findRelevantSystems: { system: System }[] }>(query, {
-      searchTerms,
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
     });
-    return response.findRelevantSystems.map((s) => s.system);
+    if (options?.includeDocs) {
+      params.set("includeDocs", "true");
+    }
+    const response = await this.restRequest<{
+      success: boolean;
+      data: System[];
+      total: number;
+      page: number;
+      limit: number;
+    }>("GET", `/v1/systems?${params.toString()}`);
+    return { items: response.data, total: response.total };
   }
 
   async findRelevantTools(searchTerms?: string): Promise<SuggestedTool[]> {
@@ -1184,32 +1138,13 @@ export class SuperglueClient {
     return response.findRelevantTools;
   }
 
-  async getSystem(id: string): Promise<System> {
-    const query = `
-        query GetSystem($id: ID!) {
-          getSystem(id: $id) {
-            id
-            name
-            type
-            urlHost
-            urlPath
-            credentials
-            documentationUrl
-            documentation
-            documentationPending
-            openApiSchema
-            openApiUrl
-            specificInstructions
-            documentationKeywords
-            icon
-            version
-            createdAt
-            updatedAt
-          }
-        }
-      `;
-    const response = await this.request<{ getSystem: System }>(query, { id });
-    return response.getSystem;
+  async getSystem(id: string, options?: { includeDocs?: boolean }): Promise<System> {
+    const params = options?.includeDocs ? "?includeDocs=true" : "";
+    const response = await this.restRequest<{ success: boolean; data: System }>(
+      "GET",
+      `/v1/systems/${encodeURIComponent(id)}${params}`,
+    );
+    return response.data;
   }
 
   async upsertSystem(
@@ -1235,6 +1170,7 @@ export class SuperglueClient {
             specificInstructions
             documentationKeywords
             icon
+            metadata
             version
             createdAt
             updatedAt

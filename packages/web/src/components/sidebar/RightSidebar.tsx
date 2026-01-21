@@ -81,8 +81,9 @@ export function RightSidebar({ className }: RightSidebarProps) {
     return new SuperglueClient({
       endpoint: config.superglueEndpoint,
       apiKey: tokenRegistry.getToken(),
+      apiEndpoint: config.apiEndpoint,
     });
-  }, [config.superglueEndpoint]);
+  }, [config.superglueEndpoint, config.apiEndpoint]);
 
   const filteredLogs = useMemo(
     () => (showDebug ? logs : logs.filter((log) => log.level !== "DEBUG")),

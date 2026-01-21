@@ -36,6 +36,7 @@ export function SystemsProvider({ children }: { children: ReactNode }) {
       const client = new SuperglueClient({
         endpoint: config.superglueEndpoint,
         apiKey: tokenRegistry.getToken(),
+        apiEndpoint: config.apiEndpoint,
       });
       const { items } = await client.listSystems(100, 0);
       setSystems(items);

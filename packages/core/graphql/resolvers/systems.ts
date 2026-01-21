@@ -5,7 +5,6 @@ import { PostgresService } from "../../datastore/postgres.js";
 import { server_defaults } from "../../default.js";
 import { DocumentationFetcher } from "../../documentation/documentation-fetching.js";
 import { DocumentationSearch } from "../../documentation/documentation-search.js";
-import { SystemFinder } from "../../systems/system-finder.js";
 import { composeUrl } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
 import { GraphQLRequestContext } from "../types.js";
@@ -208,30 +207,6 @@ export const deleteSystemResolver = async (
   } catch (error) {
     logMessage("error", `Error deleting system: ${String(error)}`, context.toMetadata());
     throw error;
-  }
-};
-
-export const findRelevantSystemsResolver = async (
-  _: any,
-  { searchTerms }: { searchTerms?: string },
-  context: GraphQLRequestContext,
-  info: GraphQLResolveInfo,
-) => {
-  const metadata = context.toMetadata();
-
-  try {
-    const allSystems = await context.datastore.listSystems({
-      limit: 1000,
-      offset: 0,
-      includeDocs: false,
-      orgId: context.orgId,
-    });
-
-    const selector = new SystemFinder(metadata);
-    return await selector.findSystems(searchTerms, allSystems.items || []);
-  } catch (error) {
-    logMessage("error", `Error finding relevant systems: ${String(error)}`, metadata);
-    return [];
   }
 };
 

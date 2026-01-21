@@ -49,6 +49,7 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
         const client = new SuperglueClient({
           endpoint: config.superglueEndpoint,
           apiKey: tokenRegistry.getToken(),
+          apiEndpoint: config.apiEndpoint,
         });
 
         for (const file of files) {

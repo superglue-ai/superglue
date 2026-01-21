@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/src/components/ui/select";
-import { getSystemIcon as getSystemIconName, getSimpleIcon } from "@/src/lib/general-utils";
+import { getSystemSimpleIcon } from "@/src/lib/general-utils";
 import { System } from "@superglue/shared";
 import { Globe } from "lucide-react";
 
@@ -38,11 +38,6 @@ export function SystemSelector({
   const { systems: contextSystems } = useSystems();
   const systems = providedSystems || contextSystems;
 
-  const getSystemIcon = (system: System) => {
-    const iconName = getSystemIconName(system);
-    return iconName ? getSimpleIcon(iconName) : null;
-  };
-
   const handleValueChange = (selectedValue: string) => {
     if (selectedValue === "CREATE_NEW" && onCreateNew) {
       onCreateNew();
@@ -62,7 +57,7 @@ export function SystemSelector({
       </SelectTrigger>
       <SelectContent className={`${contentClassName} shadow-none`}>
         {systems?.map((system) => {
-          const icon = getSystemIcon(system);
+          const icon = getSystemSimpleIcon(system);
           return (
             <SelectItem key={system.id} value={system.id}>
               <div className="flex items-center gap-2 w-full">

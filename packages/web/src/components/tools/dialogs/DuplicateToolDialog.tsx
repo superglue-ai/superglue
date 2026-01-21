@@ -71,6 +71,7 @@ export function DuplicateToolDialog({
       const superglueClient = new SuperglueClient({
         endpoint: config.superglueEndpoint,
         apiKey: tokenRegistry.getToken(),
+        apiEndpoint: config.apiEndpoint,
       });
 
       const duplicatedTool: Tool = {

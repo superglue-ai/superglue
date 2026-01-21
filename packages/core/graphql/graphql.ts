@@ -11,7 +11,6 @@ import { getRunResolver } from "./resolvers/get.js";
 import {
   cacheOauthClientCredentialsResolver,
   deleteSystemResolver,
-  findRelevantSystemsResolver,
   getSystemResolver,
   getOAuthClientCredentialsResolver,
   listSystemsResolver,
@@ -48,7 +47,6 @@ export const resolvers = {
     getSystem: getSystemResolver,
     listSystems: listSystemsResolver,
     searchSystemDocumentation: searchSystemDocumentationResolver,
-    findRelevantSystems: findRelevantSystemsResolver,
     findRelevantTools: findRelevantToolsResolver,
   },
   Mutation: {

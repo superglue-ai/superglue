@@ -55,8 +55,9 @@ export function DocumentationField({
       new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
         apiKey: tokenRegistry.getToken(),
+        apiEndpoint: superglueConfig.apiEndpoint,
       }),
-    [superglueConfig.superglueEndpoint],
+    [superglueConfig.superglueEndpoint, superglueConfig.apiEndpoint],
   );
 
   // Parse multiple files from file:// URL format

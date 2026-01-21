@@ -1,5 +1,5 @@
 import { Card } from "@/src/components/ui/card";
-import { cn, getSystemIcon, getSimpleIcon } from "@/src/lib/general-utils";
+import { cn, getSystemSimpleIcon } from "@/src/lib/general-utils";
 import { FileJson, FilePlay, Globe, OctagonAlert, RotateCw } from "lucide-react";
 import React from "react";
 import { useToolConfig, useExecution } from "../context";
@@ -211,8 +211,7 @@ export const MiniStepCard = React.memo(
     const linkedSystem =
       step.systemId && systems ? systems.find((sys) => sys.id === step.systemId) : undefined;
 
-    const iconName = linkedSystem ? getSystemIcon(linkedSystem) : null;
-    const simpleIcon = iconName ? getSimpleIcon(iconName) : null;
+    const simpleIcon = linkedSystem ? getSystemSimpleIcon(linkedSystem) : null;
 
     return (
       <div

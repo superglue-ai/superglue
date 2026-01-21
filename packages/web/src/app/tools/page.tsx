@@ -24,7 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
-import { getSystemIcon as getSystemIconName } from "@/src/lib/general-utils";
+import { getSystemSimpleIcon } from "@/src/lib/general-utils";
 import { System, Tool } from "@superglue/shared";
 import {
   ArrowDown,
@@ -39,8 +39,6 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import type { SimpleIcon } from "simple-icons";
-import * as simpleIcons from "simple-icons";
 import { useTools } from "../tools-context";
 
 type SortColumn = "id" | "folder" | "instruction" | "updatedAt";
@@ -146,23 +144,7 @@ const ToolsTable = () => {
     );
   };
 
-  const getSimpleIcon = (name: string): SimpleIcon | null => {
-    if (!name || name === "default") return null;
-    const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-    const iconKey = `si${formatted}`;
-    try {
-      // @ts-ignore
-      let icon = simpleIcons[iconKey];
-      return icon || null;
-    } catch (e) {
-      return null;
-    }
-  };
-
-  const getSystemIcon = (system: System) => {
-    const iconName = getSystemIconName(system);
-    return iconName ? getSimpleIcon(iconName) : null;
-  };
+  const getSystemIcon = (system: System) => getSystemSimpleIcon(system);
 
   useEffect(() => {
     if (!isInitiallyLoading && !hasCompletedInitialLoad) {

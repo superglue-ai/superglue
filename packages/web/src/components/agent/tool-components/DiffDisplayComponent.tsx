@@ -13,7 +13,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { cn, getSystemIcon, getSimpleIcon } from "@/src/lib/general-utils";
+import { cn, getSystemSimpleIcon } from "@/src/lib/general-utils";
 import {
   DiffLine,
   DiffTarget,
@@ -53,9 +53,7 @@ function SystemIcon({ systemId }: { systemId?: string }) {
   const simpleIcon = useMemo(() => {
     if (!systemId) return null;
     const system = systems.find((i) => i.id === systemId);
-    if (!system) return null;
-    const iconName = getSystemIcon(system);
-    return iconName ? getSimpleIcon(iconName) : null;
+    return system ? getSystemSimpleIcon(system) : null;
   }, [systemId, systems]);
 
   if (simpleIcon) {

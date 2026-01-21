@@ -35,6 +35,7 @@ export function useSystemActions() {
         const client = new SuperglueClient({
           endpoint: config.superglueEndpoint,
           apiKey: tokenRegistry.getToken(),
+          apiEndpoint: config.apiEndpoint,
         });
         const savedSystem = await client.upsertSystem(system.id, cleanedSystem, UpsertMode.UPDATE);
 
@@ -145,6 +146,11 @@ export function useSystemActions() {
         authType,
         handleOAuthError,
         true, // Force OAuth
+        undefined, // templateInfo
+        undefined, // onSuccess
+        config.superglueEndpoint,
+        undefined, // suppressErrorUI
+        config.apiEndpoint,
       );
 
       // Store cleanup function for potential use

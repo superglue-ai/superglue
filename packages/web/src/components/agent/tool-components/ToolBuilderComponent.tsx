@@ -183,6 +183,7 @@ export function ToolBuilderComponent({
     const client = new SuperglueClient({
       endpoint: config.superglueEndpoint,
       apiKey: tokenRegistry.getToken(),
+      apiEndpoint: config.apiEndpoint,
     });
 
     // Subscribe to logs for this specific run
@@ -344,6 +345,7 @@ export function ToolBuilderComponent({
       const client = new SuperglueClient({
         endpoint: config.superglueEndpoint,
         apiKey: tokenRegistry.getToken(),
+        apiEndpoint: config.apiEndpoint,
       });
 
       try {
@@ -758,6 +760,7 @@ export function ToolBuilderComponent({
                       const client = new SuperglueClient({
                         endpoint: config.superglueEndpoint,
                         apiKey: tokenRegistry.getToken(),
+                        apiEndpoint: config.apiEndpoint,
                       });
                       const saved = await client.upsertWorkflow(wf.id, wf);
                       setCurrentConfig(saved);
