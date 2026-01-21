@@ -622,6 +622,8 @@ export function SystemForm({
         templateInfo,
         handleOAuthSuccess,
         config.superglueEndpoint,
+        undefined, // suppressErrorUI
+        config.apiEndpoint,
       );
     } catch (error) {
       console.error("Error connecting OAuth:", error);

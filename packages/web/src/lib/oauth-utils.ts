@@ -305,6 +305,7 @@ export const triggerOAuthFlow = (
   onSuccess?: (tokens: any) => void,
   endpoint?: string,
   suppressErrorUI?: boolean,
+  apiEndpoint?: string,
 ): (() => void) | null => {
   if (authType !== "oauth") return null;
 
@@ -323,7 +324,7 @@ export const triggerOAuthFlow = (
 
   if (!usingTemplate && oauthFields.client_secret && oauthFields.client_id && apiKey && endpoint) {
     clientCredentialsUid = crypto.randomUUID();
-    const client = new SuperglueClient({ endpoint, apiKey });
+    const client = new SuperglueClient({ endpoint, apiKey, apiEndpoint });
     cachePromise = client.cacheOauthClientCredentials({
       clientCredentialsUid,
       clientId: oauthFields.client_id,

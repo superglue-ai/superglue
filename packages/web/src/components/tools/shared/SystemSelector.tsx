@@ -8,9 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/src/components/ui/select";
-import { getSystemIcon as getSystemIconName, getSimpleIcon } from "@/src/lib/general-utils";
+import { SystemIcon } from "@/src/components/ui/system-icon";
 import { System } from "@superglue/shared";
-import { Globe } from "lucide-react";
 
 interface SystemSelectorProps {
   value: string;
@@ -38,11 +37,6 @@ export function SystemSelector({
   const { systems: contextSystems } = useSystems();
   const systems = providedSystems || contextSystems;
 
-  const getSystemIcon = (system: System) => {
-    const iconName = getSystemIconName(system);
-    return iconName ? getSimpleIcon(iconName) : null;
-  };
-
   const handleValueChange = (selectedValue: string) => {
     if (selectedValue === "CREATE_NEW" && onCreateNew) {
       onCreateNew();
@@ -61,32 +55,17 @@ export function SystemSelector({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent className={`${contentClassName} shadow-none`}>
-        {systems?.map((system) => {
-          const icon = getSystemIcon(system);
-          return (
-            <SelectItem key={system.id} value={system.id}>
-              <div className="flex items-center gap-2 w-full">
-                {icon ? (
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill={`#${icon.hex}`}
-                    className="flex-shrink-0"
-                  >
-                    <path d={icon.path || ""} />
-                  </svg>
-                ) : (
-                  <Globe className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                )}
-                <span className="flex-grow">{system.id}</span>
-                {system.urlHost && (
-                  <span className="text-muted-foreground text-xs ml-auto">({system.urlHost})</span>
-                )}
-              </div>
-            </SelectItem>
-          );
-        })}
+        {systems?.map((system) => (
+          <SelectItem key={system.id} value={system.id}>
+            <div className="flex items-center gap-2 w-full">
+              <SystemIcon system={system} size={16} />
+              <span className="flex-grow">{system.id}</span>
+              {system.urlHost && (
+                <span className="text-muted-foreground text-xs ml-auto">({system.urlHost})</span>
+              )}
+            </div>
+          </SelectItem>
+        ))}
         {showCreateNew && onCreateNew && (
           <SelectItem value="CREATE_NEW" className="text-primary">
             + Add New System

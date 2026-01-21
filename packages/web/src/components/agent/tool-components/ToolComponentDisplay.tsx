@@ -4,7 +4,7 @@ import { JsonCodeEditor } from "@/src/components/editors/JsonCodeEditor";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
-import { getSystemIcon as getSystemIconName } from "@/src/lib/general-utils";
+import { SystemIcon } from "@/src/components/ui/system-icon";
 import {
   AlertCircle,
   CheckCircle,
@@ -12,13 +12,10 @@ import {
   Code,
   Copy,
   Database,
-  Globe,
   RotateCcw,
   Save,
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
-import type { SimpleIcon } from "simple-icons";
-import * as simpleIcons from "simple-icons";
 
 interface ToolStep {
   id: string;
@@ -113,31 +110,6 @@ export function ToolCallToolDisplay({
 
   // Get the effective tool ID - either from props or from the tool object
   const effectiveToolId = toolId || tool?.id || tool?.config?.id;
-
-  // Helper function to get system icon (same as systems page)
-  const getSimpleIcon = (name: string): SimpleIcon | null => {
-    if (!name || name === "default") return null;
-    const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-    const iconKey = `si${formatted}`;
-    try {
-      // @ts-ignore
-      let icon = simpleIcons[iconKey];
-      return icon || null;
-    } catch (e) {
-      return null;
-    }
-  };
-
-  // Helper to get icon for system
-  const getSystemIcon = (step: ToolStep) => {
-    if (!step.systemId) return null;
-    const systemData = {
-      id: step.systemId,
-      urlHost: step.apiConfig?.urlHost,
-    };
-    const iconName = getSystemIconName(systemData);
-    return iconName ? getSimpleIcon(iconName) : null;
-  };
 
   const copyToClipboard = async (content: string, id: string) => {
     try {
@@ -269,19 +241,10 @@ export function ToolCallToolDisplay({
                     <div className="mb-3">
                       <div className="flex items-center gap-2 mb-2">
                         {/* System Icon - Left of Step ID */}
-                        {getSystemIcon(step) ? (
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill={`#${getSystemIcon(step)?.hex}`}
-                            className="flex-shrink-0"
-                          >
-                            <path d={getSystemIcon(step)?.path || ""} />
-                          </svg>
-                        ) : (
-                          <Globe className="w-4 h-4 text-muted-foreground" />
-                        )}
+                        <SystemIcon
+                          system={{ id: step.systemId, urlHost: step.apiConfig?.urlHost }}
+                          size={16}
+                        />
                         <span className="font-medium text-sm">{step.id || "New Step"}</span>
 
                         {/* Loop Icon - Right side (if LOOP) */}

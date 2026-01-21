@@ -24,6 +24,7 @@ export function useGenerateStepConfig() {
       const client = new SuperglueClient({
         endpoint: config.superglueEndpoint,
         apiKey: tokenRegistry.getToken(),
+        apiEndpoint: config.apiEndpoint,
       });
 
       const result: { config: ApiConfig; dataSelector: string } = await client.generateStepConfig({

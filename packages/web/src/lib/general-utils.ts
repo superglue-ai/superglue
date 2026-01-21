@@ -254,6 +254,61 @@ export function getSimpleIcon(name: string): SimpleIcon | null {
   }
 }
 
+// Resolved icon type - either a SimpleIcon or a Lucide icon name
+export type ResolvedIcon =
+  | { type: "simpleicons"; icon: SimpleIcon }
+  | { type: "lucide"; name: string }
+  | null;
+
+/**
+ * Resolve a system's icon to a renderable format.
+ * Handles:
+ * - New format: "simpleicons:salesforce" or "lucide:database"
+ * - Legacy format: "salesforce" (assumes simpleicons)
+ * - Fallback to template matching by system id/urlHost
+ */
+export function resolveSystemIcon(system: {
+  id?: string;
+  urlHost?: string;
+  icon?: string | null;
+}): ResolvedIcon {
+  // First, try the system's own icon field
+  if (system.icon) {
+    const colonIndex = system.icon.indexOf(":");
+    if (colonIndex !== -1) {
+      // New prefixed format
+      const source = system.icon.substring(0, colonIndex);
+      const name = system.icon.substring(colonIndex + 1);
+
+      if (source === "lucide") {
+        return { type: "lucide", name };
+      }
+      // simpleicons or unknown source - try to resolve
+      const simpleIcon = getSimpleIcon(name);
+      if (simpleIcon) {
+        return { type: "simpleicons", icon: simpleIcon };
+      }
+    } else {
+      // Legacy format - no prefix, assume simpleicons
+      const simpleIcon = getSimpleIcon(system.icon);
+      if (simpleIcon) {
+        return { type: "simpleicons", icon: simpleIcon };
+      }
+    }
+  }
+
+  // Fallback: try to get icon from templates by system id/urlHost
+  const iconName = getSystemIcon({ id: system.id || "", urlHost: system.urlHost });
+  if (iconName) {
+    const simpleIcon = getSimpleIcon(iconName);
+    if (simpleIcon) {
+      return { type: "simpleicons", icon: simpleIcon };
+    }
+  }
+
+  return null;
+}
+
 // Computes the execution-ready payload by merging manual JSON with file payloads
 export const computeToolPayload = (
   manualPayloadText: string,

@@ -24,13 +24,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
-import { getSystemIcon as getSystemIconName } from "@/src/lib/general-utils";
-import { System, Tool } from "@superglue/shared";
+import { SystemIcon } from "@/src/components/ui/system-icon";
 import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  Globe,
   Hammer,
   Loader2,
   Plus,
@@ -39,8 +37,6 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import type { SimpleIcon } from "simple-icons";
-import * as simpleIcons from "simple-icons";
 import { useTools } from "../tools-context";
 
 type SortColumn = "id" | "folder" | "instruction" | "updatedAt";
@@ -144,24 +140,6 @@ const ToolsTable = () => {
     ) : (
       <ArrowDown className="ml-1 h-3 w-3" />
     );
-  };
-
-  const getSimpleIcon = (name: string): SimpleIcon | null => {
-    if (!name || name === "default") return null;
-    const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-    const iconKey = `si${formatted}`;
-    try {
-      // @ts-ignore
-      let icon = simpleIcons[iconKey];
-      return icon || null;
-    } catch (e) {
-      return null;
-    }
-  };
-
-  const getSystemIcon = (system: System) => {
-    const iconName = getSystemIconName(system);
-    return iconName ? getSimpleIcon(iconName) : null;
   };
 
   useEffect(() => {
@@ -331,31 +309,13 @@ const ToolsTable = () => {
                           {systemIdsArray.map((systemId: string) => {
                             const system = systems.find((s) => s.id === systemId);
                             if (!system) return null;
-                            const icon = getSystemIcon(system);
-                            return icon ? (
+                            return (
                               <TooltipProvider key={systemId}>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <svg
-                                      width="14"
-                                      height="14"
-                                      viewBox="0 0 24 24"
-                                      fill={`#${icon.hex}`}
-                                      className="flex-shrink-0"
-                                    >
-                                      <path d={icon.path} />
-                                    </svg>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>{system.id}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            ) : (
-                              <TooltipProvider key={systemId}>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                                    <span>
+                                      <SystemIcon system={system} size={14} />
+                                    </span>
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <p>{system.id}</p>

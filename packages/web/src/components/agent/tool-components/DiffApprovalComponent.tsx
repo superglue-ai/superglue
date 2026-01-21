@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/src/components/ui/button";
+import { SystemIcon } from "@/src/components/ui/system-icon";
 import { cn } from "@/src/lib/general-utils";
 import {
   Check,
@@ -27,7 +28,6 @@ import {
   formatTargetLabel,
 } from "@/src/lib/config-diff-utils";
 import { useSystems } from "@/src/app/systems-context";
-import { getSystemIcon, getSimpleIcon } from "@/src/lib/general-utils";
 
 type DiffApprovalState = "pending" | "approved" | "rejected";
 
@@ -47,29 +47,18 @@ function getTargetIcon(type: DiffTargetType) {
   }
 }
 
-function SystemIcon({ systemId }: { systemId?: string }) {
+function StepSystemIcon({ systemId }: { systemId?: string }) {
   const { systems } = useSystems();
 
-  const simpleIcon = useMemo(() => {
+  const system = useMemo(() => {
     if (!systemId) return null;
-    const system = systems.find((i) => i.id === systemId);
-    if (!system) return null;
-    const iconName = getSystemIcon(system);
-    return iconName ? getSimpleIcon(iconName) : null;
+    return systems.find((i) => i.id === systemId) || null;
   }, [systemId, systems]);
 
-  if (simpleIcon) {
+  if (system) {
     return (
       <div className="p-1 rounded-full bg-white dark:bg-gray-100 border border-border/50 flex-shrink-0">
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill={`#${simpleIcon.hex}`}
-          className="flex-shrink-0"
-        >
-          <path d={simpleIcon.path} />
-        </svg>
+        <SystemIcon system={system} size={14} />
       </div>
     );
   }
@@ -178,7 +167,7 @@ function DiffApprovalItem({
       <div className="px-2 py-1.5 bg-muted/30 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           {targetInfo.type === "step" ? (
-            <SystemIcon systemId={targetInfo.systemId} />
+            <StepSystemIcon systemId={targetInfo.systemId} />
           ) : (
             getTargetIcon(targetInfo.type)
           )}

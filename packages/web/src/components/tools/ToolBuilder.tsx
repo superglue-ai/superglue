@@ -11,13 +11,8 @@ import {
   type UploadedFileInfo,
 } from "@/src/lib/file-utils";
 import { useFileUpload } from "./hooks/use-file-upload";
-import {
-  cn,
-  composeUrl,
-  getSystemIcon as getSystemIconName,
-  getSimpleIcon,
-  inputErrorStyles,
-} from "@/src/lib/general-utils";
+import { SystemIcon } from "@/src/components/ui/system-icon";
+import { cn, composeUrl, getSimpleIcon, inputErrorStyles } from "@/src/lib/general-utils";
 import { tokenRegistry } from "@/src/lib/token-registry";
 import {
   CredentialMode,
@@ -185,8 +180,9 @@ export function ToolBuilder({
       new SuperglueClient({
         endpoint: superglueConfig.superglueEndpoint,
         apiKey: tokenRegistry.getToken(),
+        apiEndpoint: superglueConfig.apiEndpoint,
       }),
-    [superglueConfig.superglueEndpoint],
+    [superglueConfig.superglueEndpoint, superglueConfig.apiEndpoint],
   );
 
   const waitForSystemReady = useCallback(
@@ -538,8 +534,6 @@ export function ToolBuilder({
                         {filteredSystems.map((sys) => {
                           const selected = selectedSystemIds.includes(sys.id);
                           const badge = getAuthBadge(sys);
-                          const iconName = getSystemIconName(sys);
-                          const icon = iconName ? getSimpleIcon(iconName) : null;
 
                           return (
                             <div
@@ -553,19 +547,11 @@ export function ToolBuilder({
                               onClick={() => toggleSystem(sys.id)}
                             >
                               <div className="flex items-center gap-3 flex-1 min-w-0">
-                                {icon ? (
-                                  <svg
-                                    width="20"
-                                    height="20"
-                                    viewBox="0 0 24 24"
-                                    fill={`#${icon.hex}`}
-                                    className="flex-shrink-0"
-                                  >
-                                    <path d={icon.path} />
-                                  </svg>
-                                ) : (
-                                  <Globe className="h-5 w-5 flex-shrink-0 text-foreground" />
-                                )}
+                                <SystemIcon
+                                  system={sys}
+                                  size={20}
+                                  fallbackClassName="text-foreground"
+                                />
                                 <div className="flex flex-col min-w-0">
                                   <span className="font-medium text-sm truncate">{sys.id}</span>
                                   <span className="text-xs text-muted-foreground truncate">
@@ -715,9 +701,6 @@ export function ToolBuilder({
             const system = systems.find((i) => i.id === id);
             if (!system) return null;
 
-            const iconName = getSystemIconName(system);
-            const icon = iconName ? getSimpleIcon(iconName) : null;
-
             return (
               <button
                 key={id}
@@ -739,19 +722,7 @@ export function ToolBuilder({
                 )}
                 title={isBuilding ? "Cannot modify while building" : "Click to remove"}
               >
-                {icon ? (
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill={`#${icon.hex}`}
-                    className="flex-shrink-0"
-                  >
-                    <path d={icon.path} />
-                  </svg>
-                ) : (
-                  <Globe className="h-4 w-4 flex-shrink-0 text-foreground" />
-                )}
+                <SystemIcon system={system} size={16} fallbackClassName="text-foreground" />
                 <span className="text-sm font-medium max-w-[120px] truncate">{system.id}</span>
                 <X className="h-3 w-3 text-muted-foreground group-hover:text-red-500 transition-colors" />
               </button>
