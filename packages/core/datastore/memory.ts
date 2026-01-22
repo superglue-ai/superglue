@@ -9,7 +9,7 @@ import {
   Tool,
 } from "@superglue/shared";
 import { createHash } from "node:crypto";
-import { normalizeTool } from "./migrations/run-migration.js";
+import { normalizeTool } from "./migrations/migration.js";
 import type { DataStore, PrometheusRunMetrics, ToolScheduleInternal } from "./types.js";
 
 export class MemoryStore implements DataStore {

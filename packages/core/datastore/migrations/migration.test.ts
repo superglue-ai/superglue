@@ -1,6 +1,6 @@
 import { RunStatus } from "@superglue/shared";
 import { describe, expect, it } from "vitest";
-import { extractRun, LegacyRunRow } from "./run-migration.js";
+import { extractRun, LegacyRunRow } from "./migration.js";
 
 describe("extractRun", () => {
   const baseRow: LegacyRunRow = {

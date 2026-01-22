@@ -8,10 +8,11 @@ import type {
   RunStatus,
   Tool,
 } from "@superglue/shared";
+import jsonpatch from "fast-json-patch";
 import { Pool, PoolConfig } from "pg";
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
-import { extractRun, normalizeTool } from "./migrations/run-migration.js";
+import { extractRun, normalizeTool } from "./migrations/migration.js";
 import type {
   DataStore,
   PrometheusRunMetrics,
@@ -815,12 +816,9 @@ export class PostgresService implements DataStore {
       if (existingResult.rows.length > 0) {
         const existingTool = existingResult.rows[0].data as Tool;
 
-        // Compare tools (excluding volatile fields like updatedAt)
-        const normalize = (t: Tool) => {
-          const { updatedAt, createdAt, ...rest } = t as any;
-          return JSON.stringify(rest, Object.keys(rest).sort());
-        };
-        const hasChanges = normalize(existingTool) !== normalize(workflow);
+        const { updatedAt: _u1, createdAt: _c1, ...existingRest } = existingTool as any;
+        const { updatedAt: _u2, createdAt: _c2, ...workflowRest } = workflow as any;
+        const hasChanges = jsonpatch.compare(existingRest, workflowRest).length > 0;
 
         if (hasChanges) {
           // Get next version number
@@ -830,7 +828,7 @@ export class PostgresService implements DataStore {
           );
           const nextVersion = versionResult.rows[0].next_version;
 
-          // Archive the existing version
+          // Archive the existing version (normalized to ensure consistent format)
           await client.query(
             `INSERT INTO tool_history (tool_id, org_id, version, data, created_by_user_id, created_by_email)
              VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -838,7 +836,7 @@ export class PostgresService implements DataStore {
               id,
               orgId,
               nextVersion,
-              JSON.stringify(existingTool),
+              JSON.stringify(normalizeTool(existingTool)),
               userId || null,
               userEmail || null,
             ],
@@ -1035,8 +1033,8 @@ export class PostgresService implements DataStore {
         );
       }
 
-      // Save the restored version
-      const restoredWorkflow = { ...toolToRestore, updatedAt: new Date() };
+      // Save the restored version (override id to match current tool's primary key)
+      const restoredWorkflow = { ...toolToRestore, id: toolId, updatedAt: new Date() };
       const toolVersion = this.extractVersion(restoredWorkflow);
       await client.query(
         `UPDATE configurations SET data = $1, version = $2, updated_at = CURRENT_TIMESTAMP

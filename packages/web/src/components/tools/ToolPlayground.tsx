@@ -180,7 +180,7 @@ function ToolPlaygroundInner({
     }
   }, [responseSchema]);
 
-  const { loading, saving, justSaved, saveTool, setLoading } = useToolData({
+  const { loading, saving, justSaved, loadTool, saveTool, setLoading } = useToolData({
     id,
     initialTool,
     initialInstruction,
@@ -444,6 +444,7 @@ function ToolPlaygroundInner({
         }}
         onArchived={() => router.push("/tools")}
         onUnarchived={() => setIsArchived(false)}
+        onRestored={() => toolId && loadTool(toolId)}
       />
     </div>
   ) : null;
