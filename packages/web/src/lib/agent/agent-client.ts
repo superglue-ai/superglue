@@ -52,10 +52,13 @@ export class AgentClient {
     toolSet: ToolSet = "agent",
   ) {
     if (!process.env.GRAPHQL_ENDPOINT) {
-      throw new Error("GRAPHQL_ENDPOINT is not set");
+      throw new Error("Environment variable GRAPHQL_ENDPOINT is not set");
     }
     if (!process.env.API_ENDPOINT) {
-      throw new Error("API_ENDPOINT is not set");
+      throw new Error("Environment variable API_ENDPOINT is not set");
+    }
+    if (!process.env.FRONTEND_LLM_PROVIDER) {
+      throw new Error("Environment variable FRONTEND_LLM_PROVIDER is not set");
     }
     this.superglueClient = new SuperglueClient({
       endpoint: process.env.GRAPHQL_ENDPOINT,
