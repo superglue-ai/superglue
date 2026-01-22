@@ -1,4 +1,4 @@
-import { System } from "./types.js";
+import { System } from "./types";
 
 export interface SystemConfig {
   name: string;
@@ -2846,34 +2846,73 @@ export const systemOptions = [
 ];
 
 /**
- * Find matching system for a given URL
- * @param url - The URL to match against systems
- * @returns The matching system key and details, or null if no match found
+ * Find matching template for a System object.
+ * Priority order: templateName > id > id with numeric suffix stripped > name > urlHost regex match
+ * @param system - System object with templateName, id, name, and/or urlHost/urlPath
+ * @returns The matching template key and config, or null if no match found
  */
-export function findMatchingSystem(url: string): { key: string; system: SystemConfig } | null {
-  // Ensure URL has a scheme for proper matching
-  const urlForMatching =
-    url.startsWith("http") || url.startsWith("postgres") ? url : `https://${url}`;
+export function findTemplateForSystem(system: {
+  templateName?: string;
+  id?: string;
+  name?: string;
+  urlHost?: string;
+  urlPath?: string;
+}): { key: string; template: SystemConfig; } | null {
+  // 1. Direct lookup via stored templateName (highest priority)
+  if (system.templateName && systems[system.templateName]) {
+    return { key: system.templateName, template: systems[system.templateName] };
+  }
 
-  const matches: { key: string; system: SystemConfig; specificity: number }[] = [];
+  // 2. Direct lookup by system ID
+  if (system.id && systems[system.id]) {
+    return { key: system.id, template: systems[system.id] };
+  }
 
-  for (const [key, system] of Object.entries(systems)) {
-    try {
-      if (new RegExp(system.regex).test(urlForMatching)) {
-        // Calculate specificity: longer, more specific regexes get higher scores
-        const specificity = system.regex.length + (system.regex.includes("(?!") ? 100 : 0);
-        matches.push({ key, system, specificity });
-      }
-    } catch (e) {
-      console.error(`Invalid regex pattern for system: ${key}`);
+  // 3. Try ID with numeric suffix stripped (e.g., "firebase-1" -> "firebase")
+  if (system.id) {
+    const baseId = system.id.replace(/-\d+$/, "");
+    if (baseId !== system.id && systems[baseId]) {
+      return { key: baseId, template: systems[baseId] };
     }
   }
 
-  if (matches.length === 0) return null;
+  // 4. Try by name (lowercase)
+  if (system.name && systems[system.name]) {
+    return { key: system.name, template: systems[system.name] };
+  }
 
-  // Return the most specific match (highest specificity score)
-  const bestMatch = matches.sort((a, b) => b.specificity - a.specificity)[0];
-  return { key: bestMatch.key, system: bestMatch.system };
+  // 5. URL regex matching (lowest priority) - compose urlHost + urlPath for matching
+  if (system.urlHost) {
+    const url = system.urlPath
+      ? `${system.urlHost.replace(/\/$/, "")}/${system.urlPath.replace(/^\//, "")}`
+      : system.urlHost;
+
+    // Ensure URL has a scheme for proper matching
+    const urlForMatching =
+      url.startsWith("http") || url.startsWith("postgres") ? url : `https://${url}`;
+
+    const matches: { key: string; template: SystemConfig; specificity: number; }[] = [];
+
+    for (const [key, template] of Object.entries(systems)) {
+      try {
+        if (new RegExp(template.regex).test(urlForMatching)) {
+          // Calculate specificity: longer, more specific regexes get higher scores
+          const specificity = template.regex.length + (template.regex.includes("(?!") ? 100 : 0);
+          matches.push({ key, template, specificity });
+        }
+      } catch (e) {
+        console.error(`Invalid regex pattern for system: ${key}`);
+      }
+    }
+
+    if (matches.length > 0) {
+      // Return the most specific match (highest specificity score)
+      const bestMatch = matches.sort((a, b) => b.specificity - a.specificity)[0];
+      return { key: bestMatch.key, template: bestMatch.template };
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -2886,7 +2925,7 @@ export function getOAuthConfig(systemKey: string): SystemConfig["oauth"] | null 
 }
 
 /**
- * Get OAuth token URL for an system
+ * Get OAuth token URL for a system
  * @param system - The system object with credentials and URL info
  * @returns The token URL for OAuth token exchange
  */
@@ -2896,16 +2935,10 @@ export function getOAuthTokenUrl(system: System): string {
     return system.credentials.token_url;
   }
 
-  // Second priority: Known system template token URL
-  const knownSystem = Object.entries(systems).find(
-    ([key]) => system.id === key || system.urlHost?.includes(key),
-  );
-
-  if (knownSystem) {
-    const [_, config] = knownSystem;
-    if (config.oauth?.tokenUrl) {
-      return config.oauth.tokenUrl;
-    }
+  // Second priority: Template lookup (templateName > id > urlHost)
+  const match = findTemplateForSystem(system);
+  if (match?.template.oauth?.tokenUrl) {
+    return match.template.oauth.tokenUrl;
   }
 
   // Fallback: Default OAuth token endpoint

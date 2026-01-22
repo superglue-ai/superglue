@@ -1,4 +1,4 @@
-import type { System, ServiceMetadata } from "@superglue/shared";
+import type { ServiceMetadata, System } from "@superglue/shared";
 import { getOAuthTokenUrl, resolveOAuthCertAndKey } from "@superglue/shared";
 import axios from "axios";
 import https from "https";
@@ -113,7 +113,7 @@ export async function refreshOAuthToken(
         typeof response.data === "string" ? response.data : JSON.stringify(response.data);
       if (access_token === refresh_token) {
         throw new Error(
-          `OAuth access token was unable to refresh. This system likely uses a long-lived access token in its OAuth flow. Please reauthenticate with the OAuth provider to refresh the access token manually.`,
+          `OAuth access token was unable to refresh. This system likely uses a long-lived access token in its OAuth flow. Please reauthenticate with the OAuth provider to refresh the access token manually. ${errorText}`,
         );
       }
       throw new Error(`Token refresh failed: ${response.status} - ${errorText}`);

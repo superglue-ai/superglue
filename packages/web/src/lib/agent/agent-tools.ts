@@ -849,8 +849,9 @@ export const runCreateSystem = async (
       urlPath,
       documentationUrl: template.docsUrl,
       documentationKeywords: template.keywords,
+      templateName: templateId,
       ...systemInput, // User overrides
-      credentials: { ...oauthCreds, ...systemInput.credentials }, // After spread to preserve OAuth config
+      credentials: { ...oauthCreds, ...systemInput.credentials }, // Must come after spread to preserve OAuth config
     };
   }
 

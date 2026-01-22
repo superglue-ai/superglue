@@ -1,6 +1,5 @@
 import type { System } from "@superglue/shared";
-import { SuperglueClient } from "@superglue/shared";
-import { resolveOAuthCertAndKey } from "@superglue/shared";
+import { resolveOAuthCertAndKey, SuperglueClient } from "@superglue/shared";
 
 type OAuthFields = {
   client_id: string;
@@ -237,7 +236,7 @@ const executeAuthorizationCodeFlow = (params: {
     });
 
   // Return dummy cleanup - actual cleanup set up after popup opens
-  return () => {};
+  return () => { };
 };
 
 // Helper to set up popup monitoring
@@ -254,7 +253,7 @@ const setupPopupMonitoring = (popup: Window, systemId: string, callbacks: OAuthC
       window.removeEventListener("message", handleMessage);
       if (!isCompleted) {
         onError?.(
-          "[OAUTH_STAGE:USER_CANCELLED] OAuth flow was cancelled - the popup window was closed before completing authentication.",
+          "[OAUTH_STAGE:USER_CANCELLED] User closed the authentication window - probably because of an error.",
         );
       }
     }
@@ -275,7 +274,7 @@ const setupPopupMonitoring = (popup: Window, systemId: string, callbacks: OAuthC
       window.removeEventListener("message", handleMessage);
       onError?.(
         event.data.message ||
-          "[OAUTH_STAGE:UNKNOWN] OAuth authentication failed with no error details",
+        "[OAUTH_STAGE:UNKNOWN] OAuth authentication failed with no error details",
       );
     }
   };
@@ -301,7 +300,7 @@ export const triggerOAuthFlow = (
   authType?: string,
   onError?: (error: string) => void,
   forceOAuth?: boolean,
-  templateInfo?: { templateId?: string; clientId?: string },
+  templateInfo?: { templateId?: string; clientId?: string; },
   onSuccess?: (tokens: any) => void,
   endpoint?: string,
   suppressErrorUI?: boolean,
@@ -384,7 +383,7 @@ export const createOAuthErrorHandler = (
 export const parseOAuthError = (
   error: string,
   systemId: string,
-): { title: string; description: string; action?: string } => {
+): { title: string; description: string; action?: string; } => {
   const errorLower = error.toLowerCase();
 
   // Extract stage information if present

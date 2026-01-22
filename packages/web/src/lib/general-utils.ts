@@ -1,4 +1,4 @@
-import { assertValidArrowFunction, findMatchingSystem, systems } from "@superglue/shared";
+import { assertValidArrowFunction, findTemplateForSystem } from "@superglue/shared";
 import { clsx, type ClassValue } from "clsx";
 import prettierPluginBabel from "prettier/plugins/babel";
 import prettierPluginEstree from "prettier/plugins/estree";
@@ -60,29 +60,6 @@ export function composeUrl(host: string, path: string | undefined) {
   const cleanPath = path.startsWith("/") ? path.slice(1) : path;
 
   return `${cleanHost}/${cleanPath}`;
-}
-
-export function getSystemIcon(system: { id: string; urlHost?: string }): string | null {
-  // First try exact ID match with known systems
-  if (systems[system.id]) {
-    return systems[system.id].icon;
-  }
-
-  // Second try: strip any numeric suffix (e.g., "firebase-1" -> "firebase")
-  const baseId = system.id.replace(/-\d+$/, "");
-  if (baseId !== system.id && systems[baseId]) {
-    return systems[baseId].icon;
-  }
-
-  // Finally try using the proper regex-based matching
-  if (system.urlHost) {
-    const match = findMatchingSystem(system.urlHost);
-    if (match) {
-      return match.system.icon;
-    }
-  }
-
-  return null;
 }
 
 export const isEmptyData = (value: any): boolean => {
@@ -271,6 +248,7 @@ export function resolveSystemIcon(system: {
   id?: string;
   urlHost?: string;
   icon?: string | null;
+  templateName?: string;
 }): ResolvedIcon {
   // First, try the system's own icon field
   if (system.icon) {
@@ -297,10 +275,10 @@ export function resolveSystemIcon(system: {
     }
   }
 
-  // Fallback: try to get icon from templates by system id/urlHost
-  const iconName = getSystemIcon({ id: system.id || "", urlHost: system.urlHost });
-  if (iconName) {
-    const simpleIcon = getSimpleIcon(iconName);
+  // Fallback: try to get icon from templates via findTemplateForSystem
+  const match = findTemplateForSystem(system);
+  if (match?.template.icon) {
+    const simpleIcon = getSimpleIcon(match.template.icon);
     if (simpleIcon) {
       return { type: "simpleicons", icon: simpleIcon };
     }

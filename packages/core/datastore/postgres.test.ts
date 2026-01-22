@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, System, Run, RunStatus, Tool } from "@superglue/shared";
+import { ApiConfig, HttpMethod, Run, RunStatus, System, Tool } from "@superglue/shared";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PostgresService } from "./postgres.js";
 import { ToolScheduleInternal } from "./types.js";
@@ -256,6 +256,7 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         name: "Test System",
         urlHost: "https://system.test",
         credentials: { apiKey: "secret" },
+        templateName: "slack",
         createdAt: new Date(),
         updatedAt: new Date(),
       };

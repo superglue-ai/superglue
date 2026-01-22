@@ -32,6 +32,7 @@ export const callEndpointResolver = async (
   if (systemId) {
     try {
       const systemManager = new SystemManager(systemId, context.datastore, metadata);
+      await systemManager.enrichWithTemplateCredentials();
       await systemManager.refreshTokenIfNeeded();
       system = await systemManager.getSystem();
       logMessage("debug", `Loaded system ${systemId}`, metadata);

@@ -310,6 +310,7 @@ input SystemInput {
   documentationKeywords: [String!]
   icon: String
   metadata: JSON
+  templateName: String
 }
 
 type Log {
@@ -545,6 +546,7 @@ type System {
   documentationKeywords: [String!]
   icon: String
   metadata: JSON
+  templateName: String
   version: String
   createdAt: DateTime
   updatedAt: DateTime

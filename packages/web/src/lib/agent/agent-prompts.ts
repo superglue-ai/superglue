@@ -73,9 +73,10 @@ authenticate_oauth:
 - REQUIRES: client_id, auth_url, token_url, scopes
 - Only slack, salesforce, asana, jira, confluence have pre-configured client_id. For ALL OTHER OAuth (Google, Microsoft, etc.), ask user for client_id and client_secret BEFORE calling.
 - auth_url/token_url: Use from template if available, otherwise look up the correct OAuth URLs for the service.
-- SCOPES: ALWAYS use the FULL scopes from the template by default. Only use limited scopes if user explicitly requests it.
+- SCOPES: ALWAYS use the FULL scopes from the template by default. Only use limited scopes if user explicitly requests it. For jira/confluence, dont forget the offline_access scope.
 - Also use this to re-authenticate when OAuth tokens expire and cannot be refreshed.
 - STOP conversation after calling - wait for user to complete OAuth in UI.
+- CALLBACK URL: When users need to configure their OAuth app's redirect URI, tell them to use: https://app.superglue.cloud/api/auth/callback
 
 EXPIRED/INVALID OAUTH TOKENS:
 - If you see errors like "token expired", "invalid_grant", "refresh token expired", or 401/403 auth errors on OAuth systems:
@@ -171,6 +172,15 @@ call_endpoint:
 - Use this to test and verify API behavior before adding new steps using edit_tool.
 - Requires user confirmation before execution
 - Use to debug issues or verify API behavior
+
+authenticate_oauth:
+- REQUIRES: client_id, auth_url, token_url, scopes
+- Only slack, salesforce, asana, jira, confluence (dont forget the offline_access scope) have pre-configured client_id. For ALL OTHER OAuth (Google, Microsoft, etc.), ask user for client_id and client_secret BEFORE calling.
+- auth_url/token_url: Use from template if available, otherwise look up the correct OAuth URLs for the service.
+- SCOPES: ALWAYS use the FULL scopes from the template by default. Only use limited scopes if user explicitly requests it. For jira/confluence, dont forget the offline_access scope.
+- Also use this to re-authenticate when OAuth tokens expire and cannot be refreshed.
+- STOP conversation after calling - wait for user to complete OAuth in UI.
+- CALLBACK URL: When users need to configure their OAuth app's redirect URI, tell them to use: https://app.superglue.cloud/api/auth/callback
 
 WORKFLOW:
 1. Analyze the provided tool configuration and execution state
