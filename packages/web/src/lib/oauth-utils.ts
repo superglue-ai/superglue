@@ -236,7 +236,7 @@ const executeAuthorizationCodeFlow = (params: {
     });
 
   // Return dummy cleanup - actual cleanup set up after popup opens
-  return () => { };
+  return () => {};
 };
 
 // Helper to set up popup monitoring
@@ -274,7 +274,7 @@ const setupPopupMonitoring = (popup: Window, systemId: string, callbacks: OAuthC
       window.removeEventListener("message", handleMessage);
       onError?.(
         event.data.message ||
-        "[OAUTH_STAGE:UNKNOWN] OAuth authentication failed with no error details",
+          "[OAUTH_STAGE:UNKNOWN] OAuth authentication failed with no error details",
       );
     }
   };
@@ -300,7 +300,7 @@ export const triggerOAuthFlow = (
   authType?: string,
   onError?: (error: string) => void,
   forceOAuth?: boolean,
-  templateInfo?: { templateId?: string; clientId?: string; },
+  templateInfo?: { templateId?: string; clientId?: string },
   onSuccess?: (tokens: any) => void,
   endpoint?: string,
   suppressErrorUI?: boolean,
@@ -383,7 +383,7 @@ export const createOAuthErrorHandler = (
 export const parseOAuthError = (
   error: string,
   systemId: string,
-): { title: string; description: string; action?: string; } => {
+): { title: string; description: string; action?: string } => {
   const errorLower = error.toLowerCase();
 
   // Extract stage information if present

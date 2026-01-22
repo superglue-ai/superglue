@@ -2857,7 +2857,7 @@ export function findTemplateForSystem(system: {
   name?: string;
   urlHost?: string;
   urlPath?: string;
-}): { key: string; template: SystemConfig; } | null {
+}): { key: string; template: SystemConfig } | null {
   // 1. Direct lookup via stored templateName (highest priority)
   if (system.templateName && systems[system.templateName]) {
     return { key: system.templateName, template: systems[system.templateName] };
@@ -2891,7 +2891,7 @@ export function findTemplateForSystem(system: {
     const urlForMatching =
       url.startsWith("http") || url.startsWith("postgres") ? url : `https://${url}`;
 
-    const matches: { key: string; template: SystemConfig; specificity: number; }[] = [];
+    const matches: { key: string; template: SystemConfig; specificity: number }[] = [];
 
     for (const [key, template] of Object.entries(systems)) {
       try {
