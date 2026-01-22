@@ -116,6 +116,9 @@ export class AgentClient {
         toolDef.execute = async function* (input: any) {
           try {
             for await (const toolResult of self.executeToolWithLogs({
+              // This ID is for internal logging/tracing only.
+              // The actual UI-facing ID is assigned in the tool-result handler
+              // by mapping the Vercel SDK's toolCallId to our generated UI ID.
               id: crypto.randomUUID(),
               name: toolName,
               input: input,
@@ -618,8 +621,12 @@ export class AgentClient {
       // Store messages for draft lookup in tool execution
       this.currentMessages = messages;
 
-      // Map to track tool IDs across events
-      const toolInputMap = new Map<string, string>();
+      // Queue per tool name to handle parallel calls to the same tool
+      // When tool-input-start fires, we push a generated ID to the queue
+      // When tool-call fires, we shift from the queue to get the matching ID
+      const toolInputQueues = new Map<string, string[]>();
+      // Map from Vercel's toolCallId to our generated ID for result/error lookup
+      const toolCallIdMap = new Map<string, string>();
 
       const tools = await this.getAISDKTools();
 
@@ -659,34 +666,48 @@ export class AgentClient {
           }
 
           case "tool-call": {
-            // Use the generated ID if we have one, otherwise use Vercel's ID
-            const toolId = toolInputMap.get(part.toolName) || part.toolCallId;
+            // Pop the first generated ID from the queue for this tool name
+            const queue = toolInputQueues.get(part.toolName);
+            const generatedId = queue?.shift();
 
-            // Store reverse mapping from Vercel's ID to our generated ID
-            // This allows tool-result and tool-error to find the right ID
-            if (toolInputMap.has(part.toolName)) {
-              toolInputMap.set(part.toolCallId, toolId);
+            if (generatedId) {
+              // We have a matching tool-input-start, map Vercel's ID to our ID
+              toolCallIdMap.set(part.toolCallId, generatedId);
+              // Don't yield another tool_call_start - we already did in tool-input-start
+            } else {
+              // No tool-input-start was received, use Vercel's ID directly
+              toolCallIdMap.set(part.toolCallId, part.toolCallId);
+              yield {
+                type: "tool_call_start",
+                toolCall: { id: part.toolCallId, name: part.toolName, input: part.input },
+              };
             }
-
-            yield {
-              type: "tool_call_start",
-              toolCall: { id: toolId, name: part.toolName, input: part.input },
-            };
             break;
           }
 
           case "tool-input-start": {
+            // Generate a unique ID for this tool call and queue it
             const generatedId = crypto.randomUUID();
             yield {
               type: "tool_call_start",
               toolCall: { id: generatedId, name: part.toolName, input: undefined },
             };
-            toolInputMap.set(part.toolName, generatedId);
+
+            // Push to queue - handles multiple parallel calls to the same tool
+            const queue = toolInputQueues.get(part.toolName) || [];
+            queue.push(generatedId);
+            toolInputQueues.set(part.toolName, queue);
             break;
           }
 
           case "tool-result": {
-            const toolId = toolInputMap.get(part.toolCallId) || part.toolCallId;
+            // Look up our UI ID from the Vercel SDK's toolCallId.
+            // We intentionally keep entries in the map (no delete) because:
+            // - executeToolWithLogs yields multiple times (updates + complete)
+            // - Each yield becomes a separate tool-result event
+            // - All need the same UI ID mapping
+            // - Map is small and gets GC'd when stream ends
+            const toolId = toolCallIdMap.get(part.toolCallId) || part.toolCallId;
 
             if (part.toolName === "web_search") {
               yield {
@@ -704,26 +725,17 @@ export class AgentClient {
               ...(part.output as any),
               toolCall: { ...((part.output as any).toolCall ?? {}), id: toolId },
             };
-
-            if ((part.output as any)?.type === "tool_call_complete") {
-              toolInputMap.delete(part.toolName);
-              toolInputMap.delete(part.toolCallId);
-            }
             break;
           }
 
           case "tool-error": {
             console.warn("[Vercel AI] Tool error:", part.error);
-            const toolId = toolInputMap.get(part.toolCallId) || part.toolCallId;
+            const toolId = toolCallIdMap.get(part.toolCallId) || part.toolCallId;
 
             yield {
               type: "tool_call_error",
               toolCall: { id: toolId, name: part.toolName, error: String(part.error) },
             };
-
-            // Clean up mappings for this tool
-            toolInputMap.delete(part.toolName);
-            toolInputMap.delete(part.toolCallId);
             break;
           }
 
