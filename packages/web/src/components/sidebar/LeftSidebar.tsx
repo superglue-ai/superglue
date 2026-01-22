@@ -5,11 +5,11 @@ import { useTheme } from "@/src/hooks/use-theme";
 import {
   Blocks,
   Book,
-  Bot,
   ExternalLink,
   Hammer,
   History,
   Menu,
+  MessagesSquare,
   Monitor,
   Moon,
   Sun,
@@ -19,7 +19,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const navItems = [
-  { icon: Bot, label: "Agent", href: "/" },
+  { icon: MessagesSquare, label: "Agent", href: "/" },
   { icon: Hammer, label: "Tools", href: "/tools" },
   { icon: Blocks, label: "Systems", href: "/systems" },
   { icon: Book, label: "Documentation", href: "https://docs.superglue.cloud", target: "_blank" },
