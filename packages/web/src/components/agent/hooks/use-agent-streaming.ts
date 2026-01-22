@@ -358,7 +358,10 @@ export function useAgentStreaming({
         if (response.status === 401) {
           throw new Error("Authentication failed. Please check your API key configuration.");
         }
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const error = await response.json();
+        throw new Error(
+          `HTTP error ${response.status}: ${error?.error || "Internal server error"}`,
+        );
       }
 
       if (!response.body) {

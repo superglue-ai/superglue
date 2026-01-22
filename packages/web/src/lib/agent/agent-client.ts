@@ -52,10 +52,13 @@ export class AgentClient {
     toolSet: ToolSet = "agent",
   ) {
     if (!process.env.GRAPHQL_ENDPOINT) {
-      throw new Error("GRAPHQL_ENDPOINT is not set");
+      throw new Error("Environment variable GRAPHQL_ENDPOINT is not set");
     }
     if (!process.env.API_ENDPOINT) {
-      throw new Error("API_ENDPOINT is not set");
+      throw new Error("Environment variable API_ENDPOINT is not set");
+    }
+    if (!process.env.FRONTEND_LLM_PROVIDER) {
+      throw new Error("Environment variable FRONTEND_LLM_PROVIDER is not set");
     }
     this.superglueClient = new SuperglueClient({
       endpoint: process.env.GRAPHQL_ENDPOINT,
@@ -238,7 +241,7 @@ export class AgentClient {
               }
 
               if (part.tool?.id && part.tool?.name) {
-                let output: { type: "error-text" | "json" | "text"; value: string; };
+                let output: { type: "error-text" | "json" | "text"; value: string };
 
                 switch (part.tool.status) {
                   case "pending":
@@ -339,7 +342,7 @@ export class AgentClient {
     };
   }> {
     // Declare subscription outside try so it's accessible in finally
-    let logSubscription: { unsubscribe: () => void; } | null = null;
+    let logSubscription: { unsubscribe: () => void } | null = null;
 
     try {
       // Special treatment for create_system tool - normalize credentials (flatten object and convert to snake case) and handle OAuth detection
@@ -593,12 +596,12 @@ export class AgentClient {
 
   async *streamLLMResponse(messages: Array<Message>): AsyncGenerator<{
     type:
-    | "content"
-    | "tool_call_start"
-    | "tool_call_complete"
-    | "tool_call_error"
-    | "tool_call_update"
-    | "done";
+      | "content"
+      | "tool_call_start"
+      | "tool_call_complete"
+      | "tool_call_error"
+      | "tool_call_update"
+      | "done";
     content?: string;
     toolCall?: {
       id: string;
