@@ -20,6 +20,7 @@ import {
   UserModelMessage,
 } from "ai";
 import { GraphQLSubscriptionClient } from "../graphql-subscriptions";
+import { requiresConfirmationAfterExec, requiresConfirmationBeforeExec } from "./agent-helpers";
 import { PLAYGROUND_SYSTEM_PROMPT, SYSTEM_PROMPT } from "./agent-prompts";
 import {
   executeAgentTool,
@@ -27,7 +28,6 @@ import {
   getPlaygroundToolDefinitions,
   processIntermediateToolResult as processUserActionResult,
 } from "./agent-tools";
-import { requiresConfirmationBeforeExec, requiresConfirmationAfterExec } from "./agent-helpers";
 
 export type ToolSet = "agent" | "playground";
 
@@ -238,7 +238,7 @@ export class AgentClient {
               }
 
               if (part.tool?.id && part.tool?.name) {
-                let output: { type: "error-text" | "json" | "text"; value: string };
+                let output: { type: "error-text" | "json" | "text"; value: string; };
 
                 switch (part.tool.status) {
                   case "pending":
@@ -339,7 +339,7 @@ export class AgentClient {
     };
   }> {
     // Declare subscription outside try so it's accessible in finally
-    let logSubscription: { unsubscribe: () => void } | null = null;
+    let logSubscription: { unsubscribe: () => void; } | null = null;
 
     try {
       // Special treatment for create_system tool - normalize credentials (flatten object and convert to snake case) and handle OAuth detection
@@ -593,12 +593,12 @@ export class AgentClient {
 
   async *streamLLMResponse(messages: Array<Message>): AsyncGenerator<{
     type:
-      | "content"
-      | "tool_call_start"
-      | "tool_call_complete"
-      | "tool_call_error"
-      | "tool_call_update"
-      | "done";
+    | "content"
+    | "tool_call_start"
+    | "tool_call_complete"
+    | "tool_call_error"
+    | "tool_call_update"
+    | "done";
     content?: string;
     toolCall?: {
       id: string;
@@ -673,7 +673,15 @@ export class AgentClient {
             if (generatedId) {
               // We have a matching tool-input-start, map Vercel's ID to our ID
               toolCallIdMap.set(part.toolCallId, generatedId);
-              // Don't yield another tool_call_start - we already did in tool-input-start
+              // For confirmation tools (no execute), we must send the input now
+              // since there won't be a tool-result event to carry it
+              if (requiresConfirmationBeforeExec(part.toolName)) {
+                yield {
+                  type: "tool_call_start",
+                  toolCall: { id: generatedId, name: part.toolName, input: part.input },
+                };
+              }
+              // For auto-execute tools, don't yield - input comes via tool-result
             } else {
               // No tool-input-start was received, use Vercel's ID directly
               toolCallIdMap.set(part.toolCallId, part.toolCallId);
