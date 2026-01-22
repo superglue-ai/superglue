@@ -30,7 +30,7 @@ export function ToolDeployModal({
   currentTool,
   payload,
   isOpen,
-  onClose = () => {},
+  onClose = () => { },
 }: ToolDeployModalProps) {
   const superglueConfig = useConfig();
   const [activeTab, setActiveTab] = useState("schedule");
@@ -116,7 +116,7 @@ await runTool("${currentTool.id}", {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-x-hidden flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-x-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Deploy your Tool</span>
