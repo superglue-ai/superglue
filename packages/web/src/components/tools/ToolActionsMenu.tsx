@@ -21,6 +21,7 @@ interface ToolActionsMenuProps {
   onUnarchived?: () => void;
   onRenamed?: (newId: string) => void;
   onDuplicated?: (newId: string) => void;
+  onRestored?: () => void;
   disabled?: boolean;
   showLabel?: boolean;
 }
@@ -31,6 +32,7 @@ export function ToolActionsMenu({
   onUnarchived,
   onRenamed,
   onDuplicated,
+  onRestored,
   disabled = false,
   showLabel = false,
 }: ToolActionsMenuProps) {
@@ -127,6 +129,16 @@ export function ToolActionsMenu({
         isOpen={showArchiveDialog}
         onClose={() => setShowArchiveDialog(false)}
         onArchived={handleArchived}
+      />
+
+      <VersionHistoryDialog
+        tool={tool}
+        isOpen={showVersionHistoryDialog}
+        onClose={() => setShowVersionHistoryDialog(false)}
+        onRestored={() => {
+          refreshTools();
+          onRestored?.();
+        }}
       />
     </>
   );

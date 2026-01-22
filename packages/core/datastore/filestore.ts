@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
-import { extractRun, normalizeTool } from "./migrations/run-migration.js";
+import { extractRun, normalizeTool } from "./migrations/migration.js";
 import type { DataStore, PrometheusRunMetrics, ToolScheduleInternal } from "./types.js";
 
 export class FileStore implements DataStore {
