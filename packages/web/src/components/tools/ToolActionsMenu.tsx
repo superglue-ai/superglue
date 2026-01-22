@@ -130,16 +130,6 @@ export function ToolActionsMenu({
         onClose={() => setShowArchiveDialog(false)}
         onArchived={handleArchived}
       />
-
-      <VersionHistoryDialog
-        tool={tool}
-        isOpen={showVersionHistoryDialog}
-        onClose={() => setShowVersionHistoryDialog(false)}
-        onRestored={() => {
-          refreshTools();
-          onRestored?.();
-        }}
-      />
     </>
   );
 }
