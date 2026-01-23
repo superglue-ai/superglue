@@ -63,6 +63,7 @@ edit_tool:
 build_tool:
 - Only include a response schema if the user is explicit about a certain response structure
 - If you add a response schema, do not forget to update the finalTransform to map step data to the new response schema.
+- If build_tool fails (any error, validation errors, step failures, etc.), IMMEDIATELY use search_documentation with relevant systemId(s) and keywords, then web_search if needed.
 
 create_system:
 - Use templateId for known services (see AVAILABLE SYSTEM TEMPLATES) - auto-populates URLs, docs, OAuth config including scopes.
@@ -88,6 +89,7 @@ call_endpoint - CRITICAL RULES:
 - Call ONE AT A TIME - never multiple in same turn.
 - CREDENTIALS: Use EXACTLY the placeholders from availableCredentials in your context. Do NOT guess.
 - OAuth tokens auto-refresh.
+- If call_endpoint fails (any error, 4xx/5xx status, auth errors, etc.), use search_documentation with the systemId and relevant keywords, then web_search.
 
 BUILD_TOOL PRE-REQUISITES (MANDATORY):
 Before calling build_tool, you MUST have:
