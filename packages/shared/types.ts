@@ -618,3 +618,17 @@ export interface DiscoveryResult {
   description: string;
   systems: ExtendedSystem[];
 }
+
+export enum ConfirmationAction {
+  CONFIRMED = "confirmed",
+  DECLINED = "declined",
+  PARTIAL = "partial",
+}
+
+export interface AgentRequest {
+  agentId: string;
+  messages: Message[];
+  runtimeContext?: string;
+  agentParams?: Record<string, any>;
+  filePayloads?: Record<string, any>;
+}

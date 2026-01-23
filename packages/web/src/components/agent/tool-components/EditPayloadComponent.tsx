@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/src/components/ui/button";
-import { EDIT_TOOL_CONFIRMATION } from "@/src/lib/agent/agent-tools";
+import { UserAction } from "@/src/lib/agent/agent-types";
 import { EnrichedDiff, buildUnifiedDiff } from "@/src/lib/config-diff-utils";
 import { ToolCall, ToolDiff } from "@superglue/shared";
 import { Check, X } from "lucide-react";
@@ -13,7 +13,10 @@ interface EditPayloadComponentProps {
   tool: ToolCall;
   currentPayload: string;
   onToolUpdate?: (toolCallId: string, updates: Partial<ToolCall>) => void;
-  onTriggerContinuation?: () => void;
+  sendAgentRequest?: (
+    userMessage?: string,
+    options?: { userActions?: UserAction[] },
+  ) => Promise<void>;
   onApplyPayload?: (newPayload: string) => void;
 }
 
@@ -21,7 +24,7 @@ export function EditPayloadComponent({
   tool,
   currentPayload,
   onToolUpdate,
-  onTriggerContinuation,
+  sendAgentRequest,
   onApplyPayload,
 }: EditPayloadComponentProps) {
   const [decision, setDecision] = useState<"pending" | "approved" | "rejected">("pending");
@@ -80,43 +83,43 @@ export function EditPayloadComponent({
   }, [payloadDiff]);
 
   const handleApprove = useCallback(() => {
-    if (!newPayload || !onApplyPayload) return;
+    if (!newPayload || !onApplyPayload || !sendAgentRequest) return;
 
     setDecision("approved");
     setHasActed(true);
     onApplyPayload(newPayload);
+    onToolUpdate?.(tool.id, { status: "completed" });
 
-    onToolUpdate?.(tool.id, {
-      status: "completed",
-      output: JSON.stringify({
-        ...parsedOutput,
-        approved: true,
-        confirmationState: EDIT_TOOL_CONFIRMATION.APPROVED,
-      }),
+    sendAgentRequest(undefined, {
+      userActions: [
+        {
+          type: "tool_confirmation",
+          toolCallId: tool.id,
+          toolName: "edit_payload",
+          action: "confirmed",
+        },
+      ],
     });
-
-    setTimeout(() => {
-      onTriggerContinuation?.();
-    }, 100);
-  }, [newPayload, onApplyPayload, onToolUpdate, tool.id, parsedOutput, onTriggerContinuation]);
+  }, [newPayload, onApplyPayload, onToolUpdate, tool.id, sendAgentRequest]);
 
   const handleReject = useCallback(() => {
+    if (!sendAgentRequest) return;
+
     setDecision("rejected");
     setHasActed(true);
+    onToolUpdate?.(tool.id, { status: "declined" });
 
-    onToolUpdate?.(tool.id, {
-      status: "declined",
-      output: JSON.stringify({
-        ...parsedOutput,
-        approved: false,
-        confirmationState: EDIT_TOOL_CONFIRMATION.REJECTED,
-      }),
+    sendAgentRequest(undefined, {
+      userActions: [
+        {
+          type: "tool_confirmation",
+          toolCallId: tool.id,
+          toolName: "edit_payload",
+          action: "declined",
+        },
+      ],
     });
-
-    setTimeout(() => {
-      onTriggerContinuation?.();
-    }, 100);
-  }, [onToolUpdate, tool.id, parsedOutput, onTriggerContinuation]);
+  }, [onToolUpdate, tool.id, sendAgentRequest]);
 
   const isPending = tool.status === "awaiting_confirmation" && decision === "pending";
   const shouldBeOpen = isPending && !hasActed;

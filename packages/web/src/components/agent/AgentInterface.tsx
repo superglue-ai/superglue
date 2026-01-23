@@ -3,6 +3,7 @@ import { Button } from "@/src/components/ui/button";
 import { FileChip } from "@/src/components/ui/FileChip";
 import { Textarea } from "@/src/components/ui/textarea";
 import { cn, handleCopyCode } from "@/src/lib/general-utils";
+import { UserAction } from "@/src/lib/agent/agent-types";
 import { ALLOWED_FILE_EXTENSIONS, Message, ToolCall } from "@superglue/shared";
 import {
   AlertTriangle,
@@ -22,6 +23,7 @@ import { AgentContextProvider, useAgentContext } from "./AgentContextProvider";
 import { ConversationHistory } from "./ConversationHistory";
 import { ScrollToBottomButton, ScrollToBottomContainer } from "./hooks/use-scroll-to-bottom";
 import { ToolCallComponent } from "./ToolCallComponent";
+import { BackgroundToolGroup, groupMessageParts } from "./tool-components";
 import { AgentWelcome } from "./welcome/AgentWelcome";
 
 const MAX_MESSAGE_LENGTH = 50000;
@@ -30,10 +32,8 @@ const MemoMessage = React.memo(
   ({
     message,
     onInputChange,
-    onOAuthComplete,
     onToolUpdate,
-    onSystemMessage,
-    onTriggerContinuation,
+    sendAgentRequest,
     onAbortStream,
     editingMessageId,
     editingContent,
@@ -46,10 +46,11 @@ const MemoMessage = React.memo(
   }: {
     message: Message;
     onInputChange: (newInput: any) => void;
-    onOAuthComplete?: (toolCallId: string, systemData: any) => void;
     onToolUpdate: (toolCallId: string, updates: Partial<ToolCall>) => void;
-    onSystemMessage?: (message: string, options?: { triggerImmediateResponse?: boolean }) => void;
-    onTriggerContinuation?: () => void;
+    sendAgentRequest?: (
+      userMessage?: string,
+      options?: { userActions?: UserAction[] },
+    ) => Promise<void>;
     onAbortStream?: () => void;
     editingMessageId: string | null;
     editingContent: string;
@@ -130,7 +131,7 @@ const MemoMessage = React.memo(
               <Textarea
                 value={editingContent}
                 onChange={(e) => setEditingContent(e.target.value)}
-                className="min-h-[48px] max-h-[120px] resize-none text-base leading-relaxed"
+                className="min-h-[48px] max-h-[120px] resize-none text-base leading-relaxed focus-visible:ring-0 focus-visible:border-ring"
                 placeholder="Edit your message..."
                 autoFocus
               />
@@ -151,30 +152,35 @@ const MemoMessage = React.memo(
           ) : (
             <div className="space-y-3 message-content-wrapper break-words">
               {message.parts && message.parts.length > 0 ? (
-                message.parts.map((part) =>
-                  part.type === "content" ? (
-                    <div
-                      key={part.id}
-                      className={cn(
-                        "prose prose-sm max-w-none dark:prose-invert",
-                        message.isStreaming && "streaming-message streaming-active",
-                      )}
-                    >
-                      <Streamdown>{part.content || ""}</Streamdown>
-                    </div>
-                  ) : part.type === "tool" && part.tool ? (
-                    <ToolCallComponent
-                      key={part.id}
-                      tool={part.tool}
-                      onInputChange={onInputChange}
-                      onOAuthComplete={onOAuthComplete}
-                      onToolUpdate={onToolUpdate}
-                      onSystemMessage={onSystemMessage}
-                      onTriggerContinuation={onTriggerContinuation}
-                      onAbortStream={onAbortStream}
-                    />
-                  ) : null,
-                )
+                groupMessageParts(message.parts).map((grouped, idx) => {
+                  if (grouped.type === "content") {
+                    return (
+                      <div
+                        key={grouped.part.id}
+                        className={cn(
+                          "prose prose-sm max-w-none dark:prose-invert",
+                          message.isStreaming && "streaming-message streaming-active",
+                        )}
+                      >
+                        <Streamdown>{grouped.part.content || ""}</Streamdown>
+                      </div>
+                    );
+                  } else if (grouped.type === "background_tools") {
+                    return <BackgroundToolGroup key={`bg-${idx}`} tools={grouped.tools} />;
+                  } else if (grouped.type === "tool" && grouped.part.tool) {
+                    return (
+                      <ToolCallComponent
+                        key={grouped.part.id}
+                        tool={grouped.part.tool}
+                        onInputChange={onInputChange}
+                        onToolUpdate={onToolUpdate}
+                        sendAgentRequest={sendAgentRequest}
+                        onAbortStream={onAbortStream}
+                      />
+                    );
+                  }
+                  return null;
+                })
               ) : (
                 <>
                   <div
@@ -192,10 +198,8 @@ const MemoMessage = React.memo(
                           key={tool.id}
                           tool={tool}
                           onInputChange={onInputChange}
-                          onOAuthComplete={onOAuthComplete}
                           onToolUpdate={onToolUpdate}
-                          onSystemMessage={onSystemMessage}
-                          onTriggerContinuation={onTriggerContinuation}
+                          sendAgentRequest={sendAgentRequest}
                           onAbortStream={onAbortStream}
                         />
                       ))}
@@ -236,9 +240,7 @@ function AgentInterfaceContent() {
     stopStreaming,
     handleToolInputChange,
     handleToolUpdate,
-    handleOAuthCompletion,
-    addSystemMessage,
-    triggerStreamContinuation,
+    sendAgentRequest,
     abortStream,
     uploadedFiles,
     isProcessingFiles,
@@ -254,7 +256,7 @@ function AgentInterfaceContent() {
     loadConversation,
     startNewConversation,
     handleSendMessage,
-    startExamplePrompt,
+    startTemplatePrompt,
     welcomeRef,
   } = useAgentContext();
 
@@ -414,7 +416,7 @@ function AgentInterfaceContent() {
         <div className="space-y-2 pb-4 mx-auto max-w-7xl" data-chat-messages>
           {messages.length === 0 ? (
             <div className="w-full">
-              <AgentWelcome onStartPrompt={startExamplePrompt} ref={welcomeRef} />
+              <AgentWelcome onStartPrompt={startTemplatePrompt} ref={welcomeRef} />
             </div>
           ) : (
             <>
@@ -425,10 +427,8 @@ function AgentInterfaceContent() {
                     key={m.id}
                     message={m}
                     onInputChange={handleToolInputChange}
-                    onOAuthComplete={handleOAuthCompletion}
                     onToolUpdate={handleToolUpdate}
-                    onSystemMessage={addSystemMessage}
-                    onTriggerContinuation={triggerStreamContinuation}
+                    sendAgentRequest={sendAgentRequest}
                     onAbortStream={abortStream}
                     editingMessageId={editingMessageId}
                     editingContent={editingContent}
