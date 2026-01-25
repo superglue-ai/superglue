@@ -637,7 +637,7 @@ export const systems: Record<string, SystemConfig> = {
       scopes: "full",
       grant_type: "authorization_code",
       client_id:
-        "3MVG9rZjd7MXFdLh_gnrsdT0JY5BfNPxarDdhPQvng2.N9lbP0RCh9Rov2Mx.QYjNVNjlCuJMlYOouwbYOMAx",
+        "3MVG9rZjd7MXFdLh_gnrsdT0JYyCLRCfTpDu93a61QQbINe1OKu1ROuXUBzNLAX2WT.XbO3L444Hyuu2Xd8wO",
     },
     keywords: [
       "accounts",

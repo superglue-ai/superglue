@@ -11,8 +11,10 @@ import { SystemConfig, systems } from "@superglue/shared/templates";
 import { DraftLookup, findDraftInMessages, formatDiffSummary } from "../agent-context";
 import {
   filterSystemFields,
-  resolveFileReferences,
+  resolveDocumentationFiles,
+  resolvePayloadWithFiles,
   stripLegacyToolFields,
+  validateDraftOrToolId,
   validateRequiredFields,
 } from "../agent-helpers";
 import {
@@ -58,7 +60,7 @@ const buildToolDefinition = (): ToolDefinition => ({
       - Use this only after all systems are set up and verified to be working correctly.
       - This tool only BUILDS the tool - it does NOT execute it. Use run_tool to execute.
       - Building can take up to several minutes.
-      - Use file::<key> to reference uploaded files (gets replaced with actual parsed content)
+      - Use file::<key> in payload values to reference uploaded files (gets replaced with actual parsed content)
       - Returns a draftId - use this ID with run_tool to test, edit_tool to fix errors, or save_tool to persist.
     </important_notes>
     `,
@@ -74,10 +76,10 @@ const buildToolDefinition = (): ToolDefinition => ({
         items: { type: "string" },
         description: "Array of system IDs to use in the tool",
       },
-      payload: { type: "object", description: "Sample JSON payload for the tool." },
-      filePayloadReferences: {
+      payload: {
         type: "object",
-        description: "Optional file payloads. Use file::filename to reference uploaded files.",
+        description:
+          'Sample JSON payload for the tool. Use file::<key> syntax for file references (e.g., { "data": "file::my_csv" })',
       },
       responseSchema: {
         type: "object",
@@ -89,32 +91,19 @@ const buildToolDefinition = (): ToolDefinition => ({
 });
 
 const runBuildTool = async (input: any, ctx: ToolExecutionContext) => {
-  const { instruction, systemIds, payload, filePayloadReferences, responseSchema } = input;
-  let filePayloadContent = {};
+  const { instruction, systemIds, payload, responseSchema } = input;
 
-  try {
-    if (
-      filePayloadReferences &&
-      ctx.filePayloads &&
-      Object.keys(filePayloadReferences).length > 0
-    ) {
-      filePayloadContent = resolveFileReferences(filePayloadReferences, ctx.filePayloads);
-    }
-  } catch (error: any) {
-    return {
-      success: false,
-      error: error.message,
-      suggestion:
-        "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
-    };
+  const fileResult = resolvePayloadWithFiles(payload, ctx.filePayloads);
+  if (!fileResult.success) {
+    return { success: false, ...fileResult };
   }
+  const resolvedPayload = fileResult.resolved;
 
   try {
-    const fullPayload = { ...payload, ...filePayloadContent };
     const builtTool = await ctx.superglueClient.buildWorkflow({
       instruction,
       systemIds,
-      payload: fullPayload,
+      payload: resolvedPayload,
       responseSchema,
       save: false,
     });
@@ -147,7 +136,7 @@ const runToolDefinition = (): ToolDefinition => ({
     <important_notes>
       - Provide either draftId (for drafts from build_tool) OR toolId (for saved tools), not both.
       - If execution fails, the error is stored in the draft for use with edit_tool.
-      - Use file::<key> to reference uploaded files in the payload.
+      - Use file::<key> in payload values to reference uploaded files (e.g., { "data": "file::my_csv" })
     </important_notes>
     `,
   inputSchema: {
@@ -155,51 +144,28 @@ const runToolDefinition = (): ToolDefinition => ({
     properties: {
       draftId: { type: "string", description: "ID of a draft tool (from build_tool)" },
       toolId: { type: "string", description: "ID of a saved tool" },
-      payload: { type: "object", description: "JSON payload to pass to the tool" },
-      filePayloadReferences: {
+      payload: {
         type: "object",
-        description: "Optional file payloads. Use file::filename to reference uploaded files.",
+        description:
+          "JSON payload to pass to the tool. Use file::<key> syntax for file references.",
       },
     },
   },
 });
 
 const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
-  const { draftId, toolId, payload, filePayloadReferences } = input;
+  const { draftId, toolId, payload } = input;
 
-  if (!draftId && !toolId) {
-    return {
-      success: false,
-      error: "Either draftId or toolId is required",
-      suggestion: "Provide draftId (from build_tool) or toolId (for saved tools)",
-    };
+  const idValidation = validateDraftOrToolId(draftId, toolId);
+  if (idValidation.valid === false) {
+    return { success: false, error: idValidation.error, suggestion: idValidation.suggestion };
   }
 
-  if (draftId && toolId) {
-    return {
-      success: false,
-      error: "Provide either draftId or toolId, not both",
-    };
+  const fileResult = resolvePayloadWithFiles(payload, ctx.filePayloads);
+  if (!fileResult.success) {
+    return { success: false, ...fileResult };
   }
-
-  let filePayloadContent = {};
-  try {
-    if (
-      filePayloadReferences &&
-      ctx.filePayloads &&
-      Object.keys(filePayloadReferences).length > 0
-    ) {
-      filePayloadContent = resolveFileReferences(filePayloadReferences, ctx.filePayloads);
-    }
-  } catch (error: any) {
-    return {
-      success: false,
-      error: error.message,
-      suggestion: "File payload resolution failed. Use the exact sanitized file key.",
-    };
-  }
-
-  const fullPayload = { ...payload, ...filePayloadContent };
+  const resolvedPayload = fileResult.resolved;
 
   let toolConfig: any;
   let inputSchema: any;
@@ -231,7 +197,7 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
     isDraft = true;
   }
 
-  const validation = validateRequiredFields(inputSchema, fullPayload);
+  const validation = validateRequiredFields(inputSchema, resolvedPayload);
   if (validation.valid === false) {
     const { missingFields, schema } = validation;
     return {
@@ -240,7 +206,7 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
       error: `Missing required input fields: ${missingFields.join(", ")}`,
       config: stripLegacyToolFields(toolConfig),
       inputSchema: schema,
-      providedPayload: fullPayload,
+      providedPayload: resolvedPayload,
       suggestion: `This tool requires the following inputs: ${JSON.stringify(schema.properties || {}, null, 2)}. Please provide values for: ${missingFields.join(", ")}`,
     };
   }
@@ -255,13 +221,13 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
       isDraft
         ? {
             tool: toolConfig,
-            payload: fullPayload,
+            payload: resolvedPayload,
             options: { selfHealing: SelfHealingMode.DISABLED, testMode: false, retries: 0 },
             traceId,
           }
         : {
             id: toolId,
-            payload: fullPayload,
+            payload: resolvedPayload,
             options: { selfHealing: SelfHealingMode.DISABLED },
           },
     );
@@ -318,7 +284,7 @@ const editToolDefinition = (): ToolDefinition => ({
       - Provide specific fix instructions (e.g., "change the endpoint to /v2/users", "remove extra fields from finalTransform", "fix the response schema mapping").
       - The fix creates an updated draft - use run_tool to test, then save_tool to persist.
       - After fixing, use run_tool with the returned draftId to test the updated draft.
-      - Include the payload parameter with the same test data from build_tool - users need this to test the fixed tool! This param can be an empty object if the tool does not require input data for testing.
+      - CRITICAL: You MUST include the payload parameter with the exact same test data that was used in build_tool. Copy it from the build_tool call in the conversation history. Without this payload, users cannot test the fixed tool. Use an empty object {} only if the tool genuinely requires no input.
     </important_notes>
     `,
   inputSchema: {
@@ -332,7 +298,8 @@ const editToolDefinition = (): ToolDefinition => ({
       },
       payload: {
         type: "object",
-        description: "IMPORTANT: Include a working payload so users can test the fixed tool",
+        description:
+          "CRITICAL: Copy the exact payload from the build_tool call. Users need this to test the fixed tool.",
       },
     },
     required: ["fixInstructions", "payload"],
@@ -370,19 +337,9 @@ const editToolDefinitionPlayground = (): ToolDefinition => ({
 const runEditTool = async (input: any, ctx: ToolExecutionContext) => {
   const { draftId, toolId, fixInstructions } = input;
 
-  if (!draftId && !toolId) {
-    return {
-      success: false,
-      error: "Either draftId or toolId is required",
-      suggestion: "Provide draftId (from build_tool) or toolId (for saved tools)",
-    };
-  }
-
-  if (draftId && toolId) {
-    return {
-      success: false,
-      error: "Provide either draftId or toolId, not both",
-    };
+  const idValidation = validateDraftOrToolId(draftId, toolId);
+  if (idValidation.valid === false) {
+    return { success: false, error: idValidation.error, suggestion: idValidation.suggestion };
   }
 
   let draft: DraftLookup | null = null;
@@ -702,32 +659,24 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
     };
   }
 
-  try {
-    if (ctx.filePayloads && Object.keys(ctx.filePayloads).length > 0 && systemInput.documentation) {
-      const hasFileReference =
-        typeof systemInput.documentation === "string" &&
-        systemInput.documentation.includes("file::");
-
-      if (hasFileReference) {
-        const fileRefs = systemInput.documentation
-          .split(",")
-          .map((ref: string) => ref.trim().replace(/^file::/, ""));
-        systemInput.documentationUrl = setFileUploadDocumentationURL(fileRefs);
-      }
-
-      systemInput.documentation = resolveFileReferences(
-        systemInput.documentation,
-        ctx.filePayloads,
-        true,
-      );
-    }
-  } catch (error: any) {
+  const docResult = resolveDocumentationFiles(
+    systemInput.documentation,
+    ctx.filePayloads,
+    setFileUploadDocumentationURL,
+  );
+  if ("error" in docResult) {
     return {
       success: false,
-      error: error.message,
+      error: docResult.error,
       suggestion:
         "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
     };
+  }
+  if (docResult.documentation !== undefined) {
+    systemInput.documentation = docResult.documentation;
+  }
+  if (docResult.documentationUrl) {
+    systemInput.documentationUrl = docResult.documentationUrl;
   }
 
   try {
@@ -764,8 +713,7 @@ const modifySystemDefinition = (): ToolDefinition => ({
       - Providing a documentationUrl will trigger asynchronous API documentation processing.
       - For documentation field, you can provide raw documentation text OR use file::filename to reference uploaded files. For multiple files, use comma-separated: file::doc1.pdf,file::doc2.pdf
       - When referencing files in the documentation field, use the exact file key (file::<key>) exactly as shown (e.g., file::my_data_csv). Do NOT use the original filename.
-      - Files are ONLY available in the same message they were uploaded with
-      - If user asks to add documentation from a previous message, tell them to re-upload the file
+      - Files persist for the entire conversation session (until page refresh or new conversation)
       - When providing files as system documentation input, the files you use will overwrite the current documentation content. Ensure to include ALL required files always, even if the user only asks you to add one.
       - If you provide documentationUrl, include relevant keywords in 'documentationKeywords' to improve documentation search (e.g., endpoint names, data objects, key concepts mentioned in conversation).
     </important_notes>
@@ -812,32 +760,24 @@ const modifySystemDefinition = (): ToolDefinition => ({
 const runModifySystem = async (input: any, ctx: ToolExecutionContext) => {
   let { ...systemInput } = input;
 
-  try {
-    if (ctx.filePayloads && Object.keys(ctx.filePayloads).length > 0 && systemInput.documentation) {
-      const hasFileReference =
-        typeof systemInput.documentation === "string" &&
-        systemInput.documentation.includes("file::");
-
-      if (hasFileReference) {
-        const fileRefs = systemInput.documentation
-          .split(",")
-          .map((ref: string) => ref.trim().replace(/^file::/, ""));
-        systemInput.documentationUrl = setFileUploadDocumentationURL(fileRefs);
-      }
-
-      systemInput.documentation = resolveFileReferences(
-        systemInput.documentation,
-        ctx.filePayloads,
-        true,
-      );
-    }
-  } catch (error: any) {
+  const docResult = resolveDocumentationFiles(
+    systemInput.documentation,
+    ctx.filePayloads,
+    setFileUploadDocumentationURL,
+  );
+  if ("error" in docResult) {
     return {
       success: false,
-      error: error.message,
+      error: docResult.error,
       suggestion:
         "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
     };
+  }
+  if (docResult.documentation !== undefined) {
+    systemInput.documentation = docResult.documentation;
+  }
+  if (docResult.documentationUrl) {
+    systemInput.documentationUrl = docResult.documentationUrl;
   }
 
   try {
@@ -1504,6 +1444,68 @@ const runGetRuns = async (
   }
 };
 
+const findToolDefinition = (): ToolDefinition => ({
+  name: "find_tool",
+  description: `Look up an existing tool by ID or search for tools by query.
+<use_case>Use when you need to see the full configuration of an existing tool, or find tools matching a description.</use_case>`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      id: { type: "string", description: "Exact tool ID to look up" },
+      query: { type: "string", description: "Search query to find matching tools" },
+    },
+  },
+});
+
+const runFindTool = async (
+  input: { id?: string; query?: string },
+  ctx: ToolExecutionContext,
+): Promise<any> => {
+  if (!input.id && !input.query) {
+    return { success: false, error: "Provide either id or query" };
+  }
+  if (input.id) {
+    const tool = await ctx.superglueClient.getWorkflow(input.id);
+    return { success: true, tool };
+  }
+  const tools = await ctx.superglueClient.findRelevantTools(input.query);
+  return { success: true, tools };
+};
+
+const findSystemDefinition = (): ToolDefinition => ({
+  name: "find_system",
+  description: `Look up an existing system by ID or search for systems by query.
+<use_case>Use when you need to see the full configuration of an existing system, or find systems matching a description.</use_case>`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      id: { type: "string", description: "Exact system ID to look up" },
+      query: { type: "string", description: "Search query to find matching systems" },
+    },
+  },
+});
+
+const runFindSystem = async (
+  input: { id?: string; query?: string },
+  ctx: ToolExecutionContext,
+): Promise<any> => {
+  if (!input.id && !input.query) {
+    return { success: false, error: "Provide either id or query" };
+  }
+  if (input.id) {
+    const system = await ctx.superglueClient.getSystem(input.id);
+    return { success: true, system };
+  }
+  const { items } = await ctx.superglueClient.listSystems(100);
+  const query = input.query!.toLowerCase();
+  const keywords = query.split(/\s+/).filter((k) => k.length > 0);
+  const filtered = items.filter((s) => {
+    const text = [s.id, s.urlHost, s.documentation].filter(Boolean).join(" ").toLowerCase();
+    return keywords.some((kw) => text.includes(kw));
+  });
+  return { success: true, systems: filtered };
+};
+
 export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
   build_tool: {
     name: "build_tool",
@@ -1597,6 +1599,16 @@ export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
     definition: getRunsDefinition,
     execute: runGetRuns,
   },
+  find_tool: {
+    name: "find_tool",
+    definition: findToolDefinition,
+    execute: runFindTool,
+  },
+  find_system: {
+    name: "find_system",
+    definition: findSystemDefinition,
+    execute: runFindSystem,
+  },
 };
 
 export const AGENT_TOOL_SET = [
@@ -1611,6 +1623,8 @@ export const AGENT_TOOL_SET = [
   "authenticate_oauth",
   "get_runs",
   "find_system_templates",
+  "find_tool",
+  "find_system",
 ];
 
 export const PLAYGROUND_TOOL_SET = [
@@ -1620,4 +1634,6 @@ export const PLAYGROUND_TOOL_SET = [
   "call_endpoint",
   "modify_system",
   "authenticate_oauth",
+  "find_tool",
+  "find_system",
 ];

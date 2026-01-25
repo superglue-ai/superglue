@@ -1,7 +1,7 @@
 "use client";
 
 import { ToolCall } from "@superglue/shared";
-import { Search, BookOpen, LayoutTemplate, Globe } from "lucide-react";
+import { Search, BookOpen, LayoutTemplate, Globe, Hammer, Blocks, Save } from "lucide-react";
 import { cn } from "@/src/lib/general-utils";
 import { MessagePart } from "@superglue/shared";
 
@@ -11,8 +11,8 @@ const BACKGROUND_TOOL_CONFIG: Record<
 > = {
   web_search: {
     icon: Globe,
-    label: "Searched online",
-    activeLabel: "Searching online...",
+    label: "Searched web",
+    activeLabel: "Searching web...",
   },
   search_documentation: {
     icon: BookOpen,
@@ -23,6 +23,21 @@ const BACKGROUND_TOOL_CONFIG: Record<
     icon: LayoutTemplate,
     label: "Found templates",
     activeLabel: "Finding templates...",
+  },
+  find_tool: {
+    icon: Hammer,
+    label: "Found tool",
+    activeLabel: "Finding tool...",
+  },
+  find_system: {
+    icon: Blocks,
+    label: "Found system",
+    activeLabel: "Finding system...",
+  },
+  save_tool: {
+    icon: Save,
+    label: "Saved tool",
+    activeLabel: "Saving tool...",
   },
 };
 

@@ -258,9 +258,15 @@ export class AgentClient {
   async *streamResponse(request: AgentRequest): AsyncGenerator<StreamChunk> {
     const validated = validateAgentRequest(request);
 
+    const unwrappedFilePayloads = validated.filePayloads
+      ? Object.fromEntries(
+          Object.entries(validated.filePayloads).map(([key, { content }]) => [key, content]),
+        )
+      : {};
+
     const executionContext: ToolExecutionContext = {
       superglueClient: this.superglueClient,
-      filePayloads: validated.filePayloads ?? {},
+      filePayloads: unwrappedFilePayloads,
       messages: [],
       orgId: "",
       subscriptionClient: this.subscriptionClient ?? undefined,

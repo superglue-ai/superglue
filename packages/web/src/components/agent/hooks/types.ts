@@ -63,8 +63,8 @@ export interface UseAgentRequestReturn {
 }
 
 export interface UseAgentFileUploadReturn {
-  uploadedFiles: UploadedFile[];
-  setUploadedFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
+  pendingFiles: UploadedFile[];
+  sessionFiles: UploadedFile[];
   filePayloads: Record<string, any>;
   setFilePayloads: React.Dispatch<React.SetStateAction<Record<string, any>>>;
   isProcessingFiles: boolean;
@@ -72,7 +72,9 @@ export interface UseAgentFileUploadReturn {
   setIsDragging: React.Dispatch<React.SetStateAction<boolean>>;
   fileInputRef: React.RefObject<HTMLInputElement>;
   handleFilesUpload: (files: File[]) => Promise<void>;
-  handleFileRemove: (key: string) => void;
+  handlePendingFileRemove: (key: string) => void;
+  handleSessionFileRemove: (key: string) => void;
+  commitPendingFiles: () => void;
   handleDrop: (e: React.DragEvent) => void;
   handleDragOver: (e: React.DragEvent) => void;
   handleDragLeave: (e: React.DragEvent) => void;

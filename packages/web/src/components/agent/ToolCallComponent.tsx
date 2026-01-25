@@ -11,7 +11,6 @@ import {
   EditPayloadComponent,
   GetRunsComponent,
   ModifySystemComponent,
-  SaveToolComponent,
   ToolBuilderComponent,
 } from "./tool-components";
 
@@ -23,11 +22,13 @@ interface ToolCallComponentProps {
     userMessage?: string,
     options?: { userActions?: UserAction[] },
   ) => Promise<void>;
+  bufferAction?: (action: UserAction) => void;
   onAbortStream?: () => void;
   onApplyChanges?: (config: Tool, diffs?: ToolDiff[]) => void;
   onApplyPayload?: (newPayload: string) => void;
   currentPayload?: string;
   isPlayground?: boolean;
+  filePayloads?: Record<string, any>;
 }
 
 export function ToolCallComponent({
@@ -35,14 +36,15 @@ export function ToolCallComponent({
   onInputChange,
   onToolUpdate,
   sendAgentRequest,
+  bufferAction,
   onAbortStream,
   onApplyChanges,
   onApplyPayload,
   currentPayload,
   isPlayground = false,
+  filePayloads,
 }: ToolCallComponentProps) {
   switch (tool.name) {
-    // Unified build/fix/run component
     case "build_tool":
       return (
         <ToolBuilderComponent
@@ -50,7 +52,9 @@ export function ToolCallComponent({
           mode="build"
           onInputChange={onInputChange}
           sendAgentRequest={sendAgentRequest}
+          bufferAction={bufferAction}
           isPlayground={isPlayground}
+          filePayloads={filePayloads}
         />
       );
     case "edit_tool":
@@ -61,10 +65,12 @@ export function ToolCallComponent({
           onInputChange={onInputChange}
           onToolUpdate={onToolUpdate}
           sendAgentRequest={sendAgentRequest}
+          bufferAction={bufferAction}
           onAbortStream={onAbortStream}
           onApplyChanges={onApplyChanges}
           isPlayground={isPlayground}
           currentPayload={currentPayload}
+          filePayloads={filePayloads}
         />
       );
     case "run_tool":
@@ -74,11 +80,11 @@ export function ToolCallComponent({
           mode="run"
           onInputChange={onInputChange}
           sendAgentRequest={sendAgentRequest}
+          bufferAction={bufferAction}
           isPlayground={isPlayground}
+          filePayloads={filePayloads}
         />
       );
-    case "save_tool":
-      return <SaveToolComponent tool={tool} onInputChange={onInputChange} />;
 
     // System tools
     case "create_system":
@@ -123,6 +129,9 @@ export function ToolCallComponent({
     case "find_system_templates":
     case "web_search":
     case "search_documentation":
+    case "find_tool":
+    case "find_system":
+    case "save_tool":
       return <BackgroundToolIndicator tool={tool} />;
 
     default:

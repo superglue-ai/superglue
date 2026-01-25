@@ -90,9 +90,23 @@ export function ToolConfigProvider({
   const uploadedFiles = externalUploadedFiles ?? localUploadedFiles;
   const filePayloads = externalFilePayloads ?? localFilePayloads;
 
+  // Combined setter for atomic updates - prevents mismatched state in parent callbacks
+  const setFilesAndPayloads = useCallback(
+    (files: UploadedFileInfo[], payloads: Record<string, any>) => {
+      if (onExternalFilesChange) {
+        onExternalFilesChange(files, payloads);
+      } else {
+        setLocalUploadedFiles(files);
+        setLocalFilePayloads(payloads);
+      }
+    },
+    [onExternalFilesChange],
+  );
+
   const setUploadedFiles = useCallback(
     (files: UploadedFileInfo[]) => {
       if (onExternalFilesChange) {
+        // Use the combined setter to ensure atomic update
         onExternalFilesChange(files, filePayloads);
       } else {
         setLocalUploadedFiles(files);
@@ -104,6 +118,7 @@ export function ToolConfigProvider({
   const setFilePayloads = useCallback(
     (payloads: Record<string, any>) => {
       if (onExternalFilesChange) {
+        // Use the combined setter to ensure atomic update
         onExternalFilesChange(uploadedFiles, payloads);
       } else {
         setLocalFilePayloads(payloads);
@@ -228,6 +243,7 @@ export function ToolConfigProvider({
       setPayloadText: setManualPayloadText,
       setUploadedFiles,
       setFilePayloads,
+      setFilesAndPayloads,
       markPayloadEdited: () => setHasUserEdited(true),
 
       addStep,
@@ -251,6 +267,7 @@ export function ToolConfigProvider({
       addStep,
       removeStep,
       updateStep,
+      setFilesAndPayloads,
       getStepConfig,
       getStepIndex,
       getStepSystem,

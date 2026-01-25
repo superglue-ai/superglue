@@ -59,10 +59,19 @@ TOOL CALLING RULES:
 edit_tool:
 - Whenever you add new steps, always make sure that every step has the right systemId for an existing, available system.
 - If you add a response schema, do not forget to update the finalTransform to map step data to the new response schema.
+- When you edit a pre-saved tool, edits are not automatically persisted. Call save_tool to ensure changes are saved.
 
 build_tool:
 - Only include a response schema if the user is explicit about a certain response structure
 - If you add a response schema, do not forget to update the finalTransform to map step data to the new response schema.
+
+find_tool:
+- Use to look up existing tool configurations by ID or search by keyword/description.
+- Provide either id (exact match) or query (keyword search), not both.
+
+find_system:
+- Use to look up existing system configurations by ID or search by keyword/description.
+- Provide either id (exact match) or query (keyword search), not both.
 
 create_system:
 - Use templateId for known services (see AVAILABLE SYSTEM TEMPLATES) - auto-populates URLs, docs, OAuth config including scopes.
@@ -116,14 +125,15 @@ Use get_runs with the toolId to fetch recent executions and inspect the toolPayl
 This shows exactly what the external service sent. Compare against the tool's inputSchema to identify mismatches, then use edit_tool to fix the schema.
 
 FILE HANDLING_RULES:
-- Files uploaded by users are processed and made available in the CURRENT message only. File references are ONLY valid for files in the current message
-- If a user asks you to build a tool that requires file inputs, ensure the file is uploaded in the same message as you're calling the build_tool in. If you execute directly without the file input, the tool will fail.
-- When building a tool using build_tool, the payload key that contains the file type must be the sanitized filename without the extension, e.g. 'data.csv' becomes 'data'. If you use a different key, the tool will fail.
-- Always use the exact sanitized key from the file reference list when referencing files in tool call inputs. File references in tool call inputs use the format: file::<key>
+- Files uploaded by users are processed and stored for the ENTIRE conversation duration. File references remain valid across all messages in the same conversation.
+- Files are cleared when starting a new conversation or loading a different conversation.
+- When building a tool using build_tool or running a tool using run_tool, use file::<key> syntax directly in the payload to reference uploaded files. Example: { "data": "file::my_csv" }
+- The file::<key> references are automatically resolved to actual file content before tool execution.
+- Always use the exact sanitized key from the file reference list when referencing files. The key is the sanitized filename without extension (e.g., 'data.csv' becomes 'data').
 - When providing files as system documentation input, the files you use will overwrite the current documentation content.
-- If a user asks you to use a file from a previous message, ask the user to re-upload the file so you can help them with it.
-- For tools with inputSchema, match the schema structure when using files. File payloads and payloads are automatically merged before execution.
-- Full file content is used in tool execution even if context preview was truncated
+- For tools with inputSchema, match the schema structure when using files. File references in payload values are resolved automatically.
+- Full file content is used in tool execution even if context preview was truncated.
+- If a file reference cannot be resolved (file not found), the tool will return a descriptive error listing available file keys.
 `;
 
 export const TOOL_PLAYGROUND_AGENT_SYSTEM_PROMPT = `
@@ -182,6 +192,12 @@ authenticate_oauth:
 - Also use this to re-authenticate when OAuth tokens expire and cannot be refreshed.
 - STOP conversation after calling - wait for user to complete OAuth in UI.
 - CALLBACK URL: When users need to configure their OAuth app's redirect URI, tell them to use: https://app.superglue.cloud/api/auth/callback
+
+find_tool:
+- Look up existing tool configurations by ID or search by keyword.
+
+find_system:
+- Look up existing system configurations by ID or search by keyword.
 
 WORKFLOW:
 1. Analyze the provided tool configuration and execution state

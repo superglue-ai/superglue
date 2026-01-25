@@ -49,14 +49,16 @@ export interface AgentContextValue {
   bufferAction: (action: UserAction) => void;
 
   // Files
-  uploadedFiles: UploadedFile[];
+  pendingFiles: UploadedFile[];
+  sessionFiles: UploadedFile[];
   filePayloads: Record<string, any>;
   isProcessingFiles: boolean;
   isDragging: boolean;
   setIsDragging: React.Dispatch<React.SetStateAction<boolean>>;
   fileInputRef: React.RefObject<HTMLInputElement>;
   handleFilesUpload: (files: File[]) => Promise<void>;
-  handleFileRemove: (key: string) => void;
+  handlePendingFileRemove: (key: string) => void;
+  handleSessionFileRemove: (key: string) => void;
   handleDrop: (e: React.DragEvent) => void;
   handleDragOver: (e: React.DragEvent) => void;
   handleDragLeave: (e: React.DragEvent) => void;
@@ -158,6 +160,7 @@ export function AgentContextProvider({
   });
 
   // Request hook - the main way to send requests
+  const allUploadedFiles = [...fileUpload.sessionFiles, ...fileUpload.pendingFiles];
   const requestHook = useAgentRequest({
     config,
     messagesRef: messagesHook.messagesRef,
@@ -169,9 +172,9 @@ export function AgentContextProvider({
     findAndResumeMessageWithTool: messagesHook.findAndResumeMessageWithTool,
     processStreamData: streamingHook.processStreamData,
     currentStreamControllerRef: streamingHook.currentStreamControllerRef,
-    uploadedFiles: fileUpload.uploadedFiles,
+    uploadedFiles: allUploadedFiles,
+    pendingFiles: fileUpload.pendingFiles,
     filePayloads: fileUpload.filePayloads,
-    clearFiles: fileUpload.clearFiles,
     toast,
   });
 
@@ -222,9 +225,10 @@ export function AgentContextProvider({
     async (content: string) => {
       const MAX_MESSAGE_LENGTH = 50000;
       if (!content.trim() || content.length > MAX_MESSAGE_LENGTH) return;
+      fileUpload.commitPendingFiles();
       await requestHook.sendAgentRequest(content);
     },
-    [requestHook],
+    [requestHook, fileUpload],
   );
 
   const startTemplatePrompt = useCallback(
@@ -279,14 +283,16 @@ export function AgentContextProvider({
       bufferAction: requestHook.bufferAction,
 
       // Files
-      uploadedFiles: fileUpload.uploadedFiles,
+      pendingFiles: fileUpload.pendingFiles,
+      sessionFiles: fileUpload.sessionFiles,
       filePayloads: fileUpload.filePayloads,
       isProcessingFiles: fileUpload.isProcessingFiles,
       isDragging: fileUpload.isDragging,
       setIsDragging: fileUpload.setIsDragging,
       fileInputRef: fileUpload.fileInputRef,
       handleFilesUpload: fileUpload.handleFilesUpload,
-      handleFileRemove: fileUpload.handleFileRemove,
+      handlePendingFileRemove: fileUpload.handlePendingFileRemove,
+      handleSessionFileRemove: fileUpload.handleSessionFileRemove,
       handleDrop: fileUpload.handleDrop,
       handleDragOver: fileUpload.handleDragOver,
       handleDragLeave: fileUpload.handleDragLeave,
