@@ -348,11 +348,6 @@ paths:
           schema:
             type: string
             enum: [running, success, failed, aborted]
-        - name: requestSource
-          in: query
-          schema:
-            type: string
-            enum: [api, frontend, scheduler, mcp, tool-chain, webhook]
         - name: page
           in: query
           schema:
@@ -648,8 +643,16 @@ components:
           description: ID of the tool that was executed
           example: 550e8400-e29b-41d4-a716-446655440000
         tool:
-          $ref: "#/components/schemas/Tool"
-          description: Full tool configuration that was executed
+          type: object
+          description: Tool metadata (not full configuration, maps to 'toolConfig' in GraphQL)
+          required:
+            - id
+          properties:
+            id:
+              type: string
+            version:
+              type: string
+              example: "2.1.0"
         status:
           type: string
           enum: [running, success, failed, aborted]

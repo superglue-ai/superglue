@@ -26,9 +26,7 @@ jobs:
         uses: tj-actions/changed-files@v45
         with:
           files: |
-            packages/**/*.{ts,tsx,js,jsx,json,md,mdx}
-            scripts/**/*.{ts,tsx,js,jsx,json,md,mdx}
-            *.{ts,tsx,js,jsx,json,md,mdx}
+            **/*.{ts,tsx,js,jsx,json,md,mdx}
 
       - name: Install dependencies
         run: npm install
