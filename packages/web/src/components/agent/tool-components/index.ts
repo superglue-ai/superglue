@@ -12,7 +12,6 @@ export { DefaultComponent } from "./DefaultComponent";
 export { EditPayloadComponent } from "./EditPayloadComponent";
 export { GetRunsComponent } from "./GetRunsComponent";
 export { ModifySystemComponent } from "./ModifySystemComponent";
-export { SaveToolComponent } from "./SaveToolComponent";
 export { SearchDocumentationComponent } from "./SearchDocumentationComponent";
 export { ToolBuilderComponent } from "./ToolBuilderComponent";
 export { ToolCallWrapper } from "./ToolComponentWrapper";

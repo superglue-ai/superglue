@@ -61,7 +61,7 @@ export interface AgentDefinition {
   agentParamsSchema?: z.ZodSchema;
 }
 
-export type UserAction = ToolConfirmationAction | ToolExecutionFeedback;
+export type UserAction = ToolConfirmationAction | ToolExecutionFeedback | FileUploadAction;
 
 export interface ToolConfirmationAction {
   type: "tool_confirmation";
@@ -78,8 +78,32 @@ export interface ToolExecutionFeedback {
   type: "tool_execution_feedback";
   toolCallId: string;
   toolName: string;
-  feedback: "manual_run" | "request_fix" | "save_success" | "oauth_success" | "oauth_failure";
-  data?: any;
+  feedback:
+    | "manual_run"
+    | "manual_run_success"
+    | "manual_run_failure"
+    | "request_fix"
+    | "save_success"
+    | "oauth_success"
+    | "oauth_failure";
+  data?:
+    | {
+        toolId?: string;
+        result?: any;
+        error?: string;
+        appliedChanges?: number;
+        payload?: any;
+      }
+    | any;
+}
+
+export interface FileUploadAction {
+  type: "file_upload";
+  files: Array<{
+    key: string;
+    name: string;
+    contentPreview: string;
+  }>;
 }
 
 export interface AgentRequest {

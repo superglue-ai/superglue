@@ -64,6 +64,7 @@ export interface ToolPlaygroundProps {
   shouldStopExecution?: boolean;
   onStopExecution?: () => void;
   uploadedFiles?: UploadedFileInfo[];
+  filePayloads?: Record<string, any>;
   onFilesUpload?: (files: File[]) => Promise<void>;
   onFileRemove?: (key: string) => void;
   isProcessingFiles?: boolean;
@@ -124,6 +125,7 @@ function ToolPlaygroundInner({
     setPayloadText,
     setUploadedFiles: setContextUploadedFiles,
     setFilePayloads: setContextFilePayloads,
+    setFilesAndPayloads: setContextFilesAndPayloads,
     markPayloadEdited,
     setSteps,
     setFolder,
@@ -162,8 +164,14 @@ function ToolPlaygroundInner({
   const computedPayload = payload.computedPayload;
 
   const localFileUpload = useFileUpload({
+    onFilesChange: (files, payloads) => {
+      // Use combined setter for atomic update to prevent mismatched state
+      setContextFilesAndPayloads(files, payloads);
+    },
     onPayloadTextUpdate: (updater) => setPayloadText(updater(manualPayloadText)),
     onUserEdit: markPayloadEdited,
+    externalFiles: payload.uploadedFiles,
+    externalPayloads: payload.filePayloads,
   });
 
   const uploadedFiles = parentUploadedFiles ?? payload.uploadedFiles;
@@ -685,6 +693,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>((pr
       initialInstruction={props.initialInstruction}
       systems={systems}
       externalUploadedFiles={props.uploadedFiles}
+      externalFilePayloads={props.filePayloads}
       onExternalFilesChange={props.onFilesChange}
     >
       <ExecutionProvider>

@@ -19,30 +19,26 @@ interface UseAgentFileUploadOptions {
 
 export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAgentFileUploadReturn {
   const config = useConfig();
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([]);
+  const [sessionFiles, setSessionFiles] = useState<UploadedFile[]>([]);
   const [filePayloads, setFilePayloads] = useState<Record<string, any>>({});
   const [isProcessingFiles, setIsProcessingFiles] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const allFiles = [...sessionFiles, ...pendingFiles];
 
   const handleFilesUpload = useCallback(
     async (files: File[]) => {
       setIsProcessingFiles(true);
 
       try {
-        const currentTotalSize = uploadedFiles.reduce((sum, f) => sum + (f.size || 0), 0);
-        const newSize = files.reduce((sum, f) => sum + f.size, 0);
+        const currentPayloadSize = Object.values(filePayloads).reduce((sum, content) => {
+          const str = typeof content === "string" ? content : JSON.stringify(content);
+          return sum + new Blob([str]).size;
+        }, 0);
 
-        if (currentTotalSize + newSize > MAX_TOTAL_FILE_SIZE_CHAT) {
-          toast({
-            title: "Size limit exceeded",
-            description: `Total file size cannot exceed ${formatBytes(MAX_TOTAL_FILE_SIZE_CHAT)} for chat uploads`,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const existingKeys = uploadedFiles.map((f) => f.key);
+        const existingKeys = allFiles.map((f) => f.key);
         const newFiles: UploadedFile[] = [];
         const newPayloads: Record<string, any> = {};
 
@@ -70,19 +66,19 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
               status: "processing",
             };
             newFiles.push(fileInfo);
-            setUploadedFiles((prev) => [...prev, fileInfo]);
+            setPendingFiles((prev) => [...prev, fileInfo]);
 
             const parsedData = await processAndExtractFile(file, client);
             newPayloads[key] = parsedData;
             existingKeys.push(key);
 
-            setUploadedFiles((prev) =>
+            setPendingFiles((prev) =>
               prev.map((f) => (f.key === key ? { ...f, status: "ready" as const } : f)),
             );
           } catch (error: any) {
             const fileInfo = newFiles.find((f) => f.name === file.name);
             if (fileInfo) {
-              setUploadedFiles((prev) =>
+              setPendingFiles((prev) =>
                 prev.map((f) =>
                   f.key === fileInfo.key
                     ? { ...f, status: "error" as const, error: error.message }
@@ -104,16 +100,11 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
           return sum + new Blob([str]).size;
         }, 0);
 
-        const currentPayloadSize = Object.values(filePayloads).reduce((sum, content) => {
-          const str = typeof content === "string" ? content : JSON.stringify(content);
-          return sum + new Blob([str]).size;
-        }, 0);
-
         if (currentPayloadSize + batchContentSize > MAX_TOTAL_FILE_SIZE_CHAT) {
-          setUploadedFiles((prev) => prev.filter((f) => !newFiles.find((nf) => nf.key === f.key)));
+          setPendingFiles((prev) => prev.filter((f) => !newFiles.find((nf) => nf.key === f.key)));
           toast({
-            title: "Upload batch too large",
-            description: `Total extracted content (${formatBytes(batchContentSize)}) exceeds 50 MB limit. Try uploading fewer or smaller files.`,
+            title: "Session file limit reached",
+            description: `This conversation has ${formatBytes(currentPayloadSize)} of files. To upload more, please start a new chat or remove existing files.`,
             variant: "destructive",
           });
           return;
@@ -124,17 +115,37 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
         setIsProcessingFiles(false);
       }
     },
-    [uploadedFiles, filePayloads, config.superglueEndpoint, toast],
+    [allFiles, filePayloads, config.superglueEndpoint, toast],
   );
 
-  const handleFileRemove = useCallback((key: string) => {
-    setUploadedFiles((prev) => prev.filter((f) => f.key !== key));
+  const handlePendingFileRemove = useCallback((key: string) => {
+    setPendingFiles((prev) => prev.filter((f) => f.key !== key));
     setFilePayloads((prev) => {
       const newPayloads = { ...prev };
       delete newPayloads[key];
       return newPayloads;
     });
   }, []);
+
+  const handleSessionFileRemove = useCallback((key: string) => {
+    setSessionFiles((prev) => prev.filter((f) => f.key !== key));
+    setFilePayloads((prev) => {
+      const newPayloads = { ...prev };
+      delete newPayloads[key];
+      return newPayloads;
+    });
+  }, []);
+
+  const commitPendingFiles = useCallback(() => {
+    const readyFiles = pendingFiles.filter((f) => f.status === "ready");
+    const nonReadyFiles = pendingFiles.filter((f) => f.status !== "ready");
+
+    if (readyFiles.length > 0) {
+      setSessionFiles((prev) => [...prev, ...readyFiles]);
+    }
+    // Only clear ready files, keep processing/error files in pending
+    setPendingFiles(nonReadyFiles);
+  }, [pendingFiles]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -167,13 +178,14 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
   }, []);
 
   const clearFiles = useCallback(() => {
-    setUploadedFiles([]);
+    setPendingFiles([]);
+    setSessionFiles([]);
     setFilePayloads({});
   }, []);
 
   return {
-    uploadedFiles,
-    setUploadedFiles,
+    pendingFiles,
+    sessionFiles,
     filePayloads,
     setFilePayloads,
     isProcessingFiles,
@@ -181,7 +193,9 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
     setIsDragging,
     fileInputRef,
     handleFilesUpload,
-    handleFileRemove,
+    handlePendingFileRemove,
+    handleSessionFileRemove,
+    commitPendingFiles,
     handleDrop,
     handleDragOver,
     handleDragLeave,

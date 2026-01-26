@@ -6,7 +6,9 @@ import {
   UserAction,
   ToolConfirmationAction,
   ToolExecutionFeedback,
+  FileUploadAction,
 } from "@/src/lib/agent/agent-types";
+import { truncateFileContent } from "@/src/lib/file-utils";
 import { Message } from "@superglue/shared";
 import { useCallback, useRef } from "react";
 import type { AgentConfig, UploadedFile, UseAgentRequestReturn } from "./types";
@@ -27,8 +29,8 @@ interface UseAgentRequestOptions {
   ) => Promise<void>;
   currentStreamControllerRef: React.MutableRefObject<AbortController | null>;
   uploadedFiles: UploadedFile[];
+  pendingFiles: UploadedFile[];
   filePayloads: Record<string, any>;
-  clearFiles: () => void;
   toast: (options: { title: string; description: string; variant?: "destructive" }) => void;
 }
 
@@ -44,8 +46,8 @@ export function useAgentRequest({
   processStreamData,
   currentStreamControllerRef,
   uploadedFiles,
+  pendingFiles,
   filePayloads,
-  clearFiles,
   toast,
 }: UseAgentRequestOptions): UseAgentRequestReturn {
   const actionBufferRef = useRef<UserAction[]>([]);
@@ -59,17 +61,42 @@ export function useAgentRequest({
   const buildFilePayloads = useCallback(():
     | Record<string, { name: string; content: any }>
     | undefined => {
-    const readyFiles = uploadedFiles.filter((f) => f.status === "ready");
-    if (readyFiles.length === 0) return undefined;
+    if (Object.keys(filePayloads).length === 0) return undefined;
 
     const result: Record<string, { name: string; content: any }> = {};
-    for (const file of readyFiles) {
-      const content = filePayloads[file.key];
-      if (content) {
-        result[file.key] = { name: file.name, content };
-      }
+    for (const [key, content] of Object.entries(filePayloads)) {
+      const file = uploadedFiles.find((f) => f.key === key);
+      const fileName = file?.name || key;
+      result[key] = { name: fileName, content };
     }
     return Object.keys(result).length > 0 ? result : undefined;
+  }, [uploadedFiles, filePayloads]);
+
+  const buildFileUploadAction = useCallback((): FileUploadAction | undefined => {
+    if (Object.keys(filePayloads).length === 0) return undefined;
+
+    const FILE_PREVIEW_MAX_CHARS = 2000;
+
+    const files = Object.entries(filePayloads).map(([key, content]) => {
+      const file = uploadedFiles.find((f) => f.key === key);
+      const fileName = file?.name || key;
+
+      let contentStr: string;
+      try {
+        contentStr =
+          typeof content === "string" ? content : (JSON.stringify(content, null, 2) ?? "");
+      } catch {
+        contentStr = "[Unable to serialize]";
+      }
+
+      return {
+        key,
+        name: fileName,
+        contentPreview: truncateFileContent(contentStr, FILE_PREVIEW_MAX_CHARS).truncated,
+      };
+    });
+
+    return files.length > 0 ? { type: "file_upload" as const, files } : undefined;
   }, [uploadedFiles, filePayloads]);
 
   const sendAgentRequest = useCallback(
@@ -79,8 +106,8 @@ export function useAgentRequest({
     ) => {
       let actionsToSend: UserAction[];
       if (options?.userActions) {
-        actionsToSend = options.userActions;
-        actionBufferRef.current = [];
+        // Merge buffered actions with explicit actions (buffered first to preserve chronological order)
+        actionsToSend = [...actionBufferRef.current.splice(0), ...options.userActions];
       } else {
         actionsToSend = actionBufferRef.current.splice(0);
       }
@@ -112,21 +139,18 @@ export function useAgentRequest({
       const currentMessages = [...messagesRef.current];
 
       if (hasMessage) {
+        const readyPendingFiles = pendingFiles.filter((f) => f.status === "ready");
         const userMessageObj: Message = {
           id: Date.now().toString(),
           content: userMessage!.trim(),
           role: "user",
           timestamp: new Date(),
-          attachedFiles:
-            uploadedFiles.filter((f) => f.status === "ready").length > 0
-              ? uploadedFiles.filter((f) => f.status === "ready")
-              : undefined,
+          attachedFiles: readyPendingFiles.length > 0 ? readyPendingFiles : undefined,
         };
         currentMessages.push(userMessageObj);
         setMessages((prev) => [...prev, userMessageObj]);
       }
 
-      clearFiles();
       setIsLoading(true);
 
       let assistantMessage: Message | null = null;
@@ -142,11 +166,14 @@ export function useAgentRequest({
 
       const hiddenContext = options?.hiddenContext || config.hiddenContextBuilder?.();
 
+      const fileUploadAction = buildFileUploadAction();
+      const allActions = fileUploadAction ? [...actionsToSend, fileUploadAction] : actionsToSend;
+
       const request: AgentRequest = {
         agentId: config.agentId,
         messages: currentMessages,
         userMessage: hasMessage ? userMessage!.trim() : undefined,
-        userActions: hasActions ? actionsToSend : undefined,
+        userActions: allActions.length > 0 ? allActions : undefined,
         filePayloads: buildFilePayloads(),
         hiddenContext,
         agentParams: config.agentParams,
@@ -230,8 +257,9 @@ export function useAgentRequest({
       processStreamData,
       currentStreamControllerRef,
       uploadedFiles,
+      pendingFiles,
       buildFilePayloads,
-      clearFiles,
+      buildFileUploadAction,
       chatEndpoint,
       getAuthToken,
       toast,

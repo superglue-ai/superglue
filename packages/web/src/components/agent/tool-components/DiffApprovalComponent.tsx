@@ -2,6 +2,11 @@
 
 import { Button } from "@/src/components/ui/button";
 import { SystemIcon } from "@/src/components/ui/system-icon";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/src/components/ui/dropdown-menu";
 import { cn } from "@/src/lib/general-utils";
 import {
   Check,
@@ -19,7 +24,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { JsonCodeEditor } from "@/src/components/editors/JsonCodeEditor";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ToolDiff } from "@superglue/shared";
 import {
   DiffLine,
@@ -74,11 +79,12 @@ interface DiffApprovalComponentProps {
     approvedDiffs: ToolDiff[];
     rejectedDiffs: ToolDiff[];
   }) => void;
-  onRunWithDiffs?: (approvedDiffs: ToolDiff[]) => void;
+  onRunWithDiffs?: (approvedDiffs: ToolDiff[], payload?: Record<string, any>) => void;
   onAbortTest?: () => void;
   isRunning?: boolean;
   testLogs?: Array<{ message: string; timestamp: Date }>;
   testResult?: { success: boolean; data?: any; error?: string } | null;
+  initialPayload?: string;
 }
 
 /**
@@ -260,10 +266,25 @@ export function DiffApprovalComponent({
   isRunning = false,
   testLogs,
   testResult,
+  initialPayload,
 }: DiffApprovalComponentProps) {
   const [diffStates, setDiffStates] = useState<Map<number, DiffApprovalState>>(
     () => new Map(enrichedDiffs.map((_, i) => [i, "approved"])),
   );
+  const [editablePayload, setEditablePayload] = useState<string>(initialPayload || "{}");
+  const [payloadError, setPayloadError] = useState<string | null>(null);
+  const [hasUserEdited, setHasUserEdited] = useState(false);
+
+  useEffect(() => {
+    if (
+      !hasUserEdited &&
+      initialPayload &&
+      initialPayload !== "{}" &&
+      initialPayload !== editablePayload
+    ) {
+      setEditablePayload(initialPayload);
+    }
+  }, [initialPayload, hasUserEdited, editablePayload]);
 
   const approvedCount = useMemo(
     () => [...diffStates.values()].filter((s) => s === "approved").length,
@@ -332,8 +353,14 @@ export function DiffApprovalComponent({
         approvedDiffs.push(enrichedDiffs[index].diff);
       }
     }
-    onRunWithDiffs?.(approvedDiffs);
-  }, [diffStates, enrichedDiffs, onRunWithDiffs]);
+    let payload: Record<string, any> | undefined;
+    try {
+      if (editablePayload.trim()) {
+        payload = JSON.parse(editablePayload);
+      }
+    } catch {}
+    onRunWithDiffs?.(approvedDiffs, payload);
+  }, [diffStates, enrichedDiffs, onRunWithDiffs, editablePayload]);
 
   return (
     <div className="space-y-3">
@@ -375,15 +402,60 @@ export function DiffApprovalComponent({
               Stop
             </Button>
           ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleRunWithApproved}
-              className="h-7 text-xs"
-            >
-              <Play className="w-3 h-3 mr-1" />
-              Test {approvedCount} change{approvedCount !== 1 ? "s" : ""}
-            </Button>
+            <DropdownMenu>
+              <div className="flex">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRunWithApproved}
+                  className="h-7 text-xs rounded-r-none"
+                >
+                  <Play className="w-3 h-3 mr-1" />
+                  Test {approvedCount} change{approvedCount !== 1 ? "s" : ""}
+                </Button>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-1.5 text-xs rounded-l-none border-l-0"
+                  >
+                    <ChevronDown className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </div>
+              <DropdownMenuContent align="start" className="w-[400px] p-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Test Payload</span>
+                    {payloadError && <span className="text-xs text-red-500">(Invalid JSON)</span>}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Edit the payload to test with different inputs.
+                  </p>
+                  <JsonCodeEditor
+                    value={editablePayload}
+                    onChange={(val) => {
+                      setHasUserEdited(true);
+                      setEditablePayload(val || "");
+                      try {
+                        if (val?.trim()) {
+                          JSON.parse(val);
+                          setPayloadError(null);
+                        } else {
+                          setPayloadError(null);
+                        }
+                      } catch (e) {
+                        setPayloadError((e as Error).message);
+                      }
+                    }}
+                    readOnly={false}
+                    maxHeight="200px"
+                    resizable={true}
+                    showValidation={true}
+                  />
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ))}
         <Button
           size="sm"

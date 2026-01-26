@@ -20,6 +20,11 @@ export function findDraftInMessages(messages: Message[], draftId: string): Draft
       if (part.type !== "tool" || !part.tool?.output) continue;
       if (!DRAFT_SOURCE_TOOLS.has(part.tool.name)) continue;
 
+      const isEditTool = part.tool.name === "edit_tool";
+      if (isEditTool && part.tool.status !== "completed") {
+        continue;
+      }
+
       try {
         const output =
           typeof part.tool.output === "string" ? JSON.parse(part.tool.output) : part.tool.output;
@@ -88,6 +93,8 @@ export interface PlaygroundContextData {
   stepsCount: number;
   currentPayload: string;
   executionSummary: string;
+  uploadedFiles?: Array<{ name: string; key: string; status?: string }>;
+  mergedPayload?: string;
 }
 
 export function formatPlaygroundRuntimeContext(ctx: PlaygroundContextData): string {
@@ -97,6 +104,36 @@ export function formatPlaygroundRuntimeContext(ctx: PlaygroundContextData): stri
         `\n... [truncated, ${ctx.currentPayload.length} chars total]`
       : ctx.currentPayload;
 
+  const hasFiles = ctx.uploadedFiles && ctx.uploadedFiles.length > 0;
+
+  let fileSection = "";
+  if (hasFiles) {
+    const fileList = ctx
+      .uploadedFiles!.map((f) => `  - ${f.name} (key: "${f.key}", status: ${f.status || "ready"})`)
+      .join("\n");
+    fileSection = `
+<uploaded_files>
+${fileList}
+Note: File data is automatically parsed and merged with the manual payload. Each file's parsed content is available under its "key" in the merged payload.
+</uploaded_files>
+`;
+  }
+
+  let mergedPayloadSection = "";
+  if (hasFiles && ctx.mergedPayload) {
+    const truncatedMerged =
+      ctx.mergedPayload.length > 2000
+        ? ctx.mergedPayload.substring(0, 2000) +
+          `\n... [truncated, ${ctx.mergedPayload.length} chars total]`
+        : ctx.mergedPayload;
+    mergedPayloadSection = `
+<merged_payload_preview>
+This is the ACTUAL payload that will be sent when the tool executes (manual payload + file data merged):
+${truncatedMerged}
+</merged_payload_preview>
+`;
+  }
+
   return `[PLAYGROUND CONTEXT]
 <current_tool_config>
 Tool ID: ${ctx.toolId || "(unsaved)"}
@@ -105,9 +142,10 @@ Steps: ${ctx.stepsCount} step(s)
 </current_tool_config>
 
 <current_test_payload>
+${hasFiles ? "Manual payload (before file merge):" : ""}
 ${truncatedPayload}
 </current_test_payload>
-
+${fileSection}${mergedPayloadSection}
 <execution_state>
 ${ctx.executionSummary}
 </execution_state>

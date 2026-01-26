@@ -134,6 +134,7 @@ export function ToolCreateStepper({
                 shouldStopExecution={shouldStopExecution}
                 onStopExecution={handleStopExecution}
                 uploadedFiles={uploadedFiles}
+                filePayloads={filePayloads}
                 onFilesChange={handleFilesChange}
               />
               <SaveToolDialog

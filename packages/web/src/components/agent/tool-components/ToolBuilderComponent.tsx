@@ -6,6 +6,7 @@ import { SaveToolDialog } from "@/src/components/tools/dialogs/SaveToolDialog";
 import ToolPlayground, { type ToolPlaygroundHandle } from "@/src/components/tools/ToolPlayground";
 import { Button } from "@/src/components/ui/button";
 import { UserAction } from "@/src/lib/agent/agent-types";
+import { resolveFileReferences, validateFileReferences } from "@/src/lib/agent/agent-helpers";
 import {
   abortExecution,
   createSuperglueClient,
@@ -48,10 +49,12 @@ interface ToolBuilderComponentProps {
     userMessage?: string,
     options?: { userActions?: UserAction[] },
   ) => Promise<void>;
+  bufferAction?: (action: UserAction) => void;
   onAbortStream?: () => void;
   onApplyChanges?: (config: Tool, diffs?: ToolDiff[]) => void;
   isPlayground?: boolean;
   currentPayload?: string;
+  filePayloads?: Record<string, any>;
 }
 
 export function ToolBuilderComponent({
@@ -59,10 +62,12 @@ export function ToolBuilderComponent({
   mode,
   onToolUpdate,
   sendAgentRequest,
+  bufferAction,
   onAbortStream,
   onApplyChanges,
   isPlayground = false,
   currentPayload,
+  filePayloads,
 }: ToolBuilderComponentProps) {
   const config = useConfig();
   const { refreshTools } = useTools();
@@ -121,13 +126,25 @@ export function ToolBuilderComponent({
     }
   }, [parsedOutput, tool.status, mode]);
 
-  // Initialize editable payload when tool completes
+  // Initialize editable payload when tool completes or is awaiting confirmation (for edit_tool)
   useEffect(() => {
-    if (tool.status === "completed" && (mode === "build" || mode === "fix")) {
-      const initialPayload = tool.input?.payload || {};
+    if (
+      (tool.status === "completed" || tool.status === "awaiting_confirmation") &&
+      (mode === "build" || mode === "fix")
+    ) {
+      const initialPayload =
+        isPlayground && currentPayload
+          ? (() => {
+              try {
+                return JSON.parse(currentPayload);
+              } catch {
+                return {};
+              }
+            })()
+          : tool.input?.payload || {};
       setEditablePayload(JSON.stringify(initialPayload, null, 2));
     }
-  }, [tool.status, mode, tool.input?.payload]);
+  }, [tool.status, mode, tool.input?.payload, isPlayground, currentPayload]);
 
   // Cleanup log subscription on unmount
   useEffect(() => {
@@ -165,76 +182,183 @@ export function ToolBuilderComponent({
     }
   };
 
-  const handleRunTool = async () => {
-    if (!currentConfig) return;
+  // Unified tool execution function
+  const executeToolConfig = useCallback(
+    async (options: {
+      toolConfig: any;
+      appliedChangesCount?: number;
+      overridePayload?: Record<string, any>;
+      toolNameForFeedback: string;
+      toolIdForFeedback?: string;
+    }) => {
+      const {
+        toolConfig,
+        appliedChangesCount = 0,
+        overridePayload,
+        toolNameForFeedback,
+        toolIdForFeedback,
+      } = options;
 
-    const runId = generateUUID();
-    currentRunIdRef.current = runId;
-    setIsRunning(true);
-    setRunResult(null);
-    setManualRunLogs([]);
+      const runId = generateUUID();
+      currentRunIdRef.current = runId;
+      setIsRunning(true);
+      setRunResult(null);
+      setManualRunLogs([]);
 
-    const client = new SuperglueClient({
-      endpoint: config.superglueEndpoint,
-      apiKey: tokenRegistry.getToken(),
-      apiEndpoint: config.apiEndpoint,
-    });
-
-    // Subscribe to logs for this specific run
-    try {
-      const subscription = await client.subscribeToLogs({
-        traceId: runId,
-        onLog: (log) => {
-          setManualRunLogs((prev) => [...prev, { message: log.message, timestamp: log.timestamp }]);
-        },
-        includeDebug: true,
+      const client = new SuperglueClient({
+        endpoint: config.superglueEndpoint,
+        apiKey: tokenRegistry.getToken(),
+        apiEndpoint: config.apiEndpoint,
       });
-      logSubscriptionRef.current = subscription;
-    } catch (e) {
-      console.warn("Could not subscribe to logs:", e);
-    }
 
-    // Parse payload - in playground mode prefer currentPayload prop, else use local editablePayload
-    let runPayload = tool.input?.payload || {};
-    try {
-      const payloadSource = isPlayground && currentPayload ? currentPayload : editablePayload;
-      if (payloadSource.trim()) {
-        runPayload = JSON.parse(payloadSource);
+      try {
+        const subscription = await client.subscribeToLogs({
+          traceId: runId,
+          onLog: (log) => {
+            setManualRunLogs((prev) => [
+              ...prev,
+              { message: log.message, timestamp: log.timestamp },
+            ]);
+          },
+          includeDebug: true,
+        });
+        logSubscriptionRef.current = subscription;
+      } catch (e) {
+        console.warn("Could not subscribe to logs:", e);
       }
-    } catch {
-      // Keep original payload if parsing fails
-    }
 
-    try {
-      const result = await client.executeWorkflow({
-        tool: currentConfig,
-        payload: runPayload,
-        runId,
-        traceId: runId,
-      });
-
-      setRunResult({
-        success: result.success,
-        data: result.data,
-        error: result.error,
-      });
-    } catch (error: any) {
-      setRunResult({
-        success: false,
-        error: error.message || "Execution failed",
-      });
-    } finally {
-      currentRunIdRef.current = null;
-      setIsRunning(false);
-      // Clean up log subscription
-      if (logSubscriptionRef.current) {
-        setTimeout(() => {
-          logSubscriptionRef.current?.unsubscribe();
+      const cleanup = () => {
+        currentRunIdRef.current = null;
+        setIsRunning(false);
+        if (logSubscriptionRef.current) {
+          logSubscriptionRef.current.unsubscribe();
           logSubscriptionRef.current = null;
-        }, 500);
+        }
+      };
+
+      const bufferFailure = (errorMsg: string) => {
+        if (bufferAction) {
+          bufferAction({
+            type: "tool_execution_feedback",
+            toolCallId: tool.id,
+            toolName: toolNameForFeedback,
+            feedback: "manual_run_failure",
+            data: {
+              toolId: toolIdForFeedback,
+              error: errorMsg,
+              appliedChanges: appliedChangesCount,
+            },
+          });
+        }
+      };
+
+      // Parse payload - in playground mode prefer the payload prop from tool input UI, else use the tool input payload
+      let runPayload = overridePayload || tool.input?.payload || {};
+      if (!overridePayload) {
+        try {
+          const payloadSource = isPlayground && currentPayload ? currentPayload : editablePayload;
+          if (payloadSource.trim()) {
+            runPayload = JSON.parse(payloadSource);
+          }
+        } catch {}
       }
-    }
-  };
+
+      // Validate file references
+      const validation = validateFileReferences(runPayload, filePayloads || {});
+      if (validation.valid === false) {
+        const errorMsg = `Missing files: ${validation.missingFiles.join(", ")}. ${validation.availableKeys.length > 0 ? `Available: ${validation.availableKeys.join(", ")}` : "No files uploaded in this session."}`;
+        setRunResult({ success: false, error: errorMsg });
+        cleanup();
+        bufferFailure(errorMsg);
+        return;
+      }
+
+      // Resolve file references
+      if (filePayloads && Object.keys(filePayloads).length > 0) {
+        try {
+          runPayload = resolveFileReferences(runPayload, filePayloads);
+        } catch (error: any) {
+          const errorMsg = error.message || "Failed to resolve file references";
+          setRunResult({ success: false, error: errorMsg });
+          cleanup();
+          bufferFailure(errorMsg);
+          return;
+        }
+      }
+
+      // Execute
+      try {
+        const result = await client.executeWorkflow({
+          tool: toolConfig,
+          payload: runPayload,
+          runId,
+          traceId: runId,
+        });
+
+        setRunResult({
+          success: result.success,
+          data: result.data,
+          error: result.error,
+        });
+
+        if (bufferAction) {
+          const feedbackType = result.success ? "manual_run_success" : "manual_run_failure";
+          const truncatedResult =
+            result.data !== undefined ? JSON.stringify(result.data).substring(0, 500) : undefined;
+          const truncatedError =
+            result.error && result.error.length > 500
+              ? `${result.error.slice(0, 500)}...`
+              : result.error;
+
+          bufferAction({
+            type: "tool_execution_feedback",
+            toolCallId: tool.id,
+            toolName: toolNameForFeedback,
+            feedback: feedbackType,
+            data: {
+              toolId: toolIdForFeedback,
+              result: result.success ? truncatedResult : undefined,
+              error: truncatedError,
+              appliedChanges: appliedChangesCount,
+            },
+          });
+        }
+      } catch (error: any) {
+        const errorMsg = error.message || "Execution failed";
+        setRunResult({ success: false, error: errorMsg });
+        bufferFailure(errorMsg);
+      } finally {
+        currentRunIdRef.current = null;
+        setIsRunning(false);
+        if (logSubscriptionRef.current) {
+          setTimeout(() => {
+            logSubscriptionRef.current?.unsubscribe();
+            logSubscriptionRef.current = null;
+          }, 500);
+        }
+      }
+    },
+    [
+      config.superglueEndpoint,
+      config.apiEndpoint,
+      filePayloads,
+      tool.input?.payload,
+      tool.id,
+      editablePayload,
+      isPlayground,
+      currentPayload,
+      bufferAction,
+    ],
+  );
+
+  const handleRunTool = useCallback(() => {
+    if (!currentConfig) return;
+    executeToolConfig({
+      toolConfig: currentConfig,
+      toolNameForFeedback: currentConfig?.id || "draft",
+      toolIdForFeedback: currentConfig?.id,
+    });
+  }, [currentConfig, executeToolConfig]);
 
   const handleToolSaved = (savedTool: any) => {
     setCurrentConfig(savedTool);
@@ -294,90 +418,22 @@ export function ToolBuilderComponent({
 
   // Handler for testing with approved diffs before final approval
   const handleRunWithApprovedDiffs = useCallback(
-    async (approvedDiffs: ToolDiff[]) => {
+    (approvedDiffs: ToolDiff[], overridePayload?: Record<string, any>) => {
       const originalConfig = parsedOutput?.originalConfig;
       if (!originalConfig || approvedDiffs.length === 0) return;
 
-      // Apply approved diffs to the original config to create test config
       const testConfig = applyDiffsToConfig(originalConfig, approvedDiffs);
+      const toolId = currentConfig?.id || originalConfig?.id;
 
-      const runId = generateUUID();
-      currentRunIdRef.current = runId;
-      setIsRunning(true);
-      setRunResult(null);
-      setManualRunLogs([]);
-
-      const client = new SuperglueClient({
-        endpoint: config.superglueEndpoint,
-        apiKey: tokenRegistry.getToken(),
-        apiEndpoint: config.apiEndpoint,
+      executeToolConfig({
+        toolConfig: testConfig,
+        appliedChangesCount: approvedDiffs.length,
+        overridePayload,
+        toolNameForFeedback: toolId || "draft",
+        toolIdForFeedback: toolId,
       });
-
-      try {
-        const subscription = await client.subscribeToLogs({
-          traceId: runId,
-          onLog: (log) => {
-            setManualRunLogs((prev) => [
-              ...prev,
-              { message: log.message, timestamp: log.timestamp },
-            ]);
-          },
-          includeDebug: true,
-        });
-        logSubscriptionRef.current = subscription;
-      } catch (e) {
-        console.warn("Could not subscribe to logs:", e);
-      }
-
-      // Parse payload - in playground mode prefer currentPayload prop, else use local editablePayload
-      let runPayload = tool.input?.payload || {};
-      try {
-        const payloadSource = isPlayground && currentPayload ? currentPayload : editablePayload;
-        if (payloadSource.trim()) {
-          runPayload = JSON.parse(payloadSource);
-        }
-      } catch {
-        // Keep original payload if parsing fails
-      }
-
-      try {
-        const result = await client.executeWorkflow({
-          tool: testConfig,
-          payload: runPayload,
-          runId,
-          traceId: runId,
-        });
-
-        setRunResult({
-          success: result.success,
-          data: result.data,
-          error: result.error,
-        });
-      } catch (error: any) {
-        setRunResult({
-          success: false,
-          error: error.message || "Execution failed",
-        });
-      } finally {
-        currentRunIdRef.current = null;
-        setIsRunning(false);
-        if (logSubscriptionRef.current) {
-          setTimeout(() => {
-            logSubscriptionRef.current?.unsubscribe();
-            logSubscriptionRef.current = null;
-          }, 500);
-        }
-      }
     },
-    [
-      parsedOutput,
-      config.superglueEndpoint,
-      config.apiEndpoint,
-      tool.input?.payload,
-      editablePayload,
-      isPlayground,
-      currentPayload,
-    ],
+    [parsedOutput, currentConfig, executeToolConfig],
   );
 
   // Compute status override for manual runs (after build/fix is complete)
@@ -459,6 +515,7 @@ export function ToolBuilderComponent({
                   isRunning={isRunning}
                   testLogs={manualRunLogs}
                   testResult={runResult}
+                  initialPayload={editablePayload}
                 />
               </div>
             ) : (
@@ -564,7 +621,7 @@ export function ToolBuilderComponent({
                     <div className="flex">
                       <Button
                         variant={!runResult ? "default" : "outline"}
-                        onClick={handleRunTool}
+                        onClick={() => handleRunTool()}
                         className="h-9 px-3 text-sm font-medium rounded-r-none"
                       >
                         <Play className="w-4 h-4 mr-1.5" />

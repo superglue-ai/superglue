@@ -1,13 +1,16 @@
 "use client";
 import { Button } from "@/src/components/ui/button";
 import { FileChip } from "@/src/components/ui/FileChip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
 import { Textarea } from "@/src/components/ui/textarea";
 import { cn, handleCopyCode } from "@/src/lib/general-utils";
+import { formatBytes } from "@/src/lib/file-utils";
 import { UserAction } from "@/src/lib/agent/agent-types";
 import { ALLOWED_FILE_EXTENSIONS, Message, ToolCall } from "@superglue/shared";
 import {
   AlertTriangle,
   BotMessageSquare,
+  ChevronUp,
   Edit2,
   Loader2,
   Paperclip,
@@ -17,7 +20,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { AgentContextProvider, useAgentContext } from "./AgentContextProvider";
 import { ConversationHistory } from "./ConversationHistory";
@@ -34,6 +37,7 @@ const MemoMessage = React.memo(
     onInputChange,
     onToolUpdate,
     sendAgentRequest,
+    bufferAction,
     onAbortStream,
     editingMessageId,
     editingContent,
@@ -43,6 +47,7 @@ const MemoMessage = React.memo(
     handleEditMessage,
     handleSaveEdit,
     handleCancelEdit,
+    filePayloads,
   }: {
     message: Message;
     onInputChange: (newInput: any) => void;
@@ -51,6 +56,7 @@ const MemoMessage = React.memo(
       userMessage?: string,
       options?: { userActions?: UserAction[] },
     ) => Promise<void>;
+    bufferAction?: (action: UserAction) => void;
     onAbortStream?: () => void;
     editingMessageId: string | null;
     editingContent: string;
@@ -60,6 +66,7 @@ const MemoMessage = React.memo(
     handleEditMessage: (messageId: string, content: string) => void;
     handleSaveEdit: (messageId: string) => void;
     handleCancelEdit: () => void;
+    filePayloads?: Record<string, any>;
   }) => {
     return (
       <div key={message.id} className={cn("flex gap-4 p-2 pt-4 rounded-xl group min-h-16")}>
@@ -109,20 +116,17 @@ const MemoMessage = React.memo(
           {message.role === "user" &&
             (message as any).attachedFiles &&
             (message as any).attachedFiles.length > 0 && (
-              <div className="space-y-1.5 mb-2">
-                <span className="text-xs text-muted-foreground">Files included:</span>
-                <div className="flex flex-wrap gap-2">
-                  {(message as any).attachedFiles.map((file: any) => (
-                    <FileChip
-                      key={file.key}
-                      file={file}
-                      size="compact"
-                      rounded="md"
-                      showOriginalName={true}
-                      maxWidth="250px"
-                    />
-                  ))}
-                </div>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {(message as any).attachedFiles.map((file: any) => (
+                  <FileChip
+                    key={file.key}
+                    file={file}
+                    size="compact"
+                    rounded="md"
+                    showOriginalName={true}
+                    maxWidth="250px"
+                  />
+                ))}
               </div>
             )}
 
@@ -175,7 +179,9 @@ const MemoMessage = React.memo(
                         onInputChange={onInputChange}
                         onToolUpdate={onToolUpdate}
                         sendAgentRequest={sendAgentRequest}
+                        bufferAction={bufferAction}
                         onAbortStream={onAbortStream}
+                        filePayloads={filePayloads}
                       />
                     );
                   }
@@ -200,7 +206,9 @@ const MemoMessage = React.memo(
                           onInputChange={onInputChange}
                           onToolUpdate={onToolUpdate}
                           sendAgentRequest={sendAgentRequest}
+                          bufferAction={bufferAction}
                           onAbortStream={onAbortStream}
+                          filePayloads={filePayloads}
                         />
                       ))}
                     </div>
@@ -241,13 +249,17 @@ function AgentInterfaceContent() {
     handleToolInputChange,
     handleToolUpdate,
     sendAgentRequest,
+    bufferAction,
     abortStream,
-    uploadedFiles,
+    pendingFiles,
+    sessionFiles,
+    filePayloads,
     isProcessingFiles,
     isDragging,
     fileInputRef,
     handleFilesUpload,
-    handleFileRemove,
+    handlePendingFileRemove,
+    handleSessionFileRemove,
     handleDrop,
     handleDragOver,
     handleDragLeave,
@@ -429,6 +441,7 @@ function AgentInterfaceContent() {
                     onInputChange={handleToolInputChange}
                     onToolUpdate={handleToolUpdate}
                     sendAgentRequest={sendAgentRequest}
+                    bufferAction={bufferAction}
                     onAbortStream={abortStream}
                     editingMessageId={editingMessageId}
                     editingContent={editingContent}
@@ -438,6 +451,7 @@ function AgentInterfaceContent() {
                     handleEditMessage={handleEditMessage}
                     handleSaveEdit={handleSaveEdit}
                     handleCancelEdit={handleCancelEdit}
+                    filePayloads={filePayloads}
                   />
                 ))}
             </>
@@ -464,13 +478,13 @@ function AgentInterfaceContent() {
                 </div>
               )}
 
-              {uploadedFiles.length > 0 && (
+              {pendingFiles.length > 0 && (
                 <div className="flex flex-wrap gap-2 px-4 pt-3">
-                  {uploadedFiles.map((file) => (
+                  {pendingFiles.map((file) => (
                     <FileChip
                       key={file.key}
                       file={file}
-                      onRemove={handleFileRemove}
+                      onRemove={handlePendingFileRemove}
                       size="compact"
                       rounded="md"
                       showOriginalName={true}
@@ -505,15 +519,65 @@ function AgentInterfaceContent() {
                 />
 
                 <div className="absolute right-3 bottom-3 flex items-end gap-1.5">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-9 w-9 p-0 rounded-xl hover:bg-muted/90 bg-muted dark:bg-neutral-800 border-2 border-border dark:border-white/30 shadow-sm"
-                    onClick={() => (fileInputRef.current as any)?.click()}
-                    disabled={isProcessingFiles}
+                  <div
+                    className={cn(
+                      "flex items-center rounded-xl overflow-hidden",
+                      sessionFiles.length > 0
+                        ? "border border-border/40 dark:border-white/10"
+                        : "border border-border/60 dark:border-white/20",
+                    )}
                   >
-                    <Paperclip className="w-5 h-5" />
-                  </Button>
+                    {sessionFiles.length > 0 && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="h-9 px-1.5 flex items-center justify-center hover:bg-muted bg-muted/80 dark:bg-neutral-800/80 dark:hover:bg-neutral-800 text-muted-foreground hover:text-foreground transition-colors border-r border-border/30 dark:border-white/10 gap-1">
+                            <span className="min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-medium bg-primary text-primary-foreground rounded-full">
+                              {sessionFiles.length}
+                            </span>
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-auto min-w-[250px] max-w-[250px] p-2"
+                          align="end"
+                          side="top"
+                          sideOffset={8}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-muted-foreground">
+                              Session Files ({sessionFiles.length})
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatBytes(sessionFiles.reduce((acc, f) => acc + (f.size || 0), 0))}
+                            </span>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto flex flex-col gap-1.5">
+                            {sessionFiles.map((file) => (
+                              <FileChip
+                                key={file.key}
+                                file={file}
+                                onRemove={handleSessionFileRemove}
+                                size="compact"
+                                rounded="md"
+                                showOriginalName={true}
+                                showSize={true}
+                                className="w-full"
+                              />
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-9 w-9 p-0 rounded-none hover:bg-muted bg-muted/80 dark:bg-neutral-800/80 dark:hover:bg-neutral-800 border-0"
+                      onClick={() => (fileInputRef.current as any)?.click()}
+                      disabled={isProcessingFiles}
+                    >
+                      <Paperclip className="w-5 h-5" />
+                    </Button>
+                  </div>
 
                   <Button
                     onClick={isLoading ? handleStopStreaming : onSendMessage}
@@ -548,9 +612,7 @@ function AgentInterfaceContent() {
                   ""
                 )}
               </span>
-              <span className="text-xs text-muted-foreground/60">
-                Press Enter to send • Shift+Enter for new line
-              </span>
+              <span className="text-xs text-muted-foreground/60">Press Enter to send</span>
             </div>
           </div>
         </div>

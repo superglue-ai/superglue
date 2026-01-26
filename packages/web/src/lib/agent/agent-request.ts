@@ -13,6 +13,7 @@ import {
   UserAction,
   ToolConfirmationAction,
   ToolExecutionFeedback,
+  FileUploadAction,
 } from "./agent-types";
 
 function validateUserActions(actions: any[]): void {
@@ -32,13 +33,23 @@ function validateUserActions(actions: any[]): void {
         throw new Error("ToolExecutionFeedback requires toolCallId, toolName, and feedback");
       }
       if (
-        !["manual_run", "request_fix", "save_success", "oauth_success", "oauth_failure"].includes(
-          action.feedback,
-        )
+        ![
+          "manual_run",
+          "manual_run_success",
+          "manual_run_failure",
+          "request_fix",
+          "save_success",
+          "oauth_success",
+          "oauth_failure",
+        ].includes(action.feedback)
       ) {
         throw new Error(
-          "ToolExecutionFeedback.feedback must be manual_run, request_fix, save_success, oauth_success, or oauth_failure",
+          "ToolExecutionFeedback.feedback must be manual_run, manual_run_success, manual_run_failure, request_fix, save_success, oauth_success, or oauth_failure",
         );
+      }
+    } else if (action.type === "file_upload") {
+      if (!action.files || !Array.isArray(action.files)) {
+        throw new Error("FileUploadAction requires files array");
       }
     } else {
       throw new Error(`Unknown UserAction type: ${action.type}`);
@@ -201,6 +212,26 @@ function buildFeedbackContinuation(action: ToolExecutionFeedback): string {
   switch (action.feedback) {
     case "manual_run":
       return `[USER ACTION] User manually ran tool "${action.toolName}". Result: ${JSON.stringify(action.data)}`;
+    case "manual_run_success": {
+      const successData = action.data || {};
+      const changesApplied =
+        successData.appliedChanges > 0
+          ? ` with ${successData.appliedChanges} pending change(s) applied`
+          : "";
+      const truncatedResult =
+        successData.result !== undefined
+          ? JSON.stringify(successData.result).substring(0, 500)
+          : "No result data";
+      return `[USER ACTION] User tested the tool "${action.toolName}"${changesApplied}. Execution succeeded. Result preview: ${truncatedResult}`;
+    }
+    case "manual_run_failure": {
+      const failData = action.data || {};
+      const failChangesApplied =
+        failData.appliedChanges > 0
+          ? ` with ${failData.appliedChanges} pending change(s) applied`
+          : "";
+      return `[USER ACTION] User tested the tool "${action.toolName}"${failChangesApplied} but it FAILED with error: ${failData.error || "Unknown error"}. Please analyze the error and fix the tool configuration using edit_tool.`;
+    }
     case "request_fix":
       return `[USER ACTION] User clicked "Request Fix" for tool "${action.toolName}". Error: ${action.data}. Please fix using edit_tool.`;
     case "save_success":
@@ -220,6 +251,13 @@ function processToolFeedback(
   return { messages, continuation };
 }
 
+function processFileUpload(
+  _action: FileUploadAction,
+  messages: Message[],
+): { messages: Message[]; continuation: string | null } {
+  return { messages, continuation: null };
+}
+
 function processUserAction(
   action: UserAction,
   messages: Message[],
@@ -229,6 +267,8 @@ function processUserAction(
       return processToolConfirmation(action, messages);
     case "tool_execution_feedback":
       return processToolFeedback(action, messages);
+    case "file_upload":
+      return processFileUpload(action, messages);
   }
 }
 
@@ -253,6 +293,8 @@ function processUserActions(
 function buildContextInjection(
   hiddenContext?: string,
   filePayloads?: Record<string, { name: string; content: any }>,
+  userActions?: UserAction[],
+  messages?: Message[],
 ): string | null {
   const parts: string[] = [];
 
@@ -260,11 +302,41 @@ function buildContextInjection(
     parts.push(hiddenContext);
   }
 
-  if (filePayloads && Object.keys(filePayloads).length > 0) {
-    const fileRefs = Object.entries(filePayloads)
+  const hasFiles = filePayloads && Object.keys(filePayloads).length > 0;
+
+  if (hasFiles) {
+    const fileRefs = Object.entries(filePayloads!)
       .map(([key, { name }]) => `- ${name} => file::${key}`)
       .join("\n");
-    parts.push(`[SYSTEM] Files available (use file::key to reference):\n${fileRefs}`);
+    parts.push(`[SYSTEM] Files available in session (use file::key to reference):\n${fileRefs}`);
+  } else {
+    const conversationMentionsFiles =
+      messages?.some((m) => {
+        if (m.content?.includes("file::") || m.content?.includes("uploaded")) return true;
+        if (m.tools) {
+          return m.tools.some((t: any) => {
+            const resultStr = JSON.stringify(t.result || t.args || {});
+            return resultStr.includes("file::") || resultStr.includes("Files available");
+          });
+        }
+        return false;
+      }) ?? false;
+
+    if (conversationMentionsFiles) {
+      parts.push(
+        `[SYSTEM] IMPORTANT: No files are currently available in this session. Files are stored in browser memory and are cleared on page refresh. If the conversation history mentions files that were previously uploaded, those files are NO LONGER AVAILABLE. You MUST ask the user to re-upload the files before making any tool calls that require file content. Do NOT attempt to use file:: references until the user has re-uploaded the files.`,
+      );
+    }
+  }
+
+  const fileUploadAction = userActions?.find(
+    (a): a is FileUploadAction => a.type === "file_upload",
+  );
+  if (fileUploadAction && fileUploadAction.files.length > 0) {
+    const previews = fileUploadAction.files
+      .map((f) => `### ${f.name} (file::${f.key})\n\`\`\`\n${f.contentPreview}\n\`\`\``)
+      .join("\n\n");
+    parts.push(`[SYSTEM] File content previews:\n${previews}`);
   }
 
   return parts.length > 0 ? parts.join("\n\n") : null;
@@ -376,7 +448,12 @@ export async function prepareMessages(
     continuations = result.continuations;
   }
 
-  const contextInjection = buildContextInjection(request.hiddenContext, request.filePayloads);
+  const contextInjection = buildContextInjection(
+    request.hiddenContext,
+    request.filePayloads,
+    request.userActions,
+    messages,
+  );
 
   const userTurn = buildUserTurn(contextInjection, continuations, request.userMessage);
   if (userTurn) {

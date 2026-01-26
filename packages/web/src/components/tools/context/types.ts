@@ -43,6 +43,7 @@ export interface ToolConfigContextValue {
   setPayloadText: (text: string) => void;
   setUploadedFiles: (files: UploadedFileInfo[]) => void;
   setFilePayloads: (payloads: Record<string, any>) => void;
+  setFilesAndPayloads: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
   markPayloadEdited: () => void;
 
   addStep: (step: ExecutionStep, afterIndex?: number) => void;

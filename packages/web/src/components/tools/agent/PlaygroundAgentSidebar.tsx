@@ -66,7 +66,7 @@ function buildPlaygroundContext(
     systemIds,
     executionSummary,
     initialError,
-    currentPayload: payload.manualPayloadText || "{}",
+    currentPayload: JSON.stringify(payload.computedPayload || {}, null, 2),
   };
 }
 
@@ -89,6 +89,7 @@ function PlaygroundAgentContent({
     handleToolInputChange,
     handleToolUpdate,
     sendAgentRequest,
+    bufferAction,
     currentConversationId,
     setCurrentConversationId,
     loadConversation,
@@ -193,7 +194,7 @@ function PlaygroundAgentContent({
     [toolConfig],
   );
 
-  const currentPayload = toolConfig.payload.manualPayloadText || "{}";
+  const currentPayload = JSON.stringify(toolConfig.payload.computedPayload || {}, null, 2);
 
   const handleSubmit = useCallback(
     (e?: React.FormEvent) => {
@@ -362,6 +363,7 @@ function PlaygroundAgentContent({
                               onInputChange={handleToolInputChange}
                               onToolUpdate={handleToolUpdate}
                               sendAgentRequest={sendAgentRequest}
+                              bufferAction={bufferAction}
                               onAbortStream={stopStreaming}
                               onApplyChanges={handleApplyChanges}
                               onApplyPayload={handleApplyPayload}
@@ -430,12 +432,23 @@ export function PlaygroundAgentSidebar({
   const hiddenContextBuilder = useCallback(() => {
     const executionSummary = execution.getExecutionStateSummary();
     const ctx = buildPlaygroundContext(toolConfig, executionSummary, initialError);
+    const { payload } = toolConfig;
+    const uploadedFiles = payload.uploadedFiles.map((f) => ({
+      name: f.name,
+      key: f.key,
+      status: f.status,
+    }));
+    const mergedPayload =
+      uploadedFiles.length > 0 ? JSON.stringify(payload.computedPayload, null, 2) : undefined;
+
     return formatPlaygroundRuntimeContext({
       toolId: ctx.toolId,
       instruction: ctx.instruction,
       stepsCount: ctx.steps.length,
       currentPayload: ctx.currentPayload || "{}",
       executionSummary: ctx.executionSummary,
+      uploadedFiles: uploadedFiles.length > 0 ? uploadedFiles : undefined,
+      mergedPayload,
     });
   }, [toolConfig, execution, initialError]);
 
