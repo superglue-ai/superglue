@@ -3,6 +3,7 @@
 import { useConfig } from "@/src/app/config-context";
 import { useSystems } from "@/src/app/systems-context";
 import { Button } from "@/src/components/ui/button";
+import { UserAction } from "@/src/lib/agent/agent-types";
 import { triggerOAuthFlow } from "@/src/lib/oauth-utils";
 import { tokenRegistry } from "@/src/lib/token-registry";
 import { SuperglueClient, systems as templateSystems, ToolCall } from "@superglue/shared";
@@ -13,16 +14,17 @@ import { ToolCallWrapper } from "./ToolComponentWrapper";
 interface AuthenticateOAuthComponentProps {
   tool: ToolCall;
   onInputChange: (newInput: any) => void;
-  onOAuthComplete?: (toolCallId: string, systemData: any) => void;
-  onSystemMessage?: (message: string, options?: { triggerImmediateResponse?: boolean }) => void;
+  sendAgentRequest?: (
+    userMessage?: string,
+    options?: { userActions?: UserAction[] },
+  ) => Promise<void>;
   onAbortStream?: () => void;
 }
 
 export function AuthenticateOAuthComponent({
   tool,
   onInputChange,
-  onOAuthComplete,
-  onSystemMessage,
+  sendAgentRequest,
   onAbortStream,
 }: AuthenticateOAuthComponentProps) {
   const config = useConfig();
@@ -73,19 +75,21 @@ export function AuthenticateOAuthComponent({
       const handleOAuthError = (error: string) => {
         setButtonState("error");
         setErrorMessage(error);
-
-        // Report error to agent so it can help troubleshoot
-        if (onSystemMessage) {
-          onSystemMessage(
-            `[SYSTEM] OAuth authentication failed for "${systemId}". Error: ${error}. Help the user troubleshoot this issue.`,
-            { triggerImmediateResponse: true },
-          );
-        }
+        sendAgentRequest?.(undefined, {
+          userActions: [
+            {
+              type: "tool_execution_feedback",
+              toolCallId: tool.id,
+              toolName: "authenticate_oauth",
+              feedback: "oauth_failure",
+              data: { systemId, error },
+            },
+          ],
+        });
       };
 
       const handleOAuthSuccess = async (tokens: any) => {
         if (tokens) {
-          // Update the system with the OAuth tokens
           const client = new SuperglueClient({
             endpoint: config.superglueEndpoint,
             apiKey: tokenRegistry.getToken(),
@@ -93,38 +97,38 @@ export function AuthenticateOAuthComponent({
           });
 
           try {
-            // Get current system and update credentials
             const currentSystem = await client.getSystem(systemId);
             const updatedCredentials = {
               ...currentSystem?.credentials,
-              // Save OAuth config (client_id, client_secret, URLs) so they persist for token refresh
               ...(oauthConfig.client_id && { client_id: oauthConfig.client_id }),
               ...(oauthConfig.client_secret && { client_secret: oauthConfig.client_secret }),
               ...(oauthConfig.auth_url && { auth_url: oauthConfig.auth_url }),
               ...(oauthConfig.token_url && { token_url: oauthConfig.token_url }),
               ...(oauthConfig.scopes && { scopes: oauthConfig.scopes }),
               ...(oauthConfig.grant_type && { grant_type: oauthConfig.grant_type }),
-              // Save the tokens
               access_token: tokens.access_token,
               refresh_token: tokens.refresh_token,
               token_type: tokens.token_type,
               expires_at: tokens.expires_at,
             };
 
-            // Save updated system - only pass allowed fields
             await client.upsertSystem(systemId, {
               credentials: updatedCredentials,
             });
 
             setButtonState("completed");
             refreshSystems();
-
-            if (onSystemMessage) {
-              onSystemMessage(
-                `[SYSTEM] OAuth authentication for "${systemId}" completed successfully. Access token saved. Inform the user that authentication is complete and the system is ready to use, suggest to test it.`,
-                { triggerImmediateResponse: true },
-              );
-            }
+            sendAgentRequest?.(undefined, {
+              userActions: [
+                {
+                  type: "tool_execution_feedback",
+                  toolCallId: tool.id,
+                  toolName: "authenticate_oauth",
+                  feedback: "oauth_success",
+                  data: { systemId },
+                },
+              ],
+            });
           } catch (error: any) {
             handleOAuthError(`Failed to save tokens: ${error.message}`);
           }
@@ -160,11 +164,11 @@ export function AuthenticateOAuthComponent({
     systemId,
     oauthConfig,
     config.superglueEndpoint,
-    onOAuthComplete,
-    onSystemMessage,
+    config.apiEndpoint,
     onAbortStream,
     tool.id,
     refreshSystems,
+    sendAgentRequest,
   ]);
 
   // Render states
@@ -197,7 +201,7 @@ export function AuthenticateOAuthComponent({
   }
 
   return (
-    <ToolCallWrapper tool={tool} openByDefault={true}>
+    <ToolCallWrapper tool={tool} openByDefault={buttonState !== "completed"}>
       <div className="space-y-4">
         {/* System info */}
         {system && (
@@ -207,14 +211,6 @@ export function AuthenticateOAuthComponent({
             {system.urlHost && (
               <span className="text-muted-foreground ml-2">({system.urlHost})</span>
             )}
-          </div>
-        )}
-
-        {/* OAuth scopes if provided */}
-        {oauthConfig.scopes && (
-          <div className="text-sm">
-            <span className="text-muted-foreground">Scopes: </span>
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">{oauthConfig.scopes}</code>
           </div>
         )}
 

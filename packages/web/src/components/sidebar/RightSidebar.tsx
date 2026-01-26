@@ -11,10 +11,10 @@ import { useConfig } from "@/src/app/config-context";
 import { tokenRegistry } from "@/src/lib/token-registry";
 import { useRightSidebar } from "./RightSidebarContext";
 
-const SIDEBAR_MIN_WIDTH = 400;
+const SIDEBAR_MIN_WIDTH = 300;
 const SIDEBAR_MAX_WIDTH = 700;
-const SIDEBAR_DEFAULT_WIDTH = 400;
-const SIDEBAR_COLLAPSED_WIDTH = 48;
+const SIDEBAR_DEFAULT_WIDTH = 350;
+const SIDEBAR_COLLAPSED_WIDTH = 45;
 
 type ActivePanel = "logs" | "agent";
 

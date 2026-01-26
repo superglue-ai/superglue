@@ -1,4 +1,11 @@
 export { AuthenticateOAuthComponent } from "./AuthenticateOAuthComponent";
+export {
+  BackgroundToolIndicator,
+  BackgroundToolGroup,
+  BACKGROUND_TOOL_NAMES,
+  groupMessageParts,
+  type GroupedPart,
+} from "./BackgroundToolIndicator";
 export { CallEndpointComponent } from "./CallEndpointComponent";
 export { CreateSystemComponent } from "./CreateSystemComponent";
 export { DefaultComponent } from "./DefaultComponent";

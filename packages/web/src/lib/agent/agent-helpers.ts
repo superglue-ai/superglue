@@ -1,8 +1,4 @@
 import { System, Tool } from "@superglue/shared";
-import {
-  TOOLS_REQUIRING_CONFIRMATION_BEFORE_EXEC,
-  TOOLS_REQUIRING_CONFIRMATION_AFTER_EXEC,
-} from "./agent-tools";
 
 export const stripLegacyToolFields = (tool: Tool): Tool => {
   return {
@@ -125,12 +121,4 @@ export const validateRequiredFields = (
   }
 
   return { valid: true };
-};
-
-export const requiresConfirmationBeforeExec = (toolName: string): boolean => {
-  return TOOLS_REQUIRING_CONFIRMATION_BEFORE_EXEC.has(toolName);
-};
-
-export const requiresConfirmationAfterExec = (toolName: string): boolean => {
-  return TOOLS_REQUIRING_CONFIRMATION_AFTER_EXEC.has(toolName);
 };

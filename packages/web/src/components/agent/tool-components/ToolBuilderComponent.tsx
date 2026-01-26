@@ -5,7 +5,7 @@ import { useTools } from "@/src/app/tools-context";
 import { SaveToolDialog } from "@/src/components/tools/dialogs/SaveToolDialog";
 import ToolPlayground, { type ToolPlaygroundHandle } from "@/src/components/tools/ToolPlayground";
 import { Button } from "@/src/components/ui/button";
-import { EDIT_TOOL_CONFIRMATION } from "@/src/lib/agent/agent-tools";
+import { UserAction } from "@/src/lib/agent/agent-types";
 import {
   abortExecution,
   createSuperglueClient,
@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JsonCodeEditor } from "../../editors/JsonCodeEditor";
-import { DeployButton } from "../../tools/deploy/DeployButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "../../ui/dropdown-menu";
 import { DiffApprovalComponent } from "./DiffApprovalComponent";
 import { DiffDisplay, ToolDiff } from "./DiffDisplayComponent";
@@ -45,8 +44,10 @@ interface ToolBuilderComponentProps {
   mode: ToolMode;
   onInputChange: (newInput: any) => void;
   onToolUpdate?: (toolCallId: string, updates: Partial<ToolCall>) => void;
-  onSystemMessage?: (message: string, options?: { triggerImmediateResponse?: boolean }) => void;
-  onTriggerContinuation?: () => void;
+  sendAgentRequest?: (
+    userMessage?: string,
+    options?: { userActions?: UserAction[] },
+  ) => Promise<void>;
   onAbortStream?: () => void;
   onApplyChanges?: (config: Tool, diffs?: ToolDiff[]) => void;
   isPlayground?: boolean;
@@ -56,9 +57,8 @@ interface ToolBuilderComponentProps {
 export function ToolBuilderComponent({
   tool,
   mode,
-  onSystemMessage,
   onToolUpdate,
-  onTriggerContinuation,
+  sendAgentRequest,
   onAbortStream,
   onApplyChanges,
   isPlayground = false,
@@ -174,12 +174,6 @@ export function ToolBuilderComponent({
     setRunResult(null);
     setManualRunLogs([]);
 
-    // Notify agent that user is running the tool
-    onSystemMessage?.(
-      `[USER ACTION] User clicked "Run Tool" for tool "${currentConfig.id}". Executing now...`,
-      { triggerImmediateResponse: false },
-    );
-
     const client = new SuperglueClient({
       endpoint: config.superglueEndpoint,
       apiKey: tokenRegistry.getToken(),
@@ -224,30 +218,11 @@ export function ToolBuilderComponent({
         data: result.data,
         error: result.error,
       });
-
-      if (result.success) {
-        // Notify agent of success
-        onSystemMessage?.(
-          `[USER ACTION] Tool "${currentConfig.id}" executed successfully. Result: ${JSON.stringify(result.data).substring(0, 500)}`,
-          { triggerImmediateResponse: false },
-        );
-      } else {
-        // Notify agent of failure
-        onSystemMessage?.(
-          `[USER ACTION] Tool "${currentConfig.id}" execution failed. Error: ${result.error}`,
-          { triggerImmediateResponse: false },
-        );
-      }
     } catch (error: any) {
       setRunResult({
         success: false,
         error: error.message || "Execution failed",
       });
-      // Notify agent of error
-      onSystemMessage?.(
-        `[USER ACTION] Tool "${currentConfig.id}" execution failed with error: ${error.message}`,
-        { triggerImmediateResponse: false },
-      );
     } finally {
       currentRunIdRef.current = null;
       setIsRunning(false);
@@ -265,9 +240,6 @@ export function ToolBuilderComponent({
     setCurrentConfig(savedTool);
     setToolSaved(true);
     refreshTools();
-    onSystemMessage?.(`[SYSTEM] Tool "${savedTool.id}" saved.`, {
-      triggerImmediateResponse: false,
-    });
   };
 
   // Running state (build/fix in progress, or run_tool executing)
@@ -282,12 +254,10 @@ export function ToolBuilderComponent({
       approvedDiffs: ToolDiff[];
       rejectedDiffs: ToolDiff[];
     }) => {
-      if (!onToolUpdate || !onTriggerContinuation) return;
+      if (!sendAgentRequest) return;
 
       setHasActedOnDiffs(true);
-      onAbortStream?.();
 
-      // Apply only the approved diffs to the original config (partial application)
       const originalConfig = parsedOutput?.originalConfig;
       if (
         (result.approved || result.partial) &&
@@ -299,27 +269,27 @@ export function ToolBuilderComponent({
         onApplyChanges?.(newConfig, result.approvedDiffs);
       }
 
-      const confirmationState = result.approved
-        ? EDIT_TOOL_CONFIRMATION.APPROVED
-        : result.partial
-          ? EDIT_TOOL_CONFIRMATION.PARTIAL
-          : EDIT_TOOL_CONFIRMATION.REJECTED;
-
-      onToolUpdate(tool.id, {
-        output: JSON.stringify({
-          ...parsedOutput,
-          confirmationState,
-          approvedDiffs: result.approvedDiffs,
-          rejectedDiffs: result.rejectedDiffs,
-        }),
+      const action = result.approved ? "confirmed" : result.partial ? "partial" : "declined";
+      onToolUpdate?.(tool.id, {
         status: result.approved || result.partial ? "completed" : "declined",
       });
 
-      setTimeout(() => {
-        onTriggerContinuation();
-      }, 100);
+      sendAgentRequest(undefined, {
+        userActions: [
+          {
+            type: "tool_confirmation",
+            toolCallId: tool.id,
+            toolName: "edit_tool",
+            action,
+            data: {
+              appliedChanges: result.approvedDiffs,
+              rejectedChanges: result.rejectedDiffs,
+            },
+          },
+        ],
+      });
     },
-    [onToolUpdate, onTriggerContinuation, onAbortStream, onApplyChanges, parsedOutput, tool.id],
+    [sendAgentRequest, onApplyChanges, parsedOutput, tool.id, onToolUpdate],
   );
 
   // Handler for testing with approved diffs before final approval
@@ -336,11 +306,6 @@ export function ToolBuilderComponent({
       setIsRunning(true);
       setRunResult(null);
       setManualRunLogs([]);
-
-      onSystemMessage?.(
-        `[USER ACTION] User clicked "Test ${approvedDiffs.length} change${approvedDiffs.length !== 1 ? "s" : ""}" for tool "${testConfig.id}". Testing proposed changes before approval...`,
-        { triggerImmediateResponse: false },
-      );
 
       const client = new SuperglueClient({
         endpoint: config.superglueEndpoint,
@@ -388,27 +353,11 @@ export function ToolBuilderComponent({
           data: result.data,
           error: result.error,
         });
-
-        if (result.success) {
-          onSystemMessage?.(
-            `[USER ACTION] Test run for tool "${testConfig.id}" succeeded. Changes can now be applied with confidence.`,
-            { triggerImmediateResponse: false },
-          );
-        } else {
-          onSystemMessage?.(
-            `[USER ACTION] Test run for tool "${testConfig.id}" failed. Error: ${result.error}. User may want to adjust their diff selections.`,
-            { triggerImmediateResponse: false },
-          );
-        }
       } catch (error: any) {
         setRunResult({
           success: false,
           error: error.message || "Execution failed",
         });
-        onSystemMessage?.(
-          `[USER ACTION] Test run for tool "${testConfig.id}" failed with error: ${error.message}`,
-          { triggerImmediateResponse: false },
-        );
       } finally {
         currentRunIdRef.current = null;
         setIsRunning(false);
@@ -423,11 +372,11 @@ export function ToolBuilderComponent({
     [
       parsedOutput,
       config.superglueEndpoint,
+      config.apiEndpoint,
       tool.input?.payload,
       editablePayload,
       isPlayground,
       currentPayload,
-      onSystemMessage,
     ],
   );
 
@@ -675,58 +624,36 @@ export function ToolBuilderComponent({
                   Edit
                 </Button>
                 {/* Save: default if run succeeded, outline otherwise */}
-                {!toolSaved ? (
-                  <Button
-                    variant={runResult?.success ? "default" : "outline"}
-                    onClick={() => setShowSaveDialog(true)}
-                    disabled={isRunning}
-                    className="h-9 px-3 text-sm font-medium hidden md:flex"
-                  >
-                    <Save className="w-4 h-4 mr-1.5" />
-                    Save
-                  </Button>
-                ) : (
-                  <DeployButton
-                    tool={currentConfig}
-                    payload={tool.input?.payload || {}}
-                    disabled={isRunning}
-                    className="h-9 px-3 text-sm font-medium hidden md:flex"
-                  />
-                )}
+                <Button
+                  variant={runResult?.success ? "default" : "outline"}
+                  onClick={() => setShowSaveDialog(true)}
+                  disabled={isRunning || toolSaved}
+                  className="h-9 px-3 text-sm font-medium hidden md:flex"
+                >
+                  <Save className="w-4 h-4 mr-1.5" />
+                  {toolSaved ? "Saved" : "Save"}
+                </Button>
                 {/* Request Fix: shown if run failed */}
                 {runResult && !runResult.success && !isRunning && !fixRequested && (
                   <Button
                     variant="default"
                     onClick={() => {
                       setFixRequested(true);
-                      const configSummary = currentConfig
-                        ? JSON.stringify(
-                            {
-                              id: currentConfig.id,
-                              instruction: currentConfig.instruction,
-                              steps: currentConfig.steps,
-                              responseSchema: currentConfig.responseSchema,
-                              systemIds: currentConfig.systemIds,
-                            },
-                            null,
-                            2,
-                          )
-                        : "unknown";
-                      const draftId = parsedOutput?.draftId;
-                      const idParam = draftId
-                        ? `draftId "${draftId}"`
-                        : `toolId "${currentConfig?.id}"`;
-                      const idInfo = draftId
-                        ? `Draft ID: ${draftId}`
-                        : `Tool ID: ${currentConfig?.id}`;
                       const truncatedError =
                         runResult.error && runResult.error.length > 500
                           ? `${runResult.error.slice(0, 500)}...`
                           : runResult.error;
-                      onSystemMessage?.(
-                        `[USER ACTION] User clicked "Request Fix" for tool "${currentConfig?.id}". The tool execution failed with error: ${truncatedError}\n\n${idInfo}\n\nCurrent tool configuration:\n${configSummary}\n\nPlease fix this tool using edit_tool with ${idParam}.`,
-                        { triggerImmediateResponse: true },
-                      );
+                      sendAgentRequest?.(undefined, {
+                        userActions: [
+                          {
+                            type: "tool_execution_feedback",
+                            toolCallId: tool.id,
+                            toolName: "run_tool",
+                            feedback: "request_fix",
+                            data: truncatedError,
+                          },
+                        ],
+                      });
                     }}
                     className="h-9 px-3 text-sm font-medium"
                   >

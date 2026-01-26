@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/src/components/ui/button";
-import { CURL_CONFIRMATION } from "@/src/lib/agent/agent-tools";
+import { UserAction } from "@/src/lib/agent/agent-types";
 import { ToolCall } from "@superglue/shared";
 import {
   AlertCircle,
@@ -19,7 +19,10 @@ interface CallEndpointComponentProps {
   tool: ToolCall;
   onInputChange: (newInput: any) => void;
   onToolUpdate?: (toolCallId: string, updates: Partial<ToolCall>) => void;
-  onTriggerContinuation?: () => void;
+  sendAgentRequest?: (
+    userMessage?: string,
+    options?: { userActions?: UserAction[] },
+  ) => Promise<void>;
   onAbortStream?: () => void;
 }
 
@@ -27,7 +30,7 @@ export function CallEndpointComponent({
   tool,
   onInputChange,
   onToolUpdate,
-  onTriggerContinuation,
+  sendAgentRequest,
   onAbortStream,
 }: CallEndpointComponentProps) {
   const isAwaitingConfirmation = tool.status === "awaiting_confirmation";
@@ -78,43 +81,39 @@ export function CallEndpointComponent({
   };
 
   const handleConfirm = () => {
-    if (!onToolUpdate || !onTriggerContinuation) return;
+    if (!sendAgentRequest) return;
 
-    // Stop the agent stream when user clicks action button
     onAbortStream?.();
+    onToolUpdate?.(tool.id, { status: "running" });
 
-    onToolUpdate(tool.id, {
-      output: JSON.stringify({
-        confirmationState: CURL_CONFIRMATION.CONFIRMED,
-        ...tool.input,
-      }),
-      status: "running",
+    sendAgentRequest(undefined, {
+      userActions: [
+        {
+          type: "tool_confirmation",
+          toolCallId: tool.id,
+          toolName: "call_endpoint",
+          action: "confirmed",
+        },
+      ],
     });
-
-    setTimeout(() => {
-      onTriggerContinuation();
-    }, 100);
   };
 
   const handleCancel = () => {
-    if (!onToolUpdate || !onTriggerContinuation) return;
+    if (!sendAgentRequest) return;
 
-    // Stop the agent stream when user clicks action button
     onAbortStream?.();
+    onToolUpdate?.(tool.id, { status: "declined" });
 
-    onToolUpdate(tool.id, {
-      output: JSON.stringify({
-        confirmationState: CURL_CONFIRMATION.CANCELLED,
-        success: false,
-        cancelled: true,
-        message: "Request declined by user",
-      }),
-      status: "declined",
+    sendAgentRequest(undefined, {
+      userActions: [
+        {
+          type: "tool_confirmation",
+          toolCallId: tool.id,
+          toolName: "call_endpoint",
+          action: "declined",
+        },
+      ],
     });
-
-    setTimeout(() => {
-      onTriggerContinuation();
-    }, 100);
   };
 
   const copyToClipboard = async (content: string, type: "curl" | "response") => {
@@ -164,7 +163,7 @@ export function CallEndpointComponent({
   };
 
   return (
-    <ToolCallWrapper tool={tool} openByDefault={true}>
+    <ToolCallWrapper tool={tool} openByDefault={!isDeclined}>
       <div className="space-y-3">
         <div className="flex items-start gap-3">
           <button

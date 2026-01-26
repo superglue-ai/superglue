@@ -19,8 +19,8 @@ const EXAMPLES = {
       "Dont answer using emojies! You are explaining Superglue's capabilities to a new user. Be comprehensive but concise. Answer in a nice Markdown format. To the first question, answer in about 10 sentences. Dont use emohies like the rocket or checkmarks or any other.",
   },
   SYSTEM: {
-    title: "Set up a system",
-    description: "Let superglue build your first system",
+    title: "Set up an integration",
+    description: "Let superglue build your first integration",
     user: "Hey superglue, can you help me set up a system?",
     system:
       "You are helping the user build a system. Ask with which system they want to connect with - give a couple examples like slack, github, asana, etc. Group them into categories. Explain to the user that you might need an api key or oauth credentials for some systems, but superglue will help with the setup. Answer in less than 5 sentences.",

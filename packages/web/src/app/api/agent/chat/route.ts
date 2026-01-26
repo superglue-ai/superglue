@@ -1,14 +1,22 @@
 "use server";
 
-import { AgentClient, ToolSet } from "@/src/lib/agent/agent-client";
-import { generateInitialContext, injectContextIntoMessages } from "@/src/lib/agent/agent-context";
+import { AgentClient } from "@/src/lib/agent/agent-client";
 import { authenticateNextJSApiRequest } from "@/src/lib/api-auth";
-import { Message, SuperglueClient } from "@superglue/shared";
 import { NextRequest, NextResponse } from "next/server";
 
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
 export async function POST(request: NextRequest) {
+  let client: AgentClient | null = null;
+
   try {
-    // Authenticate the request
     const token = await authenticateNextJSApiRequest(request);
     if (!token) {
       return NextResponse.json(
@@ -17,45 +25,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = (await request.json()) as {
-      messages: Array<Message>;
-      filePayloads?: Record<string, any>;
-      toolSet?: ToolSet;
-    };
-    let { messages, filePayloads } = body;
-    const toolSet = (body.toolSet ?? "agent") as ToolSet;
+    const body = await request.json();
 
-    if (!messages || !Array.isArray(messages)) {
-      return NextResponse.json({ error: "Invalid messages format" }, { status: 400 });
-    }
-
-    // Always inject context into first user message (frontend doesn't preserve it)
-    const superglueClient = new SuperglueClient({
-      endpoint: process.env.GRAPHQL_ENDPOINT!,
-      apiKey: token,
+    client = new AgentClient({
+      token,
+      graphqlEndpoint: process.env.GRAPHQL_ENDPOINT!,
       apiEndpoint: process.env.API_ENDPOINT,
+      abortSignal: request.signal,
     });
-    const context = await generateInitialContext(superglueClient);
-    messages = injectContextIntoMessages(messages, context);
 
-    // Get abort signal from request to handle client disconnection
-    const abortSignal = request.signal;
-
-    const client = new AgentClient(token, filePayloads, abortSignal, toolSet);
+    try {
+      client.validateRequest(body);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Agent request validation failed." },
+        { status: 400 },
+      );
+    }
 
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const chunk of client.streamLLMResponse(messages)) {
-            // Check if client disconnected
-            if (abortSignal.aborted) {
+          for await (const chunk of client!.streamResponse(body)) {
+            if (request.signal.aborted) {
               break;
             }
             try {
               const data = `data: ${JSON.stringify(chunk)}\n\n`;
               controller.enqueue(encoder.encode(data));
-            } catch (enqueueError) {
+            } catch {
               break;
             }
           }
@@ -63,7 +62,6 @@ export async function POST(request: NextRequest) {
             controller.close();
           } catch {}
         } catch (error) {
-          // Don't log abort errors - they're expected
           if (error instanceof Error && error.name === "AbortError") {
             try {
               controller.close();
@@ -78,23 +76,17 @@ export async function POST(request: NextRequest) {
             })}\n\n`;
             controller.enqueue(encoder.encode(errorData));
             controller.close();
-          } catch (closeError) {}
+          } catch {}
+        } finally {
+          client?.disconnect();
         }
       },
     });
 
-    return new Response(readable, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
-    });
+    return new Response(readable, { headers: SSE_HEADERS });
   } catch (error) {
     console.error("Chat API error:", error);
+    client?.disconnect();
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }

@@ -1,8 +1,10 @@
 "use client";
 
 import { Tool, ToolCall, ToolDiff } from "@superglue/shared";
+import { UserAction } from "@/src/lib/agent/agent-types";
 import {
   AuthenticateOAuthComponent,
+  BackgroundToolIndicator,
   CallEndpointComponent,
   CreateSystemComponent,
   DefaultComponent,
@@ -10,17 +12,17 @@ import {
   GetRunsComponent,
   ModifySystemComponent,
   SaveToolComponent,
-  SearchDocumentationComponent,
   ToolBuilderComponent,
 } from "./tool-components";
 
 interface ToolCallComponentProps {
   tool: ToolCall;
   onInputChange: (newInput: any) => void;
-  onOAuthComplete?: (toolCallId: string, systemData: any) => void;
   onToolUpdate?: (toolCallId: string, updates: Partial<ToolCall>) => void;
-  onSystemMessage?: (message: string, options?: { triggerImmediateResponse?: boolean }) => void;
-  onTriggerContinuation?: () => void;
+  sendAgentRequest?: (
+    userMessage?: string,
+    options?: { userActions?: UserAction[] },
+  ) => Promise<void>;
   onAbortStream?: () => void;
   onApplyChanges?: (config: Tool, diffs?: ToolDiff[]) => void;
   onApplyPayload?: (newPayload: string) => void;
@@ -31,10 +33,8 @@ interface ToolCallComponentProps {
 export function ToolCallComponent({
   tool,
   onInputChange,
-  onOAuthComplete,
   onToolUpdate,
-  onSystemMessage,
-  onTriggerContinuation,
+  sendAgentRequest,
   onAbortStream,
   onApplyChanges,
   onApplyPayload,
@@ -49,7 +49,7 @@ export function ToolCallComponent({
           tool={tool}
           mode="build"
           onInputChange={onInputChange}
-          onSystemMessage={onSystemMessage}
+          sendAgentRequest={sendAgentRequest}
           isPlayground={isPlayground}
         />
       );
@@ -60,8 +60,7 @@ export function ToolCallComponent({
           mode="fix"
           onInputChange={onInputChange}
           onToolUpdate={onToolUpdate}
-          onSystemMessage={onSystemMessage}
-          onTriggerContinuation={onTriggerContinuation}
+          sendAgentRequest={sendAgentRequest}
           onAbortStream={onAbortStream}
           onApplyChanges={onApplyChanges}
           isPlayground={isPlayground}
@@ -74,7 +73,7 @@ export function ToolCallComponent({
           tool={tool}
           mode="run"
           onInputChange={onInputChange}
-          onSystemMessage={onSystemMessage}
+          sendAgentRequest={sendAgentRequest}
           isPlayground={isPlayground}
         />
       );
@@ -91,22 +90,19 @@ export function ToolCallComponent({
         <AuthenticateOAuthComponent
           tool={tool}
           onInputChange={onInputChange}
-          onOAuthComplete={onOAuthComplete}
-          onSystemMessage={onSystemMessage}
+          sendAgentRequest={sendAgentRequest}
           onAbortStream={onAbortStream}
         />
       );
 
     // Other tools
-    case "search_documentation":
-      return <SearchDocumentationComponent tool={tool} onInputChange={onInputChange} />;
     case "call_endpoint":
       return (
         <CallEndpointComponent
           tool={tool}
           onInputChange={onInputChange}
           onToolUpdate={onToolUpdate}
-          onTriggerContinuation={onTriggerContinuation}
+          sendAgentRequest={sendAgentRequest}
           onAbortStream={onAbortStream}
         />
       );
@@ -116,7 +112,7 @@ export function ToolCallComponent({
           tool={tool}
           currentPayload={currentPayload || "{}"}
           onToolUpdate={onToolUpdate}
-          onTriggerContinuation={onTriggerContinuation}
+          sendAgentRequest={sendAgentRequest}
           onApplyPayload={onApplyPayload}
         />
       );
@@ -124,10 +120,10 @@ export function ToolCallComponent({
     case "get_runs":
       return <GetRunsComponent tool={tool} onInputChange={onInputChange} />;
 
-    // Hidden tools (no UI render)
     case "find_system_templates":
     case "web_search":
-      return null;
+    case "search_documentation":
+      return <BackgroundToolIndicator tool={tool} />;
 
     default:
       return <DefaultComponent tool={tool} onInputChange={onInputChange} />;
