@@ -118,17 +118,17 @@ export const executeWorkflowResolver = async (
 
     await context.datastore.createRun({
       run: {
-        id: runId,
+        runId,
         toolId: workflow.id,
-        orgId: context.orgId,
-        userId: context.userId,
-        userEmail: context.userEmail,
         status: RunStatus.RUNNING,
-        toolConfig: workflow,
+        tool: workflow,
         options: args.options,
         requestSource: context.requestSource ?? RequestSource.FRONTEND,
-        startedAt,
+        metadata: {
+          startedAt: startedAt.toISOString(),
+        },
       },
+      orgId: context.orgId,
     });
 
     const taskPayload: ToolExecutionPayload = {
@@ -175,14 +175,19 @@ export const executeWorkflowResolver = async (
 
     // NOTE: Not persisting toolResult/stepResults and payload to avoid PostgreSQL JSONB size limits (256MB)
     // Large workflow results can exceed this, tbd
+    const completedAt = new Date();
     await context.datastore.updateRun({
       id: runId,
       orgId: context.orgId,
       updates: {
         status: graphqlResult.success ? RunStatus.SUCCESS : RunStatus.FAILED,
-        toolConfig: graphqlResult.config || workflow,
+        tool: graphqlResult.config || workflow,
         error: graphqlResult.error || undefined,
-        completedAt: new Date(),
+        metadata: {
+          startedAt: startedAt.toISOString(),
+          completedAt: completedAt.toISOString(),
+          durationMs: completedAt.getTime() - startedAt.getTime(),
+        },
       },
     });
 
@@ -227,7 +232,11 @@ export const executeWorkflowResolver = async (
           status: RunStatus.FAILED,
           toolPayload: args.payload,
           error: String(error),
-          completedAt: new Date(),
+          metadata: {
+            startedAt: startedAt.toISOString(),
+            completedAt: new Date().toISOString(),
+            durationMs: new Date().getTime() - startedAt.getTime(),
+          },
         },
       })
       .catch(() => {});
@@ -273,7 +282,11 @@ export const abortToolExecutionResolver = async (
       updates: {
         status: RunStatus.ABORTED,
         error: `Aborted run with runId ${runId}`,
-        completedAt: new Date(),
+        metadata: {
+          startedAt: run.metadata.startedAt,
+          completedAt: new Date().toISOString(),
+          durationMs: new Date().getTime() - new Date(run.metadata.startedAt).getTime(),
+        },
       },
     });
 

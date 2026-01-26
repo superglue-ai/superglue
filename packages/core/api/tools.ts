@@ -230,18 +230,18 @@ async function executeToolInternal(
 
   await authReq.datastore.createRun({
     run: {
-      id: runId,
+      runId,
       toolId: tool.id,
-      orgId: authReq.authInfo.orgId,
-      userId: authReq.authInfo.userId,
-      userEmail: authReq.authInfo.userEmail,
       status: RunStatus.RUNNING,
-      toolConfig: tool,
+      tool,
       toolPayload: payload,
       options: requestOptions,
       requestSource,
-      startedAt,
+      metadata: {
+        startedAt: startedAt.toISOString(),
+      },
     },
+    orgId: authReq.authInfo.orgId,
   });
 
   const taskPayload: ToolExecutionPayload = {
@@ -259,14 +259,19 @@ async function executeToolInternal(
   authReq.workerPools.toolExecution
     .runTask(runId, taskPayload)
     .then(async (result) => {
+      const completedAt = new Date();
       await authReq.datastore.updateRun({
         id: runId,
         orgId: authReq.authInfo.orgId,
         updates: {
           status: result.success ? RunStatus.SUCCESS : RunStatus.FAILED,
-          toolConfig: result.config || tool,
+          tool: result.config || tool,
           error: result.error,
-          completedAt: new Date(),
+          metadata: {
+            startedAt: startedAt.toISOString(),
+            completedAt: completedAt.toISOString(),
+            durationMs: completedAt.getTime() - startedAt.getTime(),
+          },
         },
       });
       handleWebhook(
@@ -283,14 +288,19 @@ async function executeToolInternal(
     })
     .catch(async (error) => {
       logMessage("error", `Tool execution error: ${String(error)}`, metadata);
+      const completedAt = new Date();
       await authReq.datastore.updateRun({
         id: runId,
         orgId: authReq.authInfo.orgId,
         updates: {
           status: RunStatus.FAILED,
-          toolConfig: tool,
+          tool,
           error: String(error),
-          completedAt: new Date(),
+          metadata: {
+            startedAt: startedAt.toISOString(),
+            completedAt: completedAt.toISOString(),
+            durationMs: completedAt.getTime() - startedAt.getTime(),
+          },
         },
       });
     });
@@ -433,18 +443,18 @@ const runTool: RouteHandler = async (request, reply) => {
 
   await authReq.datastore.createRun({
     run: {
-      id: runId,
+      runId,
       toolId: tool.id,
-      orgId: authReq.authInfo.orgId,
-      userId: authReq.authInfo.userId,
-      userEmail: authReq.authInfo.userEmail,
       status: RunStatus.RUNNING,
-      toolConfig: tool,
+      tool,
       toolPayload: body.inputs as Record<string, any>,
       options: requestOptions,
       requestSource,
-      startedAt,
+      metadata: {
+        startedAt: startedAt.toISOString(),
+      },
     },
+    orgId: authReq.authInfo.orgId,
   });
 
   const taskPayload: ToolExecutionPayload = {
@@ -467,14 +477,19 @@ const runTool: RouteHandler = async (request, reply) => {
     authReq.workerPools.toolExecution
       .runTask(runId, taskPayload)
       .then(async (result) => {
+        const completedAt = new Date();
         await authReq.datastore.updateRun({
           id: runId,
           orgId: authReq.authInfo.orgId,
           updates: {
             status: result.success ? RunStatus.SUCCESS : RunStatus.FAILED,
-            toolConfig: result.config || tool,
+            tool: result.config || tool,
             error: result.error,
-            completedAt: new Date(),
+            metadata: {
+              startedAt: startedAt.toISOString(),
+              completedAt: completedAt.toISOString(),
+              durationMs: completedAt.getTime() - startedAt.getTime(),
+            },
           },
         });
         handleWebhook(
@@ -491,14 +506,19 @@ const runTool: RouteHandler = async (request, reply) => {
       })
       .catch(async (error) => {
         logMessage("error", `Async tool execution error: ${String(error)}`, metadata);
+        const completedAt = new Date();
         await authReq.datastore.updateRun({
           id: runId,
           orgId: authReq.authInfo.orgId,
           updates: {
             status: RunStatus.FAILED,
-            toolConfig: tool,
+            tool,
             error: String(error),
-            completedAt: new Date(),
+            metadata: {
+              startedAt: startedAt.toISOString(),
+              completedAt: completedAt.toISOString(),
+              durationMs: completedAt.getTime() - startedAt.getTime(),
+            },
           },
         });
       });
@@ -529,9 +549,13 @@ const runTool: RouteHandler = async (request, reply) => {
       orgId: authReq.authInfo.orgId,
       updates: {
         status,
-        toolConfig: result.config || tool,
+        tool: result.config || tool,
         error: result.error,
-        completedAt,
+        metadata: {
+          startedAt: startedAt.toISOString(),
+          completedAt: completedAt.toISOString(),
+          durationMs: completedAt.getTime() - startedAt.getTime(),
+        },
       },
     });
     handleWebhook(
@@ -574,9 +598,13 @@ const runTool: RouteHandler = async (request, reply) => {
       orgId: authReq.authInfo.orgId,
       updates: {
         status,
-        toolConfig: tool,
+        tool,
         error: String(error),
-        completedAt,
+        metadata: {
+          startedAt: startedAt.toISOString(),
+          completedAt: completedAt.toISOString(),
+          durationMs: completedAt.getTime() - startedAt.getTime(),
+        },
       },
     });
 

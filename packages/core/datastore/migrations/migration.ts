@@ -21,17 +21,23 @@ function normalizeRunStatus(status: string): RunStatus {
 }
 
 function migrateLegacyToRun(data: any, row: LegacyRunRow): Run {
+  const startedAt = row.started_at ? new Date(row.started_at) : new Date();
+  const completedAt = row.completed_at ? new Date(row.completed_at) : undefined;
+
   return {
-    id: row.id,
+    runId: row.id,
     toolId: row.config_id,
     status: data.success === true ? RunStatus.SUCCESS : RunStatus.FAILED,
-    toolConfig: data.config,
+    tool: data.config,
     toolPayload: undefined,
-    toolResult: data.data,
+    data: data.data,
     options: undefined,
     error: data.error,
-    startedAt: row.started_at ? new Date(row.started_at) : new Date(),
-    completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
+    metadata: {
+      startedAt: startedAt.toISOString(),
+      completedAt: completedAt?.toISOString(),
+      durationMs: completedAt ? completedAt.getTime() - startedAt.getTime() : undefined,
+    },
   };
 }
 
@@ -39,20 +45,40 @@ export function extractRun(data: any, row: LegacyRunRow): Run {
   if (isLegacyRun(data)) {
     return migrateLegacyToRun(data, row);
   }
+
+  const startedAt = row.started_at
+    ? new Date(row.started_at)
+    : data.startedAt
+      ? new Date(data.startedAt)
+      : data.metadata?.startedAt
+        ? new Date(data.metadata.startedAt)
+        : new Date();
+
+  const completedAt = row.completed_at
+    ? new Date(row.completed_at)
+    : data.completedAt
+      ? new Date(data.completedAt)
+      : data.metadata?.completedAt
+        ? new Date(data.metadata.completedAt)
+        : undefined;
+
   return {
-    ...data,
+    runId: row.id,
+    toolId: data.toolId,
+    tool: data.tool ?? data.toolConfig,
     status: typeof data.status === "string" ? normalizeRunStatus(data.status) : data.status,
-    id: row.id,
-    startedAt: row.started_at
-      ? new Date(row.started_at)
-      : data.startedAt
-        ? new Date(data.startedAt)
-        : new Date(),
-    completedAt: row.completed_at
-      ? new Date(row.completed_at)
-      : data.completedAt
-        ? new Date(data.completedAt)
-        : undefined,
+    toolPayload: data.toolPayload,
+    data: data.data ?? data.toolResult,
+    error: data.error,
+    stepResults: data.stepResults,
+    options: data.options,
+    requestSource: data.requestSource,
+    traceId: data.traceId,
+    metadata: {
+      startedAt: startedAt.toISOString(),
+      completedAt: completedAt?.toISOString(),
+      durationMs: completedAt ? completedAt.getTime() - startedAt.getTime() : undefined,
+    },
   };
 }
 

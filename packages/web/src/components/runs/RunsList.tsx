@@ -172,9 +172,9 @@ const CollapsibleSection = ({
 export const RunDetails = ({ run }: { run: any }) => {
   if (!run) return null;
 
-  const cleanedToolConfig = run.toolConfig ? removeNullFields(run.toolConfig) : null;
+  const cleanedToolConfig = run.tool ? removeNullFields(run.tool) : null;
   const cleanedOptions = run.options ? removeNullFields(run.options) : null;
-  const cleanedToolResult = run.toolResult ? removeNullFields(run.toolResult) : null;
+  const cleanedToolResult = run.data ? removeNullFields(run.data) : null;
   const cleanedToolPayload = run.toolPayload ? removeNullFields(run.toolPayload) : null;
 
   const hasToolConfig = cleanedToolConfig && Object.keys(cleanedToolConfig).length > 0;
@@ -195,10 +195,10 @@ export const RunDetails = ({ run }: { run: any }) => {
         <div className="space-y-1">
           <h4 className="text-xs font-medium text-muted-foreground">Run ID</h4>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono truncate" title={run.id || run.runId}>
-              {run.id || run.runId}
+            <span className="text-xs font-mono truncate" title={run.runId}>
+              {run.runId}
             </span>
-            <CopyButton text={run.id || run.runId} />
+            <CopyButton text={run.runId} />
           </div>
         </div>
         <div className="space-y-1">
@@ -210,9 +210,7 @@ export const RunDetails = ({ run }: { run: any }) => {
           <div className="flex items-center gap-2">
             <Clock className="h-3 w-3 text-muted-foreground" />
             <span className="text-xs">
-              {run.completedAt
-                ? `${new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()}ms`
-                : "-"}
+              {run.metadata?.durationMs != null ? `${run.metadata.durationMs}ms` : "-"}
             </span>
           </div>
         </div>
@@ -385,13 +383,15 @@ export function RunsList({
   }
 
   const sortedRuns = [...runs].sort(
-    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+    (a, b) =>
+      new Date(b.metadata?.startedAt ?? 0).getTime() -
+      new Date(a.metadata?.startedAt ?? 0).getTime(),
   );
 
   return (
     <div className="space-y-2">
       {sortedRuns.map((run) => {
-        const runId = run.id || run.runId;
+        const runId = run.runId;
         const toolId = run.toolId;
         const isExpanded = expandedRunId === runId;
 
@@ -418,7 +418,7 @@ export function RunsList({
               <RequestSourceBadge source={run.requestSource} />
 
               <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
-                {new Date(run.startedAt).toLocaleString(undefined, {
+                {new Date(run.metadata?.startedAt ?? 0).toLocaleString(undefined, {
                   month: "short",
                   day: "numeric",
                   hour: "2-digit",
