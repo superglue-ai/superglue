@@ -455,7 +455,15 @@ export async function prepareMessages(
     messages,
   );
 
-  const userTurn = buildUserTurn(contextInjection, continuations, request.userMessage);
+  const lastMessage = messages[messages.length - 1];
+  const userMessageAlreadyInHistory =
+    lastMessage?.role === "user" && lastMessage?.content === request.userMessage;
+
+  const userTurn = buildUserTurn(
+    contextInjection,
+    continuations,
+    userMessageAlreadyInHistory ? undefined : request.userMessage,
+  );
   if (userTurn) {
     messages = [...messages, userTurn];
   }

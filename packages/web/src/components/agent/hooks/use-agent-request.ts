@@ -127,12 +127,14 @@ export function useAgentRequest({
       );
       const resumeToolId = confirmationAction?.toolCallId || feedbackAction?.toolCallId;
 
-      if (currentStreamControllerRef.current && !resumeToolId) {
+      const shouldResume = resumeToolId && !hasMessage;
+
+      if (currentStreamControllerRef.current && !shouldResume) {
         currentStreamControllerRef.current.abort();
         cleanupInterruptedStream("\n\n*[Response interrupted by new action]*");
       }
 
-      if (!resumeToolId) {
+      if (!shouldResume) {
         setAwaitingToolsToDeclined();
       }
 
@@ -154,11 +156,11 @@ export function useAgentRequest({
       setIsLoading(true);
 
       let assistantMessage: Message | null = null;
-      if (resumeToolId) {
-        assistantMessage = findAndResumeMessageWithTool(resumeToolId);
-      } else if (hasMessage) {
+      if (hasMessage) {
         assistantMessage = createStreamingAssistantMessage(1);
         setMessages((prev) => [...prev, assistantMessage!]);
+      } else if (shouldResume) {
+        assistantMessage = findAndResumeMessageWithTool(resumeToolId);
       }
 
       const controller = new AbortController();

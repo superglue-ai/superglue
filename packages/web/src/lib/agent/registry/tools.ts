@@ -7,7 +7,7 @@ import {
   ToolResult,
   UpsertMode,
 } from "@superglue/shared";
-import { SystemConfig, systems } from "@superglue/shared/templates";
+import { SystemConfig, systems, findTemplateForSystem } from "@superglue/shared/templates";
 import { DraftLookup, findDraftInMessages, formatDiffSummary } from "../agent-context";
 import {
   filterSystemFields,
@@ -1109,7 +1109,9 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
       };
     }
 
-    const template = systems[systemId];
+    // Check if this system matches a template with OAuth configured
+    const templateMatch = findTemplateForSystem(system);
+    const template = templateMatch?.template || systems[systemId];
     const templateOAuth = template?.oauth;
 
     const oauthConfig: Record<string, any> = {
@@ -1128,9 +1130,17 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
     else if (system.credentials?.client_id) oauthConfig.client_id = system.credentials.client_id;
     else if (templateOAuth?.client_id) oauthConfig.client_id = templateOAuth.client_id;
 
-    if (client_secret) oauthConfig.client_secret = client_secret;
-    else if (system.credentials?.client_secret)
+    // Priority: user input > stored system credentials > template
+    // If user provided client_secret, use it (will be cached)
+    // If not provided but system has it stored, use it (will be cached)
+    // If neither, and template has client_id, backend will resolve template client_secret
+    if (client_secret) {
+      oauthConfig.client_secret = client_secret;
+    } else if (system.credentials?.client_secret) {
       oauthConfig.client_secret = system.credentials.client_secret;
+    }
+    // Note: If no client_secret is set here, and template has client_id,
+    // the frontend will set templateInfo and backend will resolve template credentials
 
     if (auth_url) oauthConfig.auth_url = auth_url;
     else if (system.credentials?.auth_url) oauthConfig.auth_url = system.credentials.auth_url;

@@ -167,15 +167,21 @@ function PlaygroundAgentContent({
       }
 
       if (newConfig.responseSchema !== undefined) {
-        toolConfig.setResponseSchema(
-          newConfig.responseSchema ? JSON.stringify(newConfig.responseSchema, null, 2) : "",
-        );
+        const schemaValue = newConfig.responseSchema
+          ? typeof newConfig.responseSchema === "string"
+            ? newConfig.responseSchema
+            : JSON.stringify(newConfig.responseSchema, null, 2)
+          : "";
+        toolConfig.setResponseSchema(schemaValue);
       }
 
       if (newConfig.inputSchema !== undefined) {
-        toolConfig.setInputSchema(
-          newConfig.inputSchema ? JSON.stringify(newConfig.inputSchema, null, 2) : null,
-        );
+        const schemaValue = newConfig.inputSchema
+          ? typeof newConfig.inputSchema === "string"
+            ? newConfig.inputSchema
+            : JSON.stringify(newConfig.inputSchema, null, 2)
+          : null;
+        toolConfig.setInputSchema(schemaValue);
       }
 
       if (firstChangedStepIndex !== null) {

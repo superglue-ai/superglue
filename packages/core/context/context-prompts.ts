@@ -133,8 +133,9 @@ When present, these user instructions should take priority and be carefully foll
 </SYSTEM_INSTRUCTIONS>
 
 <STEP_CREATION>
-1. [Important] Fetch ALL prerequisites like available projects you can query, available entities / object types you can access, available categories you can filter on, etc.
-2. [Important] Plan the actual steps to fulfill the instruction. Critical: If the workflow is not a pure transformation task, you MUST add steps.
+1. [Important] Irrespective of the instruction, ALWAYS START BY PLANNING ALL API RETRIEVAL STEPS. You can handle transform logic within the steps and the final transformation. DO NOT CREATE A WORKFLOW WITHOUT STEPS.
+2. [Important] Fetch ALL prerequisites like available projects you can query, available entities / object types you can access, available categories you can filter on, etc.
+3. [Important] Plan the actual steps to fulfill the instruction. ALWAYS ADD TOOL STEPS, DO NOT CREATE A WORKFLOW WITHOUT STEPS.
 
 Further:
 - Never make assumptions or guesses about the data you need to fetch. Always fetch all prerequisites first - this is the most common failure mode.
@@ -145,7 +146,6 @@ Further:
 - Assign descriptive stepIds in camelCase that indicate the purpose of the step
 - Make absolutely sure that each step can be achieved with a single API call (or a loop of the same call)
 - Aggregation, grouping, sorting, filtering is covered by a separate final transformation and does not need to be added as a dedicated step. However, if the API supports e.g. filtering when retrieving, this should be part of the retrieval step, just do not add an extra one.
-- For pure data transformation tasks with no API calls, the workflow may have no steps with a final transformation only
 - Step instructions should DESCRIBE in detail (2-3 sentences) what this steps goal is (ex. retrieve certain data, trigger an action, etc.), and how the response should be structured, without prescribing a rigid response structure.
 - The API's actual response structure will be discovered during execution - don't prescribe it
 - Modify flag: Identify if the operation can meaningfully change or delete live data and label it as modify only when the action carries clear potential for harm. Do not rely on HTTP verbs alone and judge based on the actual effect of the call. Default to false
@@ -169,8 +169,8 @@ XML: Parses to nested object structure using SAX streaming parser, handling attr
 
 <DATA_DEPENDENCIES>
 - Consider data dependencies between steps (later steps can access results from earlier steps)
-- Keep in mind that transformations happen within each step, so there is no need to add specific transformation steps
-- Keep in mind that logging and the final transformation happen after the workflow, no need to make this a step
+- Keep in mind that transformations happen within each step, so there is no need to add dedicated intermediate specific transformation steps
+- Keep in mind that logging and the final transformation happens after the workflow steps, no need to make this a step
 </DATA_DEPENDENCIES>
 
 <DOCUMENTATION_FIRST_APPROACH>
