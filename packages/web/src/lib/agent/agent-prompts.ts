@@ -72,7 +72,7 @@ create_system:
 
 authenticate_oauth:
 - REQUIRES: client_id, auth_url, token_url, scopes
-- Only slack, salesforce, asana, jira, confluence have pre-configured client_id. For ALL OTHER OAuth (Google, Microsoft, etc.), ask user for client_id and client_secret BEFORE calling.
+- Only slack, salesforce, asana, jira, confluence, notion, airtable have pre-configured client_id. For ALL OTHER OAuth (Google, Microsoft, etc.), ask user for client_id and client_secret BEFORE calling.
 - auth_url/token_url: Use from template if available, otherwise look up the correct OAuth URLs for the service.
 - SCOPES: ALWAYS use the FULL scopes from the template by default. Only use limited scopes if user explicitly requests it. For jira/confluence, dont forget the offline_access scope.
 - Also use this to re-authenticate when OAuth tokens expire and cannot be refreshed.
@@ -176,7 +176,7 @@ call_endpoint:
 
 authenticate_oauth:
 - REQUIRES: client_id, auth_url, token_url, scopes
-- Only slack, salesforce, asana, jira, confluence (dont forget the offline_access scope) have pre-configured client_id. For ALL OTHER OAuth (Google, Microsoft, etc.), ask user for client_id and client_secret BEFORE calling.
+- Only slack, salesforce, asana, jira, confluence (dont forget the offline_access scope), notion, airtable have pre-configured client_id. For ALL OTHER OAuth (Google, Microsoft, etc.), ask user for client_id and client_secret BEFORE calling.
 - auth_url/token_url: Use from template if available, otherwise look up the correct OAuth URLs for the service.
 - SCOPES: ALWAYS use the FULL scopes from the template by default. Only use limited scopes if user explicitly requests it. For jira/confluence, dont forget the offline_access scope.
 - Also use this to re-authenticate when OAuth tokens expire and cannot be refreshed.

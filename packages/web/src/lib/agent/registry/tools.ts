@@ -1091,7 +1091,7 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
       OAuth credentials are resolved in this priority order:
       1. Values passed to this tool (client_id, client_secret, auth_url, token_url)
       2. Values already stored in the system's credentials
-      3. Values from templates (slack, salesforce, asana)
+      3. Values from templates (slack, salesforce, asana, notion, airtable, jira, confluence)
       
       If the system already has client_id/client_secret stored in credentials,
       you do NOT need to ask the user again - just call this tool with only systemId and scopes.
@@ -1102,6 +1102,10 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
       - slack: auth_url=https://slack.com/oauth/v2/authorize, token_url=https://slack.com/api/oauth.v2.access
       - salesforce: auth_url=https://login.salesforce.com/services/oauth2/authorize, token_url=https://login.salesforce.com/services/oauth2/token
       - asana: auth_url=https://app.asana.com/-/oauth_authorize, token_url=https://app.asana.com/-/oauth_token
+      - notion: auth_url=https://api.notion.com/v1/oauth/authorize, token_url=https://api.notion.com/v1/oauth/token
+      - airtable: auth_url=https://airtable.com/oauth2/v1/authorize, token_url=https://airtable.com/oauth2/v1/token
+      - jira: auth_url=https://auth.atlassian.com/authorize, token_url=https://auth.atlassian.com/oauth/token
+      - confluence: auth_url=https://auth.atlassian.com/authorize, token_url=https://auth.atlassian.com/oauth/token
     </templates_with_preconfigured_oauth>
 
     <first_time_setup>

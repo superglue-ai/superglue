@@ -333,12 +333,13 @@ export const systems: Record<string, SystemConfig> = {
     regex: "^.*airtable.*$",
     icon: "airtable",
     docsUrl: "https://airtable.com/developers/web/api",
-    preferredAuthType: "apikey",
+    preferredAuthType: "oauth",
     oauth: {
       authUrl: "https://airtable.com/oauth2/v1/authorize",
       tokenUrl: "https://airtable.com/oauth2/v1/token",
       scopes:
-        "data.records:read data.records:write data.recordComments:read data.recordComments:write schema.bases:read schema.bases:write webhook:manage user.email:read",
+        "data.recordComments:read data.recordComments:write data.records:read data.records:write schema.bases:read schema.bases:write user.email:read enterprise.groups:read workspacesAndBases.shares:manage workspacesAndBases:read workspacesAndBases:write data.records:manage enterprise.account:read enterprise.account:write enterprise.auditLogs:read enterprise.changeEvents:read enterprise.exports:manage enterprise.groups:manage enterprise.scim.usersAndGroups:manage enterprise.user:read enterprise.user:write workspacesAndBases:manage webhook:manage",
+      client_id: "02601365-de97-4191-b12d-e03c8540b03d",
     },
     keywords: [
       "bases",
@@ -1395,12 +1396,13 @@ export const systems: Record<string, SystemConfig> = {
     // this openapi spec was last updated in 2024 - might be outdated
     openApiUrl:
       "https://raw.githubusercontent.com/cameronking4/notion-openapi-chatgpt-action/refs/heads/main/public/notion-openapi.json",
-    preferredAuthType: "apikey",
+    preferredAuthType: "oauth",
     oauth: {
       authUrl: "https://api.notion.com/v1/oauth/authorize",
       tokenUrl: "https://api.notion.com/v1/oauth/token",
       scopes:
         "read_content update_content insert_content read_comments update_comments insert_comments read_user update_user",
+      client_id: "2f4d872b-594c-805e-abdd-00375c12bae0",
     },
     keywords: [
       "pages",
