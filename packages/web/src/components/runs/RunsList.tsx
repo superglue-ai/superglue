@@ -418,12 +418,14 @@ export function RunsList({
               <RequestSourceBadge source={run.requestSource} />
 
               <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
-                {new Date(run.metadata?.startedAt ?? 0).toLocaleString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+                {run.metadata?.startedAt
+                  ? new Date(run.metadata.startedAt).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "—"}
               </span>
             </button>
 
