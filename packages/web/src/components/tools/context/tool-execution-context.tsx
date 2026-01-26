@@ -544,11 +544,11 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       };
 
       const categorizedVariables: CategorizedVariables = {
-        credentials: Object.keys(systemCredentials),
-        toolInputs: Object.keys(manualPayload),
+        credentials: Object.keys(systemCredentials || {}),
+        toolInputs: Object.keys(manualPayload || {}),
         fileInputs: Object.keys(payload.filePayloads || {}),
         currentStepData: ["currentItem"],
-        previousStepData: Object.keys(previousStepResults),
+        previousStepData: Object.keys(previousStepResults || {}),
         paginationVariables: ["page", "offset", "cursor", "limit", "pageSize"],
       };
 

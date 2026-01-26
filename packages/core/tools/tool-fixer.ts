@@ -53,7 +53,7 @@ export class ToolFixer {
   private diffSchemaJson: any;
 
   constructor(options: ToolFixerOptions) {
-    this.tool = options.tool;
+    this.tool = this.normalizeToolSchemas(options.tool);
     this.fixInstructions = options.fixInstructions;
     this.systems = options.systems.reduce(
       (acc, int) => {
@@ -66,6 +66,21 @@ export class ToolFixer {
     this.stepResults = options.stepResults;
     this.metadata = options.metadata;
     this.diffSchemaJson = z.toJSONSchema(patchSchema);
+  }
+
+  private normalizeToolSchemas(tool: Tool): Tool {
+    const normalized = { ...tool };
+    if (typeof normalized.inputSchema === "string") {
+      try {
+        normalized.inputSchema = JSON.parse(normalized.inputSchema);
+      } catch {}
+    }
+    if (typeof normalized.responseSchema === "string") {
+      try {
+        normalized.responseSchema = JSON.parse(normalized.responseSchema);
+      } catch {}
+    }
+    return normalized;
   }
 
   private trimToolForLLM(tool: Tool): Partial<Tool> {
@@ -349,8 +364,10 @@ ${availableSystemIds.join(", ")}
           throw new Error(patchResult.error);
         }
 
+        const normalizedPatchedTool = this.normalizeToolSchemas(patchResult.tool!);
+
         // Validate the resulting tool
-        const toolValidation = this.validateTool(patchResult.tool!);
+        const toolValidation = this.validateTool(normalizedPatchedTool);
         if (!toolValidation.valid) {
           throw new Error(toolValidation.error);
         }
@@ -359,7 +376,7 @@ ${availableSystemIds.join(", ")}
 
         // Preserve original metadata
         const fixedTool: Tool = {
-          ...patchResult.tool!,
+          ...normalizedPatchedTool,
           instruction: this.tool.instruction,
           systemIds: this.tool.systemIds,
           createdAt: this.tool.createdAt,
