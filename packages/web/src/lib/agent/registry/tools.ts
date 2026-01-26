@@ -25,6 +25,7 @@ import {
   ToolExecutionContext,
   ToolRegistryEntry,
 } from "../agent-types";
+import { processToolPolicy } from "./tool-policies";
 
 export const TOOL_CONTINUATION_MESSAGES = {
   call_endpoint: {

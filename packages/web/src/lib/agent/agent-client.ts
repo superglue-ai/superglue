@@ -271,6 +271,7 @@ export class AgentClient {
       orgId: "",
       subscriptionClient: this.subscriptionClient ?? undefined,
       abortSignal: this.config.abortSignal,
+      toolExecutionPolicies: validated.toolExecutionPolicies,
     };
 
     const preparedMessages = await prepareMessages(validated, executionContext);
