@@ -228,3 +228,27 @@ export function resolveDocumentationFiles(
     return { error: error.message };
   }
 }
+
+const MAX_RESPONSE_BODY_LENGTH = 25_000;
+
+export const truncateResponseBody = (result: any): any => {
+  if (!result.body) return result;
+
+  if (typeof result.body === "object") {
+    const bodyStr = JSON.stringify(result.body);
+    if (bodyStr.length > MAX_RESPONSE_BODY_LENGTH) {
+      result.body = {
+        _note: `Response body truncated for LLM context (original size: ${bodyStr.length} chars)`,
+        _truncated: true,
+        preview: bodyStr.substring(0, MAX_RESPONSE_BODY_LENGTH),
+      };
+    }
+  } else if (typeof result.body === "string" && result.body.length > MAX_RESPONSE_BODY_LENGTH) {
+    const originalLength = result.body.length;
+    result.body =
+      result.body.substring(0, MAX_RESPONSE_BODY_LENGTH) +
+      `\n\n[Truncated from ${originalLength} chars]`;
+  }
+
+  return result;
+};

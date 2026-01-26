@@ -15,6 +15,7 @@ import {
   ToolExecutionFeedback,
   FileUploadAction,
 } from "./agent-types";
+import { TOOL_POLICY_PROCESSORS } from "./registry/tool-policies";
 
 function validateUserActions(actions: any[]): void {
   for (const action of actions) {
@@ -89,6 +90,10 @@ export function validateAgentRequest(body: any): ValidatedAgentRequest {
     }
   }
 
+  if (body.toolExecutionPolicies && typeof body.toolExecutionPolicies !== "object") {
+    throw new Error("toolExecutionPolicies must be an object");
+  }
+
   return {
     agentId: body.agentId,
     messages: body.messages,
@@ -97,6 +102,7 @@ export function validateAgentRequest(body: any): ValidatedAgentRequest {
     filePayloads: body.filePayloads,
     hiddenContext: body.hiddenContext,
     agentParams: body.agentParams,
+    toolExecutionPolicies: body.toolExecutionPolicies,
     agent,
   };
 }
@@ -651,7 +657,9 @@ export function buildToolsForAISDK(
       inputSchema: jsonSchema(schema),
     };
 
-    const shouldAutoExecute = entry.execute && entry.confirmation?.timing !== "before";
+    const hasPolicyProcessor = TOOL_POLICY_PROCESSORS[entry.name] !== undefined;
+    const shouldAutoExecute =
+      entry.execute && (entry.confirmation?.timing !== "before" || hasPolicyProcessor);
 
     if (shouldAutoExecute) {
       toolDef.execute = async function* (input: any) {

@@ -9,7 +9,6 @@ import {
   CreateSystemComponent,
   DefaultComponent,
   EditPayloadComponent,
-  GetRunsComponent,
   ModifySystemComponent,
   ToolBuilderComponent,
 } from "./tool-components";
@@ -124,8 +123,6 @@ export function ToolCallComponent({
       );
 
     case "get_runs":
-      return <GetRunsComponent tool={tool} onInputChange={onInputChange} />;
-
     case "find_system_templates":
     case "web_search":
     case "search_documentation":

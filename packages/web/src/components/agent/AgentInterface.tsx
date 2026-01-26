@@ -24,7 +24,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Streamdown } from "streamdown";
 import { AgentContextProvider, useAgentContext } from "./AgentContextProvider";
 import { ConversationHistory } from "./ConversationHistory";
-import { ScrollToBottomButton, ScrollToBottomContainer } from "./hooks/use-scroll-to-bottom";
+import {
+  ScrollToBottomButton,
+  ScrollToBottomContainer,
+  ScrollToBottomTrigger,
+  ScrollToBottomTriggerRef,
+} from "./hooks/use-scroll-to-bottom";
 import { ToolCallComponent } from "./ToolCallComponent";
 import { BackgroundToolGroup, groupMessageParts } from "./tool-components";
 import { AgentWelcome } from "./welcome/AgentWelcome";
@@ -276,6 +281,7 @@ function AgentInterfaceContent() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
+  const scrollTriggerRef = useRef<ScrollToBottomTriggerRef>(null);
 
   const isAnyMessageStreaming = useMemo(() => messages.some((m) => m.isStreaming), [messages]);
 
@@ -377,6 +383,7 @@ function AgentInterfaceContent() {
     if (!input.trim() || input.length > MAX_MESSAGE_LENGTH) return;
     const content = input;
     setInput("");
+    scrollTriggerRef.current?.scrollToBottom();
     await handleSendMessage(content);
   }, [input, handleSendMessage]);
 
@@ -457,6 +464,7 @@ function AgentInterfaceContent() {
             </>
           )}
         </div>
+        <ScrollToBottomTrigger ref={scrollTriggerRef} />
         <ScrollToBottomButton />
       </ScrollToBottomContainer>
 

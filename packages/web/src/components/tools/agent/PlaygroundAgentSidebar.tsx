@@ -26,6 +26,8 @@ import { AgentType } from "@/src/lib/agent/registry/agents";
 import {
   ScrollToBottomButton,
   ScrollToBottomContainer,
+  ScrollToBottomTrigger,
+  ScrollToBottomTriggerRef,
 } from "../../agent/hooks/use-scroll-to-bottom";
 import { ToolCallComponent } from "../../agent/ToolCallComponent";
 import { BackgroundToolGroup, groupMessageParts } from "../../agent/tool-components";
@@ -108,6 +110,7 @@ function PlaygroundAgentContent({
   const [inputValue, setInputValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasAutoFixedRef = useRef(false);
+  const scrollTriggerRef = useRef<ScrollToBottomTriggerRef>(null);
 
   // Auto-send fix request when there's an initial error
   useEffect(() => {
@@ -206,6 +209,7 @@ function PlaygroundAgentContent({
     (e?: React.FormEvent) => {
       e?.preventDefault();
       if (inputValue.trim() && !isLoading) {
+        scrollTriggerRef.current?.scrollToBottom();
         handleSendMessage(inputValue.trim());
         setInputValue("");
       }
@@ -390,6 +394,7 @@ function PlaygroundAgentContent({
               </div>
             ))}
         </div>
+        <ScrollToBottomTrigger ref={scrollTriggerRef} />
         <ScrollToBottomButton
           className="absolute bottom-3 left-1/2 -translate-x-1/2 z-50"
           buttonClassName="h-8 w-8 p-0 rounded-full bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 border-2 border-green-400 dark:border-green-500 shadow-lg hover:shadow-xl transition-all duration-200"

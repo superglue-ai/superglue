@@ -163,8 +163,11 @@ export function useAgentMessages(
             parsedOutput?.success === true &&
             hasConfirmableContent;
 
+          const isPendingUserConfirmation =
+            parsedOutput?.confirmationState === "PENDING_USER_CONFIRMATION";
+
           const finalStatus: "completed" | "declined" | "awaiting_confirmation" =
-            needsPostExecConfirmation
+            needsPostExecConfirmation || isPendingUserConfirmation
               ? "awaiting_confirmation"
               : data.toolCall.status || "completed";
 

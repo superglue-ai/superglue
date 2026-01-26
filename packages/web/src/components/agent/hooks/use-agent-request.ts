@@ -7,6 +7,7 @@ import {
   ToolConfirmationAction,
   ToolExecutionFeedback,
   FileUploadAction,
+  ToolExecutionPolicies,
 } from "@/src/lib/agent/agent-types";
 import { truncateFileContent } from "@/src/lib/file-utils";
 import { Message } from "@superglue/shared";
@@ -31,6 +32,7 @@ interface UseAgentRequestOptions {
   uploadedFiles: UploadedFile[];
   pendingFiles: UploadedFile[];
   filePayloads: Record<string, any>;
+  toolExecutionPolicies: ToolExecutionPolicies;
   toast: (options: { title: string; description: string; variant?: "destructive" }) => void;
 }
 
@@ -48,6 +50,7 @@ export function useAgentRequest({
   uploadedFiles,
   pendingFiles,
   filePayloads,
+  toolExecutionPolicies,
   toast,
 }: UseAgentRequestOptions): UseAgentRequestReturn {
   const actionBufferRef = useRef<UserAction[]>([]);
@@ -179,6 +182,8 @@ export function useAgentRequest({
         filePayloads: buildFilePayloads(),
         hiddenContext,
         agentParams: config.agentParams,
+        toolExecutionPolicies:
+          Object.keys(toolExecutionPolicies).length > 0 ? toolExecutionPolicies : undefined,
       };
 
       try {
@@ -262,6 +267,7 @@ export function useAgentRequest({
       pendingFiles,
       buildFilePayloads,
       buildFileUploadAction,
+      toolExecutionPolicies,
       chatEndpoint,
       getAuthToken,
       toast,
