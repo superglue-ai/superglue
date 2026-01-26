@@ -150,7 +150,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
   const setStepRunning = useCallback((stepId: string, runId: string) => {
     setStepExecutions((prev) => ({
       ...prev,
-      [stepId]: { ...(prev[stepId] ?? DEFAULT_STEP_EXECUTION), status: "running", runId },
+      [stepId]: { ...DEFAULT_STEP_EXECUTION, status: "running", runId },
     }));
   }, []);
 
@@ -275,6 +275,8 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
   }, []);
 
   const setTransformRunning = useCallback((_runId: string) => {
+    setFinalResultState(null);
+    setFinalErrorState(null);
     setTransformStatusState("running");
   }, []);
 

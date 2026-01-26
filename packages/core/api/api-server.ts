@@ -62,6 +62,7 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
 
   const fastify = Fastify({
     logger: false,
+    bodyLimit: 1024 * 1024 * 1024, // 1GB
   });
 
   // Register CORS

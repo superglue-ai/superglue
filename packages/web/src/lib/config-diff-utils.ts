@@ -213,14 +213,16 @@ export function enrichDiffsWithTargets(diffs: ToolDiff[], originalConfig?: Tool)
     let contextNewObj = contextOldObj;
     if (contextOldObj !== undefined && diff.value !== undefined) {
       const relativePath = diff.path.replace(contextPath, "") || "/";
-      const result = JSON.parse(JSON.stringify(contextOldObj));
+      let result = contextOldObj === null ? {} : JSON.parse(JSON.stringify(contextOldObj));
       const parts = relativePath.split("/").filter(Boolean);
       if (parts.length === 0) {
         contextNewObj = diff.op === "remove" ? undefined : diff.value;
       } else {
         let current = result;
         for (let i = 0; i < parts.length - 1; i++) {
-          if (current[parts[i]] === undefined) current[parts[i]] = {};
+          if (current[parts[i]] === undefined || current[parts[i]] === null) {
+            current[parts[i]] = {};
+          }
           current = current[parts[i]];
         }
         const lastKey = parts[parts.length - 1];

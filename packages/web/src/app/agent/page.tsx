@@ -1,11 +1,26 @@
 "use client";
 
 import { AgentInterface } from "@/src/components/agent/AgentInterface";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+
+function AgentPageContent() {
+  const searchParams = useSearchParams();
+  const prompt = searchParams.get("prompt");
+
+  const discoveryPrompts = prompt ? { userPrompt: prompt, systemPrompt: "" } : null;
+
+  return (
+    <div className="p-6 w-full h-full">
+      <AgentInterface discoveryPrompts={discoveryPrompts} />
+    </div>
+  );
+}
 
 export default function AgentPage() {
   return (
-    <div className="p-6 w-full h-full">
-      <AgentInterface />
-    </div>
+    <Suspense fallback={<div className="p-6 w-full h-full" />}>
+      <AgentPageContent />
+    </Suspense>
   );
 }

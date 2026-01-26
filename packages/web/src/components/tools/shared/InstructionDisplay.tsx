@@ -1,8 +1,9 @@
 import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
-import { Eye, X } from "lucide-react";
+import { Eye, Pencil, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CopyButton } from "./CopyButton";
+import { useRightSidebar } from "../../sidebar/RightSidebarContext";
 
 export const InstructionDisplay = ({
   instruction,
@@ -16,6 +17,7 @@ export const InstructionDisplay = ({
   const [showFull, setShowFull] = useState(false);
   const [isTruncated, setIsTruncated] = useState(false);
   const textRef = useRef<HTMLParagraphElement>(null);
+  const { sendMessageToAgent } = useRightSidebar();
 
   const normalizedText = instruction.replace(/\n/g, " ");
 
@@ -25,6 +27,19 @@ export const InstructionDisplay = ({
       setIsTruncated(element.scrollHeight > element.clientHeight);
     }
   }, [normalizedText]);
+
+  const handleEditClick = () => {
+    if (onEdit) {
+      onEdit();
+    } else {
+      // Send to agent for editing
+      const truncatedInstruction =
+        instruction.length > 500 ? `${instruction.slice(0, 500)}...` : instruction;
+      sendMessageToAgent(
+        `I want to edit the tool instruction. The current instruction is:\n\n"${truncatedInstruction}"\n\nPlease help me modify it.`,
+      );
+    }
+  };
 
   return (
     <>
@@ -40,6 +55,17 @@ export const InstructionDisplay = ({
               title="View full instruction"
             >
               <Eye className="h-2.5 w-2.5" />
+            </Button>
+          )}
+          {showEditButton && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-4 w-4"
+              onClick={handleEditClick}
+              title="Edit instruction with AI"
+            >
+              <Pencil className="h-2.5 w-2.5" />
             </Button>
           )}
         </div>
