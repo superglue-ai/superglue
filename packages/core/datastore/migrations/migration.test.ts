@@ -16,15 +16,15 @@ describe("extractRun", () => {
         status: RunStatus.SUCCESS,
         requestSource: "api",
         toolId: "test-tool",
-        toolResult: { foo: "bar" },
+        data: { foo: "bar" },
       };
 
       const result = extractRun(data, baseRow);
 
-      expect(result.id).toEqual(baseRow.id);
+      expect(result.runId).toEqual(baseRow.id);
       expect(result.status).toEqual(RunStatus.SUCCESS);
       expect(result.requestSource).toEqual("api");
-      expect(result.toolResult).toEqual({ foo: "bar" });
+      expect(result.data).toEqual({ foo: "bar" });
     });
 
     it("should normalize string status to RunStatus enum", () => {
@@ -51,7 +51,7 @@ describe("extractRun", () => {
       const result = extractRun(legacyData, baseRow);
 
       expect(result.status).toEqual(RunStatus.SUCCESS);
-      expect(result.toolResult).toEqual({ foo: "bar" });
+      expect(result.data).toEqual({ foo: "bar" });
     });
 
     it("should migrate legacy run with success=false to FAILED status", () => {
@@ -78,8 +78,8 @@ describe("extractRun", () => {
 
       const result = extractRun(data, baseRow);
 
-      expect(result.startedAt).toEqual(baseRow.started_at);
-      expect(result.completedAt).toEqual(baseRow.completed_at);
+      expect(result.metadata.startedAt).toEqual(baseRow.started_at.toISOString());
+      expect(result.metadata.completedAt).toEqual(baseRow.completed_at.toISOString());
     });
 
     it("should use JSON timestamps when row timestamps are null", () => {
@@ -96,8 +96,8 @@ describe("extractRun", () => {
 
       const result = extractRun(data, row);
 
-      expect(result.startedAt).toEqual(new Date("2020-06-15T10:30:00Z"));
-      expect(result.completedAt).toEqual(new Date("2020-06-15T10:35:00Z"));
+      expect(result.metadata.startedAt).toEqual(new Date("2020-06-15T10:30:00Z").toISOString());
+      expect(result.metadata.completedAt).toEqual(new Date("2020-06-15T10:35:00Z").toISOString());
     });
 
     it("should default startedAt to now when both are missing", () => {
@@ -108,8 +108,9 @@ describe("extractRun", () => {
       const result = extractRun(data, row);
       const after = new Date();
 
-      expect(result.startedAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
-      expect(result.startedAt.getTime()).toBeLessThanOrEqual(after.getTime());
+      const startedAt = new Date(result.metadata.startedAt);
+      expect(startedAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
+      expect(startedAt.getTime()).toBeLessThanOrEqual(after.getTime());
     });
   });
 });

@@ -1358,14 +1358,15 @@ const getRunsDefinition = (): ToolDefinition => ({
   name: "get_runs",
   description: `
     <use_case>
-      Fetches recent run history for a tool. Use this to debug webhook payload mismatches by inspecting what payloads were actually received.
+      Fetches recent run history. Use this to debug webhook payload mismatches by inspecting what payloads were actually received, or to see recent executions filtered by status or source.
     </use_case>
 
     <important_notes>
       - Returns recent runs including toolPayload (the actual input received)
       - Useful for debugging when a webhook-triggered tool fails due to unexpected payload format
       - Compare the returned toolPayload against the tool's inputSchema to identify mismatches
-      - Can filter by status (running, success, failed, aborted)
+      - Can filter by toolId, status (running, success, failed, aborted), or requestSource (api, frontend, scheduler, mcp, tool-chain, webhook)
+      - All filters are optional - you can combine them or use none
     </important_notes>
     `,
   inputSchema: {
@@ -1373,7 +1374,7 @@ const getRunsDefinition = (): ToolDefinition => ({
     properties: {
       toolId: {
         type: "string",
-        description: "The ID of the tool to fetch runs for",
+        description: "Optional: The ID of a specific tool to fetch runs for",
       },
       limit: {
         type: "number",
@@ -1382,53 +1383,66 @@ const getRunsDefinition = (): ToolDefinition => ({
       status: {
         type: "string",
         enum: ["running", "success", "failed", "aborted"],
-        description: "Filter runs by status",
+        description: "Optional: Filter runs by status",
+      },
+      requestSource: {
+        type: "string",
+        enum: ["api", "frontend", "scheduler", "mcp", "tool-chain", "webhook"],
+        description: "Optional: Filter runs by how they were triggered",
       },
     },
-    required: ["toolId"],
+    required: [],
   },
 });
 
 const runGetRuns = async (
-  input: { toolId: string; limit?: number; status?: string },
+  input: { toolId?: string; limit?: number; status?: string; requestSource?: string },
   ctx: ToolExecutionContext,
 ) => {
-  const { toolId, limit = 10, status } = input;
+  const { toolId, limit = 10, status, requestSource } = input;
   const cappedLimit = Math.min(limit, 50);
 
   try {
-    const result = await ctx.superglueClient.listRuns(cappedLimit, 0, toolId);
+    const result = await ctx.superglueClient.listRuns({
+      toolId,
+      limit: cappedLimit,
+      status: status as "running" | "success" | "failed" | "aborted" | undefined,
+      requestSource: requestSource as
+        | "api"
+        | "frontend"
+        | "scheduler"
+        | "mcp"
+        | "tool-chain"
+        | "webhook"
+        | undefined,
+    });
 
-    let runs = result.items;
-    if (status) {
-      runs = runs.filter((r) => r.status?.toLowerCase() === status.toLowerCase());
-    }
-
-    const simplifiedRuns = runs.map((run) => ({
-      runId: run.id,
+    // Map to a simplified format with the key info for debugging
+    const simplifiedRuns = result.items.map((run) => ({
+      runId: run.runId,
+      toolId: run.toolId,
       status: run.status,
       requestSource: run.requestSource,
       toolPayload: run.toolPayload,
       error: run.error,
-      startedAt: run.startedAt,
-      completedAt: run.completedAt,
+      metadata: run.metadata,
     }));
 
     return {
       success: true,
-      toolId,
+      toolId: toolId || "all",
       total: result.total,
       runs: simplifiedRuns,
       note:
         simplifiedRuns.length > 0
           ? "Check toolPayload field to see what was actually received. Compare against the tool's inputSchema to identify mismatches."
-          : "No runs found for this tool.",
+          : "No runs found matching the filters.",
     };
   } catch (error: any) {
     return {
       success: false,
       error: error.message,
-      suggestion: "Check that the tool ID exists",
+      suggestion: "Check that the filters are valid",
     };
   }
 };

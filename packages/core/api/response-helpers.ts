@@ -1,4 +1,4 @@
-import { RunStatus } from "@superglue/shared";
+import { RequestSource, RunStatus } from "@superglue/shared";
 
 export function parsePaginationParams(query: { page?: string; limit?: string }): {
   page: number;
@@ -31,6 +31,18 @@ export function mapOpenAPIStatusToInternal(status: string): RunStatus | undefine
     aborted: RunStatus.ABORTED,
   };
   return statusMap[status.toLowerCase()];
+}
+
+export function mapOpenAPIRequestSourceToInternal(source: string): RequestSource | undefined {
+  const sourceMap: Record<string, RequestSource> = {
+    api: RequestSource.API,
+    frontend: RequestSource.FRONTEND,
+    scheduler: RequestSource.SCHEDULER,
+    mcp: RequestSource.MCP,
+    "tool-chain": RequestSource.TOOL_CHAIN,
+    webhook: RequestSource.WEBHOOK,
+  };
+  return sourceMap[source.toLowerCase()];
 }
 
 export function sendError(reply: any, statusCode: number, message: string) {

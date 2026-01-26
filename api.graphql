@@ -336,12 +336,10 @@ type SuggestedTool {
 }
 
 type Query {
-  listRuns(limit: Int = 10, offset: Int = 0, configId: ID): RunList!
   listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
   listSystems(limit: Int = 10, offset: Int = 0): SystemList!
   findRelevantTools(searchTerms: String): [SuggestedTool!]
 
-  getRun(id: ID!): Run
   getWorkflow(id: ID!): Workflow
   getSystem(id: ID!): System
   searchSystemDocumentation(systemId: ID!, keywords: String!): String!

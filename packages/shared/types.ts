@@ -401,23 +401,25 @@ export type RequestOptions = {
   testMode?: boolean;
 };
 
+export interface RunMetadata {
+  startedAt: string; // ISO string
+  completedAt?: string; // ISO string
+  durationMs?: number;
+}
+
 export interface Run {
-  id: string;
+  runId: string;
   toolId: string;
-  orgId?: string;
-  userId?: string;
-  userEmail?: string;
+  tool?: Tool;
   status: RunStatus;
-  toolConfig?: Tool;
   toolPayload?: Record<string, any>;
-  toolResult?: any;
+  data?: any;
+  error?: string;
   stepResults?: ToolStepResult[];
   options?: RequestOptions;
   requestSource?: RequestSource;
-  error?: string;
   traceId?: string;
-  startedAt: Date;
-  completedAt?: Date;
+  metadata: RunMetadata;
 }
 
 export interface ApiCallArgs {
