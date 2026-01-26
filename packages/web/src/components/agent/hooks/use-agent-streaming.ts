@@ -190,7 +190,10 @@ export function useAgentStreaming({
                     parsedOutput?.success === true &&
                     hasConfirmableContent;
 
-                  if (needsPostExecConfirmation) {
+                  const isPendingUserConfirmation =
+                    parsedOutput?.confirmationState === "PENDING_USER_CONFIRMATION";
+
+                  if (needsPostExecConfirmation || isPendingUserConfirmation) {
                     setMessages((prev) =>
                       prev.map((msg) =>
                         msg.id === currentAssistantMessage.id

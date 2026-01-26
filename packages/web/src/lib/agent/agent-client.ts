@@ -319,26 +319,27 @@ export class AgentClient {
     return this.sanitizeAIMessages(aiMessages);
   }
 
-  private async *executeToolWithLogs(toolCall: {
-    id: string;
-    name: string;
-    input: any;
-  }): AsyncGenerator<{
-    type: "tool_call_update" | "tool_call_complete" | "tool_call_error";
-    toolCall: {
-      id: string;
-      name: string;
-      input?: any;
-      output?: any;
-      error?: string;
-      logs?: Array<{
-        id: string;
-        message: string;
-        level: string;
-        timestamp: Date;
-        traceId?: string;
-        orgId?: string;
-      }>;
+  validateRequest(body: AgentRequest): ValidatedAgentRequest {
+    return validateAgentRequest(body);
+  }
+
+  async *streamResponse(request: AgentRequest): AsyncGenerator<StreamChunk> {
+    const validated = validateAgentRequest(request);
+
+    const unwrappedFilePayloads = validated.filePayloads
+      ? Object.fromEntries(
+          Object.entries(validated.filePayloads).map(([key, { content }]) => [key, content]),
+        )
+      : {};
+
+    const executionContext: ToolExecutionContext = {
+      superglueClient: this.superglueClient,
+      filePayloads: unwrappedFilePayloads,
+      messages: [],
+      orgId: "",
+      subscriptionClient: this.subscriptionClient ?? undefined,
+      abortSignal: this.config.abortSignal,
+      toolExecutionPolicies: validated.toolExecutionPolicies,
     };
   }> {
     // Declare subscription outside try so it's accessible in finally

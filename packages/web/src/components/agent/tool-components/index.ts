@@ -3,7 +3,6 @@ export { CallEndpointComponent } from "./CallEndpointComponent";
 export { CreateSystemComponent } from "./CreateSystemComponent";
 export { DefaultComponent } from "./DefaultComponent";
 export { EditPayloadComponent } from "./EditPayloadComponent";
-export { GetRunsComponent } from "./GetRunsComponent";
 export { ModifySystemComponent } from "./ModifySystemComponent";
 export { SaveToolComponent } from "./SaveToolComponent";
 export { SearchDocumentationComponent } from "./SearchDocumentationComponent";

@@ -131,6 +131,103 @@ export const requiresConfirmationBeforeExec = (toolName: string): boolean => {
   return TOOLS_REQUIRING_CONFIRMATION_BEFORE_EXEC.has(toolName);
 };
 
-export const requiresConfirmationAfterExec = (toolName: string): boolean => {
-  return TOOLS_REQUIRING_CONFIRMATION_AFTER_EXEC.has(toolName);
+export function resolvePayloadWithFiles(
+  payload: any,
+  filePayloads: Record<string, any> | undefined,
+  stringifyObjects = false,
+): FileResolutionSuccess | FileResolutionError {
+  const validation = validateFileReferences(payload, filePayloads || {});
+  if (validation.valid === false) {
+    return {
+      success: false,
+      error: `File references not found: ${validation.missingFiles.map((f) => `file::${f}`).join(", ")}`,
+      availableFiles: validation.availableKeys.map((k) => `file::${k}`),
+      suggestion:
+        validation.availableKeys.length > 0
+          ? `Available file keys: ${validation.availableKeys.map((k) => `file::${k}`).join(", ")}`
+          : "No files are currently available. Ask the user to upload the required files.",
+    };
+  }
+
+  try {
+    const resolved =
+      filePayloads && Object.keys(filePayloads).length > 0
+        ? resolveFileReferences(payload || {}, filePayloads, stringifyObjects)
+        : payload || {};
+    return { success: true, resolved };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message,
+      availableFiles: Object.keys(filePayloads || {}).map((k) => `file::${k}`),
+      suggestion:
+        "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
+    };
+  }
+}
+
+export function validateDraftOrToolId(
+  draftId?: string,
+  toolId?: string,
+): { valid: true } | { valid: false; error: string; suggestion?: string } {
+  if (!draftId && !toolId) {
+    return {
+      valid: false,
+      error: "Either draftId or toolId is required",
+      suggestion: "Provide draftId (from build_tool) or toolId (for saved tools)",
+    };
+  }
+  if (draftId && toolId) {
+    return { valid: false, error: "Provide either draftId or toolId, not both" };
+  }
+  return { valid: true };
+}
+
+export function resolveDocumentationFiles(
+  documentation: string | undefined,
+  filePayloads: Record<string, any> | undefined,
+  setDocUrl: (refs: string[]) => string,
+): { documentation?: string; documentationUrl?: string } | { error: string } {
+  if (!filePayloads || Object.keys(filePayloads).length === 0 || !documentation) {
+    return { documentation };
+  }
+
+  const hasFileReference = typeof documentation === "string" && documentation.includes("file::");
+  let documentationUrl: string | undefined;
+
+  if (hasFileReference) {
+    const fileRefs = documentation.split(",").map((ref) => ref.trim().replace(/^file::/, ""));
+    documentationUrl = setDocUrl(fileRefs);
+  }
+
+  try {
+    const resolved = resolveFileReferences(documentation, filePayloads, true);
+    return { documentation: resolved, documentationUrl };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+const MAX_RESPONSE_BODY_LENGTH = 25_000;
+
+export const truncateResponseBody = (result: any): any => {
+  if (!result.body) return result;
+
+  if (typeof result.body === "object") {
+    const bodyStr = JSON.stringify(result.body);
+    if (bodyStr.length > MAX_RESPONSE_BODY_LENGTH) {
+      result.body = {
+        _note: `Response body truncated for LLM context (original size: ${bodyStr.length} chars)`,
+        _truncated: true,
+        preview: bodyStr.substring(0, MAX_RESPONSE_BODY_LENGTH),
+      };
+    }
+  } else if (typeof result.body === "string" && result.body.length > MAX_RESPONSE_BODY_LENGTH) {
+    const originalLength = result.body.length;
+    result.body =
+      result.body.substring(0, MAX_RESPONSE_BODY_LENGTH) +
+      `\n\n[Truncated from ${originalLength} chars]`;
+  }
+
+  return result;
 };

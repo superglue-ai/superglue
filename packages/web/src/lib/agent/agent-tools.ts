@@ -14,30 +14,18 @@ import {
   filterSystemFields,
   resolveFileReferences,
   stripLegacyToolFields,
+  truncateResponseBody,
+  validateDraftOrToolId,
   validateRequiredFields,
-} from "./agent-helpers";
-
-export interface ToolDefinition {
-  name: string;
-  description?: string;
-  inputSchema: any;
-}
-
-export const TOOLS_REQUIRING_CONFIRMATION_BEFORE_EXEC = new Set(["call_endpoint"]);
-export const TOOLS_REQUIRING_CONFIRMATION_AFTER_EXEC = new Set(["edit_tool", "edit_payload"]);
-
-export const CURL_CONFIRMATION = {
-  PENDING: "PENDING_USER_CONFIRMATION",
-  CONFIRMED: "USER_CONFIRMED",
-  CANCELLED: "USER_CANCELLED",
-} as const;
-
-export const EDIT_TOOL_CONFIRMATION = {
-  PENDING: "PENDING_DIFF_APPROVAL",
-  APPROVED: "DIFFS_APPROVED",
-  REJECTED: "DIFFS_REJECTED",
-  PARTIAL: "DIFFS_PARTIALLY_APPROVED",
-} as const;
+} from "../agent-helpers";
+import {
+  CALL_ENDPOINT_CONFIRMATION,
+  EDIT_TOOL_CONFIRMATION,
+  ToolDefinition,
+  ToolExecutionContext,
+  ToolRegistryEntry,
+} from "../agent-types";
+import { processToolPolicy } from "./tool-policies";
 
 export const TOOL_CONTINUATION_MESSAGES = {
   call_endpoint: {
@@ -1102,31 +1090,8 @@ const processCallEndpointConfirmation = async (
 
   if (output.confirmationState === CURL_CONFIRMATION.CONFIRMED) {
     try {
-      const realResult = await runCallEndpoint(toolInput, client);
-
-      const MAX_BODY_LENGTH = 25_000;
-      if (realResult.body) {
-        if (typeof realResult.body === "object") {
-          const bodyStr = JSON.stringify(realResult.body);
-          if (bodyStr.length > MAX_BODY_LENGTH) {
-            realResult.body = {
-              _note: `Response body truncated for LLM context (original size: ${bodyStr.length} chars)`,
-              _truncated: true,
-              preview: bodyStr.substring(0, MAX_BODY_LENGTH),
-            };
-          }
-        } else if (
-          typeof realResult.body === "string" &&
-          realResult.body.length > MAX_BODY_LENGTH
-        ) {
-          const originalLength = realResult.body.length;
-          realResult.body =
-            realResult.body.substring(0, MAX_BODY_LENGTH) +
-            `\n\n[Truncated from ${originalLength} chars]`;
-        }
-      }
-
-      return { output: JSON.stringify(realResult), status: "completed" };
+      const realResult = await runCallEndpoint(input, ctx);
+      return { output: JSON.stringify(truncateResponseBody(realResult)), status: "completed" };
     } catch (error: any) {
       const errorResult = {
         success: false,
@@ -1613,3 +1578,216 @@ export const runGetRuns = async (
     };
   }
 };
+
+const findToolDefinition = (): ToolDefinition => ({
+  name: "find_tool",
+  description: `Look up an existing tool by ID or search for tools by query.
+<use_case>Use when you need to see the full configuration of an existing tool, or find tools matching a description.</use_case>`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      id: { type: "string", description: "Exact tool ID to look up" },
+      query: { type: "string", description: "Search query to find matching tools" },
+    },
+  },
+});
+
+const runFindTool = async (
+  input: { id?: string; query?: string },
+  ctx: ToolExecutionContext,
+): Promise<any> => {
+  if (!input.id && !input.query) {
+    return { success: false, error: "Provide either id or query" };
+  }
+  if (input.id) {
+    const tool = await ctx.superglueClient.getWorkflow(input.id);
+    return { success: true, tool };
+  }
+  const tools = await ctx.superglueClient.findRelevantTools(input.query);
+  return { success: true, tools };
+};
+
+const findSystemDefinition = (): ToolDefinition => ({
+  name: "find_system",
+  description: `Look up an existing system by ID or search for systems by query.
+<use_case>Use when you need to see the full configuration of an existing system, or find systems matching a description.</use_case>`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      id: { type: "string", description: "Exact system ID to look up" },
+      query: { type: "string", description: "Search query to find matching systems" },
+    },
+  },
+});
+
+const runFindSystem = async (
+  input: { id?: string; query?: string },
+  ctx: ToolExecutionContext,
+): Promise<any> => {
+  if (!input.id && !input.query) {
+    return { success: false, error: "Provide either id or query" };
+  }
+  if (input.id) {
+    const system = await ctx.superglueClient.getSystem(input.id);
+    return { success: true, system };
+  }
+  const { items } = await ctx.superglueClient.listSystems(100);
+  const query = input.query!.toLowerCase();
+  const keywords = query.split(/\s+/).filter((k) => k.length > 0);
+  const filtered = items.filter((s) => {
+    const text = [s.id, s.urlHost, s.documentation].filter(Boolean).join(" ").toLowerCase();
+    return keywords.some((kw) => text.includes(kw));
+  });
+  return { success: true, systems: filtered };
+};
+
+export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
+  build_tool: {
+    name: "build_tool",
+    definition: buildToolDefinition,
+    execute: runBuildTool,
+  },
+  run_tool: {
+    name: "run_tool",
+    definition: runToolDefinition,
+    execute: runRunTool,
+  },
+  edit_tool: {
+    name: "edit_tool",
+    definition: editToolDefinition,
+    execute: runEditTool,
+    confirmation: {
+      timing: "after",
+      validActions: [
+        ConfirmationAction.CONFIRMED,
+        ConfirmationAction.DECLINED,
+        ConfirmationAction.PARTIAL,
+      ],
+      processConfirmation: processEditToolConfirmation,
+    },
+  },
+  edit_tool_playground: {
+    name: "edit_tool",
+    definition: editToolDefinitionPlayground,
+    execute: runEditTool,
+    confirmation: {
+      timing: "after",
+      validActions: [
+        ConfirmationAction.CONFIRMED,
+        ConfirmationAction.DECLINED,
+        ConfirmationAction.PARTIAL,
+      ],
+      processConfirmation: processEditToolConfirmation,
+    },
+  },
+  save_tool: {
+    name: "save_tool",
+    definition: saveToolDefinition,
+    execute: runSaveTool,
+  },
+  create_system: {
+    name: "create_system",
+    definition: createSystemDefinition,
+    execute: runCreateSystem,
+  },
+  modify_system: {
+    name: "modify_system",
+    definition: modifySystemDefinition,
+    execute: runModifySystem,
+  },
+  call_endpoint: {
+    name: "call_endpoint",
+    definition: callEndpointDefinition,
+    execute: async (input: any, ctx: ToolExecutionContext) => {
+      const { shouldAutoExecute } = processToolPolicy("call_endpoint", input, ctx);
+
+      if (shouldAutoExecute) {
+        const result = await runCallEndpoint(input, ctx);
+        return truncateResponseBody(result);
+      }
+
+      return {
+        confirmationState: CALL_ENDPOINT_CONFIRMATION.PENDING,
+        request: {
+          method: input.method,
+          url: input.url,
+          headers: input.headers,
+          body: input.body,
+          systemId: input.systemId,
+        },
+      };
+    },
+    confirmation: {
+      timing: "before",
+      validActions: [ConfirmationAction.CONFIRMED, ConfirmationAction.DECLINED],
+      processConfirmation: processCallEndpointConfirmation,
+    },
+  },
+  search_documentation: {
+    name: "search_documentation",
+    definition: searchDocumentationDefinition,
+    execute: runSearchDocumentation,
+  },
+  authenticate_oauth: {
+    name: "authenticate_oauth",
+    definition: authenticateOAuthDefinition,
+    execute: runAuthenticateOAuth,
+  },
+  find_system_templates: {
+    name: "find_system_templates",
+    definition: findSystemTemplatesDefinition,
+    execute: runFindSystemTemplates,
+  },
+  edit_payload: {
+    name: "edit_payload",
+    definition: editPayloadDefinition,
+    execute: runEditPayload,
+    confirmation: {
+      timing: "after",
+      validActions: [ConfirmationAction.CONFIRMED, ConfirmationAction.DECLINED],
+      processConfirmation: processEditPayloadConfirmation,
+    },
+  },
+  get_runs: {
+    name: "get_runs",
+    definition: getRunsDefinition,
+    execute: runGetRuns,
+  },
+  find_tool: {
+    name: "find_tool",
+    definition: findToolDefinition,
+    execute: runFindTool,
+  },
+  find_system: {
+    name: "find_system",
+    definition: findSystemDefinition,
+    execute: runFindSystem,
+  },
+};
+
+export const AGENT_TOOL_SET = [
+  "build_tool",
+  "run_tool",
+  "edit_tool",
+  "save_tool",
+  "create_system",
+  "modify_system",
+  "search_documentation",
+  "call_endpoint",
+  "authenticate_oauth",
+  "get_runs",
+  "find_system_templates",
+  "find_tool",
+  "find_system",
+];
+
+export const PLAYGROUND_TOOL_SET = [
+  "edit_tool_playground",
+  "edit_payload",
+  "search_documentation",
+  "call_endpoint",
+  "modify_system",
+  "authenticate_oauth",
+  "find_tool",
+  "find_system",
+];

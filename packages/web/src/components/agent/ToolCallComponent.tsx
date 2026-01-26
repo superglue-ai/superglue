@@ -7,7 +7,6 @@ import {
   CreateSystemComponent,
   DefaultComponent,
   EditPayloadComponent,
-  GetRunsComponent,
   ModifySystemComponent,
   SaveToolComponent,
   SearchDocumentationComponent,
@@ -122,9 +121,6 @@ export function ToolCallComponent({
       );
 
     case "get_runs":
-      return <GetRunsComponent tool={tool} onInputChange={onInputChange} />;
-
-    // Hidden tools (no UI render)
     case "find_system_templates":
     case "web_search":
       return null;

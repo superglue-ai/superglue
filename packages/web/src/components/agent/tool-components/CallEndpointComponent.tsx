@@ -1,7 +1,14 @@
 "use client";
 
 import { Button } from "@/src/components/ui/button";
-import { CURL_CONFIRMATION } from "@/src/lib/agent/agent-tools";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/src/components/ui/select";
+import { UserAction, CallEndpointAutoExecute } from "@/src/lib/agent/agent-types";
 import { ToolCall } from "@superglue/shared";
 import {
   AlertCircle,
@@ -12,8 +19,9 @@ import {
   Loader2,
   Terminal,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
+import { useAgentContext } from "../AgentContextProvider";
 
 interface CallEndpointComponentProps {
   tool: ToolCall;
@@ -30,6 +38,14 @@ export function CallEndpointComponent({
   onTriggerContinuation,
   onAbortStream,
 }: CallEndpointComponentProps) {
+  const { getToolPolicy, setToolPolicy } = useAgentContext();
+  const currentPolicy = (getToolPolicy("call_endpoint")?.autoExecute ||
+    "ask_every_time") as CallEndpointAutoExecute;
+
+  const handlePolicyChange = (value: CallEndpointAutoExecute) => {
+    setToolPolicy("call_endpoint", { autoExecute: value });
+  };
+
   const isAwaitingConfirmation = tool.status === "awaiting_confirmation";
   const [curlExpanded, setCurlExpanded] = useState(isAwaitingConfirmation);
   const [responseHeadersExpanded, setResponseHeadersExpanded] = useState(false);
@@ -57,6 +73,12 @@ export function CallEndpointComponent({
   const isDeclined = tool.status === "declined";
   const hasError = output?.success === false && output?.error && !isDeclined;
   const isDestructive = ["POST", "PUT", "DELETE", "PATCH"].includes(method);
+
+  useEffect(() => {
+    if (isCompleted || isDeclined) {
+      setCurlExpanded(false);
+    }
+  }, [isCompleted, isDeclined]);
 
   const generateCurlCommand = () => {
     let curl = `curl -X ${method}`;
@@ -189,6 +211,16 @@ export function CallEndpointComponent({
               </div>
             )}
           </div>
+          <Select value={currentPolicy} onValueChange={handlePolicyChange}>
+            <SelectTrigger className="h-5 w-[140px] text-xs text-muted-foreground border-0 bg-transparent hover:bg-muted/50 focus:ring-0 focus:ring-offset-0 flex-shrink-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ask_every_time">Ask every time</SelectItem>
+              <SelectItem value="run_gets_only">Run GETs only</SelectItem>
+              <SelectItem value="run_everything">Run everything</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {curlExpanded && (
@@ -221,7 +253,7 @@ export function CallEndpointComponent({
               </div>
             )}
 
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <Button size="sm" variant="success" onClick={handleConfirm}>
                 Execute
               </Button>
@@ -310,7 +342,7 @@ export function CallEndpointComponent({
                 </div>
               </div>
 
-              <pre className="text-xs font-mono overflow-x-auto whitespace-pre bg-background p-3 rounded border border-border max-h-64">
+              <pre className="text-xs font-mono overflow-x-auto whitespace-pre bg-background p-3 rounded border border-border max-h-32 overflow-y-auto">
                 {generateTerminalOutput()}
               </pre>
 
