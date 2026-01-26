@@ -2,6 +2,11 @@
 
 import dynamic from "next/dynamic";
 import type { default as ScrollToBottomType } from "react-scroll-to-bottom";
+import React from "react";
+
+export interface ScrollToBottomTriggerRef {
+  scrollToBottom: () => void;
+}
 
 export const ScrollToBottomContainer = dynamic(
   () => import("react-scroll-to-bottom").then((mod) => mod.default),
@@ -48,3 +53,25 @@ export const ScrollToBottomButton = dynamic(
     }),
   { ssr: false },
 );
+
+export const ScrollToBottomTrigger = dynamic(
+  () =>
+    import("react-scroll-to-bottom").then((mod) => {
+      const { useScrollToBottom } = mod;
+      const { forwardRef, useImperativeHandle } = require("react");
+
+      return forwardRef(function ScrollToBottomTriggerInner(
+        _props: object,
+        ref: React.Ref<ScrollToBottomTriggerRef>,
+      ) {
+        const scrollToBottom = useScrollToBottom();
+
+        useImperativeHandle(ref, () => ({
+          scrollToBottom: () => scrollToBottom({ behavior: "smooth" }),
+        }));
+
+        return null;
+      });
+    }),
+  { ssr: false },
+) as React.ForwardRefExoticComponent<React.RefAttributes<ScrollToBottomTriggerRef>>;

@@ -2,9 +2,17 @@
 
 import { useToast } from "@/src/hooks/use-toast";
 import type { Message, ToolCall } from "@superglue/shared";
-import { UserAction } from "@/src/lib/agent/agent-types";
+import { UserAction, ToolExecutionPolicies } from "@/src/lib/agent/agent-types";
 import { AgentType } from "@/src/lib/agent/registry/agents";
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { Conversation } from "./ConversationHistory";
 import { useAgentConversation } from "./hooks/use-agent-conversation";
 import { useAgentFileUpload } from "./hooks/use-agent-file-upload";
@@ -80,6 +88,11 @@ export interface AgentContextValue {
 
   // Config
   config: AgentConfig;
+
+  // Tool policies
+  toolExecutionPolicies: ToolExecutionPolicies;
+  setToolPolicy: (toolName: string, policy: Record<string, any>) => void;
+  getToolPolicy: (toolName: string) => Record<string, any> | undefined;
 }
 
 const AgentContext = createContext<AgentContextValue | null>(null);
@@ -110,6 +123,22 @@ export function AgentContextProvider({
   const config: AgentConfig = { ...DEFAULT_CONFIG, ...configProp };
   const { toast } = useToast();
   const welcomeRef = useRef<AgentWelcomeRef>(null);
+
+  const [toolExecutionPolicies, setToolExecutionPolicies] = useState<ToolExecutionPolicies>({});
+
+  const setToolPolicy = useCallback((toolName: string, policy: Record<string, any>) => {
+    setToolExecutionPolicies((prev) => ({
+      ...prev,
+      [toolName]: { ...prev[toolName], ...policy },
+    }));
+  }, []);
+
+  const getToolPolicy = useCallback(
+    (toolName: string) => {
+      return toolExecutionPolicies[toolName];
+    },
+    [toolExecutionPolicies],
+  );
 
   // File upload hook (independent, no dependencies)
   const fileUpload = useAgentFileUpload({ toast });
@@ -175,6 +204,7 @@ export function AgentContextProvider({
     uploadedFiles: allUploadedFiles,
     pendingFiles: fileUpload.pendingFiles,
     filePayloads: fileUpload.filePayloads,
+    toolExecutionPolicies,
     toast,
   });
 
@@ -314,6 +344,11 @@ export function AgentContextProvider({
 
       // Config
       config,
+
+      // Tool policies
+      toolExecutionPolicies,
+      setToolPolicy,
+      getToolPolicy,
     }),
     [
       messagesHook,
@@ -327,6 +362,9 @@ export function AgentContextProvider({
       handleSendMessage,
       startTemplatePrompt,
       config,
+      toolExecutionPolicies,
+      setToolPolicy,
+      getToolPolicy,
     ],
   );
 

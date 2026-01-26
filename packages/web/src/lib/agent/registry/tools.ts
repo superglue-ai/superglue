@@ -14,6 +14,7 @@ import {
   resolveDocumentationFiles,
   resolvePayloadWithFiles,
   stripLegacyToolFields,
+  truncateResponseBody,
   validateDraftOrToolId,
   validateRequiredFields,
 } from "../agent-helpers";
@@ -24,6 +25,7 @@ import {
   ToolExecutionContext,
   ToolRegistryEntry,
 } from "../agent-types";
+import { processToolPolicy } from "./tool-policies";
 
 export const TOOL_CONTINUATION_MESSAGES = {
   call_endpoint: {
@@ -901,30 +903,7 @@ const processCallEndpointConfirmation = async (
   if (parsedOutput.confirmationState === CALL_ENDPOINT_CONFIRMATION.CONFIRMED) {
     try {
       const realResult = await runCallEndpoint(input, ctx);
-
-      const MAX_BODY_LENGTH = 25_000;
-      if (realResult.body) {
-        if (typeof realResult.body === "object") {
-          const bodyStr = JSON.stringify(realResult.body);
-          if (bodyStr.length > MAX_BODY_LENGTH) {
-            realResult.body = {
-              _note: `Response body truncated for LLM context (original size: ${bodyStr.length} chars)`,
-              _truncated: true,
-              preview: bodyStr.substring(0, MAX_BODY_LENGTH),
-            };
-          }
-        } else if (
-          typeof realResult.body === "string" &&
-          realResult.body.length > MAX_BODY_LENGTH
-        ) {
-          const originalLength = realResult.body.length;
-          realResult.body =
-            realResult.body.substring(0, MAX_BODY_LENGTH) +
-            `\n\n[Truncated from ${originalLength} chars]`;
-        }
-      }
-
-      return { output: JSON.stringify(realResult), status: "completed" };
+      return { output: JSON.stringify(truncateResponseBody(realResult)), status: "completed" };
     } catch (error: any) {
       const errorResult = {
         success: false,
@@ -1573,6 +1552,25 @@ export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
   call_endpoint: {
     name: "call_endpoint",
     definition: callEndpointDefinition,
+    execute: async (input: any, ctx: ToolExecutionContext) => {
+      const { shouldAutoExecute } = processToolPolicy("call_endpoint", input, ctx);
+
+      if (shouldAutoExecute) {
+        const result = await runCallEndpoint(input, ctx);
+        return truncateResponseBody(result);
+      }
+
+      return {
+        confirmationState: CALL_ENDPOINT_CONFIRMATION.PENDING,
+        request: {
+          method: input.method,
+          url: input.url,
+          headers: input.headers,
+          body: input.body,
+          systemId: input.systemId,
+        },
+      };
+    },
     confirmation: {
       timing: "before",
       validActions: [ConfirmationAction.CONFIRMED, ConfirmationAction.DECLINED],

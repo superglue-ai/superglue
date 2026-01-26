@@ -17,6 +17,14 @@ export const EDIT_TOOL_CONFIRMATION = {
   PARTIAL: "DIFFS_PARTIALLY_APPROVED",
 } as const;
 
+export type ToolExecutionPolicies = Record<string, Record<string, any>>;
+
+export type CallEndpointAutoExecute = "ask_every_time" | "run_gets_only" | "run_everything";
+
+export interface CallEndpointPolicy {
+  autoExecute: CallEndpointAutoExecute;
+}
+
 export interface ToolDefinition {
   name: string;
   description?: string;
@@ -31,6 +39,7 @@ export interface ToolExecutionContext {
   logCallback?: (message: string) => void;
   subscriptionClient?: GraphQLSubscriptionClient;
   abortSignal?: AbortSignal;
+  toolExecutionPolicies?: ToolExecutionPolicies;
 }
 
 export interface ToolConfirmationConfig {
@@ -114,6 +123,7 @@ export interface AgentRequest {
   filePayloads?: Record<string, { name: string; content: any }>;
   hiddenContext?: string;
   agentParams?: Record<string, any>;
+  toolExecutionPolicies?: ToolExecutionPolicies;
 }
 
 export interface ValidatedAgentRequest {
@@ -124,5 +134,6 @@ export interface ValidatedAgentRequest {
   filePayloads?: Record<string, { name: string; content: any }>;
   hiddenContext?: string;
   agentParams?: Record<string, any>;
+  toolExecutionPolicies?: ToolExecutionPolicies;
   agent: AgentDefinition;
 }
