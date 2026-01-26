@@ -41,7 +41,6 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
-import { DeployButton } from "./deploy/DeployButton";
 import { FixStepDialog } from "./dialogs/FixStepDialog";
 import { FixTransformDialog } from "./dialogs/FixTransformDialog";
 import { ModifyStepConfirmDialog } from "./dialogs/ModifyStepConfirmDialog";
@@ -480,16 +479,6 @@ function ToolPlaygroundInner({
               <Play className="h-4 w-4" />
               Run All Steps
             </Button>
-          )}
-          {!embedded && toolId && !isArchived && (
-            <DeployButton
-              tool={currentTool}
-              payload={computedPayload}
-              onBeforeOpen={saveTool}
-              size="default"
-              className="h-9 px-5"
-              disabled={saving || loading}
-            />
           )}
           {!isArchived && (
             <Button

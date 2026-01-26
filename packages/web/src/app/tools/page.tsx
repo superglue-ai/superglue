@@ -11,8 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-
-import { DeployButton } from "@/src/components/tools/deploy/DeployButton";
 import { FolderSelector, useFolderFilter } from "@/src/components/tools/folders/FolderSelector";
 import { InlineFolderPicker } from "@/src/components/tools/folders/InlineFolderPicker";
 import { CopyButton } from "@/src/components/tools/shared/CopyButton";
@@ -375,7 +373,6 @@ const ToolsTable = () => {
                           <Hammer className="h-4 w-4" />
                           View
                         </Button>
-                        {!tool.archived && <DeployButton tool={tool} className="gap-2" />}
                         <ToolActionsMenu tool={tool} />
                       </div>
                     </TableCell>

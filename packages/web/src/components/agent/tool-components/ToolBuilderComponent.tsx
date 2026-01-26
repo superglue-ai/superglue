@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JsonCodeEditor } from "../../editors/JsonCodeEditor";
-import { DeployButton } from "../../tools/deploy/DeployButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "../../ui/dropdown-menu";
 import { DiffApprovalComponent } from "./DiffApprovalComponent";
 import { DiffDisplay, ToolDiff } from "./DiffDisplayComponent";
@@ -625,24 +624,15 @@ export function ToolBuilderComponent({
                   Edit
                 </Button>
                 {/* Save: default if run succeeded, outline otherwise */}
-                {!toolSaved ? (
-                  <Button
-                    variant={runResult?.success ? "default" : "outline"}
-                    onClick={() => setShowSaveDialog(true)}
-                    disabled={isRunning}
-                    className="h-9 px-3 text-sm font-medium hidden md:flex"
-                  >
-                    <Save className="w-4 h-4 mr-1.5" />
-                    Save
-                  </Button>
-                ) : (
-                  <DeployButton
-                    tool={currentConfig}
-                    payload={tool.input?.payload || {}}
-                    disabled={isRunning}
-                    className="h-9 px-3 text-sm font-medium hidden md:flex"
-                  />
-                )}
+                <Button
+                  variant={runResult?.success ? "default" : "outline"}
+                  onClick={() => setShowSaveDialog(true)}
+                  disabled={isRunning || toolSaved}
+                  className="h-9 px-3 text-sm font-medium hidden md:flex"
+                >
+                  <Save className="w-4 h-4 mr-1.5" />
+                  {toolSaved ? "Saved" : "Save"}
+                </Button>
                 {/* Request Fix: shown if run failed */}
                 {runResult && !runResult.success && !isRunning && !fixRequested && (
                   <Button
