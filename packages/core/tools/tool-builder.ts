@@ -361,9 +361,7 @@ const toolSchema = z.object({
           .describe("Complete API configuration for this step"),
       }),
     )
-    .describe(
-      "Array of workflow steps. Can be empty ([]) for transform-only workflows that just process the input payload without API calls",
-    ),
+    .describe("Array of workflow steps."),
   finalTransform: z
     .string()
     .describe(

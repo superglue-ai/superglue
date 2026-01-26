@@ -63,6 +63,16 @@ edit_tool:
 build_tool:
 - Only include a response schema if the user is explicit about a certain response structure
 - If you add a response schema, do not forget to update the finalTransform to map step data to the new response schema.
+- If build_tool fails (any error, validation errors, step failures, etc.), IMMEDIATELY use search_documentation with relevant systemId(s) and keywords, then web_search if needed.
+- When building a tool, keep instructions focused on user intent, required data retrieval steps, transformations and final response structure.
+
+find_tool:
+- Use to look up existing tool configurations by ID or search by keyword/description.
+- Provide either id (exact match) or query (keyword search), not both.
+
+find_system:
+- Use to look up existing system configurations by ID or search by keyword/description.
+- Provide either id (exact match) or query (keyword search), not both.
 
 create_system:
 - Use templateId for known services (see AVAILABLE SYSTEM TEMPLATES) - auto-populates URLs, docs, OAuth config including scopes.
