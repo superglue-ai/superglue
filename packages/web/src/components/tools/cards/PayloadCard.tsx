@@ -5,11 +5,20 @@ import { FileChip } from "@/src/components/ui/FileChip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
 import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE_TOOLS } from "@/src/lib/file-utils";
+import { buildCategorizedSources } from "@/src/lib/templating-utils";
 import { ALLOWED_FILE_EXTENSIONS } from "@superglue/shared";
 import { FileBraces, FileBracesCorner, FileJson, Upload } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { JsonCodeEditor } from "../../editors/JsonCodeEditor";
 import { useToolConfig } from "../context";
+
+export interface PayloadItem {
+  type: "payload";
+  data: { payloadText: string; inputSchema: string | null };
+  stepResult: undefined;
+  transformError: undefined;
+  categorizedSources: ReturnType<typeof buildCategorizedSources>;
+}
 
 interface PayloadSpotlightProps {
   onFilesUpload?: (files: File[]) => Promise<void>;
@@ -155,7 +164,7 @@ export const PayloadSpotlight = ({
             value="payload"
             className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
           >
-            <FileJson className="h-4 w-4" /> Payload
+            <FileJson className="h-4 w-4" /> Test Payload
           </TabsTrigger>
           {isPayloadValid && (
             <TabsTrigger

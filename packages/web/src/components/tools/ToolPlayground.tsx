@@ -195,6 +195,7 @@ function ToolPlaygroundInner({
 
   const [activeDialog, setActiveDialog] = useState<DialogState>({ type: "none" });
   const modifyStepResolveRef = useRef<((shouldContinue: boolean) => void) | null>(null);
+  const skipModifyConfirmRef = useRef<boolean>(false);
   const isExecutingStep = contextCurrentExecutingStepIndex;
   const hasGeneratedDefaultPayloadRef = useRef<boolean>(false);
 
@@ -274,7 +275,7 @@ function ToolPlaygroundInner({
   const handleBeforeStepExecution = async (stepIndex: number, step: any): Promise<boolean> => {
     if (shouldAbortRef.current || externalShouldStop) return false;
 
-    if (step.modify === true) {
+    if (step.modify === true && !skipModifyConfirmRef.current) {
       return new Promise((resolve) => {
         modifyStepResolveRef.current = resolve;
         setActiveDialog({ type: "modifyStepConfirm", stepIndex });
@@ -283,7 +284,10 @@ function ToolPlaygroundInner({
     return true;
   };
 
-  const handleModifyStepConfirm = () => {
+  const handleModifyStepConfirm = (skipFutureConfirmations: boolean) => {
+    if (skipFutureConfirmations) {
+      skipModifyConfirmRef.current = true;
+    }
     setActiveDialog({ type: "none" });
     modifyStepResolveRef.current?.(true);
     modifyStepResolveRef.current = null;
@@ -453,6 +457,16 @@ function ToolPlaygroundInner({
               Run All Steps
             </Button>
           )}
+          {!embedded && toolId && !isArchived && (
+            <DeployButton
+              tool={currentTool}
+              payload={computedPayload}
+              onBeforeOpen={saveTool}
+              size="default"
+              className="h-9 px-5"
+              disabled={saving || loading}
+            />
+          )}
           {!isArchived && (
             <Button
               variant="default"
@@ -489,21 +503,7 @@ function ToolPlaygroundInner({
     >
       {/* Main playground content */}
       <div className={renderAgentInline ? "flex-1 flex flex-col overflow-hidden" : "contents"}>
-        {!embedded && !hideHeader && (
-          <div className="flex justify-end items-center mb-1 flex-shrink-0 mr-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="shrink-0"
-              onClick={() => router.push("/tools")}
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-
-        <div className="w-full flex-1 overflow-hidden flex">
+        <div className="w-full flex-1 overflow-hidden flex mt-4">
           {/* Main content area */}
           <div className="flex-1 h-full overflow-hidden">
             <div className="w-full h-full">

@@ -105,19 +105,38 @@ function PlaygroundAgentContent({
     handleSaveEdit,
   } = useAgentContext();
 
-  const { registerAgentSendMessage } = useRightSidebar();
+  const { registerSetAgentInput, registerResetAgentChat } = useRightSidebar();
   const toolConfig = useToolConfig();
   const execution = useExecution();
   const cacheKeyPrefix = `superglue-playground-${toolId}`;
   const [inputValue, setInputValue] = useState("");
+  const [isHighlighted, setIsHighlighted] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasAutoFixedRef = useRef(false);
   const scrollTriggerRef = useRef<ScrollToBottomTriggerRef>(null);
 
-  // Register the sendMessage function so it can be called from outside
+  // Register the setInput function to paste message into input field and select it
   useEffect(() => {
-    registerAgentSendMessage(handleSendMessage);
-  }, [registerAgentSendMessage, handleSendMessage]);
+    registerSetAgentInput((message: string) => {
+      setInputValue(message);
+      setIsHighlighted(true);
+      // Focus and select the text after a short delay to ensure the value is set
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.select();
+          // Auto-resize textarea to fit content
+          textareaRef.current.style.height = "auto";
+          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+        }
+      }, 0);
+    });
+  }, [registerSetAgentInput]);
+
+  // Register the reset chat function so it can be called from outside (Cmd+L)
+  useEffect(() => {
+    registerResetAgentChat(startNewConversation);
+  }, [registerResetAgentChat, startNewConversation]);
 
   // Auto-send fix request when there's an initial error
   useEffect(() => {
@@ -219,6 +238,11 @@ function PlaygroundAgentContent({
         scrollTriggerRef.current?.scrollToBottom();
         handleSendMessage(inputValue.trim());
         setInputValue("");
+        setIsHighlighted(false);
+        // Reset textarea height
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto";
+        }
       }
     },
     [inputValue, isLoading, handleSendMessage],
@@ -411,14 +435,24 @@ function PlaygroundAgentContent({
 
       {/* Input Area */}
       <div className="p-3">
-        <form onSubmit={handleSubmit} className="flex gap-2">
+        <form onSubmit={handleSubmit} className="flex gap-2 items-end">
           <Textarea
             ref={textareaRef}
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => {
+              setInputValue(e.target.value);
+              setIsHighlighted(false);
+              // Auto-resize textarea
+              e.target.style.height = "auto";
+              e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Message superglue..."
-            className="min-h-[36px] max-h-[96px] resize-none text-sm py-2"
+            className={cn(
+              "min-h-[36px] max-h-[200px] resize-none text-sm py-2 transition-all",
+              isHighlighted &&
+                "ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30",
+            )}
             rows={1}
             disabled={isLoading}
             maxLength={MAX_MESSAGE_LENGTH}

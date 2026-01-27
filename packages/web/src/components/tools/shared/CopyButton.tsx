@@ -1,5 +1,6 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
+import { safeStringify } from "@/src/lib/general-utils";
 
 export const copyToClipboard = async (text: string): Promise<boolean> => {
   if (navigator.clipboard && window.isSecureContext) {
@@ -38,7 +39,7 @@ export const CopyButton = ({ text, getData }: { text?: string; getData?: () => a
     const textToCopy = getData
       ? typeof getData() === "string"
         ? getData()
-        : JSON.stringify(getData(), null, 2)
+        : safeStringify(getData(), 2)
       : text || "";
     const success = await copyToClipboard(textToCopy);
     if (success) {

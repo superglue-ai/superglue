@@ -185,7 +185,7 @@ export function StepResultTab({
                 <span className="text-[10px] text-muted-foreground">
                   {formatBytes(outputProcessor.bytes)}
                 </span>
-                <CopyButton text={JSON.stringify(stepResult, null, 2)} />
+                <CopyButton getData={() => stepResult} />
                 <DownloadButton data={stepResult} filename={`step_${step.id}_result.json`} />
               </div>
             }

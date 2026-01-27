@@ -3,7 +3,6 @@
 import { useConfig } from "@/src/app/config-context";
 import { useTools } from "@/src/app/tools-context";
 import { SaveToolDialog } from "@/src/components/tools/dialogs/SaveToolDialog";
-import ToolPlayground, { type ToolPlaygroundHandle } from "@/src/components/tools/ToolPlayground";
 import { Button } from "@/src/components/ui/button";
 import { UserAction } from "@/src/lib/agent/agent-types";
 import { resolveFileReferences, validateFileReferences } from "@/src/lib/agent/agent-helpers";
@@ -18,14 +17,12 @@ import { SuperglueClient, Tool, ToolCall } from "@superglue/shared";
 import {
   CheckCircle,
   ChevronDown,
-  Edit2,
   Hammer,
   Loader2,
   Play,
   Save,
   Square,
   Wrench,
-  X,
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -71,10 +68,8 @@ export function ToolBuilderComponent({
 }: ToolBuilderComponentProps) {
   const config = useConfig();
   const { refreshTools } = useTools();
-  const editorRef = useRef<ToolPlaygroundHandle | null>(null);
 
   // UI state
-  const [showEditor, setShowEditor] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
 
   // Tool state
@@ -671,15 +666,6 @@ export function ToolBuilderComponent({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
-                <Button
-                  variant="outline"
-                  onClick={() => setShowEditor(true)}
-                  disabled={isRunning}
-                  className="h-9 px-3 text-sm font-medium hidden md:flex"
-                >
-                  <Edit2 className="w-4 h-4 mr-1.5" />
-                  Edit
-                </Button>
                 {/* Save: default if run succeeded, outline otherwise */}
                 <Button
                   variant={runResult?.success ? "default" : "outline"}
@@ -718,42 +704,6 @@ export function ToolBuilderComponent({
                     Request Fix
                   </Button>
                 )}
-              </div>
-            )}
-
-            {/* Editor Modal with inline agent sidebar */}
-            {showEditor && currentConfig && (
-              <div className="fixed left-0 lg:left-48 right-0 top-0 bottom-0 z-[100] bg-background dark:bg-neutral-940 flex flex-col animate-in zoom-in-95 duration-200 !mt-0">
-                <div className="flex-none px-6 pt-4 pb-2">
-                  <div className="flex items-center justify-end">
-                    <Button variant="ghost" size="icon" onClick={() => setShowEditor(false)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex-1 overflow-hidden px-6 pb-6">
-                  <ToolPlayground
-                    ref={editorRef}
-                    embedded
-                    renderAgentInline
-                    initialTool={currentConfig}
-                    initialPayload={JSON.stringify(tool.input?.payload || {})}
-                    initialInstruction={currentConfig?.instruction}
-                    initialError={runResult && !runResult.success ? runResult.error : undefined}
-                    onSave={async (wf) => {
-                      const client = new SuperglueClient({
-                        endpoint: config.superglueEndpoint,
-                        apiKey: tokenRegistry.getToken(),
-                        apiEndpoint: config.apiEndpoint,
-                      });
-                      const saved = await client.upsertWorkflow(wf.id, wf);
-                      setCurrentConfig(saved);
-                      setToolSaved(true);
-                      setShowEditor(false);
-                      refreshTools();
-                    }}
-                  />
-                </div>
               </div>
             )}
 

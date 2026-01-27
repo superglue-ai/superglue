@@ -493,8 +493,7 @@ export async function GET(request: NextRequest) {
         message: "OAuth connection completed successfully!",
         tokens,
       });
-      // Clear cookie
-      response.cookies.delete("oauth_session");
+      response.cookies.delete({ name: "oauth_session", path: "/api/auth/callback" });
       response.cookies.delete("api_key"); // Legacy cleanup
       return response;
     } else {
@@ -507,8 +506,7 @@ export async function GET(request: NextRequest) {
         suppressErrorUI,
       );
       const response = new NextResponse(html, { headers: { "Content-Type": "text/html" } });
-      // Clear cookie
-      response.cookies.delete("oauth_session");
+      response.cookies.delete({ name: "oauth_session", path: "/api/auth/callback" });
       response.cookies.delete("api_key"); // Legacy cleanup
       return response;
     }
@@ -540,8 +538,8 @@ export async function GET(request: NextRequest) {
         },
         { status: 400 },
       );
-      // Clear cookie on error too
-      response.cookies.delete("oauth_session");
+      // Clear cookie on error too - must specify same path it was set with
+      response.cookies.delete({ name: "oauth_session", path: "/api/auth/callback" });
       response.cookies.delete("api_key"); // Legacy cleanup
       return response;
     } else {
@@ -554,8 +552,8 @@ export async function GET(request: NextRequest) {
         suppressErrorUI,
       );
       const response = new NextResponse(html, { headers: { "Content-Type": "text/html" } });
-      // Clear cookie on error too
-      response.cookies.delete("oauth_session");
+      // Clear cookie on error too - must specify same path it was set with
+      response.cookies.delete({ name: "oauth_session", path: "/api/auth/callback" });
       response.cookies.delete("api_key"); // Legacy cleanup
       return response;
     }

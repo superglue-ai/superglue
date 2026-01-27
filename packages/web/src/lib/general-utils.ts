@@ -49,6 +49,26 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Safe JSON.stringify that handles circular references, BigInt, and other edge cases.
+ * Falls back to String(obj) on error.
+ */
+export function safeStringify(obj: any, indent?: number): string {
+  try {
+    return JSON.stringify(
+      obj,
+      (_, value) => {
+        if (typeof value === "bigint") return value.toString();
+        if (typeof value === "function") return "[Function]";
+        return value;
+      },
+      indent,
+    );
+  } catch {
+    return String(obj);
+  }
+}
+
 export function composeUrl(host: string, path: string | undefined) {
   if (!host && !path) return "";
   // Handle empty/undefined inputs

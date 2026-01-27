@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/ta
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
 import { formatBytes } from "@/src/lib/file-utils";
 import { isEmptyData } from "@/src/lib/general-utils";
+import { buildCategorizedSources } from "@/src/lib/templating-utils";
 import { DownloadButton } from "@superglue/web/src/components/tools/shared/download-button";
 import {
   Code2,
@@ -25,6 +26,15 @@ import { useDataProcessor } from "../hooks/use-data-processor";
 import { CopyButton } from "../shared/CopyButton";
 import { ResponseFiltersCard } from "./ResponseFiltersCard";
 import { useRightSidebar } from "../../sidebar/RightSidebarContext";
+
+export interface TransformItem {
+  type: "transform";
+  data: { transform: string; responseSchema: string };
+  stepResult: any;
+  transformError: any;
+  hasTransformCompleted: boolean;
+  categorizedSources: ReturnType<typeof buildCategorizedSources>;
+}
 
 interface FinalTransformMiniStepCardProps {
   onExecuteTransform?: (schema: string, transform: string) => void;
@@ -328,7 +338,7 @@ export const FinalTransformMiniStepCard = ({
                       <span className="text-[10px] text-muted-foreground">
                         {formatBytes(inputData.bytes)}
                       </span>
-                      <CopyButton text={JSON.stringify(stepInputs, null, 2)} />
+                      <CopyButton getData={() => stepInputs} />
                       <DownloadButton data={stepInputs} filename="transform_step_inputs.json" />
                     </div>
                   }
@@ -449,7 +459,7 @@ export const FinalTransformMiniStepCard = ({
                         <span className="text-[10px] text-muted-foreground">
                           {formatBytes(outputData.bytes)}
                         </span>
-                        <CopyButton text={JSON.stringify(transformResult, null, 2)} />
+                        <CopyButton getData={() => transformResult} />
                         <DownloadButton data={transformResult} filename="tool_result.json" />
                       </div>
                     }
