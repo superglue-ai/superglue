@@ -1,5 +1,9 @@
 import type { ServiceMetadata, System } from "@superglue/shared";
-import { getOAuthTokenUrl, resolveOAuthCertAndKey } from "@superglue/shared";
+import {
+  getOAuthTokenUrl,
+  getOAuthTokenExchangeConfig,
+  resolveOAuthCertAndKey,
+} from "@superglue/shared";
 import axios from "axios";
 import https from "https";
 import { logMessage } from "./logs.js";
@@ -67,6 +71,11 @@ export async function refreshOAuthToken(
       throw new Error("Could not determine token URL for system");
     }
 
+    // Get token exchange config (from stored credentials or template)
+    const tokenConfig = getOAuthTokenExchangeConfig(system);
+    const useBasicAuth = tokenConfig.tokenAuthMethod === "basic_auth";
+    const useJson = tokenConfig.tokenContentType === "json";
+
     let certContent: string | undefined;
     let keyContent: string | undefined;
 
@@ -85,25 +94,41 @@ export async function refreshOAuthToken(
           })
         : undefined;
 
-    const params: Record<string, string> = isClientCredentials
+    // Build request body
+    const bodyParams: Record<string, string> = isClientCredentials
       ? {
           grant_type: "client_credentials",
-          client_id,
-          ...(client_secret && { client_secret }),
           ...(scopes && { scope: scopes }),
         }
       : {
           grant_type: "refresh_token",
           refresh_token: refresh_token!,
-          client_id,
-          client_secret: client_secret!,
         };
 
-    const response = await axios.post(tokenUrl, new URLSearchParams(params), {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-      },
+    // Add credentials to body if not using basic auth, or if basic auth but no secret (fallback)
+    if (!useBasicAuth || !client_secret) {
+      bodyParams.client_id = client_id;
+      if (client_secret) bodyParams.client_secret = client_secret;
+    }
+
+    // Build headers
+    const headers: Record<string, string> = {
+      "Content-Type": useJson ? "application/json" : "application/x-www-form-urlencoded",
+      Accept: "application/json",
+      ...tokenConfig.extraHeaders,
+    };
+
+    // Add basic auth header if configured and secret is available
+    if (useBasicAuth && client_secret) {
+      const basicAuth = Buffer.from(`${client_id}:${client_secret}`).toString("base64");
+      headers["Authorization"] = `Basic ${basicAuth}`;
+    }
+
+    // Build request body in correct format
+    const body = useJson ? JSON.stringify(bodyParams) : new URLSearchParams(bodyParams);
+
+    const response = await axios.post(tokenUrl, body, {
+      headers,
       httpsAgent,
       validateStatus: null,
     });

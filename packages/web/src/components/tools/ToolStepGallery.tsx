@@ -46,9 +46,7 @@ export interface ToolStepGalleryProps {
   onInstructionEdit?: () => void;
   onExecuteStep?: (stepIndex: number) => Promise<void>;
   onExecuteStepWithLimit?: (stepIndex: number, limit: number) => Promise<void>;
-  onOpenFixStepDialog?: (stepIndex: number) => void;
   onExecuteTransform?: (schema: string, transform: string) => Promise<void>;
-  onOpenFixTransformDialog?: () => void;
   onAbort?: () => void;
 
   onFilesUpload?: (files: File[]) => Promise<void>;
@@ -71,9 +69,7 @@ export function ToolStepGallery({
   onInstructionEdit,
   onExecuteStep,
   onExecuteStepWithLimit,
-  onOpenFixStepDialog,
   onExecuteTransform,
-  onOpenFixTransformDialog,
   onAbort,
   onFilesUpload,
   onFileRemove,
@@ -385,7 +381,7 @@ export function ToolStepGallery({
             <InstructionDisplay
               instruction={instruction}
               onEdit={onInstructionEdit}
-              showEditButton={!!onInstructionEdit}
+              showEditButton={true}
             />
           </div>
         )}
@@ -593,7 +589,6 @@ export function ToolStepGallery({
               ) : currentItem.type === "transform" ? (
                 <FinalTransformMiniStepCard
                   onExecuteTransform={onExecuteTransform}
-                  onOpenFixTransformDialog={onOpenFixTransformDialog}
                   onAbort={isRunningTransform || isFixingTransform ? onAbort : undefined}
                 />
               ) : (
@@ -608,9 +603,6 @@ export function ToolStepGallery({
                     onExecuteStepWithLimit
                       ? (limit) => onExecuteStepWithLimit(activeIndex - 1, limit)
                       : undefined
-                  }
-                  onOpenFixStepDialog={
-                    onOpenFixStepDialog ? () => onOpenFixStepDialog(activeIndex - 1) : undefined
                   }
                   onAbort={currentExecutingStepIndex === activeIndex - 1 ? onAbort : undefined}
                   isExecuting={currentExecutingStepIndex === activeIndex - 1}

@@ -11,8 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-
-import { DeployButton } from "@/src/components/tools/deploy/DeployButton";
 import { FolderSelector, useFolderFilter } from "@/src/components/tools/folders/FolderSelector";
 import { InlineFolderPicker } from "@/src/components/tools/folders/InlineFolderPicker";
 import { CopyButton } from "@/src/components/tools/shared/CopyButton";
@@ -133,7 +131,7 @@ const ToolsTable = () => {
     }
   };
 
-  const SortIcon = ({ column }: { column: SortColumn; }) => {
+  const SortIcon = ({ column }: { column: SortColumn }) => {
     if (sortColumn !== column) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
     return sortDirection === "asc" ? (
       <ArrowUp className="ml-1 h-3 w-3" />
@@ -375,7 +373,6 @@ const ToolsTable = () => {
                           <Hammer className="h-4 w-4" />
                           View
                         </Button>
-                        {!tool.archived && <DeployButton tool={tool} className="gap-2" />}
                         <ToolActionsMenu tool={tool} />
                       </div>
                     </TableCell>

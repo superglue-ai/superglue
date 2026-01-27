@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   try {
-    const { apiKey } = await request.json();
+    const { apiKey, codeVerifier } = await request.json();
 
     if (!apiKey) {
       return NextResponse.json({ error: "Missing API key" }, { status: 400 });
@@ -10,8 +10,13 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({ success: true });
 
-    // Set httpOnly cookie with JWT
-    response.cookies.set("api_key", apiKey, {
+    // Set httpOnly cookie with API key and optional PKCE code_verifier
+    const cookieData = JSON.stringify({
+      apiKey,
+      ...(codeVerifier && { codeVerifier }),
+    });
+
+    response.cookies.set("oauth_session", cookieData, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

@@ -11,10 +11,10 @@ import { useConfig } from "@/src/app/config-context";
 import { tokenRegistry } from "@/src/lib/token-registry";
 import { useRightSidebar } from "./RightSidebarContext";
 
-const SIDEBAR_MIN_WIDTH = 400;
+const SIDEBAR_MIN_WIDTH = 300;
 const SIDEBAR_MAX_WIDTH = 700;
-const SIDEBAR_DEFAULT_WIDTH = 400;
-const SIDEBAR_COLLAPSED_WIDTH = 48;
+const SIDEBAR_DEFAULT_WIDTH = 350;
+const SIDEBAR_COLLAPSED_WIDTH = 45;
 
 type ActivePanel = "logs" | "agent";
 
@@ -23,7 +23,7 @@ interface RightSidebarProps {
 }
 
 export function RightSidebar({ className }: RightSidebarProps) {
-  const { showAgent, setAgentPortalRef } = useRightSidebar();
+  const { showAgent, setAgentPortalRef, setExpandSidebar } = useRightSidebar();
   const agentContainerRef = useCallback(
     (node: HTMLDivElement | null) => {
       setAgentPortalRef(node);
@@ -77,6 +77,13 @@ export function RightSidebar({ className }: RightSidebarProps) {
     }
   }, [activePanel, isHydrated, showAgent]);
 
+  useEffect(() => {
+    setExpandSidebar(() => {
+      setIsExpanded(true);
+      setActivePanel("agent");
+    });
+  }, [setExpandSidebar]);
+
   const client = useMemo(() => {
     return new SuperglueClient({
       endpoint: config.superglueEndpoint,
@@ -93,7 +100,7 @@ export function RightSidebar({ className }: RightSidebarProps) {
   useEffect(() => {
     const subscription = client.subscribeToLogs({
       onLog: (log) => {
-        setLogs((prev) => [...prev, log].slice(-100));
+        setLogs((prev) => [...prev, log].slice(-1000));
         if (!isExpandedRef.current || activePanelRef.current !== "logs") {
           setHasNewLogs(true);
         }

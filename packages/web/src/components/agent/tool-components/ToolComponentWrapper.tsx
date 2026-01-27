@@ -34,6 +34,12 @@ export function ToolCallWrapper({
     }
   }, [openByDefault]);
 
+  useEffect(() => {
+    if (tool.status === "declined" || tool.status === "stopped") {
+      setIsExpanded(false);
+    }
+  }, [tool.status]);
+
   const displayStatus = (() => {
     // If statusOverride is provided, use it (for manual runs)
     if (statusOverride) {

@@ -1,6 +1,12 @@
-import { Message, ToolCall } from "@superglue/shared";
+import { ConfirmationAction, Message, ToolCall } from "@superglue/shared";
 import { Conversation } from "../ConversationHistory";
-import { ToolSet } from "@/src/lib/agent/agent-client";
+import { AgentType } from "@/src/lib/agent/registry/agents";
+import { UserAction } from "@/src/lib/agent/agent-types";
+
+export interface ToolConfirmationMetadata {
+  timing: "before" | "after";
+  validActions: ConfirmationAction[];
+}
 
 export interface UploadedFile {
   name: string;
@@ -26,17 +32,14 @@ export interface UseAgentMessagesReturn {
   setEditingContent: React.Dispatch<React.SetStateAction<string>>;
   handleEditMessage: (messageId: string, content: string) => void;
   handleCancelEdit: () => void;
+  findAndResumeMessageWithTool: (toolCallId: string) => Message | null;
 }
 
 export interface UseAgentStreamingReturn {
-  sendChatMessage: (
-    messages: Message[],
-    assistantMessage: Message,
-    signal?: AbortSignal,
-  ) => Promise<void>;
   processStreamData: (
     reader: ReadableStreamDefaultReader<Uint8Array>,
-    currentAssistantMessage: Message,
+    currentAssistantMessage: Message | null,
+    createMessageIfNeeded: () => Message,
   ) => Promise<void>;
   currentStreamControllerRef: React.MutableRefObject<AbortController | null>;
   abortStream: () => void;
@@ -48,14 +51,20 @@ export interface UseAgentStreamingReturn {
 export interface UseAgentToolsReturn {
   handleToolInputChange: (newInput: any) => void;
   handleToolUpdate: (toolCallId: string, updates: Partial<ToolCall>) => void;
-  handleOAuthCompletion: (toolCallId: string, systemData: any) => Promise<void>;
-  addSystemMessage: (message: string, options?: { triggerImmediateResponse?: boolean }) => void;
-  triggerStreamContinuation: () => Promise<void>;
+}
+
+export interface UseAgentRequestReturn {
+  sendAgentRequest: (
+    userMessage?: string,
+    options?: { userActions?: UserAction[]; hiddenContext?: string },
+  ) => Promise<void>;
+  bufferAction: (action: UserAction) => void;
+  actionBufferRef: React.MutableRefObject<UserAction[]>;
 }
 
 export interface UseAgentFileUploadReturn {
-  uploadedFiles: UploadedFile[];
-  setUploadedFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
+  pendingFiles: UploadedFile[];
+  sessionFiles: UploadedFile[];
   filePayloads: Record<string, any>;
   setFilePayloads: React.Dispatch<React.SetStateAction<Record<string, any>>>;
   isProcessingFiles: boolean;
@@ -63,7 +72,9 @@ export interface UseAgentFileUploadReturn {
   setIsDragging: React.Dispatch<React.SetStateAction<boolean>>;
   fileInputRef: React.RefObject<HTMLInputElement>;
   handleFilesUpload: (files: File[]) => Promise<void>;
-  handleFileRemove: (key: string) => void;
+  handlePendingFileRemove: (key: string) => void;
+  handleSessionFileRemove: (key: string) => void;
+  commitPendingFiles: () => void;
   handleDrop: (e: React.DragEvent) => void;
   handleDragOver: (e: React.DragEvent) => void;
   handleDragLeave: (e: React.DragEvent) => void;
@@ -92,10 +103,9 @@ export interface PlaygroundToolContext {
 }
 
 export interface AgentConfig {
+  agentId: AgentType;
+  agentParams?: Record<string, any>;
+  hiddenContextBuilder?: () => string;
   chatEndpoint?: string;
-  oauthEndpoint?: string;
   getAuthToken?: () => string;
-  toolSet?: ToolSet;
-  onBeforeMessage?: (messages: Message[]) => Message[];
-  playgroundContext?: PlaygroundToolContext;
 }

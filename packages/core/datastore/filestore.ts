@@ -3,6 +3,7 @@ import type {
   DiscoveryRun,
   FileReference,
   FileStatus,
+  RequestSource,
   System,
   Run,
   RunStatus,
@@ -256,14 +257,17 @@ export class FileStore implements DataStore {
         try {
           const rawData = JSON.parse(line);
           const run = extractRun(rawData, {
-            id: rawData.id,
+            id: rawData.runId ?? rawData.id,
             config_id: rawData.toolId || rawData.config?.id || "",
-            started_at: rawData.startedAt,
-            completed_at: rawData.completedAt,
+            started_at: rawData.metadata?.startedAt ?? rawData.startedAt,
+            completed_at: rawData.metadata?.completedAt ?? rawData.completedAt,
           });
 
-          if (orgId && run.orgId && run.orgId !== orgId) continue;
-          const toolId = run.toolId || run.toolConfig?.id;
+          // Determine the orgId for this entry: prefer top-level, fall back to legacy nested orgId
+          const entryOrgId = rawData.orgId ?? rawData.run?.orgId;
+          // When filtering by orgId, skip entries that don't match or have no orgId at all
+          if (orgId && entryOrgId !== orgId) continue;
+          const toolId = run.toolId || run.tool?.id;
           if (configId && toolId !== configId) continue;
 
           runs.push(run);
@@ -273,16 +277,19 @@ export class FileStore implements DataStore {
           logMessage("warn", `Failed to parse log line: ${line}`);
         }
       }
-      return runs.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+      return runs.sort(
+        (a, b) =>
+          new Date(b.metadata.startedAt).getTime() - new Date(a.metadata.startedAt).getTime(),
+      );
     } catch (error) {
       logMessage("error", "Failed to read runs from logs: " + error);
       return [];
     }
   }
 
-  private async appendRunToLogs(run: Run): Promise<void> {
+  private async appendRunToLogs(run: Run, orgId?: string): Promise<void> {
     try {
-      const logLine = JSON.stringify(run) + "\n";
+      const logLine = JSON.stringify({ ...run, orgId }) + "\n";
       await fs.promises.appendFile(this.logsFilePath, logLine, { mode: 0o644 });
     } catch (error) {
       logMessage("error", "Failed to append run to logs: " + error);
@@ -311,12 +318,14 @@ export class FileStore implements DataStore {
         try {
           const rawData = JSON.parse(line);
           const run = extractRun(rawData, {
-            id: rawData.id,
+            id: rawData.runId ?? rawData.id,
             config_id: rawData.toolId || rawData.config?.id || "",
-            started_at: rawData.startedAt,
-            completed_at: rawData.completedAt,
+            started_at: rawData.metadata?.startedAt ?? rawData.startedAt,
+            completed_at: rawData.metadata?.completedAt ?? rawData.completedAt,
           });
-          if (run.id === id && (!orgId || run.orgId === orgId)) {
+          // Determine the orgId for this entry: prefer top-level, fall back to legacy nested orgId
+          const entryOrgId = rawData.orgId ?? rawData.run?.orgId;
+          if (run.runId === id && (!orgId || entryOrgId === orgId)) {
             found = true;
             continue;
           }
@@ -392,21 +401,21 @@ export class FileStore implements DataStore {
     if (!id) return null;
 
     const runs = await this.readRunsFromLogs(orgId);
-    return runs.find((r) => r.id === id) || null;
+    return runs.find((r) => r.runId === id) || null;
   }
 
-  async createRun(params: { run: Run }): Promise<Run> {
+  async createRun(params: { run: Run; orgId?: string }): Promise<Run> {
     await this.ensureInitialized();
-    const { run } = params;
+    const { run, orgId } = params;
     if (!run) throw new Error("Run is required");
 
-    const existingRun = await this.getRun({ id: run.id, orgId: run.orgId });
+    const existingRun = await this.getRun({ id: run.runId, orgId });
     if (existingRun) {
-      throw new Error(`Run with id ${run.id} already exists`);
+      throw new Error(`Run with id ${run.runId} already exists`);
     }
 
     if (String(process.env.DISABLE_LOGS).toLowerCase() !== "true") {
-      await this.appendRunToLogs(run);
+      await this.appendRunToLogs(run, orgId);
     }
 
     return run;
@@ -417,7 +426,7 @@ export class FileStore implements DataStore {
     const { id, orgId, updates } = params;
 
     const runs = await this.readRunsFromLogs(orgId);
-    const existingRun = runs.find((r) => r.id === id);
+    const existingRun = runs.find((r) => r.runId === id);
 
     if (!existingRun) {
       throw new Error(`Run with id ${id} not found`);
@@ -426,13 +435,15 @@ export class FileStore implements DataStore {
     const updatedRun: Run = {
       ...existingRun,
       ...updates,
-      id,
-      orgId,
-      startedAt: existingRun.startedAt,
+      runId: id,
+      metadata: {
+        ...existingRun.metadata,
+        ...updates.metadata,
+      },
     };
 
     await this.removeRunFromLogs(id, orgId);
-    await this.appendRunToLogs(updatedRun);
+    await this.appendRunToLogs(updatedRun, orgId);
 
     return updatedRun;
   }
@@ -442,18 +453,23 @@ export class FileStore implements DataStore {
     offset?: number;
     configId?: string;
     status?: RunStatus;
+    requestSource?: RequestSource;
     orgId?: string;
   }): Promise<{ items: Run[]; total: number }> {
     await this.ensureInitialized();
-    const { limit = 10, offset = 0, configId, status, orgId } = params || {};
+    const { limit = 10, offset = 0, configId, status, requestSource, orgId } = params || {};
     const allRuns = await this.readRunsFromLogs(orgId, configId);
 
     let validRuns = allRuns.filter(
-      (run): run is Run => run !== null && run.id && run.startedAt instanceof Date,
+      (run): run is Run => run !== null && !!run.runId && !!run.metadata?.startedAt,
     );
 
     if (status !== undefined) {
       validRuns = validRuns.filter((run) => run.status === status);
+    }
+
+    if (requestSource !== undefined) {
+      validRuns = validRuns.filter((run) => run.requestSource === requestSource);
     }
 
     const items = validRuns.slice(offset, offset + limit);

@@ -3,6 +3,7 @@ import {
   DiscoveryRun,
   FileReference,
   FileStatus,
+  RequestSource,
   System,
   Run,
   RunStatus,
@@ -101,27 +102,27 @@ export class MemoryStore implements DataStore {
     if (!id) return null;
     const key = this.getKey("run", id, orgId);
     const run = this.storage.runs.get(key);
-    return run ? { ...run, id } : null;
+    return run ? { ...run, runId: id } : null;
   }
 
-  async createRun(params: { run: Run }): Promise<Run> {
-    const { run } = params;
+  async createRun(params: { run: Run; orgId?: string }): Promise<Run> {
+    const { run, orgId } = params;
     if (!run) throw new Error("Run is required");
-    const key = this.getKey("run", run.id, run.orgId);
+    const key = this.getKey("run", run.runId, orgId);
 
     if (this.storage.runs.has(key)) {
-      throw new Error(`Run with id ${run.id} already exists`);
+      throw new Error(`Run with id ${run.runId} already exists`);
     }
 
     this.storage.runs.set(key, run);
 
-    const toolId = run.toolId || run.toolConfig?.id;
+    const toolId = run.toolId || run.tool?.id;
     if (toolId) {
-      const indexKey = this.getKey("index", toolId, run.orgId);
+      const indexKey = this.getKey("index", toolId, orgId);
       const existing = this.storage.runsIndex.get(indexKey) || [];
       existing.push({
-        id: run.id,
-        timestamp: run.startedAt ? run.startedAt.getTime() : Date.now(),
+        id: run.runId,
+        timestamp: new Date(run.metadata.startedAt).getTime(),
         configId: toolId,
       });
       this.storage.runsIndex.set(indexKey, existing);
@@ -142,8 +143,11 @@ export class MemoryStore implements DataStore {
     const updatedRun: Run = {
       ...existingRun,
       ...updates,
-      id,
-      orgId,
+      runId: id,
+      metadata: {
+        ...existingRun.metadata,
+        ...updates.metadata,
+      },
     };
 
     this.storage.runs.set(key, updatedRun);
@@ -155,16 +159,19 @@ export class MemoryStore implements DataStore {
     offset?: number;
     configId?: string;
     status?: RunStatus;
+    requestSource?: RequestSource;
     orgId?: string;
   }): Promise<{ items: Run[]; total: number }> {
-    const { limit = 10, offset = 0, configId, status, orgId } = params || {};
+    const { limit = 10, offset = 0, configId, status, requestSource, orgId } = params || {};
     const allRuns = this.getOrgItems(this.storage.runs, "run", orgId);
 
-    const validRuns = allRuns.filter((run): run is Run => run !== null && !!run.id);
+    const validRuns = allRuns.filter(
+      (run): run is Run => run !== null && !!run.runId && !!run.metadata?.startedAt,
+    );
 
     validRuns.sort((a, b) => {
-      const aTime = a.startedAt instanceof Date ? a.startedAt.getTime() : 0;
-      const bTime = b.startedAt instanceof Date ? b.startedAt.getTime() : 0;
+      const aTime = new Date(a.metadata.startedAt).getTime();
+      const bTime = new Date(b.metadata.startedAt).getTime();
       return bTime - aTime;
     });
 
@@ -172,13 +179,17 @@ export class MemoryStore implements DataStore {
 
     if (configId) {
       filteredRuns = filteredRuns.filter((run) => {
-        const toolId = run.toolId || run.toolConfig?.id;
+        const toolId = run.toolId || run.tool?.id;
         return toolId === configId;
       });
     }
 
     if (status !== undefined) {
       filteredRuns = filteredRuns.filter((run) => run.status === status);
+    }
+
+    if (requestSource !== undefined) {
+      filteredRuns = filteredRuns.filter((run) => run.requestSource === requestSource);
     }
 
     const items = filteredRuns.slice(offset, offset + limit);

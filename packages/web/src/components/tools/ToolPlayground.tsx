@@ -4,7 +4,7 @@ import { useSystems } from "@/src/app/systems-context";
 import { useTools } from "@/src/app/tools-context";
 import { createSuperglueClient } from "@/src/lib/client-utils";
 import { type UploadedFileInfo } from "@/src/lib/file-utils";
-import { buildStepInput, isAbortError } from "@/src/lib/general-utils";
+import { buildStepInput } from "@/src/lib/general-utils";
 import {
   ExecutionStep,
   generateDefaultFromSchema,
@@ -42,8 +42,6 @@ import {
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { DeployButton } from "./deploy/DeployButton";
-import { FixStepDialog } from "./dialogs/FixStepDialog";
-import { FixTransformDialog } from "./dialogs/FixTransformDialog";
 import { ModifyStepConfirmDialog } from "./dialogs/ModifyStepConfirmDialog";
 import { FolderPicker } from "./folders/FolderPicker";
 import { ToolActionsMenu } from "./ToolActionsMenu";
@@ -65,6 +63,7 @@ export interface ToolPlaygroundProps {
   shouldStopExecution?: boolean;
   onStopExecution?: () => void;
   uploadedFiles?: UploadedFileInfo[];
+  filePayloads?: Record<string, any>;
   onFilesUpload?: (files: File[]) => Promise<void>;
   onFileRemove?: (key: string) => void;
   isProcessingFiles?: boolean;
@@ -125,6 +124,7 @@ function ToolPlaygroundInner({
     setPayloadText,
     setUploadedFiles: setContextUploadedFiles,
     setFilePayloads: setContextFilePayloads,
+    setFilesAndPayloads: setContextFilesAndPayloads,
     markPayloadEdited,
     setSteps,
     setFolder,
@@ -139,7 +139,6 @@ function ToolPlaygroundInner({
     setTransformStatus,
     stepResultsMap,
     isExecutingTransform,
-    isFixingTransform,
   } = execution;
 
   const toolId = tool.id;
@@ -163,22 +162,19 @@ function ToolPlaygroundInner({
   const computedPayload = payload.computedPayload;
 
   const localFileUpload = useFileUpload({
+    onFilesChange: (files, payloads) => {
+      // Use combined setter for atomic update to prevent mismatched state
+      setContextFilesAndPayloads(files, payloads);
+    },
     onPayloadTextUpdate: (updater) => setPayloadText(updater(manualPayloadText)),
     onUserEdit: markPayloadEdited,
+    externalFiles: payload.uploadedFiles,
+    externalPayloads: payload.filePayloads,
   });
 
   const uploadedFiles = parentUploadedFiles ?? payload.uploadedFiles;
   const totalFileSize = parentTotalFileSize ?? localFileUpload.totalFileSize;
   const isProcessingFiles = parentIsProcessingFiles ?? localFileUpload.isProcessing;
-
-  const parsedResponseSchema = useMemo(() => {
-    if (!responseSchema) return undefined;
-    try {
-      return JSON.parse(responseSchema);
-    } catch {
-      return undefined;
-    }
-  }, [responseSchema]);
 
   const { loading, saving, justSaved, loadTool, saveTool, setLoading } = useToolData({
     id,
@@ -194,8 +190,6 @@ function ToolPlaygroundInner({
 
   type DialogState =
     | { type: "none" }
-    | { type: "fixStep"; stepIndex: number }
-    | { type: "fixTransform" }
     | { type: "invalidPayload" }
     | { type: "modifyStepConfirm"; stepIndex: number };
 
@@ -385,33 +379,8 @@ function ToolPlaygroundInner({
     await executeStepByIdx(idx, { limitIterations: limit });
   };
 
-  const fixStepIndex = activeDialog.type === "fixStep" ? activeDialog.stepIndex : null;
-
-  const handleOpenFixStepDialog = (idx: number) =>
-    setActiveDialog({ type: "fixStep", stepIndex: idx });
-  const handleCloseFixStepDialog = () => setActiveDialog({ type: "none" });
-
-  const handleFixStepSuccess = (updatedStep: any) => {
-    if (fixStepIndex === null) return;
-    handleStepEdit(steps[fixStepIndex].id, updatedStep, true);
-  };
-
-  const handleFixStep = async (updatedInstruction: string): Promise<void> => {
-    if (fixStepIndex === null) return;
-    await executeStepByIdx(fixStepIndex, { selfHealing: true, updatedInstruction });
-  };
-
   const handleExecuteTransform = async (schemaStr: string, transformStr: string): Promise<void> => {
     await executeTransform(schemaStr, transformStr);
-  };
-
-  const handleOpenFixTransformDialog = () => setActiveDialog({ type: "fixTransform" });
-  const handleCloseFixTransformDialog = () => setActiveDialog({ type: "none" });
-
-  const handleFixTransformSuccess = (newTransform: string, transformedData: any) => {
-    setFinalTransform(newTransform);
-    setFinalResult(transformedData, "completed");
-    setNavigateToFinalSignal(Date.now());
   };
 
   const handleUnarchive = async () => {
@@ -440,6 +409,9 @@ function ToolPlaygroundInner({
         onRenamed={(newId) => {
           setToolId(newId);
           refreshTools();
+          router.push(`/tools/${encodeURIComponent(newId)}`);
+        }}
+        onDuplicated={(newId) => {
           router.push(`/tools/${encodeURIComponent(newId)}`);
         }}
         onArchived={() => router.push("/tools")}
@@ -480,16 +452,6 @@ function ToolPlaygroundInner({
               <Play className="h-4 w-4" />
               Run All Steps
             </Button>
-          )}
-          {!embedded && toolId && !isArchived && (
-            <DeployButton
-              tool={currentTool}
-              payload={computedPayload}
-              onBeforeOpen={saveTool}
-              size="default"
-              className="h-9 px-5"
-              disabled={saving || loading}
-            />
           )}
           {!isArchived && (
             <Button
@@ -559,9 +521,7 @@ function ToolPlaygroundInner({
                       onInstructionEdit={embedded ? onInstructionEdit : undefined}
                       onExecuteStep={handleExecuteStep}
                       onExecuteStepWithLimit={handleExecuteStepWithLimit}
-                      onOpenFixStepDialog={handleOpenFixStepDialog}
                       onExecuteTransform={handleExecuteTransform}
-                      onOpenFixTransformDialog={handleOpenFixTransformDialog}
                       onAbort={currentRunId ? handleStopExecution : undefined}
                       onFilesUpload={handleFilesUpload}
                       onFileRemove={handleFileRemove}
@@ -610,29 +570,6 @@ function ToolPlaygroundInner({
           </AlertDialogContent>
         </AlertDialog>
 
-        {fixStepIndex !== null && (
-          <FixStepDialog
-            open={activeDialog.type === "fixStep"}
-            onClose={handleCloseFixStepDialog}
-            step={steps[fixStepIndex]}
-            stepInput={buildStepInput(
-              computedPayload || {},
-              steps,
-              stepResultsMap,
-              fixStepIndex - 1,
-            )}
-            systemId={steps[fixStepIndex]?.systemId}
-            errorMessage={(() => {
-              const result = stepResultsMap[steps[fixStepIndex]?.id];
-              const msg = typeof result === "string" ? result : result?.error;
-              return msg && !isAbortError(msg) ? msg : undefined;
-            })()}
-            onSuccess={handleFixStepSuccess}
-            onAutoHeal={handleFixStep}
-            onAbort={handleStopExecution}
-          />
-        )}
-
         {pendingModifyStepIndex !== null && (
           <ModifyStepConfirmDialog
             open={activeDialog.type === "modifyStepConfirm"}
@@ -642,27 +579,6 @@ function ToolPlaygroundInner({
             onCancel={handleModifyStepCancel}
           />
         )}
-
-        <FixTransformDialog
-          open={activeDialog.type === "fixTransform"}
-          onClose={handleCloseFixTransformDialog}
-          currentTransform={finalTransform}
-          responseSchema={parsedResponseSchema}
-          stepData={buildStepInput(computedPayload || {}, steps, stepResultsMap, steps.length - 1)}
-          errorMessage={
-            typeof stepResultsMap["__final_transform__"] === "string"
-              ? stepResultsMap["__final_transform__"]
-              : undefined
-          }
-          onSuccess={handleFixTransformSuccess}
-          onLoadingChange={(loading) => {
-            if (loading) {
-              setTransformStatus("fixing");
-            } else if (isFixingTransform) {
-              setTransformStatus("idle");
-            }
-          }}
-        />
 
         {/* Portal agent into sidebar (when not inline) - hideHeader since RightSidebar has tabs */}
         {!isArchived &&
@@ -696,6 +612,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>((pr
       initialInstruction={props.initialInstruction}
       systems={systems}
       externalUploadedFiles={props.uploadedFiles}
+      externalFilePayloads={props.filePayloads}
       onExternalFilesChange={props.onFilesChange}
     >
       <ExecutionProvider>

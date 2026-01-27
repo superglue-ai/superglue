@@ -193,16 +193,50 @@ export const PayloadSpotlight = ({
           <span className="text-xs text-muted-foreground">
             Enter your inputs here manually, or upload files to autofill missing JSON fields.
           </span>
-          <div>
-            <JsonCodeEditor
-              value={localPayload}
-              onChange={(val) => handlePayloadChange(val || "")}
-              readOnly={false}
-              maxHeight="300px"
-              resizable={true}
-              showValidation={true}
-            />
-          </div>
+          {uploadedFiles.length > 0 ? (
+            <div className="flex gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-medium text-muted-foreground">Manual Payload</span>
+                  <HelpTooltip text="Edit your manual JSON input here. This will be merged with file data." />
+                </div>
+                <JsonCodeEditor
+                  value={localPayload}
+                  onChange={(val) => handlePayloadChange(val || "")}
+                  readOnly={false}
+                  maxHeight="250px"
+                  resizable={true}
+                  showValidation={true}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Merged Payload (Read-only)
+                  </span>
+                  <HelpTooltip text="This is the final payload that will be sent when the tool executes, combining your manual input with parsed file data." />
+                </div>
+                <JsonCodeEditor
+                  value={JSON.stringify(payload.computedPayload, null, 2)}
+                  readOnly={true}
+                  maxHeight="250px"
+                  resizable={true}
+                  showValidation={false}
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <JsonCodeEditor
+                value={localPayload}
+                onChange={(val) => handlePayloadChange(val || "")}
+                readOnly={false}
+                maxHeight="300px"
+                resizable={true}
+                showValidation={true}
+              />
+            </div>
+          )}
           {onFilesUpload && (
             <div className="pt-3 border-t border-border/50 space-y-3">
               <div className="flex flex-col items-center gap-2">

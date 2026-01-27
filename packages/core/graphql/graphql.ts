@@ -7,7 +7,6 @@ import {
   generateStepConfigResolver,
   generateTransformResolver,
 } from "./resolvers/generate.js";
-import { getRunResolver } from "./resolvers/get.js";
 import {
   cacheOauthClientCredentialsResolver,
   deleteSystemResolver,
@@ -17,7 +16,6 @@ import {
   searchSystemDocumentationResolver,
   upsertSystemResolver,
 } from "./resolvers/systems.js";
-import { listRunsResolver } from "./resolvers/list.js";
 import { logsResolver } from "./resolvers/logs.js";
 import { renameWorkflowResolver } from "./resolvers/rename-workflow.js";
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
@@ -38,8 +36,6 @@ export const typeDefs = fs.readFileSync("../../api.graphql", "utf8");
 
 export const resolvers = {
   Query: {
-    listRuns: listRunsResolver,
-    getRun: getRunResolver,
     getTenantInfo: getTenantInfoResolver,
     getWorkflow: getWorkflowResolver,
     listWorkflows: listWorkflowsResolver,
@@ -100,8 +96,6 @@ export const resolvers = {
       const parentField = info.path.prev.key;
 
       switch (parentField) {
-        case "call":
-          return "ApiConfig";
         case "extract":
           return "ExtractConfig";
         default:
