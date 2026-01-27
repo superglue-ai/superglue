@@ -114,23 +114,52 @@ export class SystemManager {
   }
   private searchCache = new Map<string, string>();
 
-  async searchDocumentation(instruction: string): Promise<string> {
-    if (this.searchCache.has(instruction)) {
-      return this.searchCache.get(instruction);
+  async searchDocumentation(
+    instruction: string,
+    maxSections?: number,
+    sectionSize?: number,
+  ): Promise<string> {
+    // Use cache only if using default parameters
+    const useCache = maxSections === undefined && sectionSize === undefined;
+    const cacheKey = useCache ? instruction : `${instruction}:${maxSections}:${sectionSize}`;
+
+    if (useCache && this.searchCache.has(cacheKey)) {
+      return this.searchCache.get(cacheKey)!;
     }
+
     const documentation = await this.getDocumentation();
-    if (!documentation.openApiSchema && !documentation.content) {
-      return "no documentation provided";
-    }
+    const system = await this.getSystem();
     const documentationSearch = new DocumentationSearch(this.metadata);
-    const result = documentationSearch.extractRelevantSections(
-      documentation.content,
-      instruction,
-      5,
-      4000,
-      documentation.openApiSchema,
-    );
-    this.searchCache.set(instruction, result);
+    let result = "";
+
+    const sections = maxSections ?? 3;
+    const size = sectionSize ?? 4000;
+
+    if (!documentation.openApiSchema && !documentation.content) {
+      result = "no documentation provided";
+    } else {
+      result = documentationSearch.extractRelevantSections(
+        documentation.content,
+        instruction,
+        sections,
+        size,
+        documentation.openApiSchema,
+      );
+    }
+
+    // Always append specific instructions if they exist
+    if (system.specificInstructions && system.specificInstructions.trim().length > 0) {
+      if (result) {
+        result =
+          result + "\n\n=== SPECIFIC INSTRUCTIONS ===\n\n" + system.specificInstructions.trim();
+      } else {
+        result = "=== SPECIFIC INSTRUCTIONS ===\n\n" + system.specificInstructions.trim();
+      }
+    }
+
+    if (useCache) {
+      this.searchCache.set(cacheKey, result);
+    }
     return result;
   }
 

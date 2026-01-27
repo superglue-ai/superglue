@@ -108,6 +108,7 @@ call_endpoint - CRITICAL RULES:
 - ALWAYS only call ONE AT A TIME - NEVER multiple in same turn.
 - CREDENTIALS: Use EXACTLY the placeholders from availableCredentials in your context. Do NOT guess.
 - OAuth tokens auto-refresh.
+- If call_endpoint fails (any error, 4xx/5xx status, auth errors, etc.), use search_documentation with the systemId and relevant keywords, then web_search.
 
 BUILD_TOOL PRE-REQUISITES (MANDATORY):
 Before calling build_tool, you MUST have:

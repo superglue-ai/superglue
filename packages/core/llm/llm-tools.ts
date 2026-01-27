@@ -1,7 +1,8 @@
 import { tavilySearch } from "@tavily/ai-sdk";
 import { System, ServiceMetadata } from "@superglue/shared";
-import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { LLMToolDefinition, LLMToolImplementation } from "./llm-tool-utils.js";
+import { SystemManager } from "../systems/system-manager.js";
+import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { sanitizeInstructionSuggestions, runCodeInIVM } from "../utils/helpers.js";
 import { LanguageModel, LLMMessage } from "./llm-base-model.js";
 import { GENERATE_INSTRUCTIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
@@ -36,7 +37,7 @@ export const searchDocumentationToolImplementation: LLMToolImplementation<
   }
 
   try {
-    if (!system.documentation || system.documentation.length <= 50) {
+    if (!system.documentation && !system.openApiSchema && !system.specificInstructions) {
       return {
         success: true,
         data: {
@@ -47,22 +48,31 @@ export const searchDocumentationToolImplementation: LLMToolImplementation<
         },
       };
     }
+    const systemManager = SystemManager.fromSystem(system, null, metadata);
+    const searchResults = await systemManager.searchDocumentation(query);
 
-    const documentationSearch = new DocumentationSearch(metadata);
-    const searchResults = documentationSearch.extractRelevantSections(
-      system.documentation,
-      query,
-      5,
-      2000,
-      system.openApiSchema,
-    );
+    // Handle empty results or no documentation
+    if (
+      !searchResults ||
+      searchResults.trim().length === 0 ||
+      searchResults === "no documentation provided"
+    ) {
+      return {
+        success: true,
+        data: {
+          systemId: system.id,
+          query,
+          summary: `No relevant sections found for keywords: "${query}". Try different or broader keywords, or verify that the documentation contains information about what you're looking for.`,
+        },
+      };
+    }
 
     return {
       success: true,
       data: {
         systemId: system.id,
         query,
-        summary: searchResults || "No matches found for your query.",
+        summary: searchResults,
       },
     };
   } catch (error) {
@@ -113,7 +123,7 @@ export const generateInstructionsToolImplementation: LLMToolImplementation<
     // Use DocumentationSearch to intelligently truncate documentation
     // Focus on getting started, authentication, and basic operations
     const documentationSearch = new DocumentationSearch(metadata);
-    const truncatedDocs = system.documentation
+    let truncatedDocs = system.documentation
       ? documentationSearch.extractRelevantSections(
           system.documentation,
           "getting started overview endpoints reference",
@@ -122,6 +132,18 @@ export const generateInstructionsToolImplementation: LLMToolImplementation<
           system.openApiSchema,
         )
       : "";
+
+    // Always append specific instructions if they exist
+    if (system.specificInstructions && system.specificInstructions.trim().length > 0) {
+      if (truncatedDocs) {
+        truncatedDocs =
+          truncatedDocs +
+          "\n\n=== SPECIFIC INSTRUCTIONS ===\n\n" +
+          system.specificInstructions.trim();
+      } else {
+        truncatedDocs = "=== SPECIFIC INSTRUCTIONS ===\n\n" + system.specificInstructions.trim();
+      }
+    }
 
     return {
       id: system.id,
