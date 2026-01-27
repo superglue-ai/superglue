@@ -29,6 +29,8 @@ import { Switch } from "@/src/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { splitUrl } from "@/src/lib/client-utils";
 import { composeUrl } from "@/src/lib/general-utils";
+import { buildCategorizedSources } from "@/src/lib/templating-utils";
+import { ExecutionStep } from "@superglue/shared";
 import {
   Bug,
   ChevronDown,
@@ -55,11 +57,19 @@ import { StepInputTab } from "./tabs/StepInputTab";
 import { StepResultTab } from "./tabs/StepResultTab";
 import { useRightSidebar } from "../../sidebar/RightSidebarContext";
 
+export interface StepItem {
+  type: "step";
+  data: ExecutionStep;
+  stepResult: any;
+  transformError: undefined;
+  categorizedSources: ReturnType<typeof buildCategorizedSources>;
+}
+
 interface SpotlightStepCardProps {
-  step: any;
+  step: ExecutionStep;
   stepIndex: number;
-  onEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
-  onRemove?: (stepId: string) => void;
+  onEdit?: (stepId: string, updatedStep: ExecutionStep, isUserInitiated?: boolean) => void;
+  onRemove?: () => void;
   onExecuteStep?: () => Promise<void>;
   onExecuteStepWithLimit?: (limit: number) => Promise<void>;
   onAbort?: () => void;
@@ -796,7 +806,7 @@ export const SpotlightStepCard = React.memo(
               <AlertDialogAction
                 onClick={() => {
                   setShowDeleteConfirm(false);
-                  onRemove?.(step.id);
+                  onRemove?.();
                 }}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >

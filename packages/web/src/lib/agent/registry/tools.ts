@@ -527,10 +527,12 @@ const runSaveTool = async (input: any, ctx: ToolExecutionContext) => {
 
     const savedTool = await ctx.superglueClient.upsertWorkflow(toolId, toolToSave);
 
+    const apiEndpoint = ctx.superglueClient.apiEndpoint || "https://api.superglue.cloud";
     return {
       success: true,
       toolId: savedTool.id,
-      note: `Tool "${savedTool.id}" saved successfully. You can now execute it using run_tool with toolId.`,
+      webhookUrl: `${apiEndpoint}/v1/hooks/${savedTool.id}?token=YOUR_API_KEY`,
+      note: `Tool "${savedTool.id}" saved successfully. You can now execute it using run_tool with toolId. If this is a tool that you want to trigger from external services, you can use the webhook URL to trigger it.`,
     };
   } catch (error: any) {
     return {
@@ -1184,10 +1186,16 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
     if (extraHeaders) oauthConfig.extraHeaders = extraHeaders;
     else if (system.credentials?.extraHeaders) {
       // Parse if stored as JSON string
-      oauthConfig.extraHeaders =
-        typeof system.credentials.extraHeaders === "string"
-          ? JSON.parse(system.credentials.extraHeaders)
-          : system.credentials.extraHeaders;
+      if (typeof system.credentials.extraHeaders === "string") {
+        try {
+          oauthConfig.extraHeaders = JSON.parse(system.credentials.extraHeaders);
+        } catch {
+          // Malformed JSON in stored extraHeaders - skip rather than crash
+          console.warn("Failed to parse extraHeaders from credentials, ignoring malformed value");
+        }
+      } else {
+        oauthConfig.extraHeaders = system.credentials.extraHeaders;
+      }
     } else if (templateOAuth?.extraHeaders) oauthConfig.extraHeaders = templateOAuth.extraHeaders;
 
     if (!oauthConfig.client_id) {
@@ -1719,4 +1727,5 @@ export const PLAYGROUND_TOOL_SET = [
   "authenticate_oauth",
   "find_tool",
   "find_system",
+  "get_runs",
 ];

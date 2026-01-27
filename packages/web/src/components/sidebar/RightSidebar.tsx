@@ -23,7 +23,7 @@ interface RightSidebarProps {
 }
 
 export function RightSidebar({ className }: RightSidebarProps) {
-  const { showAgent, setAgentPortalRef, setExpandSidebar } = useRightSidebar();
+  const { showAgent, setAgentPortalRef, registerSetSidebarExpanded } = useRightSidebar();
   const agentContainerRef = useCallback(
     (node: HTMLDivElement | null) => {
       setAgentPortalRef(node);
@@ -78,11 +78,13 @@ export function RightSidebar({ className }: RightSidebarProps) {
   }, [activePanel, isHydrated, showAgent]);
 
   useEffect(() => {
-    setExpandSidebar(() => {
-      setIsExpanded(true);
-      setActivePanel("agent");
+    registerSetSidebarExpanded((expanded: boolean) => {
+      setIsExpanded(expanded);
+      if (expanded) {
+        setActivePanel("agent");
+      }
     });
-  }, [setExpandSidebar]);
+  }, [registerSetSidebarExpanded]);
 
   const client = useMemo(() => {
     return new SuperglueClient({

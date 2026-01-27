@@ -9,13 +9,15 @@ import {
   AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog";
 import { Button } from "@/src/components/ui/button";
+import { Checkbox } from "@/src/components/ui/checkbox";
 import { OctagonAlert, X } from "lucide-react";
+import { useState } from "react";
 
 interface ModifyStepConfirmDialogProps {
   open: boolean;
   stepId: string;
   stepName?: string;
-  onConfirm: () => void;
+  onConfirm: (skipFutureConfirmations: boolean) => void;
   onCancel: () => void;
 }
 
@@ -26,13 +28,20 @@ export function ModifyStepConfirmDialog({
   onConfirm,
   onCancel,
 }: ModifyStepConfirmDialogProps) {
+  const [skipFuture, setSkipFuture] = useState(false);
+
+  const handleConfirm = () => {
+    onConfirm(skipFuture);
+    setSkipFuture(false); // Reset for next time dialog opens
+  };
+
   return (
     <AlertDialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
       <AlertDialogContent
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "BUTTON") {
             e.preventDefault();
-            onConfirm();
+            handleConfirm();
           }
         }}
       >
@@ -59,9 +68,22 @@ export function ModifyStepConfirmDialog({
             Do you want to continue executing this step?
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <div className="flex items-center space-x-2 py-2">
+          <Checkbox
+            id="skip-future"
+            checked={skipFuture}
+            onCheckedChange={(checked) => setSkipFuture(checked === true)}
+          />
+          <label
+            htmlFor="skip-future"
+            className="text-sm text-muted-foreground cursor-pointer select-none"
+          >
+            Don't ask again this session
+          </label>
+        </div>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel}>Inspect Step</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>Continue Execution</AlertDialogAction>
+          <AlertDialogAction onClick={handleConfirm}>Continue Execution</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

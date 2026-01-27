@@ -34,7 +34,7 @@ export class SuperglueClient {
   private endpoint: string;
   private apiKey: string;
   private wsManager: WebSocketManager;
-  private apiEndpoint: string;
+  public readonly apiEndpoint: string;
 
   private static workflowQL = `
         id

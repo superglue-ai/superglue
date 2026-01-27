@@ -99,10 +99,25 @@ export function ToolCallToolDisplay({
     return output;
   }, [output]);
 
+  // Compute payload display height
+  const payloadDisplayInfo = useMemo(() => {
+    if (!payload || Object.keys(payload).length === 0) return null;
+    const payloadJson = JSON.stringify(payload, null, 2);
+    const height = `${Math.min(Math.max(payloadJson.split("\n").length * 18 + 24, 60), 300)}px`;
+    return { payloadJson, height };
+  }, [payload]);
+
   // Check if we have valid tool data (either from props or parsed output)
   const displayTool = tool || parsedOutput?.config;
   const displayOutput = parsedOutput?.data || parsedOutput;
   const hasParseError = parsedOutput?.parseError;
+
+  // Compute result display height (max 500px)
+  const resultDisplayHeight = useMemo(() => {
+    if (!displayOutput || hasParseError) return "300px";
+    const resultJson = JSON.stringify(displayOutput, null, 2);
+    return `${Math.min(Math.max(resultJson.split("\n").length * 18 + 24, 60), 500)}px`;
+  }, [displayOutput, hasParseError]);
 
   // Get steps from the correct location in the data structure
   // For execute_tool, the tool IS the config, so steps are directly on tool
@@ -297,13 +312,18 @@ export function ToolCallToolDisplay({
       )}
 
       {/* Tool Input display */}
-      {showPayload && payload && Object.keys(payload).length > 0 && (
+      {showPayload && payloadDisplayInfo && (
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Database className="w-4 h-4" />
             <span className="font-medium text-sm">Tool Input</span>
           </div>
-          <JsonCodeEditor value={JSON.stringify(payload, null, 2)} readOnly maxHeight="100px" />
+          <JsonCodeEditor
+            value={payloadDisplayInfo.payloadJson}
+            readOnly
+            minHeight={payloadDisplayInfo.height}
+            maxHeight={payloadDisplayInfo.height}
+          />
         </div>
       )}
 
@@ -324,7 +344,7 @@ export function ToolCallToolDisplay({
             <JsonCodeEditor
               value={JSON.stringify(displayOutput, null, 2)}
               readOnly
-              maxHeight="300px"
+              maxHeight={resultDisplayHeight}
             />
           ) : (
             <div className="text-xs text-muted-foreground">No output data available yet</div>

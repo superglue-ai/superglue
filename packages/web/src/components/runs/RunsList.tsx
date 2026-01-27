@@ -190,7 +190,7 @@ export const RunDetails = ({ run }: { run: any }) => {
     run.status === RunStatus.FAILED || run.status?.toString().toUpperCase() === "FAILED";
 
   return (
-    <div className="p-4 space-y-4 max-h-[400px] overflow-y-auto [scrollbar-gutter:stable]">
+    <div className="p-4 space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-1">
           <h4 className="text-xs font-medium text-muted-foreground">Run ID</h4>
@@ -238,7 +238,7 @@ export const RunDetails = ({ run }: { run: any }) => {
                 <div className="absolute top-2 right-2">
                   <CopyButton getData={() => JSON.stringify(cleanedToolPayload, null, 2)} />
                 </div>
-                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md max-h-[200px] overflow-y-auto">
+                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md">
                   {JSON.stringify(cleanedToolPayload, null, 2)}
                 </pre>
               </div>
@@ -288,7 +288,7 @@ export const RunDetails = ({ run }: { run: any }) => {
                       </div>
                     )}
                     {step.data && (
-                      <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-2 rounded-md max-h-[150px] overflow-y-auto">
+                      <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-2 rounded-md">
                         {JSON.stringify(removeNullFields(step.data), null, 2)}
                       </pre>
                     )}
@@ -305,7 +305,7 @@ export const RunDetails = ({ run }: { run: any }) => {
                 <div className="absolute top-2 right-2 z-10">
                   <CopyButton getData={() => JSON.stringify(cleanedToolResult, null, 2)} />
                 </div>
-                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md max-h-[200px] overflow-y-auto">
+                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md">
                   {JSON.stringify(cleanedToolResult, null, 2)}
                 </pre>
               </div>
@@ -319,7 +319,7 @@ export const RunDetails = ({ run }: { run: any }) => {
                 <div className="absolute top-2 right-2">
                   <CopyButton getData={() => JSON.stringify(cleanedToolConfig, null, 2)} />
                 </div>
-                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md max-h-[200px] overflow-y-auto">
+                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md">
                   {JSON.stringify(cleanedToolConfig, null, 2)}
                 </pre>
               </div>
