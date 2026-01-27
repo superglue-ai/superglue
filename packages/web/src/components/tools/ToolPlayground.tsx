@@ -457,6 +457,16 @@ function ToolPlaygroundInner({
               Run All Steps
             </Button>
           )}
+          {!embedded && toolId && !isArchived && (
+            <DeployButton
+              tool={currentTool}
+              payload={computedPayload}
+              onBeforeOpen={saveTool}
+              size="default"
+              className="h-9 px-5"
+              disabled={saving || loading}
+            />
+          )}
           {!isArchived && (
             <Button
               variant="default"

@@ -1,19 +1,11 @@
 "use client";
 
-import { useConfig } from "@/src/app/config-context";
-import { useSchedules } from "@/src/app/schedules-context";
-import { RunsList } from "@/src/components/runs/RunsList";
-import { Button } from "@/src/components/ui/button";
 import { ScrollArea } from "@/src/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
-import { createSuperglueClient } from "@/src/lib/client-utils";
-import { Run } from "@superglue/shared";
-import { Calendar, Code, ExternalLink, RefreshCw, Webhook, Zap } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { CopyButton } from "../shared/CopyButton";
+import { Calendar, Code, ExternalLink, Info, Webhook, Zap } from "lucide-react";
+import { useState } from "react";
 import { useToolCodeSnippets } from "../deploy/useToolCodeSnippets";
 import { SdkAccordion } from "../deploy/SdkAccordion";
-import ToolSchedulesList from "../deploy/ToolSchedulesList";
 import { cn } from "@/src/lib/general-utils";
 
 interface TriggersCardProps {
@@ -24,48 +16,11 @@ interface TriggersCardProps {
 }
 
 export function TriggersCard({ toolId, payload, compact = false }: TriggersCardProps) {
-  const config = useConfig();
-  const { getSchedulesForTool } = useSchedules();
-  const [activeSection, setActiveSection] = useState<"schedule" | "webhook" | "sdk">("schedule");
-
-  // Webhook runs state
-  const [webhookRuns, setWebhookRuns] = useState<Run[]>([]);
-  const [webhookRunsLoading, setWebhookRunsLoading] = useState(false);
-  const [webhookRunsError, setWebhookRunsError] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<"schedule" | "webhook" | "sdk">("sdk");
 
   const isSavedTool = toolId && !toolId.startsWith("draft_") && toolId !== "new";
-  const activeScheduleCount = isSavedTool
-    ? getSchedulesForTool(toolId).filter((s) => s.enabled).length
-    : 0;
 
   const snippets = useToolCodeSnippets(toolId, payload);
-
-  // Fetch webhook runs
-  const fetchWebhookRuns = useCallback(async () => {
-    if (!isSavedTool) return;
-
-    setWebhookRunsLoading(true);
-    setWebhookRunsError(null);
-    try {
-      const client = createSuperglueClient(config.superglueEndpoint);
-      const result = await client.listRuns({
-        toolId: toolId,
-        requestSource: "webhook",
-        limit: 10,
-      });
-      setWebhookRuns(result.items);
-    } catch (err: any) {
-      setWebhookRunsError(err.message || "Failed to fetch webhook runs");
-    } finally {
-      setWebhookRunsLoading(false);
-    }
-  }, [config.superglueEndpoint, toolId, isSavedTool]);
-
-  useEffect(() => {
-    if (activeSection === "webhook" && isSavedTool) {
-      fetchWebhookRuns();
-    }
-  }, [activeSection, isSavedTool, fetchWebhookRuns]);
 
   if (!isSavedTool) {
     return (
@@ -79,6 +34,28 @@ export function TriggersCard({ toolId, payload, compact = false }: TriggersCardP
     );
   }
 
+  const enterpriseInfoBox = (
+    <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/50 p-3">
+      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+      <div className="text-xs">
+        <p className="font-medium text-blue-900 dark:text-blue-100">Enterprise Feature</p>
+        <p className="text-blue-700 dark:text-blue-300 mt-1">
+          This feature is available on our Enterprise plan.{" "}
+          <a
+            href="https://cal.com/superglue/superglue-demo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-blue-900 dark:hover:text-blue-100 inline-flex items-center gap-1"
+          >
+            Book a demo
+            <ExternalLink className="h-3 w-3" />
+          </a>{" "}
+          to learn more.
+        </p>
+      </div>
+    </div>
+  );
+
   const content = (
     <div className={compact ? "space-y-4" : "p-4 space-y-4"}>
       {/* Schedule Section */}
@@ -87,7 +64,7 @@ export function TriggersCard({ toolId, payload, compact = false }: TriggersCardP
           <p className="text-xs text-muted-foreground">
             Automate this tool by scheduling it to run at specific times or intervals.
           </p>
-          <ToolSchedulesList toolId={toolId} />
+          {enterpriseInfoBox}
           <div className="text-xs text-muted-foreground pt-2">
             <a
               href="https://docs.superglue.cloud/guides/deploying-a-tool#scheduled-execution"
@@ -105,57 +82,11 @@ export function TriggersCard({ toolId, payload, compact = false }: TriggersCardP
       {/* Webhook Section */}
       {activeSection === "webhook" && (
         <>
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">
-              Trigger this tool from external services like Stripe, GitHub, or any system that can
-              send HTTP POST requests. The request body becomes the tool's input.
-            </p>
-            <div className="text-xs font-medium text-muted-foreground">Webhook URL</div>
-            <div className="flex items-center gap-2 bg-muted/50 px-2 py-1.5 rounded-md border border-border">
-              <code className="text-[10px] font-mono text-foreground flex-1 truncate">
-                {snippets.webhookUrl}
-              </code>
-              <CopyButton text={snippets.webhookUrl} />
-            </div>
-            <p className="text-[10px] text-muted-foreground">
-              Replace <code className="bg-muted px-1 rounded">YOUR_API_KEY</code> with your{" "}
-              <a href="/api-keys" className="underline hover:text-foreground">
-                API key
-              </a>
-              .
-            </p>
-          </div>
-
-          {/* Recent Webhook Runs */}
-          <div className="space-y-2 pt-3 border-t border-border/50">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">
-                Recent Webhook Requests
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={fetchWebhookRuns}
-                disabled={webhookRunsLoading}
-                className="h-6 px-2"
-              >
-                <RefreshCw className={`h-3 w-3 ${webhookRunsLoading ? "animate-spin" : ""}`} />
-              </Button>
-            </div>
-
-            {webhookRunsError ? (
-              <div className="text-xs text-destructive bg-destructive/10 rounded-md p-2">
-                {webhookRunsError}
-              </div>
-            ) : (
-              <RunsList
-                runs={webhookRuns}
-                loading={webhookRunsLoading}
-                emptyMessage="No webhook requests yet."
-              />
-            )}
-          </div>
-
+          <p className="text-xs text-muted-foreground">
+            Trigger this tool from external services like Stripe, GitHub, or any system that can
+            send HTTP POST requests. The request body becomes the tool's input.
+          </p>
+          {enterpriseInfoBox}
           <div className="text-xs text-muted-foreground pt-2">
             <a
               href="https://docs.superglue.cloud/api/overview#webhooks"
@@ -209,11 +140,6 @@ export function TriggersCard({ toolId, payload, compact = false }: TriggersCardP
           >
             <Calendar className="h-3.5 w-3.5" />
             Schedule
-            {activeScheduleCount > 0 && (
-              <span className="text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 min-w-[1rem] text-center">
-                {activeScheduleCount}
-              </span>
-            )}
           </TabsTrigger>
           <TabsTrigger
             value="webhook"
