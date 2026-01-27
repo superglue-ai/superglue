@@ -23,7 +23,7 @@ interface RightSidebarProps {
 }
 
 export function RightSidebar({ className }: RightSidebarProps) {
-  const { showAgent, setAgentPortalRef } = useRightSidebar();
+  const { showAgent, setAgentPortalRef, setExpandSidebar } = useRightSidebar();
   const agentContainerRef = useCallback(
     (node: HTMLDivElement | null) => {
       setAgentPortalRef(node);
@@ -77,6 +77,13 @@ export function RightSidebar({ className }: RightSidebarProps) {
     }
   }, [activePanel, isHydrated, showAgent]);
 
+  useEffect(() => {
+    setExpandSidebar(() => {
+      setIsExpanded(true);
+      setActivePanel("agent");
+    });
+  }, [setExpandSidebar]);
+
   const client = useMemo(() => {
     return new SuperglueClient({
       endpoint: config.superglueEndpoint,
@@ -93,7 +100,7 @@ export function RightSidebar({ className }: RightSidebarProps) {
   useEffect(() => {
     const subscription = client.subscribeToLogs({
       onLog: (log) => {
-        setLogs((prev) => [...prev, log].slice(-100));
+        setLogs((prev) => [...prev, log].slice(-1000));
         if (!isExpandedRef.current || activePanelRef.current !== "logs") {
           setHasNewLogs(true);
         }

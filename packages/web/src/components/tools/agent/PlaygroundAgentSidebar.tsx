@@ -33,6 +33,7 @@ import { ToolCallComponent } from "../../agent/ToolCallComponent";
 import { BackgroundToolGroup, groupMessageParts } from "../../agent/tool-components";
 import { useToolConfig } from "../context/tool-config-context";
 import { useExecution } from "../context/tool-execution-context";
+import { useRightSidebar } from "../../sidebar/RightSidebarContext";
 
 const MAX_MESSAGE_LENGTH = 50000;
 
@@ -104,6 +105,7 @@ function PlaygroundAgentContent({
     handleSaveEdit,
   } = useAgentContext();
 
+  const { registerAgentSendMessage } = useRightSidebar();
   const toolConfig = useToolConfig();
   const execution = useExecution();
   const cacheKeyPrefix = `superglue-playground-${toolId}`;
@@ -111,6 +113,11 @@ function PlaygroundAgentContent({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasAutoFixedRef = useRef(false);
   const scrollTriggerRef = useRef<ScrollToBottomTriggerRef>(null);
+
+  // Register the sendMessage function so it can be called from outside
+  useEffect(() => {
+    registerAgentSendMessage(handleSendMessage);
+  }, [registerAgentSendMessage, handleSendMessage]);
 
   // Auto-send fix request when there's an initial error
   useEffect(() => {

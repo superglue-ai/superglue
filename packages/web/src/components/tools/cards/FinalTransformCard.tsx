@@ -3,6 +3,7 @@ import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
+import { formatBytes } from "@/src/lib/file-utils";
 import { isEmptyData } from "@/src/lib/general-utils";
 import { DownloadButton } from "@superglue/web/src/components/tools/shared/download-button";
 import {
@@ -14,26 +15,24 @@ import {
   Loader2,
   Play,
   Square,
-  Wand2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { JavaScriptCodeEditor } from "../../editors/JavaScriptCodeEditor";
 import { JsonCodeEditor } from "../../editors/JsonCodeEditor";
 import { useExecution, useToolConfig } from "../context";
 import { useDataProcessor } from "../hooks/use-data-processor";
 import { CopyButton } from "../shared/CopyButton";
 import { ResponseFiltersCard } from "./ResponseFiltersCard";
+import { useRightSidebar } from "../../sidebar/RightSidebarContext";
 
 interface FinalTransformMiniStepCardProps {
   onExecuteTransform?: (schema: string, transform: string) => void;
-  onOpenFixTransformDialog?: () => void;
   onAbort?: () => void;
 }
 
 export const FinalTransformMiniStepCard = ({
   onExecuteTransform,
-  onOpenFixTransformDialog,
   onAbort,
 }: FinalTransformMiniStepCardProps) => {
   const {
@@ -54,6 +53,7 @@ export const FinalTransformMiniStepCard = ({
     canExecuteTransform,
     transformStatus,
   } = useExecution();
+  const { sendMessageToAgent } = useRightSidebar();
 
   const transform = finalTransform;
   const transformResult = finalResult;
@@ -177,17 +177,21 @@ export const FinalTransformMiniStepCard = ({
     }
   }
 
+  const handleAskAgentToFix = useCallback(() => {
+    const truncatedError =
+      transformError && transformError.length > 500
+        ? `${transformError.slice(0, 500)}...`
+        : transformError;
+    sendMessageToAgent(
+      `The transform failed with the following error:\n\n${truncatedError}\n\nPlease fix the transform code.`,
+    );
+  }, [transformError, sendMessageToAgent]);
+
   function handleExecuteTransform(): void {
     if (onExecuteTransform) {
       setIsPendingExecution(true);
       setActiveTab("output");
       onExecuteTransform(localSchema, localTransform);
-    }
-  }
-
-  function handleOpenFixTransformDialog(): void {
-    if (onOpenFixTransformDialog) {
-      onOpenFixTransformDialog();
     }
   }
 
@@ -200,7 +204,7 @@ export const FinalTransformMiniStepCard = ({
             <h3 className="text-lg font-semibold">Tool Result</h3>
           </div>
           <div className="flex items-center gap-2">
-            {(onExecuteTransform || onOpenFixTransformDialog) && (
+            {onExecuteTransform && (
               <>
                 {onExecuteTransform && (
                   <span
@@ -234,28 +238,7 @@ export const FinalTransformMiniStepCard = ({
                     )}
                   </span>
                 )}
-                {onOpenFixTransformDialog && (
-                  <span
-                    title={
-                      !canExecute ? "Execute all steps first" : "Fix transform with auto-repair"
-                    }
-                  >
-                    <div
-                      className={`relative flex rounded-md border border-input bg-background ${transformError ? "border-destructive/50" : ""}`}
-                    >
-                      <Button
-                        variant="ghost"
-                        onClick={handleOpenFixTransformDialog}
-                        disabled={!canExecute || isRunningTransform || isFixingTransform}
-                        className="h-8 px-3 gap-2 border-0"
-                      >
-                        <Wand2 className="h-3 w-3" />
-                        <span className="font-medium text-[13px]">Fix Transform</span>
-                      </Button>
-                    </div>
-                  </span>
-                )}
-                <HelpTooltip text="Run Transform: executes the transform code with step results. Fix Transform: uses auto-repair to automatically fix transform errors and update the code." />
+                <HelpTooltip text="Run Transform: executes the transform code with step results. Use the agent to fix transform errors." />
               </>
             )}
           </div>
@@ -343,9 +326,9 @@ export const FinalTransformMiniStepCard = ({
                         </TabsList>
                       </Tabs>
                       <span className="text-[10px] text-muted-foreground">
-                        {inputData.bytes.toLocaleString()} bytes
+                        {formatBytes(inputData.bytes)}
                       </span>
-                      <CopyButton text={inputData.displayString} />
+                      <CopyButton text={JSON.stringify(stepInputs, null, 2)} />
                       <DownloadButton data={stepInputs} filename="transform_step_inputs.json" />
                     </div>
                   }
@@ -398,18 +381,25 @@ export const FinalTransformMiniStepCard = ({
                 </div>
               ) : transformError ? (
                 <div className="flex flex-col items-start justify-start p-4 border rounded-lg bg-muted/30 border-border">
-                  <div className="flex items-center gap-2 mb-2">
-                    <X className="h-4 w-4 text-red-500 dark:text-red-400" />
-                    <p className="text-sm font-semibold text-red-500 dark:text-red-400">
-                      Transform Error
-                    </p>
+                  <div className="flex items-center justify-between w-full mb-2">
+                    <div className="flex items-center gap-2">
+                      <X className="h-4 w-4 text-red-500 dark:text-red-400" />
+                      <p className="text-sm font-semibold text-red-500 dark:text-red-400">
+                        Transform Error
+                      </p>
+                    </div>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleAskAgentToFix}
+                      className="h-7 px-3 text-xs font-medium"
+                    >
+                      Fix in chat
+                    </Button>
                   </div>
                   <pre className="text-xs whitespace-pre-wrap font-mono w-full overflow-x-auto">
                     {transformError}
                   </pre>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Use the "Fix Transform" button above to automatically repair the transform code.
-                  </p>
                 </div>
               ) : transformResult === undefined ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border rounded-lg">
@@ -457,9 +447,9 @@ export const FinalTransformMiniStepCard = ({
                           </TabsList>
                         </Tabs>
                         <span className="text-[10px] text-muted-foreground">
-                          {outputData.bytes.toLocaleString()} bytes
+                          {formatBytes(outputData.bytes)}
                         </span>
-                        <CopyButton text={outputData.displayString} />
+                        <CopyButton text={JSON.stringify(transformResult, null, 2)} />
                         <DownloadButton data={transformResult} filename="tool_result.json" />
                       </div>
                     }
