@@ -91,7 +91,9 @@ export function ToolDeployModal({
                 <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/50 p-4">
                   <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-medium text-blue-900 dark:text-blue-100">Enterprise Feature</p>
+                    <p className="font-medium text-blue-900 dark:text-blue-100">
+                      Enterprise Feature
+                    </p>
                     <p className="text-blue-700 dark:text-blue-300 mt-1">
                       Scheduled execution is available on our Enterprise plan.{" "}
                       <a
@@ -152,7 +154,9 @@ export function ToolDeployModal({
                 <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/50 p-4">
                   <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-medium text-blue-900 dark:text-blue-100">Enterprise Feature</p>
+                    <p className="font-medium text-blue-900 dark:text-blue-100">
+                      Enterprise Feature
+                    </p>
                     <p className="text-blue-700 dark:text-blue-300 mt-1">
                       Webhooks are available on our Enterprise plan.{" "}
                       <a
