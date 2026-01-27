@@ -1021,8 +1021,8 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
       - slack: auth_url=https://slack.com/oauth/v2/authorize, token_url=https://slack.com/api/oauth.v2.access
       - salesforce: auth_url=https://login.salesforce.com/services/oauth2/authorize, token_url=https://login.salesforce.com/services/oauth2/token
       - asana: auth_url=https://app.asana.com/-/oauth_authorize, token_url=https://app.asana.com/-/oauth_token
-      - notion: auth_url=https://api.notion.com/v1/oauth/authorize, token_url=https://api.notion.com/v1/oauth/token
-      - airtable: auth_url=https://airtable.com/oauth2/v1/authorize, token_url=https://airtable.com/oauth2/v1/token
+      - notion: auth_url=https://api.notion.com/v1/oauth/authorize, token_url=https://api.notion.com/v1/oauth/token (uses basic_auth + json)
+      - airtable: auth_url=https://airtable.com/oauth2/v1/authorize, token_url=https://airtable.com/oauth2/v1/token (uses PKCE + basic_auth)
       - jira: auth_url=https://auth.atlassian.com/authorize, token_url=https://auth.atlassian.com/oauth/token
       - confluence: auth_url=https://auth.atlassian.com/authorize, token_url=https://auth.atlassian.com/oauth/token
     </templates_with_preconfigured_oauth>
@@ -1030,7 +1030,7 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
     <first_time_setup>
       For FIRST-TIME setup on Google, Microsoft, GitHub, etc. (when credentials are NOT already stored):
       1. ASK the user for their client_id and client_secret
-      2. Provide the correct auth_url and token_url
+      2. Provide the correct auth_url and token_url and other configuration options
     </first_time_setup>
 
     <important>
@@ -1070,13 +1070,47 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
         type: "string",
         description: "OAuth grant type: 'authorization_code' (default) or 'client_credentials'",
       },
+      tokenAuthMethod: {
+        type: "string",
+        enum: ["body", "basic_auth"],
+        description:
+          "How to send client credentials to token endpoint. 'body' (default) or 'basic_auth' (Authorization header)",
+      },
+      tokenContentType: {
+        type: "string",
+        enum: ["form", "json"],
+        description:
+          "Content-Type for token request. 'form' (default, x-www-form-urlencoded) or 'json' (application/json)",
+      },
+      usePKCE: {
+        type: "boolean",
+        description:
+          "Enable PKCE flow (Proof Key for Code Exchange). Required by some providers like Airtable, Twitter",
+      },
+      extraHeaders: {
+        type: "object",
+        description:
+          "Additional headers for token requests, e.g., {'Notion-Version': '2022-06-28'}",
+      },
     },
     required: ["systemId", "scopes"],
   },
 });
 
 const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
-  const { systemId, scopes, client_id, client_secret, auth_url, token_url, grant_type } = input;
+  const {
+    systemId,
+    scopes,
+    client_id,
+    client_secret,
+    auth_url,
+    token_url,
+    grant_type,
+    tokenAuthMethod,
+    tokenContentType,
+    usePKCE,
+    extraHeaders,
+  } = input;
 
   try {
     const system = await ctx.superglueClient.getSystem(systemId);
@@ -1128,6 +1162,33 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
     if (token_url) oauthConfig.token_url = token_url;
     else if (system.credentials?.token_url) oauthConfig.token_url = system.credentials.token_url;
     else if (templateOAuth?.tokenUrl) oauthConfig.token_url = templateOAuth.tokenUrl;
+
+    // Token exchange configuration - agent input > system credentials > template
+    if (tokenAuthMethod) oauthConfig.tokenAuthMethod = tokenAuthMethod;
+    else if (system.credentials?.tokenAuthMethod)
+      oauthConfig.tokenAuthMethod = system.credentials.tokenAuthMethod;
+    else if (templateOAuth?.tokenAuthMethod)
+      oauthConfig.tokenAuthMethod = templateOAuth.tokenAuthMethod;
+
+    if (tokenContentType) oauthConfig.tokenContentType = tokenContentType;
+    else if (system.credentials?.tokenContentType)
+      oauthConfig.tokenContentType = system.credentials.tokenContentType;
+    else if (templateOAuth?.tokenContentType)
+      oauthConfig.tokenContentType = templateOAuth.tokenContentType;
+
+    if (usePKCE !== undefined) oauthConfig.usePKCE = usePKCE;
+    else if (system.credentials?.usePKCE !== undefined)
+      oauthConfig.usePKCE = system.credentials.usePKCE;
+    else if (templateOAuth?.usePKCE) oauthConfig.usePKCE = templateOAuth.usePKCE;
+
+    if (extraHeaders) oauthConfig.extraHeaders = extraHeaders;
+    else if (system.credentials?.extraHeaders) {
+      // Parse if stored as JSON string
+      oauthConfig.extraHeaders =
+        typeof system.credentials.extraHeaders === "string"
+          ? JSON.parse(system.credentials.extraHeaders)
+          : system.credentials.extraHeaders;
+    } else if (templateOAuth?.extraHeaders) oauthConfig.extraHeaders = templateOAuth.extraHeaders;
 
     if (!oauthConfig.client_id) {
       return {

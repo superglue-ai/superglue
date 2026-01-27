@@ -604,7 +604,7 @@ export function ToolBuilderComponent({
               </div>
             )}
 
-            {mode === "build" && currentConfig && !isPlayground && (
+            {(mode === "build" || mode === "fix") && currentConfig && !isPlayground && (
               <div className="flex gap-2 flex-wrap">
                 {/* Run/Stop Tool button with payload dropdown */}
                 {isRunning ? (

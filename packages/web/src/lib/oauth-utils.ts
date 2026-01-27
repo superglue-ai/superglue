@@ -1,5 +1,5 @@
 import type { System } from "@superglue/shared";
-import { resolveOAuthCertAndKey, SuperglueClient } from "@superglue/shared";
+import { resolveOAuthCertAndKey, SuperglueClient, systems } from "@superglue/shared";
 
 type OAuthFields = {
   client_id: string;
@@ -24,6 +24,9 @@ export type OAuthState = {
   oauth_cert?: string;
   oauth_key?: string;
   scopes?: string;
+  tokenAuthMethod?: "body" | "basic_auth";
+  tokenContentType?: "form" | "json";
+  extraHeaders?: Record<string, string>;
 };
 
 type OAuthCallbacks = {
@@ -34,6 +37,32 @@ type OAuthCallbacks = {
 export const getOAuthCallbackUrl = (): string => {
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
   return `${baseUrl}/api/auth/callback`;
+};
+
+// PKCE helpers
+const generateCodeVerifier = (): string => {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...array))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+};
+
+const generateCodeChallenge = async (verifier: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+};
+
+const shouldUsePKCE = (templateId?: string): boolean => {
+  if (!templateId) return false;
+  const template = systems[templateId];
+  return template?.oauth?.usePKCE === true;
 };
 
 export const buildOAuthFieldsFromSystem = (system: System) => {
@@ -76,6 +105,9 @@ const buildOAuthState = (params: {
   oauth_cert?: string;
   oauth_key?: string;
   scopes?: string;
+  tokenAuthMethod?: "body" | "basic_auth";
+  tokenContentType?: "form" | "json";
+  extraHeaders?: Record<string, string>;
 }): OAuthState => {
   return {
     systemId: params.systemId,
@@ -89,15 +121,19 @@ const buildOAuthState = (params: {
     ...(params.oauth_cert && { oauth_cert: params.oauth_cert }),
     ...(params.oauth_key && { oauth_key: params.oauth_key }),
     ...(params.scopes && { scopes: params.scopes }),
+    ...(params.tokenAuthMethod && { tokenAuthMethod: params.tokenAuthMethod }),
+    ...(params.tokenContentType && { tokenContentType: params.tokenContentType }),
+    ...(params.extraHeaders && { extraHeaders: params.extraHeaders }),
   };
 };
 
-const buildAuthorizationUrl = (params: {
+const buildAuthorizationUrl = async (params: {
   authUrl: string;
   clientId: string;
   scopes: string;
   state: OAuthState;
-}): string => {
+  codeChallenge?: string;
+}): Promise<string> => {
   const urlParams = new URLSearchParams({
     client_id: params.clientId,
     redirect_uri: getOAuthCallbackUrl(),
@@ -105,6 +141,12 @@ const buildAuthorizationUrl = (params: {
     state: btoa(JSON.stringify(params.state)),
     scope: params.scopes,
   });
+
+  // Add PKCE params if code challenge provided
+  if (params.codeChallenge) {
+    urlParams.append("code_challenge", params.codeChallenge);
+    urlParams.append("code_challenge_method", "S256");
+  }
 
   if (params.authUrl.includes("google.com")) {
     urlParams.append("access_type", "offline");
@@ -193,8 +235,9 @@ const executeAuthorizationCodeFlow = (params: {
   state: OAuthState;
   callbacks: OAuthCallbacks;
   apiKey: string;
+  usePKCE?: boolean;
 }): (() => void) | null => {
-  const { systemId, oauthFields, state, callbacks, apiKey } = params;
+  const { systemId, oauthFields, state, callbacks, apiKey, usePKCE } = params;
   const { onSuccess, onError } = callbacks;
 
   if (!oauthFields.auth_url) {
@@ -204,36 +247,46 @@ const executeAuthorizationCodeFlow = (params: {
     return null;
   }
 
-  const authUrl = buildAuthorizationUrl({
-    authUrl: oauthFields.auth_url,
-    clientId: oauthFields.client_id,
-    scopes: oauthFields.scopes || "",
-    state,
-  });
+  // Generate PKCE values upfront if needed
+  let codeVerifier: string | undefined;
+  let codeChallenge: string | undefined;
 
-  // Set cookie then open popup to avoid race condition
-  fetch("/api/auth/init-oauth", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiKey }),
-    credentials: "same-origin",
-  })
-    .then(() => {
-      const popup = openOAuthPopup(authUrl);
-      if (!popup) {
-        onError?.(
-          "[OAUTH_STAGE:POPUP] Failed to open OAuth popup window. Please check if popups are blocked by your browser.",
-        );
-        return;
-      }
-      setupPopupMonitoring(popup, systemId, callbacks);
-    })
-    .catch((err) => {
-      console.error("Failed to set OAuth cookie:", err);
-      onError?.(
-        "[OAUTH_STAGE:INITIALIZATION] Failed to initialize OAuth session. Please try again.",
-      );
+  const initAndOpenPopup = async () => {
+    if (usePKCE) {
+      codeVerifier = generateCodeVerifier();
+      codeChallenge = await generateCodeChallenge(codeVerifier);
+    }
+
+    // Set cookie with apiKey and optional codeVerifier
+    await fetch("/api/auth/init-oauth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey, codeVerifier }),
+      credentials: "same-origin",
     });
+
+    const authUrl = await buildAuthorizationUrl({
+      authUrl: oauthFields.auth_url!,
+      clientId: oauthFields.client_id,
+      scopes: oauthFields.scopes || "",
+      state,
+      codeChallenge,
+    });
+
+    const popup = openOAuthPopup(authUrl);
+    if (!popup) {
+      onError?.(
+        "[OAUTH_STAGE:POPUP] Failed to open OAuth popup window. Please check if popups are blocked by your browser.",
+      );
+      return;
+    }
+    setupPopupMonitoring(popup, systemId, callbacks);
+  };
+
+  initAndOpenPopup().catch((err) => {
+    console.error("Failed to initialize OAuth:", err);
+    onError?.("[OAUTH_STAGE:INITIALIZATION] Failed to initialize OAuth session. Please try again.");
+  });
 
   // Return dummy cleanup - actual cleanup set up after popup opens
   return () => {};
@@ -295,6 +348,10 @@ export const triggerOAuthFlow = (
     client_secret?: string;
     oauth_cert?: string;
     oauth_key?: string;
+    tokenAuthMethod?: "body" | "basic_auth";
+    tokenContentType?: "form" | "json";
+    usePKCE?: boolean;
+    extraHeaders?: Record<string, string>;
   },
   apiKey?: string,
   authType?: string,
@@ -342,7 +399,13 @@ export const triggerOAuthFlow = (
     oauth_cert: oauthFields.oauth_cert,
     oauth_key: oauthFields.oauth_key,
     scopes: oauthFields.scopes,
+    tokenAuthMethod: oauthFields.tokenAuthMethod,
+    tokenContentType: oauthFields.tokenContentType,
+    extraHeaders: oauthFields.extraHeaders,
   });
+
+  // Determine if PKCE should be used - from oauthFields or template
+  const usePKCE = oauthFields.usePKCE || shouldUsePKCE(templateInfo?.templateId);
 
   if (grantType === "client_credentials") {
     executeClientCredentialsFlow({ state, cachePromise, callbacks, apiKey: apiKey! });
@@ -355,6 +418,7 @@ export const triggerOAuthFlow = (
     state,
     callbacks,
     apiKey,
+    usePKCE,
   });
 };
 

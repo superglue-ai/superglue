@@ -4,6 +4,7 @@ import { useToast } from "@/src/hooks/use-toast";
 import type { Message, ToolCall } from "@superglue/shared";
 import { UserAction, ToolExecutionPolicies } from "@/src/lib/agent/agent-types";
 import { AgentType } from "@/src/lib/agent/registry/agents";
+import { useTools } from "@/src/app/tools-context";
 import React, {
   createContext,
   useCallback,
@@ -123,6 +124,7 @@ export function AgentContextProvider({
   const config: AgentConfig = { ...DEFAULT_CONFIG, ...configProp };
   const { toast } = useToast();
   const welcomeRef = useRef<AgentWelcomeRef>(null);
+  const { refreshTools } = useTools();
 
   const [toolExecutionPolicies, setToolExecutionPolicies] = useState<ToolExecutionPolicies>({});
 
@@ -171,8 +173,23 @@ export function AgentContextProvider({
           return msg;
         });
       });
+
+      // Refresh tools context when save_tool completes successfully
+      if (data?.toolCall?.name === "save_tool") {
+        try {
+          const output =
+            typeof data.toolCall.output === "string"
+              ? JSON.parse(data.toolCall.output)
+              : data.toolCall.output;
+          if (output?.success) {
+            refreshTools();
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
     },
-    [messagesHook.setMessages, messagesHook.updateMessageWithData],
+    [messagesHook.setMessages, messagesHook.updateMessageWithData, refreshTools],
   );
 
   // Now create the final streaming hook with all dependencies
