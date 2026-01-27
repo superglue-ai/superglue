@@ -15,6 +15,10 @@ export interface SystemConfig {
     scopes?: string;
     client_id?: string; // Public client ID (non-sensitive, can be in template)
     grant_type?: "authorization_code" | "client_credentials";
+    tokenAuthMethod?: "body" | "basic_auth";
+    tokenContentType?: "form" | "json";
+    extraHeaders?: Record<string, string>;
+    usePKCE?: boolean;
   };
   keywords?: string[];
 }
@@ -340,6 +344,9 @@ export const systems: Record<string, SystemConfig> = {
       scopes:
         "data.recordComments:read data.recordComments:write data.records:read data.records:write schema.bases:read schema.bases:write user.email:read enterprise.groups:read workspacesAndBases.shares:manage workspacesAndBases:read workspacesAndBases:write data.records:manage enterprise.account:read enterprise.account:write enterprise.auditLogs:read enterprise.changeEvents:read enterprise.exports:manage enterprise.groups:manage enterprise.scim.usersAndGroups:manage enterprise.user:read enterprise.user:write workspacesAndBases:manage webhook:manage",
       client_id: "02601365-de97-4191-b12d-e03c8540b03d",
+      usePKCE: true,
+      tokenAuthMethod: "basic_auth",
+      tokenContentType: "form",
     },
     keywords: [
       "bases",
@@ -1403,6 +1410,9 @@ export const systems: Record<string, SystemConfig> = {
       scopes:
         "read_content update_content insert_content read_comments update_comments insert_comments read_user update_user",
       client_id: "2f4d872b-594c-805e-abdd-00375c12bae0",
+      tokenAuthMethod: "basic_auth",
+      tokenContentType: "json",
+      extraHeaders: { "Notion-Version": "2022-06-28" },
     },
     keywords: [
       "pages",
@@ -2924,6 +2934,49 @@ export function findTemplateForSystem(system: {
  */
 export function getOAuthConfig(systemKey: string): SystemConfig["oauth"] | null {
   return systems[systemKey]?.oauth || null;
+}
+
+/**
+ * Get OAuth token exchange configuration for a system
+ * Priority: system credentials > template config > defaults
+ * @param system - The system object
+ * @returns Token exchange config
+ */
+export function getOAuthTokenExchangeConfig(system: System): {
+  tokenAuthMethod?: "body" | "basic_auth";
+  tokenContentType?: "form" | "json";
+  extraHeaders?: Record<string, string>;
+} {
+  const creds = system.credentials || {};
+
+  // Parse extraHeaders if stored as JSON string
+  let extraHeaders: Record<string, string> | undefined;
+  if (creds.extraHeaders) {
+    try {
+      extraHeaders =
+        typeof creds.extraHeaders === "string"
+          ? JSON.parse(creds.extraHeaders)
+          : creds.extraHeaders;
+    } catch {
+      extraHeaders = undefined;
+    }
+  }
+
+  const storedConfig = {
+    tokenAuthMethod: creds.tokenAuthMethod as "body" | "basic_auth" | undefined,
+    tokenContentType: creds.tokenContentType as "form" | "json" | undefined,
+    extraHeaders,
+  };
+
+  // Get template config as fallback
+  const match = findTemplateForSystem(system);
+  const templateOAuth = match?.template.oauth;
+
+  return {
+    tokenAuthMethod: storedConfig.tokenAuthMethod ?? templateOAuth?.tokenAuthMethod,
+    tokenContentType: storedConfig.tokenContentType ?? templateOAuth?.tokenContentType,
+    extraHeaders: storedConfig.extraHeaders ?? templateOAuth?.extraHeaders,
+  };
 }
 
 /**

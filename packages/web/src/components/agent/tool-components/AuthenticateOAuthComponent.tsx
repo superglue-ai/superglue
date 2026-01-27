@@ -137,6 +137,14 @@ export function AuthenticateOAuthComponent({
               refresh_token: tokens.refresh_token,
               token_type: tokens.token_type,
               expires_at: tokens.expires_at,
+              ...(tokens.tokenAuthMethod && { tokenAuthMethod: tokens.tokenAuthMethod }),
+              ...(tokens.tokenContentType && { tokenContentType: tokens.tokenContentType }),
+              ...(tokens.extraHeaders && {
+                extraHeaders:
+                  typeof tokens.extraHeaders === "string"
+                    ? tokens.extraHeaders
+                    : JSON.stringify(tokens.extraHeaders),
+              }),
             };
 
             await client.upsertSystem(systemId, {
@@ -175,6 +183,10 @@ export function AuthenticateOAuthComponent({
           token_url: oauthConfig.token_url,
           scopes: oauthConfig.scopes,
           grant_type: oauthConfig.grant_type || "authorization_code",
+          tokenAuthMethod: oauthConfig.tokenAuthMethod,
+          tokenContentType: oauthConfig.tokenContentType,
+          usePKCE: oauthConfig.usePKCE,
+          extraHeaders: oauthConfig.extraHeaders,
         },
         tokenRegistry.getToken(), // apiKey
         "oauth", // authType
