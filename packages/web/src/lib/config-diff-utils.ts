@@ -1,4 +1,4 @@
-import { Tool, ToolDiff } from "@superglue/shared";
+import { Tool, ToolDiff, normalizeToolSchemas, normalizeToolDiffs } from "@superglue/shared";
 import * as jsonpatch from "fast-json-patch";
 
 // Types
@@ -274,8 +274,17 @@ export function getEarliestAffectedStepIndex(enrichedDiffs: EnrichedDiff[]): num
 export function applyDiffsToConfig(config: Tool, diffs: ToolDiff[]): Tool {
   if (!diffs?.length) return config;
   const configCopy = JSON.parse(JSON.stringify(config));
-  const result = jsonpatch.applyPatch(configCopy, diffs as jsonpatch.Operation[], true, true);
-  return result.newDocument || configCopy;
+
+  const normalizedConfig = normalizeToolSchemas(configCopy);
+  const normalizedDiffs = normalizeToolDiffs(diffs);
+
+  const result = jsonpatch.applyPatch(
+    normalizedConfig,
+    normalizedDiffs as jsonpatch.Operation[],
+    true,
+    true,
+  );
+  return result.newDocument || normalizedConfig;
 }
 
 export function formatTargetLabel(target: DiffTarget) {

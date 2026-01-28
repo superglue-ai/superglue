@@ -221,15 +221,16 @@ export function ToolStepGallery({
   const visibleCardsData = useMemo(() => {
     const totalCards = toolItems.length;
     const CARD_WIDTH = 150;
-    const ARROW_WIDTH = 24;
-    const GUTTER = 12;
-    const SAFE_MARGIN = 12;
-    const available = Math.max(0, containerWidth - SAFE_MARGIN);
+    const BUTTON_SIZE = 32;
+    const BUTTON_SPACING = 18;
+    const SEPARATOR_WIDTH = BUTTON_SIZE + BUTTON_SPACING * 2;
+    const EDGE_PADDING = 16;
+    const available = Math.max(0, containerWidth - EDGE_PADDING * 2);
 
     let cardsToShow = 1;
     const maxCandidates = Math.min(totalCards, 12);
     for (let c = 1; c <= maxCandidates; c++) {
-      const needed = c * CARD_WIDTH + (c - 1) * (ARROW_WIDTH + GUTTER);
+      const needed = c * CARD_WIDTH + (c - 1) * SEPARATOR_WIDTH;
       if (needed <= available) {
         cardsToShow = c;
       } else {
@@ -248,14 +249,7 @@ export function ToolStepGallery({
 
     const visibleItems = toolItems.slice(startIdx, endIdx);
     const visibleIndices = visibleItems.map((_, i) => startIdx + i);
-    const sepWidth = ARROW_WIDTH + GUTTER;
     const count = Math.max(1, visibleItems.length);
-    const innerAvailable = Math.max(
-      0,
-      containerWidth - SAFE_MARGIN - 2 * sepWidth - (count - 1) * sepWidth,
-    );
-    const baseCardWidth = Math.floor(innerAvailable / count);
-    const widthRemainder = innerAvailable - baseCardWidth * count;
 
     return {
       visibleItems,
@@ -265,9 +259,8 @@ export function ToolStepGallery({
       totalCards,
       hiddenLeft: startIdx,
       hiddenRight: totalCards - endIdx,
-      sepWidth,
-      baseCardWidth,
-      widthRemainder,
+      sepWidth: SEPARATOR_WIDTH,
+      cardWidth: CARD_WIDTH,
     };
   }, [toolItems, containerWidth, activeIndex]);
 
@@ -429,11 +422,7 @@ export function ToolStepGallery({
                       {visibleCardsData.visibleItems.map((item, idx) => {
                         const globalIdx = visibleCardsData.visibleIndices[idx];
                         const showArrow = idx < visibleCardsData.visibleItems.length - 1;
-                        const cardWidth =
-                          item.type === "trigger"
-                            ? 0
-                            : visibleCardsData.baseCardWidth +
-                              (idx < visibleCardsData.widthRemainder ? 1 : 0);
+                        const cardWidth = visibleCardsData.cardWidth;
 
                         const baseProps = {
                           index: globalIdx,
@@ -504,16 +493,19 @@ export function ToolStepGallery({
 
                         return (
                           <React.Fragment key={globalIdx}>
-                            <div
-                              className="flex items-center justify-center"
-                              style={{
-                                flex: `0 0 ${cardWidth}px`,
-                                width: `${cardWidth}px`,
-                                maxWidth: `${cardWidth}px`,
-                              }}
-                            >
-                              <MiniStepCard {...cardProps} />
-                            </div>
+                            {item.type !== "trigger" && (
+                              <div
+                                className="flex items-center justify-center"
+                                style={{
+                                  flex: `0 0 ${cardWidth}px`,
+                                  width: `${cardWidth}px`,
+                                  maxWidth: `${cardWidth}px`,
+                                }}
+                              >
+                                <MiniStepCard {...cardProps} />
+                              </div>
+                            )}
+                            {item.type === "trigger" && <MiniStepCard {...cardProps} />}
                             {showArrow && (
                               <div
                                 style={{
@@ -528,10 +520,10 @@ export function ToolStepGallery({
                                       e.stopPropagation();
                                       handleAddStep(getInsertIndex());
                                     }}
-                                    className="group relative flex items-center justify-center h-8 w-8 rounded-full border border-muted-foreground/30 hover:border-primary/50 hover:bg-primary/10 transition-colors"
+                                    className="group relative flex items-center justify-center h-8 w-8 rounded-full border border-muted-foreground/15 hover:border-primary/30 hover:bg-primary/5 transition-colors"
                                     title="Add step here"
                                   >
-                                    <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:opacity-0 transition-opacity" />
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:opacity-0 transition-opacity" />
                                     <Plus className="h-4 w-4 text-primary absolute opacity-0 group-hover:opacity-100 transition-opacity" />
                                   </button>
                                 ) : null}

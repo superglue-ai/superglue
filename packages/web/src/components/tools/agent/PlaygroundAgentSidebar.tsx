@@ -120,12 +120,9 @@ function PlaygroundAgentContent({
     registerSetAgentInput((message: string) => {
       setInputValue(message);
       setIsHighlighted(true);
-      // Focus and select the text after a short delay to ensure the value is set
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.focus();
-          textareaRef.current.select();
-          // Auto-resize textarea to fit content
           textareaRef.current.style.height = "auto";
           textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
         }
