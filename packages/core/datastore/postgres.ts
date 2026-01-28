@@ -1529,6 +1529,7 @@ export class PostgresService implements DataStore {
       await client.query(`DELETE FROM workflow_schedules ${condition}`, param);
       await client.query(`DELETE FROM integration_details ${condition}`, param); // Delete details first
       await client.query(`DELETE FROM integrations ${condition}`, param);
+      await client.query(`DELETE FROM tool_history ${condition}`, param);
     } finally {
       client.release();
     }
