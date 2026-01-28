@@ -644,3 +644,25 @@ export function generateDefaultFromSchema(schema: any): any {
       return null;
   }
 }
+
+export function parseJsonSafe(value: any): any {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+export function normalizeToolSchemas<T extends { inputSchema?: any; responseSchema?: any }>(
+  tool: T,
+): T {
+  const normalized = { ...tool };
+  if (normalized.inputSchema) {
+    normalized.inputSchema = parseJsonSafe(normalized.inputSchema);
+  }
+  if (normalized.responseSchema) {
+    normalized.responseSchema = parseJsonSafe(normalized.responseSchema);
+  }
+  return normalized;
+}
