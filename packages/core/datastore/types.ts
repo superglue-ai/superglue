@@ -51,7 +51,7 @@ export interface DataStore {
     offset?: number;
     configId?: string;
     status?: RunStatus;
-    requestSource?: RequestSource;
+    requestSources?: RequestSource[];
     orgId?: string;
   }): Promise<{ items: Run[]; total: number }>;
   createRun(params: { run: Run; orgId?: string }): Promise<Run>;

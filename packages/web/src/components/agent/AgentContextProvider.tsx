@@ -109,7 +109,7 @@ export function useAgentContext(): AgentContextValue {
 interface AgentContextProviderProps {
   children: React.ReactNode;
   config?: Partial<AgentConfig>;
-  discoveryPrompts?: { userPrompt: string; systemPrompt: string } | null;
+  initialPrompts?: { userPrompt: string; systemPrompt: string } | null;
 }
 
 const DEFAULT_CONFIG: AgentConfig = {
@@ -119,7 +119,7 @@ const DEFAULT_CONFIG: AgentConfig = {
 export function AgentContextProvider({
   children,
   config: configProp,
-  discoveryPrompts,
+  initialPrompts,
 }: AgentContextProviderProps) {
   const config: AgentConfig = { ...DEFAULT_CONFIG, ...configProp };
   const { toast } = useToast();
@@ -285,18 +285,18 @@ export function AgentContextProvider({
     [requestHook],
   );
 
-  // Auto-trigger discovery prompts when provided via props (only once)
-  const hasTriggeredDiscoveryRef = useRef(false);
+  // Auto-trigger initial prompts when provided via props (only once)
+  const hasTriggeredInitialPromptsRef = useRef(false);
   useEffect(() => {
     if (
-      discoveryPrompts &&
+      initialPrompts &&
       messagesHook.messages.length === 0 &&
-      !hasTriggeredDiscoveryRef.current
+      !hasTriggeredInitialPromptsRef.current
     ) {
-      hasTriggeredDiscoveryRef.current = true;
-      startTemplatePrompt(discoveryPrompts.userPrompt, discoveryPrompts.systemPrompt);
+      hasTriggeredInitialPromptsRef.current = true;
+      startTemplatePrompt(initialPrompts.userPrompt, initialPrompts.systemPrompt);
     }
-  }, [discoveryPrompts, messagesHook.messages.length, startTemplatePrompt]);
+  }, [initialPrompts, messagesHook.messages.length, startTemplatePrompt]);
 
   const value = useMemo<AgentContextValue>(
     () => ({

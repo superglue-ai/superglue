@@ -214,7 +214,7 @@ describe("FileStore", () => {
       const { items: apiItems, total: apiTotal } = await store.listRuns({
         limit: 10,
         offset: 0,
-        requestSource: RequestSource.API,
+        requestSources: [RequestSource.API],
         orgId: testOrgId,
       });
       expect(apiItems.length).toBe(2);
@@ -224,7 +224,7 @@ describe("FileStore", () => {
       const { items: webhookItems, total: webhookTotal } = await store.listRuns({
         limit: 10,
         offset: 0,
-        requestSource: RequestSource.WEBHOOK,
+        requestSources: [RequestSource.WEBHOOK],
         orgId: testOrgId,
       });
       expect(webhookItems.length).toBe(1);
@@ -267,13 +267,13 @@ describe("FileStore", () => {
       await store.createRun({ run: run3, orgId: testOrgId });
       await store.createRun({ run: run4, orgId: testOrgId });
 
-      // Filter by toolId + status + requestSource
+      // Filter by toolId + status + requestSources
       const { items, total } = await store.listRuns({
         limit: 10,
         offset: 0,
         configId: "tool1",
         status: RunStatus.SUCCESS,
-        requestSource: RequestSource.API,
+        requestSources: [RequestSource.API],
         orgId: testOrgId,
       });
       expect(items.length).toBe(1);

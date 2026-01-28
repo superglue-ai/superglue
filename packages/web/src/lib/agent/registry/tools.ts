@@ -1434,7 +1434,7 @@ const getRunsDefinition = (): ToolDefinition => ({
       - Returns recent runs including toolPayload (the actual input received)
       - Useful for debugging when a webhook-triggered tool fails due to unexpected payload format
       - Compare the returned toolPayload against the tool's inputSchema to identify mismatches
-      - Can filter by toolId, status (running, success, failed, aborted), or requestSource (api, frontend, scheduler, mcp, tool-chain, webhook)
+      - Can filter by toolId, status (running, success, failed, aborted), or requestSources (api, frontend, scheduler, mcp, tool-chain, webhook)
       - All filters are optional - you can combine them or use none
     </important_notes>
     `,
@@ -1454,10 +1454,13 @@ const getRunsDefinition = (): ToolDefinition => ({
         enum: ["running", "success", "failed", "aborted"],
         description: "Optional: Filter runs by status",
       },
-      requestSource: {
-        type: "string",
-        enum: ["api", "frontend", "scheduler", "mcp", "tool-chain", "webhook"],
-        description: "Optional: Filter runs by how they were triggered",
+      requestSources: {
+        type: "array",
+        items: {
+          type: "string",
+          enum: ["api", "frontend", "scheduler", "mcp", "tool-chain", "webhook"],
+        },
+        description: "Optional: Filter runs by how they were triggered (can specify multiple)",
       },
     },
     required: [],
@@ -1465,10 +1468,10 @@ const getRunsDefinition = (): ToolDefinition => ({
 });
 
 const runGetRuns = async (
-  input: { toolId?: string; limit?: number; status?: string; requestSource?: string },
+  input: { toolId?: string; limit?: number; status?: string; requestSources?: string[] },
   ctx: ToolExecutionContext,
 ) => {
-  const { toolId, limit = 10, status, requestSource } = input;
+  const { toolId, limit = 10, status, requestSources } = input;
   const cappedLimit = Math.min(limit, 50);
 
   try {
@@ -1476,13 +1479,8 @@ const runGetRuns = async (
       toolId,
       limit: cappedLimit,
       status: status as "running" | "success" | "failed" | "aborted" | undefined,
-      requestSource: requestSource as
-        | "api"
-        | "frontend"
-        | "scheduler"
-        | "mcp"
-        | "tool-chain"
-        | "webhook"
+      requestSources: requestSources as
+        | ("api" | "frontend" | "scheduler" | "mcp" | "tool-chain" | "webhook")[]
         | undefined,
     });
 

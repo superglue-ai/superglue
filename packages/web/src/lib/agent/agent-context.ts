@@ -1,4 +1,4 @@
-import { Message, Tool } from "@superglue/shared";
+import { Message, Run, Tool } from "@superglue/shared";
 import { systems } from "@superglue/shared/templates";
 import { AgentDefinition, ToolExecutionContext } from "./agent-types";
 import { SUPERGLUE_INFORMATION_PROMPT } from "./agent-prompts";
@@ -341,6 +341,161 @@ export function getDiscoveryPrompts(systemIds: string[]): {
   const userPrompt = isSingleIntegration
     ? `I want to set up and test ${systemList}. Help me configure it and build a simple tool to verify it's working.`
     : `I want to build tools using ${systemList}. What can I do with them together?`;
+
+  return { systemPrompt, userPrompt };
+}
+
+export function getInvestigationPrompts(run: Run): {
+  systemPrompt: string;
+  userPrompt: string;
+} {
+  const truncateJson = (obj: any, maxLength: number = 3000): string => {
+    const str = JSON.stringify(obj, null, 2);
+    if (str.length <= maxLength) return str;
+    return str.substring(0, maxLength) + "\n... [truncated]";
+  };
+
+  const formatDate = (dateStr: string | undefined): string => {
+    if (!dateStr) return "unknown";
+    try {
+      return new Date(dateStr).toLocaleString();
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // Check if tool exists and version info
+  const toolExists = !!run.tool;
+  const runToolVersion = run.tool?.version;
+  const runStartedAt = formatDate(run.metadata?.startedAt);
+
+  // Build tool existence section
+  let toolExistenceSection = "";
+  if (!toolExists) {
+    toolExistenceSection = `
+IMPORTANT - TOOL NOT FOUND:
+The tool "${run.toolId}" does not currently exist in the system. This could be because:
+1. The tool was deleted after this run
+2. The tool was only a draft created by the agent and was never saved
+
+Since the tool doesn't exist, you CANNOT use edit_tool to modify it. Instead:
+- If the user wants to recreate the tool, use build_tool to create a new one that addresses the error
+- If this was a draft from a previous agent conversation, suggest the user go back to that chat (this run was from: ${runStartedAt})
+
+BEFORE taking any action, explain the situation to the user and ask what they would like to do:
+1. Create a new tool based on what we know from this failed run
+2. Go back to the original conversation where the tool was built
+3. Something else
+
+Do NOT start creating or editing tools without user confirmation.
+`;
+  }
+
+  // Build version comparison section
+  let versionSection = "";
+  if (toolExists && runToolVersion) {
+    // Note: We include the version from the run's tool snapshot
+    // The agent should use get_tool to fetch the current version and compare
+    versionSection = `
+VERSION INFORMATION:
+- Tool version at time of this run: ${runToolVersion}
+- Run timestamp: ${runStartedAt}
+
+IMPORTANT: Before analyzing the error, use get_tool to fetch the current saved version of "${run.toolId}".
+Compare the current version with the version from this run (${runToolVersion}).
+If the versions differ:
+1. Identify what changed between versions
+2. Determine if the changes might have fixed or could fix the error we're seeing
+3. Let the user know they're looking at an old run and the tool has been updated since
+4. Analyze whether the current version would still have this issue
+`;
+  }
+
+  // Build request source section
+  let requestSourceSection = "";
+  if (run.requestSource === "webhook") {
+    requestSourceSection = `
+WEBHOOK TRIGGER ANALYSIS:
+This run was triggered by a webhook. When debugging webhook-triggered runs:
+1. Carefully examine the INPUT PAYLOAD below - this is what the webhook sent
+2. Check if the payload structure matches what the tool's inputSchema expects
+3. Look for missing required fields, incorrect data types, or unexpected values
+4. The webhook sender may be sending data in a different format than expected
+5. Test the tool with the exact payload to reproduce the issue
+6. If the payload is the problem, either:
+   - Update the tool's inputSchema and steps to handle the actual webhook format
+   - Or coordinate with the webhook sender to fix their payload format
+`;
+  } else if (run.requestSource === "scheduler") {
+    requestSourceSection = `
+SCHEDULED RUN ANALYSIS:
+This run was triggered by the scheduler. Consider:
+1. Check if any external dependencies (APIs, services) were unavailable at the scheduled time
+2. Look for rate limiting issues if this runs frequently
+3. Check if credentials or tokens may have expired
+`;
+  } else if (run.requestSource === "tool-chain") {
+    requestSourceSection = `
+TOOL CHAIN ANALYSIS:
+This run was triggered as part of a tool chain. Consider:
+1. Check if the input from the previous tool in the chain was in the expected format
+2. Look at the INPUT PAYLOAD to see what was passed from the upstream tool
+3. The error might be in the upstream tool's output rather than this tool's configuration
+`;
+  }
+
+  const systemPrompt = `You are helping debug a failed superglue tool run. Analyze the error and help the user fix it.
+
+FAILED RUN DETAILS:
+- Run ID: ${run.runId}
+- Tool ID: ${run.toolId}
+- Error: ${run.error || "Unknown error"}
+- Triggered by: ${run.requestSource || "unknown"}
+- Duration: ${run.metadata?.durationMs ? `${run.metadata.durationMs}ms` : "unknown"}
+- Started: ${runStartedAt}
+- Completed: ${formatDate(run.metadata?.completedAt)}
+${toolExistenceSection}${versionSection}${requestSourceSection}
+${
+  run.tool
+    ? `TOOL CONFIGURATION (from time of run):
+${truncateJson(run.tool)}`
+    : `NO TOOL CONFIGURATION AVAILABLE - The tool was not saved or has been deleted.`
+}
+
+${
+  run.stepResults && run.stepResults.length > 0
+    ? `STEP RESULTS:
+${truncateJson(run.stepResults)}`
+    : ""
+}
+
+${
+  run.toolPayload
+    ? `INPUT PAYLOAD:
+${truncateJson(run.toolPayload)}`
+    : ""
+}
+
+YOUR APPROACH:
+1. First, explain the error in plain English - what went wrong and why
+2. ${toolExists ? "Check the current tool version and compare with the run version" : "Acknowledge the tool doesn't exist and ask user how to proceed"}
+3. Identify the root cause - is it a configuration issue, payload issue, external API issue, or transient error?
+4. Provide a specific solution with concrete steps
+5. ${toolExists ? "Offer to modify the tool using edit_tool if needed" : "Offer to create a new tool using build_tool if the user wants"}
+
+IMPORTANT GUIDELINES:
+- Always explain the situation clearly before taking action
+- Ask for user confirmation before creating new tools or making significant changes
+- If this is a transient issue (timeout, rate limit), suggest retrying before making changes
+- Be specific about what needs to change and where`;
+
+  const errorPreview = run.error ? run.error.substring(0, 150) : "Unknown error";
+  const toolExistsNote = toolExists ? "" : "\n\nNote: This tool no longer exists in the system.";
+  const userPrompt = `Help me investigate why my "${run.toolId}" tool failed.
+
+Error: ${errorPreview}${run.error && run.error.length > 150 ? "..." : ""}
+
+What went wrong and how can I fix it?${toolExistsNote}`;
 
   return { systemPrompt, userPrompt };
 }

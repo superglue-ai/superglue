@@ -348,6 +348,12 @@ paths:
           schema:
             type: string
             enum: [running, success, failed, aborted]
+        - name: requestSources
+          in: query
+          description: Filter by request sources (comma-separated for multiple values)
+          schema:
+            type: string
+          example: "api,webhook"
         - name: page
           in: query
           schema:

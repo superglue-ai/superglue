@@ -71,23 +71,28 @@ const listRuns: RouteHandler = async (request, reply) => {
   const query = request.query as {
     toolId?: string;
     status?: string;
-    requestSource?: string;
+    requestSources?: string;
     page?: string;
     limit?: string;
   };
 
   const { page, limit, offset } = parsePaginationParams(query);
   const internalStatus = query.status ? mapOpenAPIStatusToInternal(query.status) : undefined;
-  const internalRequestSource = query.requestSource
-    ? mapOpenAPIRequestSourceToInternal(query.requestSource)
-    : undefined;
+
+  let internalRequestSources: RequestSource[] | undefined;
+  if (query.requestSources) {
+    internalRequestSources = query.requestSources
+      .split(",")
+      .map((s) => mapOpenAPIRequestSourceToInternal(s.trim()))
+      .filter((s): s is RequestSource => s !== undefined);
+  }
 
   const result = await authReq.datastore.listRuns({
     limit,
     offset,
     configId: query.toolId,
     status: internalStatus,
-    requestSource: internalRequestSource,
+    requestSources: internalRequestSources,
     orgId: authReq.authInfo.orgId,
   });
 

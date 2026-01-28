@@ -159,10 +159,10 @@ export class MemoryStore implements DataStore {
     offset?: number;
     configId?: string;
     status?: RunStatus;
-    requestSource?: RequestSource;
+    requestSources?: RequestSource[];
     orgId?: string;
   }): Promise<{ items: Run[]; total: number }> {
-    const { limit = 10, offset = 0, configId, status, requestSource, orgId } = params || {};
+    const { limit = 10, offset = 0, configId, status, requestSources, orgId } = params || {};
     const allRuns = this.getOrgItems(this.storage.runs, "run", orgId);
 
     const validRuns = allRuns.filter(
@@ -188,8 +188,10 @@ export class MemoryStore implements DataStore {
       filteredRuns = filteredRuns.filter((run) => run.status === status);
     }
 
-    if (requestSource !== undefined) {
-      filteredRuns = filteredRuns.filter((run) => run.requestSource === requestSource);
+    if (requestSources !== undefined && requestSources.length > 0) {
+      filteredRuns = filteredRuns.filter(
+        (run) => run.requestSource && requestSources.includes(run.requestSource),
+      );
     }
 
     const items = filteredRuns.slice(offset, offset + limit);

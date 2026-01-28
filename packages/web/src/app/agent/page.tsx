@@ -8,11 +8,11 @@ function AgentPageContent() {
   const searchParams = useSearchParams();
   const prompt = searchParams.get("prompt");
 
-  const discoveryPrompts = prompt ? { userPrompt: prompt, systemPrompt: "" } : null;
+  const initialPrompts = prompt ? { userPrompt: prompt, systemPrompt: "" } : null;
 
   return (
     <div className="p-6 w-full h-full">
-      <AgentInterface discoveryPrompts={discoveryPrompts} />
+      <AgentInterface initialPrompts={initialPrompts} />
     </div>
   );
 }

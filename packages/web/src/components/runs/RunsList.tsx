@@ -14,10 +14,12 @@ import {
   Link,
   Loader2,
   MousePointerClick,
+  Play,
   Webhook,
   XCircle,
 } from "lucide-react";
 import React from "react";
+import { formatDurationShort } from "@/src/lib/general-utils";
 
 // Helper function to recursively remove null values from objects
 export const removeNullFields = (obj: any): any => {
@@ -100,7 +102,7 @@ export const StatusBadge = ({ status }: { status?: RunStatus | string }) => {
   if (statusUpper === "RUNNING" || status === RunStatus.RUNNING) {
     return (
       <Badge variant="default" className="bg-blue-500 hover:bg-blue-500 gap-1">
-        <Loader2 className="h-3 w-3 animate-spin" />
+        <Play className="h-3 w-3" />
         Running
       </Badge>
     );
@@ -189,9 +191,12 @@ export const RunDetails = ({ run }: { run: any }) => {
   const isFailed =
     run.status === RunStatus.FAILED || run.status?.toString().toUpperCase() === "FAILED";
 
+  const startedAt = run.metadata?.startedAt ? new Date(run.metadata.startedAt) : null;
+  const completedAt = run.metadata?.completedAt ? new Date(run.metadata.completedAt) : null;
+
   return (
     <div className="p-4 space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="space-y-1">
           <h4 className="text-xs font-medium text-muted-foreground">Run ID</h4>
           <div className="flex items-center gap-2">
@@ -202,15 +207,27 @@ export const RunDetails = ({ run }: { run: any }) => {
           </div>
         </div>
         <div className="space-y-1">
-          <h4 className="text-xs font-medium text-muted-foreground">Run trigger</h4>
-          <RequestSourceBadge source={run.requestSource} />
+          <h4 className="text-xs font-medium text-muted-foreground">Started</h4>
+          <div className="flex items-center gap-2">
+            <Clock className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs">{startedAt ? startedAt.toLocaleString() : "-"}</span>
+          </div>
+        </div>
+        <div className="space-y-1">
+          <h4 className="text-xs font-medium text-muted-foreground">Completed</h4>
+          <div className="flex items-center gap-2">
+            <Clock className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs">{completedAt ? completedAt.toLocaleString() : "-"}</span>
+          </div>
         </div>
         <div className="space-y-1">
           <h4 className="text-xs font-medium text-muted-foreground">Duration</h4>
           <div className="flex items-center gap-2">
             <Clock className="h-3 w-3 text-muted-foreground" />
             <span className="text-xs">
-              {run.metadata?.durationMs != null ? `${run.metadata.durationMs}ms` : "-"}
+              {run.metadata?.durationMs != null
+                ? formatDurationShort(run.metadata.durationMs)
+                : "-"}
             </span>
           </div>
         </div>
