@@ -485,3 +485,34 @@ export function serializeIcon(
   // Object format from discovery
   return `${icon.source}:${icon.name}`;
 }
+
+export function normalizeToolDiff<T extends { op: string; path: string; value?: any }>(diff: T): T {
+  if (diff.op === "remove" || diff.value === undefined || typeof diff.value !== "string") {
+    return diff;
+  }
+
+  const shouldAlwaysBeObject =
+    diff.path === "/inputSchema" ||
+    diff.path === "/responseSchema" ||
+    diff.path.startsWith("/inputSchema/properties/") ||
+    diff.path.startsWith("/responseSchema/properties/") ||
+    diff.path.match(/^\/steps\/\d+\/apiConfig\/pagination$/) ||
+    diff.path.match(/^\/steps\/\d+\/apiConfig\/headers$/) ||
+    diff.path.match(/^\/steps\/\d+\/apiConfig\/queryParams$/);
+
+  if (shouldAlwaysBeObject) {
+    try {
+      return { ...diff, value: JSON.parse(diff.value) };
+    } catch {
+      return diff;
+    }
+  }
+
+  return diff;
+}
+
+export function normalizeToolDiffs<T extends { op: string; path: string; value?: any }>(
+  diffs: T[],
+): T[] {
+  return diffs.map((diff) => normalizeToolDiff(diff));
+}
