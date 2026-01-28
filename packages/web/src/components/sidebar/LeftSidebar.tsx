@@ -22,7 +22,7 @@ const navItems = [
   { icon: MessagesSquare, label: "Agent", href: "/" },
   { icon: Hammer, label: "Tools", href: "/tools" },
   { icon: Blocks, label: "Systems", href: "/systems" },
-  { icon: Book, label: "Documentation", href: "https://docs.superglue.cloud", target: "_blank" },
+  { icon: Book, label: "Docs", href: "https://docs.superglue.cloud", target: "_blank" },
   /*  { icon: AlertCircle, label: 'Error Monitoring', href: '/analytics' },
   { icon: Shield, label: 'Access Control', href: '/access-control' },
   { icon: Code, label: 'SDK Generation', href: '/sdk' },
@@ -56,7 +56,7 @@ export function LeftSidebar() {
       <div
         className={`
         fixed lg:static inset-y-0 left-0 z-40
-        w-52 min-w-56 flex-shrink-0 bg-background border-r border-border 
+        w-44 flex-shrink-0 bg-background border-r border-border 
         flex flex-col transform transition-transform duration-200 ease-in-out
         lg:transform-none ${isOpen ? "translate-x-0" : "-translate-x-full"}
       `}
