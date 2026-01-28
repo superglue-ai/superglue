@@ -891,16 +891,18 @@ export class SuperglueClient {
     page?: number;
     toolId?: string;
     status?: "running" | "success" | "failed" | "aborted";
-    requestSource?: "api" | "frontend" | "scheduler" | "mcp" | "tool-chain" | "webhook";
+    requestSources?: ("api" | "frontend" | "scheduler" | "mcp" | "tool-chain" | "webhook")[];
   }): Promise<{ items: Run[]; total: number; page: number; limit: number; hasMore: boolean }> {
-    const { limit = 100, page = 1, toolId, status, requestSource } = options ?? {};
+    const { limit = 100, page = 1, toolId, status, requestSources } = options ?? {};
     const params = new URLSearchParams({
       limit: String(limit),
       page: String(page),
     });
     if (toolId) params.set("toolId", toolId);
     if (status) params.set("status", status);
-    if (requestSource) params.set("requestSource", requestSource);
+    if (requestSources && requestSources.length > 0) {
+      params.set("requestSources", requestSources.join(","));
+    }
 
     const response = await this.restRequest<{
       data: any[];

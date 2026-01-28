@@ -453,11 +453,11 @@ export class FileStore implements DataStore {
     offset?: number;
     configId?: string;
     status?: RunStatus;
-    requestSource?: RequestSource;
+    requestSources?: RequestSource[];
     orgId?: string;
   }): Promise<{ items: Run[]; total: number }> {
     await this.ensureInitialized();
-    const { limit = 10, offset = 0, configId, status, requestSource, orgId } = params || {};
+    const { limit = 10, offset = 0, configId, status, requestSources, orgId } = params || {};
     const allRuns = await this.readRunsFromLogs(orgId, configId);
 
     let validRuns = allRuns.filter(
@@ -468,8 +468,10 @@ export class FileStore implements DataStore {
       validRuns = validRuns.filter((run) => run.status === status);
     }
 
-    if (requestSource !== undefined) {
-      validRuns = validRuns.filter((run) => run.requestSource === requestSource);
+    if (requestSources !== undefined && requestSources.length > 0) {
+      validRuns = validRuns.filter(
+        (run) => run.requestSource && requestSources.includes(run.requestSource),
+      );
     }
 
     const items = validRuns.slice(offset, offset + limit);

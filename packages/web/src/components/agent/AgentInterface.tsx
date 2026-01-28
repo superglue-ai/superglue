@@ -229,12 +229,12 @@ const MemoMessage = React.memo(
 );
 
 interface AgentInterfaceProps {
-  discoveryPrompts?: { userPrompt: string; systemPrompt: string } | null;
+  initialPrompts?: { userPrompt: string; systemPrompt: string } | null;
 }
 
-export function AgentInterface({ discoveryPrompts }: AgentInterfaceProps = {}) {
+export function AgentInterface({ initialPrompts }: AgentInterfaceProps = {}) {
   return (
-    <AgentContextProvider discoveryPrompts={discoveryPrompts}>
+    <AgentContextProvider initialPrompts={initialPrompts}>
       <AgentInterfaceContent />
     </AgentContextProvider>
   );

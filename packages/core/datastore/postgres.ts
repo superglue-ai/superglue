@@ -574,10 +574,10 @@ export class PostgresService implements DataStore {
     offset?: number;
     configId?: string;
     status?: RunStatus;
-    requestSource?: RequestSource;
+    requestSources?: RequestSource[];
     orgId?: string;
   }): Promise<{ items: Run[]; total: number }> {
-    const { limit = 10, offset = 0, configId, status, requestSource, orgId } = params || {};
+    const { limit = 10, offset = 0, configId, status, requestSources, orgId } = params || {};
     const client = await this.pool.connect();
     try {
       let selectQuery = `
@@ -587,7 +587,7 @@ export class PostgresService implements DataStore {
                 FROM runs
                 WHERE org_id = $1
             `;
-      const queryParams: string[] = [orgId || ""];
+      const queryParams: (string | string[])[] = [orgId || ""];
 
       if (configId) {
         selectQuery += " AND config_id = $2";
@@ -600,10 +600,10 @@ export class PostgresService implements DataStore {
         queryParams.push(status);
       }
 
-      if (requestSource !== undefined) {
+      if (requestSources !== undefined && requestSources.length > 0) {
         const paramIndex = queryParams.length + 1;
-        selectQuery += ` AND request_source = $${paramIndex}`;
-        queryParams.push(requestSource);
+        selectQuery += ` AND request_source = ANY($${paramIndex})`;
+        queryParams.push(requestSources);
       }
 
       selectQuery +=
@@ -1529,6 +1529,7 @@ export class PostgresService implements DataStore {
       await client.query(`DELETE FROM workflow_schedules ${condition}`, param);
       await client.query(`DELETE FROM integration_details ${condition}`, param); // Delete details first
       await client.query(`DELETE FROM integrations ${condition}`, param);
+      await client.query(`DELETE FROM tool_history ${condition}`, param);
     } finally {
       client.release();
     }
