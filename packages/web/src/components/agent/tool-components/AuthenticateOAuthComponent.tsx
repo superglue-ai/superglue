@@ -76,24 +76,15 @@ export function AuthenticateOAuthComponent({
 
       // Only use template OAuth if we don't have client_secret (neither from user input nor stored)
       if (!hasClientSecret) {
-        // Check if system matches a template with OAuth configured
-        const templateMatch = system ? findTemplateForSystem(system) : null;
-        const template = templateMatch?.template || templateSystems[systemId];
-        const templateOAuth = template?.oauth;
+        const templateMatch = findTemplateForSystem(system || { id: systemId });
+        const templateOAuth = templateMatch?.template?.oauth;
         const hasTemplateClientId = !!(
           templateOAuth?.client_id && String(templateOAuth.client_id).trim().length > 0
         );
 
-        if (hasTemplateClientId && templateMatch) {
-          // Use template OAuth if the template has a client_id configured
+        if (hasTemplateClientId && templateOAuth) {
           templateInfo = {
             templateId: templateMatch.key,
-            clientId: templateOAuth.client_id,
-          };
-        } else if (hasTemplateClientId) {
-          // Fallback: use systemId if it matches a template directly
-          templateInfo = {
-            templateId: systemId,
             clientId: templateOAuth.client_id,
           };
         }

@@ -1126,8 +1126,7 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
 
     // Check if this system matches a template with OAuth configured
     const templateMatch = findTemplateForSystem(system);
-    const template = templateMatch?.template || systems[systemId];
-    const templateOAuth = template?.oauth;
+    const templateOAuth = templateMatch?.template.oauth;
 
     const oauthConfig: Record<string, any> = {
       grant_type:
