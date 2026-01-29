@@ -150,7 +150,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
   const setStepRunning = useCallback((stepId: string, runId: string) => {
     setStepExecutions((prev) => ({
       ...prev,
-      [stepId]: { ...(prev[stepId] ?? DEFAULT_STEP_EXECUTION), status: "running", runId },
+      [stepId]: { ...DEFAULT_STEP_EXECUTION, status: "running", runId },
     }));
   }, []);
 
@@ -275,6 +275,8 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
   }, []);
 
   const setTransformRunning = useCallback((_runId: string) => {
+    setFinalResultState(null);
+    setFinalErrorState(null);
     setTransformStatusState("running");
   }, []);
 
@@ -544,11 +546,11 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       };
 
       const categorizedVariables: CategorizedVariables = {
-        credentials: Object.keys(systemCredentials),
-        toolInputs: Object.keys(manualPayload),
+        credentials: Object.keys(systemCredentials || {}),
+        toolInputs: Object.keys(manualPayload || {}),
         fileInputs: Object.keys(payload.filePayloads || {}),
         currentStepData: ["currentItem"],
-        previousStepData: Object.keys(previousStepResults),
+        previousStepData: Object.keys(previousStepResults || {}),
         paginationVariables: ["page", "offset", "cursor", "limit", "pageSize"],
       };
 

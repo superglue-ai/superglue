@@ -106,7 +106,7 @@ export function initializeAIModel(options?: {
     }
     default:
       throw new Error(
-        `Invalid provider: ${providerType}. Must be one of: anthropic, openai, gemini, azure, bedrock`,
+        `Invalid provider: ${providerType} for variable ${providerEnvVar}. Must be one of: anthropic, openai, gemini, azure, bedrock`,
       );
   }
 

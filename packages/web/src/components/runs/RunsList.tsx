@@ -14,10 +14,12 @@ import {
   Link,
   Loader2,
   MousePointerClick,
+  Play,
   Webhook,
   XCircle,
 } from "lucide-react";
 import React from "react";
+import { formatDurationShort } from "@/src/lib/general-utils";
 
 // Helper function to recursively remove null values from objects
 export const removeNullFields = (obj: any): any => {
@@ -100,7 +102,7 @@ export const StatusBadge = ({ status }: { status?: RunStatus | string }) => {
   if (statusUpper === "RUNNING" || status === RunStatus.RUNNING) {
     return (
       <Badge variant="default" className="bg-blue-500 hover:bg-blue-500 gap-1">
-        <Loader2 className="h-3 w-3 animate-spin" />
+        <Play className="h-3 w-3" />
         Running
       </Badge>
     );
@@ -172,9 +174,9 @@ const CollapsibleSection = ({
 export const RunDetails = ({ run }: { run: any }) => {
   if (!run) return null;
 
-  const cleanedToolConfig = run.toolConfig ? removeNullFields(run.toolConfig) : null;
+  const cleanedToolConfig = run.tool ? removeNullFields(run.tool) : null;
   const cleanedOptions = run.options ? removeNullFields(run.options) : null;
-  const cleanedToolResult = run.toolResult ? removeNullFields(run.toolResult) : null;
+  const cleanedToolResult = run.data ? removeNullFields(run.data) : null;
   const cleanedToolPayload = run.toolPayload ? removeNullFields(run.toolPayload) : null;
 
   const hasToolConfig = cleanedToolConfig && Object.keys(cleanedToolConfig).length > 0;
@@ -189,29 +191,42 @@ export const RunDetails = ({ run }: { run: any }) => {
   const isFailed =
     run.status === RunStatus.FAILED || run.status?.toString().toUpperCase() === "FAILED";
 
+  const startedAt = run.metadata?.startedAt ? new Date(run.metadata.startedAt) : null;
+  const completedAt = run.metadata?.completedAt ? new Date(run.metadata.completedAt) : null;
+
   return (
-    <div className="p-4 space-y-4 max-h-[400px] overflow-y-auto [scrollbar-gutter:stable]">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="p-4 space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="space-y-1">
           <h4 className="text-xs font-medium text-muted-foreground">Run ID</h4>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono truncate" title={run.id || run.runId}>
-              {run.id || run.runId}
+            <span className="text-xs font-mono truncate" title={run.runId}>
+              {run.runId}
             </span>
-            <CopyButton text={run.id || run.runId} />
+            <CopyButton text={run.runId} />
           </div>
         </div>
         <div className="space-y-1">
-          <h4 className="text-xs font-medium text-muted-foreground">Run trigger</h4>
-          <RequestSourceBadge source={run.requestSource} />
+          <h4 className="text-xs font-medium text-muted-foreground">Started</h4>
+          <div className="flex items-center gap-2">
+            <Clock className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs">{startedAt ? startedAt.toLocaleString() : "-"}</span>
+          </div>
+        </div>
+        <div className="space-y-1">
+          <h4 className="text-xs font-medium text-muted-foreground">Completed</h4>
+          <div className="flex items-center gap-2">
+            <Clock className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs">{completedAt ? completedAt.toLocaleString() : "-"}</span>
+          </div>
         </div>
         <div className="space-y-1">
           <h4 className="text-xs font-medium text-muted-foreground">Duration</h4>
           <div className="flex items-center gap-2">
             <Clock className="h-3 w-3 text-muted-foreground" />
             <span className="text-xs">
-              {run.completedAt
-                ? `${new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()}ms`
+              {run.metadata?.durationMs != null
+                ? formatDurationShort(run.metadata.durationMs)
                 : "-"}
             </span>
           </div>
@@ -240,7 +255,7 @@ export const RunDetails = ({ run }: { run: any }) => {
                 <div className="absolute top-2 right-2">
                   <CopyButton getData={() => JSON.stringify(cleanedToolPayload, null, 2)} />
                 </div>
-                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md max-h-[200px] overflow-y-auto">
+                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md">
                   {JSON.stringify(cleanedToolPayload, null, 2)}
                 </pre>
               </div>
@@ -290,7 +305,7 @@ export const RunDetails = ({ run }: { run: any }) => {
                       </div>
                     )}
                     {step.data && (
-                      <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-2 rounded-md max-h-[150px] overflow-y-auto">
+                      <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-2 rounded-md">
                         {JSON.stringify(removeNullFields(step.data), null, 2)}
                       </pre>
                     )}
@@ -307,7 +322,7 @@ export const RunDetails = ({ run }: { run: any }) => {
                 <div className="absolute top-2 right-2 z-10">
                   <CopyButton getData={() => JSON.stringify(cleanedToolResult, null, 2)} />
                 </div>
-                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md max-h-[200px] overflow-y-auto">
+                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md">
                   {JSON.stringify(cleanedToolResult, null, 2)}
                 </pre>
               </div>
@@ -321,7 +336,7 @@ export const RunDetails = ({ run }: { run: any }) => {
                 <div className="absolute top-2 right-2">
                   <CopyButton getData={() => JSON.stringify(cleanedToolConfig, null, 2)} />
                 </div>
-                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md max-h-[200px] overflow-y-auto">
+                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md">
                   {JSON.stringify(cleanedToolConfig, null, 2)}
                 </pre>
               </div>
@@ -385,13 +400,15 @@ export function RunsList({
   }
 
   const sortedRuns = [...runs].sort(
-    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+    (a, b) =>
+      new Date(b.metadata?.startedAt ?? 0).getTime() -
+      new Date(a.metadata?.startedAt ?? 0).getTime(),
   );
 
   return (
     <div className="space-y-2">
       {sortedRuns.map((run) => {
-        const runId = run.id || run.runId;
+        const runId = run.runId;
         const toolId = run.toolId;
         const isExpanded = expandedRunId === runId;
 
@@ -418,12 +435,14 @@ export function RunsList({
               <RequestSourceBadge source={run.requestSource} />
 
               <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
-                {new Date(run.startedAt).toLocaleString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+                {run.metadata?.startedAt
+                  ? new Date(run.metadata.startedAt).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "—"}
               </span>
             </button>
 

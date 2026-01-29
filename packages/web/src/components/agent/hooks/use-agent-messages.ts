@@ -1,12 +1,8 @@
 "use client";
 
-import {
-  requiresConfirmationBeforeExec,
-  requiresConfirmationAfterExec,
-} from "@/src/lib/agent/agent-helpers";
 import { Message, ToolCall } from "@superglue/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { UseAgentMessagesReturn } from "./types";
+import type { UseAgentMessagesReturn, ToolConfirmationMetadata } from "./types";
 
 export function useAgentMessages(
   stopDrip: () => void,
@@ -45,12 +41,15 @@ export function useAgentMessages(
 
         case "tool_call_start": {
           const existingToolIndex = msg.tools?.findIndex((t) => t.id === data.toolCall.id);
+          const confirmation = data.confirmation as ToolConfirmationMetadata | undefined;
+          const requiresConfirmationBefore = confirmation?.timing === "before";
+
           const newTool: ToolCall = {
             id: data.toolCall.id,
             name: data.toolCall.name,
             input: data.toolCall.input,
             status: data.toolCall.input
-              ? requiresConfirmationBeforeExec(data.toolCall.name)
+              ? requiresConfirmationBefore
                 ? "awaiting_confirmation"
                 : "running"
               : "pending",
@@ -89,6 +88,7 @@ export function useAgentMessages(
               const updatedTool = {
                 ...tool,
                 logs: [...(tool.logs || []), ...(data.toolCall.logs || [])],
+                status: tool.status === "pending" ? "running" : tool.status,
               };
 
               if (tool.name === "build_tool" && data.toolCall.logs) {
@@ -129,6 +129,7 @@ export function useAgentMessages(
                       ...part.tool,
                       logs: [...(part.tool.logs || []), ...(data.toolCall.logs || [])],
                       buildResult: updateTools.find((t) => t.id === data.toolCall.id)?.buildResult,
+                      status: part.tool.status === "pending" ? "running" : part.tool.status,
                     },
                   }
                 : part,
@@ -139,10 +140,7 @@ export function useAgentMessages(
 
         case "tool_call_complete": {
           const existingTool = msg.tools?.find((t) => t.id === data.toolCall.id);
-          const toolName = existingTool?.name || "";
 
-          // Only skip if tool is already in a final state (completed/declined)
-          // Don't skip based on confirmationState - that's just user intent, not actual completion
           const alreadyCompleted =
             existingTool?.status === "completed" || existingTool?.status === "declined";
 
@@ -158,14 +156,18 @@ export function useAgentMessages(
                 : data.toolCall.output;
           } catch {}
 
+          const confirmation = data.confirmation as ToolConfirmationMetadata | undefined;
           const hasConfirmableContent = parsedOutput?.diffs?.length > 0 || parsedOutput?.newPayload;
           const needsPostExecConfirmation =
-            requiresConfirmationAfterExec(toolName) &&
+            confirmation?.timing === "after" &&
             parsedOutput?.success === true &&
             hasConfirmableContent;
 
+          const isPendingUserConfirmation =
+            parsedOutput?.confirmationState === "PENDING_USER_CONFIRMATION";
+
           const finalStatus: "completed" | "declined" | "awaiting_confirmation" =
-            needsPostExecConfirmation
+            needsPostExecConfirmation || isPendingUserConfirmation
               ? "awaiting_confirmation"
               : data.toolCall.status || "completed";
 
@@ -387,6 +389,28 @@ export function useAgentMessages(
     setEditingContent("");
   }, []);
 
+  const findAndResumeMessageWithTool = useCallback(
+    (toolCallId: string): Message | null => {
+      const currentMessages = messagesRef.current;
+      const targetMessage = currentMessages.find((msg) =>
+        msg.parts?.some((p) => p.type === "tool" && p.tool?.id === toolCallId),
+      );
+
+      if (!targetMessage) {
+        return null;
+      }
+
+      const resumedMessage = { ...targetMessage, isStreaming: true };
+
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === targetMessage.id ? resumedMessage : msg)),
+      );
+
+      return resumedMessage;
+    },
+    [setMessages, messagesRef],
+  );
+
   return {
     messages,
     setMessages,
@@ -403,5 +427,6 @@ export function useAgentMessages(
     setEditingContent,
     handleEditMessage,
     handleCancelEdit,
+    findAndResumeMessageWithTool,
   };
 }

@@ -3,9 +3,9 @@
 import { useConfig } from "@/src/app/config-context";
 import { useTools } from "@/src/app/tools-context";
 import { SaveToolDialog } from "@/src/components/tools/dialogs/SaveToolDialog";
-import ToolPlayground, { type ToolPlaygroundHandle } from "@/src/components/tools/ToolPlayground";
 import { Button } from "@/src/components/ui/button";
-import { EDIT_TOOL_CONFIRMATION } from "@/src/lib/agent/agent-tools";
+import { UserAction } from "@/src/lib/agent/agent-types";
+import { resolveFileReferences, validateFileReferences } from "@/src/lib/agent/agent-helpers";
 import {
   abortExecution,
   createSuperglueClient,
@@ -17,19 +17,16 @@ import { SuperglueClient, Tool, ToolCall } from "@superglue/shared";
 import {
   CheckCircle,
   ChevronDown,
-  Edit2,
   Hammer,
   Loader2,
   Play,
   Save,
   Square,
   Wrench,
-  X,
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JsonCodeEditor } from "../../editors/JsonCodeEditor";
-import { DeployButton } from "../../tools/deploy/DeployButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "../../ui/dropdown-menu";
 import { DiffApprovalComponent } from "./DiffApprovalComponent";
 import { DiffDisplay, ToolDiff } from "./DiffDisplayComponent";
@@ -45,31 +42,34 @@ interface ToolBuilderComponentProps {
   mode: ToolMode;
   onInputChange: (newInput: any) => void;
   onToolUpdate?: (toolCallId: string, updates: Partial<ToolCall>) => void;
-  onSystemMessage?: (message: string, options?: { triggerImmediateResponse?: boolean }) => void;
-  onTriggerContinuation?: () => void;
+  sendAgentRequest?: (
+    userMessage?: string,
+    options?: { userActions?: UserAction[] },
+  ) => Promise<void>;
+  bufferAction?: (action: UserAction) => void;
   onAbortStream?: () => void;
   onApplyChanges?: (config: Tool, diffs?: ToolDiff[]) => void;
   isPlayground?: boolean;
   currentPayload?: string;
+  filePayloads?: Record<string, any>;
 }
 
 export function ToolBuilderComponent({
   tool,
   mode,
-  onSystemMessage,
   onToolUpdate,
-  onTriggerContinuation,
+  sendAgentRequest,
+  bufferAction,
   onAbortStream,
   onApplyChanges,
   isPlayground = false,
   currentPayload,
+  filePayloads,
 }: ToolBuilderComponentProps) {
   const config = useConfig();
   const { refreshTools } = useTools();
-  const editorRef = useRef<ToolPlaygroundHandle | null>(null);
 
   // UI state
-  const [showEditor, setShowEditor] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
 
   // Tool state
@@ -121,13 +121,25 @@ export function ToolBuilderComponent({
     }
   }, [parsedOutput, tool.status, mode]);
 
-  // Initialize editable payload when tool completes
+  // Initialize editable payload when tool completes or is awaiting confirmation (for edit_tool)
   useEffect(() => {
-    if (tool.status === "completed" && (mode === "build" || mode === "fix")) {
-      const initialPayload = tool.input?.payload || {};
+    if (
+      (tool.status === "completed" || tool.status === "awaiting_confirmation") &&
+      (mode === "build" || mode === "fix")
+    ) {
+      const initialPayload =
+        isPlayground && currentPayload
+          ? (() => {
+              try {
+                return JSON.parse(currentPayload);
+              } catch {
+                return {};
+              }
+            })()
+          : tool.input?.payload || {};
       setEditablePayload(JSON.stringify(initialPayload, null, 2));
     }
-  }, [tool.status, mode, tool.input?.payload]);
+  }, [tool.status, mode, tool.input?.payload, isPlayground, currentPayload]);
 
   // Cleanup log subscription on unmount
   useEffect(() => {
@@ -165,182 +177,28 @@ export function ToolBuilderComponent({
     }
   };
 
-  const handleRunTool = async () => {
-    if (!currentConfig) return;
-
-    const runId = generateUUID();
-    currentRunIdRef.current = runId;
-    setIsRunning(true);
-    setRunResult(null);
-    setManualRunLogs([]);
-
-    // Notify agent that user is running the tool
-    onSystemMessage?.(
-      `[USER ACTION] User clicked "Run Tool" for tool "${currentConfig.id}". Executing now...`,
-      { triggerImmediateResponse: false },
-    );
-
-    const client = new SuperglueClient({
-      endpoint: config.superglueEndpoint,
-      apiKey: tokenRegistry.getToken(),
-      apiEndpoint: config.apiEndpoint,
-    });
-
-    // Subscribe to logs for this specific run
-    try {
-      const subscription = await client.subscribeToLogs({
-        traceId: runId,
-        onLog: (log) => {
-          setManualRunLogs((prev) => [...prev, { message: log.message, timestamp: log.timestamp }]);
-        },
-        includeDebug: true,
-      });
-      logSubscriptionRef.current = subscription;
-    } catch (e) {
-      console.warn("Could not subscribe to logs:", e);
-    }
-
-    // Parse payload - in playground mode prefer currentPayload prop, else use local editablePayload
-    let runPayload = tool.input?.payload || {};
-    try {
-      const payloadSource = isPlayground && currentPayload ? currentPayload : editablePayload;
-      if (payloadSource.trim()) {
-        runPayload = JSON.parse(payloadSource);
-      }
-    } catch {
-      // Keep original payload if parsing fails
-    }
-
-    try {
-      const result = await client.executeWorkflow({
-        tool: currentConfig,
-        payload: runPayload,
-        runId,
-        traceId: runId,
-      });
-
-      setRunResult({
-        success: result.success,
-        data: result.data,
-        error: result.error,
-      });
-
-      if (result.success) {
-        // Notify agent of success
-        onSystemMessage?.(
-          `[USER ACTION] Tool "${currentConfig.id}" executed successfully. Result: ${JSON.stringify(result.data).substring(0, 500)}`,
-          { triggerImmediateResponse: false },
-        );
-      } else {
-        // Notify agent of failure
-        onSystemMessage?.(
-          `[USER ACTION] Tool "${currentConfig.id}" execution failed. Error: ${result.error}`,
-          { triggerImmediateResponse: false },
-        );
-      }
-    } catch (error: any) {
-      setRunResult({
-        success: false,
-        error: error.message || "Execution failed",
-      });
-      // Notify agent of error
-      onSystemMessage?.(
-        `[USER ACTION] Tool "${currentConfig.id}" execution failed with error: ${error.message}`,
-        { triggerImmediateResponse: false },
-      );
-    } finally {
-      currentRunIdRef.current = null;
-      setIsRunning(false);
-      // Clean up log subscription
-      if (logSubscriptionRef.current) {
-        setTimeout(() => {
-          logSubscriptionRef.current?.unsubscribe();
-          logSubscriptionRef.current = null;
-        }, 500);
-      }
-    }
-  };
-
-  const handleToolSaved = (savedTool: any) => {
-    setCurrentConfig(savedTool);
-    setToolSaved(true);
-    refreshTools();
-    onSystemMessage?.(`[SYSTEM] Tool "${savedTool.id}" saved.`, {
-      triggerImmediateResponse: false,
-    });
-  };
-
-  // Running state (build/fix in progress, or run_tool executing)
-  const isToolRunning = tool.status === "running";
-  const isToolPending = tool.status === "pending";
-  const isAwaitingConfirmation = tool.status === "awaiting_confirmation" && mode === "fix";
-
-  const handleDiffApprovalComplete = useCallback(
-    (result: {
-      approved: boolean;
-      partial: boolean;
-      approvedDiffs: ToolDiff[];
-      rejectedDiffs: ToolDiff[];
+  // Unified tool execution function
+  const executeToolConfig = useCallback(
+    async (options: {
+      toolConfig: any;
+      appliedChangesCount?: number;
+      overridePayload?: Record<string, any>;
+      toolNameForFeedback: string;
+      toolIdForFeedback?: string;
     }) => {
-      if (!onToolUpdate || !onTriggerContinuation) return;
-
-      setHasActedOnDiffs(true);
-      onAbortStream?.();
-
-      // Apply only the approved diffs to the original config (partial application)
-      const originalConfig = parsedOutput?.originalConfig;
-      if (
-        (result.approved || result.partial) &&
-        result.approvedDiffs.length > 0 &&
-        originalConfig
-      ) {
-        const newConfig = applyDiffsToConfig(originalConfig, result.approvedDiffs);
-        setCurrentConfig(newConfig);
-        onApplyChanges?.(newConfig, result.approvedDiffs);
-      }
-
-      const confirmationState = result.approved
-        ? EDIT_TOOL_CONFIRMATION.APPROVED
-        : result.partial
-          ? EDIT_TOOL_CONFIRMATION.PARTIAL
-          : EDIT_TOOL_CONFIRMATION.REJECTED;
-
-      onToolUpdate(tool.id, {
-        output: JSON.stringify({
-          ...parsedOutput,
-          confirmationState,
-          approvedDiffs: result.approvedDiffs,
-          rejectedDiffs: result.rejectedDiffs,
-        }),
-        status: result.approved || result.partial ? "completed" : "declined",
-      });
-
-      setTimeout(() => {
-        onTriggerContinuation();
-      }, 100);
-    },
-    [onToolUpdate, onTriggerContinuation, onAbortStream, onApplyChanges, parsedOutput, tool.id],
-  );
-
-  // Handler for testing with approved diffs before final approval
-  const handleRunWithApprovedDiffs = useCallback(
-    async (approvedDiffs: ToolDiff[]) => {
-      const originalConfig = parsedOutput?.originalConfig;
-      if (!originalConfig || approvedDiffs.length === 0) return;
-
-      // Apply approved diffs to the original config to create test config
-      const testConfig = applyDiffsToConfig(originalConfig, approvedDiffs);
+      const {
+        toolConfig,
+        appliedChangesCount = 0,
+        overridePayload,
+        toolNameForFeedback,
+        toolIdForFeedback,
+      } = options;
 
       const runId = generateUUID();
       currentRunIdRef.current = runId;
       setIsRunning(true);
       setRunResult(null);
       setManualRunLogs([]);
-
-      onSystemMessage?.(
-        `[USER ACTION] User clicked "Test ${approvedDiffs.length} change${approvedDiffs.length !== 1 ? "s" : ""}" for tool "${testConfig.id}". Testing proposed changes before approval...`,
-        { triggerImmediateResponse: false },
-      );
 
       const client = new SuperglueClient({
         endpoint: config.superglueEndpoint,
@@ -364,20 +222,69 @@ export function ToolBuilderComponent({
         console.warn("Could not subscribe to logs:", e);
       }
 
-      // Parse payload - in playground mode prefer currentPayload prop, else use local editablePayload
-      let runPayload = tool.input?.payload || {};
-      try {
-        const payloadSource = isPlayground && currentPayload ? currentPayload : editablePayload;
-        if (payloadSource.trim()) {
-          runPayload = JSON.parse(payloadSource);
+      const cleanup = () => {
+        currentRunIdRef.current = null;
+        setIsRunning(false);
+        if (logSubscriptionRef.current) {
+          logSubscriptionRef.current.unsubscribe();
+          logSubscriptionRef.current = null;
         }
-      } catch {
-        // Keep original payload if parsing fails
+      };
+
+      const bufferFailure = (errorMsg: string) => {
+        if (bufferAction) {
+          bufferAction({
+            type: "tool_execution_feedback",
+            toolCallId: tool.id,
+            toolName: toolNameForFeedback,
+            feedback: "manual_run_failure",
+            data: {
+              toolId: toolIdForFeedback,
+              error: errorMsg,
+              appliedChanges: appliedChangesCount,
+            },
+          });
+        }
+      };
+
+      // Parse payload - in playground mode prefer the payload prop from tool input UI, else use the tool input payload
+      let runPayload = overridePayload || tool.input?.payload || {};
+      if (!overridePayload) {
+        try {
+          const payloadSource = isPlayground && currentPayload ? currentPayload : editablePayload;
+          if (payloadSource.trim()) {
+            runPayload = JSON.parse(payloadSource);
+          }
+        } catch {}
       }
 
+      // Validate file references
+      const validation = validateFileReferences(runPayload, filePayloads || {});
+      if (validation.valid === false) {
+        const errorMsg = `Missing files: ${validation.missingFiles.join(", ")}. ${validation.availableKeys.length > 0 ? `Available: ${validation.availableKeys.join(", ")}` : "No files uploaded in this session."}`;
+        setRunResult({ success: false, error: errorMsg });
+        cleanup();
+        bufferFailure(errorMsg);
+        return;
+      }
+
+      // Resolve file references
+      if (filePayloads && Object.keys(filePayloads).length > 0) {
+        try {
+          runPayload = resolveFileReferences(runPayload, filePayloads);
+        } catch (error: any) {
+          const errorMsg = error.message || "Failed to resolve file references";
+          setRunResult({ success: false, error: errorMsg });
+          cleanup();
+          bufferFailure(errorMsg);
+          return;
+        }
+      }
+
+      // Execute
       try {
         const result = await client.executeWorkflow({
-          tool: testConfig,
+          tool: toolConfig,
           payload: runPayload,
           runId,
           traceId: runId,
@@ -389,26 +296,32 @@ export function ToolBuilderComponent({
           error: result.error,
         });
 
-        if (result.success) {
-          onSystemMessage?.(
-            `[USER ACTION] Test run for tool "${testConfig.id}" succeeded. Changes can now be applied with confidence.`,
-            { triggerImmediateResponse: false },
-          );
-        } else {
-          onSystemMessage?.(
-            `[USER ACTION] Test run for tool "${testConfig.id}" failed. Error: ${result.error}. User may want to adjust their diff selections.`,
-            { triggerImmediateResponse: false },
-          );
+        if (bufferAction) {
+          const feedbackType = result.success ? "manual_run_success" : "manual_run_failure";
+          const truncatedResult =
+            result.data !== undefined ? JSON.stringify(result.data).substring(0, 500) : undefined;
+          const truncatedError =
+            result.error && result.error.length > 500
+              ? `${result.error.slice(0, 500)}...`
+              : result.error;
+
+          bufferAction({
+            type: "tool_execution_feedback",
+            toolCallId: tool.id,
+            toolName: toolNameForFeedback,
+            feedback: feedbackType,
+            data: {
+              toolId: toolIdForFeedback,
+              result: result.success ? truncatedResult : undefined,
+              error: truncatedError,
+              appliedChanges: appliedChangesCount,
+            },
+          });
         }
       } catch (error: any) {
-        setRunResult({
-          success: false,
-          error: error.message || "Execution failed",
-        });
-        onSystemMessage?.(
-          `[USER ACTION] Test run for tool "${testConfig.id}" failed with error: ${error.message}`,
-          { triggerImmediateResponse: false },
-        );
+        const errorMsg = error.message || "Execution failed";
+        setRunResult({ success: false, error: errorMsg });
+        bufferFailure(errorMsg);
       } finally {
         currentRunIdRef.current = null;
         setIsRunning(false);
@@ -421,14 +334,101 @@ export function ToolBuilderComponent({
       }
     },
     [
-      parsedOutput,
       config.superglueEndpoint,
+      config.apiEndpoint,
+      filePayloads,
       tool.input?.payload,
+      tool.id,
       editablePayload,
       isPlayground,
       currentPayload,
-      onSystemMessage,
+      bufferAction,
     ],
+  );
+
+  const handleRunTool = useCallback(() => {
+    if (!currentConfig) return;
+    executeToolConfig({
+      toolConfig: currentConfig,
+      toolNameForFeedback: currentConfig?.id || "draft",
+      toolIdForFeedback: currentConfig?.id,
+    });
+  }, [currentConfig, executeToolConfig]);
+
+  const handleToolSaved = (savedTool: any) => {
+    setCurrentConfig(savedTool);
+    setToolSaved(true);
+    refreshTools();
+  };
+
+  // Running state (build/fix in progress, or run_tool executing)
+  const isToolRunning = tool.status === "running";
+  const isToolPending = tool.status === "pending";
+  const isAwaitingConfirmation = tool.status === "awaiting_confirmation" && mode === "fix";
+
+  const handleDiffApprovalComplete = useCallback(
+    (result: {
+      approved: boolean;
+      partial: boolean;
+      approvedDiffs: ToolDiff[];
+      rejectedDiffs: ToolDiff[];
+    }) => {
+      if (!sendAgentRequest) return;
+
+      setHasActedOnDiffs(true);
+
+      const originalConfig = parsedOutput?.originalConfig;
+      if (
+        (result.approved || result.partial) &&
+        result.approvedDiffs.length > 0 &&
+        originalConfig
+      ) {
+        const newConfig = applyDiffsToConfig(originalConfig, result.approvedDiffs);
+        setCurrentConfig(newConfig);
+        onApplyChanges?.(newConfig, result.approvedDiffs);
+      }
+
+      const action = result.approved ? "confirmed" : result.partial ? "partial" : "declined";
+      onToolUpdate?.(tool.id, {
+        status: result.approved || result.partial ? "completed" : "declined",
+      });
+
+      sendAgentRequest(undefined, {
+        userActions: [
+          {
+            type: "tool_confirmation",
+            toolCallId: tool.id,
+            toolName: "edit_tool",
+            action,
+            data: {
+              appliedChanges: result.approvedDiffs,
+              rejectedChanges: result.rejectedDiffs,
+            },
+          },
+        ],
+      });
+    },
+    [sendAgentRequest, onApplyChanges, parsedOutput, tool.id, onToolUpdate],
+  );
+
+  // Handler for testing with approved diffs before final approval
+  const handleRunWithApprovedDiffs = useCallback(
+    (approvedDiffs: ToolDiff[], overridePayload?: Record<string, any>) => {
+      const originalConfig = parsedOutput?.originalConfig;
+      if (!originalConfig || approvedDiffs.length === 0) return;
+
+      const testConfig = applyDiffsToConfig(originalConfig, approvedDiffs);
+      const toolId = currentConfig?.id || originalConfig?.id;
+
+      executeToolConfig({
+        toolConfig: testConfig,
+        appliedChangesCount: approvedDiffs.length,
+        overridePayload,
+        toolNameForFeedback: toolId || "draft",
+        toolIdForFeedback: toolId,
+      });
+    },
+    [parsedOutput, currentConfig, executeToolConfig],
   );
 
   // Compute status override for manual runs (after build/fix is complete)
@@ -510,6 +510,7 @@ export function ToolBuilderComponent({
                   isRunning={isRunning}
                   testLogs={manualRunLogs}
                   testResult={runResult}
+                  initialPayload={editablePayload}
                 />
               </div>
             ) : (
@@ -598,7 +599,7 @@ export function ToolBuilderComponent({
               </div>
             )}
 
-            {mode === "build" && currentConfig && !isPlayground && (
+            {(mode === "build" || mode === "fix") && currentConfig && !isPlayground && (
               <div className="flex gap-2 flex-wrap">
                 {/* Run/Stop Tool button with payload dropdown */}
                 {isRunning ? (
@@ -615,7 +616,7 @@ export function ToolBuilderComponent({
                     <div className="flex">
                       <Button
                         variant={!runResult ? "default" : "outline"}
-                        onClick={handleRunTool}
+                        onClick={() => handleRunTool()}
                         className="h-9 px-3 text-sm font-medium rounded-r-none"
                       >
                         <Play className="w-4 h-4 mr-1.5" />
@@ -665,68 +666,37 @@ export function ToolBuilderComponent({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
+                {/* Save: default if run succeeded, outline otherwise */}
                 <Button
-                  variant="outline"
-                  onClick={() => setShowEditor(true)}
-                  disabled={isRunning}
+                  variant={runResult?.success ? "default" : "outline"}
+                  onClick={() => setShowSaveDialog(true)}
+                  disabled={isRunning || toolSaved}
                   className="h-9 px-3 text-sm font-medium hidden md:flex"
                 >
-                  <Edit2 className="w-4 h-4 mr-1.5" />
-                  Edit
+                  <Save className="w-4 h-4 mr-1.5" />
+                  {toolSaved ? "Saved" : "Save"}
                 </Button>
-                {/* Save: default if run succeeded, outline otherwise */}
-                {!toolSaved ? (
-                  <Button
-                    variant={runResult?.success ? "default" : "outline"}
-                    onClick={() => setShowSaveDialog(true)}
-                    disabled={isRunning}
-                    className="h-9 px-3 text-sm font-medium hidden md:flex"
-                  >
-                    <Save className="w-4 h-4 mr-1.5" />
-                    Save
-                  </Button>
-                ) : (
-                  <DeployButton
-                    tool={currentConfig}
-                    payload={tool.input?.payload || {}}
-                    disabled={isRunning}
-                    className="h-9 px-3 text-sm font-medium hidden md:flex"
-                  />
-                )}
                 {/* Request Fix: shown if run failed */}
                 {runResult && !runResult.success && !isRunning && !fixRequested && (
                   <Button
                     variant="default"
                     onClick={() => {
                       setFixRequested(true);
-                      const configSummary = currentConfig
-                        ? JSON.stringify(
-                            {
-                              id: currentConfig.id,
-                              instruction: currentConfig.instruction,
-                              steps: currentConfig.steps,
-                              responseSchema: currentConfig.responseSchema,
-                              systemIds: currentConfig.systemIds,
-                            },
-                            null,
-                            2,
-                          )
-                        : "unknown";
-                      const draftId = parsedOutput?.draftId;
-                      const idParam = draftId
-                        ? `draftId "${draftId}"`
-                        : `toolId "${currentConfig?.id}"`;
-                      const idInfo = draftId
-                        ? `Draft ID: ${draftId}`
-                        : `Tool ID: ${currentConfig?.id}`;
                       const truncatedError =
                         runResult.error && runResult.error.length > 500
                           ? `${runResult.error.slice(0, 500)}...`
                           : runResult.error;
-                      onSystemMessage?.(
-                        `[USER ACTION] User clicked "Request Fix" for tool "${currentConfig?.id}". The tool execution failed with error: ${truncatedError}\n\n${idInfo}\n\nCurrent tool configuration:\n${configSummary}\n\nPlease fix this tool using edit_tool with ${idParam}.`,
-                        { triggerImmediateResponse: true },
-                      );
+                      sendAgentRequest?.(undefined, {
+                        userActions: [
+                          {
+                            type: "tool_execution_feedback",
+                            toolCallId: tool.id,
+                            toolName: "run_tool",
+                            feedback: "request_fix",
+                            data: truncatedError,
+                          },
+                        ],
+                      });
                     }}
                     className="h-9 px-3 text-sm font-medium"
                   >
@@ -734,42 +704,6 @@ export function ToolBuilderComponent({
                     Request Fix
                   </Button>
                 )}
-              </div>
-            )}
-
-            {/* Editor Modal with inline agent sidebar */}
-            {showEditor && currentConfig && (
-              <div className="fixed left-0 lg:left-48 right-0 top-0 bottom-0 z-[100] bg-background dark:bg-neutral-940 flex flex-col animate-in zoom-in-95 duration-200 !mt-0">
-                <div className="flex-none px-6 pt-4 pb-2">
-                  <div className="flex items-center justify-end">
-                    <Button variant="ghost" size="icon" onClick={() => setShowEditor(false)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex-1 overflow-hidden px-6 pb-6">
-                  <ToolPlayground
-                    ref={editorRef}
-                    embedded
-                    renderAgentInline
-                    initialTool={currentConfig}
-                    initialPayload={JSON.stringify(tool.input?.payload || {})}
-                    initialInstruction={currentConfig?.instruction}
-                    initialError={runResult && !runResult.success ? runResult.error : undefined}
-                    onSave={async (wf) => {
-                      const client = new SuperglueClient({
-                        endpoint: config.superglueEndpoint,
-                        apiKey: tokenRegistry.getToken(),
-                        apiEndpoint: config.apiEndpoint,
-                      });
-                      const saved = await client.upsertWorkflow(wf.id, wf);
-                      setCurrentConfig(saved);
-                      setToolSaved(true);
-                      setShowEditor(false);
-                      refreshTools();
-                    }}
-                  />
-                </div>
               </div>
             )}
 

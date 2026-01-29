@@ -17,6 +17,8 @@ interface UseFileUploadOptions {
   onFilesChange?: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
   onPayloadTextUpdate?: (updater: (prev: string) => string) => void;
   onUserEdit?: () => void;
+  externalFiles?: UploadedFileInfo[];
+  externalPayloads?: Record<string, any>;
 }
 
 interface UseFileUploadReturn {
@@ -36,14 +38,21 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
     onFilesChange,
     onPayloadTextUpdate,
     onUserEdit,
+    externalFiles,
+    externalPayloads,
   } = options;
 
   const config = useConfig();
   const { toast } = useToast();
 
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileInfo[]>([]);
-  const [filePayloads, setFilePayloads] = useState<Record<string, any>>({});
+  const [localUploadedFiles, setLocalUploadedFiles] = useState<UploadedFileInfo[]>([]);
+  const [localFilePayloads, setLocalFilePayloads] = useState<Record<string, any>>({});
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const uploadedFiles = externalFiles ?? localUploadedFiles;
+  const filePayloads = externalPayloads ?? localFilePayloads;
+  const setUploadedFiles = setLocalUploadedFiles;
+  const setFilePayloads = setLocalFilePayloads;
 
   const totalFileSize = uploadedFiles.reduce((sum, f) => sum + (f.size || 0), 0);
 
@@ -131,9 +140,6 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
 
   const removeFile = useCallback(
     (key: string) => {
-      const fileToRemove = uploadedFiles.find((f) => f.key === key);
-      if (!fileToRemove) return;
-
       const newFiles = uploadedFiles.filter((f) => f.key !== key);
       const newPayloads = { ...filePayloads };
       delete newPayloads[key];

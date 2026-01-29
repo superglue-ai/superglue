@@ -1,4 +1,4 @@
-import { SuperglueClient } from "@superglue/shared";
+import { SuperglueClient, systems } from "@superglue/shared";
 import { OAuthState } from "@/src/lib/oauth-utils";
 import { resolveOAuthCertAndKey } from "@superglue/shared";
 import axios from "axios";
@@ -15,38 +15,100 @@ interface OAuthTokenResponse {
   expires_in?: number;
 }
 
+interface TokenExchangeConfig {
+  tokenAuthMethod?: "body" | "basic_auth";
+  tokenContentType?: "form" | "json";
+  extraHeaders?: Record<string, string>;
+}
+
+function getTokenExchangeConfig(
+  templateId?: string,
+  stateConfig?: TokenExchangeConfig,
+): TokenExchangeConfig {
+  // State config (from agent) takes priority over template config
+  const templateConfig: TokenExchangeConfig = {};
+  if (templateId) {
+    const template = systems[templateId];
+    if (template?.oauth) {
+      templateConfig.tokenAuthMethod = template.oauth.tokenAuthMethod;
+      templateConfig.tokenContentType = template.oauth.tokenContentType;
+      templateConfig.extraHeaders = template.oauth.extraHeaders;
+    }
+  }
+
+  return {
+    tokenAuthMethod: stateConfig?.tokenAuthMethod ?? templateConfig.tokenAuthMethod,
+    tokenContentType: stateConfig?.tokenContentType ?? templateConfig.tokenContentType,
+    extraHeaders: stateConfig?.extraHeaders ?? templateConfig.extraHeaders,
+  };
+}
+
 async function exchangeCodeForToken(
   code: string,
   tokenUrl: string,
   clientId: string,
   clientSecret: string,
   redirectUri: string,
-  state?: string,
+  config: TokenExchangeConfig = {},
+  codeVerifier?: string,
 ): Promise<OAuthTokenResponse> {
-  if (!clientId || !clientSecret) {
+  if (!clientId || (!clientSecret && !codeVerifier)) {
     throw new Error(
       "[OAUTH_STAGE:TOKEN_EXCHANGE] OAuth client credentials not configured for authorization code flow",
     );
   }
 
+  const useBasicAuth = config.tokenAuthMethod === "basic_auth";
+  const useJson = config.tokenContentType === "json";
+
+  const headers: Record<string, string> = {
+    "Content-Type": useJson ? "application/json" : "application/x-www-form-urlencoded",
+    Accept: "application/json",
+    ...config.extraHeaders,
+  };
+
+  if (useBasicAuth && clientSecret) {
+    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+    headers["Authorization"] = `Basic ${basicAuth}`;
+  }
+
   try {
-    const response = await axios.post(
-      tokenUrl,
-      new URLSearchParams({
+    let body: string | URLSearchParams;
+    if (useJson) {
+      const jsonBody: Record<string, string> = {
         grant_type: "authorization_code",
         code,
-        client_id: clientId,
-        client_secret: clientSecret,
         redirect_uri: redirectUri,
-        ...(state ? { state } : {}),
-      }),
-      {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json",
-        },
-      },
-    );
+      };
+      // Only include credentials in body if not using basic auth
+      if (!useBasicAuth) {
+        jsonBody.client_id = clientId;
+        if (clientSecret) jsonBody.client_secret = clientSecret;
+      }
+      // Add PKCE code_verifier if present
+      if (codeVerifier) {
+        jsonBody.code_verifier = codeVerifier;
+      }
+      body = JSON.stringify(jsonBody);
+    } else {
+      const formParams: Record<string, string> = {
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri,
+      };
+      // Only include credentials in body if not using basic auth
+      if (!useBasicAuth) {
+        formParams.client_id = clientId;
+        if (clientSecret) formParams.client_secret = clientSecret;
+      }
+      // Add PKCE code_verifier if present
+      if (codeVerifier) {
+        formParams.code_verifier = codeVerifier;
+      }
+      body = new URLSearchParams(formParams);
+    }
+
+    const response = await axios.post(tokenUrl, body, { headers });
 
     return response.data;
   } catch (error) {
@@ -294,8 +356,28 @@ export async function GET(request: NextRequest) {
 
     const endpoint = process.env.GRAPHQL_ENDPOINT;
 
-    // Get API key from cookie (set during OAuth init)
-    const apiKey = request.cookies.get("api_key")?.value;
+    // Get OAuth session from cookie (set during OAuth init)
+    const oauthSessionCookie = request.cookies.get("oauth_session")?.value;
+    // Fallback to legacy api_key cookie for backwards compatibility
+    const legacyApiKey = request.cookies.get("api_key")?.value;
+
+    let apiKey: string | undefined;
+    let codeVerifier: string | undefined;
+
+    if (oauthSessionCookie) {
+      try {
+        const sessionData = JSON.parse(oauthSessionCookie);
+        apiKey = sessionData.apiKey;
+        codeVerifier = sessionData.codeVerifier;
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
+
+    // Fallback to legacy cookie
+    if (!apiKey && legacyApiKey) {
+      apiKey = legacyApiKey;
+    }
 
     if (!apiKey) {
       throw new Error(
@@ -346,7 +428,17 @@ export async function GET(request: NextRequest) {
         keyContent,
         scopes,
       );
-    } else {
+    }
+
+    // Get token exchange config - state config (from agent) takes priority over template
+    const stateTokenConfig: TokenExchangeConfig = {
+      tokenAuthMethod: stateData.tokenAuthMethod,
+      tokenContentType: stateData.tokenContentType,
+      extraHeaders: stateData.extraHeaders,
+    };
+    const tokenConfig = getTokenExchangeConfig(templateId, stateTokenConfig);
+
+    if (grantTypeParam !== "client_credentials") {
       const redirectUri = stateData.redirectUri || `${origin}/api/auth/callback`;
       tokenData = await exchangeCodeForToken(
         code as string,
@@ -354,7 +446,8 @@ export async function GET(request: NextRequest) {
         resolved.client_id,
         resolved.client_secret,
         redirectUri,
-        state,
+        tokenConfig,
+        codeVerifier,
       );
     }
 
@@ -388,6 +481,9 @@ export async function GET(request: NextRequest) {
         (additionalFields.expires_in
           ? new Date(Date.now() + additionalFields.expires_in * 1000).toISOString()
           : undefined),
+      ...(tokenConfig.tokenAuthMethod && { tokenAuthMethod: tokenConfig.tokenAuthMethod }),
+      ...(tokenConfig.tokenContentType && { tokenContentType: tokenConfig.tokenContentType }),
+      ...(tokenConfig.extraHeaders && { extraHeaders: JSON.stringify(tokenConfig.extraHeaders) }),
     };
 
     if (grantTypeParam === "client_credentials") {
@@ -397,8 +493,8 @@ export async function GET(request: NextRequest) {
         message: "OAuth connection completed successfully!",
         tokens,
       });
-      // Clear cookie
-      response.cookies.delete("api_key");
+      response.cookies.delete({ name: "oauth_session", path: "/api/auth/callback" });
+      response.cookies.delete("api_key"); // Legacy cleanup
       return response;
     } else {
       const html = createOAuthCallbackHTML(
@@ -410,8 +506,8 @@ export async function GET(request: NextRequest) {
         suppressErrorUI,
       );
       const response = new NextResponse(html, { headers: { "Content-Type": "text/html" } });
-      // Clear cookie
-      response.cookies.delete("api_key");
+      response.cookies.delete({ name: "oauth_session", path: "/api/auth/callback" });
+      response.cookies.delete("api_key"); // Legacy cleanup
       return response;
     }
   } catch (error) {
@@ -442,8 +538,9 @@ export async function GET(request: NextRequest) {
         },
         { status: 400 },
       );
-      // Clear cookie on error too
-      response.cookies.delete("api_key");
+      // Clear cookie on error too - must specify same path it was set with
+      response.cookies.delete({ name: "oauth_session", path: "/api/auth/callback" });
+      response.cookies.delete("api_key"); // Legacy cleanup
       return response;
     } else {
       const html = createOAuthCallbackHTML(
@@ -455,8 +552,9 @@ export async function GET(request: NextRequest) {
         suppressErrorUI,
       );
       const response = new NextResponse(html, { headers: { "Content-Type": "text/html" } });
-      // Clear cookie on error too
-      response.cookies.delete("api_key");
+      // Clear cookie on error too - must specify same path it was set with
+      response.cookies.delete({ name: "oauth_session", path: "/api/auth/callback" });
+      response.cookies.delete("api_key"); // Legacy cleanup
       return response;
     }
   }

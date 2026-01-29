@@ -49,6 +49,26 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Safe JSON.stringify that handles circular references, BigInt, and other edge cases.
+ * Falls back to String(obj) on error.
+ */
+export function safeStringify(obj: any, indent?: number): string {
+  try {
+    return JSON.stringify(
+      obj,
+      (_, value) => {
+        if (typeof value === "bigint") return value.toString();
+        if (typeof value === "function") return "[Function]";
+        return value;
+      },
+      indent,
+    );
+  } catch {
+    return String(obj);
+  }
+}
+
 export function composeUrl(host: string, path: string | undefined) {
   if (!host && !path) return "";
   // Handle empty/undefined inputs
@@ -431,6 +451,19 @@ export function isAbortError(errorMessage: string | undefined): boolean {
   if (!errorMessage) return false;
   const lower = errorMessage.toLowerCase();
   return lower.includes("abort") || lower.includes("terminated") || lower.includes("cancelled");
+}
+
+export function formatDurationShort(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 3600000) {
+    const mins = Math.floor(ms / 60000);
+    const secs = Math.round((ms % 60000) / 1000);
+    return `${mins}m ${secs}s`;
+  }
+  const hours = Math.floor(ms / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  return `${hours}h ${mins}m`;
 }
 
 export const handleCopyCode = async (code: string): Promise<boolean> => {

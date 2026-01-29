@@ -1,4 +1,12 @@
-import { ApiConfig, HttpMethod, System, Run, RunStatus, Tool } from "@superglue/shared";
+import {
+  ApiConfig,
+  HttpMethod,
+  RequestSource,
+  System,
+  Run,
+  RunStatus,
+  Tool,
+} from "@superglue/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryStore } from "./memory.js";
 import { ToolScheduleInternal } from "./types.js";
@@ -59,67 +67,68 @@ describe("MemoryStore", () => {
     };
 
     const testRun: Run = {
-      id: "test-run-id",
+      runId: "test-run-id",
       toolId: "test-api-id",
-      orgId: testOrgId,
       status: RunStatus.SUCCESS,
-      startedAt: new Date(),
-      completedAt: new Date(),
-      toolConfig: testApiConfig as any,
+      metadata: {
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+      },
+      tool: testApiConfig as any,
       error: undefined,
     };
 
     it("should store and retrieve runs", async () => {
-      await store.createRun({ run: testRun });
-      const retrieved = await store.getRun({ id: testRun.id, orgId: testOrgId });
+      await store.createRun({ run: testRun, orgId: testOrgId });
+      const retrieved = await store.getRun({ id: testRun.runId, orgId: testOrgId });
       expect(retrieved).toEqual(testRun);
     });
 
     it("should list runs in chronological order", async () => {
       const run1: Run = {
         ...testRun,
-        id: "run1",
-        startedAt: new Date(Date.now() - 1000),
+        runId: "run1",
+        metadata: { startedAt: new Date(Date.now() - 1000).toISOString() },
       };
       const run2: Run = {
         ...testRun,
-        id: "run2",
-        startedAt: new Date(),
+        runId: "run2",
+        metadata: { startedAt: new Date().toISOString() },
       };
 
-      await store.createRun({ run: run1 });
-      await store.createRun({ run: run2 });
+      await store.createRun({ run: run1, orgId: testOrgId });
+      await store.createRun({ run: run2, orgId: testOrgId });
 
       const { items, total } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
       expect(items).toHaveLength(2);
       expect(total).toBe(2);
-      expect(items[0].id).toBe(run2.id); // Most recent first
-      expect(items[1].id).toBe(run1.id);
+      expect(items[0].runId).toBe(run2.runId); // Most recent first
+      expect(items[1].runId).toBe(run1.runId);
     });
 
     it("should list runs filtered by config ID", async () => {
       const run1 = {
         ...testRun,
-        id: "run1",
+        runId: "run1",
         toolId: "config1",
-        toolConfig: { ...testRun.toolConfig, id: "config1" },
+        tool: { ...testRun.tool, id: "config1" },
       };
       const run2 = {
         ...testRun,
-        id: "run2",
+        runId: "run2",
         toolId: "config2",
-        toolConfig: { ...testRun.toolConfig, id: "config2" },
+        tool: { ...testRun.tool, id: "config2" },
       };
       const run3 = {
         ...testRun,
-        id: "run3",
+        runId: "run3",
         toolId: "config1",
-        toolConfig: { ...testRun.toolConfig, id: "config1" },
+        tool: { ...testRun.tool, id: "config1" },
       };
 
-      await store.createRun({ run: run1 });
-      await store.createRun({ run: run2 });
-      await store.createRun({ run: run3 });
+      await store.createRun({ run: run1, orgId: testOrgId });
+      await store.createRun({ run: run2, orgId: testOrgId });
+      await store.createRun({ run: run3, orgId: testOrgId });
 
       const { items, total } = await store.listRuns({
         limit: 10,
@@ -129,25 +138,138 @@ describe("MemoryStore", () => {
       });
       expect(items.length).toBe(2);
       expect(total).toBe(2);
-      expect(items.map((run) => run.id).sort()).toEqual(["run1", "run3"]);
+      expect(items.map((run) => run.runId).sort()).toEqual(["run1", "run3"]);
+    });
+
+    it("should list runs filtered by status", async () => {
+      const run1: Run = { ...testRun, runId: "run1", status: RunStatus.SUCCESS };
+      const run2: Run = { ...testRun, runId: "run2", status: RunStatus.FAILED };
+      const run3: Run = { ...testRun, runId: "run3", status: RunStatus.SUCCESS };
+      const run4: Run = { ...testRun, runId: "run4", status: RunStatus.RUNNING };
+
+      await store.createRun({ run: run1, orgId: testOrgId });
+      await store.createRun({ run: run2, orgId: testOrgId });
+      await store.createRun({ run: run3, orgId: testOrgId });
+      await store.createRun({ run: run4, orgId: testOrgId });
+
+      const { items: successItems, total: successTotal } = await store.listRuns({
+        limit: 10,
+        offset: 0,
+        status: RunStatus.SUCCESS,
+        orgId: testOrgId,
+      });
+      expect(successItems.length).toBe(2);
+      expect(successTotal).toBe(2);
+      expect(successItems.map((run) => run.runId).sort()).toEqual(["run1", "run3"]);
+
+      const { items: failedItems, total: failedTotal } = await store.listRuns({
+        limit: 10,
+        offset: 0,
+        status: RunStatus.FAILED,
+        orgId: testOrgId,
+      });
+      expect(failedItems.length).toBe(1);
+      expect(failedTotal).toBe(1);
+      expect(failedItems[0].runId).toBe("run2");
+    });
+
+    it("should list runs filtered by requestSource", async () => {
+      const run1: Run = { ...testRun, runId: "run1", requestSource: RequestSource.API };
+      const run2: Run = { ...testRun, runId: "run2", requestSource: RequestSource.WEBHOOK };
+      const run3: Run = { ...testRun, runId: "run3", requestSource: RequestSource.API };
+      const run4: Run = { ...testRun, runId: "run4", requestSource: RequestSource.SCHEDULER };
+
+      await store.createRun({ run: run1, orgId: testOrgId });
+      await store.createRun({ run: run2, orgId: testOrgId });
+      await store.createRun({ run: run3, orgId: testOrgId });
+      await store.createRun({ run: run4, orgId: testOrgId });
+
+      const { items: apiItems, total: apiTotal } = await store.listRuns({
+        limit: 10,
+        offset: 0,
+        requestSources: [RequestSource.API],
+        orgId: testOrgId,
+      });
+      expect(apiItems.length).toBe(2);
+      expect(apiTotal).toBe(2);
+      expect(apiItems.map((run) => run.runId).sort()).toEqual(["run1", "run3"]);
+
+      const { items: webhookItems, total: webhookTotal } = await store.listRuns({
+        limit: 10,
+        offset: 0,
+        requestSources: [RequestSource.WEBHOOK],
+        orgId: testOrgId,
+      });
+      expect(webhookItems.length).toBe(1);
+      expect(webhookTotal).toBe(1);
+      expect(webhookItems[0].runId).toBe("run2");
+    });
+
+    it("should list runs filtered by multiple criteria", async () => {
+      const run1: Run = {
+        ...testRun,
+        runId: "run1",
+        toolId: "tool1",
+        status: RunStatus.SUCCESS,
+        requestSource: RequestSource.API,
+      };
+      const run2: Run = {
+        ...testRun,
+        runId: "run2",
+        toolId: "tool1",
+        status: RunStatus.FAILED,
+        requestSource: RequestSource.API,
+      };
+      const run3: Run = {
+        ...testRun,
+        runId: "run3",
+        toolId: "tool1",
+        status: RunStatus.SUCCESS,
+        requestSource: RequestSource.WEBHOOK,
+      };
+      const run4: Run = {
+        ...testRun,
+        runId: "run4",
+        toolId: "tool2",
+        status: RunStatus.SUCCESS,
+        requestSource: RequestSource.API,
+      };
+
+      await store.createRun({ run: run1, orgId: testOrgId });
+      await store.createRun({ run: run2, orgId: testOrgId });
+      await store.createRun({ run: run3, orgId: testOrgId });
+      await store.createRun({ run: run4, orgId: testOrgId });
+
+      // Filter by toolId + status + requestSources
+      const { items, total } = await store.listRuns({
+        limit: 10,
+        offset: 0,
+        configId: "tool1",
+        status: RunStatus.SUCCESS,
+        requestSources: [RequestSource.API],
+        orgId: testOrgId,
+      });
+      expect(items.length).toBe(1);
+      expect(total).toBe(1);
+      expect(items[0].runId).toBe("run1");
     });
 
     it("should handle listing runs when configs have missing IDs", async () => {
       const runWithoutConfigId = {
         ...testRun,
-        id: "run1",
+        runId: "run1",
         toolId: undefined,
-        toolConfig: { ...testRun.toolConfig, id: undefined },
+        tool: { ...testRun.tool, id: undefined },
       };
       const runWithConfigId = {
         ...testRun,
-        id: "run2",
+        runId: "run2",
         toolId: "config1",
-        toolConfig: { ...testRun.toolConfig, id: "config1" },
+        tool: { ...testRun.tool, id: "config1" },
       };
 
-      await store.createRun({ run: runWithoutConfigId });
-      await store.createRun({ run: runWithConfigId });
+      await store.createRun({ run: runWithoutConfigId, orgId: testOrgId });
+      await store.createRun({ run: runWithConfigId, orgId: testOrgId });
 
       const { items: filteredItems } = await store.listRuns({
         limit: 10,
@@ -156,7 +278,7 @@ describe("MemoryStore", () => {
         orgId: testOrgId,
       });
       expect(filteredItems.length).toBe(1);
-      expect(filteredItems[0].id).toBe("run2");
+      expect(filteredItems[0].runId).toBe("run2");
 
       const { items: allItems } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
       expect(allItems.length).toBe(2);
@@ -164,13 +286,21 @@ describe("MemoryStore", () => {
 
     it("should filter out corrupted runs and continue listing valid ones", async () => {
       // Create a valid run
-      const validRun = { ...testRun, id: "valid-run" };
-      await store.createRun({ run: validRun });
+      const validRun = { ...testRun, runId: "valid-run" };
+      await store.createRun({ run: validRun, orgId: testOrgId });
 
       // Manually insert corrupted runs into storage to simulate corruption
-      const corruptedRun1 = { id: "corrupted-run-1", config: null, startedAt: null };
-      const corruptedRun2 = { id: "corrupted-run-2", config: { id: "config-id" }, startedAt: null };
-      const corruptedRun3 = { id: "corrupted-run-3", config: null, startedAt: new Date() };
+      const corruptedRun1 = { runId: "corrupted-run-1", config: null, metadata: null };
+      const corruptedRun2 = {
+        runId: "corrupted-run-2",
+        config: { id: "config-id" },
+        metadata: null,
+      };
+      const corruptedRun3 = {
+        runId: "corrupted-run-3",
+        config: null,
+        metadata: { startedAt: new Date().toISOString() },
+      };
 
       const key1 = store["getKey"]("run", "corrupted-run-1", testOrgId);
       const key2 = store["getKey"]("run", "corrupted-run-2", testOrgId);
@@ -190,25 +320,28 @@ describe("MemoryStore", () => {
 
       const { items, total } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
 
-      expect(items.length).toBe(4);
-      expect(total).toBe(4);
+      // Should only return runs with valid metadata.startedAt (validRun + corruptedRun3)
+      expect(items.length).toBe(2);
+      expect(total).toBe(2);
     });
 
     it("should handle runs with missing startedAt dates", async () => {
       const runWithoutStartedAt = {
         ...testRun,
-        id: "run-no-started-at",
-        startedAt: undefined,
+        runId: "run-no-started-at",
+        metadata: { startedAt: undefined as any },
       };
-      const validRun = { ...testRun, id: "valid-run" };
+      const validRun = { ...testRun, runId: "valid-run" };
 
-      await store.createRun({ run: runWithoutStartedAt });
-      await store.createRun({ run: validRun });
+      await store.createRun({ run: runWithoutStartedAt, orgId: testOrgId });
+      await store.createRun({ run: validRun, orgId: testOrgId });
 
       const { items, total } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
 
-      expect(items.length).toBe(2);
-      expect(total).toBe(2);
+      // Runs without startedAt are filtered out
+      expect(items.length).toBe(1);
+      expect(total).toBe(1);
+      expect(items[0].runId).toBe("valid-run");
     });
   });
 
@@ -547,13 +680,14 @@ describe("MemoryStore", () => {
       };
 
       const testRunResult: Run = {
-        id: "test-run",
+        runId: "test-run",
         toolId: "test-api-id",
-        orgId: testOrgId,
         status: RunStatus.SUCCESS,
-        startedAt: new Date(),
-        completedAt: new Date(),
-        toolConfig: testApiConfig as any,
+        metadata: {
+          startedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+        },
+        tool: testApiConfig as any,
         error: undefined,
       };
 
@@ -591,7 +725,7 @@ describe("MemoryStore", () => {
       };
 
       await store.upsertApiConfig({ id: "test-api", config: testApiConfig });
-      await store.createRun({ run: testRunResult });
+      await store.createRun({ run: testRunResult, orgId: testOrgId });
       await store.upsertSystem({ id: testSystem.id, system: testSystem });
       await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
       await store.upsertToolSchedule({ schedule: testWorkflowSchedule });

@@ -1,12 +1,16 @@
 "use client";
 import { Button } from "@/src/components/ui/button";
 import { FileChip } from "@/src/components/ui/FileChip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
 import { Textarea } from "@/src/components/ui/textarea";
 import { cn, handleCopyCode } from "@/src/lib/general-utils";
+import { formatBytes } from "@/src/lib/file-utils";
+import { UserAction } from "@/src/lib/agent/agent-types";
 import { ALLOWED_FILE_EXTENSIONS, Message, ToolCall } from "@superglue/shared";
 import {
   AlertTriangle,
   BotMessageSquare,
+  ChevronUp,
   Edit2,
   Loader2,
   Paperclip,
@@ -16,12 +20,18 @@ import {
   User,
   X,
 } from "lucide-react";
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { AgentContextProvider, useAgentContext } from "./AgentContextProvider";
 import { ConversationHistory } from "./ConversationHistory";
-import { ScrollToBottomButton, ScrollToBottomContainer } from "./hooks/use-scroll-to-bottom";
+import {
+  ScrollToBottomButton,
+  ScrollToBottomContainer,
+  ScrollToBottomTrigger,
+  ScrollToBottomTriggerRef,
+} from "./hooks/use-scroll-to-bottom";
 import { ToolCallComponent } from "./ToolCallComponent";
+import { BackgroundToolGroup, groupMessageParts } from "./tool-components";
 import { AgentWelcome } from "./welcome/AgentWelcome";
 
 const MAX_MESSAGE_LENGTH = 50000;
@@ -30,10 +40,9 @@ const MemoMessage = React.memo(
   ({
     message,
     onInputChange,
-    onOAuthComplete,
     onToolUpdate,
-    onSystemMessage,
-    onTriggerContinuation,
+    sendAgentRequest,
+    bufferAction,
     onAbortStream,
     editingMessageId,
     editingContent,
@@ -43,13 +52,16 @@ const MemoMessage = React.memo(
     handleEditMessage,
     handleSaveEdit,
     handleCancelEdit,
+    filePayloads,
   }: {
     message: Message;
     onInputChange: (newInput: any) => void;
-    onOAuthComplete?: (toolCallId: string, systemData: any) => void;
     onToolUpdate: (toolCallId: string, updates: Partial<ToolCall>) => void;
-    onSystemMessage?: (message: string, options?: { triggerImmediateResponse?: boolean }) => void;
-    onTriggerContinuation?: () => void;
+    sendAgentRequest?: (
+      userMessage?: string,
+      options?: { userActions?: UserAction[] },
+    ) => Promise<void>;
+    bufferAction?: (action: UserAction) => void;
     onAbortStream?: () => void;
     editingMessageId: string | null;
     editingContent: string;
@@ -59,6 +71,7 @@ const MemoMessage = React.memo(
     handleEditMessage: (messageId: string, content: string) => void;
     handleSaveEdit: (messageId: string) => void;
     handleCancelEdit: () => void;
+    filePayloads?: Record<string, any>;
   }) => {
     return (
       <div key={message.id} className={cn("flex gap-4 p-2 pt-4 rounded-xl group min-h-16")}>
@@ -108,20 +121,17 @@ const MemoMessage = React.memo(
           {message.role === "user" &&
             (message as any).attachedFiles &&
             (message as any).attachedFiles.length > 0 && (
-              <div className="space-y-1.5 mb-2">
-                <span className="text-xs text-muted-foreground">Files included:</span>
-                <div className="flex flex-wrap gap-2">
-                  {(message as any).attachedFiles.map((file: any) => (
-                    <FileChip
-                      key={file.key}
-                      file={file}
-                      size="compact"
-                      rounded="md"
-                      showOriginalName={true}
-                      maxWidth="250px"
-                    />
-                  ))}
-                </div>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {(message as any).attachedFiles.map((file: any) => (
+                  <FileChip
+                    key={file.key}
+                    file={file}
+                    size="compact"
+                    rounded="md"
+                    showOriginalName={true}
+                    maxWidth="250px"
+                  />
+                ))}
               </div>
             )}
 
@@ -130,7 +140,7 @@ const MemoMessage = React.memo(
               <Textarea
                 value={editingContent}
                 onChange={(e) => setEditingContent(e.target.value)}
-                className="min-h-[48px] max-h-[120px] resize-none text-base leading-relaxed"
+                className="min-h-[48px] max-h-[120px] resize-none text-base leading-relaxed focus-visible:ring-0 focus-visible:border-ring"
                 placeholder="Edit your message..."
                 autoFocus
               />
@@ -151,30 +161,37 @@ const MemoMessage = React.memo(
           ) : (
             <div className="space-y-3 message-content-wrapper break-words">
               {message.parts && message.parts.length > 0 ? (
-                message.parts.map((part) =>
-                  part.type === "content" ? (
-                    <div
-                      key={part.id}
-                      className={cn(
-                        "prose prose-sm max-w-none dark:prose-invert",
-                        message.isStreaming && "streaming-message streaming-active",
-                      )}
-                    >
-                      <Streamdown>{part.content || ""}</Streamdown>
-                    </div>
-                  ) : part.type === "tool" && part.tool ? (
-                    <ToolCallComponent
-                      key={part.id}
-                      tool={part.tool}
-                      onInputChange={onInputChange}
-                      onOAuthComplete={onOAuthComplete}
-                      onToolUpdate={onToolUpdate}
-                      onSystemMessage={onSystemMessage}
-                      onTriggerContinuation={onTriggerContinuation}
-                      onAbortStream={onAbortStream}
-                    />
-                  ) : null,
-                )
+                groupMessageParts(message.parts).map((grouped, idx) => {
+                  if (grouped.type === "content") {
+                    return (
+                      <div
+                        key={grouped.part.id}
+                        className={cn(
+                          "prose prose-sm max-w-none dark:prose-invert",
+                          message.isStreaming && "streaming-message streaming-active",
+                        )}
+                      >
+                        <Streamdown>{grouped.part.content || ""}</Streamdown>
+                      </div>
+                    );
+                  } else if (grouped.type === "background_tools") {
+                    return <BackgroundToolGroup key={`bg-${idx}`} tools={grouped.tools} />;
+                  } else if (grouped.type === "tool" && grouped.part.tool) {
+                    return (
+                      <ToolCallComponent
+                        key={grouped.part.id}
+                        tool={grouped.part.tool}
+                        onInputChange={onInputChange}
+                        onToolUpdate={onToolUpdate}
+                        sendAgentRequest={sendAgentRequest}
+                        bufferAction={bufferAction}
+                        onAbortStream={onAbortStream}
+                        filePayloads={filePayloads}
+                      />
+                    );
+                  }
+                  return null;
+                })
               ) : (
                 <>
                   <div
@@ -192,11 +209,11 @@ const MemoMessage = React.memo(
                           key={tool.id}
                           tool={tool}
                           onInputChange={onInputChange}
-                          onOAuthComplete={onOAuthComplete}
                           onToolUpdate={onToolUpdate}
-                          onSystemMessage={onSystemMessage}
-                          onTriggerContinuation={onTriggerContinuation}
+                          sendAgentRequest={sendAgentRequest}
+                          bufferAction={bufferAction}
                           onAbortStream={onAbortStream}
+                          filePayloads={filePayloads}
                         />
                       ))}
                     </div>
@@ -212,12 +229,12 @@ const MemoMessage = React.memo(
 );
 
 interface AgentInterfaceProps {
-  discoveryPrompts?: { userPrompt: string; systemPrompt: string } | null;
+  initialPrompts?: { userPrompt: string; systemPrompt: string } | null;
 }
 
-export function AgentInterface({ discoveryPrompts }: AgentInterfaceProps = {}) {
+export function AgentInterface({ initialPrompts }: AgentInterfaceProps = {}) {
   return (
-    <AgentContextProvider discoveryPrompts={discoveryPrompts}>
+    <AgentContextProvider initialPrompts={initialPrompts}>
       <AgentInterfaceContent />
     </AgentContextProvider>
   );
@@ -236,16 +253,18 @@ function AgentInterfaceContent() {
     stopStreaming,
     handleToolInputChange,
     handleToolUpdate,
-    handleOAuthCompletion,
-    addSystemMessage,
-    triggerStreamContinuation,
+    sendAgentRequest,
+    bufferAction,
     abortStream,
-    uploadedFiles,
+    pendingFiles,
+    sessionFiles,
+    filePayloads,
     isProcessingFiles,
     isDragging,
     fileInputRef,
     handleFilesUpload,
-    handleFileRemove,
+    handlePendingFileRemove,
+    handleSessionFileRemove,
     handleDrop,
     handleDragOver,
     handleDragLeave,
@@ -254,7 +273,7 @@ function AgentInterfaceContent() {
     loadConversation,
     startNewConversation,
     handleSendMessage,
-    startExamplePrompt,
+    startTemplatePrompt,
     welcomeRef,
   } = useAgentContext();
 
@@ -262,6 +281,7 @@ function AgentInterfaceContent() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
+  const scrollTriggerRef = useRef<ScrollToBottomTriggerRef>(null);
 
   const isAnyMessageStreaming = useMemo(() => messages.some((m) => m.isStreaming), [messages]);
 
@@ -363,6 +383,7 @@ function AgentInterfaceContent() {
     if (!input.trim() || input.length > MAX_MESSAGE_LENGTH) return;
     const content = input;
     setInput("");
+    scrollTriggerRef.current?.scrollToBottom();
     await handleSendMessage(content);
   }, [input, handleSendMessage]);
 
@@ -414,7 +435,7 @@ function AgentInterfaceContent() {
         <div className="space-y-2 pb-4 mx-auto max-w-7xl" data-chat-messages>
           {messages.length === 0 ? (
             <div className="w-full">
-              <AgentWelcome onStartPrompt={startExamplePrompt} ref={welcomeRef} />
+              <AgentWelcome onStartPrompt={startTemplatePrompt} ref={welcomeRef} />
             </div>
           ) : (
             <>
@@ -425,10 +446,9 @@ function AgentInterfaceContent() {
                     key={m.id}
                     message={m}
                     onInputChange={handleToolInputChange}
-                    onOAuthComplete={handleOAuthCompletion}
                     onToolUpdate={handleToolUpdate}
-                    onSystemMessage={addSystemMessage}
-                    onTriggerContinuation={triggerStreamContinuation}
+                    sendAgentRequest={sendAgentRequest}
+                    bufferAction={bufferAction}
                     onAbortStream={abortStream}
                     editingMessageId={editingMessageId}
                     editingContent={editingContent}
@@ -438,11 +458,13 @@ function AgentInterfaceContent() {
                     handleEditMessage={handleEditMessage}
                     handleSaveEdit={handleSaveEdit}
                     handleCancelEdit={handleCancelEdit}
+                    filePayloads={filePayloads}
                   />
                 ))}
             </>
           )}
         </div>
+        <ScrollToBottomTrigger ref={scrollTriggerRef} />
         <ScrollToBottomButton />
       </ScrollToBottomContainer>
 
@@ -464,13 +486,13 @@ function AgentInterfaceContent() {
                 </div>
               )}
 
-              {uploadedFiles.length > 0 && (
+              {pendingFiles.length > 0 && (
                 <div className="flex flex-wrap gap-2 px-4 pt-3">
-                  {uploadedFiles.map((file) => (
+                  {pendingFiles.map((file) => (
                     <FileChip
                       key={file.key}
                       file={file}
-                      onRemove={handleFileRemove}
+                      onRemove={handlePendingFileRemove}
                       size="compact"
                       rounded="md"
                       showOriginalName={true}
@@ -505,15 +527,65 @@ function AgentInterfaceContent() {
                 />
 
                 <div className="absolute right-3 bottom-3 flex items-end gap-1.5">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-9 w-9 p-0 rounded-xl hover:bg-muted/90 bg-muted dark:bg-neutral-800 border-2 border-border dark:border-white/30 shadow-sm"
-                    onClick={() => (fileInputRef.current as any)?.click()}
-                    disabled={isProcessingFiles}
+                  <div
+                    className={cn(
+                      "flex items-center rounded-xl overflow-hidden",
+                      sessionFiles.length > 0
+                        ? "border border-border/40 dark:border-white/10"
+                        : "border border-border/60 dark:border-white/20",
+                    )}
                   >
-                    <Paperclip className="w-5 h-5" />
-                  </Button>
+                    {sessionFiles.length > 0 && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="h-9 px-1.5 flex items-center justify-center hover:bg-muted bg-muted/80 dark:bg-neutral-800/80 dark:hover:bg-neutral-800 text-muted-foreground hover:text-foreground transition-colors border-r border-border/30 dark:border-white/10 gap-1">
+                            <span className="min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-medium bg-primary text-primary-foreground rounded-full">
+                              {sessionFiles.length}
+                            </span>
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-auto min-w-[250px] max-w-[250px] p-2"
+                          align="end"
+                          side="top"
+                          sideOffset={8}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-muted-foreground">
+                              Session Files ({sessionFiles.length})
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatBytes(sessionFiles.reduce((acc, f) => acc + (f.size || 0), 0))}
+                            </span>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto flex flex-col gap-1.5">
+                            {sessionFiles.map((file) => (
+                              <FileChip
+                                key={file.key}
+                                file={file}
+                                onRemove={handleSessionFileRemove}
+                                size="compact"
+                                rounded="md"
+                                showOriginalName={true}
+                                showSize={true}
+                                className="w-full"
+                              />
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-9 w-9 p-0 rounded-none hover:bg-muted bg-muted/80 dark:bg-neutral-800/80 dark:hover:bg-neutral-800 border-0"
+                      onClick={() => (fileInputRef.current as any)?.click()}
+                      disabled={isProcessingFiles}
+                    >
+                      <Paperclip className="w-5 h-5" />
+                    </Button>
+                  </div>
 
                   <Button
                     onClick={isLoading ? handleStopStreaming : onSendMessage}
@@ -548,9 +620,7 @@ function AgentInterfaceContent() {
                   ""
                 )}
               </span>
-              <span className="text-xs text-muted-foreground/60">
-                Press Enter to send • Shift+Enter for new line
-              </span>
+              <span className="text-xs text-muted-foreground/60">Press Enter to send</span>
             </div>
           </div>
         </div>

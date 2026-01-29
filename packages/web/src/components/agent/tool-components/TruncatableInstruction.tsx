@@ -30,7 +30,7 @@ export function TruncatableInstruction({ text, className }: TruncatableInstructi
       {(isTruncated || isExpanded) && (
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="mt-1 text-xs flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity"
+          className="mt-1 text-xs flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity bg-transparent border-0 p-0 cursor-pointer hover:!bg-transparent"
         >
           {isExpanded ? (
             <>

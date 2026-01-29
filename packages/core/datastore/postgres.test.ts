@@ -122,36 +122,37 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
       };
 
       const testRun: Run = {
-        id: "test-run-id",
+        runId: "test-run-id",
         toolId: "test-api-id",
-        orgId: testOrgId,
         status: RunStatus.SUCCESS,
-        toolConfig: { id: "test-api-id", steps: [{ id: "step1", apiConfig: testApiConfig }] },
-        startedAt: new Date(),
-        completedAt: new Date(),
+        tool: { id: "test-api-id", steps: [{ id: "step1", apiConfig: testApiConfig }] },
+        metadata: {
+          startedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+        },
       };
 
       it("should store and retrieve runs", async () => {
-        await store.createRun({ run: testRun });
-        const retrieved = await store.getRun({ id: testRun.id, orgId: testOrgId });
-        expect(retrieved?.id).toEqual(testRun.id);
+        await store.createRun({ run: testRun, orgId: testOrgId });
+        const retrieved = await store.getRun({ id: testRun.runId, orgId: testOrgId });
+        expect(retrieved?.runId).toEqual(testRun.runId);
         expect(retrieved?.status).toEqual(testRun.status);
       });
 
       it("should list runs in chronological order", async () => {
         const run1: Run = {
           ...testRun,
-          id: "run1",
-          startedAt: new Date(Date.now() - 1000),
+          runId: "run1",
+          metadata: { startedAt: new Date(Date.now() - 1000).toISOString() },
         };
         const run2: Run = {
           ...testRun,
-          id: "run2",
-          startedAt: new Date(),
+          runId: "run2",
+          metadata: { startedAt: new Date().toISOString() },
         };
 
-        await store.createRun({ run: run1 });
-        await store.createRun({ run: run2 });
+        await store.createRun({ run: run1, orgId: testOrgId });
+        await store.createRun({ run: run2, orgId: testOrgId });
 
         const { items, total } = await store.listRuns({
           limit: 10,
@@ -161,18 +162,18 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         });
         expect(items).toHaveLength(2);
         expect(total).toBe(2);
-        expect(items[0].id).toBe(run2.id);
-        expect(items[1].id).toBe(run1.id);
+        expect(items[0].runId).toBe(run2.runId);
+        expect(items[1].runId).toBe(run1.runId);
       });
 
       it("should list runs filtered by config ID", async () => {
-        const run1: Run = { ...testRun, id: "run1", toolId: "config1" };
-        const run2: Run = { ...testRun, id: "run2", toolId: "config2" };
-        const run3: Run = { ...testRun, id: "run3", toolId: "config1" };
+        const run1: Run = { ...testRun, runId: "run1", toolId: "config1" };
+        const run2: Run = { ...testRun, runId: "run2", toolId: "config2" };
+        const run3: Run = { ...testRun, runId: "run3", toolId: "config1" };
 
-        await store.createRun({ run: run1 });
-        await store.createRun({ run: run2 });
-        await store.createRun({ run: run3 });
+        await store.createRun({ run: run1, orgId: testOrgId });
+        await store.createRun({ run: run2, orgId: testOrgId });
+        await store.createRun({ run: run3, orgId: testOrgId });
 
         const { items, total } = await store.listRuns({
           limit: 10,
@@ -182,28 +183,28 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         });
         expect(items.length).toBe(2);
         expect(total).toBe(2);
-        expect(items.map((run) => run.id).sort()).toEqual(["run1", "run3"]);
+        expect(items.map((run) => run.runId).sort()).toEqual(["run1", "run3"]);
       });
 
       it("should store and retrieve requestSource correctly", async () => {
         const runWithSource: Run = {
           ...testRun,
-          id: "run-with-source",
+          runId: "run-with-source",
           requestSource: "api" as any,
         };
-        await store.createRun({ run: runWithSource });
-        const retrieved = await store.getRun({ id: runWithSource.id, orgId: testOrgId });
+        await store.createRun({ run: runWithSource, orgId: testOrgId });
+        const retrieved = await store.getRun({ id: runWithSource.runId, orgId: testOrgId });
         expect(retrieved?.requestSource).toEqual("api");
       });
 
       it("should default requestSource to 'api' when not provided", async () => {
         const runWithoutSource: Run = {
           ...testRun,
-          id: "run-without-source",
+          runId: "run-without-source",
           requestSource: undefined,
         };
-        await store.createRun({ run: runWithoutSource });
-        const retrieved = await store.getRun({ id: runWithoutSource.id, orgId: testOrgId });
+        await store.createRun({ run: runWithoutSource, orgId: testOrgId });
+        const retrieved = await store.getRun({ id: runWithoutSource.runId, orgId: testOrgId });
         // Column defaults to 'api', extractRun should return it
         expect(retrieved?.requestSource).toEqual("api");
       });
@@ -213,20 +214,20 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         for (const source of sources) {
           const run: Run = {
             ...testRun,
-            id: `run-source-${source}`,
+            runId: `run-source-${source}`,
             requestSource: source as any,
           };
-          await store.createRun({ run });
-          const retrieved = await store.getRun({ id: run.id, orgId: testOrgId });
+          await store.createRun({ run, orgId: testOrgId });
+          const retrieved = await store.getRun({ id: run.runId, orgId: testOrgId });
           expect(retrieved?.requestSource).toEqual(source);
         }
       });
 
       it("should include requestSource in listRuns results", async () => {
-        const run1: Run = { ...testRun, id: "list-run-1", requestSource: "api" as any };
-        const run2: Run = { ...testRun, id: "list-run-2", requestSource: "scheduler" as any };
-        await store.createRun({ run: run1 });
-        await store.createRun({ run: run2 });
+        const run1: Run = { ...testRun, runId: "list-run-1", requestSource: "api" as any };
+        const run2: Run = { ...testRun, runId: "list-run-2", requestSource: "scheduler" as any };
+        await store.createRun({ run: run1, orgId: testOrgId });
+        await store.createRun({ run: run2, orgId: testOrgId });
 
         const { items } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
         const sources = items.map((r) => r.requestSource).sort();
@@ -235,16 +236,16 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
       });
 
       it("should preserve requestSource during updateRun", async () => {
-        const run: Run = { ...testRun, id: "update-source-run", requestSource: "mcp" as any };
-        await store.createRun({ run });
+        const run: Run = { ...testRun, runId: "update-source-run", requestSource: "mcp" as any };
+        await store.createRun({ run, orgId: testOrgId });
 
         await store.updateRun({
-          id: run.id,
+          id: run.runId,
           orgId: testOrgId,
           updates: { status: RunStatus.FAILED, error: "Test error" },
         });
 
-        const retrieved = await store.getRun({ id: run.id, orgId: testOrgId });
+        const retrieved = await store.getRun({ id: run.runId, orgId: testOrgId });
         expect(retrieved?.requestSource).toEqual("mcp");
         expect(retrieved?.status).toEqual(RunStatus.FAILED);
       });

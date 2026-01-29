@@ -11,20 +11,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-
-import { DeployButton } from "@/src/components/tools/deploy/DeployButton";
 import { FolderSelector, useFolderFilter } from "@/src/components/tools/folders/FolderSelector";
 import { InlineFolderPicker } from "@/src/components/tools/folders/InlineFolderPicker";
 import { CopyButton } from "@/src/components/tools/shared/CopyButton";
 import { ToolActionsMenu } from "@/src/components/tools/ToolActionsMenu";
 import { ToolCreateStepper } from "@/src/components/tools/ToolCreateStepper";
+import { SystemIcon } from "@/src/components/ui/system-icon";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
-import { SystemIcon } from "@/src/components/ui/system-icon";
 import {
   ArrowDown,
   ArrowUp,
@@ -329,7 +327,16 @@ const ToolsTable = () => {
                     </TableCell>
                     <TableCell className="font-medium max-w-[200px] truncate relative group">
                       <div className="flex items-center space-x-1">
-                        <span className="truncate">{tool.id}</span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="truncate">{tool.id}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{tool.id}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                           <CopyButton text={tool.id} />
                         </div>
@@ -366,7 +373,6 @@ const ToolsTable = () => {
                           <Hammer className="h-4 w-4" />
                           View
                         </Button>
-                        {!tool.archived && <DeployButton tool={tool} className="gap-2" />}
                         <ToolActionsMenu tool={tool} />
                       </div>
                     </TableCell>

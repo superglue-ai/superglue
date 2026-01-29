@@ -21,10 +21,10 @@ import { GraphQLRequestContext, WorkerPools } from "./types.js";
 
 export const DEFAULT_QUERY = `
 query Query {
-  listRuns(limit: 10) {
+  listWorkflows(limit: 10) {
     items {
       id
-      status
+      instruction
       createdAt
     }
     total

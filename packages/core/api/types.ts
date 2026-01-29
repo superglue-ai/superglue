@@ -100,7 +100,7 @@ export interface OpenAPIRunMetadata {
 export interface OpenAPIRun {
   runId: string;
   toolId: string;
-  tool?: { id: string; version?: string };
+  tool?: Record<string, unknown>;
   status: "running" | "success" | "failed" | "aborted";
   toolPayload?: Record<string, unknown>;
   data?: Record<string, unknown>;

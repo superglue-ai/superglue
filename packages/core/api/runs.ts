@@ -3,6 +3,7 @@ import { logMessage } from "../utils/logs.js";
 import { registerApiModule } from "./registry.js";
 import {
   addTraceHeader,
+  mapOpenAPIRequestSourceToInternal,
   mapOpenAPIStatusToInternal,
   mapRunStatusToOpenAPI,
   parsePaginationParams,
@@ -12,40 +13,27 @@ import type {
   AuthenticatedFastifyRequest,
   CreateRunRequestBody,
   OpenAPIRun,
-  OpenAPIRunMetadata,
   RouteHandler,
 } from "./types.js";
 
+// Map internal Run to OpenAPI format - now minimal since types are aligned
+// Just strips internal fields and ensures tool has version
 export function mapRunToOpenAPI(run: Run): OpenAPIRun {
-  const startedAt = run.startedAt instanceof Date ? run.startedAt : new Date(run.startedAt);
-  const completedAt =
-    run.completedAt instanceof Date
-      ? run.completedAt
-      : run.completedAt
-        ? new Date(run.completedAt)
-        : undefined;
-
-  const metadata: OpenAPIRunMetadata = {
-    startedAt: startedAt.toISOString(),
-  };
-
-  if (completedAt) {
-    metadata.completedAt = completedAt.toISOString();
-    metadata.durationMs = completedAt.getTime() - startedAt.getTime();
-  }
+  // Add default version if tool exists but has no version
+  const tool = run.tool
+    ? {
+        ...(run.tool as unknown as Record<string, unknown>),
+        version: (run.tool as unknown as Record<string, unknown>).version ?? "1.0.0",
+      }
+    : undefined;
 
   return {
-    runId: run.id,
+    runId: run.runId,
     toolId: run.toolId,
-    tool: run.toolConfig
-      ? {
-          id: run.toolConfig.id,
-          version: run.toolConfig.version || "1.0.0",
-        }
-      : undefined,
+    tool,
     status: mapRunStatusToOpenAPI(run.status),
     toolPayload: run.toolPayload,
-    data: run.toolResult,
+    data: run.data,
     error: run.error,
     stepResults: run.stepResults?.map((sr) => ({
       stepId: sr.stepId,
@@ -56,7 +44,7 @@ export function mapRunToOpenAPI(run: Run): OpenAPIRun {
     options: run.options as Record<string, unknown>,
     requestSource: run.requestSource,
     traceId: run.traceId,
-    metadata,
+    metadata: run.metadata,
   };
 }
 
@@ -83,6 +71,7 @@ const listRuns: RouteHandler = async (request, reply) => {
   const query = request.query as {
     toolId?: string;
     status?: string;
+    requestSources?: string;
     page?: string;
     limit?: string;
   };
@@ -90,11 +79,20 @@ const listRuns: RouteHandler = async (request, reply) => {
   const { page, limit, offset } = parsePaginationParams(query);
   const internalStatus = query.status ? mapOpenAPIStatusToInternal(query.status) : undefined;
 
+  let internalRequestSources: RequestSource[] | undefined;
+  if (query.requestSources) {
+    internalRequestSources = query.requestSources
+      .split(",")
+      .map((s) => mapOpenAPIRequestSourceToInternal(s.trim()))
+      .filter((s): s is RequestSource => s !== undefined);
+  }
+
   const result = await authReq.datastore.listRuns({
     limit,
     offset,
     configId: query.toolId,
     status: internalStatus,
+    requestSources: internalRequestSources,
     orgId: authReq.authInfo.orgId,
   });
 
@@ -138,6 +136,9 @@ const cancelRun: RouteHandler = async (request, reply) => {
   // Abort the task
   authReq.workerPools.toolExecution.abortTask(params.runId);
 
+  const now = new Date();
+  const startedAt = new Date(run.metadata.startedAt);
+
   // Update the run status
   await authReq.datastore.updateRun({
     id: params.runId,
@@ -145,7 +146,11 @@ const cancelRun: RouteHandler = async (request, reply) => {
     updates: {
       status: RunStatus.ABORTED,
       error: `Run cancelled by user`,
-      completedAt: new Date(),
+      metadata: {
+        ...run.metadata,
+        completedAt: now.toISOString(),
+        durationMs: now.getTime() - startedAt.getTime(),
+      },
     },
   });
 
@@ -188,6 +193,14 @@ const createRun: RouteHandler = async (request, reply) => {
   const startedAt = new Date(body.startedAt);
   const completedAt = new Date(body.completedAt);
 
+  // Validate that dates are valid
+  if (isNaN(startedAt.getTime())) {
+    return sendError(reply, 400, `Invalid startedAt date: ${body.startedAt}`);
+  }
+  if (isNaN(completedAt.getTime())) {
+    return sendError(reply, 400, `Invalid completedAt date: ${body.completedAt}`);
+  }
+
   // Map status string to RunStatus enum
   let status: RunStatus;
   if (body.status === "success") {
@@ -205,21 +218,21 @@ const createRun: RouteHandler = async (request, reply) => {
   }
 
   const run: Run = {
-    id: runId,
+    runId,
     toolId: body.toolId,
-    orgId: authReq.authInfo.orgId,
-    userId: authReq.authInfo.userId,
-    userEmail: authReq.authInfo.userEmail,
     status,
-    toolConfig: body.toolConfig as unknown as Tool,
+    tool: body.toolConfig as unknown as Tool,
     requestSource: RequestSource.FRONTEND,
     error: body.error,
-    startedAt,
-    completedAt,
+    metadata: {
+      startedAt: startedAt.toISOString(),
+      completedAt: completedAt.toISOString(),
+      durationMs: completedAt.getTime() - startedAt.getTime(),
+    },
   };
 
   try {
-    await authReq.datastore.createRun({ run });
+    await authReq.datastore.createRun({ run, orgId: authReq.authInfo.orgId });
     logMessage("info", `Created manual run ${runId} for tool ${body.toolId}`, metadata);
 
     return addTraceHeader(reply, authReq.traceId).code(201).send(mapRunToOpenAPI(run));

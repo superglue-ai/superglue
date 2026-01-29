@@ -86,30 +86,8 @@ export function ToolCreateStepper({
     saveResolveRef.current = null;
     setShowSaveDialog(false);
   };
-
-  const handleClose = () => {
-    if (onComplete) {
-      onComplete();
-    } else {
-      router.push("/");
-    }
-  };
-
   return (
     <div className="flex-1 flex flex-col h-full p-6">
-      <div className="flex items-center justify-end gap-2 mb-4">
-        <Button
-          variant="outline"
-          className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50 hover:border-blue-300/50 text-blue-600 hover:text-blue-700 text-sm px-4 py-1 h-8 rounded-full animate-pulse"
-          onClick={() => window.open("https://cal.com/superglue/onboarding", "_blank")}
-        >
-          ✨ Get help from our team
-        </Button>
-        <Button variant="ghost" size="icon" onClick={handleClose}>
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-
       <div className="flex-1 overflow-hidden flex flex-col">
         <div className="overflow-y-auto px-1 min-h-0" style={{ scrollbarGutter: "stable" }}>
           {step === "build" && (
@@ -130,10 +108,10 @@ export function ToolCreateStepper({
                 initialInstruction={buildContext.instruction}
                 systems={systems}
                 onSave={handleSaveTool}
-                onInstructionEdit={() => setStep("build")}
                 shouldStopExecution={shouldStopExecution}
                 onStopExecution={handleStopExecution}
                 uploadedFiles={uploadedFiles}
+                filePayloads={filePayloads}
                 onFilesChange={handleFilesChange}
               />
               <SaveToolDialog

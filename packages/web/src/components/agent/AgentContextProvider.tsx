@@ -2,13 +2,25 @@
 
 import { useToast } from "@/src/hooks/use-toast";
 import type { Message, ToolCall } from "@superglue/shared";
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef } from "react";
+import { UserAction, ToolExecutionPolicies } from "@/src/lib/agent/agent-types";
+import { AgentType } from "@/src/lib/agent/registry/agents";
+import { useTools } from "@/src/app/tools-context";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { Conversation } from "./ConversationHistory";
 import { useAgentConversation } from "./hooks/use-agent-conversation";
 import { useAgentFileUpload } from "./hooks/use-agent-file-upload";
 import { useAgentMessages } from "./hooks/use-agent-messages";
 import { useAgentStreaming } from "./hooks/use-agent-streaming";
 import { useAgentTools } from "./hooks/use-agent-tools";
+import { useAgentRequest } from "./hooks/use-agent-request";
 import type { AgentConfig, UploadedFile } from "./hooks/types";
 import type { AgentWelcomeRef } from "./welcome/AgentWelcome";
 
@@ -29,11 +41,6 @@ export interface AgentContextValue {
   handleSaveEdit: (messageId: string) => Promise<void>;
 
   // Streaming
-  sendChatMessage: (
-    messages: Message[],
-    assistantMessage: Message,
-    signal?: AbortSignal,
-  ) => Promise<void>;
   abortStream: () => void;
   stopStreaming: () => void;
   currentStreamControllerRef: React.MutableRefObject<AbortController | null>;
@@ -42,19 +49,25 @@ export interface AgentContextValue {
   // Tools
   handleToolInputChange: (newInput: any) => void;
   handleToolUpdate: (toolCallId: string, updates: Partial<ToolCall>) => void;
-  handleOAuthCompletion: (toolCallId: string, systemData: any) => Promise<void>;
-  addSystemMessage: (message: string, options?: { triggerImmediateResponse?: boolean }) => void;
-  triggerStreamContinuation: () => Promise<void>;
+
+  // Request
+  sendAgentRequest: (
+    userMessage?: string,
+    options?: { userActions?: UserAction[] },
+  ) => Promise<void>;
+  bufferAction: (action: UserAction) => void;
 
   // Files
-  uploadedFiles: UploadedFile[];
+  pendingFiles: UploadedFile[];
+  sessionFiles: UploadedFile[];
   filePayloads: Record<string, any>;
   isProcessingFiles: boolean;
   isDragging: boolean;
   setIsDragging: React.Dispatch<React.SetStateAction<boolean>>;
   fileInputRef: React.RefObject<HTMLInputElement>;
   handleFilesUpload: (files: File[]) => Promise<void>;
-  handleFileRemove: (key: string) => void;
+  handlePendingFileRemove: (key: string) => void;
+  handleSessionFileRemove: (key: string) => void;
   handleDrop: (e: React.DragEvent) => void;
   handleDragOver: (e: React.DragEvent) => void;
   handleDragLeave: (e: React.DragEvent) => void;
@@ -68,7 +81,7 @@ export interface AgentContextValue {
 
   // Actions
   handleSendMessage: (content: string, attachedFiles?: UploadedFile[]) => Promise<void>;
-  startExamplePrompt: (userPrompt: string, systemPrompt?: string) => void;
+  startTemplatePrompt: (userPrompt: string, hiddenContext?: string) => void;
 
   // Refs
   welcomeRef: React.RefObject<AgentWelcomeRef>;
@@ -76,6 +89,11 @@ export interface AgentContextValue {
 
   // Config
   config: AgentConfig;
+
+  // Tool policies
+  toolExecutionPolicies: ToolExecutionPolicies;
+  setToolPolicy: (toolName: string, policy: Record<string, any>) => void;
+  getToolPolicy: (toolName: string) => Record<string, any> | undefined;
 }
 
 const AgentContext = createContext<AgentContextValue | null>(null);
@@ -90,32 +108,49 @@ export function useAgentContext(): AgentContextValue {
 
 interface AgentContextProviderProps {
   children: React.ReactNode;
-  config?: AgentConfig;
-  discoveryPrompts?: { userPrompt: string; systemPrompt: string } | null;
+  config?: Partial<AgentConfig>;
+  initialPrompts?: { userPrompt: string; systemPrompt: string } | null;
 }
+
+const DEFAULT_CONFIG: AgentConfig = {
+  agentId: AgentType.MAIN,
+};
 
 export function AgentContextProvider({
   children,
-  config = {},
-  discoveryPrompts,
+  config: configProp,
+  initialPrompts,
 }: AgentContextProviderProps) {
+  const config: AgentConfig = { ...DEFAULT_CONFIG, ...configProp };
   const { toast } = useToast();
   const welcomeRef = useRef<AgentWelcomeRef>(null);
-  const pendingSystemMessagesRef = useRef<string[]>([]);
+  const { refreshTools } = useTools();
+
+  const [toolExecutionPolicies, setToolExecutionPolicies] = useState<ToolExecutionPolicies>({});
+
+  const setToolPolicy = useCallback((toolName: string, policy: Record<string, any>) => {
+    setToolExecutionPolicies((prev) => ({
+      ...prev,
+      [toolName]: { ...prev[toolName], ...policy },
+    }));
+  }, []);
+
+  const getToolPolicy = useCallback(
+    (toolName: string) => {
+      return toolExecutionPolicies[toolName];
+    },
+    [toolExecutionPolicies],
+  );
 
   // File upload hook (independent, no dependencies)
   const fileUpload = useAgentFileUpload({ toast });
 
   // We need to create a temporary streaming hook first to get stopDrip and streamDripBufferRef
-  // These refs are stable across renders so this is safe
   const tempStreaming = useAgentStreaming({
     config,
     setMessages: () => {},
     updateMessageWithData: () => ({}) as Message,
     updateToolCompletion: () => {},
-    uploadedFiles: fileUpload.uploadedFiles,
-    filePayloads: fileUpload.filePayloads,
-    pendingSystemMessagesRef,
   });
 
   // Messages hook needs streaming functions for drip animation
@@ -138,8 +173,23 @@ export function AgentContextProvider({
           return msg;
         });
       });
+
+      // Refresh tools context when save_tool completes successfully
+      if (data?.toolCall?.name === "save_tool") {
+        try {
+          const output =
+            typeof data.toolCall.output === "string"
+              ? JSON.parse(data.toolCall.output)
+              : data.toolCall.output;
+          if (output?.success) {
+            refreshTools();
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
     },
-    [messagesHook.setMessages, messagesHook.updateMessageWithData],
+    [messagesHook.setMessages, messagesHook.updateMessageWithData, refreshTools],
   );
 
   // Now create the final streaming hook with all dependencies
@@ -148,26 +198,31 @@ export function AgentContextProvider({
     setMessages: messagesHook.setMessages,
     updateMessageWithData: messagesHook.updateMessageWithData,
     updateToolCompletion,
-    uploadedFiles: fileUpload.uploadedFiles,
-    filePayloads: fileUpload.filePayloads,
-    pendingSystemMessagesRef,
   });
 
-  // Tools hook - now uses the properly configured streaming hook
+  // Tools hook
   const toolsHook = useAgentTools({
-    config,
-    messages: messagesHook.messages,
     setMessages: messagesHook.setMessages,
+  });
+
+  // Request hook - the main way to send requests
+  const allUploadedFiles = [...fileUpload.sessionFiles, ...fileUpload.pendingFiles];
+  const requestHook = useAgentRequest({
+    config,
     messagesRef: messagesHook.messagesRef,
+    setMessages: messagesHook.setMessages,
     setIsLoading: messagesHook.setIsLoading,
     createStreamingAssistantMessage: messagesHook.createStreamingAssistantMessage,
-    updateMessageWithData: messagesHook.updateMessageWithData,
-    sendChatMessage: streamingHook.sendChatMessage,
+    cleanupInterruptedStream: messagesHook.cleanupInterruptedStream,
+    setAwaitingToolsToDeclined: messagesHook.setAwaitingToolsToDeclined,
+    findAndResumeMessageWithTool: messagesHook.findAndResumeMessageWithTool,
     processStreamData: streamingHook.processStreamData,
     currentStreamControllerRef: streamingHook.currentStreamControllerRef,
+    uploadedFiles: allUploadedFiles,
+    pendingFiles: fileUpload.pendingFiles,
     filePayloads: fileUpload.filePayloads,
+    toolExecutionPolicies,
     toast,
-    pendingSystemMessagesRef,
   });
 
   // Conversation hook
@@ -199,183 +254,49 @@ export function AgentContextProvider({
       const messageIndex = messagesHook.messages.findIndex((m) => m.id === messageId);
       if (messageIndex === -1) return;
 
-      const updatedMessages = [...messagesHook.messages];
-      const { attachedFiles, ...messageWithoutFiles } = updatedMessages[messageIndex] as any;
-      updatedMessages[messageIndex] = {
-        ...messageWithoutFiles,
-        content: messagesHook.editingContent.trim(),
-        timestamp: new Date(),
-      };
-
-      const truncatedMessages = updatedMessages.slice(0, messageIndex + 1);
-
+      const truncatedMessages = messagesHook.messages.slice(0, messageIndex);
+      messagesHook.messagesRef.current = truncatedMessages;
       messagesHook.setMessages(truncatedMessages);
       messagesHook.setEditingMessageId(null);
+
+      const editedContent = messagesHook.editingContent.trim();
       messagesHook.setEditingContent("");
       fileUpload.clearFiles();
-      messagesHook.setIsLoading(true);
 
-      const assistantMessage = messagesHook.createStreamingAssistantMessage();
-      messagesHook.setMessages((prev) => [...prev, assistantMessage]);
-
-      try {
-        await streamingHook.sendChatMessage(truncatedMessages, assistantMessage);
-      } catch (error) {
-        console.error("Error re-running conversation:", error);
-        toast({
-          title: "Error",
-          description: "Failed to restart conversation from edited message.",
-          variant: "destructive",
-        });
-
-        messagesHook.setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantMessage.id
-              ? {
-                  ...msg,
-                  content:
-                    "Sorry, I encountered an error restarting the conversation. Please try again.",
-                  isStreaming: false,
-                }
-              : msg,
-          ),
-        );
-      } finally {
-        messagesHook.setIsLoading(false);
-      }
+      await requestHook.sendAgentRequest(editedContent);
     },
-    [messagesHook, fileUpload, streamingHook, toast],
+    [messagesHook, fileUpload, requestHook],
   );
 
   const handleSendMessage = useCallback(
-    async (content: string, attachedFiles?: UploadedFile[]) => {
+    async (content: string) => {
       const MAX_MESSAGE_LENGTH = 50000;
       if (!content.trim() || content.length > MAX_MESSAGE_LENGTH) return;
-
-      if (streamingHook.currentStreamControllerRef.current) {
-        streamingHook.currentStreamControllerRef.current.abort();
-        messagesHook.cleanupInterruptedStream("\n\n*[Response interrupted by new message]*");
-      }
-
-      messagesHook.setAwaitingToolsToDeclined();
-
-      const filesToAttach =
-        attachedFiles || fileUpload.uploadedFiles.filter((f) => f.status === "ready");
-
-      const userMessage: Message = {
-        id: Date.now().toString(),
-        content: content.trim(),
-        role: "user",
-        timestamp: new Date(),
-        attachedFiles: filesToAttach.length > 0 ? filesToAttach : undefined,
-      };
-
-      const assistantMessage = messagesHook.createStreamingAssistantMessage(1);
-      const messagesToSend = [...messagesHook.messages, userMessage];
-
-      messagesHook.setMessages((prev) => [...prev, userMessage, assistantMessage]);
-      fileUpload.clearFiles();
-      messagesHook.setIsLoading(true);
-
-      const controller = new AbortController();
-      streamingHook.currentStreamControllerRef.current = controller;
-
-      try {
-        await streamingHook.sendChatMessage(messagesToSend, assistantMessage, controller.signal);
-      } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") return;
-
-        console.error("Error sending message:", error);
-        toast({
-          title: "Error",
-          description:
-            error instanceof Error ? error.message : "Failed to send message. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        messagesHook.setIsLoading(false);
-        if (streamingHook.currentStreamControllerRef.current === controller) {
-          streamingHook.currentStreamControllerRef.current = null;
-        }
-      }
+      fileUpload.commitPendingFiles();
+      await requestHook.sendAgentRequest(content);
     },
-    [messagesHook, fileUpload, streamingHook, toast],
+    [requestHook, fileUpload],
   );
 
-  const startExamplePrompt = useCallback(
-    (userPrompt: string, systemPrompt?: string) => {
-      if (streamingHook.currentStreamControllerRef.current) {
-        streamingHook.currentStreamControllerRef.current.abort();
-        messagesHook.cleanupInterruptedStream("\n\n*[Response interrupted by new message]*");
-      }
-
-      const userMessage: Message = {
-        id: Date.now().toString(),
-        content: userPrompt.trim(),
-        role: "user",
-        timestamp: new Date(),
-      };
-
-      messagesHook.setMessages((prev) => [...prev, userMessage]);
-      messagesHook.setIsLoading(true);
-
-      const assistantMessage = messagesHook.createStreamingAssistantMessage(1);
-      messagesHook.setMessages((prev) => [...prev, assistantMessage]);
-
-      const controller = new AbortController();
-      streamingHook.currentStreamControllerRef.current = controller;
-
-      const messagesToSend: Message[] = [...messagesHook.messages];
-      if (systemPrompt) {
-        messagesToSend.push({
-          id: `system-${Date.now()}`,
-          content: systemPrompt,
-          role: "system",
-          timestamp: new Date(),
-        });
-      }
-      messagesToSend.push({
-        id: Date.now().toString(),
-        content: userPrompt.trim(),
-        role: "user",
-        timestamp: new Date(),
-      });
-
-      streamingHook
-        .sendChatMessage(messagesToSend, assistantMessage, controller.signal)
-        .catch((error) => {
-          if (error instanceof Error && error.name === "AbortError") return;
-
-          console.error("Error sending message:", error);
-          toast({
-            title: "Error",
-            description:
-              error instanceof Error ? error.message : "Failed to send message. Please try again.",
-            variant: "destructive",
-          });
-        })
-        .finally(() => {
-          messagesHook.setIsLoading(false);
-          if (streamingHook.currentStreamControllerRef.current === controller) {
-            streamingHook.currentStreamControllerRef.current = null;
-          }
-        });
+  const startTemplatePrompt = useCallback(
+    (userPrompt: string, hiddenContext?: string) => {
+      requestHook.sendAgentRequest(userPrompt, { hiddenContext });
     },
-    [messagesHook, streamingHook, toast],
+    [requestHook],
   );
 
-  // Auto-trigger discovery prompts when provided via props (only once)
-  const hasTriggeredDiscoveryRef = useRef(false);
+  // Auto-trigger initial prompts when provided via props (only once)
+  const hasTriggeredInitialPromptsRef = useRef(false);
   useEffect(() => {
     if (
-      discoveryPrompts &&
+      initialPrompts &&
       messagesHook.messages.length === 0 &&
-      !hasTriggeredDiscoveryRef.current
+      !hasTriggeredInitialPromptsRef.current
     ) {
-      hasTriggeredDiscoveryRef.current = true;
-      startExamplePrompt(discoveryPrompts.userPrompt, discoveryPrompts.systemPrompt);
+      hasTriggeredInitialPromptsRef.current = true;
+      startTemplatePrompt(initialPrompts.userPrompt, initialPrompts.systemPrompt);
     }
-  }, [discoveryPrompts, messagesHook.messages.length, startExamplePrompt]);
+  }, [initialPrompts, messagesHook.messages.length, startTemplatePrompt]);
 
   const value = useMemo<AgentContextValue>(
     () => ({
@@ -395,7 +316,6 @@ export function AgentContextProvider({
       handleSaveEdit,
 
       // Streaming
-      sendChatMessage: streamingHook.sendChatMessage,
       abortStream: streamingHook.abortStream,
       stopStreaming,
       currentStreamControllerRef: streamingHook.currentStreamControllerRef,
@@ -404,19 +324,22 @@ export function AgentContextProvider({
       // Tools
       handleToolInputChange: toolsHook.handleToolInputChange,
       handleToolUpdate: toolsHook.handleToolUpdate,
-      handleOAuthCompletion: toolsHook.handleOAuthCompletion,
-      addSystemMessage: toolsHook.addSystemMessage,
-      triggerStreamContinuation: toolsHook.triggerStreamContinuation,
+
+      // Request
+      sendAgentRequest: requestHook.sendAgentRequest,
+      bufferAction: requestHook.bufferAction,
 
       // Files
-      uploadedFiles: fileUpload.uploadedFiles,
+      pendingFiles: fileUpload.pendingFiles,
+      sessionFiles: fileUpload.sessionFiles,
       filePayloads: fileUpload.filePayloads,
       isProcessingFiles: fileUpload.isProcessingFiles,
       isDragging: fileUpload.isDragging,
       setIsDragging: fileUpload.setIsDragging,
       fileInputRef: fileUpload.fileInputRef,
       handleFilesUpload: fileUpload.handleFilesUpload,
-      handleFileRemove: fileUpload.handleFileRemove,
+      handlePendingFileRemove: fileUpload.handlePendingFileRemove,
+      handleSessionFileRemove: fileUpload.handleSessionFileRemove,
       handleDrop: fileUpload.handleDrop,
       handleDragOver: fileUpload.handleDragOver,
       handleDragLeave: fileUpload.handleDragLeave,
@@ -430,7 +353,7 @@ export function AgentContextProvider({
 
       // Actions
       handleSendMessage,
-      startExamplePrompt,
+      startTemplatePrompt,
 
       // Refs
       welcomeRef,
@@ -438,18 +361,27 @@ export function AgentContextProvider({
 
       // Config
       config,
+
+      // Tool policies
+      toolExecutionPolicies,
+      setToolPolicy,
+      getToolPolicy,
     }),
     [
       messagesHook,
       fileUpload,
       streamingHook,
       toolsHook,
+      requestHook,
       conversationHook,
       handleSaveEdit,
       stopStreaming,
       handleSendMessage,
-      startExamplePrompt,
+      startTemplatePrompt,
       config,
+      toolExecutionPolicies,
+      setToolPolicy,
+      getToolPolicy,
     ],
   );
 

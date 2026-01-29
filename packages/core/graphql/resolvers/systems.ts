@@ -4,7 +4,7 @@ import { GraphQLResolveInfo } from "graphql";
 import { PostgresService } from "../../datastore/postgres.js";
 import { server_defaults } from "../../default.js";
 import { DocumentationFetcher } from "../../documentation/documentation-fetching.js";
-import { DocumentationSearch } from "../../documentation/documentation-search.js";
+import { SystemManager } from "../../systems/system-manager.js";
 import { logMessage } from "../../utils/logs.js";
 import { GraphQLRequestContext } from "../types.js";
 
@@ -512,30 +512,11 @@ export const searchSystemDocumentationResolver = async (
   const metadata = context.toMetadata();
 
   try {
-    const system = await context.datastore.getSystem({
-      id: systemId,
-      includeDocs: true,
-      orgId: context.orgId,
-    });
-    if (!system) throw new Error("System not found");
+    const systemManager = await SystemManager.fromId(systemId, context.datastore, metadata);
+    const result = await systemManager.searchDocumentation(keywords);
 
-    const hasDocumentation = system.documentation && system.documentation.trim().length > 0;
-    const hasOpenApiSchema = system.openApiSchema && system.openApiSchema.trim().length > 0;
-
-    if (!hasDocumentation && !hasOpenApiSchema) {
-      return ``;
-    }
-
-    const documentationSearch = new DocumentationSearch(metadata);
-    const result = documentationSearch.extractRelevantSections(
-      system.documentation || "",
-      keywords,
-      3,
-      2000,
-      system.openApiSchema || "",
-    );
-
-    if (!result || result.trim().length === 0) {
+    // Handle empty results
+    if (!result || result.trim().length === 0 || result === "no documentation provided") {
       return `No relevant sections found for keywords: "${keywords}". Try different or broader keywords, or verify that the documentation contains information about what you're looking for.`;
     }
 

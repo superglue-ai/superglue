@@ -1,4 +1,11 @@
-import { System, ServiceMetadata, Tool, ToolDiff, ToolStepResult } from "@superglue/shared";
+import {
+  System,
+  ServiceMetadata,
+  Tool,
+  ToolDiff,
+  ToolStepResult,
+  normalizeToolSchemas,
+} from "@superglue/shared";
 import jsonpatch from "fast-json-patch";
 import z from "zod";
 import { FIX_TOOL_SYSTEM_PROMPT } from "../context/context-prompts.js";
@@ -53,7 +60,7 @@ export class ToolFixer {
   private diffSchemaJson: any;
 
   constructor(options: ToolFixerOptions) {
-    this.tool = options.tool;
+    this.tool = normalizeToolSchemas(options.tool);
     this.fixInstructions = options.fixInstructions;
     this.systems = options.systems.reduce(
       (acc, int) => {
@@ -349,8 +356,10 @@ ${availableSystemIds.join(", ")}
           throw new Error(patchResult.error);
         }
 
+        const normalizedPatchedTool = normalizeToolSchemas(patchResult.tool!);
+
         // Validate the resulting tool
-        const toolValidation = this.validateTool(patchResult.tool!);
+        const toolValidation = this.validateTool(normalizedPatchedTool);
         if (!toolValidation.valid) {
           throw new Error(toolValidation.error);
         }
@@ -359,7 +368,7 @@ ${availableSystemIds.join(", ")}
 
         // Preserve original metadata
         const fixedTool: Tool = {
-          ...patchResult.tool!,
+          ...normalizedPatchedTool,
           instruction: this.tool.instruction,
           systemIds: this.tool.systemIds,
           createdAt: this.tool.createdAt,

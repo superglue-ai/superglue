@@ -401,23 +401,25 @@ export type RequestOptions = {
   testMode?: boolean;
 };
 
+export interface RunMetadata {
+  startedAt: string; // ISO string
+  completedAt?: string; // ISO string
+  durationMs?: number;
+}
+
 export interface Run {
-  id: string;
+  runId: string;
   toolId: string;
-  orgId?: string;
-  userId?: string;
-  userEmail?: string;
+  tool?: Tool;
   status: RunStatus;
-  toolConfig?: Tool;
   toolPayload?: Record<string, any>;
-  toolResult?: any;
+  data?: any;
+  error?: string;
   stepResults?: ToolStepResult[];
   options?: RequestOptions;
   requestSource?: RequestSource;
-  error?: string;
   traceId?: string;
-  startedAt: Date;
-  completedAt?: Date;
+  metadata: RunMetadata;
 }
 
 export interface ApiCallArgs {
@@ -617,4 +619,18 @@ export interface DiscoveryResult {
   title: string;
   description: string;
   systems: ExtendedSystem[];
+}
+
+export enum ConfirmationAction {
+  CONFIRMED = "confirmed",
+  DECLINED = "declined",
+  PARTIAL = "partial",
+}
+
+export interface AgentRequest {
+  agentId: string;
+  messages: Message[];
+  runtimeContext?: string;
+  agentParams?: Record<string, any>;
+  filePayloads?: Record<string, any>;
 }

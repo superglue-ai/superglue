@@ -1,9 +1,6 @@
 import axios from "axios";
 import {
-  ApiCallArgs,
   ApiConfig,
-  ApiInputRequest,
-  ApiResult,
   BuildToolArgs,
   CallEndpointArgs,
   CallEndpointResult,
@@ -16,6 +13,7 @@ import {
   GenerateStepConfigArgs,
   Log,
   Run,
+  RunStatus,
   SuggestedTool,
   System,
   Tool,
@@ -36,7 +34,7 @@ export class SuperglueClient {
   private endpoint: string;
   private apiKey: string;
   private wsManager: WebSocketManager;
-  private apiEndpoint: string;
+  public readonly apiEndpoint: string;
 
   private static workflowQL = `
         id
@@ -788,81 +786,6 @@ export class SuperglueClient {
     return result.callEndpoint;
   }
 
-  async call<T = unknown>({
-    id,
-    endpoint,
-    payload,
-    credentials,
-    options,
-  }: ApiCallArgs): Promise<ApiResult & { data: T }> {
-    const mutation = `
-        mutation Call($input: ApiInputRequest!, $payload: JSON, $credentials: JSON, $options: RequestOptions) {
-          call(input: $input, payload: $payload, credentials: $credentials, options: $options) {
-            id
-            success
-            data
-            error
-            headers
-            statusCode
-            startedAt
-            completedAt
-            ${SuperglueClient.configQL}
-          }
-        }
-      `;
-
-    let gqlInput: Partial<ApiInputRequest> = {};
-
-    if (id) {
-      gqlInput = { id };
-    } else if (endpoint) {
-      const apiInput = {
-        id: endpoint.id,
-        urlHost: endpoint.urlHost,
-        instruction: endpoint.instruction,
-        urlPath: endpoint.urlPath,
-        method: endpoint.method,
-        queryParams: endpoint.queryParams,
-        headers: endpoint.headers,
-        body: endpoint.body,
-        pagination: endpoint.pagination
-          ? {
-              type: endpoint.pagination.type,
-              ...(endpoint.pagination.pageSize !== undefined && {
-                pageSize: endpoint.pagination.pageSize,
-              }),
-              ...(endpoint.pagination.cursorPath !== undefined && {
-                cursorPath: endpoint.pagination.cursorPath,
-              }),
-              ...(endpoint.pagination.stopCondition !== undefined && {
-                stopCondition: endpoint.pagination.stopCondition,
-              }),
-            }
-          : undefined,
-        version: endpoint.version,
-      };
-      Object.keys(apiInput).forEach(
-        (key) => (apiInput as any)[key] === undefined && delete (apiInput as any)[key],
-      );
-      gqlInput = { endpoint: apiInput };
-    } else {
-      throw new Error("Either id or endpoint must be provided for call.");
-    }
-
-    const result = await this.request<{ call: ApiResult & { data: T } }>(mutation, {
-      input: gqlInput,
-      payload,
-      credentials,
-      options,
-    }).then((data) => data?.call);
-
-    if (result.error) {
-      throw new Error(result.error);
-    }
-
-    return result;
-  }
-
   async extract<T = any>({
     id,
     endpoint,
@@ -950,81 +873,57 @@ export class SuperglueClient {
     }).then((data) => data.extract);
   }
 
-  async listRuns(
-    limit: number = 100,
-    offset: number = 0,
-    configId?: string,
-  ): Promise<{ items: Run[]; total: number }> {
-    const query = `
-        query ListRuns($limit: Int!, $offset: Int!, $configId: ID) {
-          listRuns(limit: $limit, offset: $offset, configId: $configId) {
-            items {
-              id
-              toolId
-              status
-              requestSource
-              toolResult
-              toolPayload
-              stepResults {
-                stepId
-                success
-                error
-              }
-              error
-              startedAt
-              completedAt
-              toolConfig {
-                ${SuperglueClient.workflowQL}
-              }
-            }
-            total
-          }
-        }
-      `;
-    const response = await this.request<{ listRuns: { items: Run[]; total: number } }>(query, {
-      limit,
-      offset,
-      configId,
+  private mapOpenAPIRunToRun(openAPIRun: any): Run {
+    const statusMap: Record<string, RunStatus> = {
+      running: RunStatus.RUNNING,
+      success: RunStatus.SUCCESS,
+      failed: RunStatus.FAILED,
+      aborted: RunStatus.ABORTED,
+    };
+    return {
+      ...openAPIRun,
+      status: statusMap[openAPIRun.status] ?? RunStatus.FAILED,
+    } as Run;
+  }
+
+  async listRuns(options?: {
+    limit?: number;
+    page?: number;
+    toolId?: string;
+    status?: "running" | "success" | "failed" | "aborted";
+    requestSources?: ("api" | "frontend" | "scheduler" | "mcp" | "tool-chain" | "webhook")[];
+  }): Promise<{ items: Run[]; total: number; page: number; limit: number; hasMore: boolean }> {
+    const { limit = 100, page = 1, toolId, status, requestSources } = options ?? {};
+    const params = new URLSearchParams({
+      limit: String(limit),
+      page: String(page),
     });
-    return response.listRuns;
+    if (toolId) params.set("toolId", toolId);
+    if (status) params.set("status", status);
+    if (requestSources && requestSources.length > 0) {
+      params.set("requestSources", requestSources.join(","));
+    }
+
+    const response = await this.restRequest<{
+      data: any[];
+      total: number;
+      page: number;
+      limit: number;
+      hasMore: boolean;
+    }>("GET", `/v1/runs?${params.toString()}`);
+
+    return {
+      items: response.data.map((run) => this.mapOpenAPIRunToRun(run)),
+      total: response.total,
+      page: response.page,
+      limit: response.limit,
+      hasMore: response.hasMore,
+    };
   }
 
   async getRun(id: string): Promise<Run> {
-    const query = `
-        query GetRun($id: ID!) {
-          getRun(id: $id) {
-            id
-            toolId
-            status
-            requestSource
-            toolResult
-            toolPayload
-            stepResults {
-              stepId
-              success
-              transformedData
-              error
-            }
-            options
-            error
-            startedAt
-            completedAt
-            toolConfig {
-              ${SuperglueClient.workflowQL}
-            }
-          }
-        }
-      `;
-    const response = await this.request<{ getRun: Run }>(query, { id });
-    const run = response.getRun;
-
-    if (run.stepResults) {
-      run.stepResults.forEach((stepResult: any) => {
-        stepResult.data = stepResult.transformedData;
-      });
-    }
-
-    return run;
+    const response = await this.restRequest<any>("GET", `/v1/runs/${encodeURIComponent(id)}`);
+    return this.mapOpenAPIRunToRun(response);
   }
 
   async getWorkflow(id: string): Promise<Tool> {

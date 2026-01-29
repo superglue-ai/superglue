@@ -3,6 +3,7 @@ import type {
   DiscoveryRun,
   FileReference,
   FileStatus,
+  RequestSource,
   Run,
   RunStatus,
   System,
@@ -573,9 +574,10 @@ export class PostgresService implements DataStore {
     offset?: number;
     configId?: string;
     status?: RunStatus;
+    requestSources?: RequestSource[];
     orgId?: string;
   }): Promise<{ items: Run[]; total: number }> {
-    const { limit = 10, offset = 0, configId, status, orgId } = params || {};
+    const { limit = 10, offset = 0, configId, status, requestSources, orgId } = params || {};
     const client = await this.pool.connect();
     try {
       let selectQuery = `
@@ -585,7 +587,7 @@ export class PostgresService implements DataStore {
                 FROM runs
                 WHERE org_id = $1
             `;
-      const queryParams: string[] = [orgId || ""];
+      const queryParams: (string | string[])[] = [orgId || ""];
 
       if (configId) {
         selectQuery += " AND config_id = $2";
@@ -596,6 +598,12 @@ export class PostgresService implements DataStore {
         const paramIndex = queryParams.length + 1;
         selectQuery += ` AND data->>'status' = $${paramIndex}`;
         queryParams.push(status);
+      }
+
+      if (requestSources !== undefined && requestSources.length > 0) {
+        const paramIndex = queryParams.length + 1;
+        selectQuery += ` AND request_source = ANY($${paramIndex})`;
+        queryParams.push(requestSources);
       }
 
       selectQuery +=
@@ -627,8 +635,8 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async createRun(params: { run: Run }): Promise<Run> {
-    const { run } = params;
+  async createRun(params: { run: Run; orgId?: string }): Promise<Run> {
+    const { run, orgId = "" } = params;
     if (!run) throw new Error("Run is required");
     const client = await this.pool.connect();
     try {
@@ -639,19 +647,19 @@ export class PostgresService implements DataStore {
                 ON CONFLICT (id, org_id) DO NOTHING
             `,
         [
-          run.id,
+          run.runId,
           run.toolId,
-          run.orgId || "",
+          orgId,
           run.status,
           run.requestSource ?? "api",
           JSON.stringify(run),
-          run.startedAt ? run.startedAt.toISOString() : null,
-          run.completedAt ? run.completedAt.toISOString() : null,
+          run.metadata.startedAt,
+          run.metadata.completedAt ?? null,
         ],
       );
 
       if (result.rowCount === 0) {
-        throw new Error(`Run with id ${run.id} already exists`);
+        throw new Error(`Run with id ${run.runId} already exists`);
       }
 
       return run;
@@ -686,9 +694,11 @@ export class PostgresService implements DataStore {
       const updatedRun: Run = {
         ...existingRun,
         ...updates,
-        id,
-        orgId,
-        startedAt: existingRun.startedAt,
+        runId: id,
+        metadata: {
+          ...existingRun.metadata,
+          ...updates.metadata,
+        },
       };
 
       await client.query(
@@ -699,7 +709,7 @@ export class PostgresService implements DataStore {
             `,
         [
           JSON.stringify(updatedRun),
-          updatedRun.completedAt ? updatedRun.completedAt.toISOString() : null,
+          updatedRun.metadata.completedAt ?? null,
           updatedRun.status,
           updatedRun.requestSource ?? "api",
           id,
@@ -1519,6 +1529,7 @@ export class PostgresService implements DataStore {
       await client.query(`DELETE FROM workflow_schedules ${condition}`, param);
       await client.query(`DELETE FROM integration_details ${condition}`, param); // Delete details first
       await client.query(`DELETE FROM integrations ${condition}`, param);
+      await client.query(`DELETE FROM tool_history ${condition}`, param);
     } finally {
       client.release();
     }

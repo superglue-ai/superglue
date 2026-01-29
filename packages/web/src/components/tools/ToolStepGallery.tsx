@@ -1,54 +1,31 @@
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
-import { buildPreviousStepResults, buildStepInput, cn } from "@/src/lib/general-utils";
+import { buildPreviousStepResults, cn } from "@/src/lib/general-utils";
 import { buildCategorizedSources } from "@/src/lib/templating-utils";
-import { ExecutionStep, HttpMethod } from "@superglue/shared";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FinalTransformMiniStepCard } from "./cards/FinalTransformCard";
+import { FinalTransformMiniStepCard, TransformItem } from "./cards/FinalTransformCard";
 import { MiniStepCard } from "./cards/MiniStepCard";
-import { PayloadMiniStepCard } from "./cards/PayloadCard";
-import { SpotlightStepCard } from "./cards/SpotlightStepCard";
+import { PayloadMiniStepCard, PayloadItem } from "./cards/PayloadCard";
+import { SpotlightStepCard, StepItem } from "./cards/SpotlightStepCard";
 import { useExecution, useToolConfig } from "./context";
-import { AddStepDialog } from "./dialogs/AddStepDialog";
 import { useGalleryNavigation } from "./hooks/use-gallery-navigation";
 import { InstructionDisplay } from "./shared/InstructionDisplay";
+import { TriggersCard } from "./cards/TriggersCard";
+import { useRightSidebar } from "../sidebar/RightSidebarContext";
 
-interface PayloadItem {
-  type: "payload";
-  data: { payloadText: string; inputSchema: string | null };
-  stepResult: undefined;
-  transformError: undefined;
-  categorizedSources: ReturnType<typeof buildCategorizedSources>;
+export interface TriggerItem {
+  type: "trigger";
 }
 
-interface StepItem {
-  type: "step";
-  data: ExecutionStep;
-  stepResult: any;
-  transformError: undefined;
-  categorizedSources: ReturnType<typeof buildCategorizedSources>;
-}
-
-interface TransformItem {
-  type: "transform";
-  data: { transform: string; responseSchema: string };
-  stepResult: any;
-  transformError: any;
-  hasTransformCompleted: boolean;
-  categorizedSources: ReturnType<typeof buildCategorizedSources>;
-}
-
-type ToolItem = PayloadItem | StepItem | TransformItem;
+export type ToolItem = PayloadItem | StepItem | TransformItem | TriggerItem;
 
 export interface ToolStepGalleryProps {
   onStepEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
   onInstructionEdit?: () => void;
   onExecuteStep?: (stepIndex: number) => Promise<void>;
   onExecuteStepWithLimit?: (stepIndex: number, limit: number) => Promise<void>;
-  onOpenFixStepDialog?: (stepIndex: number) => void;
   onExecuteTransform?: (schema: string, transform: string) => Promise<void>;
-  onOpenFixTransformDialog?: () => void;
   onAbort?: () => void;
 
   onFilesUpload?: (files: File[]) => Promise<void>;
@@ -71,9 +48,7 @@ export function ToolStepGallery({
   onInstructionEdit,
   onExecuteStep,
   onExecuteStepWithLimit,
-  onOpenFixStepDialog,
   onExecuteTransform,
-  onOpenFixTransformDialog,
   onAbort,
   onFilesUpload,
   onFileRemove,
@@ -109,6 +84,7 @@ export function ToolStepGallery({
   const filePayloads = payload.filePayloads;
   const hasTransformCompleted = transformStatus === "completed";
   const hasTransformFailed = transformStatus === "failed";
+  const isSavedTool = toolId && !toolId.startsWith("draft_") && toolId !== "new";
 
   // Parse manual payload for categorized sources (memoized)
   const manualPayload = useMemo(() => {
@@ -120,14 +96,93 @@ export function ToolStepGallery({
   }, [payloadText]);
 
   // === LOCAL STATE ===
-  const [isAddStepDialogOpen, setIsAddStepDialogOpen] = useState(false);
-  const [pendingInsertIndex, setPendingInsertIndex] = useState<number | null>(null);
   const [hiddenLeftCount, setHiddenLeftCount] = useState(0);
   const [hiddenRightCount, setHiddenRightCount] = useState(0);
   const [activeStepItemCount, setActiveStepItemCount] = useState<number | null>(null);
 
-  // Item count: payload (1) + steps + transform (if exists)
-  const itemCount = 1 + steps.length + (finalTransform !== undefined ? 1 : 0);
+  // === AGENT SIDEBAR ===
+  const { sendMessageToAgent } = useRightSidebar();
+
+  // === TOOL ITEMS ===
+  const toolItems = useMemo((): ToolItem[] => {
+    const items: ToolItem[] = [];
+
+    // Trigger (first item for saved tools)
+    if (isSavedTool) {
+      items.push({ type: "trigger" } as TriggerItem);
+    }
+
+    // Payload
+    items.push({
+      type: "payload",
+      data: { payloadText, inputSchema },
+      stepResult: undefined,
+      transformError: undefined,
+      categorizedSources: buildCategorizedSources({
+        manualPayload,
+        filePayloads: filePayloads || {},
+      }),
+    } as PayloadItem);
+
+    // Steps
+    steps.forEach((step, index) => {
+      items.push({
+        type: "step",
+        data: step,
+        stepResult: stepResultsMap[step.id],
+        transformError: undefined,
+        categorizedSources: buildCategorizedSources({
+          manualPayload,
+          filePayloads: filePayloads || {},
+          previousStepResults: buildPreviousStepResults(steps, stepResultsMap, index - 1),
+        }),
+      } as StepItem);
+    });
+
+    // Transform
+    if (finalTransform !== undefined) {
+      items.push({
+        type: "transform",
+        data: { transform: finalTransform, responseSchema },
+        stepResult: finalResult,
+        transformError: hasTransformFailed ? stepResultsMap["__final_transform__"] : null,
+        hasTransformCompleted,
+        categorizedSources: buildCategorizedSources({
+          manualPayload,
+          filePayloads: filePayloads || {},
+          previousStepResults: buildPreviousStepResults(steps, stepResultsMap, steps.length - 1),
+        }),
+      } as TransformItem);
+    }
+
+    return items;
+  }, [
+    isSavedTool,
+    payloadText,
+    inputSchema,
+    steps,
+    stepResultsMap,
+    finalTransform,
+    responseSchema,
+    finalResult,
+    hasTransformCompleted,
+    hasTransformFailed,
+    manualPayload,
+    filePayloads,
+  ]);
+
+  // Item count is now dynamic based on toolItems
+  const itemCount = toolItems.length;
+
+  // Calculate initial index accounting for trigger card on saved tools
+  const initialNavIndex = useMemo(() => {
+    const triggerOffset = isSavedTool ? 1 : 0;
+    // If we have steps and payload is valid, start at first step; otherwise start at payload
+    if (steps.length > 0 && isPayloadValid) {
+      return triggerOffset + 1; // payload + first step
+    }
+    return triggerOffset; // payload (or trigger for saved tools)
+  }, [isSavedTool, steps.length, isPayloadValid]);
 
   // === NAVIGATION ===
   const {
@@ -144,7 +199,7 @@ export function ToolStepGallery({
     isConfiguratorEditing,
     setIsConfiguratorEditing,
   } = useGalleryNavigation({
-    initialIndex: steps.length > 0 && isPayloadValid ? 1 : 0,
+    initialIndex: initialNavIndex,
     itemCount,
     embedded,
   });
@@ -153,84 +208,29 @@ export function ToolStepGallery({
     setActiveStepItemCount(itemCount);
   }, []);
 
-  // === TOOL ITEMS ===
-  const toolItems = useMemo(
-    (): ToolItem[] => [
-      {
-        type: "payload",
-        data: { payloadText, inputSchema },
-        stepResult: undefined,
-        transformError: undefined,
-        categorizedSources: buildCategorizedSources({
-          manualPayload,
-          filePayloads: filePayloads || {},
-        }),
-      } as PayloadItem,
-      ...steps.map(
-        (step, index): StepItem => ({
-          type: "step",
-          data: step,
-          stepResult: stepResultsMap[step.id],
-          transformError: undefined,
-          categorizedSources: buildCategorizedSources({
-            manualPayload,
-            filePayloads: filePayloads || {},
-            previousStepResults: buildPreviousStepResults(steps, stepResultsMap, index - 1),
-          }),
-        }),
-      ),
-      ...(finalTransform !== undefined
-        ? [
-            {
-              type: "transform",
-              data: { transform: finalTransform, responseSchema },
-              stepResult: finalResult,
-              transformError: hasTransformFailed ? stepResultsMap["__final_transform__"] : null,
-              hasTransformCompleted,
-              categorizedSources: buildCategorizedSources({
-                manualPayload,
-                filePayloads: filePayloads || {},
-                previousStepResults: buildPreviousStepResults(
-                  steps,
-                  stepResultsMap,
-                  steps.length - 1,
-                ),
-              }),
-            } as TransformItem,
-          ]
-        : []),
-    ],
-    [
-      payloadText,
-      inputSchema,
-      steps,
-      stepResultsMap,
-      finalTransform,
-      responseSchema,
-      finalResult,
-      hasTransformCompleted,
-      hasTransformFailed,
-      manualPayload,
-      filePayloads,
-    ],
-  );
-
   const currentItem = toolItems[activeIndex];
   const indicatorIndices = toolItems.map((_, idx) => idx);
+
+  // Compute the step index for the current item (if it's a step)
+  const currentStepIndex = useMemo(() => {
+    if (currentItem?.type !== "step") return -1;
+    return toolItems.slice(0, activeIndex).filter((i) => i.type === "step").length;
+  }, [currentItem, toolItems, activeIndex]);
 
   // === VISIBLE CARDS CALCULATION ===
   const visibleCardsData = useMemo(() => {
     const totalCards = toolItems.length;
-    const CARD_WIDTH = 180;
-    const ARROW_WIDTH = 24;
-    const GUTTER = 16;
-    const SAFE_MARGIN = 12;
-    const available = Math.max(0, containerWidth - SAFE_MARGIN);
+    const CARD_WIDTH = 150;
+    const BUTTON_SIZE = 32;
+    const BUTTON_SPACING = 18;
+    const SEPARATOR_WIDTH = BUTTON_SIZE + BUTTON_SPACING * 2;
+    const EDGE_PADDING = 16;
+    const available = Math.max(0, containerWidth - EDGE_PADDING * 2);
 
     let cardsToShow = 1;
     const maxCandidates = Math.min(totalCards, 12);
     for (let c = 1; c <= maxCandidates; c++) {
-      const needed = c * CARD_WIDTH + (c - 1) * (ARROW_WIDTH + GUTTER);
+      const needed = c * CARD_WIDTH + (c - 1) * SEPARATOR_WIDTH;
       if (needed <= available) {
         cardsToShow = c;
       } else {
@@ -249,14 +249,7 @@ export function ToolStepGallery({
 
     const visibleItems = toolItems.slice(startIdx, endIdx);
     const visibleIndices = visibleItems.map((_, i) => startIdx + i);
-    const sepWidth = ARROW_WIDTH + GUTTER;
     const count = Math.max(1, visibleItems.length);
-    const innerAvailable = Math.max(
-      0,
-      containerWidth - SAFE_MARGIN - 2 * sepWidth - (count - 1) * sepWidth,
-    );
-    const baseCardWidth = Math.floor(innerAvailable / count);
-    const widthRemainder = innerAvailable - baseCardWidth * count;
 
     return {
       visibleItems,
@@ -266,9 +259,8 @@ export function ToolStepGallery({
       totalCards,
       hiddenLeft: startIdx,
       hiddenRight: totalCards - endIdx,
-      sepWidth,
-      baseCardWidth,
-      widthRemainder,
+      sepWidth: SEPARATOR_WIDTH,
+      cardWidth: CARD_WIDTH,
     };
   }, [toolItems, containerWidth, activeIndex]);
 
@@ -295,46 +287,19 @@ export function ToolStepGallery({
     }
   };
 
-  const handleInsertStep = (afterIndex: number) => {
-    if (!setSteps) return;
-    setPendingInsertIndex(afterIndex);
-    setIsAddStepDialogOpen(true);
-  };
+  const handleAddStep = useCallback(
+    (afterStepIndex: number) => {
+      const position =
+        afterStepIndex === -1
+          ? "at the beginning"
+          : `after step "${steps[afterStepIndex]?.id || afterStepIndex + 1}"`;
 
-  const insertStepsAndNavigate = (stepsToInsert: ExecutionStep[]) => {
-    if (pendingInsertIndex === null || !setSteps) return;
-    const newSteps = [...steps];
-    newSteps.splice(pendingInsertIndex, 0, ...stepsToInsert);
-    setSteps(newSteps);
-    const insertedIndex = pendingInsertIndex;
-    setIsAddStepDialogOpen(false);
-    setPendingInsertIndex(null);
-    setTimeout(() => navigateToIndex(insertedIndex + 1), 100);
-  };
-
-  const handleConfirmInsertStep = (stepId: string, instruction: string, systemId?: string) => {
-    const selectedSystem = systemId ? systems?.find((s) => s.id === systemId) : undefined;
-    const newStep: ExecutionStep = {
-      id: stepId,
-      systemId: systemId || "",
-      apiConfig: {
-        id: stepId,
-        instruction,
-        urlHost: selectedSystem?.urlHost || "",
-        urlPath: selectedSystem?.urlPath || "",
-        method: "GET" as HttpMethod,
-        headers: {},
-        queryParams: {},
-        body: "",
-      },
-      executionMode: "DIRECT",
-    };
-    insertStepsAndNavigate([newStep]);
-  };
-
-  const handleConfirmInsertTool = (toolSteps: ExecutionStep[]) => insertStepsAndNavigate(toolSteps);
-
-  const handleConfirmGenerateStep = (step: ExecutionStep) => insertStepsAndNavigate([step]);
+      sendMessageToAgent(
+        `Please add a new step ${position}. Ask me what the step should do if you need more information.`,
+      );
+    },
+    [steps, sendMessageToAgent],
+  );
 
   const onStepEdit = (stepId: string, updatedStep: any, isUserInitiated: boolean = false) => {
     // Suppress user-initiated edits during navigation to prevent spurious resets
@@ -358,7 +323,9 @@ export function ToolStepGallery({
     if (!showStepOutputSignal || !focusStepId) return;
     const idx = steps.findIndex((s: any) => s.id === focusStepId);
     if (idx >= 0) {
-      navigateToIndex(idx + 1);
+      // +1 for payload, +1 more for trigger if saved tool
+      const offset = isSavedTool ? 2 : 1;
+      navigateToIndex(idx + offset);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showStepOutputSignal, focusStepId]);
@@ -385,7 +352,7 @@ export function ToolStepGallery({
             <InstructionDisplay
               instruction={instruction}
               onEdit={onInstructionEdit}
-              showEditButton={!!onInstructionEdit}
+              showEditButton={true}
             />
           </div>
         )}
@@ -434,15 +401,16 @@ export function ToolStepGallery({
               <div className="relative">
                 <div
                   ref={listRef}
-                  className="flex justify-center items-center overflow-visible py-3"
-                  style={{ minHeight: "150px" }}
+                  className="flex justify-center items-center overflow-visible py-3 relative z-10"
+                  style={{ minHeight: "140px" }}
                 >
                   {!isHydrated ? (
                     <div className="flex items-center justify-center">
-                      <div className="w-48 h-24 bg-muted/20 rounded-md animate-pulse" />
+                      <div className="w-40 h-24 bg-muted/20 rounded-md animate-pulse" />
                     </div>
                   ) : (
                     <>
+                      {/* Left spacer */}
                       {visibleCardsData.visibleItems.length > 0 && (
                         <div
                           style={{
@@ -454,48 +422,90 @@ export function ToolStepGallery({
                       {visibleCardsData.visibleItems.map((item, idx) => {
                         const globalIdx = visibleCardsData.visibleIndices[idx];
                         const showArrow = idx < visibleCardsData.visibleItems.length - 1;
-                        const cardWidth =
-                          visibleCardsData.baseCardWidth +
-                          (idx < visibleCardsData.widthRemainder ? 1 : 0);
+                        const cardWidth = visibleCardsData.cardWidth;
+
+                        const baseProps = {
+                          index: globalIdx,
+                          isActive: globalIdx === activeIndex,
+                          onClick: () => {
+                            handleCardClick(globalIdx);
+                          },
+                          isFirstCard: globalIdx === 0,
+                          isLastCard: globalIdx === visibleCardsData.totalCards - 1,
+                        };
+
+                        // Build cardProps based on item type
+                        let cardProps: any;
+                        if (item.type === "trigger") {
+                          cardProps = {
+                            ...baseProps,
+                            type: "trigger" as const,
+                          };
+                        } else if (item.type === "payload") {
+                          cardProps = {
+                            ...baseProps,
+                            type: "payload" as const,
+                            isPayloadValid,
+                            payloadData: computedPayload,
+                          };
+                        } else if (item.type === "transform") {
+                          cardProps = {
+                            ...baseProps,
+                            type: "transform" as const,
+                            isRunning: isRunningTransform || isFixingTransform,
+                          };
+                        } else {
+                          // step type
+                          const stepItem = item as StepItem;
+                          const stepsBeforeThis = toolItems
+                            .slice(0, globalIdx)
+                            .filter((i) => i.type === "step").length;
+                          cardProps = {
+                            ...baseProps,
+                            type: "step" as const,
+                            step: stepItem.data,
+                            stepNumber: stepsBeforeThis,
+                            isRunning:
+                              isExecutingAny && currentExecutingStepIndex === stepsBeforeThis,
+                            isLoopStep:
+                              globalIdx === activeIndex &&
+                              activeStepItemCount !== null &&
+                              activeStepItemCount > 0,
+                          };
+                        }
+
+                        // Determine if we should show add step button
+                        const canShowAddButton =
+                          setSteps && item.type !== "transform" && item.type !== "trigger";
+
+                        // Get the step index for insert
+                        const getInsertIndex = () => {
+                          if (item.type === "trigger") return -1;
+                          if (item.type === "payload") return -1;
+                          if (item.type === "step") {
+                            return (
+                              toolItems.slice(0, globalIdx + 1).filter((i) => i.type === "step")
+                                .length - 1
+                            );
+                          }
+                          return -1;
+                        };
+
                         return (
                           <React.Fragment key={globalIdx}>
-                            <div
-                              className="flex items-center justify-center"
-                              style={{
-                                flex: `0 0 ${cardWidth}px`,
-                                width: `${cardWidth}px`,
-                                maxWidth: `${cardWidth}px`,
-                              }}
-                            >
-                              <MiniStepCard
-                                step={item.data}
-                                index={globalIdx}
-                                isActive={globalIdx === activeIndex}
-                                onClick={() => handleCardClick(globalIdx)}
-                                stepId={item.type === "step" ? item.data.id : undefined}
-                                isPayload={item.type === "payload"}
-                                isTransform={item.type === "transform"}
-                                isRunningAll={
-                                  isExecutingAny && currentExecutingStepIndex === globalIdx - 1
-                                }
-                                isTesting={
-                                  item.type === "step"
-                                    ? currentExecutingStepIndex === globalIdx - 1
-                                    : item.type === "transform"
-                                      ? isRunningTransform || isFixingTransform
-                                      : false
-                                }
-                                isFirstCard={globalIdx === 0}
-                                isLastCard={globalIdx === visibleCardsData.totalCards - 1}
-                                isPayloadValid={isPayloadValid}
-                                payloadData={item.type === "payload" ? computedPayload : undefined}
-                                isLoopStep={
-                                  globalIdx === activeIndex &&
-                                  activeStepItemCount !== null &&
-                                  activeStepItemCount > 0
-                                }
-                              />
-                            </div>
+                            {item.type !== "trigger" && (
+                              <div
+                                className="flex items-center justify-center"
+                                style={{
+                                  flex: `0 0 ${cardWidth}px`,
+                                  width: `${cardWidth}px`,
+                                  maxWidth: `${cardWidth}px`,
+                                }}
+                              >
+                                <MiniStepCard {...cardProps} />
+                              </div>
+                            )}
+                            {item.type === "trigger" && <MiniStepCard {...cardProps} />}
                             {showArrow && (
                               <div
                                 style={{
@@ -504,26 +514,25 @@ export function ToolStepGallery({
                                 }}
                                 className="flex items-center justify-center"
                               >
-                                {setSteps ? (
+                                {canShowAddButton ? (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleInsertStep(globalIdx);
+                                      handleAddStep(getInsertIndex());
                                     }}
-                                    className="group relative flex items-center justify-center h-8 w-8 rounded-full hover:bg-primary/10 transition-colors"
+                                    className="group relative flex items-center justify-center h-8 w-8 rounded-full border border-muted-foreground/15 hover:border-primary/30 hover:bg-primary/5 transition-colors"
                                     title="Add step here"
                                   >
-                                    <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:opacity-0 transition-opacity" />
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:opacity-0 transition-opacity" />
                                     <Plus className="h-4 w-4 text-primary absolute opacity-0 group-hover:opacity-100 transition-opacity" />
                                   </button>
-                                ) : (
-                                  <ChevronRight className="h-5 w-5 text-muted-foreground/50" />
-                                )}
+                                ) : null}
                               </div>
                             )}
                           </React.Fragment>
                         );
                       })}
+                      {/* Right spacer */}
                       {visibleCardsData.visibleItems.length > 0 && (
                         <div
                           style={{
@@ -581,66 +590,48 @@ export function ToolStepGallery({
           </div>
 
           <div className="min-h-[220px] max-w-6xl mx-auto">
-            {currentItem &&
-              (currentItem.type === "payload" ? (
-                <PayloadMiniStepCard
-                  onFilesUpload={onFilesUpload}
-                  onFileRemove={onFileRemove}
-                  isProcessingFiles={isProcessingFiles}
-                  totalFileSize={totalFileSize}
-                  isPayloadValid={isPayloadValid}
-                />
-              ) : currentItem.type === "transform" ? (
-                <FinalTransformMiniStepCard
-                  onExecuteTransform={onExecuteTransform}
-                  onOpenFixTransformDialog={onOpenFixTransformDialog}
-                  onAbort={isRunningTransform || isFixingTransform ? onAbort : undefined}
-                />
-              ) : (
-                <SpotlightStepCard
-                  key={currentItem.data.id}
-                  step={currentItem.data}
-                  stepIndex={activeIndex - 1}
-                  onEdit={onStepEdit}
-                  onRemove={currentItem.type === "step" ? handleRemoveStep : undefined}
-                  onExecuteStep={onExecuteStep ? () => onExecuteStep(activeIndex - 1) : undefined}
-                  onExecuteStepWithLimit={
-                    onExecuteStepWithLimit
-                      ? (limit) => onExecuteStepWithLimit(activeIndex - 1, limit)
-                      : undefined
-                  }
-                  onOpenFixStepDialog={
-                    onOpenFixStepDialog ? () => onOpenFixStepDialog(activeIndex - 1) : undefined
-                  }
-                  onAbort={currentExecutingStepIndex === activeIndex - 1 ? onAbort : undefined}
-                  isExecuting={currentExecutingStepIndex === activeIndex - 1}
-                  showOutputSignal={
-                    focusStepId === currentItem.data.id ? showStepOutputSignal : undefined
-                  }
-                  onConfigEditingChange={setIsConfiguratorEditing}
-                  onDataSelectorChange={handleDataSelectorChange}
-                  isFirstStep={activeIndex === 1}
-                  isPayloadValid={isPayloadValid}
-                />
-              ))}
+            {currentItem && currentItem.type === "trigger" ? (
+              <TriggersCard toolId={toolId} payload={computedPayload} compact />
+            ) : currentItem && currentItem.type === "payload" ? (
+              <PayloadMiniStepCard
+                onFilesUpload={onFilesUpload}
+                onFileRemove={onFileRemove}
+                isProcessingFiles={isProcessingFiles}
+                totalFileSize={totalFileSize}
+                isPayloadValid={isPayloadValid}
+              />
+            ) : currentItem && currentItem.type === "transform" ? (
+              <FinalTransformMiniStepCard
+                onExecuteTransform={onExecuteTransform}
+                onAbort={isRunningTransform || isFixingTransform ? onAbort : undefined}
+              />
+            ) : currentItem && currentItem.type === "step" ? (
+              <SpotlightStepCard
+                key={currentItem.data.id}
+                step={currentItem.data}
+                stepIndex={currentStepIndex}
+                onEdit={onStepEdit}
+                onRemove={() => handleRemoveStep(currentItem.data.id)}
+                onExecuteStep={onExecuteStep ? () => onExecuteStep(currentStepIndex) : undefined}
+                onExecuteStepWithLimit={
+                  onExecuteStepWithLimit
+                    ? (limit) => onExecuteStepWithLimit(currentStepIndex, limit)
+                    : undefined
+                }
+                onAbort={currentExecutingStepIndex === currentStepIndex ? onAbort : undefined}
+                isExecuting={currentExecutingStepIndex === currentStepIndex}
+                showOutputSignal={
+                  focusStepId === currentItem.data.id ? showStepOutputSignal : undefined
+                }
+                onConfigEditingChange={setIsConfiguratorEditing}
+                onDataSelectorChange={handleDataSelectorChange}
+                isFirstStep={currentStepIndex === 0}
+                isPayloadValid={isPayloadValid}
+              />
+            ) : null}
           </div>
         </div>
       </div>
-
-      <AddStepDialog
-        open={isAddStepDialogOpen}
-        onOpenChange={setIsAddStepDialogOpen}
-        onConfirm={handleConfirmInsertStep}
-        onConfirmTool={handleConfirmInsertTool}
-        onConfirmGenerate={handleConfirmGenerateStep}
-        existingStepIds={steps.map((s: any) => s.id)}
-        stepInput={
-          pendingInsertIndex !== null
-            ? buildStepInput(computedPayload, steps, stepResultsMap, pendingInsertIndex - 1)
-            : undefined
-        }
-        currentToolId={toolId}
-      />
     </div>
   );
 }

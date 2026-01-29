@@ -2,10 +2,12 @@
 
 import { Button } from "@/src/components/ui/button";
 import { Textarea } from "@/src/components/ui/textarea";
+import { formatPlaygroundRuntimeContext } from "@/src/lib/agent/agent-context";
 import { cn } from "@/src/lib/general-utils";
 import { Tool, ExecutionStep, ToolDiff } from "@superglue/shared";
 import {
   BotMessageSquare,
+  Edit2,
   Loader2,
   MessagesSquare,
   Send,
@@ -13,19 +15,25 @@ import {
   Square,
   User,
   Plus,
+  X,
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { AgentContextProvider, useAgentContext } from "../../agent/AgentContextProvider";
 import { ConversationHistory } from "../../agent/ConversationHistory";
 import type { AgentConfig, PlaygroundToolContext } from "../../agent/hooks/types";
+import { AgentType } from "@/src/lib/agent/registry/agents";
 import {
   ScrollToBottomButton,
   ScrollToBottomContainer,
+  ScrollToBottomTrigger,
+  ScrollToBottomTriggerRef,
 } from "../../agent/hooks/use-scroll-to-bottom";
 import { ToolCallComponent } from "../../agent/ToolCallComponent";
+import { BackgroundToolGroup, groupMessageParts } from "../../agent/tool-components";
 import { useToolConfig } from "../context/tool-config-context";
 import { useExecution } from "../context/tool-execution-context";
+import { useRightSidebar } from "../../sidebar/RightSidebarContext";
 
 const MAX_MESSAGE_LENGTH = 50000;
 
@@ -61,7 +69,7 @@ function buildPlaygroundContext(
     systemIds,
     executionSummary,
     initialError,
-    currentPayload: payload.manualPayloadText || "{}",
+    currentPayload: JSON.stringify(payload.computedPayload || {}, null, 2),
   };
 }
 
@@ -83,20 +91,49 @@ function PlaygroundAgentContent({
     stopStreaming,
     handleToolInputChange,
     handleToolUpdate,
-    addSystemMessage,
-    triggerStreamContinuation,
+    sendAgentRequest,
+    bufferAction,
     currentConversationId,
     setCurrentConversationId,
     loadConversation,
     startNewConversation,
+    editingMessageId,
+    editingContent,
+    setEditingContent,
+    handleEditMessage,
+    handleCancelEdit,
+    handleSaveEdit,
   } = useAgentContext();
 
+  const { registerSetAgentInput, registerResetAgentChat } = useRightSidebar();
   const toolConfig = useToolConfig();
   const execution = useExecution();
   const cacheKeyPrefix = `superglue-playground-${toolId}`;
   const [inputValue, setInputValue] = useState("");
+  const [isHighlighted, setIsHighlighted] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasAutoFixedRef = useRef(false);
+  const scrollTriggerRef = useRef<ScrollToBottomTriggerRef>(null);
+
+  // Register the setInput function to paste message into input field and select it
+  useEffect(() => {
+    registerSetAgentInput((message: string) => {
+      setInputValue(message);
+      setIsHighlighted(true);
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.style.height = "auto";
+          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+        }
+      }, 0);
+    });
+  }, [registerSetAgentInput]);
+
+  // Register the reset chat function so it can be called from outside (Cmd+L)
+  useEffect(() => {
+    registerResetAgentChat(startNewConversation);
+  }, [registerResetAgentChat, startNewConversation]);
 
   // Auto-send fix request when there's an initial error
   useEffect(() => {
@@ -156,15 +193,21 @@ function PlaygroundAgentContent({
       }
 
       if (newConfig.responseSchema !== undefined) {
-        toolConfig.setResponseSchema(
-          newConfig.responseSchema ? JSON.stringify(newConfig.responseSchema, null, 2) : "",
-        );
+        const schemaValue = newConfig.responseSchema
+          ? typeof newConfig.responseSchema === "string"
+            ? newConfig.responseSchema
+            : JSON.stringify(newConfig.responseSchema, null, 2)
+          : "";
+        toolConfig.setResponseSchema(schemaValue);
       }
 
       if (newConfig.inputSchema !== undefined) {
-        toolConfig.setInputSchema(
-          newConfig.inputSchema ? JSON.stringify(newConfig.inputSchema, null, 2) : null,
-        );
+        const schemaValue = newConfig.inputSchema
+          ? typeof newConfig.inputSchema === "string"
+            ? newConfig.inputSchema
+            : JSON.stringify(newConfig.inputSchema, null, 2)
+          : null;
+        toolConfig.setInputSchema(schemaValue);
       }
 
       if (firstChangedStepIndex !== null) {
@@ -183,14 +226,20 @@ function PlaygroundAgentContent({
     [toolConfig],
   );
 
-  const currentPayload = toolConfig.payload.manualPayloadText || "{}";
+  const currentPayload = JSON.stringify(toolConfig.payload.computedPayload || {}, null, 2);
 
   const handleSubmit = useCallback(
     (e?: React.FormEvent) => {
       e?.preventDefault();
       if (inputValue.trim() && !isLoading) {
+        scrollTriggerRef.current?.scrollToBottom();
         handleSendMessage(inputValue.trim());
         setInputValue("");
+        setIsHighlighted(false);
+        // Reset textarea height
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto";
+        }
       }
     },
     [inputValue, isLoading, handleSendMessage],
@@ -266,7 +315,7 @@ function PlaygroundAgentContent({
           {messages
             .filter((m) => !(m as any).isHidden)
             .map((message) => (
-              <div key={message.id} className="space-y-1">
+              <div key={message.id} className="space-y-1 group">
                 <div className="flex items-center gap-2">
                   <div
                     className={cn(
@@ -287,46 +336,93 @@ function PlaygroundAgentContent({
                   {message.isStreaming && (
                     <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
                   )}
-                </div>
-
-                <div className="space-y-2">
-                  {message.parts && message.parts.length > 0 ? (
-                    message.parts.map((part) =>
-                      part.type === "content" ? (
-                        <div
-                          key={part.id}
-                          className={cn(
-                            "prose prose-sm max-w-none dark:prose-invert text-sm",
-                            message.isStreaming && "streaming-message",
-                          )}
-                        >
-                          <Streamdown>{part.content || ""}</Streamdown>
-                        </div>
-                      ) : part.type === "tool" && part.tool ? (
-                        <ToolCallComponent
-                          key={part.tool.id}
-                          tool={part.tool}
-                          onInputChange={handleToolInputChange}
-                          onToolUpdate={handleToolUpdate}
-                          onSystemMessage={addSystemMessage}
-                          onTriggerContinuation={triggerStreamContinuation}
-                          onAbortStream={stopStreaming}
-                          onApplyChanges={handleApplyChanges}
-                          onApplyPayload={handleApplyPayload}
-                          currentPayload={currentPayload}
-                          isPlayground={true}
-                        />
-                      ) : null,
-                    )
-                  ) : (
-                    <div className="prose prose-sm max-w-none dark:prose-invert text-sm">
-                      <Streamdown>{message.content}</Streamdown>
-                    </div>
+                  {message.role === "user" && !isLoading && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 p-3"
+                      onClick={() => handleEditMessage(message.id, message.content)}
+                    >
+                      <Edit2 className="w-0.5 h-0.5" />
+                    </Button>
                   )}
                 </div>
+
+                {editingMessageId === message.id ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={editingContent}
+                      onChange={(e) => setEditingContent(e.target.value)}
+                      className="min-h-[48px] max-h-[120px] resize-none text-sm focus-visible:ring-0 focus-visible:border-ring"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleSaveEdit(message.id)}
+                        disabled={!editingContent.trim() || isLoading}
+                      >
+                        Save & Restart
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleCancelEdit}
+                        disabled={isLoading}
+                      >
+                        <X className="w-3 h-3 mr-1" />
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {message.parts && message.parts.length > 0 ? (
+                      groupMessageParts(message.parts).map((grouped, idx) => {
+                        if (grouped.type === "content") {
+                          return (
+                            <div
+                              key={grouped.part.id}
+                              className={cn(
+                                "prose prose-sm max-w-none dark:prose-invert text-sm",
+                                message.isStreaming && "streaming-message",
+                              )}
+                            >
+                              <Streamdown>{grouped.part.content || ""}</Streamdown>
+                            </div>
+                          );
+                        } else if (grouped.type === "background_tools") {
+                          return <BackgroundToolGroup key={`bg-${idx}`} tools={grouped.tools} />;
+                        } else if (grouped.type === "tool" && grouped.part.tool) {
+                          return (
+                            <ToolCallComponent
+                              key={grouped.part.tool.id}
+                              tool={grouped.part.tool}
+                              onInputChange={handleToolInputChange}
+                              onToolUpdate={handleToolUpdate}
+                              sendAgentRequest={sendAgentRequest}
+                              bufferAction={bufferAction}
+                              onAbortStream={stopStreaming}
+                              onApplyChanges={handleApplyChanges}
+                              onApplyPayload={handleApplyPayload}
+                              currentPayload={currentPayload}
+                              isPlayground={true}
+                            />
+                          );
+                        }
+                        return null;
+                      })
+                    ) : (
+                      <div className="prose prose-sm max-w-none dark:prose-invert text-sm">
+                        <Streamdown>{message.content}</Streamdown>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
         </div>
+        <ScrollToBottomTrigger ref={scrollTriggerRef} />
         <ScrollToBottomButton
           className="absolute bottom-3 left-1/2 -translate-x-1/2 z-50"
           buttonClassName="h-8 w-8 p-0 rounded-full bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 border-2 border-green-400 dark:border-green-500 shadow-lg hover:shadow-xl transition-all duration-200"
@@ -336,14 +432,24 @@ function PlaygroundAgentContent({
 
       {/* Input Area */}
       <div className="p-3">
-        <form onSubmit={handleSubmit} className="flex gap-2">
+        <form onSubmit={handleSubmit} className="flex gap-2 items-end">
           <Textarea
             ref={textareaRef}
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => {
+              setInputValue(e.target.value);
+              setIsHighlighted(false);
+              // Auto-resize textarea
+              e.target.style.height = "auto";
+              e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Message superglue..."
-            className="min-h-[36px] max-h-[96px] resize-none text-sm py-2"
+            className={cn(
+              "min-h-[36px] max-h-[200px] resize-none text-sm py-2 transition-all",
+              isHighlighted &&
+                "ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30",
+            )}
             rows={1}
             disabled={isLoading}
             maxLength={MAX_MESSAGE_LENGTH}
@@ -372,13 +478,51 @@ export function PlaygroundAgentSidebar({
   const execution = useExecution();
   const toolId = toolConfig.tool.id;
 
-  const agentConfig = useMemo<AgentConfig>(() => {
+  const hiddenContextBuilder = useCallback(() => {
     const executionSummary = execution.getExecutionStateSummary();
-    return {
-      toolSet: "playground",
-      playgroundContext: buildPlaygroundContext(toolConfig, executionSummary, initialError),
-    };
+    const ctx = buildPlaygroundContext(toolConfig, executionSummary, initialError);
+    const { payload } = toolConfig;
+    const uploadedFiles = payload.uploadedFiles.map((f) => ({
+      name: f.name,
+      key: f.key,
+      status: f.status,
+    }));
+    const mergedPayload =
+      uploadedFiles.length > 0 ? JSON.stringify(payload.computedPayload, null, 2) : undefined;
+
+    return formatPlaygroundRuntimeContext({
+      toolId: ctx.toolId,
+      instruction: ctx.instruction,
+      stepsCount: ctx.steps.length,
+      currentPayload: ctx.currentPayload || "{}",
+      executionSummary: ctx.executionSummary,
+      uploadedFiles: uploadedFiles.length > 0 ? uploadedFiles : undefined,
+      mergedPayload,
+    });
   }, [toolConfig, execution, initialError]);
+
+  const agentConfig = useMemo<AgentConfig>(() => {
+    const ctx = buildPlaygroundContext(
+      toolConfig,
+      execution.getExecutionStateSummary(),
+      initialError,
+    );
+    return {
+      agentId: AgentType.PLAYGROUND,
+      hiddenContextBuilder,
+      agentParams: {
+        playgroundToolConfig: {
+          toolId: ctx.toolId,
+          instruction: ctx.instruction,
+          steps: ctx.steps,
+          finalTransform: ctx.finalTransform,
+          inputSchema: ctx.inputSchema,
+          responseSchema: ctx.responseSchema,
+          systemIds: ctx.systemIds,
+        },
+      },
+    };
+  }, [toolConfig, execution, initialError, hiddenContextBuilder]);
 
   return (
     <div className={cn("h-full", className)}>

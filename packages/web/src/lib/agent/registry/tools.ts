@@ -2,42 +2,30 @@ import { setFileUploadDocumentationURL } from "@/src/lib/file-utils";
 import {
   CallEndpointArgs,
   CallEndpointResult,
-  Message,
+  ConfirmationAction,
   SelfHealingMode,
-  SuperglueClient,
   ToolResult,
   UpsertMode,
 } from "@superglue/shared";
-import { SystemConfig, systems } from "@superglue/shared/templates";
-import { DraftLookup, findDraftInMessages, formatDiffSummary } from "./agent-context";
+import { SystemConfig, systems, findTemplateForSystem } from "@superglue/shared/templates";
+import { DraftLookup, findDraftInMessages, formatDiffSummary } from "../agent-context";
 import {
   filterSystemFields,
-  resolveFileReferences,
+  resolveDocumentationFiles,
+  resolvePayloadWithFiles,
   stripLegacyToolFields,
+  truncateResponseBody,
+  validateDraftOrToolId,
   validateRequiredFields,
-} from "./agent-helpers";
-
-export interface ToolDefinition {
-  name: string;
-  description?: string;
-  inputSchema: any;
-}
-
-export const TOOLS_REQUIRING_CONFIRMATION_BEFORE_EXEC = new Set(["call_endpoint"]);
-export const TOOLS_REQUIRING_CONFIRMATION_AFTER_EXEC = new Set(["edit_tool", "edit_payload"]);
-
-export const CURL_CONFIRMATION = {
-  PENDING: "PENDING_USER_CONFIRMATION",
-  CONFIRMED: "USER_CONFIRMED",
-  CANCELLED: "USER_CANCELLED",
-} as const;
-
-export const EDIT_TOOL_CONFIRMATION = {
-  PENDING: "PENDING_DIFF_APPROVAL",
-  APPROVED: "DIFFS_APPROVED",
-  REJECTED: "DIFFS_REJECTED",
-  PARTIAL: "DIFFS_PARTIALLY_APPROVED",
-} as const;
+} from "../agent-helpers";
+import {
+  CALL_ENDPOINT_CONFIRMATION,
+  EDIT_TOOL_CONFIRMATION,
+  ToolDefinition,
+  ToolExecutionContext,
+  ToolRegistryEntry,
+} from "../agent-types";
+import { processToolPolicy } from "./tool-policies";
 
 export const TOOL_CONTINUATION_MESSAGES = {
   call_endpoint: {
@@ -48,11 +36,11 @@ export const TOOL_CONTINUATION_MESSAGES = {
   },
   edit_tool: {
     confirmed:
-      "[USER ACTION] The user approved the tool edit changes. The changes have been applied to the tool configuration. Briefly confirm the edit was applied.",
+      "[USER ACTION] The user approved the tool edit changes. The changes have been applied to the tool configuration. Briefly confirm the edit was applied. Do NOT call run_tool unless the user explicitly asks to run/test again.",
     declined:
       "[USER ACTION] The user rejected the tool edit changes. Ask what they would like to change or if they want to try a different approach.",
     partial:
-      "[USER ACTION] The user PARTIALLY approved the tool edit. IMPORTANT: Check the tool output for 'appliedChanges' (changes that WERE applied) and 'rejectedChanges' (changes the user rejected). Only report the applied changes as successful. Acknowledge which changes were rejected.",
+      "[USER ACTION] The user PARTIALLY approved the tool edit. IMPORTANT: Check the tool output for 'appliedChanges' (changes that WERE applied) and 'rejectedChanges' (changes the user rejected). Only report the applied changes as successful. Acknowledge which changes were rejected. Do NOT call run_tool unless the user explicitly asks.",
   },
   edit_payload: {
     confirmed:
@@ -62,130 +50,7 @@ export const TOOL_CONTINUATION_MESSAGES = {
   },
 };
 
-export const getAgentToolDefinitions = (): ToolDefinition[] => {
-  return [
-    buildToolDefinition(),
-    runToolDefinition(),
-    editToolDefinition(),
-    saveToolDefinition(),
-    createSystemDefinition(),
-    modifySystemDefinition(),
-    searchDocumentationDefinition(),
-    callEndpointDefinition(),
-    authenticateOAuthDefinition(),
-    getRunsDefinition(),
-    findSystemTemplatesDefinition(),
-  ];
-};
-
-export const getPlaygroundToolDefinitions = (): ToolDefinition[] => {
-  return [
-    editToolDefinitionPlayground(),
-    editPayloadDefinition(),
-    searchDocumentationDefinition(),
-    callEndpointDefinition(),
-    modifySystemDefinition(),
-    authenticateOAuthDefinition(),
-  ];
-};
-
-export const executeAgentTool = async (
-  toolName: string,
-  args: any,
-  client: SuperglueClient,
-  orgId?: string,
-  logCallback?: (message: string) => void,
-  filePayloads?: Record<string, any>,
-  messages?: Message[],
-): Promise<any> => {
-  switch (toolName) {
-    case "build_tool":
-      return runBuildTool(args, client, filePayloads);
-    case "run_tool":
-      return runRunTool(args, client, logCallback, filePayloads, messages);
-    case "edit_tool":
-      return runEditTool(args, client, messages);
-    case "save_tool":
-      return runSaveTool(args, client, messages);
-    case "create_system":
-      return runCreateSystem(args, client, filePayloads);
-    case "modify_system":
-      return runModifySystem(args, client, filePayloads);
-    case "search_documentation":
-      return runSearchDocumentation(args, client);
-    case "call_endpoint":
-      throw new Error("call_endpoint should be handled via confirmation flow");
-    case "authenticate_oauth":
-      return runAuthenticateOAuth(args, client);
-    case "find_system_templates":
-      return runFindSystemTemplates(args);
-    case "edit_payload":
-      return runEditPayload(args);
-    case "get_runs":
-      return runGetRuns(args, client);
-    default:
-      throw new Error(`Unknown tool: ${toolName}`);
-  }
-};
-
-export const hasConfirmedTool = (toolOutput: any): boolean => {
-  try {
-    const output = typeof toolOutput === "string" ? JSON.parse(toolOutput) : toolOutput;
-    return (
-      output?.confirmationState === CURL_CONFIRMATION.CONFIRMED ||
-      output?.confirmationState === EDIT_TOOL_CONFIRMATION.APPROVED
-    );
-  } catch {
-    return false;
-  }
-};
-
-export const hasDeclinedTool = (toolOutput: any): boolean => {
-  try {
-    const output = typeof toolOutput === "string" ? JSON.parse(toolOutput) : toolOutput;
-    return (
-      output?.confirmationState === CURL_CONFIRMATION.CANCELLED ||
-      output?.confirmationState === EDIT_TOOL_CONFIRMATION.REJECTED
-    );
-  } catch {
-    return false;
-  }
-};
-
-export const hasPartiallyApprovedTool = (toolOutput: any): boolean => {
-  try {
-    const output = typeof toolOutput === "string" ? JSON.parse(toolOutput) : toolOutput;
-    return output?.confirmationState === EDIT_TOOL_CONFIRMATION.PARTIAL;
-  } catch {
-    return false;
-  }
-};
-
-export const getToolContinuationMessage = (
-  toolName: string,
-  action: "confirmed" | "declined" | "partial",
-): string | null => {
-  const messages = TOOL_CONTINUATION_MESSAGES[toolName as keyof typeof TOOL_CONTINUATION_MESSAGES];
-  return messages?.[action as keyof typeof messages] ?? null;
-};
-
-export const processIntermediateToolResult = async (
-  toolName: string,
-  toolInput: any,
-  toolOutput: any,
-  client: SuperglueClient,
-): Promise<{ output: string; status: "completed" | "declined" } | null> => {
-  switch (toolName) {
-    case "call_endpoint":
-      return await processCallEndpointConfirmation(toolInput, toolOutput, client);
-    case "edit_tool":
-      return await processEditToolConfirmation(toolOutput);
-    default:
-      return null;
-  }
-};
-
-export const buildToolDefinition = (): ToolDefinition => ({
+const buildToolDefinition = (): ToolDefinition => ({
   name: "build_tool",
   description: `
     <use_case>
@@ -197,7 +62,7 @@ export const buildToolDefinition = (): ToolDefinition => ({
       - Use this only after all systems are set up and verified to be working correctly.
       - This tool only BUILDS the tool - it does NOT execute it. Use run_tool to execute.
       - Building can take up to several minutes.
-      - Use file::<key> to reference uploaded files (gets replaced with actual parsed content)
+      - Use file::<key> in payload values to reference uploaded files (gets replaced with actual parsed content)
       - Returns a draftId - use this ID with run_tool to test, edit_tool to fix errors, or save_tool to persist.
     </important_notes>
     `,
@@ -213,10 +78,10 @@ export const buildToolDefinition = (): ToolDefinition => ({
         items: { type: "string" },
         description: "Array of system IDs to use in the tool",
       },
-      payload: { type: "object", description: "Sample JSON payload for the tool." },
-      filePayloadReferences: {
+      payload: {
         type: "object",
-        description: "Optional file payloads. Use file::filename to reference uploaded files.",
+        description:
+          'Sample JSON payload for the tool. Use file::<key> syntax for file references (e.g., { "data": "file::my_csv" })',
       },
       responseSchema: {
         type: "object",
@@ -227,38 +92,24 @@ export const buildToolDefinition = (): ToolDefinition => ({
   },
 });
 
-export const runBuildTool = async (
-  args: any,
-  client: SuperglueClient,
-  filePayloads?: Record<string, any>,
-) => {
-  const { instruction, systemIds, payload, filePayloadReferences, responseSchema } = args;
-  let filePayloadContent = {};
+const runBuildTool = async (input: any, ctx: ToolExecutionContext) => {
+  const { instruction, systemIds, payload, responseSchema } = input;
 
-  try {
-    if (filePayloadReferences && filePayloads && Object.keys(filePayloadReferences).length > 0) {
-      filePayloadContent = resolveFileReferences(filePayloadReferences, filePayloads);
-    }
-  } catch (error: any) {
-    return {
-      success: false,
-      error: error.message,
-      suggestion:
-        "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
-    };
+  const fileResult = resolvePayloadWithFiles(payload, ctx.filePayloads);
+  if (!fileResult.success) {
+    return { success: false, ...fileResult };
   }
+  const resolvedPayload = fileResult.resolved;
 
   try {
-    const fullPayload = { ...payload, ...filePayloadContent };
-    const builtTool = await client.buildWorkflow({
+    const builtTool = await ctx.superglueClient.buildWorkflow({
       instruction,
       systemIds,
-      payload: fullPayload,
+      payload: resolvedPayload,
       responseSchema,
       save: false,
     });
 
-    // Generate a draftId - the config is stored in message history via tool output
     const draftId = `draft_${crypto.randomUUID()}`;
 
     return {
@@ -277,7 +128,7 @@ export const runBuildTool = async (
   }
 };
 
-export const runToolDefinition = (): ToolDefinition => ({
+const runToolDefinition = (): ToolDefinition => ({
   name: "run_tool",
   description: `
     <use_case>
@@ -287,7 +138,7 @@ export const runToolDefinition = (): ToolDefinition => ({
     <important_notes>
       - Provide either draftId (for drafts from build_tool) OR toolId (for saved tools), not both.
       - If execution fails, the error is stored in the draft for use with edit_tool.
-      - Use file::<key> to reference uploaded files in the payload.
+      - Use file::<key> in payload values to reference uploaded files (e.g., { "data": "file::my_csv" })
     </important_notes>
     `,
   inputSchema: {
@@ -295,62 +146,36 @@ export const runToolDefinition = (): ToolDefinition => ({
     properties: {
       draftId: { type: "string", description: "ID of a draft tool (from build_tool)" },
       toolId: { type: "string", description: "ID of a saved tool" },
-      payload: { type: "object", description: "JSON payload to pass to the tool" },
-      filePayloadReferences: {
+      payload: {
         type: "object",
-        description: "Optional file payloads. Use file::filename to reference uploaded files.",
+        description:
+          "JSON payload to pass to the tool. Use file::<key> syntax for file references.",
       },
     },
   },
 });
 
-export const runRunTool = async (
-  args: any,
-  client: SuperglueClient,
-  logCallback?: (message: string) => void,
-  filePayloads?: Record<string, any>,
-  messages?: Message[],
-) => {
-  const { draftId, toolId, payload, filePayloadReferences } = args;
+const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
+  const { draftId, toolId, payload } = input;
 
-  if (!draftId && !toolId) {
-    return {
-      success: false,
-      error: "Either draftId or toolId is required",
-      suggestion: "Provide draftId (from build_tool) or toolId (for saved tools)",
-    };
+  const idValidation = validateDraftOrToolId(draftId, toolId);
+  if (idValidation.valid === false) {
+    return { success: false, error: idValidation.error, suggestion: idValidation.suggestion };
   }
 
-  if (draftId && toolId) {
-    return {
-      success: false,
-      error: "Provide either draftId or toolId, not both",
-    };
+  const fileResult = resolvePayloadWithFiles(payload, ctx.filePayloads);
+  if (!fileResult.success) {
+    return { success: false, ...fileResult };
   }
+  const resolvedPayload = fileResult.resolved;
 
-  let filePayloadContent = {};
-  try {
-    if (filePayloadReferences && filePayloads && Object.keys(filePayloadReferences).length > 0) {
-      filePayloadContent = resolveFileReferences(filePayloadReferences, filePayloads);
-    }
-  } catch (error: any) {
-    return {
-      success: false,
-      error: error.message,
-      suggestion: "File payload resolution failed. Use the exact sanitized file key.",
-    };
-  }
-
-  const fullPayload = { ...payload, ...filePayloadContent };
-
-  // Resolve tool config and context (draft vs saved)
   let toolConfig: any;
   let inputSchema: any;
   let isDraft = false;
 
   if (toolId) {
     try {
-      toolConfig = await client.getWorkflow(toolId);
+      toolConfig = await ctx.superglueClient.getWorkflow(toolId);
       inputSchema = toolConfig?.inputSchema?.properties?.payload;
     } catch (error: any) {
       return {
@@ -360,7 +185,7 @@ export const runRunTool = async (
       };
     }
   } else {
-    const draft = findDraftInMessages(messages || [], draftId);
+    const draft = findDraftInMessages(ctx.messages || [], draftId);
     if (!draft) {
       return {
         success: false,
@@ -374,8 +199,7 @@ export const runRunTool = async (
     isDraft = true;
   }
 
-  // Validate required fields
-  const validation = validateRequiredFields(inputSchema, fullPayload);
+  const validation = validateRequiredFields(inputSchema, resolvedPayload);
   if (validation.valid === false) {
     const { missingFields, schema } = validation;
     return {
@@ -384,29 +208,28 @@ export const runRunTool = async (
       error: `Missing required input fields: ${missingFields.join(", ")}`,
       config: stripLegacyToolFields(toolConfig),
       inputSchema: schema,
-      providedPayload: fullPayload,
+      providedPayload: resolvedPayload,
       suggestion: `This tool requires the following inputs: ${JSON.stringify(schema.properties || {}, null, 2)}. Please provide values for: ${missingFields.join(", ")}`,
     };
   }
 
-  // Execute the tool
   const traceId = isDraft ? crypto.randomUUID() : undefined;
-  if (isDraft && logCallback && traceId) {
-    logCallback(`TOOL_CALL_UPDATE:run_tool:TRACE_ID:${traceId}`);
+  if (isDraft && ctx.logCallback && traceId) {
+    ctx.logCallback(`TOOL_CALL_UPDATE:run_tool:TRACE_ID:${traceId}`);
   }
 
   try {
-    const result: ToolResult = await client.executeWorkflow(
+    const result: ToolResult = await ctx.superglueClient.executeWorkflow(
       isDraft
         ? {
             tool: toolConfig,
-            payload: fullPayload,
+            payload: resolvedPayload,
             options: { selfHealing: SelfHealingMode.DISABLED, testMode: false, retries: 0 },
             traceId,
           }
         : {
             id: toolId,
-            payload: fullPayload,
+            payload: resolvedPayload,
             options: { selfHealing: SelfHealingMode.DISABLED },
           },
     );
@@ -449,7 +272,7 @@ export const runRunTool = async (
   }
 };
 
-export const editToolDefinition = (): ToolDefinition => ({
+const editToolDefinition = (): ToolDefinition => ({
   name: "edit_tool",
   description: `
     <use_case>
@@ -463,7 +286,7 @@ export const editToolDefinition = (): ToolDefinition => ({
       - Provide specific fix instructions (e.g., "change the endpoint to /v2/users", "remove extra fields from finalTransform", "fix the response schema mapping").
       - The fix creates an updated draft - use run_tool to test, then save_tool to persist.
       - After fixing, use run_tool with the returned draftId to test the updated draft.
-      - Include the payload parameter with the same test data from build_tool - users need this to test the fixed tool! This param can be an empty object if the tool does not require input data for testing.
+      - CRITICAL: You MUST include the payload parameter with the exact same test data that was used in build_tool. Copy it from the build_tool call in the conversation history. Without this payload, users cannot test the fixed tool. Use an empty object {} only if the tool genuinely requires no input.
     </important_notes>
     `,
   inputSchema: {
@@ -477,15 +300,15 @@ export const editToolDefinition = (): ToolDefinition => ({
       },
       payload: {
         type: "object",
-        description: "IMPORTANT: Include a working payload so users can test the fixed tool",
+        description:
+          "CRITICAL: Copy the exact payload from the build_tool call. Users need this to test the fixed tool.",
       },
     },
     required: ["fixInstructions", "payload"],
   },
 });
 
-// Playground-specific version - no payload field (playground has its own payload state)
-export const editToolDefinitionPlayground = (): ToolDefinition => ({
+const editToolDefinitionPlayground = (): ToolDefinition => ({
   name: "edit_tool",
   description: `
     <use_case>
@@ -513,31 +336,20 @@ export const editToolDefinitionPlayground = (): ToolDefinition => ({
   },
 });
 
-export const runEditTool = async (args: any, client: SuperglueClient, messages?: Message[]) => {
-  const { draftId, toolId, fixInstructions } = args;
+const runEditTool = async (input: any, ctx: ToolExecutionContext) => {
+  const { draftId, toolId, fixInstructions } = input;
 
-  if (!draftId && !toolId) {
-    return {
-      success: false,
-      error: "Either draftId or toolId is required",
-      suggestion: "Provide draftId (from build_tool) or toolId (for saved tools)",
-    };
-  }
-
-  if (draftId && toolId) {
-    return {
-      success: false,
-      error: "Provide either draftId or toolId, not both",
-    };
+  const idValidation = validateDraftOrToolId(draftId, toolId);
+  if (idValidation.valid === false) {
+    return { success: false, error: idValidation.error, suggestion: idValidation.suggestion };
   }
 
   let draft: DraftLookup | null = null;
   let workingDraftId = draftId;
 
-  // If toolId provided, fetch the saved tool
   if (toolId) {
     try {
-      const savedTool = await client.getWorkflow(toolId);
+      const savedTool = await ctx.superglueClient.getWorkflow(toolId);
       if (!savedTool) {
         return {
           success: false,
@@ -549,7 +361,6 @@ export const runEditTool = async (args: any, client: SuperglueClient, messages?:
         .map((step: any) => step.systemId)
         .filter((id: string) => id);
       const systemIds = [...savedTool.systemIds, ...new Set(stepSystemIds)];
-      // Create a draft-like object from the saved tool
       workingDraftId = `fix-${toolId}-${Date.now()}`;
       draft = {
         config: savedTool,
@@ -564,7 +375,7 @@ export const runEditTool = async (args: any, client: SuperglueClient, messages?:
       };
     }
   } else {
-    draft = findDraftInMessages(messages || [], draftId);
+    draft = findDraftInMessages(ctx.messages || [], draftId);
   }
 
   if (!draft) {
@@ -576,20 +387,17 @@ export const runEditTool = async (args: any, client: SuperglueClient, messages?:
   }
 
   try {
-    // Use the dedicated fixWorkflow endpoint with diff-based approach
-    const fixResult = await client.fixWorkflow({
+    const fixResult = await ctx.superglueClient.fixWorkflow({
       tool: draft.config,
       fixInstructions,
       systemIds: draft.systemIds,
     });
 
-    // Preserve original instruction for display and strip legacy fields
     const fixedToolForStorage = stripLegacyToolFields({
       ...fixResult.tool,
       instruction: draft.instruction,
     });
 
-    // Also strip legacy fields from original for consistency
     const originalConfigForStorage = stripLegacyToolFields(draft.config);
 
     return {
@@ -612,47 +420,53 @@ export const runEditTool = async (args: any, client: SuperglueClient, messages?:
 };
 
 const processEditToolConfirmation = async (
-  toolOutput: any,
-): Promise<{ output: string; status: "completed" | "declined" } | null> => {
-  let output;
+  input: any,
+  output: any,
+  _ctx: ToolExecutionContext,
+): Promise<{ output: string; status: "completed" | "declined" }> => {
+  let parsedOutput;
   try {
-    output = typeof toolOutput === "string" ? JSON.parse(toolOutput) : toolOutput;
+    parsedOutput = typeof output === "string" ? JSON.parse(output) : output;
   } catch {
-    return null;
+    return { output: JSON.stringify(output), status: "completed" };
   }
 
-  if (!output.confirmationState) {
-    return null;
+  if (!parsedOutput.confirmationState) {
+    return { output: JSON.stringify(parsedOutput), status: "completed" };
   }
 
-  if (output.confirmationState === EDIT_TOOL_CONFIRMATION.APPROVED) {
+  if (parsedOutput.confirmationState === EDIT_TOOL_CONFIRMATION.CONFIRMED) {
     return {
       output: JSON.stringify({
-        ...output,
+        ...parsedOutput,
         userApproved: true,
         message: "All changes approved and applied.",
       }),
       status: "completed",
     };
-  } else if (output.confirmationState === EDIT_TOOL_CONFIRMATION.PARTIAL) {
-    const approvedSummaries = (output.approvedDiffs || []).map((d: any) => formatDiffSummary(d));
-    const rejectedSummaries = (output.rejectedDiffs || []).map((d: any) => formatDiffSummary(d));
+  } else if (parsedOutput.confirmationState === EDIT_TOOL_CONFIRMATION.PARTIAL) {
+    const approvedSummaries = (parsedOutput.approvedDiffs || []).map((d: any) =>
+      formatDiffSummary(d),
+    );
+    const rejectedSummaries = (parsedOutput.rejectedDiffs || []).map((d: any) =>
+      formatDiffSummary(d),
+    );
 
     return {
       output: JSON.stringify({
-        ...output,
+        ...parsedOutput,
         userApproved: true,
         partialApproval: true,
-        message: `User PARTIALLY approved: ${output.approvedDiffs?.length || 0} change(s) APPLIED, ${output.rejectedDiffs?.length || 0} REJECTED.`,
+        message: `User PARTIALLY approved: ${parsedOutput.approvedDiffs?.length || 0} change(s) APPLIED, ${parsedOutput.rejectedDiffs?.length || 0} REJECTED.`,
         appliedChanges: approvedSummaries,
         rejectedChanges: rejectedSummaries,
       }),
       status: "completed",
     };
-  } else if (output.confirmationState === EDIT_TOOL_CONFIRMATION.REJECTED) {
+  } else if (parsedOutput.confirmationState === EDIT_TOOL_CONFIRMATION.DECLINED) {
     return {
       output: JSON.stringify({
-        ...output,
+        ...parsedOutput,
         userApproved: false,
         rejected: true,
         message: "All changes rejected by user.",
@@ -661,10 +475,10 @@ const processEditToolConfirmation = async (
     };
   }
 
-  return null;
+  return { output: JSON.stringify(parsedOutput), status: "completed" };
 };
 
-export const saveToolDefinition = (): ToolDefinition => ({
+const saveToolDefinition = (): ToolDefinition => ({
   name: "save_tool",
   description: `
     <use_case>
@@ -691,10 +505,10 @@ export const saveToolDefinition = (): ToolDefinition => ({
   },
 });
 
-export const runSaveTool = async (args: any, client: SuperglueClient, messages?: Message[]) => {
-  const { draftId, id } = args;
+const runSaveTool = async (input: any, ctx: ToolExecutionContext) => {
+  const { draftId, id } = input;
 
-  const draft = findDraftInMessages(messages || [], draftId);
+  const draft = findDraftInMessages(ctx.messages || [], draftId);
   if (!draft) {
     return {
       success: false,
@@ -711,12 +525,14 @@ export const runSaveTool = async (args: any, client: SuperglueClient, messages?:
       systemIds: draft.systemIds,
     };
 
-    const savedTool = await client.upsertWorkflow(toolId, toolToSave);
+    const savedTool = await ctx.superglueClient.upsertWorkflow(toolId, toolToSave);
 
+    const apiEndpoint = ctx.superglueClient.apiEndpoint || "https://api.superglue.cloud";
     return {
       success: true,
       toolId: savedTool.id,
-      note: `Tool "${savedTool.id}" saved successfully. You can now execute it using run_tool with toolId.`,
+      webhookUrl: `${apiEndpoint}/v1/hooks/${savedTool.id}?token=YOUR_API_KEY`,
+      note: `Tool "${savedTool.id}" saved successfully. You can now execute it using run_tool with toolId. If this is a tool that you want to trigger from external services, you can use the webhook URL to trigger it.`,
     };
   } catch (error: any) {
     return {
@@ -727,7 +543,7 @@ export const runSaveTool = async (args: any, client: SuperglueClient, messages?:
   }
 };
 
-export const createSystemDefinition = (): ToolDefinition => ({
+const createSystemDefinition = (): ToolDefinition => ({
   name: "create_system",
   description: `
     <use_case>
@@ -801,14 +617,9 @@ export const createSystemDefinition = (): ToolDefinition => ({
   },
 });
 
-export const runCreateSystem = async (
-  args: any,
-  client: SuperglueClient,
-  filePayloads?: Record<string, any>,
-) => {
-  let { templateId, ...systemInput } = args;
+const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
+  let { templateId, ...systemInput } = input;
 
-  // If templateId provided, populate from template
   if (templateId) {
     const template = systems[templateId];
     if (!template) {
@@ -819,7 +630,6 @@ export const runCreateSystem = async (
       };
     }
 
-    // Parse apiUrl into urlHost and urlPath
     let urlHost = "";
     let urlPath = "";
     if (template.apiUrl) {
@@ -832,7 +642,6 @@ export const runCreateSystem = async (
       }
     }
 
-    // Build OAuth credentials from template if available
     const oauthCreds: Record<string, any> = {};
     if (template.oauth) {
       if (template.oauth.authUrl) oauthCreds.auth_url = template.oauth.authUrl;
@@ -842,7 +651,6 @@ export const runCreateSystem = async (
       if (template.oauth.grant_type) oauthCreds.grant_type = template.oauth.grant_type;
     }
 
-    // Merge template defaults with provided values (provided values take precedence)
     systemInput = {
       name: template.name,
       urlHost,
@@ -850,41 +658,37 @@ export const runCreateSystem = async (
       documentationUrl: template.docsUrl,
       documentationKeywords: template.keywords,
       templateName: templateId,
-      ...systemInput, // User overrides
-      credentials: { ...oauthCreds, ...systemInput.credentials }, // Must come after spread to preserve OAuth config
+      ...systemInput,
+      credentials: { ...oauthCreds, ...systemInput.credentials },
     };
   }
 
-  try {
-    if (filePayloads && Object.keys(filePayloads).length > 0 && systemInput.documentation) {
-      const hasFileReference =
-        typeof systemInput.documentation === "string" &&
-        systemInput.documentation.includes("file::");
-
-      if (hasFileReference) {
-        const fileRefs = systemInput.documentation
-          .split(",")
-          .map((ref: string) => ref.trim().replace(/^file::/, ""));
-        systemInput.documentationUrl = setFileUploadDocumentationURL(fileRefs);
-      }
-
-      systemInput.documentation = resolveFileReferences(
-        systemInput.documentation,
-        filePayloads,
-        true,
-      );
-    }
-  } catch (error: any) {
+  const docResult = resolveDocumentationFiles(
+    systemInput.documentation,
+    ctx.filePayloads,
+    setFileUploadDocumentationURL,
+  );
+  if ("error" in docResult) {
     return {
       success: false,
-      error: error.message,
+      error: docResult.error,
       suggestion:
         "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
     };
   }
+  if (docResult.documentation !== undefined) {
+    systemInput.documentation = docResult.documentation;
+  }
+  if (docResult.documentationUrl) {
+    systemInput.documentationUrl = docResult.documentationUrl;
+  }
 
   try {
-    const result = await client.upsertSystem(systemInput.id, systemInput, UpsertMode.UPSERT);
+    const result = await ctx.superglueClient.upsertSystem(
+      systemInput.id,
+      systemInput,
+      UpsertMode.UPSERT,
+    );
     return {
       success: true,
       system: filterSystemFields(result),
@@ -898,7 +702,7 @@ export const runCreateSystem = async (
   }
 };
 
-export const modifySystemDefinition = (): ToolDefinition => ({
+const modifySystemDefinition = (): ToolDefinition => ({
   name: "modify_system",
   description: `
     <use_case>
@@ -913,8 +717,7 @@ export const modifySystemDefinition = (): ToolDefinition => ({
       - Providing a documentationUrl will trigger asynchronous API documentation processing.
       - For documentation field, you can provide raw documentation text OR use file::filename to reference uploaded files. For multiple files, use comma-separated: file::doc1.pdf,file::doc2.pdf
       - When referencing files in the documentation field, use the exact file key (file::<key>) exactly as shown (e.g., file::my_data_csv). Do NOT use the original filename.
-      - Files are ONLY available in the same message they were uploaded with
-      - If user asks to add documentation from a previous message, tell them to re-upload the file
+      - Files persist for the entire conversation session (until page refresh or new conversation)
       - When providing files as system documentation input, the files you use will overwrite the current documentation content. Ensure to include ALL required files always, even if the user only asks you to add one.
       - If you provide documentationUrl, include relevant keywords in 'documentationKeywords' to improve documentation search (e.g., endpoint names, data objects, key concepts mentioned in conversation).
     </important_notes>
@@ -958,43 +761,35 @@ export const modifySystemDefinition = (): ToolDefinition => ({
   },
 });
 
-export const runModifySystem = async (
-  args: any,
-  client: SuperglueClient,
-  filePayloads?: Record<string, any>,
-) => {
-  let { ...systemInput } = args;
+const runModifySystem = async (input: any, ctx: ToolExecutionContext) => {
+  let { ...systemInput } = input;
 
-  try {
-    if (filePayloads && Object.keys(filePayloads).length > 0 && systemInput.documentation) {
-      const hasFileReference =
-        typeof systemInput.documentation === "string" &&
-        systemInput.documentation.includes("file::");
-
-      if (hasFileReference) {
-        const fileRefs = systemInput.documentation
-          .split(",")
-          .map((ref: string) => ref.trim().replace(/^file::/, ""));
-        systemInput.documentationUrl = setFileUploadDocumentationURL(fileRefs);
-      }
-
-      systemInput.documentation = resolveFileReferences(
-        systemInput.documentation,
-        filePayloads,
-        true,
-      );
-    }
-  } catch (error: any) {
+  const docResult = resolveDocumentationFiles(
+    systemInput.documentation,
+    ctx.filePayloads,
+    setFileUploadDocumentationURL,
+  );
+  if ("error" in docResult) {
     return {
       success: false,
-      error: error.message,
+      error: docResult.error,
       suggestion:
         "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
     };
   }
+  if (docResult.documentation !== undefined) {
+    systemInput.documentation = docResult.documentation;
+  }
+  if (docResult.documentationUrl) {
+    systemInput.documentationUrl = docResult.documentationUrl;
+  }
 
   try {
-    const result = await client.upsertSystem(systemInput.id, systemInput, UpsertMode.UPDATE);
+    const result = await ctx.superglueClient.upsertSystem(
+      systemInput.id,
+      systemInput,
+      UpsertMode.UPDATE,
+    );
     const note = result.documentationPending
       ? "System modified. Documentation is being processed in the background."
       : "System modified successfully.";
@@ -1013,7 +808,7 @@ export const runModifySystem = async (
   }
 };
 
-export const callEndpointDefinition = (): ToolDefinition => ({
+const callEndpointDefinition = (): ToolDefinition => ({
   name: "call_endpoint",
   description: `
     <use_case>
@@ -1067,14 +862,21 @@ export const callEndpointDefinition = (): ToolDefinition => ({
   },
 });
 
-export const runCallEndpoint = async (
+const runCallEndpoint = async (
   request: CallEndpointArgs,
-  client: SuperglueClient,
+  ctx: ToolExecutionContext,
 ): Promise<CallEndpointResult> => {
   const { systemId, method, url, headers, body, timeout } = request;
 
   try {
-    return await client.callEndpoint({ systemId, method, url, headers, body, timeout });
+    return await ctx.superglueClient.callEndpoint({
+      systemId,
+      method,
+      url,
+      headers,
+      body,
+      timeout,
+    });
   } catch (error) {
     return {
       success: false,
@@ -1085,48 +887,25 @@ export const runCallEndpoint = async (
 };
 
 const processCallEndpointConfirmation = async (
-  toolInput: any,
-  toolOutput: any,
-  client: SuperglueClient,
-): Promise<{ output: string; status: "completed" | "declined" } | null> => {
-  let output;
+  input: any,
+  output: any,
+  ctx: ToolExecutionContext,
+): Promise<{ output: string; status: "completed" | "declined" }> => {
+  let parsedOutput;
   try {
-    output = typeof toolOutput === "string" ? JSON.parse(toolOutput) : toolOutput;
+    parsedOutput = typeof output === "string" ? JSON.parse(output) : output;
   } catch {
-    return null;
+    return { output: JSON.stringify(output), status: "completed" };
   }
 
-  if (!output.confirmationState) {
-    return null;
+  if (!parsedOutput.confirmationState) {
+    return { output: JSON.stringify(parsedOutput), status: "completed" };
   }
 
-  if (output.confirmationState === CURL_CONFIRMATION.CONFIRMED) {
+  if (parsedOutput.confirmationState === CALL_ENDPOINT_CONFIRMATION.CONFIRMED) {
     try {
-      const realResult = await runCallEndpoint(toolInput, client);
-
-      const MAX_BODY_LENGTH = 25_000;
-      if (realResult.body) {
-        if (typeof realResult.body === "object") {
-          const bodyStr = JSON.stringify(realResult.body);
-          if (bodyStr.length > MAX_BODY_LENGTH) {
-            realResult.body = {
-              _note: `Response body truncated for LLM context (original size: ${bodyStr.length} chars)`,
-              _truncated: true,
-              preview: bodyStr.substring(0, MAX_BODY_LENGTH),
-            };
-          }
-        } else if (
-          typeof realResult.body === "string" &&
-          realResult.body.length > MAX_BODY_LENGTH
-        ) {
-          const originalLength = realResult.body.length;
-          realResult.body =
-            realResult.body.substring(0, MAX_BODY_LENGTH) +
-            `\n\n[Truncated from ${originalLength} chars]`;
-        }
-      }
-
-      return { output: JSON.stringify(realResult), status: "completed" };
+      const realResult = await runCallEndpoint(input, ctx);
+      return { output: JSON.stringify(truncateResponseBody(realResult)), status: "completed" };
     } catch (error: any) {
       const errorResult = {
         success: false,
@@ -1135,7 +914,7 @@ const processCallEndpointConfirmation = async (
       };
       return { output: JSON.stringify(errorResult), status: "completed" };
     }
-  } else if (output.confirmationState === CURL_CONFIRMATION.CANCELLED) {
+  } else if (parsedOutput.confirmationState === CALL_ENDPOINT_CONFIRMATION.DECLINED) {
     const cancelOutput = JSON.stringify({
       success: false,
       cancelled: true,
@@ -1144,10 +923,10 @@ const processCallEndpointConfirmation = async (
     return { output: cancelOutput, status: "declined" };
   }
 
-  return null;
+  return { output: JSON.stringify(parsedOutput), status: "completed" };
 };
 
-export const searchDocumentationDefinition = (): ToolDefinition => ({
+const searchDocumentationDefinition = (): ToolDefinition => ({
   name: "search_documentation",
   description: `
     <use_case>
@@ -1178,11 +957,11 @@ export const searchDocumentationDefinition = (): ToolDefinition => ({
   },
 });
 
-export const runSearchDocumentation = async (args: any, client: SuperglueClient) => {
-  const { systemId, keywords } = args;
+const runSearchDocumentation = async (input: any, ctx: ToolExecutionContext) => {
+  const { systemId, keywords } = input;
 
   try {
-    const result = await client.searchSystemDocumentation(systemId, keywords);
+    const result = await ctx.superglueClient.searchSystemDocumentation(systemId, keywords);
 
     const hasNoDocumentation = result.trim().length === 0;
     const hasNoResults = result.startsWith("No relevant sections found");
@@ -1220,7 +999,7 @@ export const runSearchDocumentation = async (args: any, client: SuperglueClient)
   }
 };
 
-export const authenticateOAuthDefinition = (): ToolDefinition => ({
+const authenticateOAuthDefinition = (): ToolDefinition => ({
   name: "authenticate_oauth",
   description: `
     <use_case>
@@ -1233,7 +1012,7 @@ export const authenticateOAuthDefinition = (): ToolDefinition => ({
       OAuth credentials are resolved in this priority order:
       1. Values passed to this tool (client_id, client_secret, auth_url, token_url)
       2. Values already stored in the system's credentials
-      3. Values from templates (slack, salesforce, asana)
+      3. Values from templates (slack, salesforce, asana, notion, airtable, jira, confluence)
       
       If the system already has client_id/client_secret stored in credentials,
       you do NOT need to ask the user again - just call this tool with only systemId and scopes.
@@ -1244,12 +1023,16 @@ export const authenticateOAuthDefinition = (): ToolDefinition => ({
       - slack: auth_url=https://slack.com/oauth/v2/authorize, token_url=https://slack.com/api/oauth.v2.access
       - salesforce: auth_url=https://login.salesforce.com/services/oauth2/authorize, token_url=https://login.salesforce.com/services/oauth2/token
       - asana: auth_url=https://app.asana.com/-/oauth_authorize, token_url=https://app.asana.com/-/oauth_token
+      - notion: auth_url=https://api.notion.com/v1/oauth/authorize, token_url=https://api.notion.com/v1/oauth/token (uses basic_auth + json)
+      - airtable: auth_url=https://airtable.com/oauth2/v1/authorize, token_url=https://airtable.com/oauth2/v1/token (uses PKCE + basic_auth)
+      - jira: auth_url=https://auth.atlassian.com/authorize, token_url=https://auth.atlassian.com/oauth/token
+      - confluence: auth_url=https://auth.atlassian.com/authorize, token_url=https://auth.atlassian.com/oauth/token
     </templates_with_preconfigured_oauth>
 
     <first_time_setup>
       For FIRST-TIME setup on Google, Microsoft, GitHub, etc. (when credentials are NOT already stored):
       1. ASK the user for their client_id and client_secret
-      2. Provide the correct auth_url and token_url
+      2. Provide the correct auth_url and token_url and other configuration options
     </first_time_setup>
 
     <important>
@@ -1289,17 +1072,50 @@ export const authenticateOAuthDefinition = (): ToolDefinition => ({
         type: "string",
         description: "OAuth grant type: 'authorization_code' (default) or 'client_credentials'",
       },
+      tokenAuthMethod: {
+        type: "string",
+        enum: ["body", "basic_auth"],
+        description:
+          "How to send client credentials to token endpoint. 'body' (default) or 'basic_auth' (Authorization header)",
+      },
+      tokenContentType: {
+        type: "string",
+        enum: ["form", "json"],
+        description:
+          "Content-Type for token request. 'form' (default, x-www-form-urlencoded) or 'json' (application/json)",
+      },
+      usePKCE: {
+        type: "boolean",
+        description:
+          "Enable PKCE flow (Proof Key for Code Exchange). Required by some providers like Airtable, Twitter",
+      },
+      extraHeaders: {
+        type: "object",
+        description:
+          "Additional headers for token requests, e.g., {'Notion-Version': '2022-06-28'}",
+      },
     },
     required: ["systemId", "scopes"],
   },
 });
 
-export const runAuthenticateOAuth = async (args: any, client: SuperglueClient) => {
-  const { systemId, scopes, client_id, client_secret, auth_url, token_url, grant_type } = args;
+const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
+  const {
+    systemId,
+    scopes,
+    client_id,
+    client_secret,
+    auth_url,
+    token_url,
+    grant_type,
+    tokenAuthMethod,
+    tokenContentType,
+    usePKCE,
+    extraHeaders,
+  } = input;
 
-  // Fetch the system to get existing OAuth config
   try {
-    const system = await client.getSystem(systemId);
+    const system = await ctx.superglueClient.getSystem(systemId);
     if (!system) {
       return {
         success: false,
@@ -1308,11 +1124,11 @@ export const runAuthenticateOAuth = async (args: any, client: SuperglueClient) =
       };
     }
 
-    // Check if systemId matches a template (for pre-configured OAuth like Slack, Salesforce, Asana)
-    const template = systems[systemId];
+    // Check if this system matches a template with OAuth configured
+    const templateMatch = findTemplateForSystem(system);
+    const template = templateMatch?.template || systems[systemId];
     const templateOAuth = template?.oauth;
 
-    // Build OAuth config - priority: args > system.credentials > template
     const oauthConfig: Record<string, any> = {
       grant_type:
         grant_type ||
@@ -1321,7 +1137,6 @@ export const runAuthenticateOAuth = async (args: any, client: SuperglueClient) =
         "authorization_code",
     };
 
-    // Merge OAuth fields - args take precedence, then stored credentials, then template
     if (scopes) oauthConfig.scopes = scopes;
     else if (system.credentials?.scopes) oauthConfig.scopes = system.credentials.scopes;
     else if (templateOAuth?.scopes) oauthConfig.scopes = templateOAuth.scopes;
@@ -1330,9 +1145,17 @@ export const runAuthenticateOAuth = async (args: any, client: SuperglueClient) =
     else if (system.credentials?.client_id) oauthConfig.client_id = system.credentials.client_id;
     else if (templateOAuth?.client_id) oauthConfig.client_id = templateOAuth.client_id;
 
-    if (client_secret) oauthConfig.client_secret = client_secret;
-    else if (system.credentials?.client_secret)
+    // Priority: user input > stored system credentials > template
+    // If user provided client_secret, use it (will be cached)
+    // If not provided but system has it stored, use it (will be cached)
+    // If neither, and template has client_id, backend will resolve template client_secret
+    if (client_secret) {
+      oauthConfig.client_secret = client_secret;
+    } else if (system.credentials?.client_secret) {
       oauthConfig.client_secret = system.credentials.client_secret;
+    }
+    // Note: If no client_secret is set here, and template has client_id,
+    // the frontend will set templateInfo and backend will resolve template credentials
 
     if (auth_url) oauthConfig.auth_url = auth_url;
     else if (system.credentials?.auth_url) oauthConfig.auth_url = system.credentials.auth_url;
@@ -1342,7 +1165,39 @@ export const runAuthenticateOAuth = async (args: any, client: SuperglueClient) =
     else if (system.credentials?.token_url) oauthConfig.token_url = system.credentials.token_url;
     else if (templateOAuth?.tokenUrl) oauthConfig.token_url = templateOAuth.tokenUrl;
 
-    // Validate we have minimum required OAuth fields
+    // Token exchange configuration - agent input > system credentials > template
+    if (tokenAuthMethod) oauthConfig.tokenAuthMethod = tokenAuthMethod;
+    else if (system.credentials?.tokenAuthMethod)
+      oauthConfig.tokenAuthMethod = system.credentials.tokenAuthMethod;
+    else if (templateOAuth?.tokenAuthMethod)
+      oauthConfig.tokenAuthMethod = templateOAuth.tokenAuthMethod;
+
+    if (tokenContentType) oauthConfig.tokenContentType = tokenContentType;
+    else if (system.credentials?.tokenContentType)
+      oauthConfig.tokenContentType = system.credentials.tokenContentType;
+    else if (templateOAuth?.tokenContentType)
+      oauthConfig.tokenContentType = templateOAuth.tokenContentType;
+
+    if (usePKCE !== undefined) oauthConfig.usePKCE = usePKCE;
+    else if (system.credentials?.usePKCE !== undefined)
+      oauthConfig.usePKCE = system.credentials.usePKCE;
+    else if (templateOAuth?.usePKCE) oauthConfig.usePKCE = templateOAuth.usePKCE;
+
+    if (extraHeaders) oauthConfig.extraHeaders = extraHeaders;
+    else if (system.credentials?.extraHeaders) {
+      // Parse if stored as JSON string
+      if (typeof system.credentials.extraHeaders === "string") {
+        try {
+          oauthConfig.extraHeaders = JSON.parse(system.credentials.extraHeaders);
+        } catch {
+          // Malformed JSON in stored extraHeaders - skip rather than crash
+          console.warn("Failed to parse extraHeaders from credentials, ignoring malformed value");
+        }
+      } else {
+        oauthConfig.extraHeaders = system.credentials.extraHeaders;
+      }
+    } else if (templateOAuth?.extraHeaders) oauthConfig.extraHeaders = templateOAuth.extraHeaders;
+
     if (!oauthConfig.client_id) {
       return {
         success: false,
@@ -1359,7 +1214,6 @@ export const runAuthenticateOAuth = async (args: any, client: SuperglueClient) =
       };
     }
 
-    // Return OAuth required state - UI will show button
     return {
       success: true,
       requiresOAuth: true,
@@ -1378,7 +1232,7 @@ export const runAuthenticateOAuth = async (args: any, client: SuperglueClient) =
   }
 };
 
-export const findSystemTemplatesDefinition = (): ToolDefinition => ({
+const findSystemTemplatesDefinition = (): ToolDefinition => ({
   name: "find_system_templates",
   description: `
     <use_case>
@@ -1407,8 +1261,8 @@ export const findSystemTemplatesDefinition = (): ToolDefinition => ({
   },
 });
 
-export const runFindSystemTemplates = async (args: any) => {
-  const { system_names } = args;
+const runFindSystemTemplates = async (input: any, _ctx: ToolExecutionContext) => {
+  const { system_names } = input;
   const templates: Array<SystemConfig & { urlHost?: string; urlPath?: string }> = [];
 
   const processedNames = system_names
@@ -1498,7 +1352,7 @@ export const runFindSystemTemplates = async (args: any) => {
   };
 };
 
-export const editPayloadDefinition = (): ToolDefinition => ({
+const editPayloadDefinition = (): ToolDefinition => ({
   name: "edit_payload",
   description: `
     <use_case>
@@ -1525,26 +1379,63 @@ export const editPayloadDefinition = (): ToolDefinition => ({
   },
 });
 
-export const runEditPayload = async (args: { newPayload: string }) => {
+const runEditPayload = async (input: { newPayload: string }, _ctx: ToolExecutionContext) => {
   return {
     success: true,
-    newPayload: args.newPayload,
+    newPayload: input.newPayload,
     note: "Payload edit pending approval. Apply the change in the playground.",
   };
 };
 
-export const getRunsDefinition = (): ToolDefinition => ({
+const processEditPayloadConfirmation = async (
+  _input: any,
+  output: any,
+  _ctx: ToolExecutionContext,
+): Promise<{ output: string; status: "completed" | "declined" }> => {
+  let parsedOutput;
+  try {
+    parsedOutput = typeof output === "string" ? JSON.parse(output) : output;
+  } catch {
+    return { output: JSON.stringify(output), status: "completed" };
+  }
+
+  if (parsedOutput.confirmationState === EDIT_TOOL_CONFIRMATION.CONFIRMED) {
+    return {
+      output: JSON.stringify({
+        ...parsedOutput,
+        userApproved: true,
+        message: "Payload edit approved and applied.",
+      }),
+      status: "completed",
+    };
+  } else if (parsedOutput.confirmationState === EDIT_TOOL_CONFIRMATION.DECLINED) {
+    return {
+      output: JSON.stringify({
+        ...parsedOutput,
+        userApproved: false,
+        rejected: true,
+        message: "Payload edit rejected by user.",
+      }),
+      status: "declined",
+    };
+  }
+
+  return { output: JSON.stringify(parsedOutput), status: "completed" };
+};
+
+const getRunsDefinition = (): ToolDefinition => ({
   name: "get_runs",
   description: `
     <use_case>
-      Fetches recent run history for a tool. Use this to debug webhook payload mismatches by inspecting what payloads were actually received.
+      Fetches recent run history. Use this to debug webhook payload mismatches by inspecting what payloads were actually received, or to see recent executions filtered by status or source.
     </use_case>
 
     <important_notes>
       - Returns recent runs including toolPayload (the actual input received)
       - Useful for debugging when a webhook-triggered tool fails due to unexpected payload format
       - Compare the returned toolPayload against the tool's inputSchema to identify mismatches
-      - Can filter by status (running, success, failed, aborted)
+      - Can filter by toolId, status (running, success, failed, aborted), or requestSources (api, frontend, scheduler, mcp, tool-chain, webhook)
+      - All filters are optional - you can combine them or use none
     </important_notes>
     `,
   inputSchema: {
@@ -1552,7 +1443,7 @@ export const getRunsDefinition = (): ToolDefinition => ({
     properties: {
       toolId: {
         type: "string",
-        description: "The ID of the tool to fetch runs for",
+        description: "Optional: The ID of a specific tool to fetch runs for",
       },
       limit: {
         type: "number",
@@ -1561,55 +1452,278 @@ export const getRunsDefinition = (): ToolDefinition => ({
       status: {
         type: "string",
         enum: ["running", "success", "failed", "aborted"],
-        description: "Filter runs by status",
+        description: "Optional: Filter runs by status",
+      },
+      requestSources: {
+        type: "array",
+        items: {
+          type: "string",
+          enum: ["api", "frontend", "scheduler", "mcp", "tool-chain", "webhook"],
+        },
+        description: "Optional: Filter runs by how they were triggered (can specify multiple)",
       },
     },
-    required: ["toolId"],
+    required: [],
   },
 });
 
-export const runGetRuns = async (
-  args: { toolId: string; limit?: number; status?: string },
-  client: SuperglueClient,
+const runGetRuns = async (
+  input: { toolId?: string; limit?: number; status?: string; requestSources?: string[] },
+  ctx: ToolExecutionContext,
 ) => {
-  const { toolId, limit = 10, status } = args;
+  const { toolId, limit = 10, status, requestSources } = input;
   const cappedLimit = Math.min(limit, 50);
 
   try {
-    const result = await client.listRuns(cappedLimit, 0, toolId);
-
-    // Filter by status if provided
-    let runs = result.items;
-    if (status) {
-      runs = runs.filter((r) => r.status?.toLowerCase() === status.toLowerCase());
-    }
+    const result = await ctx.superglueClient.listRuns({
+      toolId,
+      limit: cappedLimit,
+      status: status as "running" | "success" | "failed" | "aborted" | undefined,
+      requestSources: requestSources as
+        | ("api" | "frontend" | "scheduler" | "mcp" | "tool-chain" | "webhook")[]
+        | undefined,
+    });
 
     // Map to a simplified format with the key info for debugging
-    const simplifiedRuns = runs.map((run) => ({
-      runId: run.id,
+    const simplifiedRuns = result.items.map((run) => ({
+      runId: run.runId,
+      toolId: run.toolId,
       status: run.status,
       requestSource: run.requestSource,
       toolPayload: run.toolPayload,
       error: run.error,
-      startedAt: run.startedAt,
-      completedAt: run.completedAt,
+      metadata: run.metadata,
     }));
 
     return {
       success: true,
-      toolId,
+      toolId: toolId || "all",
       total: result.total,
       runs: simplifiedRuns,
       note:
         simplifiedRuns.length > 0
           ? "Check toolPayload field to see what was actually received. Compare against the tool's inputSchema to identify mismatches."
-          : "No runs found for this tool.",
+          : "No runs found matching the filters.",
     };
   } catch (error: any) {
     return {
       success: false,
       error: error.message,
-      suggestion: "Check that the tool ID exists",
+      suggestion: "Check that the filters are valid",
     };
   }
 };
+
+const findToolDefinition = (): ToolDefinition => ({
+  name: "find_tool",
+  description: `Look up an existing tool by ID or search for tools by query.
+<use_case>Use when you need to see the full configuration of an existing tool, or find tools matching a description.</use_case>`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      id: { type: "string", description: "Exact tool ID to look up" },
+      query: { type: "string", description: "Search query to find matching tools" },
+    },
+  },
+});
+
+const runFindTool = async (
+  input: { id?: string; query?: string },
+  ctx: ToolExecutionContext,
+): Promise<any> => {
+  if (!input.id && !input.query) {
+    return { success: false, error: "Provide either id or query" };
+  }
+  if (input.id) {
+    const tool = await ctx.superglueClient.getWorkflow(input.id);
+    return { success: true, tool };
+  }
+  const tools = await ctx.superglueClient.findRelevantTools(input.query);
+  return { success: true, tools };
+};
+
+const findSystemDefinition = (): ToolDefinition => ({
+  name: "find_system",
+  description: `Look up an existing system by ID or search for systems by query.
+<use_case>Use when you need to see the full configuration of an existing system, or find systems matching a description.</use_case>`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      id: { type: "string", description: "Exact system ID to look up" },
+      query: { type: "string", description: "Search query to find matching systems" },
+    },
+  },
+});
+
+const runFindSystem = async (
+  input: { id?: string; query?: string },
+  ctx: ToolExecutionContext,
+): Promise<any> => {
+  if (!input.id && !input.query) {
+    return { success: false, error: "Provide either id or query" };
+  }
+  if (input.id) {
+    const system = await ctx.superglueClient.getSystem(input.id);
+    return { success: true, system };
+  }
+  const { items } = await ctx.superglueClient.listSystems(100);
+  const query = input.query!.toLowerCase();
+  const keywords = query.split(/\s+/).filter((k) => k.length > 0);
+  const filtered = items.filter((s) => {
+    const text = [s.id, s.urlHost, s.documentation].filter(Boolean).join(" ").toLowerCase();
+    return keywords.some((kw) => text.includes(kw));
+  });
+  return { success: true, systems: filtered };
+};
+
+export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
+  build_tool: {
+    name: "build_tool",
+    definition: buildToolDefinition,
+    execute: runBuildTool,
+  },
+  run_tool: {
+    name: "run_tool",
+    definition: runToolDefinition,
+    execute: runRunTool,
+  },
+  edit_tool: {
+    name: "edit_tool",
+    definition: editToolDefinition,
+    execute: runEditTool,
+    confirmation: {
+      timing: "after",
+      validActions: [
+        ConfirmationAction.CONFIRMED,
+        ConfirmationAction.DECLINED,
+        ConfirmationAction.PARTIAL,
+      ],
+      processConfirmation: processEditToolConfirmation,
+    },
+  },
+  edit_tool_playground: {
+    name: "edit_tool",
+    definition: editToolDefinitionPlayground,
+    execute: runEditTool,
+    confirmation: {
+      timing: "after",
+      validActions: [
+        ConfirmationAction.CONFIRMED,
+        ConfirmationAction.DECLINED,
+        ConfirmationAction.PARTIAL,
+      ],
+      processConfirmation: processEditToolConfirmation,
+    },
+  },
+  save_tool: {
+    name: "save_tool",
+    definition: saveToolDefinition,
+    execute: runSaveTool,
+  },
+  create_system: {
+    name: "create_system",
+    definition: createSystemDefinition,
+    execute: runCreateSystem,
+  },
+  modify_system: {
+    name: "modify_system",
+    definition: modifySystemDefinition,
+    execute: runModifySystem,
+  },
+  call_endpoint: {
+    name: "call_endpoint",
+    definition: callEndpointDefinition,
+    execute: async (input: any, ctx: ToolExecutionContext) => {
+      const { shouldAutoExecute } = processToolPolicy("call_endpoint", input, ctx);
+
+      if (shouldAutoExecute) {
+        const result = await runCallEndpoint(input, ctx);
+        return truncateResponseBody(result);
+      }
+
+      return {
+        confirmationState: CALL_ENDPOINT_CONFIRMATION.PENDING,
+        request: {
+          method: input.method,
+          url: input.url,
+          headers: input.headers,
+          body: input.body,
+          systemId: input.systemId,
+        },
+      };
+    },
+    confirmation: {
+      timing: "before",
+      validActions: [ConfirmationAction.CONFIRMED, ConfirmationAction.DECLINED],
+      processConfirmation: processCallEndpointConfirmation,
+    },
+  },
+  search_documentation: {
+    name: "search_documentation",
+    definition: searchDocumentationDefinition,
+    execute: runSearchDocumentation,
+  },
+  authenticate_oauth: {
+    name: "authenticate_oauth",
+    definition: authenticateOAuthDefinition,
+    execute: runAuthenticateOAuth,
+  },
+  find_system_templates: {
+    name: "find_system_templates",
+    definition: findSystemTemplatesDefinition,
+    execute: runFindSystemTemplates,
+  },
+  edit_payload: {
+    name: "edit_payload",
+    definition: editPayloadDefinition,
+    execute: runEditPayload,
+    confirmation: {
+      timing: "after",
+      validActions: [ConfirmationAction.CONFIRMED, ConfirmationAction.DECLINED],
+      processConfirmation: processEditPayloadConfirmation,
+    },
+  },
+  get_runs: {
+    name: "get_runs",
+    definition: getRunsDefinition,
+    execute: runGetRuns,
+  },
+  find_tool: {
+    name: "find_tool",
+    definition: findToolDefinition,
+    execute: runFindTool,
+  },
+  find_system: {
+    name: "find_system",
+    definition: findSystemDefinition,
+    execute: runFindSystem,
+  },
+};
+
+export const AGENT_TOOL_SET = [
+  "build_tool",
+  "run_tool",
+  "edit_tool",
+  "save_tool",
+  "create_system",
+  "modify_system",
+  "search_documentation",
+  "call_endpoint",
+  "authenticate_oauth",
+  "get_runs",
+  "find_system_templates",
+  "find_tool",
+  "find_system",
+];
+
+export const PLAYGROUND_TOOL_SET = [
+  "edit_tool_playground",
+  "edit_payload",
+  "search_documentation",
+  "call_endpoint",
+  "modify_system",
+  "authenticate_oauth",
+  "find_tool",
+  "find_system",
+  "get_runs",
+];

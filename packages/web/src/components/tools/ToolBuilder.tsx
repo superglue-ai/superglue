@@ -168,7 +168,6 @@ export function ToolBuilder({
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
   const [showPayloadSection, setShowPayloadSection] = useState(false);
-  const [showFileUploadSection, setShowFileUploadSection] = useState(false);
   const [showResponseSchemaSection, setShowResponseSchemaSection] = useState(false);
   const [isPayloadValid, setIsPayloadValid] = useState(true);
 
@@ -223,13 +222,12 @@ export function ToolBuilder({
   }, [payload]);
 
   const handleSectionToggle = useCallback(
-    (section: "payload" | "files" | "schema") => {
+    (section: "payload" | "schema") => {
       if (isBuilding) return;
 
       initializePayloadIfEmpty();
 
       setShowPayloadSection(section === "payload" ? (prev) => !prev : false);
-      setShowFileUploadSection(section === "files" ? (prev) => !prev : false);
       setShowResponseSchemaSection(section === "schema" ? (prev) => !prev : false);
     },
     [isBuilding, initializePayloadIfEmpty],
@@ -406,7 +404,6 @@ export function ToolBuilder({
     }
 
     setShowPayloadSection(false);
-    setShowFileUploadSection(false);
     setShowResponseSchemaSection(false);
     setIsBuilding(true);
 
@@ -465,8 +462,8 @@ export function ToolBuilder({
     if (!isPayloadValid && enforceInputSchema && inputSchemaMode === "custom" && inputSchema) {
       return "Input Does Not Match Schema";
     }
-    if (isEmptyPayload) return "Attach JSON Tool Input";
-    return isValidPayloadJson ? "JSON Tool Input Attached" : "Invalid Input JSON";
+    if (isEmptyPayload) return "Attach Tool Input";
+    return isValidPayloadJson ? "Tool Input Attached" : "Invalid Input JSON";
   };
 
   if (view === "systems") {
@@ -774,26 +771,16 @@ export function ToolBuilder({
                 className={cn(
                   "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 border",
                   isBuilding && "opacity-50 cursor-not-allowed",
-                  getSectionButtonStyle(!isEmptyPayload, showPayloadSection),
+                  getSectionButtonStyle(
+                    !isEmptyPayload || uploadedFiles.length > 0,
+                    showPayloadSection,
+                  ),
                 )}
               >
                 <FileJson className="h-4 w-4" />
-                {getPayloadButtonLabel()}
-              </button>
-
-              <button
-                onClick={() => handleSectionToggle("files")}
-                disabled={isBuilding}
-                className={cn(
-                  "text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 border",
-                  isBuilding && "opacity-50 cursor-not-allowed",
-                  getSectionButtonStyle(uploadedFiles.length > 0, showFileUploadSection),
-                )}
-              >
-                <Paperclip className="h-4 w-4" />
                 {uploadedFiles.length > 0
-                  ? `File Tool Input Attached (${uploadedFiles.length})`
-                  : "Attach File Tool Input"}
+                  ? `Tool Input (${uploadedFiles.length} file${uploadedFiles.length > 1 ? "s" : ""})`
+                  : getPayloadButtonLabel()}
               </button>
 
               <button
@@ -841,7 +828,7 @@ export function ToolBuilder({
           >
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="font-medium text-sm">JSON Tool Input</h4>
+                <h4 className="font-medium text-sm">Tool Input</h4>
                 <div className="flex items-center gap-2">
                   <Label htmlFor="enforce-input-schema" className="text-xs cursor-pointer">
                     Enforce Input Schema
@@ -855,23 +842,135 @@ export function ToolBuilder({
                 </div>
               </div>
 
-              <JsonCodeEditor
-                value={payload}
-                onChange={(val) => {
-                  setPayload(val);
-                  try {
-                    JSON.parse(val || "");
-                    setValidationErrors((prev) => ({ ...prev, payload: false }));
-                  } catch {
-                    setValidationErrors((prev) => ({ ...prev, payload: true }));
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-1.5">
+                  {uploadedFiles.map((file) => (
+                    <FileChip
+                      key={file.key}
+                      file={file}
+                      onRemove={handleFileRemove}
+                      size="default"
+                      rounded="md"
+                      showOriginalName={true}
+                      showKey={true}
+                    />
+                  ))}
+                </div>
+              )}
+
+              <input
+                type="file"
+                multiple
+                accept={ALLOWED_FILE_EXTENSIONS.join(",")}
+                onChange={async (e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length > 0) {
+                    await handleFilesUpload(files);
                   }
+                  e.target.value = "";
                 }}
-                minHeight="150px"
-                maxHeight="300px"
-                resizable={true}
-                placeholder="{}"
-                showValidation={true}
+                className="hidden"
+                id="file-upload-builder"
               />
+
+              {uploadedFiles.length > 0 ? (
+                <div className="flex gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Manual Payload
+                      </span>
+                    </div>
+                    <JsonCodeEditor
+                      value={payload}
+                      onChange={(val) => {
+                        setPayload(val);
+                        try {
+                          JSON.parse(val || "");
+                          setValidationErrors((prev) => ({ ...prev, payload: false }));
+                        } catch {
+                          setValidationErrors((prev) => ({ ...prev, payload: true }));
+                        }
+                      }}
+                      minHeight="150px"
+                      maxHeight="250px"
+                      resizable={true}
+                      placeholder="{}"
+                      showValidation={true}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Merged Payload (Read-only)
+                      </span>
+                    </div>
+                    <JsonCodeEditor
+                      value={(() => {
+                        try {
+                          return JSON.stringify(
+                            { ...JSON.parse(payload || "{}"), ...filePayloads },
+                            null,
+                            2,
+                          );
+                        } catch {
+                          return JSON.stringify(filePayloads, null, 2);
+                        }
+                      })()}
+                      readOnly={true}
+                      minHeight="150px"
+                      maxHeight="250px"
+                      resizable={true}
+                      showValidation={false}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <JsonCodeEditor
+                  value={payload}
+                  onChange={(val) => {
+                    setPayload(val);
+                    try {
+                      JSON.parse(val || "");
+                      setValidationErrors((prev) => ({ ...prev, payload: false }));
+                    } catch {
+                      setValidationErrors((prev) => ({ ...prev, payload: true }));
+                    }
+                  }}
+                  minHeight="150px"
+                  maxHeight="300px"
+                  resizable={true}
+                  placeholder="{}"
+                  showValidation={true}
+                />
+              )}
+
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => document.getElementById("file-upload-builder")?.click()}
+                  disabled={isProcessingFiles}
+                  className="h-8 px-4"
+                >
+                  {isProcessingFiles ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Paperclip className="h-4 w-4 mr-2" />
+                      {uploadedFiles.length > 0 ? "Add More Files" : "Upload Files"}
+                    </>
+                  )}
+                </Button>
+                {uploadedFiles.length > 0 && (
+                  <span className="ml-3 text-xs text-muted-foreground self-center">
+                    {formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE_TOOLS)}
+                  </span>
+                )}
+              </div>
 
               {!isPayloadValid &&
                 enforceInputSchema &&
@@ -941,69 +1040,6 @@ export function ToolBuilder({
           </div>
         )}
 
-        {showFileUploadSection && (
-          <div
-            className="space-y-3 border rounded-lg p-4 bg-card animate-fade-in mt-3"
-            style={FADE_IN_STYLE}
-          >
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm">File Tool Input</h4>
-              <input
-                type="file"
-                multiple
-                accept={ALLOWED_FILE_EXTENSIONS.join(",")}
-                onChange={async (e) => {
-                  const files = Array.from(e.target.files || []);
-                  if (files.length > 0) {
-                    await handleFilesUpload(files);
-                  }
-                  e.target.value = "";
-                }}
-                className="hidden"
-                id="file-upload-builder"
-              />
-              {uploadedFiles.length > 0 && (
-                <div className="space-y-2 mb-3">
-                  {uploadedFiles.map((file) => (
-                    <FileChip
-                      key={file.key}
-                      file={file}
-                      onRemove={handleFileRemove}
-                      size="default"
-                      rounded="md"
-                      showOriginalName={true}
-                    />
-                  ))}
-                </div>
-              )}
-              <div className="flex flex-col items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => document.getElementById("file-upload-builder")?.click()}
-                  disabled={isProcessingFiles}
-                  className="w-48"
-                >
-                  {isProcessingFiles ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Paperclip className="h-4 w-4 mr-2" />
-                      Select Files
-                    </>
-                  )}
-                </Button>
-                <div className="text-xs text-muted-foreground text-center">
-                  {formatBytes(totalFileSize)} / {formatBytes(MAX_TOTAL_FILE_SIZE_TOOLS)}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {showResponseSchemaSection && (
           <div className="border rounded-lg p-4 bg-card animate-fade-in mt-3" style={FADE_IN_STYLE}>
             <h4 className="font-medium text-sm mb-3">Tool Result Schema</h4>
@@ -1035,7 +1071,6 @@ export function ToolBuilder({
       {suggestions.length > 0 &&
         !instruction.trim() &&
         !showPayloadSection &&
-        !showFileUploadSection &&
         !showResponseSchemaSection && (
           <div className="w-full max-w-4xl space-y-2 mt-4">
             <p className="text-sm text-muted-foreground text-center">Suggestions</p>

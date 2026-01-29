@@ -3,6 +3,7 @@ import type {
   DiscoveryRun,
   FileReference,
   FileStatus,
+  RequestSource,
   System,
   Run,
   RunStatus,
@@ -50,9 +51,10 @@ export interface DataStore {
     offset?: number;
     configId?: string;
     status?: RunStatus;
+    requestSources?: RequestSource[];
     orgId?: string;
   }): Promise<{ items: Run[]; total: number }>;
-  createRun(params: { run: Run }): Promise<Run>;
+  createRun(params: { run: Run; orgId?: string }): Promise<Run>;
   updateRun(params: { id: string; orgId: string; updates: Partial<Run> }): Promise<Run>;
   getPrometheusRunMetrics(params: {
     orgId: string;
