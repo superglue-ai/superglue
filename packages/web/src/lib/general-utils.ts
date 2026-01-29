@@ -449,8 +449,7 @@ export function wrapLoopSelectorWithLimit(
 
 export function isAbortError(errorMessage: string | undefined): boolean {
   if (!errorMessage) return false;
-  const lower = errorMessage.toLowerCase();
-  return lower.includes("abort") || lower.includes("terminated") || lower.includes("cancelled");
+  return errorMessage.startsWith("AbortError:");
 }
 
 export function formatDurationShort(ms: number): string {
