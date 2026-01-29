@@ -13,6 +13,7 @@ import {
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import { parseJSON } from "../../files/index.js";
+import { RunLifecycleManager } from "../../runs/index.js";
 import { SystemManager } from "../../systems/system-manager.js";
 import { ToolBuilder } from "../../tools/tool-builder.js";
 import { ToolFinder } from "../../tools/tool-finder.js";
@@ -72,11 +73,24 @@ export const executeWorkflowResolver = async (
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
 ): Promise<GraphQLWorkflowResult> => {
-  const runId = args.runId || crypto.randomUUID();
-  const startedAt = new Date();
   const metadata = context.toMetadata();
+  const requestSource = context.requestSource ?? RequestSource.FRONTEND;
+
+  // Use RunLifecycleManager for centralized run handling
+  const lifecycle = new RunLifecycleManager(context.datastore, context.orgId, metadata);
 
   let workflow: Tool | undefined;
+  let runContext:
+    | {
+        runId: string;
+        startedAt: Date;
+        toolId: string;
+        tool: Tool;
+        requestSource: RequestSource;
+        options?: RequestOptions;
+      }
+    | undefined;
+
   try {
     if (args.input.id) {
       workflow = await context.datastore.getWorkflow({ id: args.input.id, orgId: context.orgId });
@@ -97,7 +111,7 @@ export const executeWorkflowResolver = async (
       throw new Error("Cannot execute archived workflow");
     }
 
-    logMessage("debug", `Executing tool with id: ${workflow.id}, run_id: ${runId}`, metadata);
+    logMessage("debug", `Executing tool with id: ${workflow.id}`, metadata);
 
     // Parse schemas if they're strings
     if (workflow.inputSchema && typeof workflow.inputSchema === "string") {
@@ -116,23 +130,17 @@ export const executeWorkflowResolver = async (
       { includeDocs: selfHealingEnabled },
     );
 
-    await context.datastore.createRun({
-      run: {
-        runId,
-        toolId: workflow.id,
-        status: RunStatus.RUNNING,
-        tool: workflow,
-        options: args.options,
-        requestSource: context.requestSource ?? RequestSource.FRONTEND,
-        metadata: {
-          startedAt: startedAt.toISOString(),
-        },
-      },
-      orgId: context.orgId,
+    // NOTE: GraphQL does NOT store payload in DB to save space (intentional)
+    runContext = await lifecycle.startRun({
+      runId: args.runId,
+      tool: workflow,
+      // payload intentionally omitted to save DB space
+      options: args.options,
+      requestSource,
     });
 
     const taskPayload: ToolExecutionPayload = {
-      runId,
+      runId: runContext.runId,
       workflow,
       payload: args.payload,
       credentials: args.credentials,
@@ -142,20 +150,27 @@ export const executeWorkflowResolver = async (
       traceId: metadata.traceId,
     };
 
-    let result;
+    let executionResult;
     try {
-      result = await context.workerPools.toolExecution.runTask(runId, taskPayload);
+      executionResult = await context.workerPools.toolExecution.runTask(
+        runContext.runId,
+        taskPayload,
+      );
     } catch (abortError: any) {
       if (abortError.message?.includes("abort") || abortError.name === "AbortError") {
-        logMessage("warn", `Aborted run with runId ${runId}`, metadata);
+        logMessage("warn", `Aborted run with runId ${runContext.runId}`, metadata);
+        await lifecycle.abortRun(
+          runContext,
+          `User manually aborted run with runId ${runContext.runId}`,
+        );
 
         return {
-          id: runId,
+          id: runContext.runId,
           success: false,
-          error: `User manually aborted run with runId ${runId}`,
+          error: `User manually aborted run with runId ${runContext.runId}`,
           config: workflow,
           stepResults: [],
-          startedAt,
+          startedAt: runContext.startedAt,
           completedAt: new Date(),
           data: undefined,
         } as GraphQLWorkflowResult;
@@ -164,38 +179,28 @@ export const executeWorkflowResolver = async (
     }
 
     const graphqlResult: GraphQLWorkflowResult = {
-      ...result,
-      id: runId,
-      stepResults: result.stepResults.map((stepResult) => ({
+      ...executionResult,
+      id: runContext.runId,
+      stepResults: executionResult.stepResults.map((stepResult) => ({
         ...stepResult,
         rawData: undefined,
         transformedData: stepResult.data,
       })),
     };
 
-    // NOTE: Not persisting toolResult/stepResults and payload to avoid PostgreSQL JSONB size limits (256MB)
-    // Large workflow results can exceed this, tbd
-    const completedAt = new Date();
-    await context.datastore.updateRun({
-      id: runId,
-      orgId: context.orgId,
-      updates: {
-        status: graphqlResult.success ? RunStatus.SUCCESS : RunStatus.FAILED,
-        tool: graphqlResult.config || workflow,
-        error: graphqlResult.error || undefined,
-        metadata: {
-          startedAt: startedAt.toISOString(),
-          completedAt: completedAt.toISOString(),
-          durationMs: completedAt.getTime() - startedAt.getTime(),
-        },
-      },
+    // Complete the run (handles DB update and notifications)
+    await lifecycle.completeRun(runContext, {
+      success: graphqlResult.success,
+      tool: graphqlResult.config || workflow,
+      error: graphqlResult.error,
+      stepResults: executionResult.stepResults,
     });
 
     // Notify webhook if configured (fire-and-forget)
     if (args.options?.webhookUrl?.startsWith("http")) {
       notifyWebhook(
         args.options.webhookUrl,
-        runId,
+        runContext.runId,
         graphqlResult.success,
         graphqlResult.data,
         graphqlResult.error,
@@ -224,31 +229,39 @@ export const executeWorkflowResolver = async (
   } catch (error) {
     logMessage("error", "Workflow execution error: " + String(error), metadata);
 
-    await context.datastore
-      .updateRun({
-        id: runId,
-        orgId: context.orgId,
-        updates: {
-          status: RunStatus.FAILED,
-          toolPayload: args.payload,
-          error: String(error),
-          metadata: {
-            startedAt: startedAt.toISOString(),
-            completedAt: new Date().toISOString(),
-            durationMs: new Date().getTime() - startedAt.getTime(),
-          },
-        },
-      })
-      .catch(() => {});
+    const errorStartedAt = runContext?.startedAt || new Date();
+    const completedAt = new Date();
+
+    // Determine the runId to use for both persistence and response
+    const errorRunId = runContext?.runId || args.runId || crypto.randomUUID();
+
+    // Use lifecycle manager for error handling if we have a runContext
+    if (runContext) {
+      await lifecycle.completeRun(runContext, {
+        success: false,
+        tool: workflow,
+        error: String(error),
+      });
+    } else {
+      // Fallback for errors before run was started
+      await lifecycle.failRunWithoutContext(
+        errorRunId,
+        workflow?.id || args.input.id || "unknown",
+        workflow,
+        String(error),
+        errorStartedAt,
+        requestSource,
+      );
+    }
 
     const result = {
-      id: runId,
+      id: errorRunId,
       success: false,
       config: workflow || { id: args.input.id, steps: [] },
       error: String(error),
       stepResults: [],
-      startedAt,
-      completedAt: new Date(),
+      startedAt: errorStartedAt,
+      completedAt,
     };
     return { ...result, data: undefined, stepResults: [] } as GraphQLWorkflowResult;
   }

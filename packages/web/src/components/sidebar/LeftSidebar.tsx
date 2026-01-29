@@ -3,6 +3,7 @@
 import { Button } from "@/src/components/ui/button";
 import { useTheme } from "@/src/hooks/use-theme";
 import {
+  Bell,
   Blocks,
   Book,
   ExternalLink,
@@ -22,11 +23,21 @@ const navItems = [
   { icon: MessagesSquare, label: "Agent", href: "/" },
   { icon: Hammer, label: "Tools", href: "/tools" },
   { icon: Blocks, label: "Systems", href: "/systems" },
-  { icon: Book, label: "Docs", href: "https://docs.superglue.cloud", target: "_blank" },
-  /*  { icon: AlertCircle, label: 'Error Monitoring', href: '/analytics' },
-  { icon: Shield, label: 'Access Control', href: '/access-control' },
-  { icon: Code, label: 'SDK Generation', href: '/sdk' },
-*/
+];
+
+const docsNavItem = {
+  icon: Book,
+  label: "Docs",
+  href: "https://docs.superglue.cloud",
+  target: "_blank",
+};
+
+const adminSubItems = [
+  { icon: Home, label: "Overview", view: null },
+  { icon: History, label: "Runs", view: "runs" },
+  { icon: Clock, label: "Schedules", view: "schedules" },
+  { icon: Key, label: "API Keys", view: "api-keys" },
+  { icon: Bell, label: "Notifications", view: "notifications" },
 ];
 
 export function LeftSidebar() {

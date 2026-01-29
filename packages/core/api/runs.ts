@@ -233,8 +233,6 @@ const createRun: RouteHandler = async (request, reply) => {
 
   try {
     await authReq.datastore.createRun({ run, orgId: authReq.authInfo.orgId });
-    logMessage("info", `Created manual run ${runId} for tool ${body.toolId}`, metadata);
-
     return addTraceHeader(reply, authReq.traceId).code(201).send(mapRunToOpenAPI(run));
   } catch (error: any) {
     logMessage("error", `Failed to create run: ${String(error)}`, metadata);
