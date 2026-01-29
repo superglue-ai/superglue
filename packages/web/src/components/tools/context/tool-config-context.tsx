@@ -86,9 +86,85 @@ export function ToolConfigProvider({
     }
   }, [toolId, initialPayload]);
 
-  // Use external state if provided (embedded mode), otherwise use local state
-  const uploadedFiles = externalUploadedFiles ?? localUploadedFiles;
-  const filePayloads = externalFilePayloads ?? localFilePayloads;
+  const lastAttemptedSaveRef = useRef<string | null>(null);
+  const draftSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingDraftRef = useRef<{
+    toolId: string;
+    steps: ExecutionStep[];
+    instruction: string;
+    finalTransform: string;
+    inputSchema: string | null;
+    responseSchema: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!toolId || !toolId.trim()) return;
+
+    if (!initialStateReady) {
+      return;
+    }
+
+    const currentState = JSON.stringify({
+      steps,
+      instruction,
+      finalTransform,
+      inputSchema,
+      responseSchema,
+    });
+
+    if (currentState === initialStateRef.current) {
+      pendingDraftRef.current = null;
+      return;
+    }
+
+    if (currentState === lastAttemptedSaveRef.current) {
+      pendingDraftRef.current = null;
+      return;
+    }
+
+    // Track pending draft for save on unmount
+    const draftData = {
+      toolId,
+      steps,
+      instruction,
+      finalTransform,
+      inputSchema,
+      responseSchema,
+    };
+    pendingDraftRef.current = draftData;
+
+    if (draftSaveTimeoutRef.current) {
+      clearTimeout(draftSaveTimeoutRef.current);
+    }
+
+    draftSaveTimeoutRef.current = setTimeout(() => {
+      lastAttemptedSaveRef.current = currentState;
+      pendingDraftRef.current = null;
+
+      addDraft(toolId, draftData).catch((error) => {
+        console.error("Failed to save draft:", error);
+      });
+    }, 1000);
+
+    return () => {
+      if (draftSaveTimeoutRef.current) {
+        clearTimeout(draftSaveTimeoutRef.current);
+      }
+    };
+  }, [toolId, steps, instruction, finalTransform, inputSchema, responseSchema, initialStateReady]);
+
+  // Save pending draft on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingDraftRef.current) {
+        const draft = pendingDraftRef.current;
+        // Fire and forget - component is unmounting
+        addDraft(draft.toolId, draft).catch((error) => {
+          console.error("Failed to save draft on unmount:", error);
+        });
+      }
+    };
+  }, []);
 
   // Combined setter for atomic updates - prevents mismatched state in parent callbacks
   const setFilesAndPayloads = useCallback(

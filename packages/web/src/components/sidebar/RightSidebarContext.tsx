@@ -29,6 +29,16 @@ interface RightSidebarContextType {
   sendMessageToAgent: (message: string) => void;
   registerSetSidebarExpanded: (fn: (expanded: boolean) => void) => void;
   registerResetAgentChat: (fn: ResetChatFn) => void;
+  agentMode: PlaygroundMode;
+  setAgentMode: (mode: PlaygroundMode) => void;
+  systemConfig: SystemConfigForAgent | undefined;
+  setSystemConfig: (config: SystemConfigForAgent | undefined) => void;
+  savedTool: Tool | null;
+  setSavedTool: (tool: Tool | null) => void;
+  playgroundTool: Tool | null;
+  setPlaygroundTool: (tool: Tool | null) => void;
+  onRestoreDraft?: (draft: ToolDraft) => void;
+  setOnRestoreDraft: (fn: ((draft: ToolDraft) => void) | undefined) => void;
 }
 
 const RightSidebarContext = createContext<RightSidebarContextType>({
@@ -41,12 +51,27 @@ const RightSidebarContext = createContext<RightSidebarContextType>({
   sendMessageToAgent: () => {},
   registerSetSidebarExpanded: () => {},
   registerResetAgentChat: () => {},
+  agentMode: "tool",
+  setAgentMode: () => {},
+  systemConfig: undefined,
+  setSystemConfig: () => {},
+  savedTool: null,
+  setSavedTool: () => {},
+  playgroundTool: null,
+  setPlaygroundTool: () => {},
+  onRestoreDraft: undefined,
+  setOnRestoreDraft: () => {},
 });
 
 export function RightSidebarProvider({ children }: { children: ReactNode }) {
   const [showAgent, setShowAgent] = useState(false);
   const [agentPortalRef, setAgentPortalRef] = useState<HTMLDivElement | null>(null);
   const [sidebarExpanded, setSidebarExpandedState] = useState(false);
+  const [agentMode, setAgentMode] = useState<PlaygroundMode>("tool");
+  const [systemConfig, setSystemConfig] = useState<SystemConfigForAgent | undefined>(undefined);
+  const [savedTool, setSavedTool] = useState<Tool | null>(null);
+  const [playgroundTool, setPlaygroundTool] = useState<Tool | null>(null);
+  const onRestoreDraftRef = useRef<((draft: ToolDraft) => void) | null>(null);
   const setAgentInputRef = useRef<SetInputFn | null>(null);
   const setSidebarExpandedRef = useRef<((expanded: boolean) => void) | null>(null);
   const resetAgentChatRef = useRef<ResetChatFn | null>(null);
@@ -96,6 +121,16 @@ export function RightSidebarProvider({ children }: { children: ReactNode }) {
         sendMessageToAgent,
         registerSetSidebarExpanded,
         registerResetAgentChat,
+        agentMode,
+        setAgentMode,
+        systemConfig,
+        setSystemConfig,
+        savedTool,
+        setSavedTool,
+        playgroundTool,
+        setPlaygroundTool,
+        onRestoreDraft,
+        setOnRestoreDraft,
       }}
     >
       {children}

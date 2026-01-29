@@ -237,7 +237,7 @@ export function AgentContextProvider({
   const stopStreaming = useCallback(() => {
     if (streamingHook.currentStreamControllerRef.current) {
       streamingHook.currentStreamControllerRef.current.abort();
-      messagesHook.cleanupInterruptedStream("\n\n*[Response stopped]*");
+      messagesHook.cleanupInterruptedStream("\n\n");
       messagesHook.setIsLoading(false);
     }
   }, [streamingHook.currentStreamControllerRef, messagesHook]);

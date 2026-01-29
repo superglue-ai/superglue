@@ -144,7 +144,14 @@ function ToolPlaygroundInner({
   const toolId = tool.id;
   const folder = tool.folder;
   const isArchived = tool.isArchived;
-  const { setShowAgent, agentPortalRef, AgentSidebarComponent } = useRightSidebar();
+  const {
+    setShowAgent,
+    agentPortalRef,
+    AgentSidebarComponent,
+    setSavedTool,
+    setPlaygroundTool,
+    setOnRestoreDraft,
+  } = useRightSidebar();
 
   useEffect(() => {
     if (!isArchived && !renderAgentInline && AgentSidebarComponent) {
@@ -157,6 +164,47 @@ function ToolPlaygroundInner({
   const responseSchema = toolConfig.responseSchema;
   const inputSchema = toolConfig.inputSchema;
   const instructions = tool.instruction;
+
+  // Register saved tool with sidebar for history panel
+  useEffect(() => {
+    if (!embedded && toolId) {
+      const toolFromContext = tools.find((t) => t.id === toolId);
+      setSavedTool(toolFromContext || null);
+    } else {
+      setSavedTool(null);
+    }
+    return () => {
+      setSavedTool(null);
+    };
+  }, [embedded, toolId, tools, setSavedTool]);
+
+  useEffect(() => {
+    if (!embedded && toolId) {
+      setOnRestoreDraft((draft) => {
+        if (!draft) return;
+        setSteps(draft.steps);
+        setInstruction(draft.instruction);
+        setFinalTransform(draft.finalTransform);
+        setInputSchema(draft.inputSchema);
+        setResponseSchema(draft.responseSchema);
+        // Payload is not part of the draft - it's saved separately
+        setTimeout(markCurrentStateAsBaseline, 0);
+      });
+    }
+    return () => {
+      setOnRestoreDraft(undefined);
+    };
+  }, [
+    embedded,
+    toolId,
+    setOnRestoreDraft,
+    setSteps,
+    setInstruction,
+    setFinalTransform,
+    setInputSchema,
+    setResponseSchema,
+    markCurrentStateAsBaseline,
+  ]);
   const manualPayloadText = payload.manualPayloadText;
   const hasUserEditedPayload = payload.hasUserEdited;
   const computedPayload = payload.computedPayload;
@@ -349,6 +397,18 @@ function ToolPlaygroundInner({
       }) as Tool,
     [toolId, steps, responseSchema, inputSchema, finalTransform, instructions, folder, initialTool],
   );
+
+  // Register current playground state for draft comparisons
+  useEffect(() => {
+    if (!embedded && toolId) {
+      setPlaygroundTool(currentTool);
+    } else {
+      setPlaygroundTool(null);
+    }
+    return () => {
+      setPlaygroundTool(null);
+    };
+  }, [embedded, toolId, currentTool, setPlaygroundTool]);
 
   useImperativeHandle(
     innerRef,

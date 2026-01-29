@@ -23,7 +23,14 @@ interface RightSidebarProps {
 }
 
 export function RightSidebar({ className }: RightSidebarProps) {
-  const { showAgent, setAgentPortalRef, registerSetSidebarExpanded } = useRightSidebar();
+  const {
+    showAgent,
+    setAgentPortalRef,
+    registerSetSidebarExpanded,
+    savedTool,
+    playgroundTool,
+    onRestoreDraft,
+  } = useRightSidebar();
   const agentContainerRef = useCallback(
     (node: HTMLDivElement | null) => {
       setAgentPortalRef(node);
@@ -31,7 +38,9 @@ export function RightSidebar({ className }: RightSidebarProps) {
     [setAgentPortalRef],
   );
   const [isExpanded, setIsExpanded] = useState(false);
-  const [activePanel, setActivePanel] = useState<ActivePanel>(showAgent ? "agent" : "logs");
+  const [activePanel, setActivePanel] = useState<ActivePanel>(
+    savedTool ? "history" : showAgent ? "agent" : "logs",
+  );
   const [isHydrated, setIsHydrated] = useState(false);
   const [transitionDuration, setTransitionDuration] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
@@ -52,30 +61,39 @@ export function RightSidebar({ className }: RightSidebarProps) {
   activePanelRef.current = activePanel;
 
   useEffect(() => {
-    const storageKey = showAgent ? "playground-sidebar" : "global-sidebar";
+    const storageKey = showAgent || savedTool ? "playground-sidebar" : "global-sidebar";
     const savedExpanded = localStorage.getItem(`${storageKey}-expanded`) === "true";
     const savedPanel = localStorage.getItem(`${storageKey}-panel`) as ActivePanel;
-    // When agent mode activates, always expand the sidebar
-    setIsExpanded(showAgent ? true : savedExpanded);
-    if (showAgent) {
-      setActivePanel(savedPanel === "logs" || savedPanel === "agent" ? savedPanel : "agent");
+    // When agent mode or tool is active, always expand the sidebar
+    setIsExpanded(showAgent || savedTool ? true : savedExpanded);
+    if (showAgent || savedTool) {
+      const validPanels: ActivePanel[] = showAgent
+        ? ["logs", "agent", "history"]
+        : ["logs", "history"];
+      setActivePanel(
+        savedPanel && validPanels.includes(savedPanel)
+          ? savedPanel
+          : savedTool
+            ? "history"
+            : "agent",
+      );
     }
     setIsHydrated(true);
     requestAnimationFrame(() => setTransitionDuration(0.3));
-  }, [showAgent]);
+  }, [showAgent, savedTool]);
 
   useEffect(() => {
     if (isHydrated) {
-      const storageKey = showAgent ? "playground-sidebar" : "global-sidebar";
+      const storageKey = showAgent || savedTool ? "playground-sidebar" : "global-sidebar";
       localStorage.setItem(`${storageKey}-expanded`, String(isExpanded));
     }
-  }, [isExpanded, isHydrated, showAgent]);
+  }, [isExpanded, isHydrated, showAgent, savedTool]);
 
   useEffect(() => {
-    if (isHydrated && showAgent) {
+    if (isHydrated && (showAgent || savedTool)) {
       localStorage.setItem("playground-sidebar-panel", activePanel);
     }
-  }, [activePanel, isHydrated, showAgent]);
+  }, [activePanel, isHydrated, showAgent, savedTool]);
 
   useEffect(() => {
     registerSetSidebarExpanded((expanded: boolean) => {
@@ -203,6 +221,20 @@ export function RightSidebar({ className }: RightSidebarProps) {
             <MessagesSquare className="h-5 w-5" />
           </Button>
         )}
+        {savedTool && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handlePanelSelect("history")}
+            className={cn(
+              "h-10 w-10 relative",
+              activePanel === "history" && "bg-primary/10 text-primary",
+            )}
+            title="Version History"
+          >
+            <History className="h-5 w-5" />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -239,6 +271,20 @@ export function RightSidebar({ className }: RightSidebarProps) {
               >
                 <MessagesSquare className="h-3.5 w-3.5" />
                 Agent
+              </button>
+            )}
+            {savedTool && (
+              <button
+                onClick={() => setActivePanel("history")}
+                className={cn(
+                  "h-7 px-2 gap-1.5 text-xs rounded-md inline-flex items-center font-medium transition-colors",
+                  activePanel === "history"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                )}
+              >
+                <History className="h-3.5 w-3.5" />
+                History
               </button>
             )}
             <button
@@ -279,6 +325,16 @@ export function RightSidebar({ className }: RightSidebarProps) {
               ref={agentContainerRef}
               className={cn("h-full", activePanel !== "agent" && "hidden")}
             />
+          )}
+          {savedTool && (
+            <div className={cn("h-full", activePanel !== "history" && "hidden")}>
+              <VersionHistoryPanel
+                savedTool={savedTool}
+                playgroundTool={playgroundTool}
+                onRestoreDraft={onRestoreDraft}
+                isActive={activePanel === "history"}
+              />
+            </div>
           )}
           <div className={cn("h-full", activePanel !== "logs" && "hidden")}>
             <LogsPanel
