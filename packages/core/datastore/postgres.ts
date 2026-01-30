@@ -81,7 +81,7 @@ export class PostgresService implements DataStore {
       if (includeDocs) {
         query = `SELECT i.id, i.name, i.type, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
-                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.version, i.created_at, i.updated_at,
+                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.documentation_files, i.version, i.created_at, i.updated_at,
                         d.documentation, d.open_api_schema
                  FROM integrations i
                  LEFT JOIN integration_details d ON i.id = d.integration_id AND i.org_id = d.org_id
@@ -89,7 +89,7 @@ export class PostgresService implements DataStore {
       } else {
         query = `SELECT id, name, type, url_host, url_path, credentials, 
                         documentation_url, documentation_pending,
-                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, version, created_at, updated_at
+                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, version, created_at, updated_at
                  FROM integrations WHERE id = ANY($1) AND org_id = $2`;
       }
 
@@ -112,6 +112,8 @@ export class PostgresService implements DataStore {
           documentationKeywords: row.documentation_keywords,
           icon: row.icon,
           metadata: row.metadata,
+          templateName: row.template_name,
+          documentationFiles: row.documentation_files || {},
           version: row.version,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
@@ -250,6 +252,9 @@ export class PostgresService implements DataStore {
       await client.query(`ALTER TABLE integrations ADD COLUMN IF NOT EXISTS metadata JSONB`);
       await client.query(
         `ALTER TABLE integrations ADD COLUMN IF NOT EXISTS template_name VARCHAR(255)`,
+      );
+      await client.query(
+        `ALTER TABLE integrations ADD COLUMN IF NOT EXISTS documentation_files JSONB DEFAULT '{}'`,
       );
 
       // Integration templates table for Superglue OAuth credentials (and potentially further fields in the future)
@@ -1242,7 +1247,7 @@ export class PostgresService implements DataStore {
       if (includeDocs) {
         query = `SELECT i.id, i.name, i.type, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
-                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.version, i.created_at, i.updated_at,
+                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.documentation_files, i.version, i.created_at, i.updated_at,
                         d.documentation, d.open_api_schema
                  FROM integrations i
                  LEFT JOIN integration_details d ON i.id = d.integration_id AND i.org_id = d.org_id
@@ -1250,7 +1255,7 @@ export class PostgresService implements DataStore {
       } else {
         query = `SELECT id, name, type, url_host, url_path, credentials, 
                         documentation_url, documentation_pending,
-                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, version, created_at, updated_at
+                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, version, created_at, updated_at
                  FROM integrations WHERE id = $1 AND org_id = $2`;
       }
 
@@ -1275,6 +1280,7 @@ export class PostgresService implements DataStore {
         icon: row.icon,
         metadata: row.metadata,
         templateName: row.template_name,
+        documentationFiles: row.documentation_files || {},
         version: row.version,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -1305,7 +1311,7 @@ export class PostgresService implements DataStore {
       if (includeDocs) {
         query = `SELECT i.id, i.name, i.type, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
-                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.version, i.created_at, i.updated_at,
+                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.documentation_files, i.version, i.created_at, i.updated_at,
                         d.documentation, d.open_api_schema
                  FROM integrations i
                  LEFT JOIN integration_details d ON i.id = d.integration_id AND i.org_id = d.org_id
@@ -1314,7 +1320,7 @@ export class PostgresService implements DataStore {
       } else {
         query = `SELECT id, name, type, url_host, url_path, credentials, 
                         documentation_url, documentation_pending,
-                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, version, created_at, updated_at
+                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, version, created_at, updated_at
                  FROM integrations WHERE org_id = $1 
                  ORDER BY created_at DESC LIMIT $2 OFFSET $3`;
       }
@@ -1339,6 +1345,7 @@ export class PostgresService implements DataStore {
           icon: row.icon,
           metadata: row.metadata,
           templateName: row.template_name,
+          documentationFiles: row.documentation_files || {},
           version: row.version,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
@@ -1370,9 +1377,9 @@ export class PostgresService implements DataStore {
         INSERT INTO integrations (
             id, org_id, name, type, url_host, url_path, credentials,
             documentation_url, documentation_pending,
-            open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, version, created_at, updated_at
+            open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, version, created_at, updated_at
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
         )
         ON CONFLICT (id, org_id) 
         DO UPDATE SET 
@@ -1389,8 +1396,9 @@ export class PostgresService implements DataStore {
             icon = $13,
             metadata = $14,
             template_name = $15,
-            version = $16,
-            updated_at = $18
+            documentation_files = $16,
+            version = $17,
+            updated_at = $19
       `,
         [
           id,
@@ -1408,6 +1416,7 @@ export class PostgresService implements DataStore {
           system.icon,
           system.metadata ? JSON.stringify(system.metadata) : null,
           system.templateName,
+          system.documentationFiles ? JSON.stringify(system.documentationFiles) : "{}",
           system.version,
           system.createdAt || new Date(),
           system.updatedAt || new Date(),
@@ -1432,6 +1441,193 @@ export class PostgresService implements DataStore {
 
       await client.query("COMMIT");
       return { ...system, id };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async createSystem(params: { system: System; orgId?: string }): Promise<System> {
+    const { system, orgId } = params;
+    if (!system?.id) throw new Error("System id is required");
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const encryptedCredentials = system.credentials
+        ? credentialEncryption.encrypt(system.credentials)
+        : null;
+
+      const result = await client.query(
+        `
+        INSERT INTO integrations (
+            id, org_id, name, type, url_host, url_path, credentials,
+            documentation_url, documentation_pending,
+            open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, version, created_at, updated_at
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+        )
+        RETURNING id
+      `,
+        [
+          system.id,
+          orgId || "",
+          system.name,
+          system.type,
+          system.urlHost,
+          system.urlPath,
+          encryptedCredentials,
+          system.documentationUrl,
+          system.documentationPending,
+          system.openApiUrl,
+          system.specificInstructions,
+          system.documentationKeywords,
+          system.icon,
+          system.metadata ? JSON.stringify(system.metadata) : null,
+          system.templateName,
+          system.documentationFiles ? JSON.stringify(system.documentationFiles) : "{}",
+          system.version,
+          system.createdAt || new Date(),
+          system.updatedAt || new Date(),
+        ],
+      );
+
+      if (result.rowCount === 0) {
+        throw new Error("Failed to create system");
+      }
+
+      if (system.documentation || system.openApiSchema) {
+        await client.query(
+          `
+            INSERT INTO integration_details (
+                integration_id, org_id, documentation, open_api_schema
+            ) VALUES ($1, $2, $3, $4)
+          `,
+          [system.id, orgId || "", system.documentation, system.openApiSchema],
+        );
+      }
+
+      await client.query("COMMIT");
+      return { ...system };
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      if (error.code === "23505") {
+        throw new Error(`System with id '${system.id}' already exists`);
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateSystem(params: {
+    id: string;
+    system: Partial<System>;
+    orgId?: string;
+  }): Promise<System | null> {
+    const { id, system, orgId } = params;
+    if (!id) throw new Error("System id is required");
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const encryptedCredentials = system.credentials
+        ? credentialEncryption.encrypt(system.credentials)
+        : null;
+
+      const result = await client.query(
+        `
+        UPDATE integrations SET
+            name = COALESCE($3, name),
+            type = COALESCE($4, type),
+            url_host = COALESCE($5, url_host),
+            url_path = COALESCE($6, url_path),
+            credentials = COALESCE($7, credentials),
+            documentation_url = COALESCE($8, documentation_url),
+            documentation_pending = COALESCE($9, documentation_pending),
+            open_api_url = COALESCE($10, open_api_url),
+            specific_instructions = COALESCE($11, specific_instructions),
+            documentation_keywords = COALESCE($12, documentation_keywords),
+            icon = COALESCE($13, icon),
+            metadata = COALESCE($14, metadata),
+            template_name = COALESCE($15, template_name),
+            documentation_files = COALESCE($16, documentation_files),
+            version = COALESCE($17, version),
+            updated_at = $18
+        WHERE id = $1 AND org_id = $2
+        RETURNING *
+      `,
+        [
+          id,
+          orgId || "",
+          system.name,
+          system.type,
+          system.urlHost,
+          system.urlPath,
+          encryptedCredentials,
+          system.documentationUrl,
+          system.documentationPending,
+          system.openApiUrl,
+          system.specificInstructions,
+          system.documentationKeywords,
+          system.icon,
+          system.metadata ? JSON.stringify(system.metadata) : null,
+          system.templateName,
+          system.documentationFiles ? JSON.stringify(system.documentationFiles) : null,
+          system.version,
+          new Date(),
+        ],
+      );
+
+      if (result.rowCount === 0) {
+        await client.query("ROLLBACK");
+        return null;
+      }
+
+      if (system.documentation || system.openApiSchema) {
+        await client.query(
+          `
+            INSERT INTO integration_details (
+                integration_id, org_id, documentation, open_api_schema
+            ) VALUES ($1, $2, $3, $4)
+            ON CONFLICT (integration_id, org_id)
+            DO UPDATE SET
+                documentation = COALESCE($3, integration_details.documentation),
+                open_api_schema = COALESCE($4, integration_details.open_api_schema)
+          `,
+          [id, orgId || "", system.documentation, system.openApiSchema],
+        );
+      }
+
+      await client.query("COMMIT");
+
+      const row = result.rows[0];
+      const decryptedCredentials = row.credentials
+        ? credentialEncryption.decrypt(row.credentials)
+        : {};
+
+      return {
+        id: row.id,
+        name: row.name,
+        type: row.type,
+        urlHost: row.url_host,
+        urlPath: row.url_path,
+        credentials: decryptedCredentials,
+        documentationUrl: row.documentation_url,
+        documentationPending: row.documentation_pending,
+        openApiUrl: row.open_api_url,
+        specificInstructions: row.specific_instructions,
+        documentationKeywords: row.documentation_keywords,
+        icon: row.icon,
+        metadata: row.metadata,
+        templateName: row.template_name,
+        documentationFiles: row.documentation_files,
+        version: row.version,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

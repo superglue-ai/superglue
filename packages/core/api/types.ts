@@ -2,6 +2,7 @@ import { ServiceMetadata, UserRole } from "@superglue/shared";
 import { FastifyReply, FastifyRequest } from "fastify";
 import type { DataStore } from "../datastore/types.js";
 import type { WorkerPools } from "../worker/types.js";
+import type { DocumentationFiles, FileStatus } from "@superglue/shared";
 
 export interface AuthenticatedFastifyRequest extends FastifyRequest {
   traceId?: string;
@@ -137,4 +138,41 @@ export interface CreateRunRequestBody {
   error?: string;
   startedAt: string;
   completedAt: string;
+}
+
+export interface CreateSystemBody {
+  name: string;
+  urlHost: string;
+  credentials?: Record<string, any>;
+  specificInstructions?: string;
+  templateName?: string;
+  documentationFiles?: DocumentationFiles;
+  icon?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface UpdateSystemBody {
+  name: string;
+  urlHost: string;
+  specificInstructions?: string;
+  icon?: string;
+  credentials?: Record<string, any>;
+  metadata?: Record<string, any>;
+  templateName?: string;
+  documentationFiles?: DocumentationFiles;
+}
+
+export interface ScrapeRequestBody {
+  url?: string;
+  keywords?: string[];
+}
+
+export interface DocumentationFileResponse {
+  id: string;
+  source: "upload" | "scrape" | "openapi";
+  status: FileStatus;
+  fileName: string;
+  sourceUrl?: string;
+  error?: string;
+  content?: string;
 }

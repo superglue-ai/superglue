@@ -101,6 +101,12 @@ export interface DataStore {
     includeDocs?: boolean;
     orgId?: string;
   }): Promise<{ items: System[]; total: number }>;
+  createSystem(params: { system: System; orgId?: string }): Promise<System>;
+  updateSystem(params: {
+    id: string;
+    system: Partial<System>;
+    orgId?: string;
+  }): Promise<System | null>;
   upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System>;
   deleteSystem(params: { id: string; orgId?: string }): Promise<boolean>;
   getManySystems(params: {

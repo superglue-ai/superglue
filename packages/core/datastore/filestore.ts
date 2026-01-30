@@ -703,6 +703,24 @@ export class FileStore implements DataStore {
       .filter((i): i is System => i !== null);
   }
 
+  async createSystem(params: { system: System; orgId?: string }): Promise<System> {
+    return this.upsertSystem({ id: params.system.id, system: params.system, orgId: params.orgId });
+  }
+
+  async updateSystem(params: {
+    id: string;
+    system: Partial<System>;
+    orgId?: string;
+  }): Promise<System | null> {
+    const existing = await this.getSystem({ id: params.id, orgId: params.orgId });
+    if (!existing) return null;
+    return this.upsertSystem({
+      id: params.id,
+      system: { ...existing, ...params.system },
+      orgId: params.orgId,
+    });
+  }
+
   async upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System> {
     await this.ensureInitialized();
     const { id, system, orgId } = params;
