@@ -67,10 +67,13 @@ export async function executeAndEvaluateFinalTransform(
       finalTransform: finalResult.code,
     };
   } catch (transformError) {
+    const errorMessage = transformError?.message || String(transformError);
+    const prefixedError = `Final transform JavaScript error: ${errorMessage}`;
+
     if (!isSelfHealingEnabled(options, "transform")) {
       return {
         success: false,
-        error: transformError?.message || transformError,
+        error: prefixedError,
         finalTransform: finalTransform,
       };
     }
@@ -98,7 +101,7 @@ export async function executeAndEvaluateFinalTransform(
     if (!transformationResult) {
       return {
         success: false,
-        error: "Failed to generate new final transform",
+        error: `Final transform JavaScript error: ${errorMessage} (self-healing also failed to generate a working transform)`,
         finalTransform: finalTransform,
       };
     }

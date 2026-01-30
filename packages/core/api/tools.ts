@@ -7,6 +7,7 @@ import {
   ToolResult,
 } from "@superglue/shared";
 import { parseJSON } from "../files/index.js";
+import { RunLifecycleManager } from "../runs/index.js";
 import { SystemManager } from "../systems/system-manager.js";
 import { isSelfHealingEnabled } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
@@ -216,8 +217,6 @@ async function executeToolInternal(
     tool.responseSchema = parseJSON(tool.responseSchema);
   }
 
-  const runId = crypto.randomUUID();
-  const startedAt = new Date();
   const requestOptions: RequestOptions = {
     webhookUrl: options?.webhookUrl,
     timeout: options?.timeout,
@@ -228,24 +227,17 @@ async function executeToolInternal(
     includeDocs: selfHealingEnabled,
   });
 
-  await authReq.datastore.createRun({
-    run: {
-      runId,
-      toolId: tool.id,
-      status: RunStatus.RUNNING,
-      tool,
-      toolPayload: payload,
-      options: requestOptions,
-      requestSource,
-      metadata: {
-        startedAt: startedAt.toISOString(),
-      },
-    },
-    orgId: authReq.authInfo.orgId,
+  // Use RunLifecycleManager for centralized run handling
+  const lifecycle = new RunLifecycleManager(authReq.datastore, authReq.authInfo.orgId, metadata);
+  const runContext = await lifecycle.startRun({
+    tool,
+    payload,
+    options: requestOptions,
+    requestSource,
   });
 
   const taskPayload: ToolExecutionPayload = {
-    runId,
+    runId: runContext.runId,
     workflow: tool,
     payload,
     credentials: credentials as Record<string, string> | undefined,
@@ -257,28 +249,19 @@ async function executeToolInternal(
 
   // Fire and forget execution
   authReq.workerPools.toolExecution
-    .runTask(runId, taskPayload)
+    .runTask(runContext.runId, taskPayload)
     .then(async (result) => {
-      const completedAt = new Date();
-      await authReq.datastore.updateRun({
-        id: runId,
-        orgId: authReq.authInfo.orgId,
-        updates: {
-          status: result.success ? RunStatus.SUCCESS : RunStatus.FAILED,
-          tool: result.config || tool,
-          error: result.error,
-          metadata: {
-            startedAt: startedAt.toISOString(),
-            completedAt: completedAt.toISOString(),
-            durationMs: completedAt.getTime() - startedAt.getTime(),
-          },
-        },
+      await lifecycle.completeRun(runContext, {
+        success: result.success,
+        tool: result.config || tool,
+        error: result.error,
+        stepResults: result.stepResults,
       });
       handleWebhook(
         authReq,
         options?.webhookUrl,
         toolId,
-        runId,
+        runContext.runId,
         result,
         credentials,
         options,
@@ -286,23 +269,19 @@ async function executeToolInternal(
         requestSource,
       );
     })
-    .catch(async (error) => {
+    .catch(async (error: any) => {
       logMessage("error", `Tool execution error: ${String(error)}`, metadata);
-      const completedAt = new Date();
-      await authReq.datastore.updateRun({
-        id: runId,
-        orgId: authReq.authInfo.orgId,
-        updates: {
-          status: RunStatus.FAILED,
+      const isAborted = error.message?.includes("abort") || error.name === "AbortError";
+
+      if (isAborted) {
+        await lifecycle.abortRun(runContext, String(error));
+      } else {
+        await lifecycle.completeRun(runContext, {
+          success: false,
           tool,
           error: String(error),
-          metadata: {
-            startedAt: startedAt.toISOString(),
-            completedAt: completedAt.toISOString(),
-            durationMs: completedAt.getTime() - startedAt.getTime(),
-          },
-        },
-      });
+        });
+      }
     });
 
   return null; // Fire and forget
@@ -384,16 +363,13 @@ const runTool: RouteHandler = async (request, reply) => {
 
   const traceId = body.options?.traceId || authReq.traceId;
   const metadata = { orgId: authReq.authInfo.orgId, traceId };
-  const runId = body.runId || crypto.randomUUID();
+  const providedRunId = body.runId;
 
   // Source attribution:
-  // - default: api
-  // - frontend: if auth indicates a user context (not a raw API key)
-  // - mcp: only if client explicitly asks for it; everything else ignored
+  // - default: api (REST API calls are always API unless explicitly overridden)
+  // - mcp: only if client explicitly asks for it
+  // Note: userId presence doesn't indicate frontend - API keys can have associated users
   let requestSource: RequestSource = RequestSource.API;
-  if (authReq.authInfo.userId) {
-    requestSource = RequestSource.FRONTEND;
-  }
   if (body.options?.requestSource === RequestSource.MCP) {
     requestSource = RequestSource.MCP;
   }
@@ -408,8 +384,6 @@ const runTool: RouteHandler = async (request, reply) => {
       return sendError(reply, 409, `Run with id ${body.runId} already exists`);
     }
   }
-
-  const startedAt = new Date();
 
   const tool = await authReq.datastore.getWorkflow({
     id: params.toolId,
@@ -441,24 +415,18 @@ const runTool: RouteHandler = async (request, reply) => {
     includeDocs: selfHealingEnabled,
   });
 
-  await authReq.datastore.createRun({
-    run: {
-      runId,
-      toolId: tool.id,
-      status: RunStatus.RUNNING,
-      tool,
-      toolPayload: body.inputs as Record<string, any>,
-      options: requestOptions,
-      requestSource,
-      metadata: {
-        startedAt: startedAt.toISOString(),
-      },
-    },
-    orgId: authReq.authInfo.orgId,
+  // Use RunLifecycleManager for centralized run handling
+  const lifecycle = new RunLifecycleManager(authReq.datastore, authReq.authInfo.orgId, metadata);
+  const runContext = await lifecycle.startRun({
+    runId: providedRunId,
+    tool,
+    payload: body.inputs as Record<string, unknown>,
+    options: requestOptions,
+    requestSource,
   });
 
   const taskPayload: ToolExecutionPayload = {
-    runId,
+    runId: runContext.runId,
     workflow: tool,
     payload: body.inputs,
     credentials: body.credentials as Record<string, string> | undefined,
@@ -475,28 +443,19 @@ const runTool: RouteHandler = async (request, reply) => {
   // Async execution
   if (body.options?.async) {
     authReq.workerPools.toolExecution
-      .runTask(runId, taskPayload)
+      .runTask(runContext.runId, taskPayload)
       .then(async (result) => {
-        const completedAt = new Date();
-        await authReq.datastore.updateRun({
-          id: runId,
-          orgId: authReq.authInfo.orgId,
-          updates: {
-            status: result.success ? RunStatus.SUCCESS : RunStatus.FAILED,
-            tool: result.config || tool,
-            error: result.error,
-            metadata: {
-              startedAt: startedAt.toISOString(),
-              completedAt: completedAt.toISOString(),
-              durationMs: completedAt.getTime() - startedAt.getTime(),
-            },
-          },
+        await lifecycle.completeRun(runContext, {
+          success: result.success,
+          tool: result.config || tool,
+          error: result.error,
+          stepResults: result.stepResults,
         });
         handleWebhook(
           authReq,
           body.options?.webhookUrl,
           params.toolId,
-          runId,
+          runContext.runId,
           result,
           body.credentials,
           body.options,
@@ -506,63 +465,45 @@ const runTool: RouteHandler = async (request, reply) => {
       })
       .catch(async (error) => {
         logMessage("error", `Async tool execution error: ${String(error)}`, metadata);
-        const completedAt = new Date();
-        await authReq.datastore.updateRun({
-          id: runId,
-          orgId: authReq.authInfo.orgId,
-          updates: {
-            status: RunStatus.FAILED,
-            tool,
-            error: String(error),
-            metadata: {
-              startedAt: startedAt.toISOString(),
-              completedAt: completedAt.toISOString(),
-              durationMs: completedAt.getTime() - startedAt.getTime(),
-            },
-          },
+        await lifecycle.completeRun(runContext, {
+          success: false,
+          tool,
+          error: String(error),
         });
       });
 
     return sendResponse(
       202,
       buildRunResponse({
-        runId,
+        runId: runContext.runId,
         tool,
         status: RunStatus.RUNNING,
         toolPayload: body.inputs,
         options: requestOptions,
         requestSource,
         traceId: metadata.traceId,
-        startedAt,
+        startedAt: runContext.startedAt,
       }),
     );
   }
 
   // Sync execution
   try {
-    const result = await authReq.workerPools.toolExecution.runTask(runId, taskPayload);
+    const result = await authReq.workerPools.toolExecution.runTask(runContext.runId, taskPayload);
     const completedAt = new Date();
     const status = result.success ? RunStatus.SUCCESS : RunStatus.FAILED;
 
-    await authReq.datastore.updateRun({
-      id: runId,
-      orgId: authReq.authInfo.orgId,
-      updates: {
-        status,
-        tool: result.config || tool,
-        error: result.error,
-        metadata: {
-          startedAt: startedAt.toISOString(),
-          completedAt: completedAt.toISOString(),
-          durationMs: completedAt.getTime() - startedAt.getTime(),
-        },
-      },
+    await lifecycle.completeRun(runContext, {
+      success: result.success,
+      tool: result.config || tool,
+      error: result.error,
+      stepResults: result.stepResults,
     });
     handleWebhook(
       authReq,
       body.options?.webhookUrl,
       params.toolId,
-      runId,
+      runContext.runId,
       result,
       body.credentials,
       body.options,
@@ -573,7 +514,7 @@ const runTool: RouteHandler = async (request, reply) => {
     return sendResponse(
       200,
       buildRunResponse({
-        runId,
+        runId: runContext.runId,
         tool,
         status,
         toolPayload: body.inputs,
@@ -583,7 +524,7 @@ const runTool: RouteHandler = async (request, reply) => {
         options: requestOptions,
         requestSource,
         traceId: metadata.traceId,
-        startedAt,
+        startedAt: runContext.startedAt,
         completedAt,
       }),
     );
@@ -591,27 +532,23 @@ const runTool: RouteHandler = async (request, reply) => {
     logMessage("error", `Tool execution error: ${String(error)}`, metadata);
     const completedAt = new Date();
     const isAborted = error.message?.includes("abort") || error.name === "AbortError";
-    const status = isAborted ? RunStatus.ABORTED : RunStatus.FAILED;
 
-    await authReq.datastore.updateRun({
-      id: runId,
-      orgId: authReq.authInfo.orgId,
-      updates: {
-        status,
+    if (isAborted) {
+      await lifecycle.abortRun(runContext, String(error));
+    } else {
+      await lifecycle.completeRun(runContext, {
+        success: false,
         tool,
         error: String(error),
-        metadata: {
-          startedAt: startedAt.toISOString(),
-          completedAt: completedAt.toISOString(),
-          durationMs: completedAt.getTime() - startedAt.getTime(),
-        },
-      },
-    });
+      });
+    }
+
+    const status = isAborted ? RunStatus.ABORTED : RunStatus.FAILED;
 
     return sendResponse(
       200,
       buildRunResponse({
-        runId,
+        runId: runContext.runId,
         tool,
         status,
         toolPayload: body.inputs,
@@ -619,7 +556,7 @@ const runTool: RouteHandler = async (request, reply) => {
         options: requestOptions,
         requestSource,
         traceId: metadata.traceId,
-        startedAt,
+        startedAt: runContext.startedAt,
         completedAt,
       }),
     );

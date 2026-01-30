@@ -634,3 +634,92 @@ export interface AgentRequest {
   agentParams?: Record<string, any>;
   filePayloads?: Record<string, any>;
 }
+
+// ============================================
+// NOTIFICATION TYPES
+// ============================================
+
+// Rule conditions - permissive data model, UI can restrict
+export interface NotificationRuleConditions {
+  status: "failed" | "success" | "any";
+  toolIdPattern?: string; // Glob pattern like "prod-*"
+  requestSources?: RequestSource[]; // Empty/undefined = all sources
+  // Future extensibility
+  tags?: string[];
+  folders?: string[];
+}
+
+export interface NotificationRule {
+  id: string;
+  enabled: boolean;
+  conditions: NotificationRuleConditions;
+}
+
+// ============================================
+// CHANNEL CONFIGURATIONS
+// ============================================
+
+export type NotificationChannelStatus = "active" | "failing" | "disabled";
+
+// Base config all channels share
+export interface BaseChannelConfig {
+  enabled: boolean;
+  rules: NotificationRule[]; // Rules are per-channel
+  // Circuit breaker / health tracking
+  status: NotificationChannelStatus;
+  consecutiveFailures: number;
+  lastError?: string;
+  lastErrorAt?: string;
+}
+
+// Slack-specific configuration
+export type SlackAuthType = "webhook" | "bot_token" | "oauth";
+
+export interface SlackChannelConfig extends BaseChannelConfig {
+  authType: SlackAuthType;
+  webhookUrl?: string; // For webhook auth
+  botToken?: string; // For bot_token auth (encrypted)
+  channelId?: string; // For bot_token auth
+  // OAuth fields for future
+  accessToken?: string;
+  teamId?: string;
+}
+
+// Email channel (future)
+export interface EmailChannelConfig extends BaseChannelConfig {
+  recipients: string[];
+  fromAddress?: string;
+}
+
+// ============================================
+// NOTIFICATION SETTINGS
+// ============================================
+
+// Channels keyed by type - easy to add new ones
+export interface NotificationChannels {
+  slack?: SlackChannelConfig;
+  email?: EmailChannelConfig;
+}
+
+export interface NotificationRateLimit {
+  maxPerHour: number;
+  currentCount: number;
+  windowStart: string; // ISO timestamp
+}
+
+export interface NotificationSettings {
+  channels: NotificationChannels;
+  rateLimit: NotificationRateLimit;
+}
+
+// ============================================
+// ORG SETTINGS
+// ============================================
+
+export interface OrgSettings {
+  orgId: string;
+  notifications?: NotificationSettings; // Optional - might not exist yet
+  preferences: Record<string, any>;
+  createdAt?: Date;
+  updatedAt?: Date;
+}

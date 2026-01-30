@@ -3,6 +3,7 @@ import type {
   DiscoveryRun,
   FileReference,
   FileStatus,
+  OrgSettings,
   RequestSource,
   System,
   Run,
@@ -24,6 +25,7 @@ export class FileStore implements DataStore {
     systems: Map<string, System>;
     discoveryRuns: Map<string, DiscoveryRun>;
     fileReferences: Map<string, FileReference>;
+    orgSettings: Map<string, OrgSettings>;
     tenant: {
       email: string | null;
       emailEntrySkipped: boolean;
@@ -43,6 +45,7 @@ export class FileStore implements DataStore {
       systems: new Map(),
       discoveryRuns: new Map(),
       fileReferences: new Map(),
+      orgSettings: new Map(),
       tenant: {
         email: null,
         emailEntrySkipped: false,
@@ -112,6 +115,7 @@ export class FileStore implements DataStore {
           systems: new Map(Object.entries(parsed.integrations || {})),
           discoveryRuns: new Map(Object.entries(parsed.discoveryRuns || {})),
           fileReferences: new Map(Object.entries(parsed.fileReferences || {})),
+          orgSettings: new Map(Object.entries(parsed.orgSettings || {})),
           tenant: {
             email: parsed.tenant?.email || null,
             emailEntrySkipped: parsed.tenant?.emailEntrySkipped || false,
@@ -159,6 +163,7 @@ export class FileStore implements DataStore {
         integrations: Object.fromEntries(this.storage.systems),
         discoveryRuns: Object.fromEntries(this.storage.discoveryRuns),
         fileReferences: Object.fromEntries(this.storage.fileReferences),
+        orgSettings: Object.fromEntries(this.storage.orgSettings),
         tenant: this.storage.tenant,
       };
       await fs.promises.writeFile(this.filePath, JSON.stringify(serialized, null, 2), {
@@ -989,5 +994,42 @@ export class FileStore implements DataStore {
       await this.persist();
     }
     return deleted;
+  }
+
+  // Org Settings Methods
+  async getOrgSettings(params: { orgId: string }): Promise<OrgSettings | null> {
+    await this.ensureInitialized();
+    const { orgId } = params;
+    return this.storage.orgSettings.get(orgId) || null;
+  }
+
+  async upsertOrgSettings(params: {
+    orgId: string;
+    settings: Partial<OrgSettings>;
+  }): Promise<OrgSettings> {
+    await this.ensureInitialized();
+    const { orgId, settings } = params;
+
+    const existing = this.storage.orgSettings.get(orgId);
+    const defaultNotifications = {
+      channels: {},
+      rateLimit: { maxPerHour: 50, currentCount: 0, windowStart: new Date().toISOString() },
+    };
+
+    const updated: OrgSettings = {
+      orgId,
+      notifications: settings.notifications
+        ? { ...(existing?.notifications || defaultNotifications), ...settings.notifications }
+        : existing?.notifications || defaultNotifications,
+      preferences: settings.preferences
+        ? { ...(existing?.preferences || {}), ...settings.preferences }
+        : existing?.preferences || {},
+      createdAt: existing?.createdAt || new Date(),
+      updatedAt: new Date(),
+    };
+
+    this.storage.orgSettings.set(orgId, updated);
+    await this.persist();
+    return updated;
   }
 }

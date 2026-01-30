@@ -3,6 +3,7 @@ import type {
   DiscoveryRun,
   FileReference,
   FileStatus,
+  OrgSettings,
   RequestSource,
   Run,
   RunStatus,
@@ -344,6 +345,17 @@ export class PostgresService implements DataStore {
                     created_by_user_id VARCHAR(255),
                     created_by_email VARCHAR(255),
                     UNIQUE(tool_id, org_id, version)
+                )
+            `);
+
+      // Org settings table (notifications, preferences, etc.)
+      await client.query(`
+                CREATE TABLE IF NOT EXISTS org_settings (
+                    org_id VARCHAR(255) PRIMARY KEY,
+                    notifications JSONB DEFAULT '{}',
+                    preferences JSONB DEFAULT '{}',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             `);
 
@@ -1936,6 +1948,89 @@ export class PostgresService implements DataStore {
         [id, orgId],
       );
       return (result.rowCount || 0) > 0;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Org Settings Methods
+  private mapOrgSettingsRow(row: any): OrgSettings {
+    return {
+      orgId: row.org_id,
+      notifications: row.notifications || {
+        enabled: false,
+        rules: [],
+        rateLimit: { maxPerHour: 50, currentCount: 0, windowStart: new Date().toISOString() },
+      },
+      preferences: row.preferences || {},
+      createdAt: row.created_at ? new Date(row.created_at) : undefined,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
+    };
+  }
+
+  async getOrgSettings(params: { orgId: string }): Promise<OrgSettings | null> {
+    const { orgId } = params;
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `SELECT org_id, notifications, preferences, created_at, updated_at 
+         FROM org_settings WHERE org_id = $1`,
+        [orgId],
+      );
+      if (result.rows.length === 0) return null;
+      return this.mapOrgSettingsRow(result.rows[0]);
+    } finally {
+      client.release();
+    }
+  }
+
+  async upsertOrgSettings(params: {
+    orgId: string;
+    settings: Partial<OrgSettings>;
+  }): Promise<OrgSettings> {
+    const { orgId, settings } = params;
+    const client = await this.pool.connect();
+    try {
+      // Get existing settings to merge (using existing client to avoid extra connection)
+      const existingResult = await client.query(
+        `SELECT org_id, notifications, preferences, created_at, updated_at 
+         FROM org_settings WHERE org_id = $1`,
+        [orgId],
+      );
+      const existing =
+        existingResult.rows.length > 0 ? this.mapOrgSettingsRow(existingResult.rows[0]) : null;
+
+      const notifications = settings.notifications
+        ? { ...(existing?.notifications || {}), ...settings.notifications }
+        : existing?.notifications || {
+            channels: {},
+            rateLimit: { maxPerHour: 50, currentCount: 0, windowStart: new Date().toISOString() },
+          };
+
+      const preferences = settings.preferences
+        ? { ...(existing?.preferences || {}), ...settings.preferences }
+        : existing?.preferences || {};
+
+      await client.query(
+        `INSERT INTO org_settings (org_id, notifications, preferences, created_at, updated_at)
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+         ON CONFLICT (org_id) DO UPDATE SET
+           notifications = $2,
+           preferences = $3,
+           updated_at = CURRENT_TIMESTAMP
+         RETURNING org_id, notifications, preferences, created_at, updated_at`,
+        [orgId, JSON.stringify(notifications), JSON.stringify(preferences)],
+      );
+
+      // Fetch the updated row using the same client
+      const updatedResult = await client.query(
+        `SELECT org_id, notifications, preferences, created_at, updated_at 
+         FROM org_settings WHERE org_id = $1`,
+        [orgId],
+      );
+      if (updatedResult.rows.length === 0)
+        throw new Error("Failed to retrieve upserted org settings");
+      return this.mapOrgSettingsRow(updatedResult.rows[0]);
     } finally {
       client.release();
     }

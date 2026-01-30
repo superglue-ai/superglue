@@ -3,6 +3,7 @@ import type {
   DiscoveryRun,
   FileReference,
   FileStatus,
+  OrgSettings,
   RequestSource,
   System,
   Run,
@@ -166,6 +167,13 @@ export interface DataStore {
     orgId?: string;
   }): Promise<{ items: FileReference[]; total: number }>;
   deleteFileReference(params: { id: string; orgId?: string }): Promise<boolean>;
+
+  // Org Settings Methods
+  getOrgSettings(params: { orgId: string }): Promise<OrgSettings | null>;
+  upsertOrgSettings(params: {
+    orgId: string;
+    settings: Partial<OrgSettings>;
+  }): Promise<OrgSettings>;
 }
 
 export type ToolScheduleInternal = ToolSchedule & {

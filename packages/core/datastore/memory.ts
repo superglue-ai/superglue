@@ -3,6 +3,7 @@ import {
   DiscoveryRun,
   FileReference,
   FileStatus,
+  OrgSettings,
   RequestSource,
   System,
   Run,
@@ -23,6 +24,7 @@ export class MemoryStore implements DataStore {
     systems: Map<string, System>;
     discoveryRuns: Map<string, DiscoveryRun>;
     fileReferences: Map<string, FileReference>;
+    orgSettings: Map<string, OrgSettings>;
   };
 
   private tenant: { email: string | null; emailEntrySkipped: boolean } = {
@@ -40,6 +42,7 @@ export class MemoryStore implements DataStore {
       systems: new Map(),
       discoveryRuns: new Map(),
       fileReferences: new Map(),
+      orgSettings: new Map(),
     };
   }
 
@@ -627,5 +630,39 @@ export class MemoryStore implements DataStore {
     const { id, orgId } = params;
     const key = this.getKey("file-reference", id, orgId);
     return this.storage.fileReferences.delete(key);
+  }
+
+  // Org Settings Methods
+  async getOrgSettings(params: { orgId: string }): Promise<OrgSettings | null> {
+    const { orgId } = params;
+    return this.storage.orgSettings.get(orgId) || null;
+  }
+
+  async upsertOrgSettings(params: {
+    orgId: string;
+    settings: Partial<OrgSettings>;
+  }): Promise<OrgSettings> {
+    const { orgId, settings } = params;
+
+    const existing = this.storage.orgSettings.get(orgId);
+    const defaultNotifications = {
+      channels: {},
+      rateLimit: { maxPerHour: 50, currentCount: 0, windowStart: new Date().toISOString() },
+    };
+
+    const updated: OrgSettings = {
+      orgId,
+      notifications: settings.notifications
+        ? { ...(existing?.notifications || defaultNotifications), ...settings.notifications }
+        : existing?.notifications || defaultNotifications,
+      preferences: settings.preferences
+        ? { ...(existing?.preferences || {}), ...settings.preferences }
+        : existing?.preferences || {},
+      createdAt: existing?.createdAt || new Date(),
+      updatedAt: new Date(),
+    };
+
+    this.storage.orgSettings.set(orgId, updated);
+    return updated;
   }
 }

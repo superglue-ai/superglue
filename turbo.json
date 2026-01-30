@@ -27,6 +27,7 @@
   "globalEnv": [
     "GRAPHQL_ENDPOINT",
     "GRAPHQL_PORT",
+    "SUPERGLUE_APP_URL",
     "WEB_PORT",
     "DATASTORE_TYPE",
     "REDIS_HOST",
