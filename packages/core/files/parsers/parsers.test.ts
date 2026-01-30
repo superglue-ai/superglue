@@ -20,6 +20,7 @@ import { GZIPStrategy } from "./gzip.js";
 import { DOCXStrategy } from "./docx.js";
 import { ExcelStrategy } from "./excel.js";
 import { YAMLStrategy, parseYAML } from "./yaml.js";
+import { HTMLStrategy } from "./html.js";
 import JSZip from "jszip";
 import { promisify } from "util";
 import { gzip } from "zlib";
@@ -510,6 +511,164 @@ describe("File Parsing - Comprehensive Tests", () => {
 
       const canHandle = await strategy.canHandle(zipBuffer);
       expect(canHandle).toBe(false);
+    });
+  });
+
+  describe("HTML Parsing", () => {
+    it("should detect and parse basic HTML", async () => {
+      const htmlData = `
+        <!DOCTYPE html>
+        <html>
+          <head><title>Test Page</title></head>
+          <body>
+            <h1>Welcome</h1>
+            <p>This is a test</p>
+          </body>
+        </html>
+      `;
+      const buffer = Buffer.from(htmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.HTML);
+      expect(result).toBeDefined();
+      expect(result.html).toBeDefined();
+    });
+
+    it("should auto-detect HTML with DOCTYPE", async () => {
+      const htmlData = "<!DOCTYPE html><html><body>Test</body></html>";
+      const buffer = Buffer.from(htmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.AUTO);
+      expect(result).toBeDefined();
+    });
+
+    it("should detect HTML with <html> tag", async () => {
+      const htmlData = "<html><body><h1>Test</h1></body></html>";
+      const buffer = Buffer.from(htmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.AUTO);
+      expect(result).toBeDefined();
+    });
+
+    it("should parse HTML with attributes", async () => {
+      const htmlData = `
+        <html>
+          <body>
+            <div id="main" class="container">
+              <p>Content</p>
+            </div>
+          </body>
+        </html>
+      `;
+      const buffer = Buffer.from(htmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.HTML);
+      expect(result).toBeDefined();
+      expect(result.html).toBeDefined();
+    });
+
+    it("should parse HTML with text content", async () => {
+      const htmlData = `
+        <html>
+          <body>
+            <div id="content">Hello World</div>
+          </body>
+        </html>
+      `;
+      const buffer = Buffer.from(htmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.HTML);
+      expect(result).toBeDefined();
+      expect(result.html.body.content).toBeDefined();
+    });
+
+    it("should reject XML files (not HTML)", async () => {
+      const xmlData = '<?xml version="1.0"?><root><item>test</item></root>';
+      const buffer = Buffer.from(xmlData);
+
+      // XML strategy should handle this, not HTML
+      const result = await parseFile(buffer, SupportedFileType.AUTO);
+      expect(result.ROOT).toBeDefined(); // Confirms it was parsed as XML
+    });
+
+    it("should not detect plain text as HTML", () => {
+      const strategy = new HTMLStrategy();
+
+      const plainText = Buffer.from("This is just plain text without HTML tags");
+      expect(strategy.canHandle(plainText)).toBe(false);
+    });
+
+    it("should handle HTML with multiple elements of same type", async () => {
+      const htmlData = `
+        <html>
+          <body>
+            <p>First paragraph</p>
+            <p>Second paragraph</p>
+            <p>Third paragraph</p>
+          </body>
+        </html>
+      `;
+      const buffer = Buffer.from(htmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.HTML);
+      expect(result).toBeDefined();
+      expect(result.html.body.p).toBeDefined();
+    });
+
+    it("should handle nested HTML elements", async () => {
+      const htmlData = `
+        <html>
+          <body>
+            <div>
+              <ul>
+                <li>Item 1</li>
+                <li>Item 2</li>
+              </ul>
+            </div>
+          </body>
+        </html>
+      `;
+      const buffer = Buffer.from(htmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.HTML);
+      expect(result).toBeDefined();
+      expect(result.html.body.div).toBeDefined();
+    });
+
+    it("should parse simple HTML form", async () => {
+      const htmlData = `<html><body><form><input name="email" type="text"/></form></body></html>`;
+      const buffer = Buffer.from(htmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.HTML);
+      expect(result).toBeDefined();
+      expect(result.html.body.form).toBeDefined();
+    });
+
+    it("should handle HTML with links", async () => {
+      const htmlData = `<html><body><a href="https://example.com">Click here</a></body></html>`;
+      const buffer = Buffer.from(htmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.HTML);
+      expect(result).toBeDefined();
+      expect(result.html.body.a).toBeDefined();
+      expect(result.html.body.a.href).toBe("https://example.com");
+    });
+
+    it("should parse minimal HTML", async () => {
+      const htmlData = "<html><body>Hello</body></html>";
+      const buffer = Buffer.from(htmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.HTML);
+      expect(result).toBeDefined();
+      expect(result.html.body.content).toBe("Hello");
+    });
+
+    it("should handle empty HTML elements", async () => {
+      const htmlData = "<html><body><div></div></body></html>";
+      const buffer = Buffer.from(htmlData);
+
+      const result = await parseFile(buffer, SupportedFileType.HTML);
+      expect(result).toBeDefined();
+      expect(result.html.body.div).toBeDefined();
     });
   });
 

@@ -73,6 +73,7 @@ export enum SupportedFileType {
   JSON = "JSON",
   CSV = "CSV",
   XML = "XML",
+  HTML = "HTML",
   YAML = "YAML",
   EXCEL = "EXCEL",
   PDF = "PDF",
@@ -633,6 +634,43 @@ export interface AgentRequest {
   runtimeContext?: string;
   agentParams?: Record<string, any>;
   filePayloads?: Record<string, any>;
+}
+
+// OpenAPI format types for API responses
+export interface OpenAPIPagination {
+  type: string;
+  pageSize?: string;
+  cursorPath?: string;
+  stopCondition?: string;
+}
+
+export interface OpenAPIToolStep {
+  id: string;
+  url: string;
+  method: string;
+  queryParams?: Record<string, unknown>;
+  headers?: Record<string, unknown>;
+  body?: string;
+  pagination?: OpenAPIPagination;
+  systemId?: string;
+  instruction?: string;
+  modify?: boolean;
+  dataSelector?: string;
+  failureBehavior?: "fail" | "continue";
+}
+
+export interface OpenAPITool {
+  id: string;
+  name: string;
+  version?: string;
+  instruction?: string;
+  inputSchema?: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  steps: OpenAPIToolStep[];
+  outputTransform?: string;
+  archived?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // ============================================

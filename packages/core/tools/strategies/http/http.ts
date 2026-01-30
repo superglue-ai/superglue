@@ -1,5 +1,4 @@
 import {
-  HttpMethod,
   maskCredentials,
   PaginationType,
   RequestOptions,
@@ -34,13 +33,15 @@ export class HttpStepExecutionStrategy implements StepExecutionStrategy {
   }
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
-    const { stepConfig, stepInputData, credentials, requestOptions, metadata } = input;
+    const { stepConfig, stepInputData, credentials, requestOptions, metadata, failureBehavior } =
+      input;
     const httpResult = await callHttp({
       config: stepConfig,
       payload: stepInputData,
       credentials,
       options: requestOptions,
       metadata,
+      continueOnFailure: failureBehavior === "CONTINUE",
     });
     return {
       success: true,
@@ -214,53 +215,76 @@ export class AbortError extends Error {
     this.name = "AbortError";
   }
 }
-type StatusHandlerResult = { shouldFail: boolean; message?: string };
 
-function detectHtmlErrorResponse(data: any): { isHtml: boolean; preview?: string } {
-  const MAX_HTML_CHECK_BYTES = 1024; // Only check first 1KB for efficiency
-  let dataPrefix = "";
+function checkForErrors({
+  status,
+  parsedData,
+  response,
+  axiosConfig,
+  credentials = {},
+  retriesAttempted = 0,
+  lastFailureStatus,
+}: {
+  status: number;
+  parsedData: any;
+  response: AxiosResponse;
+  axiosConfig: AxiosRequestConfig;
+  credentials?: Record<string, any>;
+  retriesAttempted?: number;
+  lastFailureStatus?: number;
+}): void {
+  const method = (axiosConfig?.method || "GET").toString().toUpperCase();
+  const url = String(axiosConfig?.url || "");
+  const maskedConfig = maskCredentials(JSON.stringify(axiosConfig || {}), credentials);
+  const retrySuffix = `\nRetries attempted: ${retriesAttempted}${lastFailureStatus ? `; last failure status: ${lastFailureStatus}` : ""}`;
 
-  if (data instanceof Buffer) {
-    // Only convert first 1KB to string for HTML detection
-    const bytesToRead = Math.min(data.length, MAX_HTML_CHECK_BYTES);
-    dataPrefix = data.subarray(0, bytesToRead).toString("utf-8");
-  } else if (typeof data === "string") {
-    dataPrefix = data.slice(0, MAX_HTML_CHECK_BYTES);
-  } else {
-    return { isHtml: false };
+  // Handle 429 rate limiting
+  if (status === 429) {
+    const error = JSON.stringify(
+      (parsedData as any)?.error ||
+        (parsedData as any)?.errors ||
+        parsedData ||
+        response?.statusText ||
+        "undefined",
+    );
+    const retryAfter = response.headers["retry-after"]
+      ? `Retry-After: ${response.headers["retry-after"]}`
+      : "No Retry-After header provided";
+    const message = `Rate limit exceeded. ${retryAfter}. Maximum wait time of 60s exceeded. \n${method} ${url} failed with status ${status}.\nResponse: ${String(error).slice(0, 1000)}\nconfig: ${maskedConfig}`;
+    throw new ApiCallError(
+      `API call failed with status ${status}. Response: ${message}${retrySuffix}`,
+      status,
+    );
   }
 
-  const trimmedLower = dataPrefix.slice(0, 100).trim().toLowerCase();
-  const isHtml = trimmedLower.startsWith("<!doctype html") || trimmedLower.startsWith("<html");
+  // Handle other non-2xx status codes
+  if (status < 200 || status > 205) {
+    const error = JSON.stringify(
+      (parsedData as any)?.error ||
+        (parsedData as any)?.errors ||
+        parsedData ||
+        response?.statusText ||
+        "undefined",
+    );
+    const message = `${method} ${url} failed with status ${status}.\nResponse: ${String(error).slice(0, 1000)}\nconfig: ${maskedConfig}`;
+    throw new ApiCallError(
+      `API call failed with status ${status}. Response: ${message}${retrySuffix}`,
+      status,
+    );
+  }
 
-  return {
-    isHtml,
-    preview: dataPrefix,
-  };
-}
+  // SMART mode: check parsed response for error indicators in 2xx responses
+  if (!parsedData || typeof parsedData !== "object") {
+    return;
+  }
 
-export function checkResponseForErrors(
-  data: any,
-  status: number,
-  ctx: {
-    axiosConfig: AxiosRequestConfig;
-    credentials: Record<string, any>;
-    payload: Record<string, any>;
-  },
-): void {
-  if (!data || typeof data !== "object") return;
-
-  const d: any = Array.isArray(data) && data.length > 0 ? data[0] : data;
+  const d: any = Array.isArray(parsedData) && parsedData.length > 0 ? parsedData[0] : parsedData;
   if (!d || typeof d !== "object") return;
 
   const throwDetected = (reason: string, value?: any) => {
-    const method = (ctx.axiosConfig?.method || "GET").toString().toUpperCase();
-    const url = String(ctx.axiosConfig?.url || "");
-    const maskedConfig = maskCredentials(JSON.stringify(ctx.axiosConfig || {}), ctx.credentials);
-    const previewSource = JSON.stringify(data);
-    const preview = String(previewSource).slice(0, 2500);
+    const preview = String(JSON.stringify(parsedData)).slice(0, 2500);
     const valueStr = value !== undefined ? `='${String(value).slice(0, 120)}'` : "";
-    const message = `${method} ${url} returned ${status} but appears to be an error. Reason: ${reason}${valueStr}\nResponse preview: ${preview}\nconfig: ${maskedConfig}`;
+    const message = `${method} ${url} returned ${status} but appears to be an error. Error detection flagged this response. To prevent this from happening, enable "Continue on failure" in the step's Advanced Settings. Reason: ${reason}${valueStr}\nResponse preview: ${preview}\nconfig: ${maskedConfig}`;
     throw new ApiCallError(message, status);
   };
 
@@ -312,82 +336,20 @@ export function checkResponseForErrors(
   traverse(d, 0);
 }
 
-type StatusHandlerInput = {
-  response: AxiosResponse;
-  axiosConfig: AxiosRequestConfig;
-  credentials?: Record<string, any>;
-  payload?: Record<string, any>;
-  retriesAttempted?: number;
-  lastFailureStatus?: number | undefined;
-};
-
-export function handle2xxStatus(input: StatusHandlerInput): StatusHandlerResult {
-  const { response, axiosConfig, credentials = {}, payload = {} } = input;
-  const htmlCheck = detectHtmlErrorResponse(response?.data);
-  if (htmlCheck.isHtml) {
-    const url = String(axiosConfig?.url || "");
-    const maskedUrl = maskCredentials(url, credentials);
-    const msg = `Received HTML response instead of expected JSON data from ${maskedUrl}. \n        This usually indicates an error page or invalid endpoint.\nResponse: ${htmlCheck.preview}`;
-    return { shouldFail: true, message: msg };
-  }
-  return { shouldFail: false };
-}
-
-export function handle429Status(input: StatusHandlerInput): StatusHandlerResult {
-  const { response, axiosConfig, credentials = {}, payload = {} } = input;
-  const method = (axiosConfig?.method || "GET").toString().toUpperCase();
-  const url = String(axiosConfig?.url || "");
-  const errorData =
-    response?.data instanceof Buffer ? response.data.toString("utf-8") : response?.data;
-  const error = JSON.stringify(
-    (errorData as any)?.error ||
-      (errorData as any)?.errors ||
-      errorData ||
-      response?.statusText ||
-      "undefined",
-  );
-  const maskedConfig = maskCredentials(JSON.stringify(axiosConfig || {}), credentials);
-  let message = `${method} ${url} failed with status ${response.status}.\nResponse: ${String(error).slice(0, 1000)}\nconfig: ${maskedConfig}`;
-
-  const retryAfter = response.headers["retry-after"]
-    ? `Retry-After: ${response.headers["retry-after"]}`
-    : "No Retry-After header provided";
-  message = `Rate limit exceeded. ${retryAfter}. Maximum wait time of 60s exceeded. \n        \n        ${message}`;
-  const full = `API call failed with status ${response.status}. Response: ${message}`;
-  return { shouldFail: true, message: full };
-}
-
-export function handleErrorStatus(input: StatusHandlerInput): StatusHandlerResult {
-  const { response, axiosConfig, credentials = {}, payload = {} } = input;
-  const method = (axiosConfig?.method || "GET").toString().toUpperCase();
-  const url = String(axiosConfig?.url || "");
-  const errorData =
-    response?.data instanceof Buffer ? response.data.toString("utf-8") : response?.data;
-  const error = JSON.stringify(
-    (errorData as any)?.error ||
-      (errorData as any)?.errors ||
-      errorData ||
-      response?.statusText ||
-      "undefined",
-  );
-  const maskedConfig = maskCredentials(JSON.stringify(axiosConfig || {}), credentials);
-  const message = `${method} ${url} failed with status ${response.status}.\nResponse: ${String(error).slice(0, 1000)}\nconfig: ${maskedConfig}`;
-  const full = `API call failed with status ${response.status}. Response: ${message}`;
-  return { shouldFail: true, message: full };
-}
-
 export async function callHttp({
   config,
   payload,
   credentials,
   options,
   metadata,
+  continueOnFailure,
 }: {
   config: StepConfig;
   payload: Record<string, any>;
   credentials: Record<string, any>;
   options: RequestOptions;
   metadata: ServiceMetadata;
+  continueOnFailure?: boolean;
 }): Promise<{ data: any; statusCode: number; headers: Record<string, any> }> {
   const allVariables = { ...payload, ...credentials };
   let allResults = [];
@@ -533,69 +495,30 @@ export async function callHttp({
     lastResponse = axiosResult.response;
 
     const status = lastResponse?.status;
-    let statusHandlerResult = null;
-
     const retriesAttempted = axiosResult.retriesAttempted || 0;
     const lastFailureStatus = axiosResult.lastFailureStatus;
-    if ([200, 201, 202, 203, 204, 205].includes(status)) {
-      statusHandlerResult = handle2xxStatus({
-        response: lastResponse,
-        axiosConfig,
-        credentials,
-        payload,
-        retriesAttempted,
-        lastFailureStatus,
-      });
-    } else if (status === 429) {
-      statusHandlerResult = handle429Status({
-        response: lastResponse,
-        axiosConfig,
-        credentials,
-        payload,
-        retriesAttempted,
-        lastFailureStatus,
-      });
-    } else {
-      const base = handleErrorStatus({
-        response: lastResponse,
-        axiosConfig,
-        credentials,
-        payload,
-        retriesAttempted,
-        lastFailureStatus,
-      });
-      if (base.shouldFail && base.message) {
-        const suffix = `\nRetries attempted: ${retriesAttempted}${lastFailureStatus ? `; last failure status: ${lastFailureStatus}` : ""}`;
-        statusHandlerResult = { shouldFail: true, message: `${base.message}${suffix}` };
-      } else {
-        statusHandlerResult = base;
-      }
-    }
 
-    if (statusHandlerResult.shouldFail) {
-      throw new ApiCallError(statusHandlerResult.message, status);
-    }
-
+    // Parse response data
     let responseData = lastResponse.data;
-
-    // callAxios now always returns a Buffer, so we always need to parse it
     if (responseData instanceof Buffer) {
       responseData = await parseFile(responseData, SupportedFileType.AUTO);
-    }
-    // Fallback for any legacy code paths or special cases - we can remove this later
-    else if (responseData && responseData instanceof ArrayBuffer) {
+    } else if (responseData && responseData instanceof ArrayBuffer) {
       responseData = await parseFile(Buffer.from(responseData), SupportedFileType.AUTO);
     } else if (responseData && typeof responseData === "string") {
       responseData = await parseFile(Buffer.from(responseData), SupportedFileType.AUTO);
     }
     const parsedResponseData = responseData;
 
-    if (status >= 200 && status <= 205) {
-      try {
-        checkResponseForErrors(parsedResponseData, status, { axiosConfig, credentials, payload });
-      } catch (e) {
-        throw new ApiCallError(e?.message || String(e), status);
-      }
+    if (!continueOnFailure) {
+      checkForErrors({
+        status,
+        parsedData: parsedResponseData,
+        response: lastResponse,
+        axiosConfig,
+        credentials,
+        retriesAttempted,
+        lastFailureStatus,
+      });
     }
 
     // Handle pagination based on whether stopCondition exists

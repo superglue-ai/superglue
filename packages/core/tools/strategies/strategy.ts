@@ -12,6 +12,7 @@ export interface StepExecutionInput {
   stepInputData: any;
   credentials: Record<string, any>;
   requestOptions?: RequestOptions;
+  failureBehavior?: "FAIL" | "CONTINUE";
   metadata: ServiceMetadata;
 }
 

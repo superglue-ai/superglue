@@ -14,6 +14,7 @@ export type DiffTargetType =
   | "folder"
   | "name"
   | "id"
+  | "archived"
   | "unknown";
 
 export interface DiffTarget {
@@ -61,6 +62,7 @@ const TOP_LEVEL_TARGETS: Record<string, DiffTargetType> = {
   folder: "folder",
   name: "name",
   id: "id",
+  archived: "archived",
 };
 
 const TARGET_LABELS: Record<DiffTargetType, string> = {
@@ -76,6 +78,7 @@ const TARGET_LABELS: Record<DiffTargetType, string> = {
   name: "Name",
   id: "ID",
   unknown: "Unknown",
+  archived: "Archived",
 };
 
 // Exported functions
@@ -122,8 +125,16 @@ export function buildUnifiedDiff(oldValue: any, newValue: any, op: string): Diff
   const newLines = newStr === "" ? [] : newStr.split("\n");
 
   if (oldLines.length === 0 && newLines.length === 0) return [];
-  if (op === "remove") return oldLines.map((content) => ({ type: "removed" as const, content }));
-  if (op === "add") return newLines.map((content) => ({ type: "added" as const, content }));
+
+  if (op === "remove" && oldLines.length > 0 && newLines.length > 0) {
+  } else if (op === "remove") {
+    return oldLines.map((content) => ({ type: "removed" as const, content }));
+  }
+
+  if (op === "add" && oldLines.length > 0 && newLines.length > 0) {
+  } else if (op === "add") {
+    return newLines.map((content) => ({ type: "added" as const, content }));
+  }
 
   // Find common prefix
   let commonPrefix = 0;

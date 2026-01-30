@@ -12,8 +12,8 @@ export const JavaScriptCodeEditor = React.memo(
     value,
     onChange,
     readOnly = false,
-    minHeight = "200px",
-    maxHeight = "350px",
+    minHeight = "100px",
+    maxHeight = "300px",
     showCopy = true,
     resizable = false,
     isTransformEditor = false,
@@ -31,8 +31,8 @@ export const JavaScriptCodeEditor = React.memo(
   }) => {
     const { theme, onMount } = useMonacoTheme();
     const { height: resizableHeight, resizeHandleProps } = useResizable({
-      minHeight: 150,
-      maxHeight: 600,
+      minHeight: 100,
+      maxHeight: 1000,
       initialHeight: parseInt(maxHeight),
     });
     const effectiveHeight = resizable ? resizableHeight : maxHeight;

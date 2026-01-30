@@ -283,6 +283,7 @@ export class ToolExecutor implements Tool {
                 credentials: stepCredentials,
                 requestOptions: { ...options, testMode: false },
                 metadata: this.metadata,
+                failureBehavior: step.failureBehavior,
               });
 
               if (
