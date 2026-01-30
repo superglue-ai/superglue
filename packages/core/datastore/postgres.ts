@@ -3,6 +3,7 @@ import type {
   DiscoveryRun,
   FileReference,
   FileStatus,
+  NotificationSettings,
   OrgSettings,
   RequestSource,
   Run,
@@ -1954,14 +1955,87 @@ export class PostgresService implements DataStore {
   }
 
   // Org Settings Methods
+
+  /**
+   * Encrypt sensitive fields in notification settings before storing
+   */
+  private encryptNotificationSettings(
+    notifications: NotificationSettings | undefined,
+  ): NotificationSettings | undefined {
+    if (!notifications) return notifications;
+
+    const encrypted = { ...notifications };
+
+    // Encrypt Slack sensitive fields
+    if (encrypted.channels?.slack) {
+      const slack = { ...encrypted.channels.slack };
+
+      if (slack.botToken) {
+        const encryptedToken = credentialEncryption.encrypt({ botToken: slack.botToken });
+        slack.botToken = encryptedToken?.botToken || slack.botToken;
+      }
+
+      if (slack.accessToken) {
+        const encryptedAccess = credentialEncryption.encrypt({ accessToken: slack.accessToken });
+        slack.accessToken = encryptedAccess?.accessToken || slack.accessToken;
+      }
+
+      if (slack.webhookUrl) {
+        const encryptedWebhook = credentialEncryption.encrypt({ webhookUrl: slack.webhookUrl });
+        slack.webhookUrl = encryptedWebhook?.webhookUrl || slack.webhookUrl;
+      }
+
+      encrypted.channels = { ...encrypted.channels, slack };
+    }
+
+    return encrypted;
+  }
+
+  /**
+   * Decrypt sensitive fields in notification settings after reading
+   */
+  private decryptNotificationSettings(
+    notifications: NotificationSettings | undefined,
+  ): NotificationSettings | undefined {
+    if (!notifications) return notifications;
+
+    const decrypted = { ...notifications };
+
+    // Decrypt Slack sensitive fields
+    if (decrypted.channels?.slack) {
+      const slack = { ...decrypted.channels.slack };
+
+      if (slack.botToken) {
+        const decryptedToken = credentialEncryption.decrypt({ botToken: slack.botToken });
+        slack.botToken = decryptedToken?.botToken || slack.botToken;
+      }
+
+      if (slack.accessToken) {
+        const decryptedAccess = credentialEncryption.decrypt({ accessToken: slack.accessToken });
+        slack.accessToken = decryptedAccess?.accessToken || slack.accessToken;
+      }
+
+      if (slack.webhookUrl) {
+        const decryptedWebhook = credentialEncryption.decrypt({ webhookUrl: slack.webhookUrl });
+        slack.webhookUrl = decryptedWebhook?.webhookUrl || slack.webhookUrl;
+      }
+
+      decrypted.channels = { ...decrypted.channels, slack };
+    }
+
+    return decrypted;
+  }
+
   private mapOrgSettingsRow(row: any): OrgSettings {
+    const notifications = row.notifications || {
+      enabled: false,
+      rules: [],
+      rateLimit: { maxPerHour: 50, currentCount: 0, windowStart: new Date().toISOString() },
+    };
+
     return {
       orgId: row.org_id,
-      notifications: row.notifications || {
-        enabled: false,
-        rules: [],
-        rateLimit: { maxPerHour: 50, currentCount: 0, windowStart: new Date().toISOString() },
-      },
+      notifications: this.decryptNotificationSettings(notifications),
       preferences: row.preferences || {},
       createdAt: row.created_at ? new Date(row.created_at) : undefined,
       updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
@@ -2011,6 +2085,9 @@ export class PostgresService implements DataStore {
         ? { ...(existing?.preferences || {}), ...settings.preferences }
         : existing?.preferences || {};
 
+      // Encrypt sensitive fields before storing
+      const encryptedNotifications = this.encryptNotificationSettings(notifications);
+
       await client.query(
         `INSERT INTO org_settings (org_id, notifications, preferences, created_at, updated_at)
          VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -2019,7 +2096,7 @@ export class PostgresService implements DataStore {
            preferences = $3,
            updated_at = CURRENT_TIMESTAMP
          RETURNING org_id, notifications, preferences, created_at, updated_at`,
-        [orgId, JSON.stringify(notifications), JSON.stringify(preferences)],
+        [orgId, JSON.stringify(encryptedNotifications), JSON.stringify(preferences)],
       );
 
       // Fetch the updated row using the same client

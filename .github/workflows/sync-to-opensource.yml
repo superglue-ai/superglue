@@ -139,6 +139,13 @@ jobs:
           # Sidebar org switcher (hosted-only)
           rm -f packages/web/src/components/sidebar/OrgSwitcher.tsx 2>/dev/null || true
           
+          # Admin panel (hosted-only)
+          rm -rf packages/web/src/app/admin 2>/dev/null || true
+          rm -rf packages/web/src/components/admin 2>/dev/null || true
+          
+          # Notifications - keep open source version, revert any hosted changes
+          git checkout origin/main -- packages/core/notifications 2>/dev/null || true
+          
           # Scripts (hosted-only migrations)
           rm -f scripts/org_management_migration.up.sql 2>/dev/null || true
           

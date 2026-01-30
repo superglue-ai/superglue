@@ -3,6 +3,7 @@ import type {
   DiscoveryRun,
   FileReference,
   FileStatus,
+  NotificationSettings,
   OrgSettings,
   RequestSource,
   System,
@@ -997,10 +998,88 @@ export class FileStore implements DataStore {
   }
 
   // Org Settings Methods
+
+  /**
+   * Encrypt sensitive fields in notification settings before storing
+   */
+  private encryptNotificationSettings(
+    notifications: NotificationSettings | undefined,
+  ): NotificationSettings | undefined {
+    if (!notifications) return notifications;
+
+    const encrypted = { ...notifications };
+
+    // Encrypt Slack sensitive fields
+    if (encrypted.channels?.slack) {
+      const slack = { ...encrypted.channels.slack };
+
+      if (slack.botToken) {
+        const encryptedToken = credentialEncryption.encrypt({ botToken: slack.botToken });
+        slack.botToken = encryptedToken?.botToken || slack.botToken;
+      }
+
+      if (slack.accessToken) {
+        const encryptedAccess = credentialEncryption.encrypt({ accessToken: slack.accessToken });
+        slack.accessToken = encryptedAccess?.accessToken || slack.accessToken;
+      }
+
+      if (slack.webhookUrl) {
+        const encryptedWebhook = credentialEncryption.encrypt({ webhookUrl: slack.webhookUrl });
+        slack.webhookUrl = encryptedWebhook?.webhookUrl || slack.webhookUrl;
+      }
+
+      encrypted.channels = { ...encrypted.channels, slack };
+    }
+
+    return encrypted;
+  }
+
+  /**
+   * Decrypt sensitive fields in notification settings after reading
+   */
+  private decryptNotificationSettings(
+    notifications: NotificationSettings | undefined,
+  ): NotificationSettings | undefined {
+    if (!notifications) return notifications;
+
+    const decrypted = { ...notifications };
+
+    // Decrypt Slack sensitive fields
+    if (decrypted.channels?.slack) {
+      const slack = { ...decrypted.channels.slack };
+
+      if (slack.botToken) {
+        const decryptedToken = credentialEncryption.decrypt({ botToken: slack.botToken });
+        slack.botToken = decryptedToken?.botToken || slack.botToken;
+      }
+
+      if (slack.accessToken) {
+        const decryptedAccess = credentialEncryption.decrypt({ accessToken: slack.accessToken });
+        slack.accessToken = decryptedAccess?.accessToken || slack.accessToken;
+      }
+
+      if (slack.webhookUrl) {
+        const decryptedWebhook = credentialEncryption.decrypt({ webhookUrl: slack.webhookUrl });
+        slack.webhookUrl = decryptedWebhook?.webhookUrl || slack.webhookUrl;
+      }
+
+      decrypted.channels = { ...decrypted.channels, slack };
+    }
+
+    return decrypted;
+  }
+
   async getOrgSettings(params: { orgId: string }): Promise<OrgSettings | null> {
     await this.ensureInitialized();
     const { orgId } = params;
-    return this.storage.orgSettings.get(orgId) || null;
+    const settings = this.storage.orgSettings.get(orgId);
+    if (!settings) return null;
+
+    // Decrypt sensitive fields before returning
+    return {
+      ...settings,
+      notifications: this.decryptNotificationSettings(settings.notifications),
+    };
   }
 
   async upsertOrgSettings(params: {
@@ -1010,17 +1089,23 @@ export class FileStore implements DataStore {
     await this.ensureInitialized();
     const { orgId, settings } = params;
 
-    const existing = this.storage.orgSettings.get(orgId);
-    const defaultNotifications = {
+    // Get existing settings (already decrypted by getOrgSettings)
+    const existing = await this.getOrgSettings({ orgId });
+    const defaultNotifications: NotificationSettings = {
       channels: {},
       rateLimit: { maxPerHour: 50, currentCount: 0, windowStart: new Date().toISOString() },
     };
 
+    const notifications = settings.notifications
+      ? { ...(existing?.notifications || defaultNotifications), ...settings.notifications }
+      : existing?.notifications || defaultNotifications;
+
+    // Encrypt sensitive fields before storing
+    const encryptedNotifications = this.encryptNotificationSettings(notifications);
+
     const updated: OrgSettings = {
       orgId,
-      notifications: settings.notifications
-        ? { ...(existing?.notifications || defaultNotifications), ...settings.notifications }
-        : existing?.notifications || defaultNotifications,
+      notifications: encryptedNotifications,
       preferences: settings.preferences
         ? { ...(existing?.preferences || {}), ...settings.preferences }
         : existing?.preferences || {},
@@ -1030,6 +1115,11 @@ export class FileStore implements DataStore {
 
     this.storage.orgSettings.set(orgId, updated);
     await this.persist();
-    return updated;
+
+    // Return with decrypted values
+    return {
+      ...updated,
+      notifications: this.decryptNotificationSettings(updated.notifications),
+    };
   }
 }
