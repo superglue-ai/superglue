@@ -2003,8 +2003,7 @@ export class PostgresService implements DataStore {
       const notifications = settings.notifications
         ? { ...(existing?.notifications || {}), ...settings.notifications }
         : existing?.notifications || {
-            enabled: false,
-            rules: [],
+            channels: {},
             rateLimit: { maxPerHour: 50, currentCount: 0, windowStart: new Date().toISOString() },
           };
 
