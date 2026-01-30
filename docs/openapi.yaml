@@ -538,7 +538,7 @@ components:
           example: Fetch user details from the API
         modify:
           type: boolean
-          description: Whether this step modifies data on the system it operates on
+          description: Whether this step can be modified by the self-healing system
           default: false
         dataSelector:
           type: string
