@@ -1,4 +1,4 @@
-import { assertValidArrowFunction, RequestOptions, SelfHealingMode } from "@superglue/shared";
+import { assertValidArrowFunction } from "@superglue/shared";
 import ivm from "isolated-vm";
 import { Validator } from "jsonschema";
 import { z } from "zod";
@@ -178,25 +178,6 @@ export function addNullableToOptional(schema: any, required: boolean = true): an
   }
 
   return newSchema;
-}
-
-export function isSelfHealingEnabled(
-  options: RequestOptions | undefined,
-  type: "transform" | "api",
-): boolean {
-  const selfHealingMode = options?.selfHealing;
-
-  if (selfHealingMode === undefined || selfHealingMode === null) {
-    return false;
-  }
-  if (selfHealingMode === SelfHealingMode.DISABLED) {
-    return false;
-  }
-  return type === "transform"
-    ? selfHealingMode === SelfHealingMode.ENABLED ||
-        selfHealingMode === SelfHealingMode.TRANSFORM_ONLY
-    : selfHealingMode === SelfHealingMode.ENABLED ||
-        selfHealingMode === SelfHealingMode.REQUEST_ONLY;
 }
 
 export function smartMergeResponses(accumulated: any, newResponse: any): any {

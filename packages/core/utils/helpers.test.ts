@@ -1,13 +1,6 @@
-import { SelfHealingMode } from "@superglue/shared";
 import { assertValidArrowFunction, sampleResultObject } from "@superglue/shared";
 import { describe, expect, it, vi } from "vitest";
-import {
-  applyAuthFormat,
-  composeUrl,
-  isSelfHealingEnabled,
-  replaceVariables,
-  transformData,
-} from "./helpers.js";
+import { applyAuthFormat, composeUrl, replaceVariables, transformData } from "./helpers.js";
 import { maskCredentials } from "@superglue/shared";
 
 vi.mock("axios");
@@ -114,70 +107,6 @@ describe("tools utility functions", () => {
       const message = "My password is 123456";
       const result = maskCredentials(message);
       expect(result).toBe(message);
-    });
-  });
-
-  describe("isSelfHealingEnabled", () => {
-    describe("transform type", () => {
-      it("should return true for ENABLED mode", () => {
-        const options = { selfHealing: SelfHealingMode.ENABLED };
-        expect(isSelfHealingEnabled(options, "transform")).toBe(true);
-      });
-
-      it("should return true for TRANSFORM_ONLY mode", () => {
-        const options = { selfHealing: SelfHealingMode.TRANSFORM_ONLY };
-        expect(isSelfHealingEnabled(options, "transform")).toBe(true);
-      });
-
-      it("should return false for REQUEST_ONLY mode", () => {
-        const options = { selfHealing: SelfHealingMode.REQUEST_ONLY };
-        expect(isSelfHealingEnabled(options, "transform")).toBe(false);
-      });
-
-      it("should return false for DISABLED mode", () => {
-        const options = { selfHealing: SelfHealingMode.DISABLED };
-        expect(isSelfHealingEnabled(options, "transform")).toBe(false);
-      });
-
-      it("should default to false when selfHealing is undefined", () => {
-        const options = {};
-        expect(isSelfHealingEnabled(options, "transform")).toBe(false);
-      });
-
-      it("should default to false when options is undefined", () => {
-        expect(isSelfHealingEnabled(undefined, "transform")).toBe(false);
-      });
-    });
-
-    describe("api type", () => {
-      it("should return true for ENABLED mode", () => {
-        const options = { selfHealing: SelfHealingMode.ENABLED };
-        expect(isSelfHealingEnabled(options, "api")).toBe(true);
-      });
-
-      it("should return true for REQUEST_ONLY mode", () => {
-        const options = { selfHealing: SelfHealingMode.REQUEST_ONLY };
-        expect(isSelfHealingEnabled(options, "api")).toBe(true);
-      });
-
-      it("should return false for TRANSFORM_ONLY mode", () => {
-        const options = { selfHealing: SelfHealingMode.TRANSFORM_ONLY };
-        expect(isSelfHealingEnabled(options, "api")).toBe(false);
-      });
-
-      it("should return false for DISABLED mode", () => {
-        const options = { selfHealing: SelfHealingMode.DISABLED };
-        expect(isSelfHealingEnabled(options, "api")).toBe(false);
-      });
-
-      it("should default to false when selfHealing is undefined", () => {
-        const options = {};
-        expect(isSelfHealingEnabled(options, "api")).toBe(false);
-      });
-
-      it("should default to false when options is undefined", () => {
-        expect(isSelfHealingEnabled(undefined, "api")).toBe(false);
-      });
     });
   });
 

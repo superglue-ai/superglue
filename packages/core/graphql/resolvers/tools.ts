@@ -18,7 +18,6 @@ import { SystemManager } from "../../systems/system-manager.js";
 import { ToolBuilder } from "../../tools/tool-builder.js";
 import { ToolFinder } from "../../tools/tool-finder.js";
 import { ToolFixer } from "../../tools/tool-fixer.js";
-import { isSelfHealingEnabled } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
 import { notifyWebhook } from "../../utils/webhook.js";
 import type { ToolExecutionPayload } from "../../worker/types.js";
@@ -121,13 +120,10 @@ export const executeWorkflowResolver = async (
       workflow.responseSchema = parseJSON(workflow.responseSchema);
     }
 
-    const selfHealingEnabled = isSelfHealingEnabled(args.options, "api");
-
     const systemManagers = await SystemManager.forToolExecution(
       workflow,
       context.datastore,
       metadata,
-      { includeDocs: selfHealingEnabled },
     );
 
     // NOTE: GraphQL does NOT store payload in DB to save space (intentional)

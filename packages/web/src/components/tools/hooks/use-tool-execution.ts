@@ -28,7 +28,6 @@ interface UseToolExecutionOptions {
 
 interface ExecuteStepOptions {
   limitIterations?: number;
-  selfHealing?: boolean;
   updatedInstruction?: string;
 }
 
@@ -116,7 +115,7 @@ export function useToolExecution(
   };
 
   const executeStepByIdx = async (idx: number, stepOptions?: ExecuteStepOptions) => {
-    const { limitIterations, selfHealing = false, updatedInstruction } = stepOptions || {};
+    const { limitIterations, updatedInstruction } = stepOptions || {};
 
     return executeWithRunId(
       async () => {
@@ -143,10 +142,8 @@ export function useToolExecution(
         const single = await executeSingleStep({
           client,
           step: stepToExecute,
-          toolId,
           payload: computedPayload,
           previousResults: currentStepResultsMap,
-          selfHealing,
           onRunIdGenerated: (singleRunId) => {
             currentRunIdRef.current = singleRunId;
           },
@@ -163,21 +160,11 @@ export function useToolExecution(
               : single.updatedStep;
           skipNextHashInvalidation();
           setSteps(steps.map((step, i) => (i === idx ? updatedStep : step)));
-
-          if (selfHealing && single.success) {
-            toast({
-              title: "Step fixed",
-              description: "The step configuration has been updated and executed successfully.",
-            });
-          }
         }
 
         if (isFailure) {
           const status: StepStatus = isAbortError(single.error) ? "aborted" : "failed";
           setStepResult(sid, normalized.output, status, single.error || undefined);
-          if (selfHealing) {
-            throw new Error(single.error || "Failed to fix step");
-          }
         } else {
           setStepResult(sid, normalized.output, "completed");
         }
@@ -190,13 +177,9 @@ export function useToolExecution(
     );
   };
 
-  const executeTransform = async (
-    schemaStr: string,
-    transformStr: string,
-    selfHealing: boolean = false,
-  ): Promise<void> => {
+  const executeTransform = async (schemaStr: string, transformStr: string): Promise<void> => {
     await executeWithRunId(async () => {
-      setTransformStatus(selfHealing ? "fixing" : "running");
+      setTransformStatus("running");
 
       const currentStepResultsMap = stepResultsMap;
       const stepData: Record<string, any> = {};
@@ -208,20 +191,18 @@ export function useToolExecution(
 
       const parsedSchema = schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null;
       const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
-      const result = await executeFinalTransform(
+      const result = await executeFinalTransform({
         client,
-        toolId || "test",
-        transformStr || finalTransform,
-        parsedSchema,
-        inputSchema ? JSON.parse(inputSchema) : null,
-        computedPayload,
-        stepData,
-        selfHealing,
-        (transformRunId) => {
+        finalTransform: transformStr || finalTransform,
+        responseSchema: parsedSchema,
+        inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
+        payload: computedPayload,
+        previousResults: stepData,
+        onRunIdGenerated: (transformRunId) => {
           currentRunIdRef.current = transformRunId;
         },
         responseFilters,
-      );
+      });
 
       if (result.success) {
         setFinalResult(result.data, "completed");
@@ -232,12 +213,6 @@ export function useToolExecution(
           result.updatedTransform !== (transformStr || finalTransform)
         ) {
           setFinalTransform(result.updatedTransform);
-          if (selfHealing) {
-            toast({
-              title: "Transform code updated",
-              description: "auto-repair has modified the transform code to fix issues.",
-            });
-          }
         }
       } else {
         const status: TransformStatus = isAbortError(result.error) ? "aborted" : "failed";
@@ -274,7 +249,6 @@ export function useToolExecution(
       const executionSteps = steps;
       const currentResponseSchema =
         responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null;
-      const effectiveSelfHealing = false;
 
       const executionTool = {
         id: toolId,
@@ -290,11 +264,11 @@ export function useToolExecution(
       setCurrentExecutingStepIndex(0);
 
       const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
-      const state = await executeToolStepByStep(
+      const state = await executeToolStepByStep({
         client,
-        executionTool,
-        computedPayload,
-        (i: number, res: StepExecutionResult) => {
+        tool: executionTool,
+        payload: computedPayload,
+        onStepComplete: (i: number, res: StepExecutionResult) => {
           if (i < executionTool.steps.length - 1) {
             setCurrentExecutingStepIndex(i + 1);
           } else {
@@ -318,24 +292,17 @@ export function useToolExecution(
             // Ignore individual step processing errors to not halt the overall execution
           }
         },
-        effectiveSelfHealing,
-        handleBeforeStepExecution,
-        (stepRunId: string) => {
+        onBeforeStep: handleBeforeStepExecution,
+        onStepRunIdChange: (stepRunId: string) => {
           currentRunIdRef.current = stepRunId;
         },
-      );
+      });
 
       if (state.currentTool.steps) {
         const returnedStepsJson = JSON.stringify(state.currentTool.steps);
         if (originalStepsJson !== returnedStepsJson) {
           skipNextHashInvalidation();
           setSteps(state.currentTool.steps);
-          if (effectiveSelfHealing) {
-            toast({
-              title: "Tool configuration updated",
-              description: "auto-repair has modified the tool configuration to fix issues.",
-            });
-          }
         }
       }
 

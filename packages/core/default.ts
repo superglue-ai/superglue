@@ -6,8 +6,7 @@ export const server_defaults = {
     apiKey: "phc_89mcVkZ9osPaFQwTp3oFA2595ne95OSNk47qnhqCCbE",
     host: "https://d22ze2hfwgrlye.cloudfront.net",
   },
-  MAX_CALL_RETRIES: 10,
-  MAX_TRANSFORMATION_RETRIES: 10,
+  MAX_CALL_RETRIES: 3,
   DEFAULT_LOOP_MAX_ITERS: 10_000,
   MAX_PAGINATION_REQUESTS: 1_000,
   WORKER_POOLS: {

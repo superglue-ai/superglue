@@ -10,7 +10,6 @@ import {
   ExtractResult,
   FixToolArgs,
   FixToolResult,
-  GenerateStepConfigArgs,
   Log,
   Run,
   RunStatus,
@@ -405,7 +404,7 @@ export class SuperglueClient {
     payload?: Record<string, any>;
     previousResults?: Record<string, any>;
     credentials?: Record<string, string>;
-    options?: { selfHealing?: boolean; timeout?: number };
+    options?: { timeout?: number };
     runId?: string;
   }): Promise<{
     stepId: string;
@@ -451,7 +450,7 @@ export class SuperglueClient {
     payload?: Record<string, any>;
     stepResults?: Record<string, any>;
     responseFilters?: any[];
-    options?: { selfHealing?: boolean; timeout?: number };
+    options?: { timeout?: number };
     runId?: string;
   }): Promise<{
     success: boolean;
@@ -699,72 +698,6 @@ export class SuperglueClient {
         }, 2000);
       }
     }
-  }
-
-  async generateStepConfig({
-    systemId,
-    currentStepConfig,
-    currentDataSelector,
-    stepInput,
-    credentials,
-    errorMessage,
-  }: GenerateStepConfigArgs): Promise<{ config: ApiConfig; dataSelector: string }> {
-    const mutation = `
-        mutation GenerateStepConfig(
-          $systemId: String,
-          $currentStepConfig: JSON,
-          $currentDataSelector: String,
-          $stepInput: JSON,
-          $credentials: JSON,
-          $errorMessage: String
-        ) {
-          generateStepConfig(
-            systemId: $systemId,
-            currentStepConfig: $currentStepConfig,
-            currentDataSelector: $currentDataSelector,
-            stepInput: $stepInput,
-            credentials: $credentials,
-            errorMessage: $errorMessage
-          ) {
-            config {
-              id
-              version
-              createdAt
-              updatedAt
-              urlHost
-              urlPath
-              instruction
-              method
-              queryParams
-              headers
-              body
-              pagination {
-                type
-                pageSize
-                cursorPath
-                stopCondition
-              }
-            }
-            dataSelector
-          }
-        }
-      `;
-
-    const result = await this.request<{
-      generateStepConfig: { config: ApiConfig; dataSelector: string };
-    }>(mutation, {
-      systemId,
-      currentStepConfig,
-      currentDataSelector,
-      stepInput,
-      credentials,
-      errorMessage,
-    });
-
-    return {
-      config: result.generateStepConfig.config,
-      dataSelector: result.generateStepConfig.dataSelector,
-    };
   }
 
   async callEndpoint(args: CallEndpointArgs): Promise<CallEndpointResult> {
@@ -1159,39 +1092,5 @@ export class SuperglueClient {
       throw new Error(instructions[0].replace("Error: ", ""));
     }
     return instructions;
-  }
-
-  async generateTransform(args: {
-    currentTransform: string;
-    responseSchema?: any;
-    stepData: Record<string, any>;
-    errorMessage?: string;
-    instruction?: string;
-  }): Promise<{ transformCode: string; data?: any }> {
-    const mutation = `
-            mutation GenerateTransform(
-                $currentTransform: String!,
-                $responseSchema: JSONSchema,
-                $stepData: JSON!,
-                $errorMessage: String,
-                $instruction: String
-            ) {
-                generateTransform(
-                    currentTransform: $currentTransform,
-                    responseSchema: $responseSchema,
-                    stepData: $stepData,
-                    errorMessage: $errorMessage,
-                    instruction: $instruction
-                ) {
-                    transformCode
-                    data
-                }
-            }
-        `;
-
-    const response = await this.request<{
-      generateTransform: { transformCode: string; data?: any };
-    }>(mutation, args);
-    return response.generateTransform;
   }
 }

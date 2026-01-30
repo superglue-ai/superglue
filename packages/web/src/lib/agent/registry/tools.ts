@@ -3,7 +3,6 @@ import {
   CallEndpointArgs,
   CallEndpointResult,
   ConfirmationAction,
-  SelfHealingMode,
   ToolResult,
   UpsertMode,
 } from "@superglue/shared";
@@ -224,13 +223,12 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
         ? {
             tool: toolConfig,
             payload: resolvedPayload,
-            options: { selfHealing: SelfHealingMode.DISABLED, testMode: false, retries: 0 },
+            options: { retries: 0 },
             traceId,
           }
         : {
             id: toolId,
             payload: resolvedPayload,
-            options: { selfHealing: SelfHealingMode.DISABLED },
           },
     );
 
