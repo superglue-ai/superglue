@@ -9,7 +9,6 @@ import {
 import { parseJSON } from "../files/index.js";
 import { RunLifecycleManager } from "../runs/index.js";
 import { SystemManager } from "../systems/system-manager.js";
-import { isSelfHealingEnabled } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
 import { notifyWebhook } from "../utils/webhook.js";
 import type { ToolExecutionPayload } from "../worker/types.js";
@@ -158,10 +157,7 @@ async function executeToolInternal(
     timeout: options?.timeout,
   };
 
-  const selfHealingEnabled = isSelfHealingEnabled(requestOptions, "api");
-  const systemManagers = await SystemManager.forToolExecution(tool, authReq.datastore, metadata, {
-    includeDocs: selfHealingEnabled,
-  });
+  const systemManagers = await SystemManager.forToolExecution(tool, authReq.datastore, metadata);
 
   // Use RunLifecycleManager for centralized run handling
   const lifecycle = new RunLifecycleManager(authReq.datastore, authReq.authInfo.orgId, metadata);
@@ -346,10 +342,7 @@ const runTool: RouteHandler = async (request, reply) => {
     timeout: body.options?.timeout,
   };
 
-  const selfHealingEnabled = isSelfHealingEnabled(requestOptions, "api");
-  const systemManagers = await SystemManager.forToolExecution(tool, authReq.datastore, metadata, {
-    includeDocs: selfHealingEnabled,
-  });
+  const systemManagers = await SystemManager.forToolExecution(tool, authReq.datastore, metadata);
 
   // Use RunLifecycleManager for centralized run handling
   const lifecycle = new RunLifecycleManager(authReq.datastore, authReq.authInfo.orgId, metadata);

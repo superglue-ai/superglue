@@ -48,7 +48,7 @@ describe("superglue_execute_tool", () => {
       runTool: vi.fn(),
       listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
     };
-    const args = { id: "tool-1", options: { selfHealing: "ENABLED" }, client, orgId: "test-org" };
+    const args = { id: "tool-1", options: { retries: 3 }, client, orgId: "test-org" };
     const result = await executeTool(args, {});
 
     expect(result.success).toBe(false);

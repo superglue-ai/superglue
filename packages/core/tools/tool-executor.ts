@@ -12,19 +12,10 @@ import {
 } from "@superglue/shared";
 import { flattenAndNamespaceCredentials } from "@superglue/shared/utils";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
-import { z } from "zod";
-import {
-  getEvaluateStepResponseContext,
-  getGenerateStepConfigContext,
-} from "../context/context-builders.js";
-import {
-  EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT,
-  GENERATE_STEP_CONFIG_SYSTEM_PROMPT,
-} from "../context/context-prompts.js";
 import { server_defaults } from "../default.js";
 import { SystemManager } from "../systems/system-manager.js";
 import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
-import { isSelfHealingEnabled, transformData } from "../utils/helpers.js";
+import { transformData } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
 import { telemetryClient } from "../utils/telemetry.js";
 import { applyResponseFilters, FilterMatchError } from "./response-filters.js";
@@ -32,7 +23,6 @@ import { FTPStepExecutionStrategy } from "./strategies/ftp/ftp.js";
 import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
 import { PostgresStepExecutionStrategy } from "./strategies/postgres/postgres.js";
 import { StepExecutionStrategyRegistry } from "./strategies/strategy.js";
-import { buildSourceData, generateStepConfig } from "./tool-step-builder.js";
 import { executeAndEvaluateFinalTransform } from "./tool-transform.js";
 
 export interface ToolExecutorOptions {
@@ -171,6 +161,7 @@ export class ToolExecutor implements Tool {
         this.result.config = {
           id: this.id,
           steps: this.steps,
+          systemIds: this.systemIds,
           finalTransform: this.finalTransform,
           inputSchema: this.inputSchema,
           responseSchema: this.responseSchema,
@@ -196,7 +187,6 @@ export class ToolExecutor implements Tool {
     options: RequestOptions;
   }): Promise<{ result: ToolStepResult; updatedStep: ExecutionStep }> {
     try {
-      const isSelfHealing = isSelfHealingEnabled(options, "api");
       let retryCount = 0;
       let lastError: string | null = null;
       let messages: LLMMessage[] = [];
@@ -216,7 +206,7 @@ export class ToolExecutor implements Tool {
         );
       }
 
-      // Get system early so it's available for self-healing even if data selector fails
+      // Get system early so it's available even if data selector fails
       await systemManager?.refreshTokenIfNeeded();
       currentSystem = await systemManager?.getSystem();
 
@@ -226,176 +216,115 @@ export class ToolExecutor implements Tool {
           ...flattenAndNamespaceCredentials([currentSystem]),
         } as Record<string, string>;
       }
+      try {
+        const dataSelectorTransformResult = await transformData(stepInput, currentDataSelector);
+        if (!dataSelectorTransformResult.success) {
+          throw new Error(
+            `Loop selector for '${step.id}' failed. ${dataSelectorTransformResult.error}\nCode: ${currentDataSelector}\nPayload: ${JSON.stringify(stepInput).slice(0, 1000)}...`,
+          );
+        }
+        const dataSelectorOutput = dataSelectorTransformResult.data || {};
 
-      const maxRetries = isSelfHealing
-        ? options?.retries !== undefined
-          ? options.retries
-          : server_defaults.MAX_CALL_RETRIES
-        : 1;
-      while (retryCount < maxRetries) {
-        try {
-          const dataSelectorTransformResult = await transformData(stepInput, currentDataSelector);
-          if (!dataSelectorTransformResult.success) {
-            throw new Error(
-              `Loop selector for '${step.id}' failed. ${dataSelectorTransformResult.error}\nCode: ${currentDataSelector}\nPayload: ${JSON.stringify(stepInput).slice(0, 1000)}...`,
+        isLoopStep = Array.isArray(dataSelectorOutput);
+        let itemsToExecuteStepOn = isLoopStep ? dataSelectorOutput : [dataSelectorOutput || {}];
+
+        itemsToExecuteStepOn = itemsToExecuteStepOn.slice(
+          0,
+          server_defaults.DEFAULT_LOOP_MAX_ITERS,
+        );
+
+        stepResults = [];
+        for (let i = 0; i < itemsToExecuteStepOn.length; i++) {
+          const currentItem = itemsToExecuteStepOn[i];
+
+          if (itemsToExecuteStepOn.length > 1) {
+            logMessage(
+              "debug",
+              `Executing loop iteration ${i + 1}/${itemsToExecuteStepOn.length} with item: ${JSON.stringify(currentItem).slice(0, 100)}...`,
+              this.metadata,
             );
           }
-          const dataSelectorOutput = dataSelectorTransformResult.data || {};
 
-          isLoopStep = Array.isArray(dataSelectorOutput);
-          let itemsToExecuteStepOn = isLoopStep ? dataSelectorOutput : [dataSelectorOutput || {}];
+          loopPayload = { currentItem, ...stepInput };
 
-          itemsToExecuteStepOn = itemsToExecuteStepOn.slice(
-            0,
-            server_defaults.DEFAULT_LOOP_MAX_ITERS,
-          );
+          // Refresh system token if needed (important for long-running loops)
+          await systemManager?.refreshTokenIfNeeded();
+          currentSystem = await systemManager?.getSystem();
 
-          stepResults = [];
-          for (let i = 0; i < itemsToExecuteStepOn.length; i++) {
-            const currentItem = itemsToExecuteStepOn[i];
+          // Repeated to update the credentials with the latest OAuth token
+          if (currentSystem) {
+            stepCredentials = {
+              ...credentials,
+              ...flattenAndNamespaceCredentials([currentSystem]),
+            } as Record<string, string>;
+          }
 
-            if (itemsToExecuteStepOn.length > 1) {
-              logMessage(
-                "debug",
-                `Executing loop iteration ${i + 1}/${itemsToExecuteStepOn.length} with item: ${JSON.stringify(currentItem).slice(0, 100)}...`,
-                this.metadata,
+          try {
+            const itemExecutionResult = await this.strategyRegistry.routeAndExecute({
+              stepConfig: currentConfig,
+              stepInputData: loopPayload,
+              credentials: stepCredentials,
+              requestOptions: options,
+              metadata: this.metadata,
+              failureBehavior: step.failureBehavior,
+            });
+
+            if (
+              !itemExecutionResult.success ||
+              itemExecutionResult.strategyExecutionData === undefined
+            ) {
+              throw new Error(
+                itemExecutionResult.error ||
+                  `No data returned from iteration: ${i + 1} in step: ${step.id}`,
               );
             }
 
-            loopPayload = { currentItem, ...stepInput };
+            const stepResponseData = {
+              currentItem,
+              data: itemExecutionResult.strategyExecutionData,
+              success: true,
+            };
 
-            // Refresh system token if needed (important for long-running loops)
-            await systemManager?.refreshTokenIfNeeded();
-            currentSystem = await systemManager?.getSystem();
-
-            // Repeated to update the credentials with the latest OAuth token
-            if (currentSystem) {
-              stepCredentials = {
-                ...credentials,
-                ...flattenAndNamespaceCredentials([currentSystem]),
-              } as Record<string, string>;
-            }
-
-            try {
-              const itemExecutionResult = await this.strategyRegistry.routeAndExecute({
-                stepConfig: currentConfig,
-                stepInputData: loopPayload,
-                credentials: stepCredentials,
-                requestOptions: { ...options, testMode: false },
-                metadata: this.metadata,
-                failureBehavior: step.failureBehavior,
-              });
-
-              if (
-                !itemExecutionResult.success ||
-                itemExecutionResult.strategyExecutionData === undefined
-              ) {
-                throw new Error(
-                  itemExecutionResult.error ||
-                    `No data returned from iteration: ${i + 1} in step: ${step.id}`,
-                );
-              }
+            stepResults.push(stepResponseData);
+          } catch (error) {
+            if (step.failureBehavior === "CONTINUE") {
+              const errorMessage = maskCredentials(
+                error?.message || String(error),
+                stepCredentials,
+              );
+              logMessage(
+                "warn",
+                `Iteration ${i + 1} failed but continuing due to failureBehavior=CONTINUE: ${errorMessage}`,
+                this.metadata,
+              );
 
               const stepResponseData = {
                 currentItem,
-                data: itemExecutionResult.strategyExecutionData,
-                success: true,
+                data: null,
+                success: false,
+                error: errorMessage,
               };
 
               stepResults.push(stepResponseData);
-            } catch (error) {
-              if (step.failureBehavior === "CONTINUE") {
-                const errorMessage = maskCredentials(
-                  error?.message || String(error),
-                  stepCredentials,
-                );
-                logMessage(
-                  "warn",
-                  `Iteration ${i + 1} failed but continuing due to failureBehavior=CONTINUE: ${errorMessage}`,
-                  this.metadata,
-                );
-
-                const stepResponseData = {
-                  currentItem,
-                  data: null,
-                  success: false,
-                  error: errorMessage,
-                };
-
-                stepResults.push(stepResponseData);
-              } else {
-                throw error;
-              }
+            } else {
+              throw error;
             }
-          }
-          // llm as a judge validation on the output data, this function throws an error if the data does not align with the instruction
-          if (options.testMode || isSelfHealing) {
-            await this.validateStepResponse(
-              isLoopStep ? stepResults : stepResults[0] || null,
-              currentConfig,
-              systemManager,
-            );
-          }
-
-          // we went through the whole step without errors, so we can break out of the retry loop
-          break;
-        } catch (error) {
-          lastError = maskCredentials(error?.message || String(error), stepCredentials).slice(
-            0,
-            10000,
-          );
-
-          if (retryCount > 0) {
-            messages.push({ role: "user", content: `Error: ${lastError}` });
-            logMessage("info", `Step execution failed: ${lastError}`, this.metadata);
-          }
-
-          if (error instanceof AbortError) throw error;
-
-          retryCount++;
-
-          if (retryCount >= maxRetries) {
-            this.handleMaxRetriesExceeded(step.id, currentConfig, retryCount, lastError);
-          }
-
-          if (isSelfHealing) {
-            logMessage("info", `Self healing step config (retry ${retryCount})`, this.metadata);
-
-            if (messages.length === 0) {
-              messages = await this.initializeSelfHealingContext(
-                systemManager,
-                currentConfig,
-                currentDataSelector,
-                loopPayload,
-                stepCredentials,
-                currentSystem,
-              );
-            }
-
-            const sourceData = await buildSourceData({
-              stepInput,
-              credentials: stepCredentials,
-              currentItem: loopPayload?.currentItem,
-              systemUrlHost: currentSystem.urlHost,
-              paginationPageSize: currentConfig?.pagination?.pageSize,
-            });
-
-            const generateStepConfigResult = await generateStepConfig({
-              retryCount,
-              messages,
-              sourceData,
-              system: currentSystem,
-              metadata: this.metadata,
-            });
-
-            if (!generateStepConfigResult.success) {
-              throw new Error(generateStepConfigResult.error);
-            }
-
-            currentConfig = { ...currentConfig, ...generateStepConfigResult.config } as ApiConfig;
-            currentDataSelector = generateStepConfigResult.dataSelector;
           }
         }
+      } catch (error) {
+        lastError = maskCredentials(error?.message || String(error), stepCredentials).slice(
+          0,
+          10000,
+        );
+        messages.push({ role: "user", content: `Error: ${lastError}` });
+        logMessage("info", `Step execution failed: ${lastError}`, this.metadata);
+
+        telemetryClient?.captureException(
+          new Error(`API call failed after ${retryCount} attempts: ${lastError}`),
+          this.metadata?.orgId,
+          { currentConfig, retryCount },
+        );
+        throw new ApiCallError(`Error executing step ${step.id}: ${lastError}`, 500);
       }
 
       logMessage("info", `Step '${step.id}' Complete`, this.metadata);
@@ -435,67 +364,6 @@ export class ToolExecutor implements Tool {
         updatedStep: step,
       } as { result: ToolStepResult; updatedStep: ExecutionStep };
     }
-  }
-
-  private async initializeSelfHealingContext(
-    systemManager: SystemManager,
-    config: ApiConfig,
-    loopSelector: string,
-    payload: any,
-    credentials: Record<string, string>,
-    system: System,
-  ): Promise<LLMMessage[]> {
-    const docs = await systemManager.getDocumentation();
-
-    const userPrompt = getGenerateStepConfigContext(
-      {
-        instruction: config.instruction,
-        previousStepConfig: config,
-        previousStepDataSelector: loopSelector,
-        stepInput: payload,
-        credentials,
-        systemDocumentation: docs?.content || "",
-        systemSpecificInstructions: system.specificInstructions || "",
-      },
-      { characterBudget: 50000, mode: "self-healing" },
-    );
-
-    return [
-      { role: "system", content: GENERATE_STEP_CONFIG_SYSTEM_PROMPT },
-      { role: "user", content: userPrompt },
-    ];
-  }
-
-  private async validateStepResponse(
-    data: any,
-    config: ApiConfig,
-    systemManager: SystemManager,
-  ): Promise<void> {
-    const evaluation = await this.evaluateStepResponse({
-      data,
-      config,
-      docSearchResultsForStepInstruction: await systemManager?.searchDocumentation(
-        config.instruction,
-      ),
-    });
-
-    if (!evaluation.success) {
-      throw new Error(evaluation.shortReason + " " + JSON.stringify(data).slice(0, 10000));
-    }
-  }
-
-  private handleMaxRetriesExceeded(
-    stepId: string,
-    config: ApiConfig,
-    retryCount: number,
-    lastError: string,
-  ): never {
-    telemetryClient?.captureException(
-      new Error(`API call failed after ${retryCount} attempts: ${lastError}`),
-      this.metadata?.orgId,
-      { config, retryCount },
-    );
-    throw new ApiCallError(`Error executing step ${stepId}: ${lastError}`, 500);
   }
 
   private validate(payload: Record<string, unknown>): void {
@@ -573,50 +441,5 @@ export class ToolExecutor implements Tool {
     this.result.error = error;
     this.result.completedAt = new Date();
     return this.result;
-  }
-
-  private async evaluateStepResponse({
-    data,
-    config,
-    docSearchResultsForStepInstruction,
-  }: {
-    data: any;
-    config: ApiConfig;
-    docSearchResultsForStepInstruction?: string;
-  }): Promise<{ success?: boolean; refactorNeeded?: boolean; shortReason?: string }> {
-    const evaluateStepResponsePrompt = getEvaluateStepResponseContext(
-      { data, config, docSearchResultsForStepInstruction },
-      { characterBudget: 20000 },
-    );
-
-    const messages = [
-      {
-        role: "system",
-        content: EVALUATE_STEP_RESPONSE_SYSTEM_PROMPT,
-      },
-      {
-        role: "user",
-        content: evaluateStepResponsePrompt,
-      },
-    ] as LLMMessage[];
-
-    const evaluationSchema = z.object({
-      success: z.boolean().describe("Whether the step execution was successful"),
-      refactorNeeded: z.boolean().describe("Whether the configuration needs to be refactored"),
-      shortReason: z.string().describe("Brief reason for the evaluation result"),
-    });
-
-    const evaluationResult = await LanguageModel.generateObject<z.infer<typeof evaluationSchema>>({
-      messages: messages,
-      schema: z.toJSONSchema(evaluationSchema),
-      temperature: 0,
-      metadata: this.metadata,
-    });
-
-    if (!evaluationResult.success) {
-      throw new Error(`Error evaluating config response: ${evaluationResult.response}`);
-    }
-
-    return evaluationResult.response;
   }
 }

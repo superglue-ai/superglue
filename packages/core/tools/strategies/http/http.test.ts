@@ -1,8 +1,8 @@
-import { ApiConfig, HttpMethod, PaginationType, SelfHealingMode } from "@superglue/shared";
+import { ApiConfig, HttpMethod, PaginationType } from "@superglue/shared";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server_defaults } from "../../../default.js";
-import { convertBasicAuthToBase64, isSelfHealingEnabled } from "../../../utils/helpers.js";
+import { convertBasicAuthToBase64 } from "../../../utils/helpers.js";
 import * as httpModule from "./http.js";
 import { HttpStepExecutionStrategy } from "./http.js";
 
@@ -801,85 +801,58 @@ describe("API Utilities", () => {
     });
   });
 
-  describe("API Self-Healing Integration", () => {
-    it("should test that isSelfHealingEnabled is used correctly for API calls", () => {
-      // Import the function to test the logic directly
-
-      // Test API self-healing enabled scenarios
-      expect(isSelfHealingEnabled({ selfHealing: SelfHealingMode.ENABLED }, "api")).toBe(true);
-      expect(isSelfHealingEnabled({ selfHealing: SelfHealingMode.REQUEST_ONLY }, "api")).toBe(true);
-
-      // Test API self-healing disabled scenarios
-      expect(isSelfHealingEnabled({ selfHealing: SelfHealingMode.DISABLED }, "api")).toBe(false);
-      expect(isSelfHealingEnabled({ selfHealing: SelfHealingMode.TRANSFORM_ONLY }, "api")).toBe(
-        false,
-      );
-
-      // Test defaults
-      expect(isSelfHealingEnabled({}, "api")).toBe(false);
-      expect(isSelfHealingEnabled(undefined, "api")).toBe(false);
+  describe("Basic Auth Utilities", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
     });
 
-    it("should verify self-healing flag is passed to API execution logic", () => {
-      // This test verifies the integration between the self-healing flag and API calls
-      // The actual executeApiCall function uses isSelfHealingEnabled(options, "api") internally
-      // and this has been verified by code inspection in the diff
-      expect(true).toBe(true); // Placeholder test for self-healing integration
-    });
-  });
-});
-
-describe("Basic Auth Utilities", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.resetAllMocks();
-  });
-
-  describe("convertBasicAuthToBase64", () => {
-    it("should encode username:password format", () => {
-      expect(convertBasicAuthToBase64("Basic test:1234")).toBe("Basic dGVzdDoxMjM0");
+    afterEach(() => {
+      vi.resetAllMocks();
     });
 
-    it("should leave already encoded credentials unchanged", () => {
-      expect(convertBasicAuthToBase64("Basic dGVzdDoxMjM0")).toBe("Basic dGVzdDoxMjM0");
-    });
+    describe("convertBasicAuthToBase64", () => {
+      it("should encode username:password format", () => {
+        expect(convertBasicAuthToBase64("Basic test:1234")).toBe("Basic dGVzdDoxMjM0");
+      });
 
-    it("should leave non-Basic Auth headers unchanged", () => {
-      expect(convertBasicAuthToBase64("Bearer token123")).toBe("Bearer token123");
-    });
+      it("should leave already encoded credentials unchanged", () => {
+        expect(convertBasicAuthToBase64("Basic dGVzdDoxMjM0")).toBe("Basic dGVzdDoxMjM0");
+      });
 
-    it("should handle undefined or null values", () => {
-      expect(convertBasicAuthToBase64(undefined)).toBeUndefined();
-      expect(convertBasicAuthToBase64(null)).toBeNull();
+      it("should leave non-Basic Auth headers unchanged", () => {
+        expect(convertBasicAuthToBase64("Bearer token123")).toBe("Bearer token123");
+      });
+
+      it("should handle undefined or null values", () => {
+        expect(convertBasicAuthToBase64(undefined)).toBeUndefined();
+        expect(convertBasicAuthToBase64(null)).toBeNull();
+      });
     });
   });
-});
 
-describe("HttpStepExecutionStrategy", () => {
-  const strategy = new HttpStepExecutionStrategy();
+  describe("HttpStepExecutionStrategy", () => {
+    const strategy = new HttpStepExecutionStrategy();
 
-  describe("shouldExecute", () => {
-    it("should return true for http:// URLs", () => {
-      expect(strategy.shouldExecute("http://api.example.com")).toBe(true);
-    });
+    describe("shouldExecute", () => {
+      it("should return true for http:// URLs", () => {
+        expect(strategy.shouldExecute("http://api.example.com")).toBe(true);
+      });
 
-    it("should return true for https:// URLs", () => {
-      expect(strategy.shouldExecute("https://api.example.com")).toBe(true);
-    });
+      it("should return true for https:// URLs", () => {
+        expect(strategy.shouldExecute("https://api.example.com")).toBe(true);
+      });
 
-    it("should return false for postgres:// URLs", () => {
-      expect(strategy.shouldExecute("postgres://user:pass@localhost:5432")).toBe(false);
-    });
+      it("should return false for postgres:// URLs", () => {
+        expect(strategy.shouldExecute("postgres://user:pass@localhost:5432")).toBe(false);
+      });
 
-    it("should return false for ftp:// URLs", () => {
-      expect(strategy.shouldExecute("ftp://files.example.com")).toBe(false);
-    });
+      it("should return false for ftp:// URLs", () => {
+        expect(strategy.shouldExecute("ftp://files.example.com")).toBe(false);
+      });
 
-    it("should return false for empty URL", () => {
-      expect(strategy.shouldExecute("")).toBe(false);
+      it("should return false for empty URL", () => {
+        expect(strategy.shouldExecute("")).toBe(false);
+      });
     });
   });
 });

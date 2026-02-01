@@ -160,13 +160,6 @@ export enum CredentialMode {
   REPLACE = "REPLACE",
 }
 
-export enum SelfHealingMode {
-  ENABLED = "ENABLED",
-  TRANSFORM_ONLY = "TRANSFORM_ONLY",
-  REQUEST_ONLY = "REQUEST_ONLY",
-  DISABLED = "DISABLED",
-}
-
 export enum RunStatus {
   RUNNING = "RUNNING",
   SUCCESS = "SUCCESS",
@@ -394,12 +387,10 @@ export type WorkflowInputRequest = ToolInputRequest;
 
 export type RequestOptions = {
   cacheMode?: CacheMode;
-  selfHealing?: SelfHealingMode;
   timeout?: number;
   retries?: number;
   retryDelay?: number;
   webhookUrl?: string;
-  testMode?: boolean;
 };
 
 export interface RunMetadata {
@@ -451,14 +442,6 @@ export interface ToolArgs {
   traceId?: string;
 }
 
-export interface GenerateTransformArgs {
-  currentTransform?: string;
-  responseSchema?: JSONSchema;
-  stepData: Record<string, any>;
-  errorMessage?: string;
-  instruction?: string;
-}
-
 // Legacy alias
 export type WorkflowArgs = ToolArgs;
 
@@ -493,15 +476,6 @@ export interface FixToolArgs {
 export interface FixToolResult {
   tool: Tool;
   diffs: ToolDiff[];
-}
-
-export interface GenerateStepConfigArgs {
-  systemId?: string;
-  currentDataSelector?: string;
-  currentStepConfig?: Partial<ApiConfig>;
-  stepInput?: Record<string, any>;
-  credentials?: Record<string, string>;
-  errorMessage?: string;
 }
 
 export type SystemList = {

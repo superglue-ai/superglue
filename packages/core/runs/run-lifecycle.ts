@@ -29,7 +29,7 @@ export interface RunContext {
 
 export interface CompleteRunParams {
   success: boolean;
-  tool?: Tool; // Updated tool config (e.g., after self-healing)
+  tool?: Tool; // Updated tool config
   error?: string;
   stepResults?: ToolStepResult[];
 }

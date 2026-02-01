@@ -247,7 +247,7 @@ USING SUPERGLUE:
 
 SUPERGLUE CAPABILITIES:
 - AI-Powered Tool Building: superglue uses AI to generate systems with deterministic transformation code and tool steps that map data between systems. AI is used during tool building only to generate the transformation logic and configure tool steps. After building, code runs 100% deterministically.
-- Tool Self-Healing: When API formats change or errors occur in tool execution, superglue can automatically repair failing tool steps. This happens during execution and is configurable by the user.
+- Tool Monitoring: When API formats change or errors occur in tool execution, superglue can automatically notify the user so they can repair failing tool steps.
 - System Landscape Management: superglue uses AI to model and visualize your system landscape, and lets you observe usage and manage access to your systems.
 - File Handling: superglue automatically parses payload files as well as files returned by a tool step irrespective of their source.
 - Multi-Protocol Support: Supports REST APIs (GET, POST, PUT, DELETE, PATCH), GraphQL APIs (queries and mutations), PostgreSQL databases (queries and inserts), FTP/SFTP servers (file retrieval), Webhooks (HTTP/HTTPS endpoints)
