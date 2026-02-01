@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  getEvaluateStepResponseContext,
-  getEvaluateTransformContext,
-  getObjectContext,
-  getToolBuilderContext,
-  getTransformContext,
-} from "./context-builders.js";
+import { getObjectContext, getToolBuilderContext } from "./context-builders.js";
 
 function timeIt<T>(fn: () => T): { ms: number; result: T } {
   const start = Date.now();
@@ -314,68 +308,6 @@ describe("getWorkflowBuilderContext budget and include combinations", () => {
     });
     expect(out).toMatch(/<<test_system_apiKey>>/);
     expect(out).toMatch(/<<foo>>/);
-  });
-});
-
-describe("getEvaluateStepResponseContext budgets and content", () => {
-  const input = {
-    data: { list: [1, 2, 3] },
-    endpoint: {
-      id: "e1",
-      instruction: "List items",
-      method: "GET",
-      urlHost: "https://api.example.com",
-      urlPath: "/v1",
-    },
-    docSearchResultsForStepInstruction: "Relevant docs",
-  } as any;
-
-  it("enforces budget and includes data, step_config, and doc search tags", () => {
-    const out = getEvaluateStepResponseContext(input, { characterBudget: 800 });
-    expect(out.length).toBeLessThanOrEqual(800);
-    expect(out).toMatch(/<step_response>/);
-    expect(out).toMatch(/<step_config>/);
-    expect(out).toMatch(/<doc_search_results_for_step_instruction>/);
-  });
-});
-
-describe("getTransformContext budgets and content", () => {
-  const input = {
-    instruction: "Map fields",
-    targetSchema: { type: "object", properties: { id: { type: "number" } } },
-    sourceData: { users: [{ id: 1 }, { id: 2 }] },
-  } as any;
-
-  it("enforces budget and includes instruction, target_schema, and source_data", () => {
-    const out = getTransformContext(input, { characterBudget: 500 });
-    expect(out.length).toBeLessThanOrEqual(500);
-    expect(out).toMatch(/<instruction>/);
-    expect(out).toMatch(/<target_schema>/);
-    expect(out).toMatch(/<transform_input>/);
-  });
-});
-
-describe("getEvaluateTransformContext budgets and content", () => {
-  const base = {
-    targetSchema: { type: "object", properties: { id: { type: "number" } } },
-    sourceData: { users: [{ id: 1 }, { id: 2 }] },
-    transformedData: [{ id: 1 }],
-    transformCode: "return sourceData.users;",
-  } as any;
-
-  it("with instruction: enforces budget", () => {
-    const out = getEvaluateTransformContext(
-      { ...base, instruction: "Ensure mapping" },
-      { characterBudget: 700 },
-    );
-    expect(out.length).toBeLessThanOrEqual(700);
-    expect(out.length).toBeGreaterThan(0);
-  });
-
-  it("without instruction: enforces budget", () => {
-    const out = getEvaluateTransformContext({ ...base, instruction: "" }, { characterBudget: 600 });
-    expect(out.length).toBeLessThanOrEqual(600);
-    expect(out.length).toBeGreaterThan(0);
   });
 });
 

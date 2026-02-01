@@ -77,18 +77,14 @@ export async function abortExecution(
 export async function executeSingleStep({
   client,
   step,
-  toolId,
   payload,
   previousResults,
-  selfHealing,
   onRunIdGenerated,
 }: {
   client: SuperglueClient;
   step: ExecutionStep;
-  toolId: string;
   payload: any;
   previousResults: Record<string, any>;
-  selfHealing: boolean;
   onRunIdGenerated?: (runId: string) => void;
 }): Promise<StepExecutionResult> {
   const stepRunId = generateUUID();
@@ -103,9 +99,6 @@ export async function executeSingleStep({
       step,
       payload,
       previousResults,
-      options: {
-        selfHealing,
-      },
       runId: stepRunId,
     });
 
@@ -127,15 +120,21 @@ export async function executeSingleStep({
   }
 }
 
-export async function executeToolStepByStep(
-  client: SuperglueClient,
-  tool: Tool,
-  payload: any,
-  onStepComplete?: (stepIndex: number, result: StepExecutionResult) => void,
-  selfHealing: boolean = false,
-  onBeforeStep?: (stepIndex: number, step: any) => Promise<boolean>,
-  onStepRunIdChange?: (stepRunId: string) => void,
-): Promise<ToolExecutionState> {
+export async function executeToolStepByStep({
+  client,
+  tool,
+  payload,
+  onStepComplete,
+  onBeforeStep,
+  onStepRunIdChange,
+}: {
+  client: SuperglueClient;
+  tool: Tool;
+  payload: any;
+  onStepComplete?: (stepIndex: number, result: StepExecutionResult) => void;
+  onBeforeStep?: (stepIndex: number, step: any) => Promise<boolean>;
+  onStepRunIdChange?: (stepRunId: string) => void;
+}): Promise<ToolExecutionState> {
   const state: ToolExecutionState = {
     originalTool: tool,
     currentTool: { ...tool },
@@ -166,10 +165,8 @@ export async function executeToolStepByStep(
     const result = await executeSingleStep({
       client,
       step,
-      toolId: state.currentTool.id,
       payload,
       previousResults,
-      selfHealing,
       onRunIdGenerated: onStepRunIdChange,
     });
 
@@ -179,7 +176,7 @@ export async function executeToolStepByStep(
       state.completedSteps.push(step.id);
       previousResults[step.id] = result.data;
 
-      // Update the tool with any returned step configuration (normalization, self-healing, etc.)
+      // Update the tool with any returned step configuration (normalization, etc.)
       if (result.updatedStep) {
         state.currentTool = {
           ...state.currentTool,
@@ -206,18 +203,16 @@ export async function executeToolStepByStep(
   }
 
   if ((tool.finalTransform || tool.responseFilters?.length) && state.failedSteps.length === 0) {
-    const finalResult = await executeFinalTransform(
+    const finalResult = await executeFinalTransform({
       client,
-      tool.id || "tool",
-      state.currentTool.finalTransform || tool.finalTransform,
-      tool.responseSchema,
-      tool.inputSchema,
+      finalTransform: state.currentTool.finalTransform || tool.finalTransform,
+      responseSchema: tool.responseSchema,
+      inputSchema: tool.inputSchema,
       payload,
       previousResults,
-      selfHealing,
-      onStepRunIdChange,
-      tool.responseFilters,
-    );
+      responseFilters: tool.responseFilters,
+      onRunIdGenerated: onStepRunIdChange,
+    });
 
     state.stepResults["__final_transform__"] = {
       stepId: "__final_transform__",
@@ -228,13 +223,6 @@ export async function executeToolStepByStep(
 
     if (finalResult.success) {
       state.completedSteps.push("__final_transform__");
-
-      if (finalResult.updatedTransform && selfHealing) {
-        state.currentTool = {
-          ...state.currentTool,
-          finalTransform: finalResult.updatedTransform,
-        };
-      }
     } else {
       if (isAbortError(finalResult.error)) {
         state.abortedSteps.push("__final_transform__");
@@ -248,18 +236,25 @@ export async function executeToolStepByStep(
   return state;
 }
 
-export async function executeFinalTransform(
-  client: SuperglueClient,
-  toolId: string,
-  finalTransform: string,
-  responseSchema: any,
-  inputSchema: any,
-  payload: any,
-  previousResults: Record<string, any>,
-  selfHealing: boolean = false,
-  onRunIdGenerated?: (runId: string) => void,
-  responseFilters?: ResponseFilter[],
-): Promise<FinalTransformExecutionResult> {
+export async function executeFinalTransform({
+  client,
+  finalTransform,
+  responseSchema,
+  inputSchema,
+  payload,
+  previousResults,
+  onRunIdGenerated,
+  responseFilters,
+}: {
+  client: SuperglueClient;
+  finalTransform: string;
+  responseSchema: any;
+  inputSchema: any;
+  payload: any;
+  previousResults: Record<string, any>;
+  onRunIdGenerated?: (runId: string) => void;
+  responseFilters?: ResponseFilter[];
+}): Promise<FinalTransformExecutionResult> {
   const transformRunId = generateUUID();
 
   if (onRunIdGenerated) {
@@ -275,9 +270,6 @@ export async function executeFinalTransform(
       payload,
       stepResults: previousResults,
       responseFilters,
-      options: {
-        selfHealing,
-      },
       runId: transformRunId,
     });
 

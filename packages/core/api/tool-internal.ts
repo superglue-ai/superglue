@@ -1,10 +1,4 @@
-import {
-  ExecutionStep,
-  RequestOptions,
-  ResponseFilter,
-  SelfHealingMode,
-  Tool,
-} from "@superglue/shared";
+import { ExecutionStep, RequestOptions, ResponseFilter, Tool } from "@superglue/shared";
 import { SystemManager } from "../systems/system-manager.js";
 import { logMessage } from "../utils/logs.js";
 import type { ToolExecutionPayload } from "../worker/types.js";
@@ -14,7 +8,6 @@ import type { AuthenticatedFastifyRequest, RouteHandler } from "./types.js";
 
 // Step execution types (internal only, not in OpenAPI spec)
 interface RunStepRequestOptions {
-  selfHealing?: boolean;
   timeout?: number;
 }
 
@@ -73,13 +66,7 @@ const runStep: RouteHandler = async (request, reply) => {
 
   const requestOptions: RequestOptions = {
     timeout: body.options?.timeout,
-    selfHealing: body.options?.selfHealing
-      ? SelfHealingMode.REQUEST_ONLY
-      : SelfHealingMode.DISABLED,
-    testMode: body.options?.selfHealing,
   };
-
-  const selfHealingEnabled = body.options?.selfHealing ?? false;
 
   // Create a temporary single-step tool for execution
   const tempTool: Tool = {
@@ -99,7 +86,6 @@ const runStep: RouteHandler = async (request, reply) => {
     tempTool,
     authReq.datastore,
     metadata,
-    { includeDocs: selfHealingEnabled },
   );
 
   const taskPayload: ToolExecutionPayload = {
@@ -156,10 +142,6 @@ const runTransform: RouteHandler = async (request, reply) => {
 
   const requestOptions: RequestOptions = {
     timeout: body.options?.timeout,
-    selfHealing: body.options?.selfHealing
-      ? SelfHealingMode.TRANSFORM_ONLY
-      : SelfHealingMode.DISABLED,
-    testMode: body.options?.selfHealing,
   };
 
   // Create a temporary tool with no steps, just the transform
