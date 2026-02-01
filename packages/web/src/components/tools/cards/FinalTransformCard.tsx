@@ -267,69 +267,23 @@ export const FinalTransformMiniStepCard = ({
                         <span className="font-medium text-[13px]">Stop</span>
                       </Button>
                     ) : (
-                      <div className="relative flex rounded-md border border-input bg-background">
-                        <Button
-                          variant="ghost"
-                          onClick={handleExecuteTransform}
-                          disabled={!canExecute || isRunningTransform || isFixingTransform}
-                          className="h-8 px-3 gap-2 border-0"
-                        >
-                          <Play className="h-3 w-3" />
-                          <span className="font-medium text-[13px]">Run Transform</span>
-                        </Button>
-                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={handleExecuteTransform}
+                        disabled={!canExecute || isRunningTransform || isFixingTransform}
+                        className="h-8 px-3 gap-2"
+                      >
+                        <Play className="h-3 w-3" />
+                        <span className="font-medium text-[13px]">Run Transform</span>
+                      </Button>
                     )}
                   </span>
-                )}
-                <HelpTooltip text="Run Transform: executes the transform code with step results. Use the agent to fix transform errors." />
-              </>
-            )}
-          </div>
-        </div>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="h-9 p-1 rounded-md mb-3">
-            <TabsTrigger
-              value="inputs"
-              className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
-            >
-              <FileInput className="h-4 w-4" /> Step Input
-            </TabsTrigger>
-            <TabsTrigger
-              value="transform"
-              className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
-            >
-              <Code2 className="h-4 w-4" /> Transform Code
-            </TabsTrigger>
-            <TabsTrigger
-              value="schema"
-              className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
-            >
-              <FileBracesCorner className="h-4 w-4" /> Result Schema
-            </TabsTrigger>
-            <TabsTrigger
-              value="filters"
-              className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
-            >
-              <Filter className="h-4 w-4" /> Filters
-            </TabsTrigger>
-            <TabsTrigger
-              value="output"
-              className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
-              style={
-                hasTransformCompleted && activeTab === "output"
-                  ? { backgroundColor: "#FFA500", color: "#000" }
-                  : undefined
-              }
-            >
-              {isRunningTransform || isFixingTransform ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FilePlay className="h-4 w-4" />
+                  <HelpTooltip text="Run Transform: executes the transform code with step results. Use the agent to fix transform errors." />
+                </>
               )}
-              Tool Result
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="inputs" className="mt-2">
+            </div>
+          </div>
+          <TabsContent value="inputs" className="mt-0">
             {!canExecute ? (
               <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border rounded-md bg-muted/5">
                 <div className="text-xs mb-1">No input yet</div>
@@ -384,7 +338,7 @@ export const FinalTransformMiniStepCard = ({
               </>
             )}
           </TabsContent>
-          <TabsContent value="transform" className="mt-2">
+          <TabsContent value="transform" className="mt-0">
             <JavaScriptCodeEditor
               value={localTransform}
               onChange={handleTransformChange}
@@ -395,7 +349,7 @@ export const FinalTransformMiniStepCard = ({
               isTransformEditor={true}
             />
           </TabsContent>
-          <TabsContent value="schema" className="mt-2">
+          <TabsContent value="schema" className="mt-0">
             <div className="space-y-3">
               <JsonSchemaEditor
                 value={localSchema || ""}
@@ -405,14 +359,14 @@ export const FinalTransformMiniStepCard = ({
               />
             </div>
           </TabsContent>
-          <TabsContent value="filters" className="mt-2">
+          <TabsContent value="filters" className="mt-0">
             <ResponseFiltersCard
               filters={responseFilters}
               onChange={setResponseFilters}
               disabled={isRunningTransform || isFixingTransform}
             />
           </TabsContent>
-          <TabsContent value="output" className="mt-2">
+          <TabsContent value="output" className="mt-0">
             <>
               {isPendingExecution || isRunningTransform || isFixingTransform ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border rounded-lg">
