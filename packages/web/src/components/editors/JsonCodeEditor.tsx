@@ -34,8 +34,8 @@ export const JsonCodeEditor = ({
 }: JsonCodeEditorProps) => {
   const { theme, onMount } = useMonacoTheme();
   const { height: resizableHeight, resizeHandleProps } = useResizable({
-    minHeight: 60,
-    maxHeight: 600,
+    minHeight: 100,
+    maxHeight: 1000,
     initialHeight: parseInt(maxHeight),
   });
   const [jsonError, setJsonError] = useState<string | null>(null);

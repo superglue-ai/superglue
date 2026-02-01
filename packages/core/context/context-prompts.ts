@@ -422,7 +422,7 @@ EACH STEP IN THE "steps" ARRAY HAS:
 - systemId: string - Which system this step uses
 - executionMode: "DIRECT" | "LOOP" - How the step executes (derived from loopSelector return)
 - loopSelector: string - JavaScript function determining execution mode (see LOOP_SELECTOR section)
-- failureBehavior: "FAIL" | "CONTINUE" - Error handling behavior (fail on step failure or continue on step failure)
+- failureBehavior: "FAIL" | "CONTINUE" - Error handling behavior (fail on step failure or continue on step failure). When set to CONTINUE, error detection is automatically disabled.
 - apiConfig: object (required) - The API configuration for this step
 
 EACH STEP'S "apiConfig" CONTAINS:
@@ -605,8 +605,8 @@ Example 7 - Multiple changes (change model in two places):
 <STEP_PROPERTIES>
 Each step can have these optional properties:
 - failureBehavior: "FAIL" | "CONTINUE" - What to do when the step fails. 
-  * "FAIL" (default): Stop execution on error
-  * "CONTINUE": Continue with next step/iteration even if this one fails
+  * "FAIL" (default): Stop execution on error. Smart error detection is enabled (checks response content for errors).
+  * "CONTINUE": Continue with next step/iteration even if this one fails. Error detection is automatically disabled.
 - modify: boolean - Whether the step modifies data on the system it operates on (writes, updates, deletes). Read-only operations should be false. Defaults to false.
 </STEP_PROPERTIES>
 

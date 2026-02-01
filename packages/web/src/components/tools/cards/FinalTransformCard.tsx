@@ -208,15 +208,48 @@ export const FinalTransformMiniStepCard = ({
   return (
     <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
       <div className="p-3">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <FilePlay className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold">Tool Result</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            {onExecuteTransform && (
-              <>
-                {onExecuteTransform && (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <div className="flex items-center justify-between mb-3">
+            <TabsList className="h-9 p-1 rounded-md">
+              <TabsTrigger
+                value="inputs"
+                className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
+              >
+                <FileInput className="h-4 w-4" /> Step Input
+              </TabsTrigger>
+              <TabsTrigger
+                value="transform"
+                className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
+              >
+                <Code2 className="h-4 w-4" /> Transform Code
+              </TabsTrigger>
+              <TabsTrigger
+                value="schema"
+                className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
+              >
+                <FileBracesCorner className="h-4 w-4" /> Result Schema
+              </TabsTrigger>
+              <TabsTrigger
+                value="filters"
+                className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
+              >
+                <Filter className="h-4 w-4" /> Filters
+              </TabsTrigger>
+              <TabsTrigger
+                value="output"
+                className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
+              >
+                {isRunningTransform || isFixingTransform ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FilePlay className="h-4 w-4" />
+                )}
+                Tool Result
+              </TabsTrigger>
+            </TabsList>
+            <div className="flex items-center gap-2">
+              {onExecuteTransform && (
+                <>
                   <span
                     title={
                       !canExecute
@@ -308,7 +341,7 @@ export const FinalTransformMiniStepCard = ({
                   value={inputData.displayString}
                   readOnly={true}
                   minHeight="150px"
-                  maxHeight="250px"
+                  maxHeight="300px"
                   resizable={true}
                   overlay={
                     <div className="flex items-center gap-2">
@@ -357,7 +390,7 @@ export const FinalTransformMiniStepCard = ({
               onChange={handleTransformChange}
               readOnly={false}
               minHeight="150px"
-              maxHeight="250px"
+              maxHeight="300px"
               resizable={true}
               isTransformEditor={true}
             />
@@ -427,7 +460,7 @@ export const FinalTransformMiniStepCard = ({
                     value={outputData.displayString}
                     readOnly
                     minHeight="150px"
-                    maxHeight="250px"
+                    maxHeight="300px"
                     resizable={true}
                     overlay={
                       <div className="flex items-center gap-2">

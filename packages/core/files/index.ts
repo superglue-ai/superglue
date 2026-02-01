@@ -3,6 +3,7 @@ import { CSVStrategy, parseCSV } from "./parsers/csv.js";
 import { DOCXStrategy, parseDOCX } from "./parsers/docx.js";
 import { ExcelStrategy, parseExcel } from "./parsers/excel.js";
 import { GZIPStrategy, parseGZIP, setGzipParseFileFunction } from "./parsers/gzip.js";
+import { HTMLStrategy, parseHTML } from "./parsers/html.js";
 import { JSONStrategy, parseJSON } from "./parsers/json.js";
 import { PDFStrategy, parsePDF } from "./parsers/pdf.js";
 import { XMLStrategy, parseXML } from "./parsers/xml.js";
@@ -17,6 +18,7 @@ fileStrategyRegistry.register(new ExcelStrategy()); // Priority 2: ZIP_BASED_SPE
 fileStrategyRegistry.register(new DOCXStrategy()); // Priority 2: ZIP_BASED_SPECIFIC
 fileStrategyRegistry.register(new PDFStrategy()); // Priority 10: BINARY_SIGNATURE
 fileStrategyRegistry.register(new ZIPStrategy()); // Priority 11: ZIP_GENERIC
+fileStrategyRegistry.register(new HTMLStrategy()); // Priority 12: STRUCTURED_TEXT_SPECIFIC
 fileStrategyRegistry.register(new JSONStrategy()); // Priority 20: STRUCTURED_TEXT
 fileStrategyRegistry.register(new XMLStrategy()); // Priority 20: STRUCTURED_TEXT
 fileStrategyRegistry.register(new YAMLStrategy()); // Priority 20: STRUCTURED_TEXT
@@ -35,6 +37,8 @@ export async function parseFile(
       return parseCSV(buffer);
     case SupportedFileType.XML:
       return parseXML(buffer);
+    case SupportedFileType.HTML:
+      return parseHTML(buffer);
     case SupportedFileType.YAML:
       return parseYAML(buffer);
     case SupportedFileType.EXCEL:
@@ -64,6 +68,7 @@ export * from "./parsers/csv.js";
 export * from "./parsers/docx.js";
 export * from "./parsers/excel.js";
 export * from "./parsers/gzip.js";
+export * from "./parsers/html.js";
 export * from "./parsers/json.js";
 export * from "./parsers/pdf.js";
 export * from "./parsers/xml.js";

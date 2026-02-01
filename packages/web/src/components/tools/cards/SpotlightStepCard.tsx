@@ -97,15 +97,12 @@ export const SpotlightStepCard = React.memo(
     isFirstStep = false,
     isPayloadValid = true,
   }: SpotlightStepCardProps) => {
-    // === CONSUME FROM CONTEXTS ===
-    const { systems } = useToolConfig();
     const { isExecutingAny, getStepResult, isStepFailed, canExecuteStep, getDataSelectorResult } =
       useExecution();
     const { sendMessageToAgent } = useRightSidebar();
 
     const isGlobalExecuting = isExecutingAny;
     const stepResult = getStepResult(step.id);
-    const stepFailed = isStepFailed(step.id);
     const canExecute = canExecuteStep(stepIndex);
 
     const { output: dataSelectorOutput, error: dataSelectorError } = getDataSelectorResult(step.id);
@@ -655,7 +652,7 @@ export const SpotlightStepCard = React.memo(
                                       }))
                                     }
                                     minHeight="50px"
-                                    maxHeight="250px"
+                                    maxHeight="300px"
                                     resizable={true}
                                     isTransformEditor={false}
                                     autoFormatOnMount={true}
@@ -728,6 +725,7 @@ export const SpotlightStepCard = React.memo(
                               <p className="text-[10px] text-muted-foreground">
                                 When enabled, the workflow continues even if this step fails. Failed
                                 iterations are tracked in the results but don't stop execution.
+                                Error detection is automatically disabled when this is enabled.
                               </p>
                             </div>
                             <Switch

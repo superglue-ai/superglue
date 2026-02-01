@@ -1,13 +1,17 @@
-import { ExecutionStep, HttpMethod, PaginationType, RunStatus, Tool } from "@superglue/shared";
-import { describe, expect, it } from "vitest";
-import { ApiConfig } from "../../shared/types.js";
 import {
-  buildRunResponse,
+  ExecutionStep,
+  HttpMethod,
+  PaginationType,
+  RunStatus,
+  Tool,
   mapFailureBehavior,
   mapPaginationType,
   mapStepToOpenAPI,
   mapToolToOpenAPI,
-} from "./tools.js";
+} from "@superglue/shared";
+import { describe, expect, it } from "vitest";
+import { ApiConfig } from "../../shared/types.js";
+import { buildRunResponse } from "./tools.js";
 
 describe("tools API helpers", () => {
   describe("mapPaginationType", () => {

@@ -228,7 +228,7 @@ export const PayloadSpotlight = ({
                 <JsonCodeEditor
                   value={JSON.stringify(payload.computedPayload, null, 2)}
                   readOnly={true}
-                  maxHeight="250px"
+                  maxHeight="300px"
                   resizable={true}
                   showValidation={false}
                 />

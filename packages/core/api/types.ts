@@ -1,4 +1,10 @@
-import { ServiceMetadata, UserRole } from "@superglue/shared";
+import {
+  OpenAPIPagination,
+  OpenAPITool,
+  OpenAPIToolStep,
+  ServiceMetadata,
+  UserRole,
+} from "@superglue/shared";
 import { FastifyReply, FastifyRequest } from "fastify";
 import type { DataStore } from "../datastore/types.js";
 import type { WorkerPools } from "../worker/types.js";
@@ -47,42 +53,8 @@ export interface ApiModule {
   routes: RouteConfig[];
 }
 
-// OpenAPI Response Types
-export interface OpenAPIPagination {
-  type: string;
-  pageSize?: string;
-  cursorPath?: string;
-  stopCondition?: string;
-}
-
-export interface OpenAPIToolStep {
-  id: string;
-  url: string;
-  method: string;
-  queryParams?: Record<string, unknown>;
-  headers?: Record<string, unknown>;
-  body?: string;
-  pagination?: OpenAPIPagination;
-  systemId?: string;
-  instruction?: string;
-  modify?: boolean;
-  dataSelector?: string;
-  failureBehavior?: "fail" | "continue";
-}
-
-export interface OpenAPITool {
-  id: string;
-  name: string;
-  version?: string;
-  instruction?: string;
-  inputSchema?: Record<string, unknown>;
-  outputSchema?: Record<string, unknown>;
-  steps: OpenAPIToolStep[];
-  outputTransform?: string;
-  archived?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
+// Re-export OpenAPI types from shared for convenience
+export type { OpenAPIPagination, OpenAPITool, OpenAPIToolStep };
 
 export interface OpenAPIStepResult {
   stepId: string;

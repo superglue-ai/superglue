@@ -893,7 +893,7 @@ export function ToolBuilder({
                         }
                       }}
                       minHeight="150px"
-                      maxHeight="250px"
+                      maxHeight="300px"
                       resizable={true}
                       placeholder="{}"
                       showValidation={true}
@@ -919,7 +919,7 @@ export function ToolBuilder({
                       })()}
                       readOnly={true}
                       minHeight="150px"
-                      maxHeight="250px"
+                      maxHeight="300px"
                       resizable={true}
                       showValidation={false}
                     />
