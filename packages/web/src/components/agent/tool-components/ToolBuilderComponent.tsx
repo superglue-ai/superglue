@@ -89,11 +89,9 @@ export function ToolBuilderComponent({
   const [fixRequested, setFixRequested] = useState(false);
   const [hasActedOnDiffs, setHasActedOnDiffs] = useState(false);
 
-  // Payload editor state
   const [editablePayload, setEditablePayload] = useState<string>("");
   const [payloadError, setPayloadError] = useState<string | null>(null);
 
-  // Abort state
   const currentRunIdRef = useRef<string | null>(null);
   const lastAbortTimeRef = useRef<number>(0);
   const logSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
@@ -106,6 +104,39 @@ export function ToolBuilderComponent({
       return null;
     }
   }, [tool.output]);
+
+  const isSuccess = parsedOutput?.success === true;
+  const isAwaitingConfirmation = tool.status === "awaiting_confirmation" && mode === "fix";
+
+  // Enrich diffs for awaiting confirmation state
+  const awaitingConfirmationDiffs = useMemo(() => {
+    if (!isAwaitingConfirmation || !parsedOutput?.diffs || parsedOutput.diffs.length === 0) {
+      return { enrichedDiffs: [], error: null };
+    }
+    try {
+      const enriched = enrichDiffsWithTargets(parsedOutput.diffs, parsedOutput?.originalConfig);
+      return { enrichedDiffs: enriched, error: null };
+    } catch (error: any) {
+      return {
+        enrichedDiffs: [],
+        error: error.message || "Failed to enrich diffs with target information",
+      };
+    }
+  }, [isAwaitingConfirmation, parsedOutput]);
+
+  // Enrich diffs for completed state
+  const completedDiffs = useMemo(() => {
+    if (tool.status !== "completed" || !isSuccess || mode !== "fix") {
+      return { enrichedDiffs: [], error: null };
+    }
+    const approvedDiffs = parsedOutput?.approvedDiffs || parsedOutput?.diffs || [];
+    try {
+      const enriched = enrichDiffsWithTargets(approvedDiffs, parsedOutput?.originalConfig);
+      return { enrichedDiffs: enriched, error: null };
+    } catch (error: any) {
+      return { enrichedDiffs: [], error: error.message || "Failed to process diffs" };
+    }
+  }, [tool.status, isSuccess, mode, parsedOutput]);
 
   useEffect(() => {
     if (parsedOutput?.config && tool.status === "completed") {
@@ -150,8 +181,6 @@ export function ToolBuilderComponent({
       }
     };
   }, []);
-
-  const isSuccess = parsedOutput?.success === true;
 
   // Mode-specific labels and icons
   const modeConfig = {
@@ -364,7 +393,6 @@ export function ToolBuilderComponent({
   // Running state (build/fix in progress, or run_tool executing)
   const isToolRunning = tool.status === "running";
   const isToolPending = tool.status === "pending";
-  const isAwaitingConfirmation = tool.status === "awaiting_confirmation" && mode === "fix";
 
   const handleDiffApprovalComplete = useCallback(
     (result: {
@@ -497,13 +525,22 @@ export function ToolBuilderComponent({
               <Wrench className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               <span className="text-sm font-medium">Review Changes</span>
             </div>
-            {parsedOutput?.diffs && parsedOutput.diffs.length > 0 ? (
+            {awaitingConfirmationDiffs?.error ? (
+              <div className="flex items-start gap-3 p-3 bg-red-50/50 dark:bg-red-950/20 rounded-lg border border-red-200/60 dark:border-red-900/40">
+                <XCircle className="w-4 h-4 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-red-700 dark:text-red-300">
+                    Failed to Process Changes
+                  </div>
+                  <div className="text-sm text-red-600/80 dark:text-red-400/80 break-words mt-1">
+                    {awaitingConfirmationDiffs.error}
+                  </div>
+                </div>
+              </div>
+            ) : awaitingConfirmationDiffs?.enrichedDiffs?.length > 0 ? (
               <div>
                 <DiffApprovalComponent
-                  enrichedDiffs={enrichDiffsWithTargets(
-                    parsedOutput.diffs,
-                    parsedOutput?.originalConfig,
-                  )}
+                  enrichedDiffs={awaitingConfirmationDiffs.enrichedDiffs}
                   onComplete={handleDiffApprovalComplete}
                   onRunWithDiffs={handleRunWithApprovedDiffs}
                   onAbortTest={handleStopExecution}
@@ -543,26 +580,40 @@ export function ToolBuilderComponent({
             {mode === "fix" && (
               <div className="space-y-3">
                 {(() => {
-                  const approvedDiffs = parsedOutput?.approvedDiffs || parsedOutput?.diffs || [];
-                  const enrichedDiffs = enrichDiffsWithTargets(
-                    approvedDiffs,
-                    parsedOutput?.originalConfig,
-                  );
                   const rejectedCount = parsedOutput?.rejectedDiffs?.length || 0;
+
+                  if (completedDiffs?.error) {
+                    return (
+                      <div className="flex items-start gap-3 p-3 bg-red-50/50 dark:bg-red-950/20 rounded-lg border border-red-200/60 dark:border-red-900/40">
+                        <XCircle className="w-4 h-4 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-red-700 dark:text-red-300">
+                            Failed to Display Changes
+                          </div>
+                          <div className="text-sm text-red-600/80 dark:text-red-400/80 break-words mt-1">
+                            {completedDiffs.error}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
                     <>
                       <div className="flex items-center gap-2">
                         <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
                         <span className="text-sm font-medium">Tool Edited Successfully</span>
-                        {enrichedDiffs.length > 0 && (
+                        {completedDiffs?.enrichedDiffs?.length > 0 && (
                           <span className="text-xs text-muted-foreground">
-                            {enrichedDiffs.length} change{enrichedDiffs.length !== 1 ? "s" : ""}{" "}
-                            applied
+                            {completedDiffs.enrichedDiffs.length} change
+                            {completedDiffs.enrichedDiffs.length !== 1 ? "s" : ""} applied
                             {rejectedCount > 0 && `, ${rejectedCount} rejected`}
                           </span>
                         )}
                       </div>
-                      {enrichedDiffs.length > 0 && <DiffDisplay enrichedDiffs={enrichedDiffs} />}
+                      {completedDiffs?.enrichedDiffs?.length > 0 && (
+                        <DiffDisplay enrichedDiffs={completedDiffs.enrichedDiffs} />
+                      )}
                     </>
                   );
                 })()}
