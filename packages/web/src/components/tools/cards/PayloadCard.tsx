@@ -332,7 +332,7 @@ export const PayloadMiniStepCard = React.memo(
     isPayloadValid,
   }: PayloadMiniStepCardProps) => {
     return (
-      <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
+      <Card className="w-full max-w-6xl mx-auto shadow-md border border-border/50 dark:border-border/70 overflow-hidden bg-gradient-to-br from-muted/30 to-muted/10 dark:from-muted/40 dark:to-muted/20 backdrop-blur-sm">
         <div className="p-3">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">

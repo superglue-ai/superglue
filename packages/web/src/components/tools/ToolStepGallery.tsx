@@ -2,7 +2,17 @@ import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { buildPreviousStepResults, cn } from "@/src/lib/general-utils";
 import { buildCategorizedSources } from "@/src/lib/templating-utils";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import {
+  Blocks,
+  ChevronLeft,
+  ChevronRight,
+  FileJson,
+  FilePlay,
+  OctagonAlert,
+  Plus,
+  RotateCw,
+  Zap,
+} from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FinalTransformMiniStepCard, TransformItem } from "./cards/FinalTransformCard";
 import { MiniStepCard } from "./cards/MiniStepCard";
@@ -63,8 +73,17 @@ export function ToolStepGallery({
   embedded = false,
 }: ToolStepGalleryProps) {
   // === CONTEXT ===
-  const { tool, steps, payload, systems, inputSchema, responseSchema, finalTransform, setSteps } =
-    useToolConfig();
+  const {
+    tool,
+    steps,
+    payload,
+    systems,
+    inputSchema,
+    responseSchema,
+    finalTransform,
+    setSteps,
+    isPayloadReferenced,
+  } = useToolConfig();
 
   const {
     isExecutingAny,
@@ -387,7 +406,7 @@ export function ToolStepGallery({
                   variant="default"
                   className={cn(
                     "absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center",
-                    !isPayloadValid
+                    !isPayloadValid || !isPayloadReferenced
                       ? "bg-amber-500 text-white"
                       : "bg-primary text-primary-foreground",
                   )}
@@ -489,6 +508,181 @@ export function ToolStepGallery({
                             );
                           }
                           return -1;
+                        };
+
+                        const showSeparator = idx < visibleCardsData.visibleItems.length - 1;
+
+                        const renderCardContent = () => {
+                          if (item.type === "payload") {
+                            const isEmptyPayload =
+                              !computedPayload ||
+                              (typeof computedPayload === "object" &&
+                                Object.keys(computedPayload).length === 0) ||
+                              (typeof computedPayload === "string" &&
+                                (!(computedPayload as string).trim() ||
+                                  (computedPayload as string).trim() === "{}"));
+
+                            const showUnreferencedWarning =
+                              isPayloadValid && !isPayloadReferenced && !isEmptyPayload;
+
+                            return (
+                              <MiniCard isActive={isActive} onClick={handleClick}>
+                                <div className="flex-1 flex flex-col items-center justify-center">
+                                  <div
+                                    className={cn(
+                                      "p-2 rounded-full",
+                                      !isPayloadValid || showUnreferencedWarning
+                                        ? "bg-amber-500/20"
+                                        : "bg-primary/10",
+                                    )}
+                                  >
+                                    {!isPayloadValid || showUnreferencedWarning ? (
+                                      <svg
+                                        className="h-4 w-4 text-amber-600 dark:text-amber-400"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      >
+                                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                        <line x1="12" y1="9" x2="12" y2="13" />
+                                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                                      </svg>
+                                    ) : (
+                                      <FileJson className="h-4 w-4 text-primary" />
+                                    )}
+                                  </div>
+                                  <span className="text-[11px] font-semibold mt-1.5">
+                                    Tool Input
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-center">
+                                  {!isPayloadValid ? (
+                                    <StatusIndicator
+                                      text="Required"
+                                      color="text-amber-600 dark:text-amber-400"
+                                      dotColor="bg-amber-600 dark:bg-amber-400"
+                                      animate
+                                    />
+                                  ) : showUnreferencedWarning ? (
+                                    <StatusIndicator
+                                      text="Unused in tool"
+                                      color="text-amber-600 dark:text-amber-400"
+                                      dotColor="bg-amber-600 dark:bg-amber-400"
+                                    />
+                                  ) : (
+                                    <span className="text-[9px] font-medium text-muted-foreground">
+                                      {isEmptyPayload ? "Empty" : "Provided"}
+                                    </span>
+                                  )}
+                                </div>
+                              </MiniCard>
+                            );
+                          }
+
+                          if (item.type === "transform") {
+                            const isRunning = isRunningTransform || isFixingTransform;
+                            const baseStatusInfo = getStepStatusInfo("__final_transform__");
+                            const statusInfo = isRunning ? RUNNING_STATUS : baseStatusInfo;
+
+                            return (
+                              <MiniCard isActive={isActive} onClick={handleClick}>
+                                <div className="flex-1 flex flex-col items-center justify-center">
+                                  <div className="p-2 rounded-full bg-primary/10">
+                                    <FilePlay className="h-4 w-4 text-primary" />
+                                  </div>
+                                  <span className="text-[11px] font-semibold mt-1.5">
+                                    Tool Result
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-center">
+                                  <StatusIndicator
+                                    text={statusInfo.text}
+                                    color={statusInfo.color}
+                                    dotColor={statusInfo.dotColor}
+                                    animate={statusInfo.animate}
+                                  />
+                                </div>
+                              </MiniCard>
+                            );
+                          }
+
+                          const stepItem = item as StepItem;
+                          const step = stepItem.data;
+                          const stepsBeforeThis = toolItems
+                            .slice(0, globalIdx)
+                            .filter((i) => i.type === "step").length;
+                          const isRunning =
+                            isExecutingAny && currentExecutingStepIndex === stepsBeforeThis;
+                          const isLoopStep =
+                            globalIdx === activeIndex &&
+                            activeStepItemCount !== null &&
+                            activeStepItemCount > 0;
+
+                          const baseStatusInfo = step.id
+                            ? getStepStatusInfo(step.id)
+                            : {
+                                text: "Pending",
+                                color: "text-gray-500 dark:text-gray-400",
+                                dotColor: "bg-gray-500 dark:bg-gray-400",
+                                animate: false,
+                              };
+                          const statusInfo = isRunning ? RUNNING_STATUS : baseStatusInfo;
+                          const linkedSystem =
+                            step.systemId && systems
+                              ? systems.find((sys) => sys.id === step.systemId)
+                              : undefined;
+
+                          return (
+                            <MiniCard isActive={isActive} onClick={handleClick}>
+                              <div className="h-full flex flex-col relative w-full">
+                                <div className="absolute top-0 left-0 flex items-center h-4">
+                                  <span className="text-[9px] px-1 py-0.5 rounded font-medium bg-primary/10 text-primary">
+                                    {stepsBeforeThis + 1}
+                                  </span>
+                                </div>
+                                <div className="absolute top-0 right-0 flex items-center gap-0.5 h-4">
+                                  {step?.modify === true && (
+                                    <OctagonAlert
+                                      className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400"
+                                      aria-label="Modifies data"
+                                    />
+                                  )}
+                                  {isLoopStep && !(step?.modify === true) && (
+                                    <RotateCw
+                                      className="h-3 w-3 text-amber-600 dark:text-amber-400"
+                                      aria-label="Loop step"
+                                    />
+                                  )}
+                                </div>
+                                <div className="flex-1 flex flex-col items-center justify-center">
+                                  <div className="p-2 rounded-full bg-white dark:bg-gray-100 border border-border/50">
+                                    {linkedSystem ? (
+                                      <SystemIcon system={linkedSystem} size={18} />
+                                    ) : (
+                                      <Blocks className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                  </div>
+                                  <span
+                                    className="text-[11px] font-semibold mt-1.5 truncate max-w-[120px]"
+                                    title={step.id || `Step ${globalIdx}`}
+                                  >
+                                    {step.id || `Step ${globalIdx}`}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-center">
+                                  <StatusIndicator
+                                    text={statusInfo.text}
+                                    color={statusInfo.color}
+                                    dotColor={statusInfo.dotColor}
+                                    animate={statusInfo.animate}
+                                  />
+                                </div>
+                              </div>
+                            </MiniCard>
+                          );
                         };
 
                         return (

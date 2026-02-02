@@ -54,6 +54,8 @@ export interface ToolConfigContextValue {
   getStepConfig: (stepId: string) => ExecutionStep | undefined;
   getStepIndex: (stepId: string) => number;
   getStepSystem: (stepId: string) => System | undefined;
+
+  isPayloadReferenced: boolean;
 }
 
 export type StepStatus = "pending" | "running" | "completed" | "failed" | "aborted";
@@ -159,6 +161,7 @@ export interface ExecutionContextValue {
   getStepExecution: (stepId: string) => StepExecutionState;
   getStepStatus: (stepId: string) => StepStatus;
   getStepResult: (stepId: string) => any | null;
+  getStepError: (stepId: string) => string | null;
   getStepStatusInfo: (stepId: string) => StepStatusInfo;
   isStepCompleted: (stepId: string) => boolean;
   isStepFailed: (stepId: string) => boolean;

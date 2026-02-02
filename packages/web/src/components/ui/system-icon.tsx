@@ -1,7 +1,7 @@
 "use client";
 
 import { resolveSystemIcon } from "@/src/lib/general-utils";
-import { Globe, icons, LucideIcon } from "lucide-react";
+import { Blocks, icons, LucideIcon } from "lucide-react";
 import { memo } from "react";
 
 interface SystemIconProps {
@@ -14,13 +14,13 @@ interface SystemIconProps {
   };
   size?: number;
   className?: string;
-  /** Additional classes for the fallback Globe icon */
+  /** Additional classes for the fallback Blocks icon */
   fallbackClassName?: string;
 }
 
 /**
  * Unified system icon component that handles all icon rendering logic.
- * Automatically resolves SimpleIcons, Lucide icons, and falls back to Globe.
+ * Automatically resolves SimpleIcons, Lucide icons, and falls back to Blocks.
  *
  * Usage:
  * ```tsx
@@ -50,7 +50,6 @@ export const SystemIcon = memo(function SystemIcon({
   }
 
   if (resolved?.type === "lucide") {
-    // Convert kebab-case or lowercase to PascalCase for lucide-react icons object
     const iconName = resolved.name
       .split("-")
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -68,9 +67,8 @@ export const SystemIcon = memo(function SystemIcon({
     }
   }
 
-  // Fallback to Globe
   return (
-    <Globe
+    <Blocks
       style={{ width: size, height: size }}
       className={`flex-shrink-0 ${fallbackClassName} ${className}`}
     />

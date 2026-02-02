@@ -1,4 +1,5 @@
 export * from "./json-schema.js";
+export * from "./seed-config.js";
 export * from "./templates.js";
 export * from "./type-utils.js";
 export * from "./types.js";

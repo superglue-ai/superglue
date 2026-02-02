@@ -14,6 +14,51 @@ import {
 } from "react";
 import { PayloadState, ToolConfigContextValue, ToolDefinition } from "./types";
 
+function checkPayloadKeysReferenced(
+  steps: ExecutionStep[],
+  finalTransform: string,
+  payloadKeys: string[],
+): boolean {
+  if (payloadKeys.length === 0) return true;
+
+  const patternCache = new Map<string, RegExp>();
+  const buildPatternForKey = (key: string): RegExp => {
+    let pattern = patternCache.get(key);
+    if (!pattern) {
+      const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      pattern = new RegExp(
+        `sourceData\\.${escaped}(?![a-zA-Z0-9_])|sourceData\\[\\s*\\\\?['"]${escaped}\\\\?['"]\\s*\\]`,
+      );
+      patternCache.set(key, pattern);
+    }
+    return pattern;
+  };
+
+  const checkStringForAnyKey = (str: string | undefined | null): boolean => {
+    if (!str) return false;
+    return payloadKeys.some((key) => buildPatternForKey(key).test(str));
+  };
+
+  const checkObjectForAnyKey = (obj: Record<string, any> | undefined): boolean => {
+    if (!obj) return false;
+    return checkStringForAnyKey(JSON.stringify(obj));
+  };
+
+  for (const step of steps) {
+    const { apiConfig, loopSelector } = step;
+    if (checkStringForAnyKey(apiConfig.urlPath)) return true;
+    if (checkStringForAnyKey(apiConfig.urlHost)) return true;
+    if (checkStringForAnyKey(apiConfig.body)) return true;
+    if (checkStringForAnyKey(loopSelector)) return true;
+    if (checkObjectForAnyKey(apiConfig.queryParams)) return true;
+    if (checkObjectForAnyKey(apiConfig.headers)) return true;
+  }
+
+  if (checkStringForAnyKey(finalTransform)) return true;
+
+  return false;
+}
+
 interface ToolConfigProviderProps {
   initialTool?: Tool;
   initialPayload?: string;
@@ -219,6 +264,24 @@ export function ToolConfigProvider({
     [steps, systems],
   );
 
+  // Mark current state as baseline to prevent auto-save after restore
+  const markCurrentStateAsBaseline = useCallback(() => {
+    const currentState = JSON.stringify({
+      steps,
+      instruction,
+      finalTransform,
+      inputSchema,
+      responseSchema,
+    });
+    initialStateRef.current = currentState;
+    lastAttemptedSaveRef.current = currentState;
+  }, [steps, instruction, finalTransform, inputSchema, responseSchema]);
+
+  const isPayloadReferenced = useMemo(() => {
+    const payloadKeys = Object.keys(computedPayload || {});
+    return checkPayloadKeysReferenced(steps, finalTransform, payloadKeys);
+  }, [steps, finalTransform, computedPayload]);
+
   const value = useMemo<ToolConfigContextValue>(
     () => ({
       tool,
@@ -254,6 +317,8 @@ export function ToolConfigProvider({
       getStepConfig,
       getStepIndex,
       getStepSystem,
+
+      isPayloadReferenced,
     }),
     [
       tool,
@@ -271,6 +336,7 @@ export function ToolConfigProvider({
       getStepConfig,
       getStepIndex,
       getStepSystem,
+      isPayloadReferenced,
     ],
   );
 

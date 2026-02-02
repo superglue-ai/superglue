@@ -18,21 +18,14 @@ import { Input } from "@/src/components/ui/input";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import { DocStatus } from "@/src/components/utils/DocStatusSpinner";
 import { useToast } from "@/src/hooks/use-toast";
-import { createSuperglueClient, needsUIToTriggerDocFetch } from "@/src/lib/client-utils";
-import { composeUrl, getSimpleIcon } from "@/src/lib/general-utils";
-import {
-  buildOAuthFieldsFromSystem,
-  createOAuthErrorHandler,
-  triggerOAuthFlow,
-} from "@/src/lib/oauth-utils";
-import { tokenRegistry } from "@/src/lib/token-registry";
+import { composeUrl } from "@/src/lib/general-utils";
+import { createOAuthErrorHandler } from "@/src/lib/oauth-utils";
+import { SystemActionsMenu } from "@/src/components/systems/SystemActionsMenu";
+import { SystemTemplatePicker } from "@/src/components/systems/SystemTemplatePicker";
+import { useSystemPickerModal } from "@/src/components/systems/SystemPickerModalContext";
 import type { System } from "@superglue/shared";
-import { CredentialMode, systemOptions, UpsertMode } from "@superglue/shared";
-import { waitForSystemProcessing } from "@superglue/shared/utils";
 import {
   Clock,
-  FileDown,
-  Globe,
   Key,
   Pencil,
   Plus,
@@ -101,14 +94,13 @@ export default function SystemsPage() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const {
-    systems,
-    pendingDocIds,
-    loading: initialLoading,
-    isRefreshing,
-    refreshSystems,
-    setPendingDocIds,
-  } = useSystems();
+  const { systems, loading: initialLoading, isRefreshing, refreshSystems } = useSystems();
+  const { openSystemPicker } = useSystemPickerModal();
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [sortColumn, setSortColumn] = useState<SortColumn>("updatedAt");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   useEffect(() => {
     refreshSystems();
@@ -158,18 +150,9 @@ export default function SystemsPage() {
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 10;
 
-  const filteredSystems =
-    systems
-      ?.filter((system) => {
-        if (!searchQuery) return true;
-        const query = searchQuery.toLowerCase();
-        return (
-          system.id.toLowerCase().includes(query) ||
-          system.urlHost?.toLowerCase().includes(query) ||
-          system.urlPath?.toLowerCase().includes(query)
-        );
-      })
-      .sort((a, b) => a.id.localeCompare(b.id)) || [];
+  const handleAdd = () => {
+    openSystemPicker();
+  };
 
   const paginatedSystems = filteredSystems.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const totalPages = Math.ceil(filteredSystems.length / PAGE_SIZE);
@@ -259,133 +242,13 @@ export default function SystemsPage() {
     };
   };
 
-  const handleSave = async (system: System, isOAuthConnect?: boolean): Promise<System | null> => {
-    try {
-      if (system.id) {
-        const existingSystem = systems.find((i) => i.id === system.id);
-        const mode = existingSystem ? UpsertMode.UPDATE : UpsertMode.CREATE;
-        const cleanedSystem = cleanSystemForInput(system);
-
-        const client = createSuperglueClient(config.superglueEndpoint);
-        const savedSystem = await client.upsertSystem(
-          system.id,
-          cleanedSystem,
-          mode,
-          CredentialMode.REPLACE,
-        );
-
-        const willTriggerDocFetch = needsUIToTriggerDocFetch(savedSystem, existingSystem);
-
-        if (willTriggerDocFetch) {
-          setPendingDocIds((prev) => new Set([...prev, savedSystem.id]));
-
-          // Fire-and-forget poller for background doc fetch
-          waitForSystemReady([savedSystem.id])
-            .then(() => {
-              // Remove from pending when done
-              setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== savedSystem.id)));
-            })
-            .catch((error) => {
-              console.error("Error waiting for docs:", error);
-              // Remove from pending on error
-              setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== savedSystem.id)));
-            });
-        }
-
-        if (isOAuthConnect) {
-          const currentCreds = JSON.stringify(editingSystem?.credentials || {});
-          const newCreds = JSON.stringify(savedSystem.credentials || {});
-          if (currentCreds !== newCreds) {
-            setEditingSystem(savedSystem);
-          }
-        } else {
-          setEditingSystem(null);
-          setAddFormOpen(false);
-        }
-
-        await refreshSystems();
-
-        return savedSystem;
-      }
-      return null;
-    } catch (error) {
-      console.error("Error saving system:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save system",
-        variant: "destructive",
-      });
-      throw error; // Re-throw so the form can handle the error
-    }
-  };
-
-  const handleRefreshDocs = async (systemId: string) => {
-    const system = systems.find((i) => i.id === systemId);
-    if (!system) return;
-    setPendingDocIds((prev) => new Set([...prev, systemId]));
-
-    try {
-      const upsertData = cleanSystemForInput({
-        ...system,
-        documentationPending: true,
-      });
-
-      const client = createSuperglueClient(config.superglueEndpoint);
-      await client.upsertSystem(systemId, upsertData, UpsertMode.UPDATE);
-
-      const results = await waitForSystemReady([systemId]);
-
-      if (results.length > 0 && results[0]?.documentation) {
-        setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== systemId)));
-
-        toast({
-          title: "Documentation Ready",
-          description: `Documentation for system "${systemId}" is now ready!`,
-          variant: "default",
-        });
-      } else {
-        await client.upsertSystem(
-          systemId,
-          {
-            ...upsertData,
-            documentationPending: false,
-          },
-          UpsertMode.UPDATE,
-        );
-
-        setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== systemId)));
-      }
-    } catch (error) {
-      console.error("Error refreshing docs:", error);
-      try {
-        const sys = systems.find((i) => i.id === systemId);
-        if (sys) {
-          const resetData = cleanSystemForInput({
-            ...sys,
-            documentation: sys.documentation || "",
-            documentationPending: false,
-          });
-
-          const client = createSuperglueClient(config.superglueEndpoint);
-          await client.upsertSystem(systemId, resetData, UpsertMode.UPDATE);
-        }
-      } catch (resetError) {
-        console.error("Error resetting documentationPending:", resetError);
-      }
-
-      setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== systemId)));
-    }
-  };
-
-  const hasDocumentation = (system: System) => {
-    return !!(system.documentationUrl?.trim() && !pendingDocIds.has(system.id));
-  };
-
-  const handleRefresh = async () => {
-    await refreshSystems();
-  };
-
-  const blockAllContent = initialLoading && !addFormOpen;
+  if (systems.length === 0) {
+    return (
+      <div className="p-8 max-w-none w-full h-full flex flex-col overflow-hidden">
+        <SystemTemplatePicker showHeader={true} className="flex-1" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-full p-8 w-full">

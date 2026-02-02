@@ -83,7 +83,8 @@ export function TemplateAwareTextEditor({
       attributes: {
         class: cn(
           "w-full h-9 px-3 py-2 text-xs font-mono rounded-lg border bg-muted/30 shadow-sm",
-          "focus:outline-none overflow-x-auto overflow-y-hidden whitespace-nowrap",
+          "focus:outline-none overflow-x-auto overflow-y-hidden",
+          "[&_p]:whitespace-nowrap",
           disabled && "opacity-50 cursor-not-allowed",
         ),
         style: "min-height: 36px; line-height: 20px;",

@@ -14,6 +14,7 @@ import {
   FilePlay,
   Filter,
   Loader2,
+  MessagesSquare,
   Play,
   Square,
   X,
@@ -206,7 +207,7 @@ export const FinalTransformMiniStepCard = ({
   }
 
   return (
-    <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50">
+    <Card className="w-full max-w-6xl mx-auto shadow-md border border-border/50 dark:border-border/70 overflow-hidden bg-gradient-to-br from-muted/30 to-muted/10 dark:from-muted/40 dark:to-muted/20 backdrop-blur-sm">
       <div className="p-3">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="flex items-center justify-between mb-3">
@@ -244,10 +245,21 @@ export const FinalTransformMiniStepCard = ({
                 ) : (
                   <FilePlay className="h-4 w-4" />
                 )}
-                Tool Result
+                Result
               </TabsTrigger>
             </TabsList>
             <div className="flex items-center gap-2">
+              {transformError && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleAskAgentToFix}
+                  className="h-8 px-3 text-xs font-medium gap-1.5"
+                >
+                  <MessagesSquare className="h-3.5 w-3.5" />
+                  Fix in chat
+                </Button>
+              )}
               {onExecuteTransform && (
                 <>
                   <span
@@ -278,7 +290,6 @@ export const FinalTransformMiniStepCard = ({
                       </Button>
                     )}
                   </span>
-                  <HelpTooltip text="Run Transform: executes the transform code with step results. Use the agent to fix transform errors." />
                 </>
               )}
             </div>
@@ -378,21 +389,11 @@ export const FinalTransformMiniStepCard = ({
                 </div>
               ) : transformError ? (
                 <div className="flex flex-col items-start justify-start p-4 border rounded-lg bg-muted/30 border-border">
-                  <div className="flex items-center justify-between w-full mb-2">
-                    <div className="flex items-center gap-2">
-                      <X className="h-4 w-4 text-red-500 dark:text-red-400" />
-                      <p className="text-sm font-semibold text-red-500 dark:text-red-400">
-                        Transform Error
-                      </p>
-                    </div>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={handleAskAgentToFix}
-                      className="h-7 px-3 text-xs font-medium"
-                    >
-                      Fix in chat
-                    </Button>
+                  <div className="flex items-center gap-2 mb-2">
+                    <X className="h-4 w-4 text-red-500 dark:text-red-400" />
+                    <p className="text-sm font-semibold text-red-500 dark:text-red-400">
+                      Transform Error
+                    </p>
                   </div>
                   <pre className="text-xs whitespace-pre-wrap font-mono w-full overflow-x-auto">
                     {transformError}

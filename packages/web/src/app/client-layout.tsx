@@ -4,6 +4,11 @@ import { usePathname } from "next/navigation";
 import { LeftSidebar } from "@/src/components/sidebar/LeftSidebar";
 import { RightSidebar } from "@/src/components/sidebar/RightSidebar";
 import { RightSidebarProvider } from "@/src/components/sidebar/RightSidebarContext";
+import { AgentModalProvider, AgentModalContent } from "@/src/components/agent/AgentModalContext";
+import {
+  SystemPickerModalProvider,
+  SystemPickerModalContent,
+} from "@/src/components/systems/SystemPickerModalContext";
 import { Toaster } from "../components/ui/toaster";
 import { ServerMonitor } from "../components/utils/ServerMonitor";
 import { ConfigProvider } from "./config-context";
@@ -28,33 +33,41 @@ export function ClientWrapper({ children, config }: Props) {
       <ConditionalDataProvider>
         <CSPostHogProvider>
           <RightSidebarProvider>
-            <div className={`${jetbrainsSans.variable} ${jetbrainsMono.variable} antialiased`}>
-              {isAuthPage || isEmbeddedPage ? (
-                children
-              ) : (
-                <div className="flex h-screen overflow-hidden">
-                  {token && <LeftSidebar />}
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={pathname}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="w-full h-full overflow-y-auto"
-                    >
-                      {children}
-                    </motion.div>
-                  </AnimatePresence>
-                  {token && (
-                    <div className="hidden lg:block h-full">
-                      <RightSidebar />
+            <AgentModalProvider>
+              <SystemPickerModalProvider>
+                <div className={`${jetbrainsSans.variable} ${jetbrainsMono.variable} antialiased`}>
+                  {isAuthPage || isEmbeddedPage ? (
+                    children
+                  ) : (
+                    <div className="flex h-screen overflow-hidden">
+                      {token && <LeftSidebar />}
+                      <div className="relative flex-1 min-w-0 h-full">
+                        <AnimatePresence mode="wait">
+                          <motion.div
+                            key={pathname}
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="w-full h-full overflow-y-auto"
+                          >
+                            {children}
+                          </motion.div>
+                        </AnimatePresence>
+                        <SystemPickerModalContent />
+                        <AgentModalContent />
+                      </div>
+                      {token && (
+                        <div className="hidden lg:flex h-full flex-shrink-0">
+                          <RightSidebar />
+                        </div>
+                      )}
                     </div>
                   )}
+                  <Toaster />
+                  {token && <ServerMonitor />}
                 </div>
-              )}
-              <Toaster />
-              {token && <ServerMonitor />}
-            </div>
+              </SystemPickerModalProvider>
+            </AgentModalProvider>
           </RightSidebarProvider>
         </CSPostHogProvider>
       </ConditionalDataProvider>

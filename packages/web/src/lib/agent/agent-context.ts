@@ -232,32 +232,34 @@ export async function initializeMainAgentContext(ctx: ToolExecutionContext): Pro
   const templateIds = Object.keys(systems);
 
   const result = `
-    [PRELOADED CONTEXT - Your available tools and systems are listed below]${SUPERGLUE_INFORMATION_PROMPT}
+    [PRELOADED CONTEXT - The user's available superglue tools and systems are listed below]${SUPERGLUE_INFORMATION_PROMPT}
 
-    AVAILABLE TOOLS:
+    AVAILABLE SUPERGLUE TOOLS:
     ${JSON.stringify(toolsResult.tools || [])}
 
-    AVAILABLE SYSTEMS (credentials with hasValue:true are configured, use the placeholder format shown):
+    AVAILABLE SUPERGLUE SYSTEMS (credentials with hasValue:true are configured, use the placeholder format shown):
     ${JSON.stringify(systemsResult.systems || [])}
 
-    AVAILABLE SYSTEM TEMPLATES (use find_system_templates for OAuth URLs, scopes, etc. BEFORE creating systems or authenticating):
+    AVAILABLE SYSTEM TEMPLATES:
     ${templateIds.join(", ")}
     `;
   return result;
 }
 
-export async function initializePlaygroundAgentContext(ctx: ToolExecutionContext): Promise<string> {
+export async function initializeToolPlaygroundAgentContext(
+  ctx: ToolExecutionContext,
+): Promise<string> {
   const systemsResult = await getSystemsForContext(ctx);
-  const templateIds = Object.keys(systems);
+  const toolsResult = await getToolsForContext(ctx);
 
   return `
-    [PRELOADED CONTEXT - Your available systems are listed below]${SUPERGLUE_INFORMATION_PROMPT}
+    [PRELOADED CONTEXT - The user's available superglue systems and tools are listed below]${SUPERGLUE_INFORMATION_PROMPT}
 
     AVAILABLE SYSTEMS (credentials with hasValue:true are configured, use the placeholder format shown):
     ${JSON.stringify(systemsResult.systems || [])}
 
-    AVAILABLE SYSTEM TEMPLATES (use find_system_templates for OAuth URLs, scopes, etc. BEFORE creating systems or authenticating):
-    ${templateIds.join(", ")}
+    AVAILABLE SUPERGLUE TOOLS:
+    ${JSON.stringify(toolsResult.tools || [])}
     `;
 }
 
@@ -516,4 +518,50 @@ export async function generateAgentInitialContext(
     return null;
   }
   return agent.initialContextGenerator(ctx, agentParams);
+}
+
+export { type SystemContextForAgent as SystemPlaygroundContextData } from "@/src/components/systems/context/types";
+import type { SystemContextForAgent } from "@/src/components/systems/context/types";
+
+export function formatSystemRuntimeContext(ctx: SystemContextForAgent): string {
+  const credentialPlaceholders = ctx.credentialKeys
+    .map((key) => `<<${ctx.systemId}_${key}>>`)
+    .join(", ");
+
+  const uploadedFileWarning = ctx.hasUploadedFile
+    ? "\nWARNING: Has uploaded file documentation - changing documentationUrl will lose content."
+    : "";
+
+  const specificInstructionsLine = ctx.specificInstructions
+    ? `\nSpecific Instructions: ${ctx.specificInstructions.substring(0, 200)}${ctx.specificInstructions.length > 200 ? "..." : ""}`
+    : "";
+
+  return `[SYSTEM PLAYGROUND CONTEXT]
+System ID: ${ctx.systemId || "(not set)"}
+URL Host: ${ctx.urlHost || "(not set)"}
+Template: ${ctx.templateName || "(custom)"}
+Auth Type: ${ctx.authType}
+Credentials: ${credentialPlaceholders || "(none)"}
+Documentation: ${ctx.hasDocumentation ? "Yes" : "No"}${ctx.hasUploadedFile ? " (uploaded file)" : ""}${ctx.documentationUrl ? ` - ${ctx.documentationUrl}` : ""}${uploadedFileWarning}${specificInstructionsLine}
+
+Section Status:
+- Configuration: ${ctx.sectionStatuses.configuration.label}
+- Authentication: ${ctx.sectionStatuses.authentication.label}
+- Context: ${ctx.sectionStatuses.context.label}
+
+Use edit_system with id="${ctx.systemId}" to make changes.
+Use call_endpoint with placeholders like ${credentialPlaceholders || "<<systemId_keyName>>"} to test.`;
+}
+
+export async function initializeSystemPlaygroundContext(
+  ctx: ToolExecutionContext,
+  _agentParams?: Record<string, any>,
+): Promise<string> {
+  const systemsResult = await getSystemsForContext(ctx);
+  const templateIds = Object.keys(systems);
+
+  return `AVAILABLE SYSTEMS (credentials with hasValue:true are configured, use the placeholder format shown):
+${JSON.stringify(systemsResult.systems || [])}
+
+AVAILABLE TEMPLATES: ${templateIds.slice(0, 30).join(", ")}${templateIds.length > 30 ? ` (+${templateIds.length - 30} more)` : ""}`;
 }

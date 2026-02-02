@@ -28,6 +28,7 @@ export interface Message {
   tools?: ToolCall[];
   parts?: MessagePart[];
   isStreaming?: boolean;
+  isHidden?: boolean;
   attachedFiles?: Array<{
     name: string;
     size?: number;

@@ -283,7 +283,11 @@ export function CallEndpointComponent({
               <div className="text-sm font-medium text-red-900 dark:text-red-100 mb-1">
                 Request Failed
               </div>
-              <div className="text-sm text-red-800 dark:text-red-200">{output.error}</div>
+              <div className="text-sm text-red-800 dark:text-red-200 break-words">
+                {typeof output.error === "string"
+                  ? output.error
+                  : JSON.stringify(output.error, null, 2)}
+              </div>
               {output.duration !== undefined && (
                 <div className="text-xs text-red-700 dark:text-red-300 mt-1">
                   Failed after {output.duration}ms

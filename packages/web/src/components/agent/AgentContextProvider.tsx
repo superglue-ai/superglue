@@ -81,7 +81,11 @@ export interface AgentContextValue {
 
   // Actions
   handleSendMessage: (content: string, attachedFiles?: UploadedFile[]) => Promise<void>;
-  startTemplatePrompt: (userPrompt: string, hiddenContext?: string) => void;
+  startTemplatePrompt: (
+    userPrompt: string,
+    hiddenContext?: string,
+    options?: { hideUserMessage?: boolean; chatTitle?: string; chatIcon?: string },
+  ) => void;
 
   // Refs
   welcomeRef: React.RefObject<AgentWelcomeRef>;
@@ -109,7 +113,12 @@ export function useAgentContext(): AgentContextValue {
 interface AgentContextProviderProps {
   children: React.ReactNode;
   config?: Partial<AgentConfig>;
-  initialPrompts?: { userPrompt: string; systemPrompt: string } | null;
+  initialPrompts?: {
+    userPrompt: string;
+    systemPrompt: string;
+    chatTitle?: string;
+    chatIcon?: string;
+  } | null;
 }
 
 const DEFAULT_CONFIG: AgentConfig = {
@@ -279,13 +288,17 @@ export function AgentContextProvider({
   );
 
   const startTemplatePrompt = useCallback(
-    (userPrompt: string, hiddenContext?: string) => {
-      requestHook.sendAgentRequest(userPrompt, { hiddenContext });
+    (userPrompt: string, hiddenContext?: string, options?: { hideUserMessage?: boolean }) => {
+      requestHook.sendAgentRequest(userPrompt, {
+        hiddenContext,
+        hideUserMessage: options?.hideUserMessage,
+      });
     },
     [requestHook],
   );
 
   // Auto-trigger initial prompts when provided via props (only once)
+  // Hide the user message when coming from system setup flow (has chatTitle)
   const hasTriggeredInitialPromptsRef = useRef(false);
   useEffect(() => {
     if (
@@ -294,7 +307,10 @@ export function AgentContextProvider({
       !hasTriggeredInitialPromptsRef.current
     ) {
       hasTriggeredInitialPromptsRef.current = true;
-      startTemplatePrompt(initialPrompts.userPrompt, initialPrompts.systemPrompt);
+      const hideUserMessage = !!initialPrompts.chatTitle;
+      startTemplatePrompt(initialPrompts.userPrompt, initialPrompts.systemPrompt, {
+        hideUserMessage,
+      });
     }
   }, [initialPrompts, messagesHook.messages.length, startTemplatePrompt]);
 
