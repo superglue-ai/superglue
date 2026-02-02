@@ -2,6 +2,7 @@
 
 import { UploadedFileInfo } from "@/src/lib/file-utils";
 import { computeToolPayload } from "@/src/lib/general-utils";
+import { getPayload, addDraft } from "@/src/lib/storage";
 import { ExecutionStep, System, ResponseFilter, Tool } from "@superglue/shared";
 import {
   createContext,
@@ -10,6 +11,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { PayloadState, ToolConfigContextValue, ToolDefinition } from "./types";
@@ -115,27 +117,173 @@ export function ToolConfigProvider({
   const [localUploadedFiles, setLocalUploadedFiles] = useState<UploadedFileInfo[]>([]);
   const [localFilePayloads, setLocalFilePayloads] = useState<Record<string, any>>({});
   const [hasUserEdited, setHasUserEdited] = useState(false);
+  const initialStateRef = useRef<string | null>(null);
+  const [initialStateReady, setInitialStateReady] = useState(false);
 
-  // Load saved payload from localStorage on tool load
+  // Set initial baseline state for draft comparison
   useEffect(() => {
-    if (!toolId) return;
+    if (initialStateReady) return;
 
-    const STORAGE_KEY = `superglue-payload:${toolId}`;
-    try {
-      const savedPayload = localStorage.getItem(STORAGE_KEY);
-      if (savedPayload && savedPayload !== initialPayload) {
-        setManualPayloadText(savedPayload);
-      }
-    } catch (error) {
-      console.error("Failed to load payload from localStorage:", error);
+    // Case 1: Tool loaded from server (initialTool provided)
+    if (initialTool?.id) {
+      const state = JSON.stringify({
+        steps: initialTool.steps || [],
+        instruction: initialInstruction || initialTool.instruction || "",
+        finalTransform: initialTool.finalTransform || "(sourceData) => { return {} }",
+        inputSchema: initialTool.inputSchema
+          ? JSON.stringify(initialTool.inputSchema, null, 2)
+          : null,
+        responseSchema: initialTool.responseSchema
+          ? JSON.stringify(initialTool.responseSchema, null, 2)
+          : "",
+      });
+      initialStateRef.current = state;
+      lastAttemptedSaveRef.current = null; // Allow detecting first change
+      setInitialStateReady(true);
+      return;
     }
-  }, [toolId, initialPayload]);
 
-  // Use external state if provided (embedded mode), otherwise use local state
+    // Case 2: Tool state exists but no initialTool (e.g., created in-session)
+    if (toolId && steps.length > 0) {
+      const state = JSON.stringify({
+        steps,
+        instruction,
+        finalTransform,
+        inputSchema,
+        responseSchema,
+      });
+      initialStateRef.current = state;
+      lastAttemptedSaveRef.current = state; // Don't save current state as draft
+      setInitialStateReady(true);
+    }
+  }, [
+    initialTool,
+    initialInstruction,
+    toolId,
+    steps,
+    instruction,
+    finalTransform,
+    inputSchema,
+    responseSchema,
+    initialStateReady,
+  ]);
+
   const uploadedFiles = externalUploadedFiles ?? localUploadedFiles;
   const filePayloads = externalFilePayloads ?? localFilePayloads;
 
-  // Combined setter for atomic updates - prevents mismatched state in parent callbacks
+  useEffect(() => {
+    if (!toolId) return;
+
+    let cancelled = false;
+
+    const loadPayload = async () => {
+      try {
+        const savedPayload = await getPayload(toolId);
+        if (!cancelled && savedPayload && savedPayload !== initialPayload) {
+          setManualPayloadText(savedPayload);
+        }
+      } catch (error) {
+        console.error("Failed to load payload from IndexedDB:", error);
+        // Fallback to localStorage during migration
+        try {
+          const STORAGE_KEY = `superglue-payload:${toolId}`;
+          const localPayload = localStorage.getItem(STORAGE_KEY);
+          if (!cancelled && localPayload && localPayload !== initialPayload) {
+            setManualPayloadText(localPayload);
+          }
+        } catch (localError) {
+          console.error("Failed to load payload from localStorage:", localError);
+        }
+      }
+    };
+
+    loadPayload();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [toolId, initialPayload]);
+
+  const lastAttemptedSaveRef = useRef<string | null>(null);
+  const draftSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingDraftRef = useRef<{
+    toolId: string;
+    steps: ExecutionStep[];
+    instruction: string;
+    finalTransform: string;
+    inputSchema: string | null;
+    responseSchema: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!toolId || !toolId.trim()) return;
+
+    if (!initialStateReady) {
+      return;
+    }
+
+    const currentState = JSON.stringify({
+      steps,
+      instruction,
+      finalTransform,
+      inputSchema,
+      responseSchema,
+    });
+
+    if (currentState === initialStateRef.current) {
+      pendingDraftRef.current = null;
+      return;
+    }
+
+    if (currentState === lastAttemptedSaveRef.current) {
+      pendingDraftRef.current = null;
+      return;
+    }
+
+    // Track pending draft for save on unmount
+    const draftData = {
+      toolId,
+      steps,
+      instruction,
+      finalTransform,
+      inputSchema,
+      responseSchema,
+    };
+    pendingDraftRef.current = draftData;
+
+    if (draftSaveTimeoutRef.current) {
+      clearTimeout(draftSaveTimeoutRef.current);
+    }
+
+    draftSaveTimeoutRef.current = setTimeout(() => {
+      lastAttemptedSaveRef.current = currentState;
+      pendingDraftRef.current = null;
+
+      addDraft(toolId, draftData).catch((error) => {
+        console.error("Failed to save draft:", error);
+      });
+    }, 1000);
+
+    return () => {
+      if (draftSaveTimeoutRef.current) {
+        clearTimeout(draftSaveTimeoutRef.current);
+      }
+    };
+  }, [toolId, steps, instruction, finalTransform, inputSchema, responseSchema, initialStateReady]);
+
+  // Save pending draft on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingDraftRef.current) {
+        const draft = pendingDraftRef.current;
+        // Fire and forget - component is unmounting
+        addDraft(draft.toolId, draft).catch((error) => {
+          console.error("Failed to save draft on unmount:", error);
+        });
+      }
+    };
+  }, []);
+
   const setFilesAndPayloads = useCallback(
     (files: UploadedFileInfo[], payloads: Record<string, any>) => {
       if (onExternalFilesChange) {
@@ -308,6 +456,7 @@ export function ToolConfigProvider({
       setFilePayloads,
       setFilesAndPayloads,
       markPayloadEdited: () => setHasUserEdited(true),
+      markCurrentStateAsBaseline,
 
       addStep,
       removeStep,
@@ -333,6 +482,7 @@ export function ToolConfigProvider({
       removeStep,
       updateStep,
       setFilesAndPayloads,
+      markCurrentStateAsBaseline,
       getStepConfig,
       getStepIndex,
       getStepSystem,

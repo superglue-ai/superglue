@@ -139,9 +139,8 @@ export function AgentWelcome({ onStartPrompt, ref }: AgentWelcomeProps) {
         <SystemCarousel onSystemSelect={handleSystemSelect} showNavArrows />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mx-auto max-w-3xl">
-        <Card
-          className="p-4 hover:bg-muted/30 transition-colors cursor-pointer border-2 hover:border-primary/20"
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mx-auto max-w-3xl">
+        <GlassButton
           onClick={() => onStartPrompt(EXAMPLES.CAPABILITIES.user, EXAMPLES.CAPABILITIES.system)}
           icon={<Lightbulb className="w-5 h-5" />}
           title={EXAMPLES.CAPABILITIES.title}
@@ -150,8 +149,7 @@ export function AgentWelcome({ onStartPrompt, ref }: AgentWelcomeProps) {
           iconGradient="bg-muted text-muted-foreground"
         />
 
-        <Card
-          className="p-4 hover:bg-muted/30 transition-colors cursor-pointer border-2 hover:border-primary/20"
+        <GlassButton
           onClick={() => {
             setShowToolLibrary(!showToolLibrary);
           }}
