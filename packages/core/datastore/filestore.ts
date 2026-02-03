@@ -1032,45 +1032,4 @@ export class FileStore implements DataStore {
     await this.persist();
     return updated;
   }
-
-  async listAllOrgSettings(): Promise<OrgSettings[]> {
-    await this.ensureInitialized();
-    const allSettings: OrgSettings[] = [];
-    for (const [orgId, settings] of this.storage.orgSettings.entries()) {
-      allSettings.push({
-        ...settings,
-        orgId,
-        notifications: this.decryptNotificationSettings(settings.notifications),
-      });
-    }
-    return allSettings;
-  }
-
-  async listRunsForPeriod(params: {
-    orgId: string;
-    startTime: Date;
-    endTime: Date;
-    requestSources?: RequestSource[];
-  }): Promise<{ items: Run[]; total: number }> {
-    await this.ensureInitialized();
-    const { orgId, startTime, endTime, requestSources } = params;
-
-    // Read all runs for the org
-    const allRuns = await this.readRunsFromLogs(orgId);
-
-    // Filter by time range
-    let filteredRuns = allRuns.filter((run) => {
-      const runStartedAt = new Date(run.metadata.startedAt);
-      return runStartedAt >= startTime && runStartedAt < endTime;
-    });
-
-    // Filter by request sources if specified
-    if (requestSources && requestSources.length > 0) {
-      filteredRuns = filteredRuns.filter(
-        (run) => run.requestSource && requestSources.includes(run.requestSource),
-      );
-    }
-
-    return { items: filteredRuns, total: filteredRuns.length };
-  }
 }
