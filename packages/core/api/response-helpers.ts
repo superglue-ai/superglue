@@ -64,13 +64,17 @@ export function uniqueKeywords(keywords: string[] | undefined): string[] {
   return [...new Set(keywords)];
 }
 
+const DEFAULT_PAGE_LIMIT = 50;
+const MAX_PAGE_LIMIT = 100;
+
 export function parsePaginationParams(query: { page?: string; limit?: string }): {
   page: number;
   limit: number;
   offset: number;
 } {
   const page = Math.max(1, parseInt(query.page || "1") || 1);
-  const limit = Math.min(1000, Math.max(1, parseInt(query.limit || "1000") || 1000));
+  const parsedLimit = parseInt(query.limit || "") || DEFAULT_PAGE_LIMIT;
+  const limit = Math.min(MAX_PAGE_LIMIT, Math.max(1, parsedLimit));
   const offset = (page - 1) * limit;
   return { page, limit, offset };
 }

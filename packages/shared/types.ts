@@ -645,6 +645,9 @@ export interface OpenAPITool {
 // NOTIFICATION TYPES
 // ============================================
 
+// Notification mode - realtime for immediate alerts, summary for periodic digests
+export type NotificationMode = "realtime" | "daily_summary" | "weekly_summary";
+
 // Rule conditions - permissive data model, UI can restrict
 export interface NotificationRuleConditions {
   status: "failed" | "success" | "any";
@@ -657,7 +660,22 @@ export interface NotificationRuleConditions {
 export interface NotificationRule {
   id: string;
   enabled: boolean;
+  mode?: NotificationMode; // Defaults to "realtime" for backward compatibility
   conditions: NotificationRuleConditions;
+}
+
+// Summary payload for daily/weekly notification digests
+export interface NotificationSummaryPayload {
+  period: "daily" | "weekly";
+  periodStart: string; // ISO date
+  periodEnd: string; // ISO date
+  requestSources: RequestSource[]; // The filters that were applied
+  toolStats: Array<{
+    toolId: string;
+    successCount: number;
+    failedCount: number;
+  }>;
+  adminUrl: string;
 }
 
 export type NotificationChannelStatus = "active" | "failing" | "disabled";
