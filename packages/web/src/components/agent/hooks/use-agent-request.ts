@@ -143,8 +143,23 @@ export function useAgentRequest({
 
       const currentMessages = [...messagesRef.current];
 
+      const hiddenContext = options?.hiddenContext || config.hiddenContextBuilder?.();
+
       if (hasMessage) {
         const readyPendingFiles = pendingFiles.filter((f) => f.status === "ready");
+
+        if (hiddenContext) {
+          const contextMessage: Message = {
+            id: `${Date.now()}-context`,
+            content: hiddenContext,
+            role: "user",
+            timestamp: new Date(),
+            isHidden: true,
+          };
+          currentMessages.push(contextMessage);
+          setMessages((prev) => [...prev, contextMessage]);
+        }
+
         const userMessageObj: Message = {
           id: Date.now().toString(),
           content: userMessage!.trim(),
@@ -170,8 +185,6 @@ export function useAgentRequest({
       const controller = new AbortController();
       currentStreamControllerRef.current = controller;
 
-      const hiddenContext = options?.hiddenContext || config.hiddenContextBuilder?.();
-
       const fileUploadAction = buildFileUploadAction();
       const allActions = fileUploadAction ? [...actionsToSend, fileUploadAction] : actionsToSend;
 
@@ -181,7 +194,6 @@ export function useAgentRequest({
         userMessage: hasMessage ? userMessage!.trim() : undefined,
         userActions: allActions.length > 0 ? allActions : undefined,
         filePayloads: buildFilePayloads(),
-        hiddenContext,
         agentParams: config.agentParams,
         toolExecutionPolicies:
           Object.keys(toolExecutionPolicies).length > 0 ? toolExecutionPolicies : undefined,

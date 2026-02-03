@@ -105,8 +105,9 @@ export function validateAgentRequest(body: any): ValidatedAgentRequest {
   };
 }
 
-function isNewConversation(messages: Message[]): boolean {
-  return messages.length === 1 && messages[0].role === "user";
+function needsSystemMessage(messages: Message[]): boolean {
+  // New conversation = no system message has been injected yet
+  return !messages.some((m) => m.role === "system");
 }
 
 type ToolStatus =
@@ -395,9 +396,7 @@ export async function prepareMessages(
 ): Promise<Message[]> {
   let messages = [...request.messages];
 
-  const isNew = isNewConversation(messages);
-
-  if (isNew) {
+  if (needsSystemMessage(messages)) {
     const systemPrompt = resolveSystemPrompt(request.agent, request.agentParams);
     const dateMessage = getDateMessage();
     const initialContext = await generateAgentInitialContext(

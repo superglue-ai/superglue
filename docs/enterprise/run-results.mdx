@@ -1,0 +1,64 @@
+---
+title: "Run Results"
+description: "Track every tool execution and debug failures with full context"
+---
+
+<Info>
+  **Enterprise Feature** — Run Results is available on superglue Enterprise plans. [Contact us](https://cal.com/superglue/superglue-demo) to learn more.
+</Info>
+
+Every time a tool runs—whether from the API, a schedule, or the dashboard—superglue saves the complete execution history. When something goes wrong, you have everything you need to understand what happened and fix it.
+
+## The Runs tab
+
+Open the **Runs** tab to see all tool executions across your organization.
+
+Each row shows:
+
+- **Started At** — When the run began
+- **Tool** — Which tool was executed
+- **Status** — Success, failed, or running
+- **Trigger** — How it was started (API, schedule, dashboard, or agent)
+- **Details** — Duration for successful runs, or the error message for failures
+
+Click any row to expand it and see the full execution details, including the input payload and step-by-step results.
+
+## Debugging a failed run
+
+When a run fails, you have two ways to investigate:
+
+### Load the run in the playground
+
+Click **Load Run** to open the tool with the exact same inputs that caused the failure. You can:
+
+1. See the payload that was sent
+2. Re-run the tool to reproduce the issue
+3. Make changes and test until it works
+4. Save your fix
+
+This is the fastest way to debug when you already have a hunch about what went wrong.
+
+<video autoPlay muted loop playsInline className="w-full rounded-lg">
+  <source src="../resources/run-result.mp4" type="video/mp4" />
+</video>
+
+### Ask the agent to investigate
+
+Click **Investigate** to open a conversation with the superglue agent, pre-loaded with the run's context. The agent can:
+
+- Analyze the error and explain what went wrong
+- Look at the step results to find where things broke
+- Compare with successful runs to spot differences
+- Suggest fixes based on the actual data
+
+<video autoPlay muted loop playsInline className="w-full rounded-lg">
+  <source src="../resources/agent-debug.mp4" type="video/mp4" />
+</video>
+
+This is helpful when the error is unclear or you want a second opinion on what might be causing the issue.
+
+## Enabling run results
+
+Run results can be enabled on superglue via the enterprise plan.
+
+Results are compressed before storage and retained according to your organization's data retention settings.
