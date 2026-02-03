@@ -3,6 +3,7 @@ import { SuperglueClient } from "@superglue/shared";
 import { z } from "zod";
 import { GraphQLSubscriptionClient } from "../graphql-subscriptions";
 import { AgentType } from "./registry/agents";
+import { EESuperglueClient } from "../ee-superglue-client";
 
 export const CALL_ENDPOINT_CONFIRMATION = {
   PENDING: "PENDING_USER_CONFIRMATION",
@@ -32,7 +33,7 @@ export interface ToolDefinition {
 }
 
 export interface ToolExecutionContext {
-  superglueClient: SuperglueClient;
+  superglueClient: EESuperglueClient;
   filePayloads: Record<string, any>;
   messages: Message[];
   orgId: string;

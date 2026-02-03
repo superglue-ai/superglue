@@ -61,8 +61,8 @@ export function buildRunResponse(params: {
 
   return {
     runId,
+    tool: tool,
     toolId: tool.id,
-    tool: { id: tool.id, version: tool.version || "1.0.0" },
     status: mapRunStatusToOpenAPI(status),
     toolPayload,
     data,
@@ -186,8 +186,10 @@ async function executeToolInternal(
       await lifecycle.completeRun(runContext, {
         success: result.success,
         tool: result.config || tool,
+        data: result.data,
         error: result.error,
         stepResults: result.stepResults,
+        payload,
       });
       handleWebhook(
         authReq,
@@ -212,6 +214,8 @@ async function executeToolInternal(
           success: false,
           tool,
           error: String(error),
+          stepResults: error.stepResults,
+          payload,
         });
       }
     });
@@ -377,8 +381,10 @@ const runTool: RouteHandler = async (request, reply) => {
         await lifecycle.completeRun(runContext, {
           success: result.success,
           tool: result.config || tool,
+          data: result.data,
           error: result.error,
           stepResults: result.stepResults,
+          payload: body.inputs,
         });
         handleWebhook(
           authReq,
@@ -392,12 +398,14 @@ const runTool: RouteHandler = async (request, reply) => {
           requestSource,
         );
       })
-      .catch(async (error) => {
+      .catch(async (error: any) => {
         logMessage("error", `Async tool execution error: ${String(error)}`, metadata);
         await lifecycle.completeRun(runContext, {
           success: false,
           tool,
           error: String(error),
+          stepResults: error.stepResults,
+          payload: body.inputs,
         });
       });
 
@@ -425,8 +433,10 @@ const runTool: RouteHandler = async (request, reply) => {
     await lifecycle.completeRun(runContext, {
       success: result.success,
       tool: result.config || tool,
+      data: result.data,
       error: result.error,
       stepResults: result.stepResults,
+      payload: body.inputs,
     });
     handleWebhook(
       authReq,
@@ -469,6 +479,8 @@ const runTool: RouteHandler = async (request, reply) => {
         success: false,
         tool,
         error: String(error),
+        stepResults: error.stepResults,
+        payload: body.inputs,
       });
     }
 

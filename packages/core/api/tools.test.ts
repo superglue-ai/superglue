@@ -249,7 +249,8 @@ describe("tools API helpers", () => {
 
       expect(result.runId).toBe("run-456");
       expect(result.toolId).toBe("tool-123");
-      expect(result.tool).toEqual({ id: "tool-123", version: "1.0.0" });
+      // Tool is passed through as-is (full tool object)
+      expect(result.tool).toEqual(baseTool);
       expect(result.status).toBe("success");
       expect(result.requestSource).toBe("api");
     });
@@ -315,7 +316,8 @@ describe("tools API helpers", () => {
       const toolWithVersion = { ...baseTool, version: "2.5.0" };
       const result = buildRunResponse({ ...baseParams, tool: toolWithVersion });
 
-      expect(result.tool).toEqual({ id: "tool-123", version: "2.5.0" });
+      // Tool is passed through as-is (full tool object)
+      expect(result.tool).toEqual(toolWithVersion);
     });
   });
 });

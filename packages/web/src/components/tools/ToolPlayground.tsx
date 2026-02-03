@@ -11,11 +11,13 @@ import {
   System,
   Tool,
   ToolResult,
+  ToolStepResult,
 } from "@superglue/shared";
 import { useFileUpload } from "./hooks/use-file-upload";
 import { usePayloadValidation } from "./hooks/use-payload-validation";
 import { useToolExecution } from "./hooks/use-tool-execution";
 import { useToolData } from "./hooks/use-tool-data";
+import { useRestoreRun } from "./hooks/use-restore-run";
 import { ToolConfigProvider, useToolConfig, ExecutionProvider, useExecution } from "./context";
 import { useToast } from "@/src/hooks/use-toast";
 import { ArchiveRestore, Check, Loader2, Play, Square, X } from "lucide-react";
@@ -71,6 +73,7 @@ export interface ToolPlaygroundProps {
   onFilesChange?: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
   renderAgentInline?: boolean;
   initialError?: string;
+  restoreRunId?: string; // Load a specific run on mount (EE feature)
 }
 
 export interface ToolPlaygroundHandle {
@@ -103,6 +106,7 @@ function ToolPlaygroundInner({
   onFilesChange: parentOnFilesChange,
   renderAgentInline = false,
   initialError,
+  restoreRunId,
   innerRef,
 }: ToolPlaygroundInnerProps) {
   const router = useRouter();
@@ -182,11 +186,103 @@ function ToolPlaygroundInner({
     initialInstruction,
     embedded,
     onSave,
+    restoreRunId,
   });
 
   const [navigateToFinalSignal, setNavigateToFinalSignal] = useState<number>(0);
   const [showStepOutputSignal, setShowStepOutputSignal] = useState<number>(0);
   const [focusStepId, setFocusStepId] = useState<string | null>(null);
+  const [isRestoringRun, setIsRestoringRun] = useState<boolean>(!!restoreRunId);
+  const prevRestoreRunIdRef = useRef<string | null>(null);
+
+  // Hook to restore a specific run by ID
+  const restoreRun = useRestoreRun();
+
+  // Handle restoreRunId on mount
+  useEffect(() => {
+    if (restoreRunId && restoreRunId !== prevRestoreRunIdRef.current) {
+      setIsRestoringRun(true);
+      restoreRun(restoreRunId).then((result) => {
+        if (result) {
+          // Apply tool config from the run if available
+          if (result.tool) {
+            if (result.tool.id) {
+              setToolId(result.tool.id);
+            }
+            if (result.tool.steps) {
+              setSteps(result.tool.steps);
+            }
+            if (result.tool.finalTransform !== undefined) {
+              setFinalTransform(result.tool.finalTransform || "");
+            }
+            if (result.tool.inputSchema !== undefined) {
+              setInputSchema(
+                result.tool.inputSchema ? JSON.stringify(result.tool.inputSchema, null, 2) : "",
+              );
+            }
+            if (result.tool.responseSchema !== undefined) {
+              setResponseSchema(
+                result.tool.responseSchema
+                  ? JSON.stringify(result.tool.responseSchema, null, 2)
+                  : "",
+              );
+            }
+            if (result.tool.instruction !== undefined) {
+              setInstruction(result.tool.instruction || "");
+            }
+            if (result.tool.folder !== undefined) {
+              setFolder(result.tool.folder);
+            }
+          }
+
+          // Set the payload
+          setPayloadText(JSON.stringify(result.payload, null, 2));
+          markPayloadEdited();
+          prevRestoreRunIdRef.current = restoreRunId;
+
+          // Clear executions first, then populate step results
+          execution.clearAllExecutions();
+          requestAnimationFrame(() => {
+            // Populate step results if available
+            if (result.stepResults && result.stepResults.length > 0) {
+              result.stepResults.forEach((stepResult) => {
+                const status = stepResult.success ? "completed" : "failed";
+                execution.setStepResult(
+                  stepResult.stepId,
+                  stepResult.data,
+                  status,
+                  stepResult.error,
+                );
+              });
+            }
+
+            // Set the final tool result if available
+            if (result.data !== undefined) {
+              const status = result.success ? "completed" : "failed";
+              execution.setFinalResult(result.data, status);
+            }
+
+            setIsRestoringRun(false);
+          });
+        } else {
+          setIsRestoringRun(false);
+        }
+      });
+    }
+  }, [
+    restoreRunId,
+    restoreRun,
+    setToolId,
+    setSteps,
+    setFinalTransform,
+    setInputSchema,
+    setResponseSchema,
+    setInstruction,
+    setFolder,
+    setPayloadText,
+    markPayloadEdited,
+    execution,
+  ]);
 
   type DialogState =
     | { type: "none" }
@@ -509,10 +605,33 @@ function ToolPlaygroundInner({
             <div className="w-full h-full">
               <div className="h-full">
                 <div className={embedded ? "h-full" : "h-full"}>
-                  {loading && steps.length === 0 && !instructions ? (
+                  {notFound ? (
+                    <div className="flex items-center justify-center py-20">
+                      <div className="flex flex-col items-center gap-4 text-center">
+                        <FileQuestion className="h-16 w-16 text-muted-foreground" />
+                        <div>
+                          <h2 className="text-xl font-semibold mb-2">Tool Not Found</h2>
+                          <p className="text-muted-foreground mb-4">
+                            The tool &quot;{id}&quot; doesn&apos;t exist or has been deleted.
+                          </p>
+                          <Button variant="outline" onClick={() => router.push("/tools")}>
+                            Back to Tools
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : isRestoringRun ? (
                     <div className="flex items-center justify-center py-20">
                       <div className="flex flex-col items-center gap-3">
                         <Loader2 className="h-8 w-8 animate-spin text-foreground" />
+                        <p className="text-sm text-muted-foreground">Restoring run...</p>
+                      </div>
+                    </div>
+                  ) : loading && steps.length === 0 && !instructions ? (
+                    <div className="flex items-center justify-center py-20">
+                      <div className="flex flex-col items-center gap-3">
+                        <Loader2 className="h-8 w-8 animate-spin text-foreground" />
+                        <p className="text-sm text-muted-foreground">Loading tool...</p>
                       </div>
                     </div>
                   ) : (
@@ -604,6 +723,7 @@ function ToolPlaygroundInner({
 const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>((props, ref) => {
   const { systems: contextSystems } = useSystems();
   const systems = props.systems || contextSystems;
+  const toolId = props.id || props.initialTool?.id;
 
   return (
     <ToolConfigProvider

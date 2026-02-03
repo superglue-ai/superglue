@@ -1,8 +1,7 @@
 import { Download } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { downloadJson } from "@/src/lib/download-utils";
-import { maskCredentials } from "@superglue/shared";
-import { safeStringify } from "@/src/lib/general-utils";
+import { maskCredentials, safeStringify } from "@superglue/shared";
 
 interface DownloadButtonProps {
   data: any;

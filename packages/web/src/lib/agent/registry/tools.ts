@@ -1,7 +1,7 @@
 import { setFileUploadDocumentationURL } from "@/src/lib/file-utils";
+import { splitUrl } from "@/src/lib/client-utils";
+import { truncateToolResult } from "@/src/lib/general-utils";
 import {
-  CallEndpointArgs,
-  CallEndpointResult,
   ConfirmationAction,
   ToolResult,
   UpsertMode,
@@ -1437,6 +1437,7 @@ const getRunsDefinition = (): ToolDefinition => ({
       - Useful for debugging when a webhook-triggered tool fails due to unexpected payload format
       - Compare the returned toolPayload against the tool's inputSchema to identify mismatches
       - Can filter by toolId, status (running, success, failed, aborted), or requestSources (api, frontend, scheduler, mcp, tool-chain, webhook)
+      - Set fetchResults=true to load full execution details (stepResults, toolResult) for runs that have stored results (only use if needed e.g. for investigation, can bloat context, and not if just listing runs)
       - All filters are optional - you can combine them or use none
     </important_notes>
     `,
@@ -1456,6 +1457,11 @@ const getRunsDefinition = (): ToolDefinition => ({
         enum: ["running", "success", "failed", "aborted"],
         description: "Optional: Filter runs by status",
       },
+      fetchResults: {
+        type: "boolean",
+        description:
+          "Optional: If true, fetch full stored results (stepResults, toolResult) for runs that have them. Default: false. This is an expensive operation and should only be used if needed e.g. for investigation, can bloat context, and not if just listing runs.",
+      },
       requestSources: {
         type: "array",
         items: {
@@ -1470,10 +1476,16 @@ const getRunsDefinition = (): ToolDefinition => ({
 });
 
 const runGetRuns = async (
-  input: { toolId?: string; limit?: number; status?: string; requestSources?: string[] },
+  input: {
+    toolId?: string;
+    limit?: number;
+    status?: string;
+    requestSources?: string[];
+    fetchResults?: boolean;
+  },
   ctx: ToolExecutionContext,
 ) => {
-  const { toolId, limit = 10, status, requestSources } = input;
+  const { toolId, limit = 10, status, requestSources, fetchResults = false } = input;
   const cappedLimit = Math.min(limit, 50);
 
   try {
@@ -1487,15 +1499,46 @@ const runGetRuns = async (
     });
 
     // Map to a simplified format with the key info for debugging
-    const simplifiedRuns = result.items.map((run) => ({
-      runId: run.runId,
-      toolId: run.toolId,
-      status: run.status,
-      requestSource: run.requestSource,
-      toolPayload: run.toolPayload,
-      error: run.error,
-      metadata: run.metadata,
-    }));
+    const simplifiedRuns = await Promise.all(
+      result.items.map(async (run) => {
+        let storedResults: { stepResults: string | null; toolResult: string | null };
+
+        // If fetchResults is true and run has stored results, fetch them
+        if (fetchResults && run.resultStorageUri) {
+          try {
+            const fullResults = await ctx.superglueClient.getRunResults(run.runId);
+            if (fullResults) {
+              // Truncate results to strings
+              storedResults = {
+                stepResults: fullResults.stepResults
+                  ? truncateToolResult(fullResults.stepResults, 20000 / result.items.length)
+                  : null,
+                toolResult: fullResults.data
+                  ? truncateToolResult(fullResults.data, 10000 / result.items.length)
+                  : null,
+              };
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch results for run ${run.runId}:`, err);
+          }
+        }
+
+        return {
+          runId: run.runId,
+          toolId: run.toolId,
+          status: run.status,
+          requestSource: run.requestSource,
+          toolPayload: run.toolPayload,
+          error: run.error,
+          metadata: run.metadata,
+          hasStoredResults: !!run.resultStorageUri,
+          ...(storedResults && { storedResults }),
+        };
+      }),
+    );
+
+    const hasAnyStoredResults = simplifiedRuns.some((r) => r.hasStoredResults);
+    const fetchedCount = simplifiedRuns.filter((r) => r.storedResults).length;
 
     return {
       success: true,
@@ -1504,7 +1547,7 @@ const runGetRuns = async (
       runs: simplifiedRuns,
       note:
         simplifiedRuns.length > 0
-          ? "Check toolPayload field to see what was actually received. Compare against the tool's inputSchema to identify mismatches."
+          ? `Check toolPayload field to see what was actually received. Compare against the tool's inputSchema to identify mismatches.${hasAnyStoredResults ? ` Runs with hasStoredResults=true have full execution data available.` : ""}${fetchResults && fetchedCount > 0 ? ` Fetched stored results for ${fetchedCount} run(s) - see storedResults field for stepResults and toolResult.` : ""}`
           : "No runs found matching the filters.",
     };
   } catch (error: any) {

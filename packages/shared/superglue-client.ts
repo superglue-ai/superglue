@@ -478,6 +478,9 @@ export class SuperglueClient {
   async createRun({
     toolId,
     toolConfig,
+    toolResult,
+    stepResults,
+    toolPayload,
     status,
     error,
     startedAt,
@@ -485,6 +488,9 @@ export class SuperglueClient {
   }: {
     toolId: string;
     toolConfig: Tool;
+    toolResult?: unknown;
+    stepResults?: Array<{ stepId: string; success: boolean; data?: unknown; error?: string }>;
+    toolPayload?: Record<string, unknown>;
     status: "success" | "failed" | "aborted";
     error?: string;
     startedAt: Date;
@@ -497,6 +503,9 @@ export class SuperglueClient {
     return this.restRequest("POST", "/v1/runs", {
       toolId,
       toolConfig,
+      toolResult,
+      stepResults,
+      toolPayload,
       status,
       error,
       startedAt: startedAt.toISOString(),
@@ -814,8 +823,20 @@ export class SuperglueClient {
       aborted: RunStatus.ABORTED,
     };
     return {
-      ...openAPIRun,
+      runId: openAPIRun.runId ?? openAPIRun.id,
+      toolId: openAPIRun.toolId,
+      tool: openAPIRun.tool,
       status: statusMap[openAPIRun.status] ?? RunStatus.FAILED,
+      toolPayload: openAPIRun.toolPayload,
+      data: openAPIRun.data,
+      toolResult: openAPIRun.data,
+      error: openAPIRun.error,
+      stepResults: openAPIRun.stepResults,
+      options: openAPIRun.options,
+      requestSource: openAPIRun.requestSource,
+      traceId: openAPIRun.traceId,
+      resultStorageUri: openAPIRun.resultStorageUri,
+      metadata: openAPIRun.metadata,
     } as Run;
   }
 
@@ -854,9 +875,16 @@ export class SuperglueClient {
     };
   }
 
-  async getRun(id: string): Promise<Run> {
-    const response = await this.restRequest<any>("GET", `/v1/runs/${encodeURIComponent(id)}`);
-    return this.mapOpenAPIRunToRun(response);
+  async getRun(id: string): Promise<Run | null> {
+    try {
+      const response = await this.restRequest<any>("GET", `/v1/runs/${encodeURIComponent(id)}`);
+      return this.mapOpenAPIRunToRun(response);
+    } catch (err: any) {
+      if (err.message?.includes("404") || err.message?.includes("not found")) {
+        return null;
+      }
+      throw err;
+    }
   }
 
   async getWorkflow(id: string): Promise<Tool> {

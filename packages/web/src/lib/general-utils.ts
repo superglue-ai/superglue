@@ -1,4 +1,9 @@
-import { assertValidArrowFunction, findTemplateForSystem } from "@superglue/shared";
+import {
+  assertValidArrowFunction,
+  findTemplateForSystem,
+  sampleResultObject,
+  safeStringify,
+} from "@superglue/shared";
 import { clsx, type ClassValue } from "clsx";
 import prettierPluginBabel from "prettier/plugins/babel";
 import prettierPluginEstree from "prettier/plugins/estree";
@@ -47,26 +52,6 @@ export function getThemeScript(): string {
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
-}
-
-/**
- * Safe JSON.stringify that handles circular references, BigInt, and other edge cases.
- * Falls back to String(obj) on error.
- */
-export function safeStringify(obj: any, indent?: number): string {
-  try {
-    return JSON.stringify(
-      obj,
-      (_, value) => {
-        if (typeof value === "bigint") return value.toString();
-        if (typeof value === "function") return "[Function]";
-        return value;
-      },
-      indent,
-    );
-  } catch {
-    return String(obj);
-  }
 }
 
 export function composeUrl(host: string, path: string | undefined) {
@@ -536,3 +521,70 @@ export const handleCopyCode = async (code: string): Promise<boolean> => {
     return false;
   }
 };
+
+/**
+ * Truncates tool result to fit within max length by progressively sampling data.
+ * Only samples fields that can be large (data, stepResults, toolPayload).
+ * All other fields (diffs, config, metadata, etc.) are preserved as-is.
+ *
+ * @param result - The result data to truncate (string, object, or array)
+ * @param maxLength - Maximum character length (default: 100000)
+ * @returns Truncated string representation of the result
+ */
+export function truncateToolResult(result: any, maxLength: number = 100000): string {
+  // If result is already a string, just truncate if needed
+  if (typeof result === "string") {
+    return result.length > maxLength
+      ? result.slice(0, maxLength) + "\n\n... [Output truncated - result too large]"
+      : result;
+  }
+
+  // For objects/arrays, try progressive sampling before stringifying
+  try {
+    // First try without any sampling - most results fit
+    let resultString = JSON.stringify(result, null, 2);
+    if (resultString.length <= maxLength) {
+      return resultString;
+    }
+
+    // Only sample fields that can be large - preserve everything else
+    const sampleableKeys = ["data", "stepResults", "toolPayload", "rawData", "transformedData"];
+
+    const sampleFields = (obj: any, sampleSize: number): any => {
+      if (typeof obj !== "object" || obj === null || Array.isArray(obj)) {
+        return sampleResultObject(obj, sampleSize);
+      }
+
+      const sampled: Record<string, any> = {};
+      for (const [key, val] of Object.entries(obj)) {
+        sampled[key] = sampleableKeys.includes(key) ? sampleResultObject(val, sampleSize) : val;
+      }
+      return sampled;
+    };
+
+    // Sample with size 3
+    let sampled = sampleFields(result, 4);
+    resultString = JSON.stringify(sampled, null, 2);
+
+    if (resultString.length <= maxLength) {
+      return resultString;
+    }
+
+    // More aggressive sampling with size 1
+    sampled = sampleFields(result, 1);
+    resultString = JSON.stringify(sampled, null, 2);
+
+    if (resultString.length <= maxLength) {
+      return resultString;
+    }
+
+    // Last resort: truncate the string (may break JSON structure)
+    return resultString.slice(0, maxLength) + "\n\n... [Output truncated - result too large]";
+  } catch {
+    // If sampling or stringifying fails (e.g., circular references), use safe stringify
+    const basicString = safeStringify(result);
+    return basicString.length > maxLength
+      ? basicString.slice(0, maxLength) + "\n\n... [Output truncated - result too large]"
+      : basicString;
+  }
+}

@@ -16,6 +16,7 @@ import {
 } from "./agent-request";
 import { TOOL_REGISTRY } from "./registry/tools";
 import type { ToolConfirmationMetadata } from "@/src/components/agent/hooks/types";
+import { EESuperglueClient } from "../ee-superglue-client";
 
 export interface StreamChunk {
   type:
@@ -56,7 +57,7 @@ export class AgentClient {
   private config: AgentClientConfig;
   private model: LanguageModel;
   private subscriptionClient: GraphQLSubscriptionClient | null = null;
-  private superglueClient: SuperglueClient;
+  private superglueClient: EESuperglueClient;
 
   constructor(config: AgentClientConfig) {
     this.config = config;
@@ -66,7 +67,7 @@ export class AgentClient {
       defaultModel: "claude-sonnet-4-5",
     });
 
-    this.superglueClient = new SuperglueClient({
+    this.superglueClient = new EESuperglueClient({
       endpoint: config.graphqlEndpoint,
       apiKey: config.token,
       apiEndpoint: config.apiEndpoint,

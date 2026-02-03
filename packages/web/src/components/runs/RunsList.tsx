@@ -1,8 +1,13 @@
 "use client";
 
+import { useConfig } from "@/src/app/config-context";
 import { CopyButton } from "@/src/components/tools/shared/CopyButton";
 import { Badge } from "@/src/components/ui/badge";
-import { RequestSource, RunStatus } from "@superglue/shared";
+import { JsonCodeEditor } from "@/src/components/editors/JsonCodeEditor";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/src/components/ui/tabs";
+import { createEESuperglueClient } from "@/src/lib/ee-superglue-client";
+import { RequestSource, RunStatus, StoredRunResults } from "@superglue/shared";
+
 import {
   AlertTriangle,
   CheckCircle,
@@ -136,48 +141,59 @@ export const RequestSourceBadge = ({ source }: { source?: RequestSource | string
   );
 };
 
-const CollapsibleSection = ({
-  title,
-  children,
-  defaultOpen = false,
-  isFirst = false,
-  isLast = false,
-}: {
-  title: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-  isFirst?: boolean;
-  isLast?: boolean;
-}) => {
-  const [isOpen, setIsOpen] = React.useState(defaultOpen);
-
-  return (
-    <div
-      className={`border-x border-t ${isLast && !isOpen ? "border-b" : ""} ${isFirst ? "rounded-t-lg" : ""} ${isLast ? "rounded-b-lg" : ""}`}
-    >
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted/30 transition-colors"
-      >
-        {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        {title}
-      </button>
-      {isOpen && (
-        <div className={`px-3 pb-3 ${isLast ? "border-b rounded-b-lg" : "border-b"}`}>
-          {children}
-        </div>
-      )}
-    </div>
-  );
-};
-
 export const RunDetails = ({ run }: { run: any }) => {
-  if (!run) return null;
+  const config = useConfig();
+  const [loadedResults, setLoadedResults] = React.useState<StoredRunResults | null>(null);
+  const [isLoadingResults, setIsLoadingResults] = React.useState(false);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [activeTab, setActiveTab] = React.useState<string>("config");
+
+  const runId = run?.runId;
+  const hasStoredResults = !!run?.resultStorageUri;
+
+  // Auto-load results from S3 when available
+  React.useEffect(() => {
+    if (!hasStoredResults || loadedResults || isLoadingResults || loadError || !runId || !run) {
+      return;
+    }
+
+    const loadResults = async () => {
+      setIsLoadingResults(true);
+      setLoadError(null);
+      try {
+        const client = createEESuperglueClient(config.superglueEndpoint, config.apiEndpoint);
+        const results = await client.getRunResults(runId);
+        setLoadedResults(results);
+        if (!results) {
+          setLoadError("No results available for this run");
+        }
+      } catch (err: any) {
+        setLoadError(err.message || "Failed to load results");
+      } finally {
+        setIsLoadingResults(false);
+      }
+    };
+
+    loadResults();
+  }, [
+    hasStoredResults,
+    loadedResults,
+    isLoadingResults,
+    loadError,
+    runId,
+    config.superglueEndpoint,
+    config.apiEndpoint,
+  ]);
+
+  // Use loaded results if available, otherwise fall back to run data
+  const displayStepResults = loadedResults?.stepResults || run.stepResults;
+  const displayToolResult = loadedResults?.data || run.data;
+  const displayToolPayload = loadedResults?.toolPayload || run.toolPayload;
 
   const cleanedToolConfig = run.tool ? removeNullFields(run.tool) : null;
   const cleanedOptions = run.options ? removeNullFields(run.options) : null;
-  const cleanedToolResult = run.data ? removeNullFields(run.data) : null;
-  const cleanedToolPayload = run.toolPayload ? removeNullFields(run.toolPayload) : null;
+  const cleanedToolResult = displayToolResult ? removeNullFields(displayToolResult) : null;
+  const cleanedToolPayload = displayToolPayload ? removeNullFields(displayToolPayload) : null;
 
   const hasToolConfig = cleanedToolConfig && Object.keys(cleanedToolConfig).length > 0;
   const hasOptions = cleanedOptions && Object.keys(cleanedOptions).length > 0;
@@ -187,16 +203,91 @@ export const RunDetails = ({ run }: { run: any }) => {
       ? cleanedToolResult.length > 0
       : Object.keys(cleanedToolResult).length > 0);
   const hasToolPayload = cleanedToolPayload && Object.keys(cleanedToolPayload).length > 0;
-  const hasStepResults = run.stepResults && run.stepResults.length > 0;
+  const hasStepResults = displayStepResults && displayStepResults.length > 0;
   const isFailed =
     run.status === RunStatus.FAILED || run.status?.toString().toUpperCase() === "FAILED";
 
   const startedAt = run.metadata?.startedAt ? new Date(run.metadata.startedAt) : null;
   const completedAt = run.metadata?.completedAt ? new Date(run.metadata.completedAt) : null;
 
+  // Build tabs array - order: input, steps, result (config removed from overview)
+  const tabs: { key: string; label: string; badge?: React.ReactNode; content: React.ReactNode }[] =
+    [];
+
+  if (hasToolPayload) {
+    tabs.push({
+      key: "payload",
+      label: "Input",
+      content: (
+        <JsonCodeEditor
+          value={JSON.stringify(cleanedToolPayload, null, 2)}
+          readOnly
+          maxHeight="500px"
+        />
+      ),
+    });
+  }
+
+  if (hasStepResults) {
+    displayStepResults.forEach((step: any, index: number) => {
+      tabs.push({
+        key: `step-${step.stepId}`,
+        label: step.stepId,
+        badge: step.success ? (
+          <CheckCircle className="ml-1 h-3.5 w-3.5 text-emerald-500" />
+        ) : (
+          <XCircle className="ml-1 h-3.5 w-3.5 text-destructive" />
+        ),
+        content: (
+          <div className="space-y-2 min-w-0">
+            <div className="text-xs text-muted-foreground font-medium">{step.stepId}</div>
+            {step.error && (
+              <div className="p-2 bg-muted/50 border border-border rounded text-xs">
+                <pre className="text-foreground whitespace-pre-wrap font-mono">{step.error}</pre>
+              </div>
+            )}
+            {step.data && (
+              <JsonCodeEditor
+                value={JSON.stringify(removeNullFields(step.data), null, 2)}
+                readOnly
+                maxHeight="500px"
+              />
+            )}
+          </div>
+        ),
+      });
+    });
+  }
+
+  if (hasToolResult) {
+    tabs.push({
+      key: "result",
+      label: "Result",
+      badge: isFailed ? (
+        <XCircle className="ml-1 h-3.5 w-3.5 text-destructive" />
+      ) : (
+        <CheckCircle className="ml-1 h-3.5 w-3.5 text-emerald-500" />
+      ),
+      content: (
+        <JsonCodeEditor
+          value={JSON.stringify(cleanedToolResult, null, 2)}
+          readOnly
+          maxHeight="400px"
+        />
+      ),
+    });
+  }
+
+  // Set default tab to first available
+  React.useEffect(() => {
+    if (tabs.length > 0 && !tabs.find((t) => t.key === activeTab)) {
+      setActiveTab(tabs[0].key);
+    }
+  }, [tabs, activeTab]);
+
   return (
-    <div className="p-4 space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="p-4 space-y-4 overflow-y-auto [scrollbar-gutter:stable] min-w-0">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="space-y-1">
           <h4 className="text-xs font-medium text-muted-foreground">Run ID</h4>
           <div className="flex items-center gap-2">
@@ -232,141 +323,42 @@ export const RunDetails = ({ run }: { run: any }) => {
           </div>
         </div>
       </div>
+      {loadError && (
+        <div className="p-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-lg">
+          <p className="text-xs text-amber-700 dark:text-amber-400">{loadError}</p>
+        </div>
+      )}
 
       {isFailed && run.error && (
         <div className="space-y-1">
           <h4 className="text-xs font-medium text-muted-foreground">Error Message</h4>
-          <div className="p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg">
-            <pre className="text-xs text-red-700 dark:text-red-400 whitespace-pre-wrap font-mono">
-              {run.error}
-            </pre>
+          <div className="p-2 bg-muted/50 border border-border rounded-lg">
+            <pre className="text-xs text-foreground whitespace-pre-wrap font-mono">{run.error}</pre>
           </div>
         </div>
       )}
 
-      {(() => {
-        const sections = [
-          hasToolPayload && {
-            key: "payload",
-            title: "Tool Payload (received input)",
-            defaultOpen: true,
-            content: (
-              <div className="relative">
-                <div className="absolute top-2 right-2">
-                  <CopyButton getData={() => JSON.stringify(cleanedToolPayload, null, 2)} />
-                </div>
-                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md">
-                  {JSON.stringify(cleanedToolPayload, null, 2)}
-                </pre>
-              </div>
-            ),
-          },
-          hasOptions && {
-            key: "options",
-            title: "Execution Options",
-            content: (
-              <div className="relative">
-                <div className="absolute top-2 right-2">
-                  <CopyButton getData={() => JSON.stringify(cleanedOptions, null, 2)} />
-                </div>
-                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md">
-                  {JSON.stringify(cleanedOptions, null, 2)}
-                </pre>
-              </div>
-            ),
-          },
-          hasStepResults && {
-            key: "steps",
-            title: `Step Results (${run.stepResults.length})`,
-            content: (
-              <div className="space-y-2">
-                {run.stepResults.map((step: any, index: number) => (
-                  <div key={step.stepId} className="p-2 border rounded-lg space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-xs">
-                        Step {index + 1}: {step.stepId}
-                      </span>
-                      <Badge
-                        variant={step.success ? "default" : "destructive"}
-                        className={
-                          step.success
-                            ? "bg-emerald-500 hover:bg-emerald-500"
-                            : "hover:bg-destructive"
-                        }
-                      >
-                        {step.success ? "Success" : "Failed"}
-                      </Badge>
-                    </div>
-                    {step.error && (
-                      <div className="p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded text-xs">
-                        <pre className="text-red-600 dark:text-red-500 whitespace-pre-wrap font-mono">
-                          {step.error}
-                        </pre>
-                      </div>
-                    )}
-                    {step.data && (
-                      <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-2 rounded-md">
-                        {JSON.stringify(removeNullFields(step.data), null, 2)}
-                      </pre>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ),
-          },
-          hasToolResult && {
-            key: "result",
-            title: "Tool Result",
-            content: (
-              <div className="relative">
-                <div className="absolute top-2 right-2 z-10">
-                  <CopyButton getData={() => JSON.stringify(cleanedToolResult, null, 2)} />
-                </div>
-                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md">
-                  {JSON.stringify(cleanedToolResult, null, 2)}
-                </pre>
-              </div>
-            ),
-          },
-          hasToolConfig && {
-            key: "config",
-            title: "Tool Configuration",
-            content: (
-              <div className="relative">
-                <div className="absolute top-2 right-2">
-                  <CopyButton getData={() => JSON.stringify(cleanedToolConfig, null, 2)} />
-                </div>
-                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-muted/30 p-3 pr-10 rounded-md">
-                  {JSON.stringify(cleanedToolConfig, null, 2)}
-                </pre>
-              </div>
-            ),
-          },
-        ].filter(Boolean) as {
-          key: string;
-          title: string;
-          content: React.ReactNode;
-          defaultOpen?: boolean;
-        }[];
-
-        if (sections.length === 0) return null;
-
-        return (
-          <div>
-            {sections.map((section, idx) => (
-              <CollapsibleSection
-                key={section.key}
-                title={section.title}
-                defaultOpen={section.defaultOpen}
-                isFirst={idx === 0}
-                isLast={idx === sections.length - 1}
+      {tabs.length > 0 && (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="h-auto p-1.5 bg-muted/40 rounded-lg gap-1.5 flex-wrap justify-start w-full">
+            {tabs.map((tab) => (
+              <TabsTrigger
+                key={tab.key}
+                value={tab.key}
+                className="h-8 px-3 text-xs font-medium flex items-center gap-1 rounded-md bg-background border border-border/60 shadow-md hover:shadow-lg active:translate-y-[1px] active:shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary/50 transition-all"
               >
-                {section.content}
-              </CollapsibleSection>
+                {tab.label}
+                {tab.badge}
+              </TabsTrigger>
             ))}
-          </div>
-        );
-      })()}
+          </TabsList>
+          {tabs.map((tab) => (
+            <TabsContent key={tab.key} value={tab.key} className="mt-3">
+              {tab.content}
+            </TabsContent>
+          ))}
+        </Tabs>
+      )}
     </div>
   );
 };

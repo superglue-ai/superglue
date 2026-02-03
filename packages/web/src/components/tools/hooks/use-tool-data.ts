@@ -11,10 +11,11 @@ interface UseToolDataOptions {
   initialInstruction?: string;
   embedded?: boolean;
   onSave?: (tool: Tool, payload: Record<string, any>) => Promise<void>;
+  restoreRunId?: string; // Skip loading tool if restoring from run
 }
 
 export function useToolData(options: UseToolDataOptions) {
-  const { id, initialTool, initialInstruction, embedded, onSave } = options;
+  const { id, initialTool, initialInstruction, embedded, onSave, restoreRunId } = options;
 
   const config = useConfig();
   const { toast } = useToast();
@@ -144,6 +145,10 @@ export function useToolData(options: UseToolDataOptions) {
   ]);
 
   useEffect(() => {
+    // Skip loading tool if we're restoring from a run (will use config from run instead)
+    if (restoreRunId) {
+      return;
+    }
     if (!embedded && id) {
       loadTool(id);
     } else if (!embedded && !id && !initialTool) {
@@ -163,7 +168,7 @@ export function useToolData(options: UseToolDataOptions) {
       setPayloadText("{}");
       clearAllExecutions();
     }
-  }, [id, embedded, initialTool]);
+  }, [id, embedded, initialTool, restoreRunId]);
 
   const saveTool = async (): Promise<boolean> => {
     try {

@@ -73,7 +73,7 @@ export function ToolBuilderComponent({
   const [showSaveDialog, setShowSaveDialog] = useState(false);
 
   // Tool state
-  const [currentConfig, setCurrentConfig] = useState<any>(null);
+  const [currentConfig, setCurrentConfig] = useState<Tool | null>(null);
   const [toolSaved, setToolSaved] = useState(false);
 
   // Run state
@@ -209,7 +209,7 @@ export function ToolBuilderComponent({
   // Unified tool execution function
   const executeToolConfig = useCallback(
     async (options: {
-      toolConfig: any;
+      toolConfig: Tool;
       appliedChangesCount?: number;
       overridePayload?: Record<string, any>;
       toolNameForFeedback: string;
@@ -312,11 +312,23 @@ export function ToolBuilderComponent({
 
       // Execute
       try {
+        console.log("[ToolBuilderComponent] Executing workflow:", {
+          toolConfigId: toolConfig?.id,
+          hasToolConfig: !!toolConfig,
+          runId,
+        });
         const result = await client.executeWorkflow({
           tool: toolConfig,
           payload: runPayload,
           runId,
           traceId: runId,
+        });
+        console.log("[ToolBuilderComponent] executeWorkflow result:", {
+          success: result.success,
+          hasData: !!result.data,
+          error: result.error,
+          hasConfig: !!result.config,
+          configId: result.config?.id,
         });
 
         setRunResult({
@@ -348,6 +360,8 @@ export function ToolBuilderComponent({
           });
         }
       } catch (error: any) {
+        console.error("[ToolBuilderComponent] executeWorkflow error:", error);
+        console.error("[ToolBuilderComponent] error stack:", error.stack);
         const errorMsg = error.message || "Execution failed";
         setRunResult({ success: false, error: errorMsg });
         bufferFailure(errorMsg);

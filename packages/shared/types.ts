@@ -419,6 +419,18 @@ export interface Run {
   requestSource?: RequestSource;
   traceId?: string;
   metadata: RunMetadata;
+  resultStorageUri?: string; // S3 URI where full results are stored (EE feature)
+}
+
+// Stored run results in S3 (EE feature)
+export interface StoredRunResults {
+  runId: string;
+  success: boolean;
+  data: any;
+  stepResults: ToolStepResult[];
+  toolPayload: Record<string, any>;
+  error?: string;
+  storedAt: Date;
 }
 
 export interface ApiCallArgs {

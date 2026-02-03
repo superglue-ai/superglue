@@ -397,19 +397,24 @@ export function sampleResultObject(value: any, sampleSize = 10, seen = new WeakS
   );
 }
 
-export function safeStringify(value: any): string {
+export function safeStringify(value: any, indent: number = 2): string {
   const seen = new WeakSet<object>();
   try {
     return JSON.stringify(
       value,
       (key, val) => {
+        // Handle circular references
         if (typeof val === "object" && val !== null) {
           if (seen.has(val)) return "[Circular]";
           seen.add(val);
         }
+        // Handle BigInt
+        if (typeof val === "bigint") return val.toString();
+        // Handle functions
+        if (typeof val === "function") return "[Function]";
         return val;
       },
-      2,
+      indent,
     );
   } catch (err) {
     // As a last resort, coerce to string

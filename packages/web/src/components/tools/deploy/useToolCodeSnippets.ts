@@ -1,6 +1,6 @@
 import { useConfig } from "@/src/app/config-context";
 import { useMemo } from "react";
-import { safeStringify } from "@/src/lib/general-utils";
+import { safeStringify } from "@superglue/shared";
 
 export interface ToolCodeSnippets {
   webhookUrl: string;

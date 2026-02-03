@@ -1,4 +1,5 @@
 import { RequestSource, Run, RunStatus, Tool } from "@superglue/shared";
+import { RunLifecycleManager } from "../runs/run-lifecycle.js";
 import { logMessage } from "../utils/logs.js";
 import { registerApiModule } from "./registry.js";
 import {
@@ -19,18 +20,10 @@ import type {
 // Map internal Run to OpenAPI format - now minimal since types are aligned
 // Just strips internal fields and ensures tool has version
 export function mapRunToOpenAPI(run: Run): OpenAPIRun {
-  // Add default version if tool exists but has no version
-  const tool = run.tool
-    ? {
-        ...(run.tool as unknown as Record<string, unknown>),
-        version: (run.tool as unknown as Record<string, unknown>).version ?? "1.0.0",
-      }
-    : undefined;
-
   return {
     runId: run.runId,
     toolId: run.toolId,
-    tool,
+    tool: run.tool,
     status: mapRunStatusToOpenAPI(run.status),
     toolPayload: run.toolPayload,
     data: run.data,
@@ -44,6 +37,7 @@ export function mapRunToOpenAPI(run: Run): OpenAPIRun {
     options: run.options as Record<string, unknown>,
     requestSource: run.requestSource,
     traceId: run.traceId,
+    resultStorageUri: run.resultStorageUri,
     metadata: run.metadata,
   };
 }
@@ -145,6 +139,7 @@ const cancelRun: RouteHandler = async (request, reply) => {
     orgId: authReq.authInfo.orgId,
     updates: {
       status: RunStatus.ABORTED,
+      tool: run.tool,
       error: `Run cancelled by user`,
       metadata: {
         ...run.metadata,
@@ -189,7 +184,6 @@ const createRun: RouteHandler = async (request, reply) => {
     return sendError(reply, 400, "completedAt is required");
   }
 
-  const runId = crypto.randomUUID();
   const startedAt = new Date(body.startedAt);
   const completedAt = new Date(body.completedAt);
 
@@ -201,15 +195,8 @@ const createRun: RouteHandler = async (request, reply) => {
     return sendError(reply, 400, `Invalid completedAt date: ${body.completedAt}`);
   }
 
-  // Map status string to RunStatus enum
-  let status: RunStatus;
-  if (body.status === "success") {
-    status = RunStatus.SUCCESS;
-  } else if (body.status === "failed") {
-    status = RunStatus.FAILED;
-  } else if (body.status === "aborted") {
-    status = RunStatus.ABORTED;
-  } else {
+  // Validate status
+  if (!["success", "failed", "aborted"].includes(body.status)) {
     return sendError(
       reply,
       400,
@@ -217,22 +204,41 @@ const createRun: RouteHandler = async (request, reply) => {
     );
   }
 
-  const run: Run = {
-    runId,
-    toolId: body.toolId,
-    status,
-    tool: body.toolConfig as unknown as Tool,
-    requestSource: RequestSource.FRONTEND,
-    error: body.error,
-    metadata: {
-      startedAt: startedAt.toISOString(),
-      completedAt: completedAt.toISOString(),
-      durationMs: completedAt.getTime() - startedAt.getTime(),
-    },
-  };
-
   try {
-    await authReq.datastore.createRun({ run, orgId: authReq.authInfo.orgId });
+    const tool = body.toolConfig;
+    const lifecycle = new RunLifecycleManager(authReq.datastore, authReq.authInfo.orgId, metadata);
+
+    // Phase 1: Create run with truncated payload
+    const runContext = await lifecycle.startRun({
+      tool,
+      payload: body.toolPayload,
+      requestSource: RequestSource.FRONTEND,
+    });
+
+    // Phase 2: Complete run with full results (handles S3 storage)
+    if (body.status === "aborted") {
+      await lifecycle.abortRun(runContext, body.error);
+    } else {
+      await lifecycle.completeRun(runContext, {
+        success: body.status === "success",
+        tool,
+        data: body.toolResult,
+        error: body.error,
+        stepResults: body.stepResults,
+        payload: body.toolPayload,
+      });
+    }
+
+    // Fetch the created run to return it
+    const run = await authReq.datastore.getRun({
+      id: runContext.runId,
+      orgId: authReq.authInfo.orgId,
+    });
+
+    if (!run) {
+      return sendError(reply, 500, "Failed to retrieve created run");
+    }
+
     return addTraceHeader(reply, authReq.traceId).code(201).send(mapRunToOpenAPI(run));
   } catch (error: any) {
     logMessage("error", `Failed to create run: ${String(error)}`, metadata);

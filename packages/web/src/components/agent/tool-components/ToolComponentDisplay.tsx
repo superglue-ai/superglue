@@ -5,6 +5,7 @@ import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
 import { SystemIcon } from "@/src/components/ui/system-icon";
+import { ExecutionStep, Tool } from "@superglue/shared";
 import {
   AlertCircle,
   CheckCircle,
@@ -17,31 +18,9 @@ import {
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
-interface ToolStep {
-  id: string;
-  systemId: string;
-  executionMode: "DIRECT" | "LOOP";
-  apiConfig: {
-    instruction: string;
-    method: string;
-    urlHost: string;
-    urlPath: string;
-  };
-}
-
 interface ToolCallToolDisplayProps {
   toolId?: string;
-  tool?: {
-    id?: string;
-    config?: {
-      id?: string;
-      steps: ToolStep[];
-    };
-    steps?: ToolStep[]; // Fallback for direct steps
-    systemIds?: string[];
-    finalTransform?: string;
-    instruction?: string;
-  };
+  tool?: Tool;
   payload?: any;
   output?: any; // Can be string (unparsed JSON) or object
   error?: any;
@@ -124,7 +103,7 @@ export function ToolCallToolDisplay({
   const steps = displayTool?.steps || displayTool?.config?.steps || [];
 
   // Get the effective tool ID - either from props or from the tool object
-  const effectiveToolId = toolId || tool?.id || tool?.config?.id;
+  const effectiveToolId = toolId || tool?.id;
 
   const copyToClipboard = async (content: string, id: string) => {
     try {

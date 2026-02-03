@@ -413,22 +413,22 @@ TOP-LEVEL TOOL FIELDS (all that's sent):
 - id: string (required) - Unique identifier for the tool
 - instruction: string - Human-readable description of what the tool does
 - inputSchema: object - JSON Schema defining expected input parameters
-- responseSchema: object - JSON Schema defining expected output structure
+- responseSchema: object (optional) - JSON Schema defining expected output structure. Only include this if the user explicitly requested a specific response format. Most tools should NOT have this field.
 - finalTransform: string - JavaScript function to transform combined step results into final output
 - steps: array (required) - Array of execution steps
 
 EACH STEP IN THE "steps" ARRAY HAS:
 - id: string (required) - Unique step identifier, used to access results as sourceData.stepId
 - systemId: string - Which system this step uses
-- executionMode: "DIRECT" | "LOOP" - How the step executes (derived from loopSelector return)
 - loopSelector: string - JavaScript function determining execution mode (see LOOP_SELECTOR section)
-- failureBehavior: "FAIL" | "CONTINUE" - Error handling behavior (fail on step failure or continue on step failure). When set to CONTINUE, error detection is automatically disabled.
 - apiConfig: object (required) - The API configuration for this step
+- failureBehavior: "FAIL" | "CONTINUE" - Error handling behavior (fail on step failure or continue on step failure). ONLY SET TO CONTINUE IF NEEDED, default to FAIL.
+- modify: boolean - Whether the step modifies data on the system it operates on (writes, updates, deletes). Read-only operations should be false. Defaults to false.
 
 EACH STEP'S "apiConfig" CONTAINS:
 - id: string - Config identifier
 - instruction: string - Description of what this API call does
-- urlHost: string - Base URL (e.g., "https://api.example.com")
+- urlHost: string - Base URL (e.g., "https://api.example.com") - required
 - urlPath: string - Path portion (e.g., "/v1/users")
 - method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
 - queryParams: object - Query parameters
@@ -601,14 +601,6 @@ Example 7 - Multiple changes (change model in two places):
   }
 ]
 </PATCH_EXAMPLES>
-
-<STEP_PROPERTIES>
-Each step can have these optional properties:
-- failureBehavior: "FAIL" | "CONTINUE" - What to do when the step fails. 
-  * "FAIL" (default): Stop execution on error. Smart error detection is enabled (checks response content for errors).
-  * "CONTINUE": Continue with next step/iteration even if this one fails. Error detection is automatically disabled.
-- modify: boolean - Whether the step modifies data on the system it operates on (writes, updates, deletes). Read-only operations should be false. Defaults to false.
-</STEP_PROPERTIES>
 
 <COMMON_FIXES>
 1. Fixing API endpoints: Use "replace" on /steps/N/apiConfig/urlPath or urlHost

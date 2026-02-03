@@ -1,6 +1,7 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
-import { safeStringify } from "@/src/lib/general-utils";
+import { safeStringify } from "@superglue/shared";
+import { cn } from "@/src/lib/general-utils";
 
 export const copyToClipboard = async (text: string): Promise<boolean> => {
   if (navigator.clipboard && window.isSecureContext) {

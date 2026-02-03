@@ -4,15 +4,39 @@
  */
 
 import type { RequestOptions, RequestSource, Tool, ToolStepResult } from "@superglue/shared";
-import { RunStatus, RequestSource as RSrc } from "@superglue/shared";
+import { RunStatus, RequestSource as RSrc, sampleResultObject } from "@superglue/shared";
 import type { DataStore } from "../datastore/types.js";
 import { NotificationService } from "../notifications/index.js";
 import { logMessage } from "../utils/logs.js";
 
+// Max size for payload/result stored in DB (10KB) - full data goes to S3
+const MAX_DB_PAYLOAD_SIZE = 10 * 1024;
+
+/**
+ * Truncate a payload for DB storage. If too large, sample it.
+ * Returns null if even sampled version is too large.
+ */
+export function truncateForDB(
+  payload: Record<string, unknown>,
+  maxSize: number = MAX_DB_PAYLOAD_SIZE,
+): Record<string, unknown> | null {
+  const json = JSON.stringify(payload);
+  if (json.length <= maxSize) {
+    return payload;
+  }
+  const sampled = sampleResultObject(payload, 3);
+  const sampledJson = JSON.stringify(sampled);
+
+  // If still too large, return null
+  if (sampledJson.length > maxSize) {
+    return null;
+  }
+  return sampled;
+}
+
 export interface StartRunParams {
   runId?: string;
   tool: Tool;
-  /** Payload to store in DB. Omit for GraphQL (saves DB space), include for REST/Webhook */
   payload?: Record<string, unknown>;
   options?: RequestOptions;
   requestSource: RequestSource;
@@ -30,8 +54,10 @@ export interface RunContext {
 export interface CompleteRunParams {
   success: boolean;
   tool?: Tool; // Updated tool config
+  data?: any; // Tool result data
   error?: string;
   stepResults?: ToolStepResult[];
+  payload?: Record<string, unknown>;
 }
 
 // Sources that should NOT trigger notifications (handled by their own UI)
@@ -72,8 +98,7 @@ export class RunLifecycleManager {
         toolId: tool.id,
         status: RunStatus.RUNNING,
         tool,
-        // Only include toolPayload if provided (GraphQL omits it to save DB space)
-        ...(payload !== undefined && { toolPayload: payload }),
+        ...(payload !== undefined && { toolPayload: truncateForDB(payload) ?? undefined }),
         options,
         requestSource,
         metadata: {
@@ -100,13 +125,15 @@ export class RunLifecycleManager {
     const status = result.success ? RunStatus.SUCCESS : RunStatus.FAILED;
     const finalTool = result.tool || context.tool;
 
-    // Update run in database
     await this.datastore.updateRun({
       id: context.runId,
       orgId: this.orgId,
       updates: {
         status,
         tool: finalTool,
+        toolPayload: result.payload,
+        data: result.data,
+        stepResults: result.stepResults,
         error: result.error,
         metadata: {
           startedAt: context.startedAt.toISOString(),
@@ -114,6 +141,7 @@ export class RunLifecycleManager {
           durationMs: completedAt.getTime() - context.startedAt.getTime(),
         },
       },
+      // Full (non-truncated) data for S3 storage only
     });
 
     // Send notification for failed runs (fire-and-forget)
