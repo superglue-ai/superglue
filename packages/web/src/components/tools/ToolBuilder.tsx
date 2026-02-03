@@ -1,10 +1,8 @@
 import { useConfig } from "@/src/app/config-context";
 import { useSystems } from "@/src/app/systems-context";
 import { getAuthBadge } from "@/src/app/systems/page";
-import { SystemForm } from "@/src/components/systems/SystemForm";
 import { FileChip } from "@/src/components/ui/FileChip";
 import { useToast } from "@/src/hooks/use-toast";
-import { needsUIToTriggerDocFetch } from "@/src/lib/client-utils";
 import {
   formatBytes,
   MAX_TOTAL_FILE_SIZE_TOOLS,
@@ -23,15 +21,14 @@ import {
   Clock,
   FileJson,
   FileWarning,
-  Globe,
   Key,
   Loader2,
   Paperclip,
-  Pencil,
   Plus,
   Wrench,
   X,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAgentModal } from "../agent/AgentModalContext";
 import { useSystemPickerModal } from "../systems/SystemPickerModalContext";
@@ -129,7 +126,7 @@ export function ToolBuilder({
   const { openAgentModal } = useAgentModal();
   const { openSystemPicker } = useSystemPickerModal();
 
-  const { systems, pendingDocIds, loading, setPendingDocIds, refreshSystems } = useSystems();
+  const { systems, pendingDocIds, loading } = useSystems();
 
   const [instruction, setInstruction] = useState(initialInstruction);
   const [payload, setPayload] = useState(initialPayload);
@@ -154,8 +151,6 @@ export function ToolBuilder({
   const [selectedSystemIds, setSelectedSystemIds] = useState<string[]>(initialSystemIds);
 
   const [systemSearch, setSystemSearch] = useState("");
-  const [showSystemForm, setShowSystemForm] = useState(false);
-  const [systemFormEdit, setSystemFormEdit] = useState<System | null>(null);
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
@@ -166,6 +161,7 @@ export function ToolBuilder({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const superglueConfig = useConfig();
   const client = useMemo(
     () =>
       new SuperglueClient({
@@ -184,7 +180,7 @@ export function ToolBuilder({
     (systemId: string) => {
       router.push(`/systems/${encodeURIComponent(systemId)}`);
     },
-    [client],
+    [router],
   );
 
   const hasMeaningfulSchema = useMemo(
@@ -318,57 +314,6 @@ export function ToolBuilder({
     }
   };
 
-  const handleSystemFormSave = async (system: System): Promise<System | null> => {
-    setShowSystemForm(false);
-    setSystemFormEdit(null);
-
-    try {
-      const upsertMode = systemFormEdit ? UpsertMode.UPDATE : UpsertMode.CREATE;
-      const savedSystem = await client.upsertSystem(
-        system.id,
-        system,
-        upsertMode,
-        CredentialMode.REPLACE,
-      );
-      const willTriggerDocFetch = needsUIToTriggerDocFetch(savedSystem, systemFormEdit);
-
-      if (willTriggerDocFetch) {
-        setPendingDocIds((prev) => new Set([...prev, savedSystem.id]));
-
-        waitForSystemReady([savedSystem.id])
-          .then(() => {
-            setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== savedSystem.id)));
-          })
-          .catch((error) => {
-            console.error("Error waiting for docs:", error);
-            setPendingDocIds((prev) => new Set([...prev].filter((id) => id !== savedSystem.id)));
-          });
-      }
-
-      setSelectedSystemIds((ids) => {
-        const newIds = ids.filter((id) => id !== (systemFormEdit?.id || system.id));
-        newIds.push(savedSystem.id);
-        return newIds;
-      });
-
-      await refreshSystems();
-      return savedSystem;
-    } catch (error) {
-      console.error("Error saving system:", error);
-      toast({
-        title: "Error Saving System",
-        description: error instanceof Error ? error.message : "Failed to save system",
-        variant: "destructive",
-      });
-      return null;
-    }
-  };
-
-  const handleSystemFormCancel = () => {
-    setShowSystemForm(false);
-    setSystemFormEdit(null);
-  };
-
   const handleBuildTool = async () => {
     const errors: Record<string, boolean> = {};
     if (!instruction.trim()) errors.instruction = true;
@@ -484,7 +429,7 @@ export function ToolBuilder({
                 variant="outline"
                 size="sm"
                 className="h-10 shrink-0"
-                onClick={() => setShowSystemForm(true)}
+                onClick={handleAddSystem}
               >
                 <Plus className="mr-2 h-4 w-4" /> Add System
               </Button>
@@ -583,24 +528,6 @@ export function ToolBuilder({
                                   )}
                                   {badge.label}
                                 </span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSystemFormEdit(sys);
-                                    setShowSystemForm(true);
-                                  }}
-                                  disabled={pendingDocIds.has(sys.id)}
-                                  title={
-                                    pendingDocIds.has(sys.id)
-                                      ? "Documentation is being processed"
-                                      : "Edit system"
-                                  }
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
                                 <button
                                   className={cn(
                                     "h-5 w-5 rounded border-2 transition-all duration-200 flex items-center justify-center",
@@ -625,7 +552,7 @@ export function ToolBuilder({
                         {filteredSystems.length === 0 && systemSearch.trim() !== "" && (
                           <div
                             className="flex items-center justify-between rounded-md px-4 py-3 transition-all duration-200 cursor-pointer bg-background border border-dashed border-muted-foreground/30 hover:bg-accent/50 hover:border-muted-foreground/50"
-                            onClick={() => setShowSystemForm(true)}
+                            onClick={handleAddSystem}
                           >
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                               <div className="h-5 w-5 flex-shrink-0 rounded-full border-2 border-dashed border-muted-foreground/50 flex items-center justify-center">
@@ -647,7 +574,7 @@ export function ToolBuilder({
                                 className="h-8 w-8 text-muted-foreground hover:text-foreground"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setShowSystemForm(true);
+                                  handleAddSystem();
                                 }}
                                 title="Create new system"
                               >
@@ -677,24 +604,6 @@ export function ToolBuilder({
               </Button>
             </div>
           </div>
-
-          {showSystemForm &&
-            typeof document !== "undefined" &&
-            createPortal(
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-                <div className="bg-background rounded-xl max-w-2xl w-full p-0">
-                  <SystemForm
-                    modal={true}
-                    system={systemFormEdit || undefined}
-                    onSave={handleSystemFormSave}
-                    onCancel={handleSystemFormCancel}
-                    systemOptions={systemOptions}
-                    getSimpleIcon={getSimpleIcon}
-                  />
-                </div>
-              </div>,
-              document.body,
-            )}
         </div>
       </div>
     );

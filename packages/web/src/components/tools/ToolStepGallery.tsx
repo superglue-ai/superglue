@@ -1,5 +1,7 @@
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
+import { MiniCard, StatusIndicator, TriggerCard } from "@/src/components/ui/mini-card";
+import { SystemIcon } from "@/src/components/ui/system-icon";
 import { buildPreviousStepResults, cn } from "@/src/lib/general-utils";
 import { buildCategorizedSources } from "@/src/lib/templating-utils";
 import {
@@ -15,7 +17,6 @@ import {
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FinalTransformMiniStepCard, TransformItem } from "./cards/FinalTransformCard";
-import { MiniStepCard } from "./cards/MiniStepCard";
 import { PayloadMiniStepCard, PayloadItem } from "./cards/PayloadCard";
 import { SpotlightStepCard, StepItem } from "./cards/SpotlightStepCard";
 import { useExecution, useToolConfig } from "./context";
@@ -24,11 +25,14 @@ import { InstructionDisplay } from "./shared/InstructionDisplay";
 import { TriggersCard } from "./cards/TriggersCard";
 import { useRightSidebar } from "../sidebar/RightSidebarContext";
 
-export interface TriggerItem {
-  type: "trigger";
-}
+const RUNNING_STATUS = {
+  text: "Running",
+  color: "text-amber-600 dark:text-amber-400",
+  dotColor: "bg-amber-600 dark:bg-amber-400",
+  animate: true,
+} as const;
 
-export type ToolItem = PayloadItem | StepItem | TransformItem | TriggerItem;
+export type ToolItem = PayloadItem | StepItem | TransformItem;
 
 export interface ToolStepGalleryProps {
   onStepEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
@@ -93,6 +97,7 @@ export function ToolStepGallery({
     stepResultsMap,
     isRunningTransform,
     isFixingTransform,
+    getStepStatusInfo,
   } = useExecution();
 
   // === DERIVED VALUES FROM CONTEXT ===
@@ -125,11 +130,6 @@ export function ToolStepGallery({
   // === TOOL ITEMS ===
   const toolItems = useMemo((): ToolItem[] => {
     const items: ToolItem[] = [];
-
-    // Trigger (first item for saved tools)
-    if (isSavedTool) {
-      items.push({ type: "trigger" } as TriggerItem);
-    }
 
     // Payload
     items.push({
@@ -176,7 +176,6 @@ export function ToolStepGallery({
 
     return items;
   }, [
-    isSavedTool,
     payloadText,
     inputSchema,
     steps,
@@ -190,18 +189,19 @@ export function ToolStepGallery({
     filePayloads,
   ]);
 
+  // Trigger is separate from navigation - it's a visual prefix to the first card
+  const [showTriggerContent, setShowTriggerContent] = useState(false);
+
   // Item count is now dynamic based on toolItems
   const itemCount = toolItems.length;
 
-  // Calculate initial index accounting for trigger card on saved tools
+  // Calculate initial index - start at first step if valid, otherwise payload
   const initialNavIndex = useMemo(() => {
-    const triggerOffset = isSavedTool ? 1 : 0;
-    // If we have steps and payload is valid, start at first step; otherwise start at payload
     if (steps.length > 0 && isPayloadValid) {
-      return triggerOffset + 1; // payload + first step
+      return 1; // first step
     }
-    return triggerOffset; // payload (or trigger for saved tools)
-  }, [isSavedTool, steps.length, isPayloadValid]);
+    return 0; // payload
+  }, [steps.length, isPayloadValid]);
 
   // === NAVIGATION ===
   const {
@@ -227,6 +227,52 @@ export function ToolStepGallery({
     setActiveStepItemCount(itemCount);
   }, []);
 
+  // Custom keyboard navigation that includes trigger
+  useEffect(() => {
+    if (!isSavedTool) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target as HTMLElement).isContentEditable
+      )
+        return;
+
+      if (isConfiguratorEditing) return;
+
+      const activeElement = document.activeElement;
+      if (
+        activeElement?.closest("[data-radix-popper-content-wrapper]") ||
+        activeElement?.closest(".monaco-editor")
+      )
+        return;
+
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        e.stopPropagation();
+        if (showTriggerContent) {
+          return;
+        } else if (activeIndex === 0) {
+          setShowTriggerContent(true);
+        } else {
+          handleNavigation("prev");
+        }
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        e.stopPropagation();
+        if (showTriggerContent) {
+          setShowTriggerContent(false);
+        } else {
+          handleNavigation("next");
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [isSavedTool, showTriggerContent, activeIndex, isConfiguratorEditing, handleNavigation]);
+
   const currentItem = toolItems[activeIndex];
   const indicatorIndices = toolItems.map((_, idx) => idx);
 
@@ -239,12 +285,15 @@ export function ToolStepGallery({
   // === VISIBLE CARDS CALCULATION ===
   const visibleCardsData = useMemo(() => {
     const totalCards = toolItems.length;
-    const CARD_WIDTH = 150;
+    const CARD_WIDTH = 170;
     const BUTTON_SIZE = 32;
     const BUTTON_SPACING = 18;
     const SEPARATOR_WIDTH = BUTTON_SIZE + BUTTON_SPACING * 2;
     const EDGE_PADDING = 16;
-    const available = Math.max(0, containerWidth - EDGE_PADDING * 2);
+    const TRIGGER_WIDTH = 32;
+    const TRIGGER_GAP = 32;
+    const triggerSpace = isSavedTool ? TRIGGER_WIDTH + TRIGGER_GAP : 0;
+    const available = Math.max(0, containerWidth - EDGE_PADDING * 2 - triggerSpace);
 
     let cardsToShow = 1;
     const maxCandidates = Math.min(totalCards, 12);
@@ -268,7 +317,6 @@ export function ToolStepGallery({
 
     const visibleItems = toolItems.slice(startIdx, endIdx);
     const visibleIndices = visibleItems.map((_, i) => startIdx + i);
-    const count = Math.max(1, visibleItems.length);
 
     return {
       visibleItems,
@@ -281,7 +329,7 @@ export function ToolStepGallery({
       sepWidth: SEPARATOR_WIDTH,
       cardWidth: CARD_WIDTH,
     };
-  }, [toolItems, containerWidth, activeIndex]);
+  }, [toolItems, containerWidth, activeIndex, isSavedTool]);
 
   // Update hidden counts for badges
   useEffect(() => {
@@ -342,9 +390,7 @@ export function ToolStepGallery({
     if (!showStepOutputSignal || !focusStepId) return;
     const idx = steps.findIndex((s: any) => s.id === focusStepId);
     if (idx >= 0) {
-      // +1 for payload, +1 more for trigger if saved tool
-      const offset = isSavedTool ? 2 : 1;
-      navigateToIndex(idx + offset);
+      navigateToIndex(idx + 1); // +1 for payload
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showStepOutputSignal, focusStepId]);
@@ -384,12 +430,15 @@ export function ToolStepGallery({
         style={{ scrollbarGutter: "stable" }}
       >
         <div className="space-y-6">
-          <div className="flex items-center gap-0">
-            <div className="relative">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-shrink-0">
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => handleNavigation("prev")}
+                onClick={() => {
+                  setShowTriggerContent(false);
+                  handleNavigation("prev");
+                }}
                 disabled={activeIndex === 0}
                 className={cn(
                   "shrink-0 h-9 w-9",
@@ -416,11 +465,11 @@ export function ToolStepGallery({
               )}
             </div>
 
-            <div className="flex-1 overflow-hidden px-0">
+            <div className="flex-1 min-w-0 overflow-hidden">
               <div className="relative">
                 <div
                   ref={listRef}
-                  className="flex justify-center items-center overflow-visible py-3 relative z-10"
+                  className="flex justify-center items-center py-3 relative z-10"
                   style={{ minHeight: "140px" }}
                 >
                   {!isHydrated ? (
@@ -429,77 +478,38 @@ export function ToolStepGallery({
                     </div>
                   ) : (
                     <>
-                      {/* Left spacer */}
-                      {visibleCardsData.visibleItems.length > 0 && (
-                        <div
-                          style={{
-                            flex: `0 0 ${visibleCardsData.sepWidth}px`,
-                            width: `${visibleCardsData.sepWidth}px`,
-                          }}
-                        />
+                      {/* Trigger button - shown as prefix when first visible card is payload */}
+                      {isSavedTool && visibleCardsData.startIdx === 0 && (
+                        <>
+                          <TriggerCard
+                            isActive={showTriggerContent}
+                            onClick={() => setShowTriggerContent(!showTriggerContent)}
+                            icon={
+                              <Zap
+                                className={cn(
+                                  "h-4 w-4 absolute transition-colors",
+                                  showTriggerContent
+                                    ? "text-[#FFA500]"
+                                    : "text-muted-foreground group-hover:text-primary",
+                                )}
+                              />
+                            }
+                          />
+                          <div className="w-8" />
+                        </>
                       )}
                       {visibleCardsData.visibleItems.map((item, idx) => {
                         const globalIdx = visibleCardsData.visibleIndices[idx];
-                        const showArrow = idx < visibleCardsData.visibleItems.length - 1;
                         const cardWidth = visibleCardsData.cardWidth;
-
-                        const baseProps = {
-                          index: globalIdx,
-                          isActive: globalIdx === activeIndex,
-                          onClick: () => {
-                            handleCardClick(globalIdx);
-                          },
-                          isFirstCard: globalIdx === 0,
-                          isLastCard: globalIdx === visibleCardsData.totalCards - 1,
+                        const isActive = globalIdx === activeIndex && !showTriggerContent;
+                        const handleClick = () => {
+                          setShowTriggerContent(false);
+                          handleCardClick(globalIdx);
                         };
 
-                        // Build cardProps based on item type
-                        let cardProps: any;
-                        if (item.type === "trigger") {
-                          cardProps = {
-                            ...baseProps,
-                            type: "trigger" as const,
-                          };
-                        } else if (item.type === "payload") {
-                          cardProps = {
-                            ...baseProps,
-                            type: "payload" as const,
-                            isPayloadValid,
-                            payloadData: computedPayload,
-                          };
-                        } else if (item.type === "transform") {
-                          cardProps = {
-                            ...baseProps,
-                            type: "transform" as const,
-                            isRunning: isRunningTransform || isFixingTransform,
-                          };
-                        } else {
-                          // step type
-                          const stepItem = item as StepItem;
-                          const stepsBeforeThis = toolItems
-                            .slice(0, globalIdx)
-                            .filter((i) => i.type === "step").length;
-                          cardProps = {
-                            ...baseProps,
-                            type: "step" as const,
-                            step: stepItem.data,
-                            stepNumber: stepsBeforeThis,
-                            isRunning:
-                              isExecutingAny && currentExecutingStepIndex === stepsBeforeThis,
-                            isLoopStep:
-                              globalIdx === activeIndex &&
-                              activeStepItemCount !== null &&
-                              activeStepItemCount > 0,
-                          };
-                        }
+                        const canShowAddButton = setSteps && item.type !== "transform";
 
-                        // Determine if we should show add step button
-                        const canShowAddButton =
-                          setSteps && item.type !== "transform" && item.type !== "trigger";
-
-                        // Get the step index for insert
                         const getInsertIndex = () => {
-                          if (item.type === "trigger") return -1;
                           if (item.type === "payload") return -1;
                           if (item.type === "step") {
                             return (
@@ -687,20 +697,17 @@ export function ToolStepGallery({
 
                         return (
                           <React.Fragment key={globalIdx}>
-                            {item.type !== "trigger" && (
-                              <div
-                                className="flex items-center justify-center"
-                                style={{
-                                  flex: `0 0 ${cardWidth}px`,
-                                  width: `${cardWidth}px`,
-                                  maxWidth: `${cardWidth}px`,
-                                }}
-                              >
-                                <MiniStepCard {...cardProps} />
-                              </div>
-                            )}
-                            {item.type === "trigger" && <MiniStepCard {...cardProps} />}
-                            {showArrow && (
+                            <div
+                              className="flex items-center justify-center"
+                              style={{
+                                flex: `0 0 ${cardWidth}px`,
+                                width: `${cardWidth}px`,
+                                maxWidth: `${cardWidth}px`,
+                              }}
+                            >
+                              {renderCardContent()}
+                            </div>
+                            {showSeparator && (
                               <div
                                 style={{
                                   flex: `0 0 ${visibleCardsData.sepWidth}px`,
@@ -726,26 +733,20 @@ export function ToolStepGallery({
                           </React.Fragment>
                         );
                       })}
-                      {/* Right spacer */}
-                      {visibleCardsData.visibleItems.length > 0 && (
-                        <div
-                          style={{
-                            flex: `0 0 ${visibleCardsData.sepWidth}px`,
-                            width: `${visibleCardsData.sepWidth}px`,
-                          }}
-                        />
-                      )}
                     </>
                   )}
                 </div>
               </div>
             </div>
 
-            <div className="relative">
+            <div className="relative flex-shrink-0">
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => handleNavigation("next")}
+                onClick={() => {
+                  setShowTriggerContent(false);
+                  handleNavigation("next");
+                }}
                 disabled={activeIndex === toolItems.length - 1}
                 className="shrink-0 h-9 w-9"
                 title="Next"
@@ -770,6 +771,7 @@ export function ToolStepGallery({
                   key={`dot-${globalIdx}`}
                   onClick={() => {
                     if (isConfiguratorEditing) return;
+                    setShowTriggerContent(false);
                     navigateToIndex(globalIdx);
                   }}
                   className={cn(
@@ -784,7 +786,7 @@ export function ToolStepGallery({
           </div>
 
           <div className="min-h-[220px] max-w-6xl mx-auto">
-            {currentItem && currentItem.type === "trigger" ? (
+            {showTriggerContent && isSavedTool ? (
               <TriggersCard toolId={toolId} payload={computedPayload} compact />
             ) : currentItem && currentItem.type === "payload" ? (
               <PayloadMiniStepCard
