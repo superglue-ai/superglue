@@ -70,3 +70,10 @@ export function getFileService(): FileService {
   }
   return _fileService;
 }
+
+/**
+ * Check if cloud file storage is available (e.g., S3 bucket configured)
+ */
+export function isFileStorageAvailable(): boolean {
+  return !!process.env.AWS_BUCKET_NAME;
+}
