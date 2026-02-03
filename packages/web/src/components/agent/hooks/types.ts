@@ -56,7 +56,7 @@ export interface UseAgentToolsReturn {
 export interface UseAgentRequestReturn {
   sendAgentRequest: (
     userMessage?: string,
-    options?: { userActions?: UserAction[]; hiddenContext?: string },
+    options?: { userActions?: UserAction[]; hiddenContext?: string; hideUserMessage?: boolean },
   ) => Promise<void>;
   bufferAction: (action: UserAction) => void;
   actionBufferRef: React.MutableRefObject<UserAction[]>;

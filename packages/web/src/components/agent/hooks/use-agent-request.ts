@@ -105,7 +105,7 @@ export function useAgentRequest({
   const sendAgentRequest = useCallback(
     async (
       userMessage?: string,
-      options?: { userActions?: UserAction[]; hiddenContext?: string },
+      options?: { userActions?: UserAction[]; hiddenContext?: string; hideUserMessage?: boolean },
     ) => {
       let actionsToSend: UserAction[];
       if (options?.userActions) {
@@ -151,6 +151,7 @@ export function useAgentRequest({
           role: "user",
           timestamp: new Date(),
           attachedFiles: readyPendingFiles.length > 0 ? readyPendingFiles : undefined,
+          isHidden: options?.hideUserMessage,
         };
         currentMessages.push(userMessageObj);
         setMessages((prev) => [...prev, userMessageObj]);

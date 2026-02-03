@@ -152,7 +152,10 @@ export const URLField = forwardRef<URLFieldHandle, URLFieldProps>(function URLFi
             onChange={handleInputChange}
             onBlur={handleBlur}
             placeholder={placeholder}
-            className={cn("pr-28", error && "border-destructive focus-visible:ring-destructive")}
+            className={cn(
+              "h-10 pr-28 rounded-lg border shadow-sm bg-muted/30 border-border/50 focus:border-primary/50 transition-colors",
+              error && "border-destructive focus-visible:ring-destructive",
+            )}
             required={required}
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">

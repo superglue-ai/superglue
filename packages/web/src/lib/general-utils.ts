@@ -237,18 +237,76 @@ export const truncateLines = (text: string, maxLines: number): string => {
   );
 };
 
+let _simpleIconsBySlug: Map<string, SimpleIcon> | null = null;
+
+function getSimpleIconsBySlug(): Map<string, SimpleIcon> {
+  if (_simpleIconsBySlug) return _simpleIconsBySlug;
+
+  _simpleIconsBySlug = new Map();
+  for (const key of Object.keys(simpleIcons)) {
+    if (key.startsWith("si") && key.length > 2) {
+      // @ts-ignore
+      const icon = simpleIcons[key] as SimpleIcon;
+      const normalizedSlug = icon.slug.toLowerCase().replace(/[^a-z0-9]/g, "");
+      _simpleIconsBySlug.set(normalizedSlug, icon);
+    }
+  }
+  return _simpleIconsBySlug;
+}
+
 export function getSimpleIcon(name: string): SimpleIcon | null {
   if (!name || name === "default") return null;
 
-  const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-  const iconKey = `si${formatted}`;
-  try {
-    // @ts-ignore - The type definitions don't properly handle string indexing
-    let icon = simpleIcons[iconKey];
-    return icon || null;
-  } catch (e) {
-    return null;
+  const slugMap = getSimpleIconsBySlug();
+  const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return slugMap.get(normalized) || null;
+}
+
+export interface SimpleIconEntry {
+  slug: string;
+  title: string;
+  hex: string;
+}
+
+let _allSimpleIconsCache: SimpleIconEntry[] | null = null;
+
+export function getAllSimpleIcons(): SimpleIconEntry[] {
+  if (_allSimpleIconsCache) return _allSimpleIconsCache;
+
+  const slugMap = getSimpleIconsBySlug();
+  _allSimpleIconsCache = Array.from(slugMap.values()).map((icon) => ({
+    slug: icon.slug,
+    title: icon.title,
+    hex: icon.hex,
+  }));
+
+  return _allSimpleIconsCache;
+}
+
+export function searchSimpleIcons(query: string, limit: number = 20): SimpleIconEntry[] {
+  if (!query || query.length < 2) return [];
+
+  const allIcons = getAllSimpleIcons();
+  const lowerQuery = query.toLowerCase();
+
+  const exactMatches: SimpleIconEntry[] = [];
+  const startsWithMatches: SimpleIconEntry[] = [];
+  const containsMatches: SimpleIconEntry[] = [];
+
+  for (const icon of allIcons) {
+    const lowerTitle = icon.title.toLowerCase();
+    const lowerSlug = icon.slug.toLowerCase();
+
+    if (lowerTitle === lowerQuery || lowerSlug === lowerQuery) {
+      exactMatches.push(icon);
+    } else if (lowerTitle.startsWith(lowerQuery) || lowerSlug.startsWith(lowerQuery)) {
+      startsWithMatches.push(icon);
+    } else if (lowerTitle.includes(lowerQuery) || lowerSlug.includes(lowerQuery)) {
+      containsMatches.push(icon);
+    }
   }
+
+  return [...exactMatches, ...startsWithMatches, ...containsMatches].slice(0, limit);
 }
 
 // Resolved icon type - either a SimpleIcon or a Lucide icon name

@@ -1,16 +1,14 @@
 import { Tabs, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
-import { Button } from "@/src/components/ui/button";
 import { DownloadButton } from "../../shared/download-button";
 import { isEmptyData } from "@/src/lib/general-utils";
 import { formatBytes } from "@/src/lib/file-utils";
 import { Loader2, OctagonX, X } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { JsonCodeEditor } from "../../../editors/JsonCodeEditor";
 import { useDataProcessor } from "../../hooks/use-data-processor";
 import { useExecution } from "../../context";
 import { CopyButton } from "../../shared/CopyButton";
 import { isAbortError } from "@/src/lib/general-utils";
-import { useRightSidebar } from "../../../sidebar/RightSidebarContext";
 
 interface StepResultTabProps {
   step: any;
@@ -27,7 +25,6 @@ export function StepResultTab({
 }: StepResultTabProps) {
   const { getStepResult, isStepFailed, isStepAborted, isExecutingAny, currentExecutingStepIndex } =
     useExecution();
-  const { sendMessageToAgent } = useRightSidebar();
 
   const stepResult = getStepResult(step.id);
   const stepFailed = isStepFailed(step.id);
@@ -86,14 +83,6 @@ export function StepResultTab({
 
   const aborted = stepAborted || (errorResult && isAbortError(stepResult));
 
-  const handleAskAgentToFix = useCallback(() => {
-    const errorMsg = typeof stepResult === "string" ? stepResult : "Step execution failed";
-    const truncatedError = errorMsg.length > 500 ? `${errorMsg.slice(0, 500)}...` : errorMsg;
-    sendMessageToAgent(
-      `Step "${step.id}" failed with the following error:\n\n${truncatedError}\n\nPlease fix this step.`,
-    );
-  }, [step.id, stepResult, sendMessageToAgent]);
-
   return (
     <div>
       {errorResult ? (
@@ -111,19 +100,9 @@ export function StepResultTab({
           </div>
         ) : (
           <div className="flex flex-col items-start justify-start p-4 border rounded-lg bg-muted/30 border-border">
-            <div className="flex items-center justify-between w-full mb-2">
-              <div className="flex items-center gap-2">
-                <X className="h-4 w-4 text-red-500 dark:text-red-400" />
-                <p className="text-sm font-semibold text-red-500 dark:text-red-400">Step Error</p>
-              </div>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleAskAgentToFix}
-                className="h-7 px-3 text-xs font-medium"
-              >
-                Fix in chat
-              </Button>
+            <div className="flex items-center gap-2 mb-2">
+              <X className="h-4 w-4 text-red-500 dark:text-red-400" />
+              <p className="text-sm font-semibold text-red-500 dark:text-red-400">Step Error</p>
             </div>
             <pre className="text-xs whitespace-pre-wrap font-mono w-full overflow-x-auto">
               {outputString || "Step execution failed"}

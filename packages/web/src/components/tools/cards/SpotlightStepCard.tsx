@@ -38,6 +38,7 @@ import {
   FileBraces,
   FileInput,
   FileOutput,
+  MessagesSquare,
   Pencil,
   Play,
   RotateCw,
@@ -97,13 +98,26 @@ export const SpotlightStepCard = React.memo(
     isFirstStep = false,
     isPayloadValid = true,
   }: SpotlightStepCardProps) => {
-    const { isExecutingAny, getStepResult, isStepFailed, canExecuteStep, getDataSelectorResult } =
-      useExecution();
+    const {
+      isExecutingAny,
+      getStepResult,
+      getStepError,
+      isStepFailed,
+      isStepAborted,
+      canExecuteStep,
+      getDataSelectorResult,
+    } = useExecution();
     const { sendMessageToAgent } = useRightSidebar();
 
     const isGlobalExecuting = isExecutingAny;
     const stepResult = getStepResult(step.id);
+    const stepFailed = isStepFailed(step.id);
+    const stepAborted = isStepAborted(step.id);
     const canExecute = canExecuteStep(stepIndex);
+
+    const errorResult =
+      (stepFailed || stepAborted) && (!stepResult || typeof stepResult === "string");
+    const showFixButton = errorResult && !stepAborted;
 
     const { output: dataSelectorOutput, error: dataSelectorError } = getDataSelectorResult(step.id);
     const lastNotifiedStepIdRef = useRef<string | null>(null);
@@ -237,8 +251,18 @@ export const SpotlightStepCard = React.memo(
       }
     };
 
+    const handleFixInChat = useCallback(() => {
+      const stepError = getStepError(step.id);
+      const errorMsg =
+        stepError || (typeof stepResult === "string" ? stepResult : "Step execution failed");
+      const truncatedError = errorMsg.length > 500 ? `${errorMsg.slice(0, 500)}...` : errorMsg;
+      sendMessageToAgent(
+        `Step "${step.id}" failed with the following error:\n\n${truncatedError}\n\nPlease fix this step.`,
+      );
+    }, [step.id, stepResult, getStepError, sendMessageToAgent]);
+
     return (
-      <Card className="w-full max-w-6xl mx-auto shadow-md border dark:border-border/50 overflow-hidden">
+      <Card className="w-full max-w-6xl mx-auto shadow-md border border-border/50 dark:border-border/70 overflow-hidden bg-gradient-to-br from-muted/30 to-muted/10 dark:from-muted/40 dark:to-muted/20 backdrop-blur-sm">
         <div className="p-3">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -359,6 +383,95 @@ export const SpotlightStepCard = React.memo(
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
+              <div className="flex items-center gap-1.5">
+                {showFixButton && (
+                  <Button variant="default" onClick={handleFixInChat} className="h-8 px-3 gap-2">
+                    <MessagesSquare className="h-3.5 w-3.5" />
+                    <span className="font-medium text-[13px]">Fix in chat</span>
+                  </Button>
+                )}
+                {onExecuteStep && (
+                  <div className="flex items-center">
+                    {isExecuting && onAbort ? (
+                      <Button variant="outline" onClick={onAbort} className="h-8 px-3 gap-2">
+                        <Square className="h-3 w-3" />
+                        <span className="font-medium text-[13px]">Stop</span>
+                      </Button>
+                    ) : (
+                      <span
+                        title={
+                          !canExecute
+                            ? "Execute previous steps first"
+                            : isExecuting
+                              ? "Step is executing..."
+                              : "Run this step"
+                        }
+                      >
+                        <div
+                          className={`relative flex rounded-md border border-input bg-background ${dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 && onExecuteStepWithLimit ? "" : ""}`}
+                        >
+                          <Button
+                            variant="ghost"
+                            onClick={handleRunStepClick}
+                            disabled={!canExecute || isExecuting || isGlobalExecuting}
+                            className={`h-8 pl-3 gap-2 border-0 ${dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 && onExecuteStepWithLimit ? "pr-2 rounded-r-none" : "pr-3"}`}
+                          >
+                            {dataSelectorOutput &&
+                            Array.isArray(dataSelectorOutput) &&
+                            dataSelectorOutput.length > 1 ? (
+                              <RotateCw className="h-3.5 w-3.5" />
+                            ) : (
+                              <Play className="h-3 w-3" />
+                            )}
+                            <span className="font-medium text-[13px]">Run Step</span>
+                          </Button>
+                          {dataSelectorOutput &&
+                            Array.isArray(dataSelectorOutput) &&
+                            dataSelectorOutput.length > 1 &&
+                            onExecuteStepWithLimit && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    disabled={!canExecute || isExecuting || isGlobalExecuting}
+                                    className="h-8 px-1.5 rounded-l-none border-0"
+                                  >
+                                    <ChevronDown className="h-3 w-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => onExecuteStepWithLimit(1)}>
+                                    <Bug className="h-3.5 w-3.5 mr-2" />
+                                    Run single iteration
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          {dataSelectorOutput &&
+                            Array.isArray(dataSelectorOutput) &&
+                            dataSelectorOutput.length > 1 && (
+                              <span className="absolute -top-2 -left-2 min-w-[16px] h-[16px] px-1 text-[10px] font-bold bg-primary text-primary-foreground rounded flex items-center justify-center">
+                                {dataSelectorOutput.length >= 1000
+                                  ? `${Math.floor(dataSelectorOutput.length / 1000)}k`
+                                  : dataSelectorOutput.length}
+                              </span>
+                            )}
+                        </div>
+                      </span>
+                    )}
+                  </div>
+                )}
+                {onRemove && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="h-8 w-8"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div>
@@ -557,26 +670,28 @@ export const SpotlightStepCard = React.memo(
                       >
                         <div className="space-y-2 mt-1 border-muted">
                           <div className="pl-2 mb-1">
-                            <Select
-                              value={step.apiConfig.pagination?.type || "none"}
-                              onValueChange={handlePaginationTypeChange}
-                            >
-                              <SelectTrigger className="h-9">
-                                <SelectValue placeholder="No pagination" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">No pagination</SelectItem>
-                                <SelectItem value="OFFSET_BASED">
-                                  Offset-based (uses {"<<offset>>"})
-                                </SelectItem>
-                                <SelectItem value="PAGE_BASED">
-                                  Page-based (uses {"<<page>>"})
-                                </SelectItem>
-                                <SelectItem value="CURSOR_BASED">
-                                  Cursor-based (uses {"<<cursor>>"})
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <div className="rounded-lg border shadow-sm bg-muted/30">
+                              <Select
+                                value={step.apiConfig.pagination?.type || "none"}
+                                onValueChange={handlePaginationTypeChange}
+                              >
+                                <SelectTrigger className="h-9 border-0 bg-transparent shadow-none">
+                                  <SelectValue placeholder="No pagination" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">No pagination</SelectItem>
+                                  <SelectItem value="OFFSET_BASED">
+                                    Offset-based (uses {"<<offset>>"})
+                                  </SelectItem>
+                                  <SelectItem value="PAGE_BASED">
+                                    Page-based (uses {"<<page>>"})
+                                  </SelectItem>
+                                  <SelectItem value="CURSOR_BASED">
+                                    Cursor-based (uses {"<<cursor>>"})
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
                           {step.apiConfig.pagination && (
                             <div className="mt-2 gap-2 pl-2">
@@ -598,7 +713,7 @@ export const SpotlightStepCard = React.memo(
                                           },
                                         }))
                                       }
-                                      className="text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0"
+                                      className="h-9 text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0"
                                       placeholder="50"
                                     />
                                   </div>
@@ -621,7 +736,7 @@ export const SpotlightStepCard = React.memo(
                                             },
                                           }))
                                         }
-                                        className="text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0"
+                                        className="h-9 text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0"
                                         placeholder="e.g., response.nextCursor"
                                       />
                                     </div>

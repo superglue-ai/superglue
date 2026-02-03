@@ -301,8 +301,8 @@ export function useAgentMessages(
   );
 
   const setAwaitingToolsToDeclined = useCallback(() => {
-    setMessages((prev) =>
-      prev.map((msg) => ({
+    const updateMessages = (msgs: Message[]) =>
+      msgs.map((msg) => ({
         ...msg,
         tools: msg.tools?.map((tool) =>
           tool.status === "awaiting_confirmation"
@@ -335,8 +335,10 @@ export function useAgentMessages(
               }
             : part,
         ),
-      })),
-    );
+      }));
+
+    messagesRef.current = updateMessages(messagesRef.current);
+    setMessages(updateMessages);
   }, []);
 
   const cleanupInterruptedStream = useCallback(

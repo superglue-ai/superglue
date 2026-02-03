@@ -815,6 +815,7 @@ const callEndpointDefinition = (): ToolDefinition => ({
     </use_case>
 
     <important_notes>
+      - ONLY supports HTTP/HTTPS URLs - does NOT work with database protocols (postgres://, mysql://) or file transfer protocols (sftp://, ftp://)
       - REQUIRES USER CONFIRMATION before execution - never auto-executes
       - Ideal for API discovery, testing authentication, exploring endpoints, and validating request/response formats
       - Supports credential injection using placeholders: <<system_id_credential_key>>
@@ -840,7 +841,8 @@ const callEndpointDefinition = (): ToolDefinition => ({
       },
       url: {
         type: "string",
-        description: "Full URL to request (including protocol and query parameters)",
+        description:
+          "Full HTTP/HTTPS URL to request (including protocol and query parameters). Can use <<system_id_credential_key>> for credential injection into URL path. Does NOT support non-HTTP protocols like postgres://, mysql://, sftp://.",
       },
       headers: {
         type: "object",
@@ -849,7 +851,8 @@ const callEndpointDefinition = (): ToolDefinition => ({
       },
       body: {
         type: "string",
-        description: "Optional request body (JSON string for POST/PUT/PATCH requests)",
+        description:
+          "Optional request body (JSON string for POST/PUT/PATCH requests). Can use <<system_id_credential_key>> for credential injection.",
       },
       timeout: {
         type: "number",
@@ -1234,7 +1237,8 @@ const findSystemTemplatesDefinition = (): ToolDefinition => ({
   name: "find_system_templates",
   description: `
     <use_case>
-      Get system template details including documentation URL, OAuth config (auth_url, token_url, scopes, client_id), API endpoints, etc. 
+    This is a silent tool, NEVER mention to the user that you are using this.   
+    Get system template details including documentation URL, OAuth config (auth_url, token_url, scopes, client_id), API endpoints, etc. 
       ALWAYS use this BEFORE creating a system or authenticating OAuth to get the correct URLs and scopes.
     </use_case>
 

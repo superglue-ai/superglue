@@ -3,6 +3,8 @@ import { Button } from "@/src/components/ui/button";
 import { FileChip } from "@/src/components/ui/FileChip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
 import { Textarea } from "@/src/components/ui/textarea";
+import { ThinkingIndicator } from "@/src/components/ui/thinking-indicator";
+import { SystemIcon } from "@/src/components/ui/system-icon";
 import { cn, handleCopyCode } from "@/src/lib/general-utils";
 import { formatBytes } from "@/src/lib/file-utils";
 import { UserAction } from "@/src/lib/agent/agent-types";
@@ -229,18 +231,32 @@ const MemoMessage = React.memo(
 );
 
 interface AgentInterfaceProps {
-  initialPrompts?: { userPrompt: string; systemPrompt: string } | null;
+  initialPrompts?: {
+    userPrompt: string;
+    systemPrompt: string;
+    chatTitle?: string;
+    chatIcon?: string;
+  } | null;
 }
 
 export function AgentInterface({ initialPrompts }: AgentInterfaceProps = {}) {
   return (
     <AgentContextProvider initialPrompts={initialPrompts}>
-      <AgentInterfaceContent />
+      <AgentInterfaceContent
+        chatTitle={initialPrompts?.chatTitle}
+        chatIcon={initialPrompts?.chatIcon}
+      />
     </AgentContextProvider>
   );
 }
 
-function AgentInterfaceContent() {
+function AgentInterfaceContent({
+  chatTitle: initialChatTitle,
+  chatIcon: initialChatIcon,
+}: {
+  chatTitle?: string;
+  chatIcon?: string;
+}) {
   const {
     messages,
     isLoading,
@@ -276,6 +292,35 @@ function AgentInterfaceContent() {
     startTemplatePrompt,
     welcomeRef,
   } = useAgentContext();
+
+  const [chatTitle, setChatTitle] = useState(initialChatTitle);
+  const [chatIcon, setChatIcon] = useState(initialChatIcon);
+
+  const handleConversationLoad = useCallback(
+    (conversation: any) => {
+      setChatTitle(undefined);
+      setChatIcon(undefined);
+      loadConversation(conversation);
+    },
+    [loadConversation],
+  );
+
+  const handleStartPrompt = useCallback(
+    (
+      userPrompt: string,
+      hiddenContext?: string,
+      options?: { hideUserMessage?: boolean; chatTitle?: string; chatIcon?: string },
+    ) => {
+      if (options?.chatTitle) {
+        setChatTitle(options.chatTitle);
+      }
+      if (options?.chatIcon) {
+        setChatIcon(options.chatIcon);
+      }
+      startTemplatePrompt(userPrompt, hiddenContext, options);
+    },
+    [startTemplatePrompt],
+  );
 
   const [input, setInput] = React.useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -405,24 +450,50 @@ function AgentInterfaceContent() {
 
   const clearMessages = useCallback(() => {
     startNewConversation();
+    setChatTitle(undefined);
+    setChatIcon(undefined);
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
   }, [startNewConversation]);
 
   return (
     <div className="h-full mx-auto flex flex-col relative">
-      <div className="flex gap-2 p-2">
+      <div className="flex items-center gap-2 p-2 relative">
         <ConversationHistory
           messages={messages}
           currentConversationId={currentConversationId}
-          onConversationLoad={loadConversation}
-          onNewConversation={startNewConversation}
+          onConversationLoad={handleConversationLoad}
+          onNewConversation={clearMessages}
           onCurrentConversationIdChange={setCurrentConversationId}
         />
 
-        {(messages.length > 1 || (messages.length === 1 && messages[0].content)) && (
-          <Button variant="outline" size="sm" onClick={clearMessages}>
+        {(chatTitle || messages.length > 1 || (messages.length === 1 && messages[0].content)) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={clearMessages}
+            className="h-9 px-3 rounded-xl"
+          >
             <Plus className="w-4 h-4 mr-2" />
             New
           </Button>
+        )}
+
+        {chatTitle && (
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-xl border border-border/50">
+            {chatIcon && (
+              <SystemIcon
+                system={{ icon: chatIcon }}
+                size={18}
+                className="flex-shrink-0"
+                fallbackClassName="text-muted-foreground"
+              />
+            )}
+            <span className="text-sm font-medium text-foreground/80 truncate max-w-[200px]">
+              {chatTitle}
+            </span>
+          </div>
         )}
       </div>
 
@@ -435,7 +506,7 @@ function AgentInterfaceContent() {
         <div className="space-y-2 pb-4 mx-auto max-w-7xl" data-chat-messages>
           {messages.length === 0 ? (
             <div className="w-full">
-              <AgentWelcome onStartPrompt={startTemplatePrompt} ref={welcomeRef} />
+              <AgentWelcome onStartPrompt={handleStartPrompt} ref={welcomeRef} />
             </div>
           ) : (
             <>
@@ -475,13 +546,19 @@ function AgentInterfaceContent() {
         <div className="mx-2 lg:mx-6 pb-4 px-4">
           <div className="max-w-7xl mx-auto">
             <div
-              className="relative flex flex-col gap-2 bg-background dark:bg-neutral-900/90 border border-border/40 dark:border-neutral-700/60 rounded-3xl overflow-hidden shadow-lg dark:shadow-2xl dark:shadow-black/50 hover:shadow-xl dark:hover:shadow-2xl dark:hover:shadow-black/60 transition-shadow duration-200 focus-within:shadow-xl dark:focus-within:shadow-2xl dark:focus-within:shadow-black/60 focus-within:border-border/60 dark:focus-within:border-neutral-600"
+              className={cn(
+                "relative flex flex-col gap-2 rounded-2xl overflow-hidden transition-all duration-200",
+                "bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/30 dark:to-muted/20",
+                "backdrop-blur-sm border border-border/50",
+                "shadow-sm hover:shadow-md focus-within:shadow-md",
+                "hover:border-border/80 focus-within:border-border/80",
+              )}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
             >
               {isDragging && (
-                <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-3xl z-10 flex items-center justify-center backdrop-blur-sm">
+                <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-2xl z-10 flex items-center justify-center backdrop-blur-sm">
                   <div className="text-primary font-medium">Drop files here</div>
                 </div>
               )}
@@ -531,14 +608,14 @@ function AgentInterfaceContent() {
                     className={cn(
                       "flex items-center rounded-xl overflow-hidden",
                       sessionFiles.length > 0
-                        ? "border border-border/40 dark:border-white/10"
-                        : "border border-border/60 dark:border-white/20",
+                        ? "border border-border/40"
+                        : "border border-border/50",
                     )}
                   >
                     {sessionFiles.length > 0 && (
                       <Popover>
                         <PopoverTrigger asChild>
-                          <button className="h-9 px-1.5 flex items-center justify-center hover:bg-muted bg-muted/80 dark:bg-neutral-800/80 dark:hover:bg-neutral-800 text-muted-foreground hover:text-foreground transition-colors border-r border-border/30 dark:border-white/10 gap-1">
+                          <button className="h-9 px-1.5 flex items-center justify-center hover:bg-muted/80 bg-muted/50 text-muted-foreground hover:text-foreground transition-colors border-r border-border/30 gap-1">
                             <span className="min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-medium bg-primary text-primary-foreground rounded-full">
                               {sessionFiles.length}
                             </span>
@@ -579,7 +656,7 @@ function AgentInterfaceContent() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-9 w-9 p-0 rounded-none hover:bg-muted bg-muted/80 dark:bg-neutral-800/80 dark:hover:bg-neutral-800 border-0"
+                      className="h-9 w-9 p-0 rounded-none hover:bg-muted/80 bg-muted/50 border-0"
                       onClick={() => (fileInputRef.current as any)?.click()}
                       disabled={isProcessingFiles}
                     >

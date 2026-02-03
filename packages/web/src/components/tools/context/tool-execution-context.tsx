@@ -311,6 +311,13 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     [stepExecutions],
   );
 
+  const getStepError = useCallback(
+    (stepId: string): string | null => {
+      return stepExecutions[stepId]?.error ?? null;
+    },
+    [stepExecutions],
+  );
+
   const isStepCompleted = useCallback(
     (stepId: string): boolean => {
       return stepExecutions[stepId]?.status === "completed";
@@ -712,6 +719,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       getStepExecution,
       getStepStatus,
       getStepResult,
+      getStepError,
       getStepStatusInfo,
       isStepCompleted,
       isStepFailed,
@@ -760,6 +768,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       getStepExecution,
       getStepStatus,
       getStepResult,
+      getStepError,
       getStepStatusInfo,
       isStepCompleted,
       isStepFailed,

@@ -146,6 +146,7 @@ const ToolsTable = () => {
     }
   }, [isInitiallyLoading, hasCompletedInitialLoad]);
 
+  const nonArchivedTools = tools.filter((t) => !t.archived);
   const shouldShowStepper =
     manuallyOpenedStepper || (hasCompletedInitialLoad && tools.length === 0);
 

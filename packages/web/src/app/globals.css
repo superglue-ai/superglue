@@ -109,45 +109,46 @@ tt {
     /* #000 */
     --foreground: 0 0% 100%;
     /* #fff */
-    --card: 220 7% 8%;
-    /* #18191b */
+    --card: 220 7% 10%;
+    /* slightly lighter card */
     --card-foreground: 0 0% 100%;
     /* #fff */
-    --popover: 0 0% 8%;
-    /* #18191b */
+    --popover: 0 0% 10%;
+    /* slightly lighter popover */
     --popover-foreground: 0 0% 100%;
     /* #fff */
-    --primary: 220 7% 30%;
-    /* #23262b */
+    --primary: 220 7% 35%;
+    /* lighter primary */
     --primary-foreground: 220 7% 100%;
     /* #fff */
     --primary-hover: 220 7% 90%;
     /* #e5e7eb */
     --primary-hover-foreground: 220 7% 20%;
     /* #32343a */
-    --secondary: 220 7% 10%;
-    /* #23262b */
-    --secondary-foreground: 220 7% 20%;
-    /* #32343a */
-    --muted: 0 0% 10%;
-    /* #1a1a1a */
-    --muted-foreground: 0 0% 50%;
-    /* #cccccc */
-    --accent: 220 7% 20%;
+    --secondary: 220 7% 14%;
+    /* lighter secondary */
+    --secondary-foreground: 220 7% 25%;
+    /* lighter secondary foreground */
+    --muted: 0 0% 14%;
+    /* lighter muted */
+    --muted-foreground: 0 0% 60%;
+    /* lighter muted foreground for better readability */
+    --accent: 220 7% 25%;
+    /* lighter accent */
     --accent-foreground: 0 0% 100%;
     /* #fff */
     --destructive: 0 72% 51%;
     /* #e5484d */
     --destructive-foreground: 0 0% 0%;
     /* #000 */
-    --border: 0 0% 20%;
-    /* #333 */
-    --input: 0 0% 15%;
-    /* #262626 */
-    --ring: 0 0% 50%;
-    /* #808080 */
-    --hover: 0 0% 18%;
-    /* #2e2e2e */
+    --border: 0 0% 25%;
+    /* lighter border for better visibility */
+    --input: 0 0% 20%;
+    /* lighter input */
+    --ring: 0 0% 55%;
+    /* lighter ring */
+    --hover: 0 0% 22%;
+    /* lighter hover */
     --radius: 0.5rem;
     --chart-1: 210 100% 60%;
     /* #339cff */
@@ -163,14 +164,14 @@ tt {
     /* #fff */
     --outline-foreground: 220 7% 100%;
     /* #fff */
-    --outline-border: 220 7% 20%;
-    /* #23262b */
-    --ghost-foreground: 220 7% 80%;
-    /* #e5e7eb */
-    --ghost-hover: 220 7% 20%;
-    /* #32343a */
-    --link: 210 100% 50%;
-    /* #1473e6 */
+    --outline-border: 220 7% 30%;
+    /* lighter outline border */
+    --ghost-foreground: 220 7% 85%;
+    /* lighter ghost foreground */
+    --ghost-hover: 220 7% 25%;
+    /* lighter ghost hover */
+    --link: 210 100% 55%;
+    /* slightly lighter link */
     --link-foreground: 0 0% 100%;
     /* #fff */
   }

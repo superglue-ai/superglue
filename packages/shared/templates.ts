@@ -549,7 +549,7 @@ export const systems: Record<string, SystemConfig> = {
     name: "AWS",
     apiUrl: "https://amazonaws.com",
     regex: "^.*(aws|amazonaws).*$",
-    icon: "amazonAWS",
+    icon: "amazonwebservices",
     docsUrl: "https://docs.aws.amazon.com/index.html",
     preferredAuthType: "apikey",
     keywords: [

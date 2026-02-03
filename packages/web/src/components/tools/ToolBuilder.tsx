@@ -12,22 +12,11 @@ import {
 } from "@/src/lib/file-utils";
 import { useFileUpload } from "./hooks/use-file-upload";
 import { SystemIcon } from "@/src/components/ui/system-icon";
-import { cn, composeUrl, getSimpleIcon, inputErrorStyles } from "@/src/lib/general-utils";
+import { SystemCarousel } from "@/src/components/ui/rotating-icon-gallery";
+import { cn, composeUrl, inputErrorStyles } from "@/src/lib/general-utils";
 import { tokenRegistry } from "@/src/lib/token-registry";
-import {
-  CredentialMode,
-  System,
-  SystemInput,
-  Tool,
-  UpsertMode,
-  SuperglueClient,
-} from "@superglue/shared";
-import {
-  ALLOWED_FILE_EXTENSIONS,
-  generateDefaultFromSchema,
-  systemOptions,
-} from "@superglue/shared";
-import { waitForSystemProcessing } from "@superglue/shared/utils";
+import { System, SystemInput, Tool, SuperglueClient, SystemConfig } from "@superglue/shared";
+import { ALLOWED_FILE_EXTENSIONS, generateDefaultFromSchema } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import {
   Check,
@@ -44,7 +33,8 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useAgentModal } from "../agent/AgentModalContext";
+import { useSystemPickerModal } from "../systems/SystemPickerModalContext";
 import { JsonCodeEditor } from "../editors/JsonCodeEditor";
 import JsonSchemaEditor from "../editors/JsonSchemaEditor";
 import { Button } from "../ui/button";
@@ -135,7 +125,9 @@ export function ToolBuilder({
   const [view, setView] = useState<ToolBuilderView>(initialView);
   const [isBuilding, setIsBuilding] = useState(false);
   const { toast } = useToast();
-  const superglueConfig = useConfig();
+  const router = useRouter();
+  const { openAgentModal } = useAgentModal();
+  const { openSystemPicker } = useSystemPickerModal();
 
   const { systems, pendingDocIds, loading, setPendingDocIds, refreshSystems } = useSystems();
 
@@ -184,12 +176,13 @@ export function ToolBuilder({
     [superglueConfig.superglueEndpoint, superglueConfig.apiEndpoint],
   );
 
-  const waitForSystemReady = useCallback(
-    (systemIds: string[]) => {
-      const clientAdapter = {
-        getSystem: (id: string) => client.getSystem(id),
-      };
-      return waitForSystemProcessing(clientAdapter, systemIds);
+  const handleAddSystem = useCallback(() => {
+    openSystemPicker();
+  }, [openSystemPicker]);
+
+  const handleEditSystem = useCallback(
+    (systemId: string) => {
+      router.push(`/systems/${encodeURIComponent(systemId)}`);
     },
     [client],
   );
@@ -500,9 +493,32 @@ export function ToolBuilder({
             {loading ? (
               <div className="h-[200px] bg-background" />
             ) : systems.length === 0 ? (
-              <div className="py-16 flex items-center justify-center">
-                <p className="text-sm text-muted-foreground italic">
-                  No systems added yet. Define the APIs or data sources your tool will use.
+              <div className="py-8 flex flex-col items-center justify-center gap-4">
+                <SystemCarousel
+                  onSystemSelect={(key, label, config) => {
+                    const hiddenContext = JSON.stringify({
+                      templateInfo: {
+                        apiUrl: config.apiUrl,
+                        docsUrl: config.docsUrl,
+                        openApiUrl: config.openApiUrl,
+                        preferredAuthType: config.preferredAuthType,
+                        hasOAuth: !!config.oauth,
+                      },
+                    });
+                    openAgentModal({
+                      userPrompt: `I want to set up ${label}`,
+                      systemPrompt: hiddenContext,
+                      chatTitle: label,
+                      chatIcon: config.icon,
+                    });
+                  }}
+                  className="w-full"
+                  showNavArrows
+                />
+                <p className="text-xs text-muted-foreground/80 text-center max-w-md">
+                  No systems added yet.
+                  <br />
+                  Click an icon or the "Add System" button to add a new system.
                 </p>
               </div>
             ) : (
@@ -649,6 +665,7 @@ export function ToolBuilder({
 
             <div className="flex justify-end mt-3">
               <Button
+                variant="outline"
                 onClick={() => setView("instructions")}
                 className="h-8 px-4 rounded-full flex-shrink-0"
               >
@@ -1076,19 +1093,25 @@ export function ToolBuilder({
             <p className="text-sm text-muted-foreground text-center">Suggestions</p>
             <div className="flex flex-wrap gap-2 justify-center">
               {suggestions.map((suggestion, index) => (
-                <Button
+                <button
                   key={index}
-                  variant="outline"
-                  size="sm"
                   onClick={() => setInstruction(suggestion)}
-                  className="text-sm h-auto py-2 px-4 font-normal animate-fade-in whitespace-normal text-left max-w-full"
+                  className={cn(
+                    "text-sm h-auto py-2.5 px-4 font-normal animate-fade-in whitespace-normal text-left max-w-full",
+                    "rounded-xl transition-all duration-200",
+                    "bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/30 dark:to-muted/20",
+                    "backdrop-blur-sm border border-border/50",
+                    "shadow-sm",
+                    "hover:shadow-md hover:border-border/60 hover:from-muted/60 hover:to-muted/40",
+                    "hover:scale-[1.01] active:scale-[0.99]",
+                  )}
                   style={{
                     animationDelay: `${index * 150}ms`,
                     animationFillMode: "backwards",
                   }}
                 >
                   {suggestion}
-                </Button>
+                </button>
               ))}
             </div>
           </div>

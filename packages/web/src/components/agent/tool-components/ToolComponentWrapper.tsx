@@ -171,7 +171,7 @@ export function ToolCallWrapper({
 
   return (
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-      <div className="border rounded-lg bg-card">
+      <div className="border border-border/50 rounded-xl bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/40 dark:to-muted/20 backdrop-blur-sm">
         <CollapsibleTrigger asChild>
           <div className="flex items-center justify-between p-4 cursor-pointer gap-2 min-w-0">
             <div className="flex items-center gap-2 min-w-0 flex-1">
