@@ -43,13 +43,14 @@ export function useAgentMessages(
           const existingToolIndex = msg.tools?.findIndex((t) => t.id === data.toolCall.id);
           const confirmation = data.confirmation as ToolConfirmationMetadata | undefined;
           const requiresConfirmationBefore = confirmation?.timing === "before";
+          const shouldAutoExecute = confirmation?.shouldAutoExecute === true;
 
           const newTool: ToolCall = {
             id: data.toolCall.id,
             name: data.toolCall.name,
             input: data.toolCall.input,
             status: data.toolCall.input
-              ? requiresConfirmationBefore
+              ? requiresConfirmationBefore && !shouldAutoExecute
                 ? "awaiting_confirmation"
                 : "running"
               : "pending",

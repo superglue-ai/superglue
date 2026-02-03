@@ -33,6 +33,7 @@ import { buildCategorizedSources } from "@/src/lib/templating-utils";
 import { ExecutionStep } from "@superglue/shared";
 import {
   Bug,
+  Check,
   ChevronDown,
   ChevronRight,
   FileBraces,
@@ -45,6 +46,7 @@ import {
   Route,
   Square,
   Trash2,
+  X,
 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { JavaScriptCodeEditor } from "../../editors/JavaScriptCodeEditor";
@@ -53,7 +55,6 @@ import { TemplateAwareTextEditor } from "../../editors/TemplateAwareTextEditor";
 import { HelpTooltip } from "../../utils/HelpTooltip";
 import { useToolConfig, useExecution } from "../context";
 import { CopyButton } from "../shared/CopyButton";
-import { SystemSelector } from "../shared/SystemSelector";
 import { StepInputTab } from "./tabs/StepInputTab";
 import { StepResultTab } from "./tabs/StepResultTab";
 import { useRightSidebar } from "../../sidebar/RightSidebarContext";
@@ -138,8 +139,13 @@ export const SpotlightStepCard = React.memo(
     const [showInvalidPayloadDialog, setShowInvalidPayloadDialog] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [pendingAction, setPendingAction] = useState<"execute" | null>(null);
+    const [isEditingInstruction, setIsEditingInstruction] = useState(false);
+    const [instructionEditValue, setInstructionEditValue] = useState(
+      step.apiConfig?.instruction || "",
+    );
     const prevShowOutputSignalRef = useRef<number | undefined>(undefined);
     const editingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const instructionTextareaRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
       return () => {
@@ -150,6 +156,7 @@ export const SpotlightStepCard = React.memo(
     // === CONFIG TAB STATE (from ToolStepConfigurator) ===
     const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
     const [paginationOpen, setPaginationOpen] = useState(false);
+    const [requestOptionsOpen, setRequestOptionsOpen] = useState(false);
     const [headersText, setHeadersText] = useState("");
     const [queryParamsText, setQueryParamsText] = useState("");
 
@@ -165,10 +172,17 @@ export const SpotlightStepCard = React.memo(
       return "{}";
     };
 
+    const isEmptyValue = (val: string): boolean => {
+      const trimmed = val.trim();
+      return !trimmed || trimmed === "{}" || trimmed === "[]";
+    };
+
     useEffect(() => {
-      setHeadersText(serializeValue(step.apiConfig?.headers));
-      setQueryParamsText(serializeValue(step.apiConfig?.queryParams));
-    }, [step.id, step.apiConfig?.headers, step.apiConfig?.queryParams]);
+      const headers = serializeValue(step.apiConfig?.headers);
+      const queryParams = serializeValue(step.apiConfig?.queryParams);
+      setHeadersText(headers);
+      setQueryParamsText(queryParams);
+    }, [step.id, step.apiConfig?.headers, step.apiConfig?.queryParams, step.apiConfig?.body]);
 
     useEffect(() => {
       if (
@@ -194,18 +208,6 @@ export const SpotlightStepCard = React.memo(
       },
       [onEdit, onConfigEditingChange, step],
     );
-
-    const handleSystemChange = (value: string, selectedSystem?: any) => {
-      handleImmediateEdit((s) => ({
-        ...s,
-        systemId: value,
-        apiConfig: {
-          ...s.apiConfig,
-          urlHost: selectedSystem?.urlHost || s.apiConfig.urlHost,
-          urlPath: selectedSystem?.urlPath || s.apiConfig.urlPath,
-        },
-      }));
-    };
 
     const DEFAULT_PAGINATION_STOP_CONDITION =
       "(response, pageInfo) => !response.data || response.data.length === 0";
@@ -234,13 +236,40 @@ export const SpotlightStepCard = React.memo(
     };
 
     const handleEditStepInstruction = useCallback(() => {
-      const instruction = step.apiConfig?.instruction || "";
-      const truncatedInstruction =
-        instruction.length > 300 ? `${instruction.slice(0, 300)}...` : instruction;
-      sendMessageToAgent(
-        `I want to edit step "${step.id}". The current instruction is:\n\n"${truncatedInstruction}"\n\nPlease help me modify this step.`,
-      );
-    }, [step.id, step.apiConfig?.instruction, sendMessageToAgent]);
+      setInstructionEditValue(step.apiConfig?.instruction || "");
+      setIsEditingInstruction(true);
+      setTimeout(() => {
+        if (instructionTextareaRef.current) {
+          instructionTextareaRef.current.focus();
+          const len = instructionTextareaRef.current.value.length;
+          instructionTextareaRef.current.setSelectionRange(len, len);
+        }
+      }, 0);
+    }, [step.apiConfig?.instruction]);
+
+    const handleSaveInstruction = useCallback(() => {
+      handleImmediateEdit((s) => ({
+        ...s,
+        apiConfig: { ...s.apiConfig, instruction: instructionEditValue },
+      }));
+      setIsEditingInstruction(false);
+    }, [instructionEditValue, handleImmediateEdit]);
+
+    const handleCancelInstructionEdit = useCallback(() => {
+      setInstructionEditValue(step.apiConfig?.instruction || "");
+      setIsEditingInstruction(false);
+    }, [step.apiConfig?.instruction]);
+
+    const handleInstructionKeyDown = useCallback(
+      (e: React.KeyboardEvent) => {
+        if (e.key === "Escape") {
+          handleCancelInstructionEdit();
+        } else if (e.key === "Enter" && e.metaKey) {
+          handleSaveInstruction();
+        }
+      },
+      [handleCancelInstructionEdit, handleSaveInstruction],
+    );
 
     const handleRunStepClick = () => {
       if (isFirstStep && !isPayloadValid) {
@@ -358,31 +387,33 @@ export const SpotlightStepCard = React.memo(
 
           <div className={activePanel === "config" ? "space-y-1" : "space-y-2"}>
             <div className="flex items-center justify-between">
-              <Tabs
-                value={activePanel}
-                onValueChange={(v) => setActivePanel(v as "input" | "config" | "output")}
-              >
-                <TabsList className="h-9 p-1 rounded-md">
-                  <TabsTrigger
-                    value="input"
-                    className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
-                  >
-                    <FileInput className="h-4 w-4" /> Step Input
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="config"
-                    className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
-                  >
-                    <FileBraces className="h-4 w-4" /> Step Config
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="output"
-                    className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
-                  >
-                    <FileOutput className="h-4 w-4" /> Step Result
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <div className="flex items-center gap-2">
+                <Tabs
+                  value={activePanel}
+                  onValueChange={(v) => setActivePanel(v as "input" | "config" | "output")}
+                >
+                  <TabsList className="h-9 p-1 rounded-md">
+                    <TabsTrigger
+                      value="input"
+                      className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
+                    >
+                      <FileInput className="h-4 w-4" /> Step Input
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="config"
+                      className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
+                    >
+                      <FileBraces className="h-4 w-4" /> Step Config
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="output"
+                      className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
+                    >
+                      <FileOutput className="h-4 w-4" /> Step Result
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
               <div className="flex items-center gap-1.5">
                 {showFixButton && (
                   <Button variant="default" onClick={handleFixInChat} className="h-8 px-3 gap-2">
@@ -482,46 +513,59 @@ export const SpotlightStepCard = React.memo(
                 <Card className="w-full border-none shadow-none opacity-100">
                   <CardContent className="space-y-3 text-sm p-3">
                     <div>
-                      <Label className="text-xs flex items-center gap-1">
-                        Step Instruction
-                        <HelpTooltip text="Instruction for this step. This describes what the step does and how it should behave." />
-                      </Label>
-                      <div className="relative mt-1 rounded-lg border shadow-sm bg-muted/30">
-                        <div className="absolute top-0 right-0 bottom-0 z-10 flex items-center gap-1 pl-2 pr-1 bg-gradient-to-l from-muted via-muted/90 to-muted/60">
-                          <button
-                            type="button"
-                            onClick={handleEditStepInstruction}
-                            className="h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-muted/50"
-                            title="Edit this step with AI"
-                            aria-label="Edit this step with AI"
-                          >
-                            <Pencil className="h-3 w-3 text-muted-foreground" />
-                          </button>
-                          <CopyButton text={step.apiConfig.instruction || ""} />
-                        </div>
-                        <div className="h-9 flex items-center text-xs text-muted-foreground px-3 pr-16 truncate">
-                          {step.apiConfig.instruction || (
-                            <span className="text-muted-foreground italic">
-                              Describe what this step should do...
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <Label className="text-xs flex items-center gap-1">
-                          System
-                          <HelpTooltip text="Select an system to link this step to. This will pre-fill the API configuration with the system's base URL and credentials." />
-                        </Label>
-                        <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
-                          <SystemSelector
-                            value={step.systemId || ""}
-                            onValueChange={handleSystemChange}
-                            triggerClassName="h-9 border-0 bg-transparent shadow-none"
+                      <Label className="text-xs flex items-center gap-1">Step Instruction</Label>
+                      {isEditingInstruction ? (
+                        <div className="relative mt-1 rounded-lg border shadow-sm bg-muted/30">
+                          <textarea
+                            ref={instructionTextareaRef}
+                            value={instructionEditValue}
+                            onChange={(e) => setInstructionEditValue(e.target.value)}
+                            onKeyDown={handleInstructionKeyDown}
+                            className="w-full min-h-[72px] text-xs font-mono border-0 bg-transparent shadow-none resize-y focus:outline-none focus:ring-0 px-3 py-2 pr-20"
+                            placeholder="Describe what this step should do..."
                           />
+                          <div className="absolute top-1 right-1 flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={handleSaveInstruction}
+                              className="h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-green-500/20 text-green-600"
+                              title="Save (⌘+Enter)"
+                            >
+                              <Check className="h-3 w-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelInstructionEdit}
+                              className="h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-red-500/20 text-red-600"
+                              title="Cancel (Esc)"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="group relative mt-1 rounded-lg border shadow-sm bg-muted/30">
+                          <div className="absolute top-0 right-0 bottom-0 z-10 flex items-center gap-1 pl-2 pr-1 bg-gradient-to-l from-muted via-muted/90 to-muted/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={handleEditStepInstruction}
+                              className="h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-muted/50"
+                              title="Edit instruction"
+                              aria-label="Edit instruction"
+                            >
+                              <Pencil className="h-3 w-3 text-muted-foreground" />
+                            </button>
+                            <CopyButton text={step.apiConfig.instruction || ""} />
+                          </div>
+                          <div className="h-9 flex items-center text-xs text-muted-foreground px-3 pr-16 truncate">
+                            {step.apiConfig.instruction || (
+                              <span className="text-muted-foreground italic">
+                                Describe what this step should do...
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <Label className="text-xs flex items-center gap-1">
@@ -571,69 +615,110 @@ export const SpotlightStepCard = React.memo(
                         </div>
                       </div>
                     </div>
-                    <div>
-                      <Label className="text-xs flex items-center gap-1">
-                        Headers
-                        <HelpTooltip text="HTTP headers to include with the request. Use JSON format. Common headers include Content-Type, Authorization, etc." />
-                      </Label>
-                      <TemplateAwareJsonEditor
-                        value={headersText}
-                        onChange={(val) => {
-                          setHeadersText(val || "");
-                          handleImmediateEdit((s) => ({
-                            ...s,
-                            apiConfig: { ...s.apiConfig, headers: val || "" },
-                          }));
-                        }}
-                        stepId={step.id}
-                        minHeight="75px"
-                        maxHeight="300px"
-                        placeholder="{}"
-                        showValidation={true}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs flex items-center gap-1 mb-1">
-                        Query Parameters
-                        <HelpTooltip text='URL query parameters to append to the request. Can be JSON object or any text format like "param1=value1&param2=value2"' />
-                      </Label>
-                      <TemplateAwareJsonEditor
-                        value={queryParamsText}
-                        onChange={(val) => {
-                          setQueryParamsText(val || "");
-                          handleImmediateEdit((s) => ({
-                            ...s,
-                            apiConfig: { ...s.apiConfig, queryParams: val || "" },
-                          }));
-                        }}
-                        stepId={step.id}
-                        minHeight="75px"
-                        maxHeight="300px"
-                        placeholder="{}"
-                        showValidation={true}
-                      />
-                    </div>
-                    {["POST", "PUT", "PATCH"].includes(step.apiConfig.method) && (
-                      <div>
-                        <Label className="text-xs flex items-center gap-1 mb-1">
-                          Body
-                          <HelpTooltip text="Request body content. Can be JSON, form data, plain text, or any format. Use JavaScript expressions to transform data from previous steps." />
-                        </Label>
-                        <TemplateAwareJsonEditor
-                          value={step.apiConfig.body || ""}
-                          onChange={(val) =>
-                            handleImmediateEdit((s) => ({
-                              ...s,
-                              apiConfig: { ...s.apiConfig, body: val || "" },
-                            }))
-                          }
-                          stepId={step.id}
-                          minHeight="75px"
-                          maxHeight="300px"
-                          placeholder=""
-                        />
-                      </div>
-                    )}
+                    {(() => {
+                      const showBody = ["POST", "PUT", "PATCH"].includes(step.apiConfig.method);
+                      const hasHeaders = !isEmptyValue(headersText);
+                      const hasQueryParams = !isEmptyValue(queryParamsText);
+                      const hasBody = showBody && !isEmptyValue(step.apiConfig.body || "");
+                      const hasAnyRequestOptions = hasHeaders || hasQueryParams || hasBody;
+
+                      return (
+                        <div>
+                          <div
+                            onClick={() => setRequestOptionsOpen(!requestOptionsOpen)}
+                            className="w-full flex items-center justify-between text-xs font-medium text-left p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setRequestOptionsOpen(!requestOptionsOpen);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-1">
+                              {requestOptionsOpen ? (
+                                <ChevronDown className="h-3 w-3" />
+                              ) : (
+                                <ChevronRight className="h-3 w-3" />
+                              )}
+                              <span>Request Options</span>
+                              {!requestOptionsOpen && hasAnyRequestOptions && (
+                                <span className="text-[10px] text-muted-foreground ml-1">
+                                  (configured)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div
+                            className={`overflow-hidden transition-all duration-200 ease-in-out ${requestOptionsOpen ? "max-h-[1200px] opacity-100" : "max-h-0 opacity-0"}`}
+                          >
+                            <div className="pl-2 space-y-3 pt-2">
+                              <div>
+                                <Label className="text-xs text-muted-foreground mb-1 block">
+                                  Headers
+                                </Label>
+                                <TemplateAwareJsonEditor
+                                  value={headersText}
+                                  onChange={(val) => {
+                                    setHeadersText(val || "");
+                                    handleImmediateEdit((s) => ({
+                                      ...s,
+                                      apiConfig: { ...s.apiConfig, headers: val || "" },
+                                    }));
+                                  }}
+                                  stepId={step.id}
+                                  minHeight="75px"
+                                  maxHeight="300px"
+                                  placeholder="{}"
+                                  showValidation={true}
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs text-muted-foreground mb-1 block">
+                                  Query Parameters
+                                </Label>
+                                <TemplateAwareJsonEditor
+                                  value={queryParamsText}
+                                  onChange={(val) => {
+                                    setQueryParamsText(val || "");
+                                    handleImmediateEdit((s) => ({
+                                      ...s,
+                                      apiConfig: { ...s.apiConfig, queryParams: val || "" },
+                                    }));
+                                  }}
+                                  stepId={step.id}
+                                  minHeight="75px"
+                                  maxHeight="300px"
+                                  placeholder="{}"
+                                  showValidation={true}
+                                />
+                              </div>
+                              {showBody && (
+                                <div>
+                                  <Label className="text-xs text-muted-foreground mb-1 block">
+                                    Body
+                                  </Label>
+                                  <TemplateAwareJsonEditor
+                                    value={step.apiConfig.body || ""}
+                                    onChange={(val) =>
+                                      handleImmediateEdit((s) => ({
+                                        ...s,
+                                        apiConfig: { ...s.apiConfig, body: val || "" },
+                                      }))
+                                    }
+                                    stepId={step.id}
+                                    minHeight="75px"
+                                    maxHeight="300px"
+                                    placeholder=""
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     <div>
                       <div
                         onClick={() => setPaginationOpen(!paginationOpen)}
@@ -653,15 +738,7 @@ export const SpotlightStepCard = React.memo(
                           ) : (
                             <ChevronRight className="h-3 w-3" />
                           )}
-                          <span>
-                            {step.apiConfig.pagination?.type === "OFFSET_BASED"
-                              ? "Offset-based Pagination"
-                              : step.apiConfig.pagination?.type === "PAGE_BASED"
-                                ? "Page-based Pagination"
-                                : step.apiConfig.pagination?.type === "CURSOR_BASED"
-                                  ? "Cursor-based Pagination"
-                                  : "No Pagination"}
-                          </span>
+                          <span>Pagination</span>
                           <HelpTooltip text="Configure pagination if the API returns data in pages. Only set this if you're using pagination variables like {'<<offset>>'}, {'<<page>>'}, or {'<<cursor>>'} in your request." />
                         </div>
                       </div>

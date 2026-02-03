@@ -115,15 +115,6 @@ export function logToolExecution(
       );
       break;
     }
-    case "inspect_source_data": {
-      const expression = input?.expression || "no expression";
-      logMessage(
-        "debug",
-        `inspect_source_data: expr="${expression}" → ${outputStr.length} chars: ${outputStr}`,
-        metadata,
-      );
-      break;
-    }
     case "web_search": {
       const query = input?.query || "no query";
       logMessage("debug", `web_search: query="${query}" → ${outputStr.length} chars`, metadata);

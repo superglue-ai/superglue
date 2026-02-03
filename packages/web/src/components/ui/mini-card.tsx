@@ -11,7 +11,7 @@ export interface MiniCardProps {
 }
 
 export const MiniCard = React.memo(
-  ({ isActive, onClick, children, className, width = 170, height = 115 }: MiniCardProps) => {
+  ({ isActive, onClick, children, className, width = 180, height = 125 }: MiniCardProps) => {
     return (
       <div
         onClick={onClick}
@@ -78,7 +78,7 @@ export const TriggerCard = React.memo(({ isActive, onClick, icon }: TriggerCardP
     <div
       className={cn(
         "transition-all duration-300 ease-out transform flex flex-col items-center justify-center cursor-pointer",
-        "h-[115px] group",
+        "h-[125px] group",
       )}
       onClick={onClick}
     >

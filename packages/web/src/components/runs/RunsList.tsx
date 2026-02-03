@@ -375,14 +375,23 @@ interface RunsListProps {
   runs: any[];
   loading?: boolean;
   emptyMessage?: string;
+  initialVisibleCount?: number;
+  pageSize?: number;
 }
 
 export function RunsList({
   runs,
   loading = false,
   emptyMessage = "No runs found.",
+  initialVisibleCount = 5,
+  pageSize = 5,
 }: RunsListProps) {
   const [expandedRunId, setExpandedRunId] = React.useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = React.useState(initialVisibleCount);
+
+  React.useEffect(() => {
+    setVisibleCount(initialVisibleCount);
+  }, [runs, initialVisibleCount]);
 
   if (loading) {
     return (
@@ -405,16 +414,19 @@ export function RunsList({
       new Date(a.metadata?.startedAt ?? 0).getTime(),
   );
 
+  const visibleRuns = sortedRuns.slice(0, visibleCount);
+  const hasMore = sortedRuns.length > visibleCount;
+  const remainingCount = sortedRuns.length - visibleCount;
+
   return (
     <div className="space-y-2">
-      {sortedRuns.map((run) => {
+      {visibleRuns.map((run) => {
         const runId = run.runId;
         const toolId = run.toolId;
         const isExpanded = expandedRunId === runId;
 
         return (
           <div key={runId} className="border rounded-lg overflow-hidden bg-background">
-            {/* Run Header */}
             <button
               onClick={() => setExpandedRunId(isExpanded ? null : runId)}
               className="w-full px-3 py-2 flex items-center gap-4 hover:bg-muted/50 transition-colors text-left"
@@ -446,7 +458,6 @@ export function RunsList({
               </span>
             </button>
 
-            {/* Expanded Content */}
             {isExpanded && (
               <div className="border-t">
                 <RunDetails run={run} />
@@ -455,6 +466,24 @@ export function RunsList({
           </div>
         );
       })}
+
+      {hasMore && (
+        <button
+          onClick={() => setVisibleCount((prev) => prev + pageSize)}
+          className="w-full py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
+        >
+          Show {Math.min(remainingCount, pageSize)} more ({remainingCount} remaining)
+        </button>
+      )}
+
+      {visibleCount > initialVisibleCount && (
+        <button
+          onClick={() => setVisibleCount(initialVisibleCount)}
+          className="w-full py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
+        >
+          Show less
+        </button>
+      )}
     </div>
   );
 }

@@ -5,8 +5,6 @@ import { resolveSystemPrompt, generateAgentInitialContext } from "./agent-contex
 import { AgentType, getAgent } from "./registry/agents";
 import { TOOL_CONTINUATION_MESSAGES, TOOL_REGISTRY } from "./registry/tools";
 import {
-  CALL_ENDPOINT_CONFIRMATION,
-  EDIT_TOOL_CONFIRMATION,
   ToolExecutionContext,
   ToolRegistryEntry,
   ValidatedAgentRequest,
@@ -15,7 +13,7 @@ import {
   ToolExecutionFeedback,
   FileUploadAction,
 } from "./agent-types";
-import { TOOL_POLICY_PROCESSORS } from "./registry/tool-policies";
+import { TOOL_POLICY_PROCESSORS, processToolPolicy } from "./registry/tool-policies";
 
 function validateUserActions(actions: any[]): void {
   for (const action of actions) {
@@ -171,20 +169,8 @@ function updateToolInMessages(
 }
 
 function getConfirmationStateForAction(toolName: string, action: string): string | undefined {
-  const normalized = toolName === "edit_tool_playground" ? "edit_tool" : toolName;
-
-  if (normalized === "call_endpoint") {
-    if (action === "confirmed") return CALL_ENDPOINT_CONFIRMATION.CONFIRMED;
-    if (action === "declined") return CALL_ENDPOINT_CONFIRMATION.DECLINED;
-  }
-
-  if (normalized === "edit_tool" || normalized === "edit_payload") {
-    if (action === "confirmed") return EDIT_TOOL_CONFIRMATION.CONFIRMED;
-    if (action === "declined") return EDIT_TOOL_CONFIRMATION.DECLINED;
-    if (action === "partial") return EDIT_TOOL_CONFIRMATION.PARTIAL;
-  }
-
-  return undefined;
+  const entry = TOOL_REGISTRY[toolName];
+  return entry?.confirmation?.states?.[action as keyof typeof entry.confirmation.states];
 }
 
 function processToolConfirmation(
@@ -205,9 +191,8 @@ function processToolConfirmation(
     ...(action.data && { confirmationData: action.data }),
   });
 
-  const normalized = action.toolName === "edit_tool_playground" ? "edit_tool" : action.toolName;
   const continuationMessages =
-    TOOL_CONTINUATION_MESSAGES[normalized as keyof typeof TOOL_CONTINUATION_MESSAGES];
+    TOOL_CONTINUATION_MESSAGES[action.toolName as keyof typeof TOOL_CONTINUATION_MESSAGES];
   const continuation =
     continuationMessages?.[action.action as keyof typeof continuationMessages] ?? null;
 
@@ -330,7 +315,7 @@ function buildContextInjection(
 
     if (conversationMentionsFiles) {
       parts.push(
-        `[SYSTEM] IMPORTANT: No files are currently available in this session. Files are stored in browser memory and are cleared on page refresh. If the conversation history mentions files that were previously uploaded, those files are NO LONGER AVAILABLE. You MUST ask the user to re-upload the files before making any tool calls that require file content. Do NOT attempt to use file:: references until the user has re-uploaded the files.`,
+        `[SYSTEM] IMPORTANT: No files are currently available in this session. Files are stored in browser memory and are cleared on page refresh. If a past chat mentions files that were previously uploaded, those files are NO LONGER AVAILABLE. You MUST ask the user to re-upload the files before making any tool calls that require file content. Do NOT attempt to use file:: references until the user has re-uploaded the files.`,
       );
     }
   }

@@ -458,134 +458,140 @@ export function SystemConfigProvider({
     getSectionStatus,
   ]);
 
-  const saveSystem = useCallback(async (): Promise<boolean> => {
-    if (!systemId.trim()) {
-      toast({
-        title: "Error",
-        description: "System ID is required",
-        variant: "destructive",
-      });
-      return false;
-    }
+  const saveSystem = useCallback(
+    async (oauthTokenOverride?: Partial<OAuthFields>): Promise<boolean> => {
+      if (!systemId.trim()) {
+        toast({
+          title: "Error",
+          description: "System ID is required",
+          variant: "destructive",
+        });
+        return false;
+      }
 
-    if (!urlHost.trim()) {
-      toast({
-        title: "Error",
-        description: "API Endpoint is required",
-        variant: "destructive",
-      });
-      return false;
-    }
+      if (!urlHost.trim()) {
+        toast({
+          title: "Error",
+          description: "API Endpoint is required",
+          variant: "destructive",
+        });
+        return false;
+      }
 
-    setIsSaving(true);
+      setIsSaving(true);
 
-    try {
-      let finalCredentials: Record<string, any> = {};
+      try {
+        let finalCredentials: Record<string, any> = {};
+        const effectiveOAuthFields = oauthTokenOverride
+          ? { ...oauthFields, ...oauthTokenOverride }
+          : oauthFields;
 
-      if (authType === "oauth") {
-        const oauthCredsRaw = Object.fromEntries(
-          Object.entries(oauthFields).filter(([_, value]) => value !== ""),
-        );
-        let additionalCreds: Record<string, any> = {};
-        if (
-          apiKeyCredentials &&
-          apiKeyCredentials.trim() !== "" &&
-          apiKeyCredentials.trim() !== "{}"
-        ) {
+        if (authType === "oauth") {
+          const oauthCredsRaw = Object.fromEntries(
+            Object.entries(effectiveOAuthFields).filter(([_, value]) => value !== ""),
+          );
+          let additionalCreds: Record<string, any> = {};
+          if (
+            apiKeyCredentials &&
+            apiKeyCredentials.trim() !== "" &&
+            apiKeyCredentials.trim() !== "{}"
+          ) {
+            try {
+              additionalCreds = JSON.parse(apiKeyCredentials);
+            } catch {
+              toast({
+                title: "Error",
+                description: "Additional API credentials must be valid JSON",
+                variant: "destructive",
+              });
+              setIsSaving(false);
+              return false;
+            }
+          }
+          finalCredentials = { ...oauthCredsRaw, ...additionalCreds };
+        } else if (authType === "apikey") {
           try {
-            additionalCreds = JSON.parse(apiKeyCredentials);
+            finalCredentials = JSON.parse(apiKeyCredentials);
           } catch {
             toast({
               title: "Error",
-              description: "Additional API credentials must be valid JSON",
+              description: "Credentials must be valid JSON",
               variant: "destructive",
             });
             setIsSaving(false);
             return false;
           }
         }
-        finalCredentials = { ...oauthCredsRaw, ...additionalCreds };
-      } else if (authType === "apikey") {
-        try {
-          finalCredentials = JSON.parse(apiKeyCredentials);
-        } catch {
-          toast({
-            title: "Error",
-            description: "Credentials must be valid JSON",
-            variant: "destructive",
-          });
-          setIsSaving(false);
-          return false;
+
+        const systemData = {
+          id: systemId.trim(),
+          name: systemName.trim() || undefined,
+          urlHost: urlHost.trim(),
+          urlPath: urlPath.trim(),
+          documentationUrl: documentationUrl.trim(),
+          documentation: documentation.trim(),
+          specificInstructions: specificInstructions.trim(),
+          credentials: finalCredentials,
+          templateName: templateName || undefined,
+        };
+
+        const existingSystem = systems.find((s) => s.id === systemId);
+        const mode = existingSystem ? UpsertMode.UPDATE : UpsertMode.CREATE;
+
+        const client = createSuperglueClient(config.superglueEndpoint);
+        const savedSystem = await client.upsertSystem(
+          systemId,
+          systemData,
+          mode,
+          CredentialMode.REPLACE,
+        );
+
+        const willTriggerDocFetch = needsUIToTriggerDocFetch(savedSystem, existingSystem);
+        if (willTriggerDocFetch) {
+          setPendingDocIds((prev) => new Set([...prev, savedSystem.id]));
         }
+
+        await refreshSystems();
+        setHasUnsavedChanges(false);
+        initialRef.current = savedSystem;
+
+        toast({
+          title: "Success",
+          description: `System "${systemId}" saved successfully`,
+        });
+
+        return true;
+      } catch (error) {
+        console.error("Error saving system:", error);
+        toast({
+          title: "Error",
+          description: "Failed to save system",
+          variant: "destructive",
+        });
+        return false;
+      } finally {
+        setIsSaving(false);
       }
-
-      const systemData = {
-        id: systemId.trim(),
-        name: systemName.trim() || undefined,
-        urlHost: urlHost.trim(),
-        urlPath: urlPath.trim(),
-        documentationUrl: documentationUrl.trim(),
-        documentation: documentation.trim(),
-        specificInstructions: specificInstructions.trim(),
-        credentials: finalCredentials,
-        templateName: templateName || undefined,
-      };
-
-      const existingSystem = systems.find((s) => s.id === systemId);
-      const mode = existingSystem ? UpsertMode.UPDATE : UpsertMode.CREATE;
-
-      const client = createSuperglueClient(config.superglueEndpoint);
-      const savedSystem = await client.upsertSystem(
-        systemId,
-        systemData,
-        mode,
-        CredentialMode.REPLACE,
-      );
-
-      const willTriggerDocFetch = needsUIToTriggerDocFetch(savedSystem, existingSystem);
-      if (willTriggerDocFetch) {
-        setPendingDocIds((prev) => new Set([...prev, savedSystem.id]));
-      }
-
-      await refreshSystems();
-      setHasUnsavedChanges(false);
-      initialRef.current = savedSystem;
-
-      toast({
-        title: "Success",
-        description: `System "${systemId}" saved successfully`,
-      });
-
-      return true;
-    } catch (error) {
-      console.error("Error saving system:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save system",
-        variant: "destructive",
-      });
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
-  }, [
-    systemId,
-    systemName,
-    urlHost,
-    urlPath,
-    documentationUrl,
-    documentation,
-    specificInstructions,
-    authType,
-    oauthFields,
-    apiKeyCredentials,
-    templateName,
-    systems,
-    config.superglueEndpoint,
-    refreshSystems,
-    setPendingDocIds,
-    toast,
-  ]);
+    },
+    [
+      systemId,
+      systemName,
+      urlHost,
+      urlPath,
+      documentationUrl,
+      documentation,
+      specificInstructions,
+      authType,
+      oauthFields,
+      apiKeyCredentials,
+      templateName,
+      systems,
+      config.superglueEndpoint,
+      refreshSystems,
+      setPendingDocIds,
+      toast,
+    ],
+  );
 
   const resetToInitial = useCallback(() => {
     const initial = initialRef.current;

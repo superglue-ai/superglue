@@ -6,7 +6,7 @@ export {
   groupMessageParts,
   type GroupedPart,
 } from "./BackgroundToolIndicator";
-export { CallEndpointComponent } from "./CallEndpointComponent";
+export { CallSystemComponent } from "./CallSystemComponent";
 export { CreateSystemComponent } from "./CreateSystemComponent";
 export { DefaultComponent } from "./DefaultComponent";
 export { EditPayloadComponent } from "./EditPayloadComponent";

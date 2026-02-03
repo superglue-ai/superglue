@@ -29,9 +29,7 @@ export function ToolCallWrapper({
   const [liveElapsed, setLiveElapsed] = useState<number>(0);
 
   useEffect(() => {
-    if (!openByDefault) {
-      setIsExpanded(false);
-    }
+    setIsExpanded(openByDefault);
   }, [openByDefault]);
 
   useEffect(() => {
@@ -238,7 +236,7 @@ export function ToolCallWrapper({
         <CollapsibleContent>
           <div className="px-4 pb-4">
             {displayStatus === "completed" &&
-              tool.name !== "call_endpoint" &&
+              tool.name !== "call_system" &&
               tool.name !== "edit_tool" &&
               tool.name !== "build_tool" &&
               tool.name !== "run_tool" &&

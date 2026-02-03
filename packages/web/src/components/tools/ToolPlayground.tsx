@@ -57,7 +57,6 @@ export interface ToolPlaygroundProps {
   systems?: System[];
   onSave?: (tool: Tool, payload: Record<string, any>) => Promise<void>;
   onExecute?: (tool: Tool, result: ToolResult) => void;
-  onInstructionEdit?: () => void;
   headerActions?: React.ReactNode;
   hideHeader?: boolean;
   shouldStopExecution?: boolean;
@@ -90,7 +89,6 @@ function ToolPlaygroundInner({
   initialInstruction,
   onSave,
   onExecute,
-  onInstructionEdit,
   headerActions,
   hideHeader = false,
   shouldStopExecution: externalShouldStop,
@@ -518,7 +516,6 @@ function ToolPlaygroundInner({
                   ) : (
                     <ToolStepGallery
                       onStepEdit={handleStepEdit}
-                      onInstructionEdit={embedded ? onInstructionEdit : undefined}
                       onExecuteStep={handleExecuteStep}
                       onExecuteStepWithLimit={handleExecuteStepWithLimit}
                       onExecuteTransform={handleExecuteTransform}

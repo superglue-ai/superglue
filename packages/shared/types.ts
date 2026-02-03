@@ -291,23 +291,10 @@ export interface ToolResult extends BaseResult {
   stepResults: ToolStepResult[];
 }
 
-export interface CallEndpointArgs {
-  systemId?: string;
-  method: HttpMethod;
-  url: string;
-  headers?: Record<string, string>;
-  body?: string;
-  timeout?: number;
-}
-
-export interface CallEndpointResult {
-  success: boolean;
-  status?: number;
-  statusText?: string;
-  headers?: Record<string, string>;
-  body?: any;
-  error?: string;
-  duration: number;
+export interface DocumentationFiles {
+  uploadFileIds?: string[];
+  scrapeFileIds?: string[];
+  openApiFileIds?: string[];
 }
 
 export interface DocumentationFiles {

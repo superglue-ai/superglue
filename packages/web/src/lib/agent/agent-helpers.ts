@@ -252,3 +252,10 @@ export const truncateResponseBody = (result: any): any => {
 
   return result;
 };
+
+export const getProtocol = (url: string): "http" | "postgres" | "sftp" => {
+  if (url.startsWith("postgres://") || url.startsWith("postgresql://")) return "postgres";
+  if (url.startsWith("ftp://") || url.startsWith("ftps://") || url.startsWith("sftp://"))
+    return "sftp";
+  return "http";
+};

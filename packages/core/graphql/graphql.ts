@@ -1,6 +1,5 @@
 import { GraphQLUpload } from "graphql-upload-ts";
 import fs from "node:fs";
-import { callEndpointResolver } from "./resolvers/call-endpoint.js";
 import { extractResolver } from "./resolvers/extract.js";
 import { generateInstructionsResolver } from "./resolvers/generate.js";
 import {
@@ -54,7 +53,6 @@ export const resolvers = {
     cacheOauthClientCredentials: cacheOauthClientCredentialsResolver,
     getOAuthClientCredentials: getOAuthClientCredentialsResolver,
     deleteSystem: deleteSystemResolver,
-    callEndpoint: callEndpointResolver,
     fixWorkflow: fixWorkflowResolver,
   },
   Subscription: {
