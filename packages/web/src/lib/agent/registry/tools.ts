@@ -34,11 +34,11 @@ export const TOOL_CONTINUATION_MESSAGES = {
   },
   edit_tool: {
     confirmed:
-      "[USER ACTION] The user approved the tool edit changes. The changes have been applied to the tool configuration. Briefly confirm the edit was applied. Do NOT call run_tool unless the user explicitly asks to run/test again.",
+      "[USER ACTION] The user approved the tool edit changes. The changes have been applied to the tool configuration. Briefly confirm the edit was applied and remind the user they can save the tool if they want to persist these changes. Do NOT call run_tool unless the user explicitly asks to run/test again.",
     declined:
       "[USER ACTION] The user rejected the tool edit changes. Ask what they would like to change or if they want to try a different approach.",
     partial:
-      "[USER ACTION] The user PARTIALLY approved the tool edit. IMPORTANT: Check the tool output for 'appliedChanges' (changes that WERE applied) and 'rejectedChanges' (changes the user rejected). Only report the applied changes as successful. Acknowledge which changes were rejected. Do NOT call run_tool unless the user explicitly asks.",
+      "[USER ACTION] The user PARTIALLY approved the tool edit. IMPORTANT: Check the tool output for 'appliedChanges' (changes that WERE applied) and 'rejectedChanges' (changes the user rejected). Only report the applied changes as successful. Acknowledge which changes were rejected and remind the user they can save the tool if they want to persist the applied changes. Do NOT call run_tool unless the user explicitly asks.",
   },
   edit_payload: {
     confirmed:
@@ -540,14 +540,19 @@ const createSystemDefinition = (): ToolDefinition => ({
     <important_notes>
       - Use templateId when creating systems for known services (slack, github, stripe, etc.) - this auto-populates urlHost, urlPath, documentationUrl, and OAuth config.
       - When using templateId, you only need to provide: id, templateId, and credentials (if required by the auth type).
-      - For API key auth: provide the api_key in credentials.
       - For OAuth auth: create the system first, then call authenticate_oauth to trigger the OAuth flow.
-      - The credentials object stores authentication data. Use placeholder references in the format: <<{system_id}_{credential_name}>> to reference them.
-      - If no credentials are needed, provide an empty object.
       - Providing a documentationUrl will trigger asynchronous API documentation processing.
       - For documentation field, you can provide raw documentation text OR use file::filename to reference uploaded files.
       - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions'.
-    </important_notes>`,
+    </important_notes>
+    
+    <credential_handling>
+      - Use 'credentials' for NON-SENSITIVE config: client_id, auth_url, token_url, scopes, grant_type, redirect_uri
+      - Use 'sensitiveCredentials' for SECRETS that require user input: { api_key: true, client_secret: true }
+      - When sensitiveCredentials is set, a secure UI appears for users to enter the actual values
+      - NEVER ask users to paste secrets in chat - always use sensitiveCredentials instead
+      - Example: For API key auth, use sensitiveCredentials: { api_key: true }
+    </credential_handling>`,
   inputSchema: {
     type: "object",
     properties: {
@@ -592,7 +597,12 @@ const createSystemDefinition = (): ToolDefinition => ({
       credentials: {
         type: "object",
         description:
-          "Credentials for accessing the system. Flat Object, no nested objects, all keys in snake_case and top level only. Example keys (all optional): api_key, access_token, client_id, client_secret, auth_url, token_url, scopes, grant_type, bot_token, etc...",
+          "Non-sensitive credentials only: client_id, auth_url, token_url, scopes, grant_type, redirect_uri. Do NOT include secrets here.",
+      },
+      sensitiveCredentials: {
+        type: "object",
+        description:
+          "Sensitive credentials requiring secure user input. Set field to true to request it. Example: { api_key: true, client_secret: true }. A secure UI will appear for users to enter values.",
       },
       metadata: {
         type: "object",
@@ -600,12 +610,12 @@ const createSystemDefinition = (): ToolDefinition => ({
           "Optional metadata object for storing additional system information such as capabilities, systemDetails and possible tools that can be built with this system.",
       },
     },
-    required: ["id", "credentials"],
+    required: ["id"],
   },
 });
 
 const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
-  let { templateId, ...systemInput } = input;
+  let { templateId, sensitiveCredentials, ...systemInput } = input;
 
   if (templateId) {
     const template = systems[templateId];
@@ -670,6 +680,14 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
     systemInput.documentationUrl = docResult.documentationUrl;
   }
 
+  if (sensitiveCredentials && Object.keys(sensitiveCredentials).length > 0) {
+    return {
+      confirmationState: SYSTEM_UPSERT_CONFIRMATION.PENDING,
+      systemConfig: systemInput,
+      requiredSensitiveFields: Object.keys(sensitiveCredentials),
+    };
+  }
+
   try {
     const result = await ctx.superglueClient.upsertSystem(
       systemInput.id,
@@ -689,17 +707,89 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
   }
 };
 
-const modifySystemDefinition = (): ToolDefinition => ({
-  name: "modify_system",
+const processCreateSystemConfirmation = async (
+  input: any,
+  output: any,
+  ctx: ToolExecutionContext,
+): Promise<{ output: string; status: "completed" | "declined" }> => {
+  let parsedOutput;
+  try {
+    parsedOutput = typeof output === "string" ? JSON.parse(output) : output;
+  } catch {
+    return { output: JSON.stringify(output), status: "completed" };
+  }
+
+  if (!parsedOutput.confirmationState) {
+    return { output: JSON.stringify(parsedOutput), status: "completed" };
+  }
+
+  if (parsedOutput.confirmationState === SYSTEM_UPSERT_CONFIRMATION.CONFIRMED) {
+    const confirmationData = parsedOutput.confirmationData || parsedOutput;
+    const systemConfig = confirmationData.systemConfig || parsedOutput.systemConfig;
+    const userProvidedCredentials =
+      confirmationData.userProvidedCredentials || parsedOutput.userProvidedCredentials || {};
+
+    if (!systemConfig || !systemConfig.id) {
+      return {
+        output: JSON.stringify({
+          success: false,
+          error: "Missing system configuration",
+          suggestion: "System configuration is required to create the system.",
+        }),
+        status: "completed",
+      };
+    }
+
+    const finalCredentials = {
+      ...(systemConfig.credentials || {}),
+      ...userProvidedCredentials,
+    };
+
+    const { sensitiveCredentials: _, ...cleanSystemConfig } = systemConfig;
+
+    try {
+      const result = await ctx.superglueClient.upsertSystem(
+        cleanSystemConfig.id,
+        { ...cleanSystemConfig, credentials: finalCredentials },
+        UpsertMode.UPSERT,
+      );
+      return {
+        output: JSON.stringify({ success: true, system: filterSystemFields(result) }),
+        status: "completed",
+      };
+    } catch (error: any) {
+      return {
+        output: JSON.stringify({
+          success: false,
+          error: error.message,
+          suggestion: "Failed to create system. Validate all system inputs and try again.",
+        }),
+        status: "completed",
+      };
+    }
+  } else if (parsedOutput.confirmationState === SYSTEM_UPSERT_CONFIRMATION.DECLINED) {
+    return {
+      output: JSON.stringify({
+        success: false,
+        cancelled: true,
+        message: "System creation cancelled by user",
+      }),
+      status: "declined",
+    };
+  }
+
+  return { output: JSON.stringify(parsedOutput), status: "completed" };
+};
+
+const editSystemDefinition = (): ToolDefinition => ({
+  name: "edit_system",
   description: `
     <use_case>
-      Modifies an existing system identified by its id. Systems are building blocks for tools and contain the credentials for accessing the API.
+      Edits an existing system identified by its id. Systems are building blocks for tools and contain the credentials for accessing the API.
       Provide only the id and the fields you want to change. Fields not included will remain unchanged.
     </use_case>
 
     <important_notes>
-      - Most APIs require authentication (API keys, tokens, etc.). Always ask the user for credentials if needed.
-      - Always split information clearly: urlHost (without secrets), urlPath, credentials (with secrets), etc.
       - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions' to guide tool building.
       - Providing a documentationUrl will trigger asynchronous API documentation processing.
       - For documentation field, you can provide raw documentation text OR use file::filename to reference uploaded files. For multiple files, use comma-separated: file::doc1.pdf,file::doc2.pdf
@@ -710,11 +800,11 @@ const modifySystemDefinition = (): ToolDefinition => ({
     </important_notes>
 
     <credential_handling>
-      - CREDENTIALS ARE MASKED: The credential values you see (like <<masked_api_key>>) are placeholders, not real values.
-      - When updating credentials, ONLY include fields with actual new values provided by the user.
-      - You may include masked values in your update - they will be automatically ignored and existing values preserved.
-      - To add a new credential field, just include that field. Existing credentials are preserved automatically.
-      - Example: To add "scope" while keeping existing "client_id" and "client_secret", just pass: credentials: { scope: "read_write" }
+      - Use 'credentials' for NON-SENSITIVE config: client_id, auth_url, token_url, scopes, grant_type, redirect_uri
+      - Use 'sensitiveCredentials' for SECRETS that require user input: { api_key: true, client_secret: true }
+      - When sensitiveCredentials is set, a secure UI appears for users to enter the actual values
+      - NEVER ask users to paste secrets in chat - always use sensitiveCredentials instead
+      - Sensitive credential values you see (like <<masked_api_key>>) are placeholders, not real values
     </credential_handling>
     `,
   inputSchema: {
@@ -741,15 +831,21 @@ const modifySystemDefinition = (): ToolDefinition => ({
       },
       credentials: {
         type: "object",
-        description: "Credentials for accessing the system. All keys should be in snake_case.",
+        description:
+          "Non-sensitive credentials only: client_id, auth_url, token_url, scopes, grant_type, redirect_uri. Do NOT include secrets here.",
+      },
+      sensitiveCredentials: {
+        type: "object",
+        description:
+          "Sensitive credentials requiring secure user input. Set field to true to request it. Example: { api_key: true }. A secure UI will appear for users to enter values.",
       },
     },
     required: ["id"],
   },
 });
 
-const runModifySystem = async (input: any, ctx: ToolExecutionContext) => {
-  let { ...systemInput } = input;
+const runEditSystem = async (input: any, ctx: ToolExecutionContext) => {
+  let { sensitiveCredentials, ...systemInput } = input;
 
   const docResult = resolveDocumentationFiles(
     systemInput.documentation,
@@ -771,19 +867,23 @@ const runModifySystem = async (input: any, ctx: ToolExecutionContext) => {
     systemInput.documentationUrl = docResult.documentationUrl;
   }
 
+  if (sensitiveCredentials && Object.keys(sensitiveCredentials).length > 0) {
+    return {
+      confirmationState: SYSTEM_UPSERT_CONFIRMATION.PENDING,
+      systemConfig: systemInput,
+      requiredSensitiveFields: Object.keys(sensitiveCredentials),
+    };
+  }
+
   try {
     const result = await ctx.superglueClient.upsertSystem(
       systemInput.id,
       systemInput,
       UpsertMode.UPDATE,
     );
-    const note = result.documentationPending
-      ? "System modified. Documentation is being processed in the background."
-      : "System modified successfully.";
-
     return {
-      note: note,
       success: true,
+      systemId: result.id,
       system: filterSystemFields(result),
     };
   } catch (error: any) {
@@ -1109,7 +1209,7 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
 
     <credential_resolution>
       OAuth credentials are resolved in this priority order:
-      1. Values passed to this tool (client_id, client_secret, auth_url, token_url)
+      1. Values passed to this tool (client_id, auth_url, token_url) or via sensitiveCredentials (client_secret)
       2. Values already stored in the system's credentials
       3. Values from templates (slack, salesforce, asana, notion, airtable, jira, confluence)
       
@@ -1130,9 +1230,16 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
 
     <first_time_setup>
       For FIRST-TIME setup on Google, Microsoft, GitHub, etc. (when credentials are NOT already stored):
-      1. ASK the user for their client_id and client_secret
-      2. Provide the correct auth_url and token_url and other configuration options
+      1. Provide client_id directly (non-sensitive)
+      2. Use sensitiveCredentials: { client_secret: true } to request the secret via secure UI
+      3. Provide the correct auth_url and token_url and other configuration options
     </first_time_setup>
+
+    <credential_handling>
+      - client_id, auth_url, token_url, scopes, grant_type are NON-SENSITIVE - pass directly
+      - client_secret is SENSITIVE - use sensitiveCredentials: { client_secret: true }
+      - NEVER ask users to paste client_secret in chat - use sensitiveCredentials instead
+    </credential_handling>
 
     <important>
       - STOP the conversation after calling - user must complete OAuth in UI
@@ -1151,12 +1258,7 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
       client_id: {
         type: "string",
         description:
-          "OAuth client ID - only needed if not already stored in system credentials or template",
-      },
-      client_secret: {
-        type: "string",
-        description:
-          "OAuth client secret - only needed if not already stored in system credentials",
+          "OAuth client ID (non-sensitive) - only needed if not already stored in system credentials or template",
       },
       auth_url: {
         type: "string",
@@ -1194,6 +1296,11 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
         description:
           "Additional headers for token requests, e.g., {'Notion-Version': '2022-06-28'}",
       },
+      sensitiveCredentials: {
+        type: "object",
+        description:
+          "Sensitive OAuth credentials requiring secure user input. Set { client_secret: true } if user needs to provide it. A secure UI will appear for users to enter the value.",
+      },
     },
     required: ["systemId", "scopes"],
   },
@@ -1204,7 +1311,6 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
     systemId,
     scopes,
     client_id,
-    client_secret,
     auth_url,
     token_url,
     grant_type,
@@ -1212,6 +1318,7 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
     tokenContentType,
     usePKCE,
     extraHeaders,
+    sensitiveCredentials,
   } = input;
 
   try {
@@ -1224,10 +1331,8 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
       };
     }
 
-    // Check if this system matches a template with OAuth configured
     const templateMatch = findTemplateForSystem(system);
-    const template = templateMatch?.template || systems[systemId];
-    const templateOAuth = template?.oauth;
+    const templateOAuth = templateMatch?.template.oauth;
 
     const oauthConfig: Record<string, any> = {
       grant_type:
@@ -1245,17 +1350,9 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
     else if (system.credentials?.client_id) oauthConfig.client_id = system.credentials.client_id;
     else if (templateOAuth?.client_id) oauthConfig.client_id = templateOAuth.client_id;
 
-    // Priority: user input > stored system credentials > template
-    // If user provided client_secret, use it (will be cached)
-    // If not provided but system has it stored, use it (will be cached)
-    // If neither, and template has client_id, backend will resolve template client_secret
-    if (client_secret) {
-      oauthConfig.client_secret = client_secret;
-    } else if (system.credentials?.client_secret) {
+    if (system.credentials?.client_secret) {
       oauthConfig.client_secret = system.credentials.client_secret;
     }
-    // Note: If no client_secret is set here, and template has client_id,
-    // the frontend will set templateInfo and backend will resolve template credentials
 
     if (auth_url) oauthConfig.auth_url = auth_url;
     else if (system.credentials?.auth_url) oauthConfig.auth_url = system.credentials.auth_url;
@@ -1314,6 +1411,16 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
       };
     }
 
+    if (sensitiveCredentials && Object.keys(sensitiveCredentials).length > 0) {
+      return {
+        confirmationState: SYSTEM_UPSERT_CONFIRMATION.PENDING,
+        systemId,
+        oauthConfig,
+        system: filterSystemFields(system),
+        requiredSensitiveFields: Object.keys(sensitiveCredentials),
+      };
+    }
+
     return {
       success: true,
       requiresOAuth: true,
@@ -1330,6 +1437,59 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
       suggestion: "Failed to fetch system. Check that the system ID exists.",
     };
   }
+};
+
+const processAuthenticateOAuthConfirmation = async (
+  input: any,
+  output: any,
+  ctx: ToolExecutionContext,
+): Promise<{ output: string; status: "completed" | "declined" }> => {
+  let parsedOutput;
+  try {
+    parsedOutput = typeof output === "string" ? JSON.parse(output) : output;
+  } catch {
+    return { output: JSON.stringify(output), status: "completed" };
+  }
+
+  if (!parsedOutput.confirmationState) {
+    return { output: JSON.stringify(parsedOutput), status: "completed" };
+  }
+
+  if (parsedOutput.confirmationState === SYSTEM_UPSERT_CONFIRMATION.CONFIRMED) {
+    const confirmationData = parsedOutput.confirmationData || parsedOutput;
+    const systemId = confirmationData.systemId || parsedOutput.systemId;
+    const oauthConfig = confirmationData.oauthConfig || parsedOutput.oauthConfig;
+    const userProvidedCredentials =
+      confirmationData.userProvidedCredentials || parsedOutput.userProvidedCredentials || {};
+
+    const finalOAuthConfig = {
+      ...(oauthConfig || {}),
+      ...userProvidedCredentials,
+    };
+
+    return {
+      output: JSON.stringify({
+        success: true,
+        requiresOAuth: true,
+        systemId,
+        oauthConfig: finalOAuthConfig,
+        message: "OAuth authentication ready. Click the button to authenticate.",
+        note: "STOP the conversation here and wait for the user to complete OAuth authentication.",
+      }),
+      status: "completed",
+    };
+  } else if (parsedOutput.confirmationState === SYSTEM_UPSERT_CONFIRMATION.DECLINED) {
+    return {
+      output: JSON.stringify({
+        success: false,
+        cancelled: true,
+        message: "OAuth authentication cancelled by user",
+      }),
+      status: "declined",
+    };
+  }
+
+  return { output: JSON.stringify(parsedOutput), status: "completed" };
 };
 
 const findSystemTemplatesDefinition = (): ToolDefinition => ({
@@ -1663,9 +1823,19 @@ const runFindSystem = async (
   if (!input.id && !input.query) {
     return { success: false, error: "Provide either id or query" };
   }
+
+  const maskCredentialsInSystem = (sys: any) => {
+    if (!sys?.credentials || Object.keys(sys.credentials).length === 0) return sys;
+    const maskedCredentials: Record<string, string> = {};
+    for (const key of Object.keys(sys.credentials)) {
+      maskedCredentials[key] = `<<masked_${key}>>`;
+    }
+    return { ...sys, credentials: maskedCredentials };
+  };
+
   if (input.id) {
     const system = await ctx.superglueClient.getSystem(input.id);
-    return { success: true, system };
+    return { success: true, system: maskCredentialsInSystem(system) };
   }
   const { items } = await ctx.superglueClient.listSystems(100);
   const query = input.query!.toLowerCase();
@@ -1674,7 +1844,7 @@ const runFindSystem = async (
     const text = [s.id, s.urlHost, s.documentation].filter(Boolean).join(" ").toLowerCase();
     return keywords.some((kw) => text.includes(kw));
   });
-  return { success: true, systems: filtered };
+  return { success: true, systems: filtered.map(maskCredentialsInSystem) };
 };
 
 export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
@@ -1699,6 +1869,11 @@ export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
         ConfirmationAction.DECLINED,
         ConfirmationAction.PARTIAL,
       ],
+      states: {
+        [ConfirmationAction.CONFIRMED]: EDIT_TOOL_CONFIRMATION.CONFIRMED,
+        [ConfirmationAction.DECLINED]: EDIT_TOOL_CONFIRMATION.DECLINED,
+        [ConfirmationAction.PARTIAL]: EDIT_TOOL_CONFIRMATION.PARTIAL,
+      },
       processConfirmation: processEditToolConfirmation,
     },
   },
@@ -1711,11 +1886,29 @@ export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
     name: "create_system",
     definition: createSystemDefinition,
     execute: runCreateSystem,
+    confirmation: {
+      timing: "before",
+      validActions: [ConfirmationAction.CONFIRMED, ConfirmationAction.DECLINED],
+      states: {
+        [ConfirmationAction.CONFIRMED]: SYSTEM_UPSERT_CONFIRMATION.CONFIRMED,
+        [ConfirmationAction.DECLINED]: SYSTEM_UPSERT_CONFIRMATION.DECLINED,
+      },
+      processConfirmation: processCreateSystemConfirmation,
+    },
   },
-  modify_system: {
-    name: "modify_system",
-    definition: modifySystemDefinition,
-    execute: runModifySystem,
+  edit_system: {
+    name: "edit_system",
+    definition: editSystemDefinition,
+    execute: runEditSystem,
+    confirmation: {
+      timing: "before",
+      validActions: [ConfirmationAction.CONFIRMED, ConfirmationAction.DECLINED],
+      states: {
+        [ConfirmationAction.CONFIRMED]: SYSTEM_UPSERT_CONFIRMATION.CONFIRMED,
+        [ConfirmationAction.DECLINED]: SYSTEM_UPSERT_CONFIRMATION.DECLINED,
+      },
+      processConfirmation: processEditSystemConfirmation,
+    },
   },
   call_system: {
     name: "call_system",
@@ -1758,6 +1951,15 @@ export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
     name: "authenticate_oauth",
     definition: authenticateOAuthDefinition,
     execute: runAuthenticateOAuth,
+    confirmation: {
+      timing: "before",
+      validActions: [ConfirmationAction.CONFIRMED, ConfirmationAction.DECLINED],
+      states: {
+        [ConfirmationAction.CONFIRMED]: SYSTEM_UPSERT_CONFIRMATION.CONFIRMED,
+        [ConfirmationAction.DECLINED]: SYSTEM_UPSERT_CONFIRMATION.DECLINED,
+      },
+      processConfirmation: processAuthenticateOAuthConfirmation,
+    },
   },
   find_system_templates: {
     name: "find_system_templates",
@@ -1771,6 +1973,10 @@ export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
     confirmation: {
       timing: "after",
       validActions: [ConfirmationAction.CONFIRMED, ConfirmationAction.DECLINED],
+      states: {
+        [ConfirmationAction.CONFIRMED]: EDIT_TOOL_CONFIRMATION.CONFIRMED,
+        [ConfirmationAction.DECLINED]: EDIT_TOOL_CONFIRMATION.DECLINED,
+      },
       processConfirmation: processEditPayloadConfirmation,
     },
   },
@@ -1797,7 +2003,7 @@ export const AGENT_TOOL_SET = [
   "edit_tool",
   "save_tool",
   "create_system",
-  "modify_system",
+  "edit_system",
   "search_documentation",
   "call_system",
   "authenticate_oauth",

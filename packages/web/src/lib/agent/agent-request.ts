@@ -5,8 +5,6 @@ import { resolveSystemPrompt, generateAgentInitialContext } from "./agent-contex
 import { AgentType, getAgent } from "./registry/agents";
 import { TOOL_CONTINUATION_MESSAGES, TOOL_REGISTRY } from "./registry/tools";
 import {
-  CALL_ENDPOINT_CONFIRMATION,
-  EDIT_TOOL_CONFIRMATION,
   ToolExecutionContext,
   ToolRegistryEntry,
   ValidatedAgentRequest,
@@ -317,7 +315,7 @@ function buildContextInjection(
 
     if (conversationMentionsFiles) {
       parts.push(
-        `[SYSTEM] IMPORTANT: No files are currently available in this session. Files are stored in browser memory and are cleared on page refresh. If the conversation history mentions files that were previously uploaded, those files are NO LONGER AVAILABLE. You MUST ask the user to re-upload the files before making any tool calls that require file content. Do NOT attempt to use file:: references until the user has re-uploaded the files.`,
+        `[SYSTEM] IMPORTANT: No files are currently available in this session. Files are stored in browser memory and are cleared on page refresh. If a past chat mentions files that were previously uploaded, those files are NO LONGER AVAILABLE. You MUST ask the user to re-upload the files before making any tool calls that require file content. Do NOT attempt to use file:: references until the user has re-uploaded the files.`,
       );
     }
   }

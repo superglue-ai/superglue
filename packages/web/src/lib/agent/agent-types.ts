@@ -17,6 +17,12 @@ export const EDIT_TOOL_CONFIRMATION = {
   PARTIAL: "DIFFS_PARTIALLY_APPROVED",
 } as const;
 
+export const SYSTEM_UPSERT_CONFIRMATION = {
+  PENDING: "PENDING_CREDENTIALS",
+  CONFIRMED: "CREDENTIALS_PROVIDED",
+  DECLINED: "CREDENTIALS_DECLINED",
+} as const;
+
 export type ToolExecutionPolicies = Record<string, Record<string, any>>;
 
 export type CallSystemAutoExecute = "ask_every_time" | "run_gets_only" | "run_everything";
@@ -45,6 +51,7 @@ export interface ToolExecutionContext {
 export interface ToolConfirmationConfig {
   timing: "before" | "after";
   validActions: ConfirmationAction[];
+  states: Partial<Record<ConfirmationAction, string>>;
   processConfirmation: (
     input: any,
     output: any,
@@ -80,6 +87,8 @@ export interface ToolConfirmationAction {
   data?: {
     appliedChanges?: any[];
     rejectedChanges?: any[];
+    systemConfig?: any;
+    userProvidedCredentials?: Record<string, string>;
   };
 }
 
