@@ -4,7 +4,7 @@ import { z } from "zod";
 import { GraphQLSubscriptionClient } from "../graphql-subscriptions";
 import { AgentType } from "./registry/agents";
 
-export const CALL_ENDPOINT_CONFIRMATION = {
+export const CALL_SYSTEM_CONFIRMATION = {
   PENDING: "PENDING_USER_CONFIRMATION",
   CONFIRMED: "USER_CONFIRMED",
   DECLINED: "USER_CANCELLED",
@@ -19,10 +19,10 @@ export const EDIT_TOOL_CONFIRMATION = {
 
 export type ToolExecutionPolicies = Record<string, Record<string, any>>;
 
-export type CallEndpointAutoExecute = "ask_every_time" | "run_gets_only" | "run_everything";
+export type CallSystemAutoExecute = "ask_every_time" | "run_gets_only" | "run_everything";
 
-export interface CallEndpointPolicy {
-  autoExecute: CallEndpointAutoExecute;
+export interface CallSystemPolicy {
+  autoExecute: CallSystemAutoExecute;
 }
 
 export interface ToolDefinition {
@@ -136,4 +136,22 @@ export interface ValidatedAgentRequest {
   agentParams?: Record<string, any>;
   toolExecutionPolicies?: ToolExecutionPolicies;
   agent: AgentDefinition;
+}
+
+export interface CallSystemArgs {
+  systemId?: string;
+  url: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+export interface CallSystemResult {
+  success: boolean;
+  protocol: "http" | "postgres" | "sftp";
+  status?: number;
+  statusText?: string;
+  headers?: Record<string, string>;
+  data?: any;
+  error?: string;
 }

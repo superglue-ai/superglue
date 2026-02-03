@@ -5,7 +5,7 @@ import { UserAction } from "@/src/lib/agent/agent-types";
 import {
   AuthenticateOAuthComponent,
   BackgroundToolIndicator,
-  CallEndpointComponent,
+  CallSystemComponent,
   CreateSystemComponent,
   DefaultComponent,
   EditPayloadComponent,
@@ -68,7 +68,6 @@ export function ToolCallComponent({
           onAbortStream={onAbortStream}
           onApplyChanges={onApplyChanges}
           isPlayground={isPlayground}
-          currentPayload={currentPayload}
           filePayloads={filePayloads}
         />
       );
@@ -101,9 +100,9 @@ export function ToolCallComponent({
       );
 
     // Other tools
-    case "call_endpoint":
+    case "call_system":
       return (
-        <CallEndpointComponent
+        <CallSystemComponent
           tool={tool}
           onInputChange={onInputChange}
           onToolUpdate={onToolUpdate}

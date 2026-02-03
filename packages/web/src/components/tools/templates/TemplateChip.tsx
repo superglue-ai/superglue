@@ -169,6 +169,8 @@ export function TemplateChip({
         lineHeight: "1.3",
         background: chipClasses.gradient,
         boxShadow: chipClasses.shadow,
+        whiteSpace: "nowrap",
+        verticalAlign: "middle",
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

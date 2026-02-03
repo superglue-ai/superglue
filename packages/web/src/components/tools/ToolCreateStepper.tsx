@@ -88,6 +88,17 @@ export function ToolCreateStepper({
   };
   return (
     <div className="flex-1 flex flex-col h-full p-6">
+      <div className="flex justify-end mb-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onComplete}
+          className="h-8 w-8 rounded-full hover:bg-muted"
+          title="Close"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
       <div className="flex-1 overflow-hidden flex flex-col">
         <div className="overflow-y-auto px-1 min-h-0" style={{ scrollbarGutter: "stable" }}>
           {step === "build" && (

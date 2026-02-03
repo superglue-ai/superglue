@@ -99,7 +99,7 @@ export interface SystemConfigContextValue {
   getSectionStatus: (section: SystemSection) => SectionStatus;
   getSystemContextForAgent: () => SystemContextForAgent;
 
-  saveSystem: () => Promise<boolean>;
+  saveSystem: (oauthTokenOverride?: Partial<OAuthFields>) => Promise<boolean>;
   resetToInitial: () => void;
 }
 

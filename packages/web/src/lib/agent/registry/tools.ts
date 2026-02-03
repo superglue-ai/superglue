@@ -1,11 +1,6 @@
 import { setFileUploadDocumentationURL } from "@/src/lib/file-utils";
-import {
-  CallEndpointArgs,
-  CallEndpointResult,
-  ConfirmationAction,
-  ToolResult,
-  UpsertMode,
-} from "@superglue/shared";
+import { splitUrl } from "@/src/lib/client-utils";
+import { ConfirmationAction, ToolResult, UpsertMode } from "@superglue/shared";
 import { SystemConfig, systems, findTemplateForSystem } from "@superglue/shared/templates";
 import { DraftLookup, findDraftInMessages, formatDiffSummary } from "../agent-context";
 import {
@@ -16,22 +11,26 @@ import {
   truncateResponseBody,
   validateDraftOrToolId,
   validateRequiredFields,
+  getProtocol,
 } from "../agent-helpers";
 import {
-  CALL_ENDPOINT_CONFIRMATION,
   EDIT_TOOL_CONFIRMATION,
+  SYSTEM_UPSERT_CONFIRMATION,
+  CALL_SYSTEM_CONFIRMATION,
   ToolDefinition,
   ToolExecutionContext,
   ToolRegistryEntry,
+  CallSystemArgs,
+  CallSystemResult,
 } from "../agent-types";
 import { processToolPolicy } from "./tool-policies";
 
 export const TOOL_CONTINUATION_MESSAGES = {
-  call_endpoint: {
+  call_system: {
     confirmed:
-      "[USER ACTION] The user confirmed an HTTP request. Analyze the results and respond to the user.",
+      "[USER ACTION] The user confirmed a system call. Analyze the results and respond to the user.",
     declined:
-      "[USER ACTION] The user declined an HTTP request. Acknowledge this and ask if they want to proceed differently or if there's anything else you can help with.",
+      "[USER ACTION] The user declined a system call. Acknowledge this and ask if they want to proceed differently or if there's anything else you can help with.",
   },
   edit_tool: {
     confirmed:
@@ -46,6 +45,24 @@ export const TOOL_CONTINUATION_MESSAGES = {
       "[USER ACTION] The user approved the payload edit. The payload has been updated in the playground.",
     declined:
       "[USER ACTION] The user rejected the payload edit. Ask what they would like to change or if they want to try a different approach.",
+  },
+  create_system: {
+    confirmed:
+      "[USER ACTION] The user provided credentials and confirmed system creation. The system has been created successfully. Briefly confirm and ask if they want to test the system with call_system.",
+    declined:
+      "[USER ACTION] The user declined system creation. Ask if they want to modify the configuration or if there's anything else you can help with.",
+  },
+  edit_system: {
+    confirmed:
+      "[USER ACTION] The user provided credentials and confirmed the system edit. The changes have been applied. Briefly confirm and ask if they want to test the system with call_system.",
+    declined:
+      "[USER ACTION] The user declined the system edit. Ask what they would like to change or if there's anything else you can help with.",
+  },
+  authenticate_oauth: {
+    confirmed:
+      "[USER ACTION] The user provided OAuth credentials. Proceed with the OAuth authentication flow. The user will need to complete the OAuth flow in the UI.",
+    declined:
+      "[USER ACTION] The user declined to provide OAuth credentials. Ask if they want to use a different authentication method or if there's anything else you can help with.",
   },
 };
 
@@ -303,34 +320,6 @@ const editToolDefinition = (): ToolDefinition => ({
       },
     },
     required: ["fixInstructions", "payload"],
-  },
-});
-
-const editToolDefinitionPlayground = (): ToolDefinition => ({
-  name: "edit_tool",
-  description: `
-    <use_case>
-      Modifies the current tool in the playground using targeted changes.
-    </use_case>
-
-    <important_notes>
-      - The tool being edited is "playground-draft" - use this as the draftId.
-      - Uses diff-based approach - makes minimal targeted changes.
-      - Do NOT provide a payload - the playground has its own test payload. Use edit_payload if the user wants to change the test data.
-      - Provide specific fix instructions (e.g., "change the endpoint to /v2/users", "fix the finalTransform mapping").
-    </important_notes>
-    `,
-  inputSchema: {
-    type: "object",
-    properties: {
-      draftId: { type: "string", description: "ID of the draft tool to edit" },
-      toolId: { type: "string", description: "ID of a saved tool to edit" },
-      fixInstructions: {
-        type: "string",
-        description: "Specific instructions on how to edit the tool",
-      },
-    },
-    required: ["fixInstructions"],
   },
 });
 
@@ -806,88 +795,7 @@ const runModifySystem = async (input: any, ctx: ToolExecutionContext) => {
   }
 };
 
-const callEndpointDefinition = (): ToolDefinition => ({
-  name: "call_endpoint",
-  description: `
-    <use_case>
-      Used to test systems and endpoints before building tools. Use this to explore APIs, verify authentication, test endpoints, and examine response formats.
-      Perfect for quickly understanding how an API works before building a tool.
-    </use_case>
-
-    <important_notes>
-      - ONLY supports HTTP/HTTPS URLs - does NOT work with database protocols (postgres://, mysql://) or file transfer protocols (sftp://, ftp://)
-      - REQUIRES USER CONFIRMATION before execution - never auto-executes
-      - Ideal for API discovery, testing authentication, exploring endpoints, and validating request/response formats
-      - Supports credential injection using placeholders: <<system_id_credential_key>>
-      - When a systemId is provided, OAuth tokens are automatically refreshed if expired
-      - Use after checking available systems to get credential keys for auth
-      - Can execute on production systems - always show request details before execution
-      - Supports all HTTP methods: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
-      - Example header with credentials: { "Authorization": "Bearer <<stripe_api_api_key>>" }
-    </important_notes>
-    `,
-  inputSchema: {
-    type: "object",
-    properties: {
-      systemId: {
-        type: "string",
-        description:
-          "Optional system ID for credential injection and automatic OAuth token refresh. Required if using credential placeholders.",
-      },
-      method: {
-        type: "string",
-        description: "HTTP method (GET, POST, PUT, DELETE, PATCH, etc.)",
-        enum: ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
-      },
-      url: {
-        type: "string",
-        description:
-          "Full HTTP/HTTPS URL to request (including protocol and query parameters). Can use <<system_id_credential_key>> for credential injection into URL path. Does NOT support non-HTTP protocols like postgres://, mysql://, sftp://.",
-      },
-      headers: {
-        type: "object",
-        description:
-          "Optional HTTP headers. Can use <<system_id_credential_key>> for credential injection.",
-      },
-      body: {
-        type: "string",
-        description:
-          "Optional request body (JSON string for POST/PUT/PATCH requests). Can use <<system_id_credential_key>> for credential injection.",
-      },
-      timeout: {
-        type: "number",
-        description: "Optional timeout in milliseconds (default: 30000)",
-      },
-    },
-    required: ["method", "url"],
-  },
-});
-
-const runCallEndpoint = async (
-  request: CallEndpointArgs,
-  ctx: ToolExecutionContext,
-): Promise<CallEndpointResult> => {
-  const { systemId, method, url, headers, body, timeout } = request;
-
-  try {
-    return await ctx.superglueClient.callEndpoint({
-      systemId,
-      method,
-      url,
-      headers,
-      body,
-      timeout,
-    });
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-      duration: 0,
-    };
-  }
-};
-
-const processCallEndpointConfirmation = async (
+const processEditSystemConfirmation = async (
   input: any,
   output: any,
   ctx: ToolExecutionContext,
@@ -903,19 +811,208 @@ const processCallEndpointConfirmation = async (
     return { output: JSON.stringify(parsedOutput), status: "completed" };
   }
 
-  if (parsedOutput.confirmationState === CALL_ENDPOINT_CONFIRMATION.CONFIRMED) {
+  if (parsedOutput.confirmationState === SYSTEM_UPSERT_CONFIRMATION.CONFIRMED) {
+    const confirmationData = parsedOutput.confirmationData || parsedOutput;
+    const systemConfig = confirmationData.systemConfig || parsedOutput.systemConfig;
+    const userProvidedCredentials =
+      confirmationData.userProvidedCredentials || parsedOutput.userProvidedCredentials || {};
+
+    if (!systemConfig || !systemConfig.id) {
+      return {
+        output: JSON.stringify({
+          success: false,
+          error: "Missing system configuration",
+          suggestion: "System configuration is required to update the system.",
+        }),
+        status: "completed",
+      };
+    }
+
+    const finalCredentials = {
+      ...(systemConfig.credentials || {}),
+      ...userProvidedCredentials,
+    };
+
+    const { sensitiveCredentials: _, ...cleanSystemConfig } = systemConfig;
+
     try {
-      const realResult = await runCallEndpoint(input, ctx);
+      const result = await ctx.superglueClient.upsertSystem(
+        cleanSystemConfig.id,
+        { ...cleanSystemConfig, credentials: finalCredentials },
+        UpsertMode.UPDATE,
+      );
+      return {
+        output: JSON.stringify({
+          success: true,
+          systemId: result.id,
+          system: filterSystemFields(result),
+        }),
+        status: "completed",
+      };
+    } catch (error: any) {
+      return {
+        output: JSON.stringify({
+          success: false,
+          error: error.message,
+          suggestion: "Failed to modify system. Validate all system inputs and try again.",
+        }),
+        status: "completed",
+      };
+    }
+  } else if (parsedOutput.confirmationState === SYSTEM_UPSERT_CONFIRMATION.DECLINED) {
+    return {
+      output: JSON.stringify({
+        success: false,
+        cancelled: true,
+        message: "System edit cancelled by user",
+      }),
+      status: "declined",
+    };
+  }
+
+  return { output: JSON.stringify(parsedOutput), status: "completed" };
+};
+
+const callSystemDefinition = (): ToolDefinition => ({
+  name: "call_system",
+  description: `
+    <use_case>
+      Used to test systems and endpoints before building tools. Use this to explore APIs, databases, and file servers, verify authentication, test endpoints, and examine response formats.
+      Perfect for quickly understanding how a system works before building a tool.
+    </use_case>
+
+    <important_notes>
+      - Supports HTTP/HTTPS URLs for REST APIs
+      - Supports postgres:// and postgresql:// URLs for PostgreSQL databases
+      - Supports sftp://, ftp://, and ftps:// URLs for file transfer operations
+      - Supports credential injection using placeholders: <<system_id_credential_key>>
+      - When a systemId is provided, OAuth tokens are automatically refreshed if expired
+    </important_notes>
+
+    <http_usage>
+      - Supports all HTTP methods: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
+      - Example header with credentials: { "Authorization": "Bearer <<stripe_api_api_key>>" }
+    </http_usage>
+
+    <postgres_usage>
+      - URL format: postgres://user:password@host:port/database
+      - Body should contain JSON with query: {"query": "SELECT * FROM users WHERE id = $1", "params": [123]}
+      - Supports parameterized queries for safety
+    </postgres_usage>
+
+    <sftp_usage>
+      - URL format: sftp://user:password@host:port
+      - Body should contain JSON with operation: {"operation": "list", "path": "/data"}
+      - Supported operations: list, get, put, delete, rename, mkdir, rmdir, exists, stat
+    </sftp_usage>
+    `,
+  inputSchema: {
+    type: "object",
+    properties: {
+      systemId: {
+        type: "string",
+        description:
+          "Optional system ID for credential injection and automatic OAuth token refresh. Required if using credential placeholders.",
+      },
+      url: {
+        type: "string",
+        description:
+          "Full URL including protocol. Supports http(s)://, postgres://, postgresql://, sftp://, ftp://, ftps://. Can use <<system_id_credential_key>> for credential injection.",
+      },
+      method: {
+        type: "string",
+        description: "HTTP method (only used for HTTP/HTTPS URLs)",
+        enum: ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+      },
+      headers: {
+        type: "object",
+        description:
+          "Optional HTTP headers (only used for HTTP/HTTPS URLs). Can use <<system_id_credential_key>> for credential injection.",
+      },
+      body: {
+        type: "string",
+        description:
+          "Request body. For HTTP: JSON string for POST/PUT/PATCH. For Postgres: JSON with query and params. For SFTP: JSON with operation and path. Can use <<system_id_credential_key>> for credential injection.",
+      },
+    },
+    required: ["url"],
+  },
+});
+
+const runCallSystem = async (
+  request: CallSystemArgs,
+  ctx: ToolExecutionContext,
+): Promise<CallSystemResult> => {
+  const { systemId, url, method, headers, body } = request;
+  const protocol = getProtocol(url);
+
+  try {
+    // this split is not strictly necessary, but we need due to backwards compatibility with composeURL() in the tool executor
+    const { urlHost, urlPath } =
+      protocol === "http" ? splitUrl(url) : { urlHost: url, urlPath: "" };
+
+    const step = {
+      id: `call_system_${Date.now()}`,
+      apiConfig: {
+        urlHost,
+        urlPath,
+        method: method || "GET",
+        headers,
+        body,
+        instruction: "",
+      },
+      systemId,
+    };
+
+    const result = await ctx.superglueClient.executeStep({
+      step,
+      payload: {},
+    });
+
+    return {
+      success: result.success,
+      protocol,
+      data: result.data,
+      error: result.error,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      protocol,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+};
+
+const processCallSystemConfirmation = async (
+  input: any,
+  output: any,
+  ctx: ToolExecutionContext,
+): Promise<{ output: string; status: "completed" | "declined" }> => {
+  let parsedOutput;
+  try {
+    parsedOutput = typeof output === "string" ? JSON.parse(output) : output;
+  } catch {
+    return { output: JSON.stringify(output), status: "completed" };
+  }
+
+  if (!parsedOutput.confirmationState) {
+    return { output: JSON.stringify(parsedOutput), status: "completed" };
+  }
+
+  if (parsedOutput.confirmationState === CALL_SYSTEM_CONFIRMATION.CONFIRMED) {
+    try {
+      const realResult = await runCallSystem(input, ctx);
       return { output: JSON.stringify(truncateResponseBody(realResult)), status: "completed" };
     } catch (error: any) {
       const errorResult = {
         success: false,
+        protocol: getProtocol(input.url),
         error: error.message || "Request failed",
-        duration: 0,
       };
       return { output: JSON.stringify(errorResult), status: "completed" };
     }
-  } else if (parsedOutput.confirmationState === CALL_ENDPOINT_CONFIRMATION.DECLINED) {
+  } else if (parsedOutput.confirmationState === CALL_SYSTEM_CONFIRMATION.DECLINED) {
     const cancelOutput = JSON.stringify({
       success: false,
       cancelled: true,
@@ -1007,6 +1104,7 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
       Initiates OAuth authentication flow for a system. Use for:
       1. Initial OAuth setup after create_system
       2. Re-authenticating when OAuth tokens have expired and cannot be refreshed
+      3. Both client_credentials and authorization_code flows are supported
     </use_case>
 
     <credential_resolution>
@@ -1038,6 +1136,7 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
 
     <important>
       - STOP the conversation after calling - user must complete OAuth in UI
+      - client_credentials flow only requires client_id, client_secret, scopes and token_url
     </important>
     `,
   inputSchema: {
@@ -1603,20 +1702,6 @@ export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
       processConfirmation: processEditToolConfirmation,
     },
   },
-  edit_tool_playground: {
-    name: "edit_tool",
-    definition: editToolDefinitionPlayground,
-    execute: runEditTool,
-    confirmation: {
-      timing: "after",
-      validActions: [
-        ConfirmationAction.CONFIRMED,
-        ConfirmationAction.DECLINED,
-        ConfirmationAction.PARTIAL,
-      ],
-      processConfirmation: processEditToolConfirmation,
-    },
-  },
   save_tool: {
     name: "save_tool",
     definition: saveToolDefinition,
@@ -1632,22 +1717,22 @@ export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
     definition: modifySystemDefinition,
     execute: runModifySystem,
   },
-  call_endpoint: {
-    name: "call_endpoint",
-    definition: callEndpointDefinition,
+  call_system: {
+    name: "call_system",
+    definition: callSystemDefinition,
     execute: async (input: any, ctx: ToolExecutionContext) => {
-      const { shouldAutoExecute } = processToolPolicy("call_endpoint", input, ctx);
+      const { shouldAutoExecute } = processToolPolicy("call_system", input, ctx);
 
       if (shouldAutoExecute) {
-        const result = await runCallEndpoint(input, ctx);
+        const result = await runCallSystem(input, ctx);
         return truncateResponseBody(result);
       }
 
       return {
-        confirmationState: CALL_ENDPOINT_CONFIRMATION.PENDING,
+        confirmationState: CALL_SYSTEM_CONFIRMATION.PENDING,
         request: {
-          method: input.method,
           url: input.url,
+          method: input.method,
           headers: input.headers,
           body: input.body,
           systemId: input.systemId,
@@ -1657,7 +1742,11 @@ export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
     confirmation: {
       timing: "before",
       validActions: [ConfirmationAction.CONFIRMED, ConfirmationAction.DECLINED],
-      processConfirmation: processCallEndpointConfirmation,
+      states: {
+        [ConfirmationAction.CONFIRMED]: CALL_SYSTEM_CONFIRMATION.CONFIRMED,
+        [ConfirmationAction.DECLINED]: CALL_SYSTEM_CONFIRMATION.DECLINED,
+      },
+      processConfirmation: processCallSystemConfirmation,
     },
   },
   search_documentation: {
@@ -1710,7 +1799,7 @@ export const AGENT_TOOL_SET = [
   "create_system",
   "modify_system",
   "search_documentation",
-  "call_endpoint",
+  "call_system",
   "authenticate_oauth",
   "get_runs",
   "find_system_templates",
@@ -1719,13 +1808,25 @@ export const AGENT_TOOL_SET = [
 ];
 
 export const PLAYGROUND_TOOL_SET = [
-  "edit_tool_playground",
+  "edit_tool",
   "edit_payload",
+  "run_tool",
   "search_documentation",
-  "call_endpoint",
-  "modify_system",
+  "call_system",
+  "edit_system",
   "authenticate_oauth",
   "find_tool",
   "find_system",
   "get_runs",
+];
+
+export const SYSTEM_PLAYGROUND_TOOL_SET = [
+  "create_system",
+  "edit_system",
+  "call_system",
+  "authenticate_oauth",
+  "find_system",
+  "get_runs",
+  "search_documentation",
+  "find_system_templates",
 ];

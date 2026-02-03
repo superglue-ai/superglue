@@ -1,9 +1,6 @@
 import axios from "axios";
 import {
-  ApiConfig,
   BuildToolArgs,
-  CallEndpointArgs,
-  CallEndpointResult,
   CredentialMode,
   ExtractArgs,
   ExtractInputRequest,
@@ -698,25 +695,6 @@ export class SuperglueClient {
         }, 2000);
       }
     }
-  }
-
-  async callEndpoint(args: CallEndpointArgs): Promise<CallEndpointResult> {
-    const mutation = `
-        mutation CallEndpoint($systemId: ID, $method: HttpMethod!, $url: String!, $headers: JSON, $body: String, $timeout: Int) {
-          callEndpoint(systemId: $systemId, method: $method, url: $url, headers: $headers, body: $body, timeout: $timeout) {
-            success
-            status
-            statusText
-            headers
-            body
-            error
-            duration
-          }
-        }
-      `;
-
-    const result = await this.request<{ callEndpoint: CallEndpointResult }>(mutation, args);
-    return result.callEndpoint;
   }
 
   async extract<T = any>({

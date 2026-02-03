@@ -89,7 +89,11 @@ function TemplateNodeView(props: NodeViewProps) {
   }, []);
 
   return (
-    <NodeViewWrapper as="span" className="inline">
+    <NodeViewWrapper
+      as="span"
+      className="inline"
+      style={{ whiteSpace: "nowrap", display: "inline" }}
+    >
       <TemplateChip
         template={rawTemplate}
         evaluatedValue={previewValue}

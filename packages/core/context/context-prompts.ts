@@ -32,6 +32,11 @@ Further:
 CRITICAL: Never use any system IDs in a step that were not explicitly provided as an available system in the <available_system_ids> context.
 </STEP_CREATION>
 
+<SYSTEM_CREDENTIAL_HANDLING>
+- There are two sourced of credentials: Those stored in the user's systems, and credentials passed as tool payloads at runtime
+- When building a tool, look carefully at the build instruction to determine which credentials to use in each step
+</SYSTEM_CREDENTIAL_HANDLING>
+
 <FILE_HANDLING>
 IMPORTANT: superglue automatically parses files returned by workflow steps irrespective of their source.
 superglue also automatically parses any files uploaded by the user and adds them to the payload using sanitized file names as keys.
@@ -61,8 +66,6 @@ Before configuring any API step:
    - Response structure
    - Pagination details (if applicable)
    - Rate limits or special requirements
-3. Only proceed with configuration after understanding the API's requirements
-4. If documentation is unclear or missing, make conservative choices
 </DOCUMENTATION_FIRST_APPROACH>
 
 <LOOP_SELECTOR>
@@ -95,11 +98,11 @@ Every step MUST have a loopSelector that determines how it executes:
    Basic variable access:
    e.g. https://api.example.com/v1/items?api_key=<<systemId_api_key>>
    e.g. headers: {
-        "Authorization": "Bearer <<systemId_access_token>>"
-   }
+        "Authorization": "Bearer <<sourceData.user_access_token>>"
+   } (for runtime credentials)
    e.g. headers: {
         "Authorization": "Basic <<systemId_username>>:<<systemId_password>>"
-   }
+   } (for system credentials)
    
    JavaScript expressions:
    e.g. body: { "userIds": <<(sourceData) => JSON.stringify(sourceData.users.map(u => u.id))>> }
@@ -110,13 +113,11 @@ Every step MUST have a loopSelector that determines how it executes:
    
 - Note: For Basic Authentication, format as "Basic <<systemId_username>>:<<systemId_password>>" and the system will automatically convert it to Base64.
 - Headers provided starting with 'x-' are probably headers.
-- Credentials are prefixed with system ID: <<systemId_credentialName>>
 - Don't hardcode pagination values - use Superglue's variables: <<page>>, <<offset>>, <<cursor>>, <<limit>>
 - Access previous step results: depends on what loopSelector returned
   * If returned object: <<(sourceData) => sourceData.fetchUsers.data>> (single result)
   * If returned array: <<(sourceData) => sourceData.fetchUsers.map(item => item.data)>> (array of results)
 - Access initial payload via sourceData (e.g., sourceData.userId)
-- Access uploaded files via sourceData (e.g., sourceData.uploadedFile.csvData)
 - Complex transformations can be done inline: <<(sourceData) => sourceData.contacts.data.filter(c => c.active).map(c => c.email).join(',')>>
 </VARIABLES>
 
@@ -204,19 +205,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
 }
 \`\`\`
 
-2. Input mapping (prepare data for API call):
-\`\`\`javascript
-(sourceData) => {
-  return {
-    userId: sourceData.currentItem?.id || sourceData.userId // if userId comes from payload,
-    action: 'update',
-    timestamp: new Date().toISOString(),
-    metadata: sourceData.globalMetadata || {}
-  };
-}
-\`\`\`
-
-3. Final transform (shape output):
+2. Final transform (shape output):
 \`\`\`javascript
 (sourceData) => {
   const results = sourceData.getIds.data.map(item => sourceData.getProductForId.data.find(product => product.id === item.id));
@@ -275,9 +264,10 @@ For special transformation functions:
 - finalTransform (array result): (sourceData) => ({ results: sourceData.processItems.map(item => item.data) })
 
 CRITICAL DATA ACCESS PATTERNS:
-1. Initial payload data: Access directly in <<>> tags
-   - <<date>> (NOT <<payload.date>>)
-   - <<companies>> (NOT <<payload.companies>>)
+1. Initial payload data: Access directly in <<>> tags or via JavaScript expressions
+   - <<date>> or <<(sourceData) => sourceData.date>> (NOT <<payload.date>>)
+   - <<companies>> or <<(sourceData) => sourceData.companies>> (NOT <<payload.companies>>)
+   - <<user_access_token>> or <<(sourceData) => sourceData.user_access_token>> (NOT <<payload.user_access_token>>)
    
 2. Previous step results: depends on what loopSelector returned
    - Object result: <<(sourceData) => sourceData.getAllContacts.data>>

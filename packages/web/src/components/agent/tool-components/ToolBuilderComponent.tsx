@@ -50,7 +50,6 @@ interface ToolBuilderComponentProps {
   onAbortStream?: () => void;
   onApplyChanges?: (config: Tool, diffs?: ToolDiff[]) => void;
   isPlayground?: boolean;
-  currentPayload?: string;
   filePayloads?: Record<string, any>;
 }
 
@@ -63,7 +62,6 @@ export function ToolBuilderComponent({
   onAbortStream,
   onApplyChanges,
   isPlayground = false,
-  currentPayload,
   filePayloads,
 }: ToolBuilderComponentProps) {
   const config = useConfig();
@@ -158,19 +156,10 @@ export function ToolBuilderComponent({
       (tool.status === "completed" || tool.status === "awaiting_confirmation") &&
       (mode === "build" || mode === "fix")
     ) {
-      const initialPayload =
-        isPlayground && currentPayload
-          ? (() => {
-              try {
-                return JSON.parse(currentPayload);
-              } catch {
-                return {};
-              }
-            })()
-          : tool.input?.payload || {};
+      const initialPayload = tool.input?.payload || {};
       setEditablePayload(JSON.stringify(initialPayload, null, 2));
     }
-  }, [tool.status, mode, tool.input?.payload, isPlayground, currentPayload]);
+  }, [tool.status, mode, tool.input?.payload]);
 
   // Cleanup log subscription on unmount
   useEffect(() => {
@@ -276,13 +265,11 @@ export function ToolBuilderComponent({
         }
       };
 
-      // Parse payload - in playground mode prefer the payload prop from tool input UI, else use the tool input payload
       let runPayload = overridePayload || tool.input?.payload || {};
       if (!overridePayload) {
         try {
-          const payloadSource = isPlayground && currentPayload ? currentPayload : editablePayload;
-          if (payloadSource.trim()) {
-            runPayload = JSON.parse(payloadSource);
+          if (editablePayload.trim()) {
+            runPayload = JSON.parse(editablePayload);
           }
         } catch {}
       }
@@ -370,7 +357,6 @@ export function ToolBuilderComponent({
       tool.id,
       editablePayload,
       isPlayground,
-      currentPayload,
       bufferAction,
     ],
   );

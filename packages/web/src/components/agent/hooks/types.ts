@@ -6,6 +6,7 @@ import { UserAction } from "@/src/lib/agent/agent-types";
 export interface ToolConfirmationMetadata {
   timing: "before" | "after";
   validActions: ConfirmationAction[];
+  shouldAutoExecute?: boolean;
 }
 
 export interface UploadedFile {

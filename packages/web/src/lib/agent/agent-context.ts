@@ -550,7 +550,7 @@ Section Status:
 - Context: ${ctx.sectionStatuses.context.label}
 
 Use edit_system with id="${ctx.systemId}" to make changes.
-Use call_endpoint with placeholders like ${credentialPlaceholders || "<<systemId_keyName>>"} to test.`;
+Use call_system with placeholders like ${credentialPlaceholders || "<<systemId_keyName>>"} to test.`;
 }
 
 export async function initializeSystemPlaygroundContext(

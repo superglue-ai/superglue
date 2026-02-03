@@ -1,3 +1,4 @@
+import { getProtocol } from "../agent-helpers";
 import { ToolExecutionContext } from "../agent-types";
 
 export interface PolicyProcessorResult {
@@ -11,11 +12,13 @@ export type PolicyProcessor = (
 ) => PolicyProcessorResult;
 
 export const TOOL_POLICY_PROCESSORS: Record<string, PolicyProcessor> = {
-  call_endpoint: (input, policies) => {
+  call_system: (input, policies) => {
     const autoExecute = policies?.autoExecute || "ask_every_time";
+    if (autoExecute === "run_everything") return { shouldAutoExecute: true };
+    if (autoExecute === "ask_every_time") return { shouldAutoExecute: false };
+    const protocol = getProtocol(input.url || "");
     const shouldAutoExecute =
-      autoExecute === "run_everything" ||
-      (autoExecute === "run_gets_only" && input.method === "GET");
+      autoExecute === "run_gets_only" && protocol === "http" && (input.method || "GET") === "GET";
     return { shouldAutoExecute };
   },
 };

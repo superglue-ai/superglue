@@ -82,12 +82,11 @@ export function TemplateAwareTextEditor({
     editorProps: {
       attributes: {
         class: cn(
-          "w-full h-9 px-3 py-2 text-xs font-mono rounded-lg border bg-muted/30 shadow-sm",
-          "focus:outline-none overflow-x-auto overflow-y-hidden",
-          "[&_p]:whitespace-nowrap",
+          "w-full min-h-9 px-3 py-2 text-xs font-mono rounded-lg border bg-muted/30 shadow-sm",
+          "focus:outline-none overflow-x-auto overflow-y-hidden scrollbar-thin",
           disabled && "opacity-50 cursor-not-allowed",
         ),
-        style: "min-height: 36px; line-height: 20px;",
+        style: "line-height: 20px;",
       },
     },
     onUpdate: ({ editor }) => {
@@ -108,7 +107,6 @@ export function TemplateAwareTextEditor({
     if (!editor || value === lastValueRef.current) return;
     isUpdatingRef.current = true;
     lastValueRef.current = value;
-    // Defer to microtask to avoid flushSync during React render
     queueMicrotask(() => {
       editor.commands.setContent(templateStringToTiptap(value));
       isUpdatingRef.current = false;
@@ -120,8 +118,16 @@ export function TemplateAwareTextEditor({
   }, [editor, disabled]);
 
   return (
-    <div className={cn("relative flex-1", className)}>
-      <EditorContent editor={editor} className="[&_.tiptap]:outline-none [&_.tiptap]:w-full" />
+    <div className={cn("relative flex-1 min-w-0", className)}>
+      <EditorContent
+        editor={editor}
+        className={cn(
+          "[&_.tiptap]:outline-none [&_.tiptap]:w-full",
+          "[&_.tiptap>p]:inline [&_.tiptap>p]:!whitespace-nowrap [&_.tiptap>p]:m-0",
+          "[&_.react-renderer]:!whitespace-nowrap [&_.react-renderer]:inline",
+          "[&_[data-node-view-wrapper]]:!inline [&_[data-node-view-wrapper]]:!whitespace-nowrap",
+        )}
+      />
       {!value?.trim() && placeholder && (
         <div className="absolute top-2 left-3 text-muted-foreground text-xs pointer-events-none font-mono">
           {placeholder}

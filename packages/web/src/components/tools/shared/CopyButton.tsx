@@ -1,6 +1,6 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
-import { safeStringify } from "@/src/lib/general-utils";
+import { safeStringify, cn } from "@/src/lib/general-utils";
 
 export const copyToClipboard = async (text: string): Promise<boolean> => {
   if (navigator.clipboard && window.isSecureContext) {
@@ -31,7 +31,15 @@ export const copyToClipboard = async (text: string): Promise<boolean> => {
   }
 };
 
-export const CopyButton = ({ text, getData }: { text?: string; getData?: () => any }) => {
+export const CopyButton = ({
+  text,
+  getData,
+  className,
+}: {
+  text?: string;
+  getData?: () => any;
+  className?: string;
+}) => {
   const [copied, setCopied] = useState(false);
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -50,7 +58,10 @@ export const CopyButton = ({ text, getData }: { text?: string; getData?: () => a
   return (
     <button
       onClick={handleCopy}
-      className="h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors backdrop-blur"
+      className={cn(
+        "h-6 w-6 flex items-center justify-center rounded hover:bg-background/80 transition-colors backdrop-blur",
+        className,
+      )}
       title="Copy"
       type="button"
     >

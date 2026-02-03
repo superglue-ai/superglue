@@ -15,6 +15,7 @@ import {
   buildToolsForAISDK,
 } from "./agent-request";
 import { TOOL_REGISTRY } from "./registry/tools";
+import { processToolPolicy } from "./registry/tool-policies";
 import type { ToolConfirmationMetadata } from "@/src/components/agent/hooks/types";
 
 export interface StreamChunk {
@@ -326,11 +327,13 @@ export class AgentClient {
             const generatedId = queue?.shift();
 
             const toolEntry = toolRegistry[part.toolName];
+            const policyResult = processToolPolicy(part.toolName, part.input, ctx);
             const confirmationMetadata: ToolConfirmationMetadata | undefined =
               toolEntry?.confirmation
                 ? {
                     timing: toolEntry.confirmation.timing,
                     validActions: toolEntry.confirmation.validActions,
+                    shouldAutoExecute: policyResult.shouldAutoExecute,
                   }
                 : undefined;
 

@@ -1,104 +1,108 @@
-import { Button } from "@/src/components/ui/button";
-import { Card } from "@/src/components/ui/card";
-import { Eye, Pencil, X } from "lucide-react";
+import { Pencil, Check, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CopyButton } from "./CopyButton";
-import { useRightSidebar } from "../../sidebar/RightSidebarContext";
 
 export const InstructionDisplay = ({
   instruction,
-  onEdit,
+  onSave,
   showEditButton = true,
 }: {
   instruction: string;
-  onEdit?: () => void;
+  onSave?: (newInstruction: string) => void;
   showEditButton?: boolean;
 }) => {
-  const [showFull, setShowFull] = useState(false);
-  const [isTruncated, setIsTruncated] = useState(false);
-  const textRef = useRef<HTMLParagraphElement>(null);
-  const { sendMessageToAgent } = useRightSidebar();
-
-  const normalizedText = instruction.replace(/\n/g, " ");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(instruction);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (textRef.current) {
-      const element = textRef.current;
-      setIsTruncated(element.scrollHeight > element.clientHeight);
-    }
-  }, [normalizedText]);
+    setEditValue(instruction);
+  }, [instruction]);
 
-  const handleEditClick = () => {
-    if (onEdit) {
-      onEdit();
-    } else {
-      // Send to agent for editing
-      const truncatedInstruction =
-        instruction.length > 500 ? `${instruction.slice(0, 500)}...` : instruction;
-      sendMessageToAgent(
-        `I want to edit the tool instruction. The current instruction is:\n\n"${truncatedInstruction}"\n\nPlease help me modify it.`,
-      );
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(editValue.length, editValue.length);
+    }
+  }, [isEditing]);
+
+  const handleSave = () => {
+    onSave?.(editValue);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditValue(instruction);
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      handleCancel();
+    } else if (e.key === "Enter" && e.metaKey) {
+      handleSave();
     }
   };
 
-  return (
-    <>
-      <div className="max-w-[75%]">
+  if (isEditing) {
+    return (
+      <div className="group">
         <div className="flex items-center gap-2 mb-1">
-          <h3 className="font-bold text-[13px]">Tool Instruction</h3>
-          {isTruncated && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-4 w-4"
-              onClick={() => setShowFull(true)}
-              title="View full instruction"
-            >
-              <Eye className="h-2.5 w-2.5" />
-            </Button>
-          )}
-          {showEditButton && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-4 w-4"
-              onClick={handleEditClick}
-              title="Edit instruction with AI"
-            >
-              <Pencil className="h-2.5 w-2.5" />
-            </Button>
-          )}
+          <span className="text-xs font-medium text-foreground/70">Tool Instruction</span>
         </div>
-        <p ref={textRef} className="text-[13px] text-muted-foreground line-clamp-2">
-          {normalizedText}
-        </p>
+        <div className="relative rounded-lg border shadow-sm bg-muted/30">
+          <textarea
+            ref={textareaRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="w-full min-h-[72px] text-[13px] border-0 bg-transparent shadow-none resize-y focus:outline-none focus:ring-0 px-3 py-2 pr-20"
+            placeholder="Describe what this tool should do..."
+          />
+          <div className="absolute top-1 right-1 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleSave}
+              className="h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-green-500/20 text-green-600"
+              title="Save (⌘+Enter)"
+            >
+              <Check className="h-3 w-3" />
+            </button>
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-red-500/20 text-red-600"
+              title="Cancel (Esc)"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
       </div>
-      {showFull && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          onClick={() => setShowFull(false)}
-        >
-          <Card
-            className="max-w-3xl w-full max-h-[80vh] overflow-hidden bg-background border-border/60"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6 relative">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Tool Instruction</h3>
-                <div className="flex items-center gap-2">
-                  <CopyButton text={instruction} />
-                  <Button variant="ghost" size="icon" onClick={() => setShowFull(false)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="bg-muted/30 rounded-lg p-4 max-h-[60vh] overflow-y-auto">
-                <p className="text-sm font-mono whitespace-pre-wrap">{instruction}</p>
-              </div>
-            </div>
-          </Card>
+    );
+  }
+
+  return (
+    <div className="group">
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className="text-xs font-medium text-foreground/70">Tool Instruction</span>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          {showEditButton && onSave && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="h-5 w-5 flex items-center justify-center rounded transition-colors hover:bg-muted"
+              title="Edit instruction"
+            >
+              <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+            </button>
+          )}
+          <CopyButton text={instruction} className="h-5 w-5" />
         </div>
-      )}
-    </>
+      </div>
+      <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-2">
+        {instruction || <span className="italic">No instruction set</span>}
+      </p>
+    </div>
   );
 };

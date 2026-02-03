@@ -71,13 +71,15 @@ export function safeStringify(obj: any, indent?: number): string {
 
 export function composeUrl(host: string, path: string | undefined) {
   if (!host && !path) return "";
-  // Handle empty/undefined inputs
   if (!host) host = "";
   if (!path) path = "";
 
-  // Trim slashes in one pass
   const cleanHost = host.endsWith("/") ? host.slice(0, -1) : host;
   const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+
+  if (!cleanPath) {
+    return cleanHost;
+  }
 
   return `${cleanHost}/${cleanPath}`;
 }

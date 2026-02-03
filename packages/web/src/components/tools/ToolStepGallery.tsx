@@ -36,7 +36,6 @@ export type ToolItem = PayloadItem | StepItem | TransformItem;
 
 export interface ToolStepGalleryProps {
   onStepEdit?: (stepId: string, updatedStep: any, isUserInitiated?: boolean) => void;
-  onInstructionEdit?: () => void;
   onExecuteStep?: (stepIndex: number) => Promise<void>;
   onExecuteStepWithLimit?: (stepIndex: number, limit: number) => Promise<void>;
   onExecuteTransform?: (schema: string, transform: string) => Promise<void>;
@@ -59,7 +58,6 @@ export interface ToolStepGalleryProps {
 
 export function ToolStepGallery({
   onStepEdit: originalOnStepEdit,
-  onInstructionEdit,
   onExecuteStep,
   onExecuteStepWithLimit,
   onExecuteTransform,
@@ -86,6 +84,7 @@ export function ToolStepGallery({
     responseSchema,
     finalTransform,
     setSteps,
+    setInstruction,
     isPayloadReferenced,
   } = useToolConfig();
 
@@ -416,7 +415,7 @@ export function ToolStepGallery({
           <div className="w-full">
             <InstructionDisplay
               instruction={instruction}
-              onEdit={onInstructionEdit}
+              onSave={setInstruction}
               showEditButton={true}
             />
           </div>
@@ -675,8 +674,16 @@ export function ToolStepGallery({
                                       <Blocks className="h-4 w-4 text-muted-foreground" />
                                     )}
                                   </div>
+                                  {step.systemId && (
+                                    <span
+                                      className="text-[9px] text-muted-foreground mt-1 truncate max-w-[140px]"
+                                      title={step.systemId}
+                                    >
+                                      {step.systemId}
+                                    </span>
+                                  )}
                                   <span
-                                    className="text-[11px] font-semibold mt-1.5 truncate max-w-[120px]"
+                                    className="text-[11px] font-semibold mt-1 truncate max-w-[140px]"
                                     title={step.id || `Step ${globalIdx}`}
                                   >
                                     {step.id || `Step ${globalIdx}`}
@@ -786,9 +793,12 @@ export function ToolStepGallery({
           </div>
 
           <div className="min-h-[220px] max-w-6xl mx-auto">
-            {showTriggerContent && isSavedTool ? (
-              <TriggersCard toolId={toolId} payload={computedPayload} compact />
-            ) : currentItem && currentItem.type === "payload" ? (
+            {isSavedTool && (
+              <div className={showTriggerContent ? "" : "hidden"}>
+                <TriggersCard toolId={toolId} payload={computedPayload} compact />
+              </div>
+            )}
+            {!showTriggerContent && currentItem && currentItem.type === "payload" ? (
               <PayloadMiniStepCard
                 onFilesUpload={onFilesUpload}
                 onFileRemove={onFileRemove}
@@ -796,12 +806,12 @@ export function ToolStepGallery({
                 totalFileSize={totalFileSize}
                 isPayloadValid={isPayloadValid}
               />
-            ) : currentItem && currentItem.type === "transform" ? (
+            ) : !showTriggerContent && currentItem && currentItem.type === "transform" ? (
               <FinalTransformMiniStepCard
                 onExecuteTransform={onExecuteTransform}
                 onAbort={isRunningTransform || isFixingTransform ? onAbort : undefined}
               />
-            ) : currentItem && currentItem.type === "step" ? (
+            ) : !showTriggerContent && currentItem && currentItem.type === "step" ? (
               <SpotlightStepCard
                 key={currentItem.data.id}
                 step={currentItem.data}
