@@ -174,6 +174,15 @@ export interface DataStore {
     orgId: string;
     settings: Partial<OrgSettings>;
   }): Promise<OrgSettings>;
+  listAllOrgSettings(): Promise<OrgSettings[]>;
+
+  // Run Methods for Notification Summaries
+  listRunsForPeriod(params: {
+    orgId: string;
+    startTime: Date;
+    endTime: Date;
+    requestSources?: RequestSource[];
+  }): Promise<{ items: Run[]; total: number }>;
 }
 
 export type ToolScheduleInternal = ToolSchedule & {

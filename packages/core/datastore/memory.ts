@@ -665,4 +665,43 @@ export class MemoryStore implements DataStore {
     this.storage.orgSettings.set(orgId, updated);
     return updated;
   }
+
+  async listAllOrgSettings(): Promise<OrgSettings[]> {
+    return Array.from(this.storage.orgSettings.values());
+  }
+
+  async listRunsForPeriod(params: {
+    orgId: string;
+    startTime: Date;
+    endTime: Date;
+    requestSources?: RequestSource[];
+  }): Promise<{ items: Run[]; total: number }> {
+    const { orgId, startTime, endTime, requestSources } = params;
+
+    // Get all runs for the org
+    const allRuns = this.getOrgItems(this.storage.runs, "run", orgId);
+
+    // Filter by time range
+    let filteredRuns = allRuns.filter((run) => {
+      if (!run.metadata?.startedAt) return false;
+      const runStartedAt = new Date(run.metadata.startedAt);
+      return runStartedAt >= startTime && runStartedAt < endTime;
+    });
+
+    // Filter by request sources if specified
+    if (requestSources && requestSources.length > 0) {
+      filteredRuns = filteredRuns.filter(
+        (run) => run.requestSource && requestSources.includes(run.requestSource),
+      );
+    }
+
+    // Sort by startedAt descending
+    filteredRuns.sort((a, b) => {
+      const aTime = new Date(a.metadata.startedAt).getTime();
+      const bTime = new Date(b.metadata.startedAt).getTime();
+      return bTime - aTime;
+    });
+
+    return { items: filteredRuns, total: filteredRuns.length };
+  }
 }

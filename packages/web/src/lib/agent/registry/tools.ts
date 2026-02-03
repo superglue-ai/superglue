@@ -1,5 +1,6 @@
 import { setFileUploadDocumentationURL } from "@/src/lib/file-utils";
 import { splitUrl } from "@/src/lib/client-utils";
+import { truncateToolResult } from "@/src/lib/general-utils";
 import { ConfirmationAction, ToolResult, UpsertMode } from "@superglue/shared";
 import { SystemConfig, systems, findTemplateForSystem } from "@superglue/shared/templates";
 import { DraftLookup, findDraftInMessages, formatDiffSummary } from "../agent-context";
