@@ -194,6 +194,15 @@ edit_tool
 - IMPORTANT: NEVER suggest changing input mappings or response mappings - these are legacy fields that do nothing.
 - PAYLOAD HANDLING: The playground manages the test payload separately. Do NOT provide a payload argument to edit_tool - use edit_payload instead if the user wants to change test data.
 
+run_tool
+- Use to test the current tool configuration
+- ALWAYS use draftId: "playground-draft" in the playground
+- Provide a representative test payload - just enough to validate the schema and logic. Users can test with very large payloads manually using the playground's Run button.
+
+edit_payload
+- Use when the user wants to change the test payload in the playground UI
+- This updates the payload shown in the playground's input editor
+
 search_documentation:
 - Search system documentation for API details, endpoint info, request/response formats
 - Use when you need to look up API specifics to fix issues

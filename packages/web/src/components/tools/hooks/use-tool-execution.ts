@@ -241,6 +241,7 @@ export function useToolExecution(
     let finalToolConfig: Tool | null = null;
     let runStatus: "success" | "failed" | "aborted" = "success";
     let runError: string | undefined;
+    let wr: ToolResult | null = null;
 
     try {
       JSON.parse(responseSchema || "{}");
@@ -322,7 +323,7 @@ export function useToolExecution(
 
       const finalData = state.stepResults["__final_transform__"]?.data;
 
-      const wr: ToolResult = {
+      wr = {
         id: generateUUID(),
         success: state.failedSteps.length === 0,
         data: finalData,
@@ -417,6 +418,9 @@ export function useToolExecution(
                 inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
                 instruction: instructions,
               } as Tool),
+            toolResult: wr?.data,
+            stepResults: wr?.stepResults,
+            toolPayload: computedPayload,
             status: runStatus,
             error: runError,
             startedAt,

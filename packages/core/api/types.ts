@@ -8,7 +8,7 @@ import {
 import { FastifyReply, FastifyRequest } from "fastify";
 import type { DataStore } from "../datastore/types.js";
 import type { WorkerPools } from "../worker/types.js";
-import type { DocumentationFiles, FileStatus } from "@superglue/shared";
+import type { DocumentationFiles, FileStatus, Tool } from "@superglue/shared";
 
 export interface AuthenticatedFastifyRequest extends FastifyRequest {
   traceId?: string;
@@ -73,7 +73,7 @@ export interface OpenAPIRunMetadata {
 export interface OpenAPIRun {
   runId: string;
   toolId: string;
-  tool?: Record<string, unknown>;
+  tool?: Tool; // Full tool config
   status: "running" | "success" | "failed" | "aborted";
   toolPayload?: Record<string, unknown>;
   data?: Record<string, unknown>;
@@ -82,6 +82,7 @@ export interface OpenAPIRun {
   options?: Record<string, unknown>;
   requestSource?: string;
   traceId?: string;
+  resultStorageUri?: string; // S3 URI where full results are stored (EE feature)
   metadata: OpenAPIRunMetadata;
 }
 
@@ -105,7 +106,10 @@ export interface RunToolRequestBody {
 // For manual run creation (e.g., playground execution records)
 export interface CreateRunRequestBody {
   toolId: string;
-  toolConfig: Record<string, unknown>;
+  toolConfig: Tool;
+  toolResult?: unknown;
+  stepResults?: Array<{ stepId: string; success: boolean; data?: unknown; error?: string }>;
+  toolPayload?: Record<string, unknown>;
   status: "success" | "failed" | "aborted";
   error?: string;
   startedAt: string;

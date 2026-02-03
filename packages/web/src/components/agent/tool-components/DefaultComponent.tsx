@@ -99,7 +99,7 @@ export function DefaultComponent({ tool, onInputChange }: DefaultComponentProps)
                 >
                   <Copy className="w-4 h-4" />
                 </button>
-                <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap max-h-64 pr-8">
+                <pre className="text-xs font-mono overflow-x-auto max-h-64 pr-8">
                   {(() => {
                     // If output is a string, try to parse and prettify JSON
                     if (typeof tool.output === "string") {

@@ -1,9 +1,10 @@
-import { Message, getDateMessage } from "@superglue/shared";
+import { Message, getDateMessage, sampleResultObject } from "@superglue/shared";
 import { jsonSchema } from "ai";
 import { tavilySearch } from "@tavily/ai-sdk";
 import { resolveSystemPrompt, generateAgentInitialContext } from "./agent-context";
 import { AgentType, getAgent } from "./registry/agents";
 import { TOOL_CONTINUATION_MESSAGES, TOOL_REGISTRY } from "./registry/tools";
+import { truncateToolResult } from "../general-utils";
 import {
   CALL_ENDPOINT_CONFIRMATION,
   EDIT_TOOL_CONFIRMATION,
@@ -570,26 +571,7 @@ async function* executeToolWithLogs(
       };
     }
 
-    let toolResultAsString = typeof result === "string" ? result : JSON.stringify(result, null, 2);
-    const MAX_TOOL_RESPONSE_LENGTH = 100000;
-
-    if (toolResultAsString.length > MAX_TOOL_RESPONSE_LENGTH) {
-      try {
-        const toolResultAsJSON = typeof result === "string" ? JSON.parse(result) : result;
-        const { sampleResultObject } = await import("@superglue/shared");
-        toolResultAsString = JSON.stringify(sampleResultObject(toolResultAsJSON, 2), null, 2);
-        if (toolResultAsString.length > MAX_TOOL_RESPONSE_LENGTH) {
-          toolResultAsString = JSON.stringify(sampleResultObject(toolResultAsJSON, 1), null, 2);
-        }
-        if (toolResultAsString.length > MAX_TOOL_RESPONSE_LENGTH) {
-          toolResultAsString =
-            toolResultAsString.slice(0, MAX_TOOL_RESPONSE_LENGTH) + "\n...(truncated)";
-        }
-      } catch {
-        toolResultAsString =
-          toolResultAsString.slice(0, MAX_TOOL_RESPONSE_LENGTH) + "\n...(truncated)";
-      }
-    }
+    const toolResultAsString = truncateToolResult(result, 50000);
 
     context.messages.push({
       id: crypto.randomUUID(),

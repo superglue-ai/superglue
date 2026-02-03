@@ -78,6 +78,7 @@ type Run {
   options: JSON
   requestSource: String
   error: String
+  resultStorageUri: String
   startedAt: DateTime!
   completedAt: DateTime
 }

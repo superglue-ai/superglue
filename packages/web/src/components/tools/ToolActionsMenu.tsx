@@ -42,6 +42,7 @@ export function ToolActionsMenu({
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleRenamed = (newId: string) => {
     refreshTools();
@@ -72,7 +73,7 @@ export function ToolActionsMenu({
 
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"

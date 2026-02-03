@@ -1,5 +1,6 @@
-import { Message, Run, Tool } from "@superglue/shared";
+import { Message, Run, RunStatus, StoredRunResults, Tool } from "@superglue/shared";
 import { systems } from "@superglue/shared/templates";
+import { truncateToolResult } from "../general-utils";
 import { AgentDefinition, ToolExecutionContext } from "./agent-types";
 import { SUPERGLUE_INFORMATION_PROMPT } from "./agent-prompts";
 
@@ -347,7 +348,10 @@ export function getDiscoveryPrompts(systemIds: string[]): {
   return { systemPrompt, userPrompt };
 }
 
-export function getInvestigationPrompts(run: Run): {
+export function getInvestigationPrompts(
+  run: Run,
+  storedResults?: StoredRunResults | null,
+): {
   systemPrompt: string;
   userPrompt: string;
 } {
@@ -366,14 +370,31 @@ export function getInvestigationPrompts(run: Run): {
     }
   };
 
+  // Determine run status
+  const isFailed =
+    run.status === RunStatus.FAILED || run.status?.toString().toUpperCase() === "FAILED";
+  const isSuccess =
+    run.status === RunStatus.SUCCESS || run.status?.toString().toUpperCase() === "SUCCESS";
+  const isRunning =
+    run.status === RunStatus.RUNNING || run.status?.toString().toUpperCase() === "RUNNING";
+  const isAborted =
+    run.status === RunStatus.ABORTED || run.status?.toString().toUpperCase() === "ABORTED";
+
+  // Use stored results if available, otherwise fall back to run data
+  const stepResults = storedResults?.stepResults ?? run.stepResults;
+  const toolPayload = storedResults?.toolPayload ?? run.toolPayload;
+  const toolResult = storedResults?.data ?? run.data;
+  const hasStoredResults = !!storedResults;
+  const hasStorageUri = !!run.resultStorageUri;
+
   // Check if tool exists and version info
   const toolExists = !!run.tool;
   const runToolVersion = run.tool?.version;
   const runStartedAt = formatDate(run.metadata?.startedAt);
 
-  // Build tool existence section
+  // Build tool existence section (only relevant for failed runs needing fixes)
   let toolExistenceSection = "";
-  if (!toolExists) {
+  if (isFailed && !toolExists) {
     toolExistenceSection = `
 IMPORTANT - TOOL NOT FOUND:
 The tool "${run.toolId}" does not currently exist in the system. This could be because:
@@ -396,27 +417,30 @@ Do NOT start creating or editing tools without user confirmation.
   // Build version comparison section
   let versionSection = "";
   if (toolExists && runToolVersion) {
-    // Note: We include the version from the run's tool snapshot
-    // The agent should use get_tool to fetch the current version and compare
     versionSection = `
 VERSION INFORMATION:
 - Tool version at time of this run: ${runToolVersion}
 - Run timestamp: ${runStartedAt}
 
-IMPORTANT: Before analyzing the error, use get_tool to fetch the current saved version of "${run.toolId}".
+${
+  isFailed
+    ? `IMPORTANT: Before analyzing the error, use get_tool to fetch the current saved version of "${run.toolId}".
 Compare the current version with the version from this run (${runToolVersion}).
 If the versions differ:
 1. Identify what changed between versions
 2. Determine if the changes might have fixed or could fix the error we're seeing
 3. Let the user know they're looking at an old run and the tool has been updated since
-4. Analyze whether the current version would still have this issue
+4. Analyze whether the current version would still have this issue`
+    : `You can use get_tool to fetch the current version of "${run.toolId}" if needed for comparison.`
+}
 `;
   }
 
   // Build request source section
   let requestSourceSection = "";
   if (run.requestSource === "webhook") {
-    requestSourceSection = `
+    requestSourceSection = isFailed
+      ? `
 WEBHOOK TRIGGER ANALYSIS:
 This run was triggered by a webhook. When debugging webhook-triggered runs:
 1. Carefully examine the INPUT PAYLOAD below - this is what the webhook sent
@@ -427,58 +451,57 @@ This run was triggered by a webhook. When debugging webhook-triggered runs:
 6. If the payload is the problem, either:
    - Update the tool's inputSchema and steps to handle the actual webhook format
    - Or coordinate with the webhook sender to fix their payload format
+`
+      : `
+WEBHOOK TRIGGER:
+This run was triggered by a webhook. The INPUT PAYLOAD shows what the webhook sent.
 `;
   } else if (run.requestSource === "scheduler") {
-    requestSourceSection = `
+    requestSourceSection = isFailed
+      ? `
 SCHEDULED RUN ANALYSIS:
 This run was triggered by the scheduler. Consider:
 1. Check if any external dependencies (APIs, services) were unavailable at the scheduled time
 2. Look for rate limiting issues if this runs frequently
 3. Check if credentials or tokens may have expired
+`
+      : `
+SCHEDULED RUN:
+This run was triggered by the scheduler.
 `;
   } else if (run.requestSource === "tool-chain") {
-    requestSourceSection = `
+    requestSourceSection = isFailed
+      ? `
 TOOL CHAIN ANALYSIS:
 This run was triggered as part of a tool chain. Consider:
 1. Check if the input from the previous tool in the chain was in the expected format
 2. Look at the INPUT PAYLOAD to see what was passed from the upstream tool
 3. The error might be in the upstream tool's output rather than this tool's configuration
+`
+      : `
+TOOL CHAIN:
+This run was triggered as part of a tool chain. The INPUT PAYLOAD shows what was passed from the upstream tool.
 `;
   }
 
-  const systemPrompt = `You are helping debug a failed superglue tool run. Analyze the error and help the user fix it.
+  // Build status-specific intro and approach
+  let statusIntro: string;
+  let approachSection: string;
+
+  if (isFailed) {
+    statusIntro = `You are helping debug a failed superglue tool run. Analyze the error and help the user fix it.
 
 FAILED RUN DETAILS:
 - Run ID: ${run.runId}
 - Tool ID: ${run.toolId}
+- Status: FAILED
 - Error: ${run.error || "Unknown error"}
 - Triggered by: ${run.requestSource || "unknown"}
 - Duration: ${run.metadata?.durationMs ? `${run.metadata.durationMs}ms` : "unknown"}
 - Started: ${runStartedAt}
-- Completed: ${formatDate(run.metadata?.completedAt)}
-${toolExistenceSection}${versionSection}${requestSourceSection}
-${
-  run.tool
-    ? `TOOL CONFIGURATION (from time of run):
-${truncateJson(run.tool)}`
-    : `NO TOOL CONFIGURATION AVAILABLE - The tool was not saved or has been deleted.`
-}
+- Completed: ${formatDate(run.metadata?.completedAt)}`;
 
-${
-  run.stepResults && run.stepResults.length > 0
-    ? `STEP RESULTS:
-${truncateJson(run.stepResults)}`
-    : ""
-}
-
-${
-  run.toolPayload
-    ? `INPUT PAYLOAD:
-${truncateJson(run.toolPayload)}`
-    : ""
-}
-
-YOUR APPROACH:
+    approachSection = `YOUR APPROACH:
 1. First, explain the error in plain English - what went wrong and why
 2. ${toolExists ? "Check the current tool version and compare with the run version" : "Acknowledge the tool doesn't exist and ask user how to proceed"}
 3. Identify the root cause - is it a configuration issue, payload issue, external API issue, or transient error?
@@ -490,14 +513,139 @@ IMPORTANT GUIDELINES:
 - Ask for user confirmation before creating new tools or making significant changes
 - If this is a transient issue (timeout, rate limit), suggest retrying before making changes
 - Be specific about what needs to change and where`;
+  } else if (isSuccess) {
+    statusIntro = `You are helping the user understand a successful superglue tool run. Analyze the execution and results.
 
-  const errorPreview = run.error ? run.error.substring(0, 150) : "Unknown error";
-  const toolExistsNote = toolExists ? "" : "\n\nNote: This tool no longer exists in the system.";
-  const userPrompt = `Help me investigate why my "${run.toolId}" tool failed.
+SUCCESSFUL RUN DETAILS:
+- Run ID: ${run.runId}
+- Tool ID: ${run.toolId}
+- Status: SUCCESS
+- Triggered by: ${run.requestSource || "unknown"}
+- Duration: ${run.metadata?.durationMs ? `${run.metadata.durationMs}ms` : "unknown"}
+- Started: ${runStartedAt}
+- Completed: ${formatDate(run.metadata?.completedAt)}`;
+
+    approachSection = `YOUR APPROACH:
+1. Summarize what the tool did and what results it produced
+2. Explain the step-by-step execution flow if step results are available
+3. Highlight any interesting data transformations or API calls
+4. Answer any questions the user has about the execution or results
+5. Offer to help optimize or modify the tool if needed
+
+IMPORTANT GUIDELINES:
+- Focus on explaining what happened and the results
+- Be ready to help with follow-up questions about the data
+- If the user wants to modify the tool, use edit_tool`;
+  } else if (isRunning) {
+    statusIntro = `You are helping the user understand a currently running superglue tool. Note that this run is still in progress.
+
+RUNNING RUN DETAILS:
+- Run ID: ${run.runId}
+- Tool ID: ${run.toolId}
+- Status: RUNNING (in progress)
+- Triggered by: ${run.requestSource || "unknown"}
+- Started: ${runStartedAt}`;
+
+    approachSection = `YOUR APPROACH:
+1. Note that this run is still in progress
+2. Explain what information is available so far
+3. Suggest the user refresh or check back later for complete results
+4. Answer any questions about the tool configuration or expected behavior`;
+  } else if (isAborted) {
+    statusIntro = `You are helping the user understand an aborted superglue tool run.
+
+ABORTED RUN DETAILS:
+- Run ID: ${run.runId}
+- Tool ID: ${run.toolId}
+- Status: ABORTED
+- Triggered by: ${run.requestSource || "unknown"}
+- Duration: ${run.metadata?.durationMs ? `${run.metadata.durationMs}ms` : "unknown"}
+- Started: ${runStartedAt}
+- Aborted: ${formatDate(run.metadata?.completedAt)}`;
+
+    approachSection = `YOUR APPROACH:
+1. Explain that the run was aborted (manually stopped or timed out)
+2. Show what progress was made before the abort if step results are available
+3. Help the user understand if they should retry or if there's an issue to fix
+4. Answer any questions about why the run might have been aborted`;
+  } else {
+    statusIntro = `You are helping the user understand a superglue tool run.
+
+RUN DETAILS:
+- Run ID: ${run.runId}
+- Tool ID: ${run.toolId}
+- Status: ${run.status || "unknown"}
+- Triggered by: ${run.requestSource || "unknown"}
+- Duration: ${run.metadata?.durationMs ? `${run.metadata.durationMs}ms` : "unknown"}
+- Started: ${runStartedAt}
+- Completed: ${formatDate(run.metadata?.completedAt)}`;
+
+    approachSection = `YOUR APPROACH:
+1. Summarize the run and its results
+2. Answer any questions the user has
+3. Offer to help with modifications if needed`;
+  }
+
+  const systemPrompt = `${statusIntro}
+${hasStorageUri ? (hasStoredResults ? "- Full results loaded from storage\n" : "- Results stored (URI exists but not fetched)\n") : ""}
+${toolExistenceSection}${versionSection}${requestSourceSection}
+${
+  run.tool
+    ? `TOOL CONFIGURATION (from time of run):
+${truncateJson(run.tool)}`
+    : `NO TOOL CONFIGURATION AVAILABLE - The tool was not saved or has been deleted.`
+}
+
+${
+  stepResults
+    ? `STEP RESULTS${hasStoredResults ? " (FULL EXECUTION DATA)" : hasStorageUri ? " (TRUNCATED - full data available in storage)" : ""}:
+${truncateToolResult(stepResults, 20000)}`
+    : ""
+}
+
+${
+  toolResult
+    ? `TOOL OUTPUT${hasStoredResults ? " (COMPLETE)" : hasStorageUri ? " (TRUNCATED - full data available in storage)" : ""}:
+${truncateToolResult(toolResult, 10000)}`
+    : ""
+}
+
+${
+  toolPayload
+    ? `INPUT PAYLOAD${hasStoredResults ? " (COMPLETE)" : hasStorageUri ? " (TRUNCATED - full data available in storage)" : ""}:
+${truncateToolResult(toolPayload, 5000)}`
+    : ""
+}
+
+${approachSection}`;
+
+  // Build user prompt based on status
+  let userPrompt: string;
+  if (isFailed) {
+    const errorPreview = run.error ? run.error.substring(0, 150) : "Unknown error";
+    const toolExistsNote = toolExists ? "" : "\n\nNote: This tool no longer exists in the system.";
+    userPrompt = `Help me investigate why my "${run.toolId}" tool failed.
 
 Error: ${errorPreview}${run.error && run.error.length > 150 ? "..." : ""}
 
 What went wrong and how can I fix it?${toolExistsNote}`;
+  } else if (isSuccess) {
+    userPrompt = `Help me understand this successful run of my "${run.toolId}" tool.
+
+What did it do and what were the results?`;
+  } else if (isRunning) {
+    userPrompt = `Help me understand this currently running execution of my "${run.toolId}" tool.
+
+What's happening and what should I expect?`;
+  } else if (isAborted) {
+    userPrompt = `Help me understand why my "${run.toolId}" tool run was aborted.
+
+What happened and should I retry?`;
+  } else {
+    userPrompt = `Help me understand this run of my "${run.toolId}" tool.
+
+What happened during this execution?`;
+  }
 
   return { systemPrompt, userPrompt };
 }

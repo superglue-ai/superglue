@@ -1,4 +1,4 @@
-import type {
+import {
   ApiConfig,
   DiscoveryRun,
   FileReference,
@@ -12,6 +12,7 @@ import type {
 } from "@superglue/shared";
 import jsonpatch from "fast-json-patch";
 import { Pool, PoolConfig } from "pg";
+import { generateRunResultsUri, getRunResultsService } from "../ee/run-results-service.js";
 import { credentialEncryption } from "../utils/encryption.js";
 import { logMessage } from "../utils/logs.js";
 import { extractRun, normalizeTool } from "./migrations/migration.js";
@@ -161,6 +162,7 @@ export class PostgresService implements DataStore {
       // Backwards-compatible schema updates for existing deployments
       await client.query(`ALTER TABLE runs ADD COLUMN IF NOT EXISTS status VARCHAR(50)`);
       await client.query(`ALTER TABLE runs ADD COLUMN IF NOT EXISTS request_source VARCHAR(50)`);
+      await client.query(`ALTER TABLE runs ADD COLUMN IF NOT EXISTS result_storage_uri TEXT`);
 
       // Ensure request_source is constrained to allowed enum values (idempotent)
       await client.query(`
@@ -561,21 +563,20 @@ export class PostgresService implements DataStore {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        "SELECT id, config_id, data, started_at, completed_at, request_source FROM runs WHERE id = $1 AND org_id = $2",
+        "SELECT id, config_id, data, started_at, completed_at, request_source, result_storage_uri FROM runs WHERE id = $1 AND org_id = $2",
         [id, orgId || ""],
       );
       if (!result.rows[0]) return null;
 
       const row = result.rows[0];
-      const run = extractRun(row.data, {
+      return extractRun(row.data, {
         id: row.id,
         config_id: row.config_id,
         started_at: row.started_at,
         completed_at: row.completed_at,
+        request_source: row.request_source,
+        result_storage_uri: row.result_storage_uri,
       });
-      // Source of truth for requestSource is the column, not the JSON
-      run.requestSource = row.request_source || run.requestSource;
-      return run;
     } finally {
       client.release();
     }
@@ -594,7 +595,7 @@ export class PostgresService implements DataStore {
     try {
       let selectQuery = `
                 SELECT 
-                    id, config_id, data, started_at, completed_at, request_source,
+                    id, config_id, data, started_at, completed_at, request_source, result_storage_uri,
                     COUNT(*) OVER() as total_count
                 FROM runs
                 WHERE org_id = $1
@@ -629,17 +630,16 @@ export class PostgresService implements DataStore {
 
       const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
 
-      const items = result.rows.map((row) => {
-        const run = extractRun(row.data, {
+      const items = result.rows.map((row) =>
+        extractRun(row.data, {
           id: row.id,
           config_id: row.config_id,
           started_at: row.started_at,
           completed_at: row.completed_at,
-        });
-        // Source of truth for requestSource is the column, not the JSON
-        run.requestSource = row.request_source || run.requestSource;
-        return run;
-      });
+          request_source: row.request_source,
+          result_storage_uri: row.result_storage_uri,
+        }),
+      );
 
       return { items, total };
     } finally {
@@ -650,12 +650,13 @@ export class PostgresService implements DataStore {
   async createRun(params: { run: Run; orgId?: string }): Promise<Run> {
     const { run, orgId = "" } = params;
     if (!run) throw new Error("Run is required");
+
     const client = await this.pool.connect();
     try {
       const result = await client.query(
         `
-                INSERT INTO runs (id, config_id, org_id, status, request_source, data, started_at, completed_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                INSERT INTO runs (id, config_id, org_id, status, request_source, data, started_at, completed_at, result_storage_uri)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 ON CONFLICT (id, org_id) DO NOTHING
             `,
         [
@@ -667,11 +668,18 @@ export class PostgresService implements DataStore {
           JSON.stringify(run),
           run.metadata.startedAt,
           run.metadata.completedAt ?? null,
+          null, // Storage URI will be set later if enabled
         ],
       );
 
       if (result.rowCount === 0) {
         throw new Error(`Run with id ${run.runId} already exists`);
+      }
+
+      // Fire-and-forget: check org settings and upload to S3 if enabled
+      const isTerminal = ["SUCCESS", "FAILED", "ABORTED"].includes(run.status);
+      if (isTerminal) {
+        this.maybeStoreRunResults({ runId: run.runId, run, orgId });
       }
 
       return run;
@@ -680,12 +688,19 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async updateRun(params: { id: string; orgId: string; updates: Partial<Run> }): Promise<Run> {
-    const { id, orgId, updates } = params;
+  async updateRun(params: {
+    id: string;
+    orgId: string;
+    updates: Partial<Run>;
+    payload?: Record<string, any>;
+    result?: Record<string, any>;
+    stepResults?: Array<{ stepId: string; success: boolean; data?: any; error?: string }>;
+  }): Promise<Run> {
+    const { id, orgId, updates, payload, result: fullResult, stepResults } = params;
     const client = await this.pool.connect();
     try {
       const existingResult = await client.query(
-        "SELECT id, config_id, data, started_at, completed_at, request_source FROM runs WHERE id = $1 AND org_id = $2",
+        "SELECT id, config_id, data, started_at, completed_at, request_source, result_storage_uri FROM runs WHERE id = $1 AND org_id = $2",
         [id, orgId],
       );
 
@@ -699,13 +714,16 @@ export class PostgresService implements DataStore {
         config_id: row.config_id,
         started_at: row.started_at,
         completed_at: row.completed_at,
+        request_source: row.request_source,
+        result_storage_uri: row.result_storage_uri,
       });
-      // Source of truth for requestSource is the column, not the JSON
-      existingRun.requestSource = row.request_source || existingRun.requestSource;
+
+      // Exclude stepResults, data, and toolPayload from DB - they go to S3 only
+      const { stepResults, data, toolPayload, ...dbSafeUpdates } = updates;
 
       const updatedRun: Run = {
         ...existingRun,
-        ...updates,
+        ...dbSafeUpdates,
         runId: id,
         metadata: {
           ...existingRun.metadata,
@@ -728,6 +746,22 @@ export class PostgresService implements DataStore {
           orgId,
         ],
       );
+
+      // Fire-and-forget: check org settings and upload to S3 if enabled and transitioning to terminal
+      const isTerminal = ["SUCCESS", "FAILED", "ABORTED"].includes(updatedRun.status);
+      const alreadyStored = !!existingRun.resultStorageUri;
+      if (isTerminal && !alreadyStored) {
+        this.maybeStoreRunResults({
+          runId: id,
+          run: {
+            ...updatedRun,
+            stepResults,
+            toolPayload,
+            data,
+          },
+          orgId,
+        });
+      }
 
       return updatedRun;
     } finally {
@@ -2034,5 +2068,62 @@ export class PostgresService implements DataStore {
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Check if run results storage is enabled for this org (EE feature)
+   * Returns true if S3 is available AND org has the feature enabled
+   */
+  private async isRunResultsStorageEnabled(orgId: string): Promise<boolean> {
+    if (!process.env.AWS_BUCKET_NAME) {
+      return false;
+    }
+    const orgSettings = await this.getOrgSettings({ orgId });
+    return !!orgSettings?.preferences?.storeRunResults;
+  }
+
+  /**
+   * Fire-and-forget: Check org settings and store run results to S3 if enabled
+   * Also updates the run with the storage URI in the database
+   */
+  private maybeStoreRunResults(params: { runId: string; run: Run; orgId: string }): void {
+    const { runId, run, orgId } = params;
+    setImmediate(async () => {
+      try {
+        const enabled = await this.isRunResultsStorageEnabled(orgId);
+        if (!enabled) return;
+
+        const storageUri = generateRunResultsUri(runId, orgId);
+        if (!storageUri) return;
+
+        // Update run with storage URI
+        const client = await this.pool.connect();
+        try {
+          await client.query(
+            `UPDATE runs SET result_storage_uri = $1, data = jsonb_set(data, '{resultStorageUri}', $2) 
+             WHERE id = $3 AND org_id = $4`,
+            [storageUri, JSON.stringify(storageUri), runId, orgId],
+          );
+        } finally {
+          client.release();
+        }
+
+        // Upload to S3 with full (non-truncated) payload and result
+        await getRunResultsService().storeResults(
+          storageUri,
+          {
+            runId,
+            success: run.status === RunStatus.SUCCESS,
+            data: run.data,
+            stepResults: run.stepResults ?? [],
+            toolPayload: run.toolPayload ?? {},
+            error: run.error,
+          },
+          { orgId },
+        );
+      } catch (err) {
+        logMessage("warn", `Failed to store run results for ${runId}: ${err}`, { orgId });
+      }
+    });
   }
 }

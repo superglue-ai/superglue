@@ -126,11 +126,10 @@ export const executeWorkflowResolver = async (
       metadata,
     );
 
-    // NOTE: GraphQL does NOT store payload in DB to save space (intentional)
     runContext = await lifecycle.startRun({
       runId: args.runId,
       tool: workflow,
-      // payload intentionally omitted to save DB space
+      payload: args.payload,
       options: args.options,
       requestSource,
     });
@@ -188,8 +187,10 @@ export const executeWorkflowResolver = async (
     await lifecycle.completeRun(runContext, {
       success: graphqlResult.success,
       tool: graphqlResult.config || workflow,
+      data: graphqlResult.data,
       error: graphqlResult.error,
       stepResults: executionResult.stepResults,
+      payload: args.payload,
     });
 
     // Notify webhook if configured (fire-and-forget)
@@ -222,7 +223,7 @@ export const executeWorkflowResolver = async (
     }
 
     return graphqlResult;
-  } catch (error) {
+  } catch (error: any) {
     logMessage("error", "Workflow execution error: " + String(error), metadata);
 
     const errorStartedAt = runContext?.startedAt || new Date();
@@ -237,6 +238,8 @@ export const executeWorkflowResolver = async (
         success: false,
         tool: workflow,
         error: String(error),
+        stepResults: error.stepResults,
+        payload: args.payload,
       });
     } else {
       // Fallback for errors before run was started
@@ -249,7 +252,6 @@ export const executeWorkflowResolver = async (
         requestSource,
       );
     }
-
     const result = {
       id: errorRunId,
       success: false,

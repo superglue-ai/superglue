@@ -115,10 +115,11 @@ describe("runs API", () => {
 
       const result = mapRunToOpenAPI(runWithConfig);
 
+      // Tool is passed through as-is (full tool object)
       expect(result.tool).toEqual({ id: "config-id", version: "2.0.0" });
     });
 
-    it("should default tool version to 1.0.0", () => {
+    it("should pass through tool without version as-is", () => {
       const runWithConfigNoVersion: Run = {
         ...baseRun,
         tool: { id: "config-id" } as any,
@@ -126,7 +127,8 @@ describe("runs API", () => {
 
       const result = mapRunToOpenAPI(runWithConfigNoVersion);
 
-      expect(result.tool).toEqual({ id: "config-id", version: "1.0.0" });
+      // Tool is passed through as-is - no version defaulting at this layer
+      expect(result.tool).toEqual({ id: "config-id" });
     });
 
     it("should map stepResults correctly", () => {
@@ -398,7 +400,7 @@ describe("runs API", () => {
   describe("createRun handler", () => {
     it("should return 400 when toolId is missing", () => {
       const body = {
-        toolConfig: {},
+        tool: {},
         status: "success",
         startedAt: "2024-01-01",
         completedAt: "2024-01-01",
@@ -406,20 +408,20 @@ describe("runs API", () => {
       expect((body as any).toolId).toBeUndefined();
     });
 
-    it("should return 400 when toolConfig is missing", () => {
+    it("should return 400 when tool is missing", () => {
       const body = {
         toolId: "tool-1",
         status: "success",
         startedAt: "2024-01-01",
         completedAt: "2024-01-01",
       };
-      expect((body as any).toolConfig).toBeUndefined();
+      expect((body as any).tool).toBeUndefined();
     });
 
     it("should return 400 when status is missing", () => {
       const body = {
         toolId: "tool-1",
-        toolConfig: {},
+        tool: {},
         startedAt: "2024-01-01",
         completedAt: "2024-01-01",
       };
@@ -445,7 +447,7 @@ describe("runs API", () => {
       const request = createMockRequest({
         body: {
           toolId: "tool-123",
-          toolConfig: { id: "tool-123", instruction: "Test" },
+          tool: { id: "tool-123", instruction: "Test" },
           status: "success",
           startedAt: "2024-01-01T10:00:00.000Z",
           completedAt: "2024-01-01T10:01:00.000Z",
@@ -460,7 +462,7 @@ describe("runs API", () => {
         runId: expect.any(String),
         toolId: body.toolId,
         status: RunStatus.SUCCESS,
-        tool: body.toolConfig,
+        tool: body.tool,
         requestSource: RequestSource.FRONTEND,
         metadata: {
           startedAt: startedAt.toISOString(),
@@ -501,7 +503,7 @@ describe("runs API", () => {
       const request = createMockRequest({
         body: {
           toolId: "tool-123",
-          toolConfig: { id: "tool-123" },
+          tool: { id: "tool-123" },
           status: "failed",
           error: "Something went wrong",
           startedAt: "2024-01-01T10:00:00.000Z",
@@ -516,7 +518,7 @@ describe("runs API", () => {
         toolId: body.toolId,
         status: RunStatus.FAILED,
         error: body.error,
-        tool: body.toolConfig,
+        tool: body.tool,
         requestSource: RequestSource.FRONTEND,
         metadata: {
           startedAt: body.startedAt,
