@@ -1,15 +1,7 @@
 import type { AgentDefinition } from "../agent-types";
-import { AGENT_TOOL_SET, PLAYGROUND_TOOL_SET, SYSTEM_PLAYGROUND_TOOL_SET } from "./tools";
-import {
-  MAIN_AGENT_SYSTEM_PROMPT,
-  TOOL_PLAYGROUND_AGENT_SYSTEM_PROMPT,
-  SYSTEM_PLAYGROUND_AGENT_PROMPT,
-} from "../agent-prompts";
-import {
-  initializeMainAgentContext,
-  initializeToolPlaygroundAgentContext,
-  initializeSystemPlaygroundContext,
-} from "../agent-context";
+import { AGENT_TOOL_SET, PLAYGROUND_TOOL_SET } from "./tools";
+import { MAIN_AGENT_SYSTEM_PROMPT, TOOL_PLAYGROUND_AGENT_SYSTEM_PROMPT } from "../agent-prompts";
+import { initializeMainAgentContext, initializeToolPlaygroundAgentContext } from "../agent-context";
 
 export enum AgentType {
   MAIN = "main",

@@ -26,7 +26,8 @@
   "dependencies": {
     "@playwright/test": "^1.55.0",
     "dotenv": "^16.4.7",
-    "dotenv-cli": "^8.0.0"
+    "dotenv-cli": "^8.0.0",
+    "idb": "^8.0.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
