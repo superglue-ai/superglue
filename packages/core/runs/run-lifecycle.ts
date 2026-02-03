@@ -3,9 +3,17 @@
  * Context is passed through (not stored) for stateless operation.
  */
 
-import type { RequestOptions, RequestSource, Tool, ToolStepResult } from "@superglue/shared";
-import { RunStatus, RequestSource as RSrc } from "@superglue/shared";
+import type {
+  RequestOptions,
+  RequestSource,
+  StoredRunResults,
+  Tool,
+  ToolStepResult,
+} from "@superglue/shared";
+import { RunStatus, RequestSource as RSrc, sampleResultObject } from "@superglue/shared";
 import type { DataStore } from "../datastore/types.js";
+import { generateRunResultsUri, getRunResultsService } from "../ee/run-results-service.js";
+import { isFileStorageAvailable } from "../filestore/file-service.js";
 import { NotificationService } from "../notifications/index.js";
 import { logMessage } from "../utils/logs.js";
 
@@ -114,6 +122,17 @@ export class RunLifecycleManager {
           durationMs: completedAt.getTime() - context.startedAt.getTime(),
         },
       },
+    });
+
+    // Fire-and-forget: Store run results to S3 if enabled
+    this.maybeStoreRunResults({
+      runId: context.runId,
+      success: result.success,
+      data: result.data ?? null,
+      stepResults: result.stepResults ?? [],
+      toolPayload: result.payload ?? {},
+      error: result.error,
+      storedAt: new Date(),
     });
 
     // Send notification for failed runs (fire-and-forget)
@@ -242,5 +261,53 @@ export class RunLifecycleManager {
         requestSource: context.requestSource,
       })
       .catch((err) => logMessage("error", `Notification failed: ${err}`, this.metadata));
+  }
+
+  /**
+   * Check if run results storage is enabled for this org (EE feature)
+   * Returns true if file storage is available AND org has the feature enabled
+   */
+  private async isRunResultsStorageEnabled(): Promise<boolean> {
+    if (!isFileStorageAvailable()) {
+      return false;
+    }
+    const orgSettings = await this.datastore.getOrgSettings({ orgId: this.orgId });
+    return !!orgSettings?.preferences?.storeRunResults;
+  }
+
+  /**
+   * Fire-and-forget: Check org settings and store run results to S3 if enabled
+   * Also updates the run with the storage URI in the database
+   */
+  private maybeStoreRunResults(results: StoredRunResults): void {
+    setImmediate(async () => {
+      try {
+        const enabled = await this.isRunResultsStorageEnabled();
+        if (!enabled) return;
+
+        const storageUri = generateRunResultsUri(results.runId, this.orgId);
+        if (!storageUri) return;
+
+        // Update run with storage URI
+        await this.datastore.updateRun({
+          id: results.runId,
+          orgId: this.orgId,
+          updates: {
+            resultStorageUri: storageUri,
+          },
+        });
+
+        // Upload to S3 with full (non-truncated) payload and result
+        await getRunResultsService().storeResults(storageUri, results, { orgId: this.orgId });
+
+        logMessage("debug", `Stored run results to S3: ${storageUri}`, this.metadata);
+      } catch (err) {
+        logMessage(
+          "warn",
+          `Failed to store run results for ${results.runId}: ${err}`,
+          this.metadata,
+        );
+      }
+    });
   }
 }
