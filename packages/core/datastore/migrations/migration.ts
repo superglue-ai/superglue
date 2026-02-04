@@ -1,10 +1,49 @@
-import { Run, RunStatus, Tool } from "@superglue/shared";
+import { Run, RunStatus, System, Tool } from "@superglue/shared";
+import { composeUrl } from "../../utils/helpers.js";
 
 export interface LegacyRunRow {
   id: string;
   config_id: string;
   started_at: Date;
   completed_at: Date;
+}
+
+/**
+ * Normalizes ApiConfig from old urlHost/urlPath to new url field.
+ * Deletes deprecated fields after normalization.
+ */
+export function normalizeApiConfig(config: any): any {
+  if (!config) return config;
+
+  // Compose url from old fields if url doesn't exist
+  if (!config.url && (config.urlHost || config.urlPath)) {
+    config.url = composeUrl(config.urlHost || "", config.urlPath || "");
+  }
+
+  // Delete deprecated fields
+  delete config.urlHost;
+  delete config.urlPath;
+
+  return config;
+}
+
+/**
+ * Normalizes System from old urlHost/urlPath to new url field.
+ * Deletes deprecated fields after normalization.
+ */
+export function normalizeSystem(system: any): System {
+  if (!system) return system;
+
+  // Compose url from old fields if url doesn't exist
+  if (!system.url && (system.urlHost || system.urlPath)) {
+    system.url = composeUrl(system.urlHost || "", system.urlPath || "");
+  }
+
+  // Delete deprecated fields
+  delete system.urlHost;
+  delete system.urlPath;
+
+  return system;
 }
 
 function isLegacyRun(data: any): boolean {
@@ -62,6 +101,9 @@ export function extractRun(data: any, row: LegacyRunRow): Run {
         ? new Date(data.metadata.completedAt)
         : undefined;
 
+  const tool = normalizeTool(data.tool ?? data.toolConfig);
+  const toolResult = data.toolResult ?? data.data;
+
   return {
     runId: row.id,
     toolId: data.toolId,
@@ -87,6 +129,12 @@ export function normalizeTool(tool: any): Tool {
 
   const normalizedSteps = tool.steps?.map((step: any) => {
     const { integrationId, ...rest } = step;
+
+    // Normalize apiConfig using shared function
+    if (step.apiConfig) {
+      step.apiConfig = normalizeApiConfig(step.apiConfig);
+    }
+
     return {
       ...rest,
       systemId: step.systemId ?? integrationId,

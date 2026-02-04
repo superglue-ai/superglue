@@ -16,8 +16,7 @@ describe("FTP File Extraction", () => {
   const ftpConfig: ApiConfig = {
     id: "ftp-test",
     instruction: "Test FTP server",
-    urlHost: "ftp://testuser:testpass@127.0.0.1:2121",
-    urlPath: "/",
+    url: "ftp://testuser:testpass@127.0.0.1:2121",
     method: HttpMethod.POST,
     body: "",
   };

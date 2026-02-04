@@ -9,7 +9,7 @@ interface OAuthConnectButtonProps {
   system: {
     id?: string;
     name?: string;
-    urlHost?: string;
+    url?: string;
     icon?: string | null;
     templateName?: string;
   };

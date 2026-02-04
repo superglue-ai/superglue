@@ -31,7 +31,7 @@ describe("OAuth Utilities", () => {
     it("should return false if no expires_at is set", () => {
       const system: System = {
         id: "test",
-        urlHost: "https://api.test.com",
+        url: "https://api.test.com",
         credentials: {},
       };
       expect(isTokenExpired(system)).toBe(false);
@@ -42,7 +42,7 @@ describe("OAuth Utilities", () => {
       const sixMinutesFromNow = new Date(now + 6 * 60 * 1000).toISOString();
       const system: System = {
         id: "test",
-        urlHost: "https://api.test.com",
+        url: "https://api.test.com",
         credentials: {
           expires_at: sixMinutesFromNow,
         },
@@ -55,7 +55,7 @@ describe("OAuth Utilities", () => {
       const fourMinutesFromNow = new Date(now + 4 * 60 * 1000).toISOString();
       const system: System = {
         id: "test",
-        urlHost: "https://api.test.com",
+        url: "https://api.test.com",
         credentials: {
           expires_at: fourMinutesFromNow,
         },
@@ -68,7 +68,7 @@ describe("OAuth Utilities", () => {
       const oneMinuteAgo = new Date(now - 60 * 1000).toISOString();
       const system: System = {
         id: "test",
-        urlHost: "https://api.test.com",
+        url: "https://api.test.com",
         credentials: {
           expires_at: oneMinuteAgo,
         },
@@ -81,7 +81,7 @@ describe("OAuth Utilities", () => {
     it("should return token URL for known system by ID", () => {
       const system: System = {
         id: "github",
-        urlHost: "https://api.github.com",
+        url: "https://api.github.com",
         credentials: {},
       };
       expect(getOAuthTokenUrl(system)).toBe("https://github.com/login/oauth/access_token");
@@ -90,7 +90,7 @@ describe("OAuth Utilities", () => {
     it("should return token URL for known system by URL host", () => {
       const system: System = {
         id: "my-github",
-        urlHost: "https://api.github.com",
+        url: "https://api.github.com",
         credentials: {},
       };
       expect(getOAuthTokenUrl(system)).toBe("https://github.com/login/oauth/access_token");
@@ -99,7 +99,7 @@ describe("OAuth Utilities", () => {
     it("should return custom token URL from credentials", () => {
       const system: System = {
         id: "custom",
-        urlHost: "https://api.custom.com",
+        url: "https://api.custom.com",
         credentials: {
           token_url: "https://custom.com/oauth/token",
         },
@@ -110,7 +110,7 @@ describe("OAuth Utilities", () => {
     it("should return default token URL for unknown system", () => {
       const system: System = {
         id: "unknown",
-        urlHost: "https://api.unknown.com",
+        url: "https://api.unknown.com",
         credentials: {},
       };
       expect(getOAuthTokenUrl(system)).toBe("https://api.unknown.com/oauth/token");
@@ -121,7 +121,7 @@ describe("OAuth Utilities", () => {
     it("should return false if missing required credentials", async () => {
       const system: System = {
         id: "test",
-        urlHost: "https://api.test.com",
+        url: "https://api.test.com",
         credentials: {
           client_id: "test-id",
           grant_type: "authorization_code",
@@ -146,7 +146,7 @@ describe("OAuth Utilities", () => {
     it("should successfully refresh token", async () => {
       const system: System = {
         id: "test",
-        urlHost: "https://api.test.com",
+        url: "https://api.test.com",
         credentials: {
           client_id: "test-id",
           client_secret: "test-secret",
@@ -182,7 +182,7 @@ describe("OAuth Utilities", () => {
     it("should handle token refresh failure", async () => {
       const system: System = {
         id: "test",
-        urlHost: "https://api.test.com",
+        url: "https://api.test.com",
         credentials: {
           client_id: "test-id",
           client_secret: "test-secret",

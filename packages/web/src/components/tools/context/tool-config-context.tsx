@@ -48,8 +48,7 @@ function checkPayloadKeysReferenced(
 
   for (const step of steps) {
     const { apiConfig, loopSelector } = step;
-    if (checkStringForAnyKey(apiConfig.urlPath)) return true;
-    if (checkStringForAnyKey(apiConfig.urlHost)) return true;
+    if (checkStringForAnyKey(apiConfig.url)) return true;
     if (checkStringForAnyKey(apiConfig.body)) return true;
     if (checkStringForAnyKey(loopSelector)) return true;
     if (checkObjectForAnyKey(apiConfig.queryParams)) return true;

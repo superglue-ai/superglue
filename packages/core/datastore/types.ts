@@ -35,16 +35,6 @@ export type PrometheusRunMetrics = {
 };
 
 export interface DataStore {
-  // API Config Methods
-  getApiConfig(params: { id: string; orgId?: string }): Promise<ApiConfig | null>;
-  listApiConfigs(params?: {
-    limit?: number;
-    offset?: number;
-    orgId?: string;
-  }): Promise<{ items: ApiConfig[]; total: number }>;
-  upsertApiConfig(params: { id: string; config: ApiConfig; orgId?: string }): Promise<ApiConfig>;
-  deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean>;
-
   // Run Methods
   getRun(params: { id: string; orgId?: string }): Promise<Run | null>;
   listRuns(params?: {

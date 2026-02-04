@@ -205,7 +205,7 @@ async function getSystemsForContext(ctx: ToolExecutionContext) {
 
       return {
         id: system?.id,
-        urlHost: system?.urlHost,
+        url: system?.url,
         credentials: credentialStatus,
       };
     });
@@ -538,7 +538,7 @@ export function formatSystemRuntimeContext(ctx: SystemContextForAgent): string {
 
   return `[SYSTEM PLAYGROUND CONTEXT]
 System ID: ${ctx.systemId || "(not set)"}
-URL Host: ${ctx.urlHost || "(not set)"}
+URL: ${ctx.url || "(not set)"}
 Template: ${ctx.templateName || "(custom)"}
 Auth Type: ${ctx.authType}
 Credentials: ${credentialPlaceholders || "(none)"}

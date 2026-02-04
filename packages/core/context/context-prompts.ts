@@ -108,7 +108,7 @@ Every step MUST have a loopSelector that determines how it executes:
    e.g. body: { "userIds": <<(sourceData) => JSON.stringify(sourceData.users.map(u => u.id))>> }
    e.g. body: { "message_in_base64": <<(sourceData) => { const message = 'Hello World'; return btoa(message) }>> }
    e.g. body: { "timestamp": "<<(sourceData) => new Date().toISOString()>>", "count": <<(sourceData) => sourceData.items.length>> }
-   e.g. urlPath: /api/<<(sourceData) => sourceData.version || 'v1'>>/users
+   e.g. url: https://api.example.com/api/<<(sourceData) => sourceData.version || 'v1'>>/users
    e.g. queryParams: { "active": "<<(sourceData) => sourceData.includeInactive ? 'all' : 'true'>>" }
    
 - Note: For Basic Authentication, format as "Basic <<systemId_username>>:<<systemId_password>>" and the system will automatically convert it to Base64.
@@ -300,8 +300,7 @@ Superglue provides these variables that you MUST use:
 
 <POSTGRES>
 Correct PostgreSQL configuration:
-- urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"
-- urlPath: "<<database_name>>"
+- url: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>/<<database_name>>"
 - body: {query: "postgres statement", params: ["some string", true]} // Recommended: parameterized query, do not forget to wrap params in quotes uf they are strings.
 - body: {query: "SELECT * FROM users WHERE age > $1", params: [<<(sourceData) => sourceData.age>>, "<<(sourceData) => sourceData.name>>"]}
 - body: {query: "INSERT INTO logs (message, level) VALUES ($1, $2)", params: ["Error occurred", "<<error_level>>"]}
@@ -316,9 +315,9 @@ Always use parameterized queries:
 
 <FTP_SFTP>
 Correct FTP/SFTP configuration:
-- FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/"
-- FTPS: urlHost: "ftps://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/"  
-- SFTP: urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/"
+- FTP: url: "ftp://<<username>>:<<password>>@<<hostname>>:21/"
+- FTPS: url: "ftps://<<username>>:<<password>>@<<hostname>>:21/"
+- SFTP: url: "sftp://<<username>>:<<password>>@<<hostname>>:22/"
 - body: Can be either a single operation object or an array of operation objects for batch operations.
 - If possible, use batch operations for efficiency.
 
@@ -418,8 +417,7 @@ EACH STEP IN THE "steps" ARRAY HAS:
 EACH STEP'S "apiConfig" CONTAINS:
 - id: string - Config identifier
 - instruction: string - Description of what this API call does
-- urlHost: string - Base URL (e.g., "https://api.example.com")
-- urlPath: string - Path portion (e.g., "/v1/users")
+- url: string - Full URL for the endpoint (e.g., "https://api.example.com/v1/users") - required
 - method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
 - queryParams: object - Query parameters
 - headers: object - HTTP headers (e.g., {"Authorization": "Bearer <<token>>"})
@@ -461,7 +459,7 @@ Basic variable access:
 
 JavaScript expressions:
 - body: { "userIds": <<(sourceData) => JSON.stringify(sourceData.users.map(u => u.id))>> }
-- urlPath: /api/<<(sourceData) => sourceData.version || 'v1'>>/users
+- url: https://api.example.com/api/<<(sourceData) => sourceData.version || 'v1'>>/users
 - queryParams: { "active": "<<(sourceData) => sourceData.includeInactive ? 'all' : 'true'>>" }
 
 Credentials are prefixed with system ID: <<systemId_credentialName>>
@@ -514,8 +512,7 @@ Pagination config requires:
 
 <POSTGRES>
 PostgreSQL configuration:
-- urlHost: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>"
-- urlPath: "<<database_name>>"
+- url: "postgres://<<user>>:<<password>>@<<hostname>>:<<port>>/<<database_name>>"
 - body: {query: "SELECT * FROM users WHERE id = $1", params: [<<userId>>]}
 
 Always use parameterized queries with $1, $2, etc. placeholders.
@@ -523,8 +520,8 @@ Always use parameterized queries with $1, $2, etc. placeholders.
 
 <FTP_SFTP>
 FTP/SFTP configuration:
-- FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/"
-- SFTP: urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/"
+- FTP: url: "ftp://<<username>>:<<password>>@<<hostname>>:21/"
+- SFTP: url: "sftp://<<username>>:<<password>>@<<hostname>>:22/"
 
 Operations: list, get, put, delete, rename, mkdir, rmdir, exists, stat
 Body format: {"operation": "get", "path": "/file.txt"}
@@ -534,8 +531,8 @@ Body format: {"operation": "get", "path": "/file.txt"}
 Example 1 - Change API endpoint:
 {
   "op": "replace",
-  "path": "/steps/0/apiConfig/urlPath",
-  "value": "/v2/users"
+  "path": "/steps/0/apiConfig/url",
+  "value": "https://api.example.com/v2/users"
 }
 
 Example 2 - Change request body (note: value is actual string, not JSON-escaped!):
@@ -601,7 +598,7 @@ Each step can have these optional properties:
 </STEP_PROPERTIES>
 
 <COMMON_FIXES>
-1. Fixing API endpoints: Use "replace" on /steps/N/apiConfig/urlPath or urlHost
+1. Fixing API endpoints: Use "replace" on /steps/N/apiConfig/url
 2. Fixing authentication: Use "replace" or "add" on /steps/N/apiConfig/headers/Authorization
 3. Fixing loop selectors: Use "replace" on /steps/N/loopSelector
 4. Fixing body/params: Use "replace" on /steps/N/apiConfig/body or queryParams
@@ -620,7 +617,7 @@ The fixed tool must:
 2. Have a valid 'id' field
 3. Have a 'steps' array (can be empty for transform-only tools)
 4. Have valid systemIds that match available systems (if provided)
-5. Have valid apiConfig for each step (urlHost, urlPath, method)
+5. Have valid apiConfig for each step (url, method)
 </VALIDATION>
 
 Output your diffs in the required format. Make the minimum number of changes needed to fix the issue.`;

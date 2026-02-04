@@ -51,8 +51,7 @@ describe("tools API helpers", () => {
     const baseStep: ExecutionStep = {
       id: "step-1",
       apiConfig: {
-        urlHost: "https://api.example.com",
-        urlPath: "/users",
+        url: "https://api.example.com/users",
         method: HttpMethod.GET,
         instruction: "Fetch users",
         id: "step-1",
@@ -73,8 +72,7 @@ describe("tools API helpers", () => {
         apiConfig: {
           id: "step-1",
           instruction: "Fetch users",
-          urlHost: "https://api.example.com",
-          urlPath: "/users",
+          url: "https://api.example.com/users",
         },
       };
 
@@ -134,7 +132,7 @@ describe("tools API helpers", () => {
       });
     });
 
-    it("should handle empty urlHost and urlPath", () => {
+    it("should handle empty url", () => {
       const stepWithEmptyUrl: ExecutionStep = {
         id: "step-1",
         apiConfig: {} as ApiConfig,
@@ -155,8 +153,7 @@ describe("tools API helpers", () => {
         {
           id: "step-1",
           apiConfig: {
-            urlHost: "https://api.example.com",
-            urlPath: "/test",
+            url: "https://api.example.com/test",
             method: HttpMethod.POST,
             instruction: "Test step instruction",
             id: "step-1",

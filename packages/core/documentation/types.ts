@@ -5,11 +5,10 @@
 import { ServiceMetadata } from "@superglue/shared";
 
 export interface DocumentationConfig {
-  urlHost?: string;
+  url?: string;
   instruction?: string;
   documentationUrl?: string;
   openApiUrl?: string;
-  urlPath?: string;
   headers?: Record<string, string>;
   queryParams?: Record<string, string>;
   keywords?: string[];

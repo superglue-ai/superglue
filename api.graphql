@@ -11,7 +11,7 @@ interface BaseConfig {
   updatedAt: DateTime
 }
 
-union ConfigType = ApiConfig | Workflow | ExtractConfig
+union ConfigType = ApiConfig | Workflow
 
 # deprecated - only left in for backwards compatibility with one customer
 type ApiConfig implements BaseConfig {
@@ -22,6 +22,7 @@ type ApiConfig implements BaseConfig {
   updatedAt: DateTime
 
   # Specific implementation
+  url: String
   urlHost: String
   urlPath: String
   instruction: String
@@ -30,29 +31,6 @@ type ApiConfig implements BaseConfig {
   headers: JSON
   body: String
   pagination: Pagination
-}
-
-# used by the tool creation for file content extraction
-type ExtractConfig implements BaseConfig {
-  # BaseConfig
-  id: ID
-  version: String
-  createdAt: DateTime
-  updatedAt: DateTime
-
-  # Specific implementation
-  urlHost: String
-  urlPath: String
-  queryParams: JSON
-  instruction: String
-  method: HttpMethod
-  headers: JSON
-  body: String
-  documentationUrl: String
-  decompressionMethod: DecompressionMethod
-  authentication: AuthType
-  fileType: FileType
-  dataPath: String
 }
 
 type RunResult {
@@ -190,31 +168,13 @@ input PaginationInput {
 
 input ApiInput {
   id: ID!
-  urlHost: String
-  urlPath: String
+  url: String
   instruction: String
   queryParams: JSON
   method: HttpMethod
   headers: JSON
   body: String
   pagination: PaginationInput
-  version: String
-}
-
-input ExtractInput {
-  id: ID!
-  urlHost: String
-  urlPath: String
-  queryParams: JSON
-  instruction: String
-  method: HttpMethod
-  headers: JSON
-  body: String
-  documentationUrl: String
-  decompressionMethod: DecompressionMethod
-  fileType: FileType
-  authentication: AuthType
-  dataPath: String
   version: String
 }
 
@@ -288,9 +248,7 @@ input ApiInputRequest @oneOf {
 }
 
 input ExtractInputRequest @oneOf {
-  endpoint: ExtractInput
   file: Upload
-  id: ID
 }
 
 input WorkflowInputRequest @oneOf {
@@ -301,6 +259,7 @@ input WorkflowInputRequest @oneOf {
 input SystemInput {
   id: ID!
   name: String
+  url: String
   urlHost: String
   urlPath: String
   credentials: JSON
@@ -434,12 +393,7 @@ input WorkflowInput {
 type Mutation {
   setTenantInfo(email: String, emailEntrySkipped: Boolean): TenantInfo!
 
-  extract(
-    input: ExtractInputRequest!
-    payload: JSON
-    credentials: JSON
-    options: RequestOptions
-  ): RunResult!
+  extract(input: ExtractInputRequest!): RunResult!
 
   executeWorkflow(
     input: WorkflowInputRequest!
@@ -506,6 +460,7 @@ type System {
   id: ID!
   name: String
   type: String
+  url: String
   urlHost: String
   urlPath: String
   credentials: JSON
