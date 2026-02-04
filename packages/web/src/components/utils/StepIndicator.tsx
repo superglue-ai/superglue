@@ -54,15 +54,17 @@ export function StepIndicator({ currentStep, steps }: StepIndicatorProps) {
   return (
     <div className="py-3">
       <div className="relative">
-        <div className="absolute top-4 left-0 w-full h-0.5 bg-muted z-0" />
+        <div className="absolute top-3.5 left-0 w-full h-0.5 bg-muted z-0" />
 
         <div
-          className="absolute top-4 left-0 h-0.5 bg-primary transition-all duration-500 ease-in-out z-0"
+          className="absolute top-3.5 left-0 h-0.5 bg-primary transition-all duration-500 ease-in-out z-0"
           style={{ width: `${(currentIndex / (steps.length - 1)) * 100}%` }}
         />
 
-        {/* Steps */}
-        <div className={`relative grid grid-cols-${steps.length} w-full z-10`}>
+        <div
+          className={`relative grid w-full z-10`}
+          style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
+        >
           {steps.map((step, index) => {
             const isActive = index === currentIndex;
             const isCompleted = index < currentIndex;
@@ -72,7 +74,7 @@ export function StepIndicator({ currentStep, steps }: StepIndicatorProps) {
                 <div className="flex flex-col items-center gap-1.5 z-10">
                   <div
                     className={cn(
-                      "w-7 h-7 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-colors z-10",
+                      "w-7 h-7 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-all duration-300 z-10",
                       isCompleted && "border-primary bg-primary text-primary-foreground",
                       isActive && "border-primary bg-background text-foreground",
                       !isCompleted && !isActive && "border-muted bg-muted text-muted-foreground",
@@ -82,7 +84,7 @@ export function StepIndicator({ currentStep, steps }: StepIndicatorProps) {
                   </div>
                   <span
                     className={cn(
-                      "text-xs font-medium text-center px-1",
+                      "text-xs font-medium text-center px-1 transition-colors duration-300",
                       isActive || isCompleted ? "text-foreground" : "text-muted-foreground",
                     )}
                   >

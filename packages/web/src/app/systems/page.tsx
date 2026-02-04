@@ -223,7 +223,7 @@ export default function SystemsPage() {
       <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2 flex-shrink-0">
         <h1 className="text-2xl font-bold">Systems</h1>
         <div className="flex gap-4">
-          <Button onClick={handleAdd}>
+          <Button className="rounded-xl" onClick={handleAdd}>
             <Plus className="mr-2 h-4 w-4" />
             Add System
           </Button>
@@ -368,10 +368,10 @@ export default function SystemsPage() {
                     <TableCell className="w-[140px]">
                       <div className="flex justify-end gap-2">
                         <Button
-                          variant="outline"
+                          variant="glass"
                           size="sm"
                           onClick={() => handleEdit(sys)}
-                          className="gap-2 border-border/40"
+                          className="gap-2"
                         >
                           <Pencil className="h-4 w-4" />
                           Edit

@@ -25,32 +25,10 @@ import {
   type UploadedFileInfo,
 } from "@/src/lib/file-utils";
 import { ALLOWED_FILE_EXTENSIONS, SuperglueClient } from "@superglue/shared";
-import { FileText, Globe, Loader2, Pencil, Upload, Code, Eye } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { FileText, Globe, Loader2, Pencil, Upload } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { useSystemConfig } from "../context";
 import { Streamdown } from "streamdown";
-
-function MarkdownPreview({ content }: { content: string }) {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    setReady(false);
-    const frame = requestAnimationFrame(() => {
-      setReady(true);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [content]);
-
-  if (!ready) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  return <Streamdown>{content}</Streamdown>;
-}
 
 type DocSourceMode = "url" | "file";
 
@@ -68,7 +46,6 @@ export function ContextSection() {
 
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const [editedDoc, setEditedDoc] = useState("");
-  const [editorViewMode, setEditorViewMode] = useState<"edit" | "preview">("edit");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<UploadedFileInfo | null>(null);
   const [inputMode, setInputMode] = useState<DocSourceMode>(
@@ -154,7 +131,6 @@ export function ContextSection() {
 
   const handleOpenEditor = useCallback(() => {
     setEditedDoc(context.documentation);
-    setEditorViewMode("edit");
     setIsDocViewerOpen(true);
   }, [context.documentation]);
 
@@ -380,54 +356,18 @@ export function ContextSection() {
       <Dialog open={isDocViewerOpen} onOpenChange={setIsDocViewerOpen}>
         <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Edit Documentation
-              </DialogTitle>
-              <div className="flex items-center rounded-lg border border-border/50 bg-muted/20 p-0.5 mr-6">
-                <button
-                  type="button"
-                  onClick={() => setEditorViewMode("edit")}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all border",
-                    editorViewMode === "edit"
-                      ? "bg-background text-foreground shadow-sm border-border/50"
-                      : "text-muted-foreground hover:text-foreground border-transparent",
-                  )}
-                >
-                  <Code className="h-3.5 w-3.5" />
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditorViewMode("preview")}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all border",
-                    editorViewMode === "preview"
-                      ? "bg-background text-foreground shadow-sm border-border/50"
-                      : "text-muted-foreground hover:text-foreground border-transparent",
-                  )}
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  Preview
-                </button>
-              </div>
-            </div>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Edit Documentation
+            </DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            {editorViewMode === "edit" ? (
-              <Textarea
-                value={editedDoc}
-                onChange={(e) => setEditedDoc(e.target.value)}
-                className="h-full min-h-[400px] font-mono text-sm resize-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-background/50 border-border/60"
-                placeholder="Enter documentation content..."
-              />
-            ) : (
-              <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-2 prose-headings:my-3 prose-headings:font-semibold prose-pre:bg-muted prose-code:text-xs p-4 bg-gradient-to-b from-muted/30 to-muted/10 rounded-xl min-h-[400px] [&_a]:pointer-events-none [&_a]:no-underline [&_a]:text-inherit">
-                <MarkdownPreview content={editedDoc} />
-              </div>
-            )}
+            <Textarea
+              value={editedDoc}
+              onChange={(e) => setEditedDoc(e.target.value)}
+              className="h-full min-h-[400px] font-mono text-sm resize-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-background/50 border-border/60"
+              placeholder="Enter documentation content..."
+            />
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setIsDocViewerOpen(false)}>

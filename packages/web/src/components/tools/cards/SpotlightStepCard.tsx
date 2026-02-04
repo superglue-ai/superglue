@@ -424,7 +424,11 @@ export const SpotlightStepCard = React.memo(
                 {onExecuteStep && (
                   <div className="flex items-center">
                     {isExecuting && onAbort ? (
-                      <Button variant="outline" onClick={onAbort} className="h-8 px-3 gap-2">
+                      <Button
+                        variant="glass"
+                        onClick={onAbort}
+                        className="h-8 px-3 gap-2 rounded-xl"
+                      >
                         <Square className="h-3 w-3" />
                         <span className="font-medium text-[13px]">Stop</span>
                       </Button>
@@ -439,7 +443,7 @@ export const SpotlightStepCard = React.memo(
                         }
                       >
                         <div
-                          className={`relative flex rounded-md border border-input bg-background ${dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 && onExecuteStepWithLimit ? "" : ""}`}
+                          className={`relative flex rounded-xl border border-input bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30 backdrop-blur-sm shadow-sm ${dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 && onExecuteStepWithLimit ? "" : ""}`}
                         >
                           <Button
                             variant="ghost"

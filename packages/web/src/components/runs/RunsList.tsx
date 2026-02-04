@@ -65,7 +65,7 @@ export const getRequestSourceLabel = (source?: RequestSource | string) => {
 };
 
 export const getRequestSourceBadgeClassName = (_source?: RequestSource | string) => {
-  return "bg-muted-foreground/70 hover:bg-muted-foreground/70";
+  return "bg-muted/50 text-muted-foreground hover:bg-muted/50";
 };
 
 export const RequestSourceIcon = ({ source }: { source?: RequestSource | string }) => {
@@ -93,7 +93,10 @@ export const StatusBadge = ({ status }: { status?: RunStatus | string }) => {
 
   if (statusUpper === "SUCCESS" || status === RunStatus.SUCCESS) {
     return (
-      <Badge variant="default" className="bg-emerald-500 hover:bg-emerald-500 gap-1">
+      <Badge
+        variant="default"
+        className="bg-green-500/10 text-green-800 dark:text-green-300 hover:bg-green-500/10 gap-1"
+      >
         <CheckCircle className="h-3 w-3" />
         Success
       </Badge>
@@ -101,7 +104,10 @@ export const StatusBadge = ({ status }: { status?: RunStatus | string }) => {
   }
   if (statusUpper === "RUNNING" || status === RunStatus.RUNNING) {
     return (
-      <Badge variant="default" className="bg-blue-500 hover:bg-blue-500 gap-1">
+      <Badge
+        variant="default"
+        className="bg-blue-500/10 text-blue-600 dark:text-blue-300 hover:bg-blue-500/10 gap-1"
+      >
         <Play className="h-3 w-3" />
         Running
       </Badge>
@@ -109,14 +115,20 @@ export const StatusBadge = ({ status }: { status?: RunStatus | string }) => {
   }
   if (statusUpper === "ABORTED" || status === RunStatus.ABORTED) {
     return (
-      <Badge variant="default" className="bg-amber-500 hover:bg-amber-500 gap-1">
+      <Badge
+        variant="default"
+        className="bg-amber-500/10 text-amber-800 dark:text-amber-300 hover:bg-amber-500/10 gap-1"
+      >
         <AlertTriangle className="h-3 w-3" />
         Aborted
       </Badge>
     );
   }
   return (
-    <Badge variant="destructive" className="hover:bg-destructive gap-1">
+    <Badge
+      variant="default"
+      className="bg-red-500/10 text-red-800 dark:text-red-300 hover:bg-red-500/10 gap-1"
+    >
       <XCircle className="h-3 w-3" />
       Failed
     </Badge>

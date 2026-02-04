@@ -176,7 +176,7 @@ const ToolsTable = () => {
       <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2 flex-shrink-0">
         <h1 className="text-2xl font-bold">Tools</h1>
         <div className="flex gap-4">
-          <Button onClick={handleTool}>
+          <Button className="rounded-xl" onClick={handleTool}>
             <Plus className="mr-2 h-4 w-4" />
             Create
           </Button>
@@ -368,17 +368,15 @@ const ToolsTable = () => {
                     <TableCell className="w-[140px]">
                       <div className="flex justify-end gap-2">
                         <Button
-                          variant="outline"
+                          variant="glass"
                           size="sm"
                           onClick={(e) => handlePlayTool(e, tool.id)}
-                          className="gap-2 border-border/40"
+                          className="gap-2"
                         >
                           <Hammer className="h-4 w-4" />
                           View
                         </Button>
-                        {!tool.archived && (
-                          <DeployButton tool={tool} className="gap-2 border-border/40" />
-                        )}
+                        {!tool.archived && <DeployButton tool={tool} className="gap-2" />}
                         <ToolActionsMenu tool={tool} />
                       </div>
                     </TableCell>

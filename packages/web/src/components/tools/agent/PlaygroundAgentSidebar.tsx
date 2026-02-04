@@ -379,7 +379,6 @@ function PlaygroundAgentContent({
             onChange={(e) => {
               setInputValue(e.target.value);
               setIsHighlighted(false);
-              // Auto-resize textarea
               e.target.style.height = "auto";
               e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
             }}
@@ -387,6 +386,9 @@ function PlaygroundAgentContent({
             placeholder="Message superglue..."
             className={cn(
               "min-h-[36px] max-h-[200px] resize-none text-sm py-2 transition-all",
+              "bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30",
+              "backdrop-blur-sm border-border/50 dark:border-border/70 shadow-sm",
+              "focus:border-border/60 dark:focus:border-border/90",
               isHighlighted &&
                 "ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30 focus-visible:ring-1 focus-visible:ring-amber-500",
             )}
