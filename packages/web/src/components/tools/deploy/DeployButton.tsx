@@ -46,7 +46,7 @@ export function DeployButton({
   return (
     <>
       <Button
-        variant="outline"
+        variant="glass"
         size={size}
         onClick={handleClick}
         disabled={disabled || isLoading}
