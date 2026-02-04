@@ -6,6 +6,7 @@ import {
   System,
 } from "@superglue/shared";
 import { CreateSystemBody, ScrapeRequestBody, UpdateSystemBody } from "./types.js";
+import { normalizeSystem } from "../datastore/migrations/migration.js";
 
 export function transformSystemDates(system: System) {
   const { createdAt, updatedAt, ...rest } = system;
@@ -17,31 +18,37 @@ export function transformSystemDates(system: System) {
 }
 
 export function validateCreateSystemBody(body: any): CreateSystemBody {
+  // Normalize legacy urlHost/urlPath to url before validation
+  const normalized = normalizeSystem(body);
+
   const missing: string[] = [];
-  if (!body.name || typeof body.name !== "string" || body.name.trim() === "") {
+  if (!normalized.name || typeof normalized.name !== "string" || normalized.name.trim() === "") {
     missing.push("name");
   }
-  if (!body.urlHost || typeof body.urlHost !== "string" || body.urlHost.trim() === "") {
-    missing.push("urlHost");
+  if (!normalized.url || typeof normalized.url !== "string" || normalized.url.trim() === "") {
+    missing.push("url");
   }
   if (missing.length > 0) {
     throw new Error(`Missing required fields: ${missing.join(", ")}`);
   }
-  return body as CreateSystemBody;
+  return normalized as CreateSystemBody;
 }
 
 export function validateUpdateSystemBody(body: any): UpdateSystemBody {
+  // Normalize legacy urlHost/urlPath to url before validation
+  const normalized = normalizeSystem(body);
+
   const missing: string[] = [];
-  if (!body.name || typeof body.name !== "string" || body.name.trim() === "") {
+  if (!normalized.name || typeof normalized.name !== "string" || normalized.name.trim() === "") {
     missing.push("name");
   }
-  if (!body.urlHost || typeof body.urlHost !== "string" || body.urlHost.trim() === "") {
-    missing.push("urlHost");
+  if (!normalized.url || typeof normalized.url !== "string" || normalized.url.trim() === "") {
+    missing.push("url");
   }
   if (missing.length > 0) {
     throw new Error(`Missing required fields: ${missing.join(", ")}`);
   }
-  return body as UpdateSystemBody;
+  return normalized as UpdateSystemBody;
 }
 
 export function validateScrapeRequestBody(

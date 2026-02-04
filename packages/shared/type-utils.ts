@@ -23,12 +23,11 @@ export function mapFailureBehavior(internal?: string): "fail" | "continue" | und
  */
 export function mapStepToOpenAPI(step: ExecutionStep): OpenAPIToolStep {
   const apiConfig = step.apiConfig;
-  const url = (apiConfig.urlHost || "") + (apiConfig.urlPath || "");
 
   const result: OpenAPIToolStep = {
     id: step.id,
-    url,
-    method: apiConfig.method || "GET",
+    url: apiConfig?.url || "",
+    method: apiConfig?.method || "GET",
   };
 
   if (apiConfig.queryParams) result.queryParams = apiConfig.queryParams;

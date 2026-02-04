@@ -1,5 +1,5 @@
 import { setFileUploadDocumentationURL } from "@/src/lib/file-utils";
-import { splitUrl } from "@/src/lib/client-utils";
+import { truncateToolResult } from "@/src/lib/general-utils";
 import { ConfirmationAction, ToolResult, UpsertMode } from "@superglue/shared";
 import { SystemConfig, systems, findTemplateForSystem } from "@superglue/shared/templates";
 import { DraftLookup, findDraftInMessages, formatDiffSummary } from "../agent-context";
@@ -538,7 +538,7 @@ const createSystemDefinition = (): ToolDefinition => ({
     </use_case>
 
     <important_notes>
-      - Use templateId when creating systems for known services (slack, github, stripe, etc.) - this auto-populates urlHost, urlPath, documentationUrl, and OAuth config.
+      - Use templateId when creating systems for known services (slack, github, stripe, etc.) - this auto-populates url, documentationUrl, and OAuth config.
       - When using templateId, you only need to provide: id, templateId, and credentials (if required by the auth type).
       - For OAuth auth: create the system first, then call authenticate_oauth to trigger the OAuth flow.
       - Providing a documentationUrl will trigger asynchronous API documentation processing.
@@ -566,14 +566,9 @@ const createSystemDefinition = (): ToolDefinition => ({
         type: "string",
         description: "Human-readable name for the system (auto-populated if using templateId)",
       },
-      urlHost: {
+      url: {
         type: "string",
-        description:
-          "Base URL/hostname for the API including protocol (auto-populated if using templateId)",
-      },
-      urlPath: {
-        type: "string",
-        description: "Path component of the URL (auto-populated if using templateId)",
+        description: "Full URL for the API including protocol (auto-populated if using templateId)",
       },
       documentationUrl: {
         type: "string",
@@ -627,18 +622,6 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
       };
     }
 
-    let urlHost = "";
-    let urlPath = "";
-    if (template.apiUrl) {
-      try {
-        const url = new URL(template.apiUrl);
-        urlHost = `${url.protocol}//${url.host}`;
-        urlPath = url.pathname;
-      } catch {
-        urlHost = template.apiUrl;
-      }
-    }
-
     const oauthCreds: Record<string, any> = {};
     if (template.oauth) {
       if (template.oauth.authUrl) oauthCreds.auth_url = template.oauth.authUrl;
@@ -650,8 +633,7 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
 
     systemInput = {
       name: template.name,
-      urlHost,
-      urlPath,
+      url: template.apiUrl,
       documentationUrl: template.docsUrl,
       documentationKeywords: template.keywords,
       templateName: templateId,
@@ -812,8 +794,7 @@ const editSystemDefinition = (): ToolDefinition => ({
     properties: {
       id: { type: "string", description: "The unique identifier of the system" },
       name: { type: "string", description: "Human-readable name for the system" },
-      urlHost: { type: "string", description: "Base URL/hostname for the API including protocol" },
-      urlPath: { type: "string", description: "Path component of the URL" },
+      url: { type: "string", description: "Full URL for the API including protocol" },
       documentationUrl: { type: "string", description: "URL to the API documentation" },
       documentation: {
         type: "string",
@@ -1047,15 +1028,10 @@ const runCallSystem = async (
   const protocol = getProtocol(url);
 
   try {
-    // this split is not strictly necessary, but we need due to backwards compatibility with composeURL() in the tool executor
-    const { urlHost, urlPath } =
-      protocol === "http" ? splitUrl(url) : { urlHost: url, urlPath: "" };
-
     const step = {
       id: `call_system_${Date.now()}`,
       apiConfig: {
-        urlHost,
-        urlPath,
+        url,
         method: method || "GET",
         headers,
         body,
@@ -1507,7 +1483,7 @@ const findSystemTemplatesDefinition = (): ToolDefinition => ({
       - Check the returned templates for OAuth config:
         - If template has oauth.client_id: Superglue OAuth is available - can create system directly
         - If template has oauth but NO client_id: Must ask user for OAuth credentials (client_id, client_secret)
-      - Use the returned urlHost, urlPath, auth_url, token_url, scopes when creating systems or authenticating
+      - Use the returned url, auth_url, token_url, scopes when creating systems or authenticating
     </important_notes>`,
   inputSchema: {
     type: "object",
@@ -1524,7 +1500,7 @@ const findSystemTemplatesDefinition = (): ToolDefinition => ({
 
 const runFindSystemTemplates = async (input: any, _ctx: ToolExecutionContext) => {
   const { system_names } = input;
-  const templates: Array<SystemConfig & { urlHost?: string; urlPath?: string }> = [];
+  const templates: Array<SystemConfig & { url?: string }> = [];
 
   const processedNames = system_names
     .map((name: string) => name.trim().toLowerCase())
@@ -1565,19 +1541,8 @@ const runFindSystemTemplates = async (input: any, _ctx: ToolExecutionContext) =>
         | Record<string, unknown>;
       const oauthObj =
         rawOauth && typeof rawOauth === "object" ? (rawOauth as TemplateOauth) : undefined;
-      let urlHost = "";
-      let urlPath = "";
+      const url = apiUrl || "";
 
-      if (apiUrl) {
-        try {
-          const url = new URL(apiUrl);
-          urlHost = `${url.protocol}//${url.host}`;
-          urlPath = url.pathname;
-        } catch {
-          urlHost = apiUrl;
-          urlPath = "";
-        }
-      }
       let snakeCaseOauth: Record<string, any> = {};
       if (oauthObj?.authUrl) {
         snakeCaseOauth["auth_url"] = oauthObj.authUrl;
@@ -1597,8 +1562,7 @@ const runFindSystemTemplates = async (input: any, _ctx: ToolExecutionContext) =>
 
       templates.push({
         ...rest,
-        urlHost,
-        urlPath,
+        url,
         oauth: snakeCaseOauth,
       } as any);
     }
@@ -1841,7 +1805,7 @@ const runFindSystem = async (
   const query = input.query!.toLowerCase();
   const keywords = query.split(/\s+/).filter((k) => k.length > 0);
   const filtered = items.filter((s) => {
-    const text = [s.id, s.urlHost, s.documentation].filter(Boolean).join(" ").toLowerCase();
+    const text = [s.id, s.url, s.documentation].filter(Boolean).join(" ").toLowerCase();
     return keywords.some((kw) => text.includes(kw));
   });
   return { success: true, systems: filtered.map(maskCredentialsInSystem) };

@@ -351,34 +351,6 @@ export const parseCredentialsHelper = (simpleCreds: string): Record<string, stri
   }
 };
 
-export const splitUrl = (url: string) => {
-  if (!url) {
-    return {
-      urlHost: "",
-      urlPath: "",
-    };
-  }
-
-  // Find the position after the protocol (://)
-  const protocolEnd = url.indexOf("://");
-  // Find the first slash after the protocol
-  const firstSlashAfterProtocol = url.indexOf("/", protocolEnd + 3);
-
-  if (firstSlashAfterProtocol === -1) {
-    // No path, entire URL is the host
-    return {
-      urlHost: url,
-      urlPath: "",
-    };
-  }
-
-  // Split at the first slash after protocol
-  return {
-    urlHost: url.substring(0, firstSlashAfterProtocol),
-    urlPath: url.substring(firstSlashAfterProtocol),
-  };
-};
-
 export function needsUIToTriggerDocFetch(newSystem: System, oldSystem: System | null): boolean {
   // If documentation was manually provided, no fetch needed.
   if (newSystem.documentation && newSystem.documentation.trim()) {
@@ -392,8 +364,7 @@ export function needsUIToTriggerDocFetch(newSystem: System, oldSystem: System | 
 
   // If any of the relevant URLs have changed, fetch is needed.
   if (
-    newSystem.urlHost !== oldSystem.urlHost ||
-    newSystem.urlPath !== oldSystem.urlPath ||
+    newSystem.url !== oldSystem.url ||
     newSystem.documentationUrl !== oldSystem.documentationUrl
   ) {
     return true;

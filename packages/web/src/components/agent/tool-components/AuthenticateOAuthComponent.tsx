@@ -250,9 +250,7 @@ export function AuthenticateOAuthComponent({
           <div className="text-sm">
             <span className="text-muted-foreground">System: </span>
             <span className="font-medium">{system.name || systemId}</span>
-            {system.urlHost && (
-              <span className="text-muted-foreground ml-2">({system.urlHost})</span>
-            )}
+            {system.url && <span className="text-muted-foreground ml-2">({system.url})</span>}
           </div>
         )}
 

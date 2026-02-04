@@ -1,6 +1,7 @@
 import { findTemplateForSystem, System } from "@superglue/shared";
 import { generateUniqueId } from "@superglue/shared/utils";
 import { GraphQLResolveInfo } from "graphql";
+import { normalizeSystem } from "../../datastore/migrations/migration.js";
 import { PostgresService } from "../../datastore/postgres.js";
 import { server_defaults } from "../../default.js";
 import { DocumentationFetcher } from "../../documentation/documentation-fetching.js";
@@ -63,7 +64,7 @@ export const upsertSystemResolver = async (
     mode = "UPSERT",
     credentialMode = "MERGE",
   }: {
-    input: System;
+    input: System & { urlHost?: string; urlPath?: string };
     mode?: "CREATE" | "UPDATE" | "UPSERT";
     credentialMode?: "MERGE" | "REPLACE";
   },
@@ -75,6 +76,9 @@ export const upsertSystemResolver = async (
   }
   try {
     const now = new Date();
+
+    // Normalize input to convert urlHost/urlPath to url
+    input = normalizeSystem(input);
 
     let existingSystemOrNull = await context.datastore.getSystem({
       id: input.id,
@@ -111,8 +115,7 @@ export const upsertSystemResolver = async (
     const systemToSave = {
       id: input.id,
       name: resolveField(input.name, existingSystemOrNull?.name, ""),
-      urlHost: resolveField(input.urlHost, existingSystemOrNull?.urlHost, ""),
-      urlPath: resolveField(input.urlPath, existingSystemOrNull?.urlPath, ""),
+      url: input.url ?? existingSystemOrNull?.url ?? "",
       documentationUrl: resolveField(
         input.documentationUrl,
         existingSystemOrNull?.documentationUrl,
@@ -303,7 +306,7 @@ function enrichWithTemplate(input: System): System {
   input.openApiUrl = matchingTemplate.openApiUrl;
   input.openApiSchema = matchingTemplate.openApiSchema;
   input.documentationUrl = input.documentationUrl || matchingTemplate.docsUrl;
-  input.urlHost = input.urlHost || matchingTemplate.apiUrl;
+  input.url = input.url || matchingTemplate.apiUrl;
   input.documentationKeywords = mergedUniqueKeywords;
   // Set templateName if not already set, for future lookups (OAuth, icons, etc.)
   if (!input.templateName) {
@@ -370,10 +373,10 @@ function shouldTriggerDocFetch(
   if (isFileUrl) return false;
 
   const hasDocumentationUrl = input.documentationUrl && input.documentationUrl.trim().length > 0;
-  const hasApiUrl = input.urlHost && input.urlHost.trim().length > 0;
-  const isGraphQLEndpoint = input.urlHost?.includes("graphql");
+  const hasApiUrl = input.url && input.url.trim().length > 0;
+  const isGraphQLEndpoint = input.url?.includes("graphql");
   const isPostgresEndpoint =
-    input.urlHost?.startsWith("postgres://") || input.urlHost?.startsWith("postgresql://");
+    input.url?.startsWith("postgres://") || input.url?.startsWith("postgresql://");
   const canIntrospect = hasApiUrl && (isGraphQLEndpoint || isPostgresEndpoint);
 
   const hasFetchableSource = hasDocumentationUrl || canIntrospect;
@@ -387,9 +390,8 @@ function shouldTriggerDocFetch(
   }
 
   const docUrlChanged = input.documentationUrl !== existingSystem.documentationUrl;
-  const hostChanged = input.urlHost !== existingSystem.urlHost;
-  const pathChanged = input.urlPath !== existingSystem.urlPath;
-  const hasRelevantChanges = docUrlChanged || hostChanged || pathChanged;
+  const urlChanged = input.url !== existingSystem.url;
+  const hasRelevantChanges = docUrlChanged || urlChanged;
 
   return hasRelevantChanges;
 }
@@ -415,8 +417,7 @@ async function triggerAsyncDocumentationFetch(
 
     const docFetcher = new DocumentationFetcher(
       {
-        urlHost: enrichedInput.urlHost,
-        urlPath: enrichedInput.urlPath,
+        url: enrichedInput.url,
         documentationUrl: enrichedInput.documentationUrl,
         openApiUrl: enrichedInput.openApiUrl?.trim()
           ? enrichedInput.openApiUrl

@@ -143,8 +143,7 @@ export function SystemConfigProvider({
 
   const [systemId, setSystemId] = useState(initialSystem?.id || "");
   const [systemName, setSystemName] = useState(initialSystem?.name || "");
-  const [urlHost, setUrlHost] = useState(initialSystem?.urlHost || "");
-  const [urlPath, setUrlPath] = useState(initialSystem?.urlPath || "");
+  const [url, setUrl] = useState(initialSystem?.url || "");
   const [templateName, setTemplateName] = useState(initialSystem?.templateName || "");
   const [icon, setIcon] = useState(initialSystem?.icon || "");
 
@@ -199,8 +198,7 @@ export function SystemConfigProvider({
       : 0;
 
     if (currentUpdatedAt > initialUpdatedAt) {
-      setUrlHost(updatedSystem.urlHost || "");
-      setUrlPath(updatedSystem.urlPath || "");
+      setUrl(updatedSystem.url || "");
       setTemplateName(updatedSystem.templateName || "");
       setIcon(updatedSystem.icon || "");
       setDocumentationUrl(updatedSystem.documentationUrl || "");
@@ -229,29 +227,19 @@ export function SystemConfigProvider({
     const hasChanges =
       systemId !== (initialSystem.id || "") ||
       systemName !== (initialSystem.name || "") ||
-      urlHost !== (initialSystem.urlHost || "") ||
-      urlPath !== (initialSystem.urlPath || "") ||
+      url !== (initialSystem.url || "") ||
       documentationUrl !== (initialSystem.documentationUrl || "") ||
       specificInstructions !== (initialSystem.specificInstructions || "") ||
       authType !== detectAuthType(initialSystem.credentials || {});
 
     setHasUnsavedChanges(hasChanges);
-  }, [
-    systemId,
-    systemName,
-    urlHost,
-    urlPath,
-    documentationUrl,
-    specificInstructions,
-    authType,
-    initialSystem,
-  ]);
+  }, [systemId, systemName, url, documentationUrl, specificInstructions, authType, initialSystem]);
 
   useEffect(() => {
     if (isNew) {
-      setHasUnsavedChanges(systemId.trim().length > 0 || urlHost.trim().length > 0);
+      setHasUnsavedChanges(systemId.trim().length > 0 || url.trim().length > 0);
     }
-  }, [isNew, systemId, urlHost]);
+  }, [isNew, systemId, url]);
 
   const setOAuthFields = useCallback((fields: Partial<OAuthFields>) => {
     setOauthFieldsState((prev) => ({ ...prev, ...fields }));
@@ -272,14 +260,13 @@ export function SystemConfigProvider({
     () => ({
       id: systemId,
       name: systemName || undefined,
-      urlHost,
-      urlPath,
+      url,
       templateName: templateName || undefined,
       icon: icon || undefined,
       createdAt: initialSystem?.createdAt,
       updatedAt: initialSystem?.updatedAt,
     }),
-    [systemId, systemName, urlHost, urlPath, templateName, icon, initialSystem],
+    [systemId, systemName, url, templateName, icon, initialSystem],
   );
 
   const auth = useMemo<AuthState>(
@@ -355,7 +342,7 @@ export function SystemConfigProvider({
       switch (section) {
         case "configuration":
           const hasId = systemId.trim().length > 0;
-          const hasUrl = urlHost.trim().length > 0;
+          const hasUrl = url.trim().length > 0;
           return {
             isComplete: hasId && hasUrl,
             hasErrors: !hasId,
@@ -397,7 +384,7 @@ export function SystemConfigProvider({
     },
     [
       systemId,
-      urlHost,
+      url,
       authType,
       isOAuthConfigured,
       apiKeyCredentials,
@@ -428,8 +415,7 @@ export function SystemConfigProvider({
 
     return {
       systemId,
-      urlHost,
-      urlPath,
+      url,
       templateName: templateName || undefined,
       authType,
       credentialKeys,
@@ -445,8 +431,7 @@ export function SystemConfigProvider({
     };
   }, [
     systemId,
-    urlHost,
-    urlPath,
+    url,
     templateName,
     authType,
     oauthFields,
@@ -469,10 +454,10 @@ export function SystemConfigProvider({
         return false;
       }
 
-      if (!urlHost.trim()) {
+      if (!url.trim()) {
         toast({
           title: "Error",
-          description: "API Endpoint is required",
+          description: "API URL is required",
           variant: "destructive",
         });
         return false;
@@ -526,8 +511,7 @@ export function SystemConfigProvider({
         const systemData = {
           id: systemId.trim(),
           name: systemName.trim() || undefined,
-          urlHost: urlHost.trim(),
-          urlPath: urlPath.trim(),
+          url: url.trim(),
           documentationUrl: documentationUrl.trim(),
           documentation: documentation.trim(),
           specificInstructions: specificInstructions.trim(),
@@ -576,8 +560,7 @@ export function SystemConfigProvider({
     [
       systemId,
       systemName,
-      urlHost,
-      urlPath,
+      url,
       documentationUrl,
       documentation,
       specificInstructions,
@@ -598,8 +581,7 @@ export function SystemConfigProvider({
     if (initial) {
       setSystemId(initial.id || "");
       setSystemName(initial.name || "");
-      setUrlHost(initial.urlHost || "");
-      setUrlPath(initial.urlPath || "");
+      setUrl(initial.url || "");
       setTemplateName(initial.templateName || "");
       setIcon(initial.icon || "");
       setAuthType(detectAuthType(initial.credentials || {}));
@@ -617,8 +599,7 @@ export function SystemConfigProvider({
     } else {
       setSystemId("");
       setSystemName("");
-      setUrlHost("");
-      setUrlPath("");
+      setUrl("");
       setTemplateName("");
       setIcon("");
       setAuthType("apikey");
@@ -634,7 +615,7 @@ export function SystemConfigProvider({
   }, []);
 
   const phaseCompletion = useMemo<PhaseCompletion>(() => {
-    const configComplete = Boolean(systemId.trim() && urlHost.trim());
+    const configComplete = Boolean(systemId.trim() && url.trim());
 
     let authComplete = false;
     if (authType === "none") {
@@ -665,7 +646,7 @@ export function SystemConfigProvider({
     };
   }, [
     systemId,
-    urlHost,
+    url,
     authType,
     oauthFields.access_token,
     oauthFields.refresh_token,
@@ -711,12 +692,8 @@ export function SystemConfigProvider({
         setSystemName(name);
         setHasUnsavedChanges(true);
       },
-      setUrlHost: (host) => {
-        setUrlHost(host);
-        setHasUnsavedChanges(true);
-      },
-      setUrlPath: (path) => {
-        setUrlPath(path);
+      setUrl: (url) => {
+        setUrl(url);
         setHasUnsavedChanges(true);
       },
       setTemplateName: (name) => {

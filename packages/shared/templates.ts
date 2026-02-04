@@ -2860,16 +2860,12 @@ export const systemOptions = [
 /**
  * Find matching template for a System object.
  * Priority order: templateName > id > id with numeric suffix stripped > name > urlHost regex match
- * @param system - System object with templateName, id, name, and/or urlHost/urlPath
+ * @param system - System object with templateName, id, name, and/or url
  * @returns The matching template key and config, or null if no match found
  */
-export function findTemplateForSystem(system: {
-  templateName?: string;
-  id?: string;
-  name?: string;
-  urlHost?: string;
-  urlPath?: string;
-}): { key: string; template: SystemConfig } | null {
+export function findTemplateForSystem(
+  system: Partial<System>,
+): { key: string; template: SystemConfig } | null {
   // 1. Direct lookup via stored templateName (highest priority)
   if (system.templateName && systems[system.templateName]) {
     return { key: system.templateName, template: systems[system.templateName] };
@@ -2893,15 +2889,13 @@ export function findTemplateForSystem(system: {
     return { key: system.name, template: systems[system.name] };
   }
 
-  // 5. URL regex matching (lowest priority) - compose urlHost + urlPath for matching
-  if (system.urlHost) {
-    const url = system.urlPath
-      ? `${system.urlHost.replace(/\/$/, "")}/${system.urlPath.replace(/^\//, "")}`
-      : system.urlHost;
-
+  // 5. URL regex matching (lowest priority)
+  if (system.url) {
     // Ensure URL has a scheme for proper matching
     const urlForMatching =
-      url.startsWith("http") || url.startsWith("postgres") ? url : `https://${url}`;
+      system.url.startsWith("http") || system.url.startsWith("postgres")
+        ? system.url
+        : `https://${system.url}`;
 
     const matches: { key: string; template: SystemConfig; specificity: number }[] = [];
 
@@ -2997,12 +2991,19 @@ export function getOAuthTokenUrl(system: System): string {
   }
 
   // Fallback: Default OAuth token endpoint
-  if (!system.urlHost) {
+  if (!system.url) {
     throw new Error(
-      `Cannot determine OAuth token URL for system ${system.id}: no urlHost or token_url provided`,
+      `Cannot determine OAuth token URL for system ${system.id}: no url or token_url provided`,
     );
   }
-  return `${system.urlHost}/oauth/token`;
+
+  // Extract host from url
+  try {
+    const urlObj = new URL(system.url.startsWith("http") ? system.url : `https://${system.url}`);
+    return `${urlObj.origin}/oauth/token`;
+  } catch {
+    return `${system.url}/oauth/token`;
+  }
 }
 
 export interface SdkCodegenOptions {

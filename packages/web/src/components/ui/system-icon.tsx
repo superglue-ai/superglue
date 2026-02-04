@@ -1,17 +1,12 @@
 "use client";
 
 import { resolveSystemIcon } from "@/src/lib/general-utils";
+import type { System } from "@superglue/shared";
 import { Blocks, icons, LucideIcon } from "lucide-react";
 import { memo } from "react";
 
 interface SystemIconProps {
-  system: {
-    id?: string;
-    name?: string;
-    urlHost?: string;
-    icon?: string | null;
-    templateName?: string;
-  };
+  system: Partial<System>;
   size?: number;
   className?: string;
   /** Additional classes for the fallback Blocks icon */

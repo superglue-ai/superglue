@@ -12,9 +12,9 @@ import {
 import { useToast } from "@/src/hooks/use-toast";
 import { useSystemActions } from "@/src/hooks/use-system-actions";
 import { SystemIcon } from "@/src/components/ui/system-icon";
-import { composeUrl, getSimpleIcon } from "@/src/lib/general-utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible";
-import { systemOptions, ToolCall } from "@superglue/shared";
+import { System, SystemInput, ToolCall } from "@superglue/shared";
+import { UserAction } from "@/src/lib/agent/agent-types";
 import {
   AlertTriangle,
   CheckCircle,
@@ -34,34 +34,14 @@ interface CreateSystemComponentProps {
   onInputChange: (newInput: any) => void;
 }
 
-interface CreateSystemInput {
-  id: string;
-  name: string;
-  urlHost: string;
-  urlPath: string;
-  credentials: Record<string, any>;
-  documentationUrl?: string;
-  documentationKeywords?: string[];
-  specificInstructions?: string;
-}
+type CreateSystemInput = SystemInput & { sensitiveCredentials?: Record<string, boolean> };
 
 interface CreateSystemOutput {
-  success: boolean;
-  note?: string;
-  system: {
-    id: string;
-    name: string;
-    urlHost: string;
-    urlPath: string;
-    credentials: Record<string, any>;
-    documentationUrl?: string;
-    documentationKeywords?: string[];
-    specificInstructions?: string;
-    documentationPending?: boolean;
-    icon?: string;
-    createdAt?: string;
-    updatedAt?: string;
-  };
+  success?: boolean;
+  confirmationState?: string;
+  systemConfig?: any;
+  requiredSensitiveFields?: string[];
+  system?: System;
 }
 
 function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponentProps) {
@@ -339,24 +319,7 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1">API Endpoint</div>
                 <div className="text-sm font-mono bg-muted/50 px-2 py-1 rounded">
-                  {(() => {
-                    // Check for different possible URL properties
-                    const urlHost = displaySystem.urlHost || displaySystem.host || "";
-                    const urlPath = displaySystem.urlPath || displaySystem.path || "";
-
-                    // If we have a host, compose the URL
-                    if (urlHost) {
-                      return composeUrl(urlHost, urlPath);
-                    }
-
-                    // If we have a path but no host, show just the path
-                    if (urlPath) {
-                      return urlPath;
-                    }
-
-                    // If neither, show a placeholder
-                    return "No API endpoint specified";
-                  })()}
+                  {displaySystem.url || "No API endpoint specified"}
                 </div>
               </div>
 

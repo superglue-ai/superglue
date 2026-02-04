@@ -13,8 +13,7 @@ export function useSystemActions() {
   const cleanSystemForInput = (system: System) => {
     return {
       id: system.id,
-      urlHost: system.urlHost,
-      urlPath: system.urlPath,
+      url: system.url,
       documentationUrl: system.documentationUrl,
       documentation: system.documentation,
       specificInstructions: system.specificInstructions,

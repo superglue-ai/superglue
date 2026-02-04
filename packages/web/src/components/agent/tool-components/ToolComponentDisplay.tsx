@@ -256,10 +256,7 @@ export function ToolCallToolDisplay({
                     <div className="mb-3">
                       <div className="flex items-center gap-2 mb-2">
                         {/* System Icon - Left of Step ID */}
-                        <SystemIcon
-                          system={{ id: step.systemId, urlHost: step.apiConfig?.urlHost }}
-                          size={16}
-                        />
+                        <SystemIcon system={{ id: step.systemId }} size={16} />
                         <span className="font-medium text-sm">{step.id || "New Step"}</span>
 
                         {/* Loop Icon - Right side (if LOOP) */}

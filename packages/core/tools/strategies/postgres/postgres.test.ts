@@ -15,8 +15,7 @@ describe("callPostgres", () => {
   const testConfig: ApiConfig = {
     id: "1",
     instruction: "test",
-    urlHost: "postgres://user:password@localhost:5432",
-    urlPath: "/testdb",
+    url: "postgres://user:password@localhost:5432/testdb",
     body: JSON.stringify({
       query: "SELECT NOW()",
     }),
@@ -48,8 +47,7 @@ describe("PostgreSQL Utilities", () => {
   const mockEndpoint: ApiConfig = {
     id: "1",
     instruction: "test",
-    urlHost: "postgres://{user}:{password}@{host}:{port}/{database}",
-    urlPath: "",
+    url: "postgres://{user}:{password}@{host}:{port}/{database}",
     body: JSON.stringify({ query: "SELECT * FROM {table}" }),
   };
 
@@ -132,8 +130,7 @@ describe("PostgreSQL Utilities", () => {
       const paramEndpoint: ApiConfig = {
         id: "2",
         instruction: "test with params",
-        urlHost: "postgres://{user}:{password}@{host}:{port}/{database}",
-        urlPath: "",
+        url: "postgres://{user}:{password}@{host}:{port}/{database}",
         body: JSON.stringify({
           query: "SELECT * FROM users WHERE id = $1",
           params: [999],
@@ -186,8 +183,7 @@ describe("PostgreSQL Utilities", () => {
       const paramEndpoint: ApiConfig = {
         id: "2",
         instruction: "test with params",
-        urlHost: "postgres://{user}:{password}@{host}:{port}/{database}",
-        urlPath: "",
+        url: "postgres://{user}:{password}@{host}:{port}/{database}",
         body: JSON.stringify({
           query: "SELECT * FROM users WHERE id = $1 AND status = $2",
           params: [123, "active"],
@@ -217,8 +213,7 @@ describe("PostgreSQL Utilities", () => {
       const paramEndpoint: ApiConfig = {
         id: "3",
         instruction: "test with values",
-        urlHost: "postgres://{user}:{password}@{host}:{port}/{database}",
-        urlPath: "",
+        url: "postgres://{user}:{password}@{host}:{port}/{database}",
         body: JSON.stringify({
           query: "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *",
           values: ["John Doe", "john@example.com"],
@@ -294,8 +289,7 @@ describe("PostgreSQL Utilities", () => {
       const customEndpoint: ApiConfig = {
         id: "1",
         instruction: "test",
-        urlHost: "postgres://{user}@{host}/{database}",
-        urlPath: "",
+        url: "postgres://{user}@{host}/{database}",
         body: JSON.stringify({ query: "SELECT * FROM {table} WHERE id = {id}" }),
       };
 
@@ -351,8 +345,7 @@ describe("PostgreSQL Utilities", () => {
       const endpointWithSpecialChars: ApiConfig = {
         id: "1",
         instruction: "test",
-        urlHost: "postgres://{user}:{password}@{host}:{port}/my-test_db$123",
-        urlPath: "",
+        url: "postgres://{user}:{password}@{host}:{port}/my-test_db$123",
         body: JSON.stringify({ query: "SELECT 1" }),
       };
 
@@ -377,8 +370,7 @@ describe("PostgreSQL Utilities", () => {
       const endpointWithTrailingSlash: ApiConfig = {
         id: "1",
         instruction: "test",
-        urlHost: "postgres://{user}:{password}@{host}:{port}/testdb///",
-        urlPath: "",
+        url: "postgres://{user}:{password}@{host}:{port}/testdb///",
         body: JSON.stringify({ query: "SELECT 1" }),
       };
 
@@ -403,9 +395,7 @@ describe("PostgreSQL Utilities", () => {
       const endpointWithQueryParams: ApiConfig = {
         id: "1",
         instruction: "test",
-        urlHost:
-          "postgres://{user}:{password}@{host}:{port}/testdb///?sslmode=disable&connect_timeout=10",
-        urlPath: "",
+        url: "postgres://{user}:{password}@{host}:{port}/testdb///?sslmode=disable&connect_timeout=10",
         body: JSON.stringify({ query: "SELECT 1" }),
       };
 
@@ -467,7 +457,7 @@ describe("PostgreSQL Utilities", () => {
         metadata: {},
       });
 
-      const endpoint2 = { ...mockEndpoint, urlHost: "postgres://user2:pass2@host2/db2" };
+      const endpoint2 = { ...mockEndpoint, url: "postgres://user2:pass2@host2/db2" };
       await callPostgres({
         endpoint: endpoint2,
         payload: {},

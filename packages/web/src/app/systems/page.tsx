@@ -19,7 +19,6 @@ import {
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
 import { useToast } from "@/src/hooks/use-toast";
-import { composeUrl } from "@/src/lib/general-utils";
 import { createOAuthErrorHandler } from "@/src/lib/oauth-utils";
 import { SystemActionsMenu } from "@/src/components/systems/SystemActionsMenu";
 import { SystemTemplatePicker } from "@/src/components/systems/SystemTemplatePicker";
@@ -91,7 +90,7 @@ export const getAuthBadge = (
   return { type: "apikey", label: "API Key", color: "green", icon: "key" };
 };
 
-type SortColumn = "id" | "urlHost" | "updatedAt";
+type SortColumn = "id" | "url" | "updatedAt";
 type SortDirection = "asc" | "desc";
 
 export default function SystemsPage() {
@@ -142,10 +141,7 @@ export default function SystemsPage() {
         if (!system) return false;
         if (debouncedSearchTerm) {
           const searchLower = debouncedSearchTerm.toLowerCase();
-          const searchableText = [system.id, system.urlHost, system.urlPath]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
+          const searchableText = [system.id, system.url].filter(Boolean).join(" ").toLowerCase();
           if (!searchableText.includes(searchLower)) return false;
         }
         return true;
@@ -156,8 +152,8 @@ export default function SystemsPage() {
       switch (sortColumn) {
         case "id":
           return dir * a.id.localeCompare(b.id);
-        case "urlHost":
-          return dir * (a.urlHost || "").localeCompare(b.urlHost || "");
+        case "url":
+          return dir * (a.url || "").localeCompare(b.url || "");
         case "updatedAt":
           return (
             dir *
@@ -258,11 +254,11 @@ export default function SystemsPage() {
               </TableHead>
               <TableHead
                 className="cursor-pointer hover:bg-muted/50 select-none"
-                onClick={() => handleSort("urlHost")}
+                onClick={() => handleSort("url")}
               >
                 <div className="flex items-center">
                   API Endpoint
-                  <SortIcon column="urlHost" />
+                  <SortIcon column="url" />
                 </div>
               </TableHead>
               <TableHead>
@@ -343,7 +339,7 @@ export default function SystemsPage() {
                     </TableCell>
                     <TableCell className="max-w-[300px]">
                       <span className="text-sm text-muted-foreground truncate block">
-                        {composeUrl(sys.urlHost, sys.urlPath) || "No API endpoint"}
+                        {sys.url || "No API endpoint"}
                       </span>
                     </TableCell>
                     <TableCell>

@@ -231,29 +231,13 @@ export interface Pagination {
 }
 
 export interface ApiConfig extends BaseConfig {
-  urlHost?: string;
-  urlPath?: string;
+  url: string;
   instruction: string;
   method?: HttpMethod;
   queryParams?: Record<string, any>;
   headers?: Record<string, any>;
   body?: string;
   pagination?: Pagination;
-}
-
-export interface ExtractConfig extends BaseConfig {
-  urlHost?: string;
-  urlPath?: string;
-  instruction: string;
-  queryParams?: Record<string, any>;
-  method?: HttpMethod;
-  headers?: Record<string, any>;
-  body?: string;
-  documentationUrl?: string;
-  decompressionMethod?: DecompressionMethod;
-  authentication?: AuthType;
-  fileType?: FileType;
-  dataPath?: string;
 }
 
 export interface ExecutionStep {
@@ -306,8 +290,7 @@ export interface DocumentationFiles {
 export interface System extends BaseConfig {
   name?: string;
   type?: string;
-  urlHost?: string;
-  urlPath?: string;
+  url?: string;
   credentials?: Record<string, any>;
   documentationUrl?: string;
   documentation?: string;
@@ -325,8 +308,7 @@ export interface System extends BaseConfig {
 export interface SystemInput {
   id: string;
   name?: string;
-  urlHost?: string;
-  urlPath?: string;
+  url?: string;
   documentationUrl?: string;
   documentation?: string;
   documentationPending?: boolean;
@@ -352,9 +334,7 @@ export interface SuggestedTool {
 
 export type RunResult = ApiResult | ToolResult;
 
-export type ExtractResult = BaseResult & {
-  config: ExtractConfig;
-};
+export type ExtractResult = BaseResult;
 
 export type ApiResult = BaseResult & {
   config: ApiConfig;
@@ -366,9 +346,7 @@ export type ApiInputRequest = {
 };
 
 export type ExtractInputRequest = {
-  id?: string;
-  endpoint?: ExtractConfig;
-  file?: Upload;
+  file: Upload;
 };
 
 export type ToolInputRequest = {
@@ -417,12 +395,7 @@ export interface ApiCallArgs {
 }
 
 export interface ExtractArgs {
-  id?: string;
-  endpoint?: ExtractConfig;
-  file?: Upload;
-  options?: RequestOptions;
-  payload?: Record<string, any>;
-  credentials?: Record<string, string>;
+  file: Upload;
 }
 
 export interface ToolArgs {

@@ -53,8 +53,7 @@ describe("Tool Fixer → Frontend Integration", () => {
         apiConfig: {
           id: "api1",
           method: "GET",
-          urlHost: "https://api.example.com",
-          urlPath: "/users",
+          url: "https://api.example.com/users",
         },
       },
     ],

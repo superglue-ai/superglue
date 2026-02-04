@@ -580,8 +580,7 @@ function SystemPlaygroundAgentSidebar({
       agentParams: {
         systemConfig: {
           id: systemConfig.systemId,
-          urlHost: systemConfig.urlHost,
-          urlPath: systemConfig.urlPath,
+          url: systemConfig.url,
           templateName: systemConfig.templateName,
         },
       },

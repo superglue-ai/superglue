@@ -6,7 +6,6 @@
 
 import { ApiConfig, ServiceMetadata } from "@superglue/shared";
 import { callPostgres } from "../../tools/strategies/postgres/postgres.js";
-import { composeUrl } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
 import { DocumentationProcessingStrategy } from "../types.js";
 
@@ -17,8 +16,8 @@ export class PostgreSqlStrategy implements DocumentationProcessingStrategy {
     metadata: ServiceMetadata,
     credentials?: Record<string, any>,
   ): Promise<string | null> {
-    if (config.urlHost?.startsWith("postgres://") || config.urlHost?.startsWith("postgresql://")) {
-      const url = composeUrl(config.urlHost, config.urlPath);
+    if (config.url?.startsWith("postgres://") || config.url?.startsWith("postgresql://")) {
+      const url = config.url;
 
       const schemaQuery = {
         query: `SELECT 

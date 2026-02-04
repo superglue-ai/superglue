@@ -17,8 +17,7 @@ export interface OAuthFields {
 export interface SystemDefinition {
   id: string;
   name?: string;
-  urlHost: string;
-  urlPath: string;
+  url: string;
   templateName?: string;
   icon?: string;
   createdAt?: Date;
@@ -78,8 +77,7 @@ export interface SystemConfigContextValue {
 
   setSystemId: (id: string) => void;
   setSystemName: (name: string) => void;
-  setUrlHost: (host: string) => void;
-  setUrlPath: (path: string) => void;
+  setUrl: (url: string) => void;
   setTemplateName: (name: string) => void;
   setIcon: (icon: string) => void;
 
@@ -105,8 +103,7 @@ export interface SystemConfigContextValue {
 
 export interface SystemContextForAgent {
   systemId: string;
-  urlHost: string;
-  urlPath: string;
+  url: string;
   templateName?: string;
   authType: "none" | "oauth" | "apikey";
   credentialKeys: string[];

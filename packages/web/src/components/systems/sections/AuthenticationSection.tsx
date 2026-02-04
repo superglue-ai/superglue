@@ -47,7 +47,7 @@ export function AuthenticationSection() {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialCredentialsRef = useRef(auth.apiKeyCredentials);
 
-  const canAutoSave = system.id && system.urlHost;
+  const canAutoSave = system.id && system.url;
 
   const debouncedSave = useCallback(() => {
     if (!canAutoSave) return;
@@ -131,7 +131,7 @@ export function AuthenticationSection() {
   const getTemplateOAuth = useCallback(() => {
     const match = findTemplateForSystem(system);
     return (match?.template.oauth as any) || null;
-  }, [system.id, system.name, system.templateName, system.urlHost, system.urlPath]);
+  }, [system.id, system.name, system.templateName, system.url]);
 
   const getResolvedOAuthFields = useCallback(() => {
     const templateOAuth = getTemplateOAuth();
@@ -211,7 +211,7 @@ export function AuthenticationSection() {
           description: "Successfully authenticated",
         });
 
-        if (system.id && system.urlHost) {
+        if (system.id && system.url) {
           await saveSystem(tokenFields);
         }
       }

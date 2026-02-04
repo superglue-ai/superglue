@@ -4,32 +4,26 @@ import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
 import { URLField } from "@/src/components/utils/URLField";
-import { composeUrl } from "@/src/lib/general-utils";
 import { useCallback, useState } from "react";
 import { useSystemConfig } from "../context";
 
 export function ConfigurationSection() {
-  const { system, isNewSystem, setSystemId, setSystemName, setUrlHost, setUrlPath } =
-    useSystemConfig();
+  const { system, isNewSystem, setSystemId, setSystemName, setUrl } = useSystemConfig();
 
   const [isIdManuallyEdited, setIsIdManuallyEdited] = useState(false);
 
   const handleUrlChange = useCallback(
-    (host: string, path: string) => {
-      setUrlHost(host);
-      setUrlPath(path);
+    (url: string, _queryParams: Record<string, string>) => {
+      setUrl(url);
 
-      if (isNewSystem && !isIdManuallyEdited) {
-        const fullUrl = composeUrl(host, path);
-        if (fullUrl) {
-          const sanitizedId = sanitizeSystemId(fullUrl);
-          if (sanitizedId) {
-            setSystemId(sanitizedId);
-          }
+      if (isNewSystem && !isIdManuallyEdited && url) {
+        const sanitizedId = sanitizeSystemId(url);
+        if (sanitizedId) {
+          setSystemId(sanitizedId);
         }
       }
     },
-    [isNewSystem, isIdManuallyEdited, setUrlHost, setUrlPath, setSystemId],
+    [isNewSystem, isIdManuallyEdited, setUrl, setSystemId],
   );
 
   const handleIdChange = useCallback(
@@ -87,10 +81,7 @@ export function ConfigurationSection() {
           </Label>
           <HelpTooltip text="The base URL of the API (e.g., https://api.example.com/v1)." />
         </div>
-        <URLField
-          url={composeUrl(system.urlHost, system.urlPath) || ""}
-          onUrlChange={handleUrlChange}
-        />
+        <URLField url={system.url || ""} onUrlChange={handleUrlChange} />
       </div>
     </div>
   );

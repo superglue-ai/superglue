@@ -79,8 +79,7 @@ describe("API Utilities", () => {
 
   describe("runStepConfig", () => {
     const testEndpoint: ApiConfig = {
-      urlHost: "https://api.example.com",
-      urlPath: "v1/test",
+      url: "https://api.example.com/v1/test",
       method: HttpMethod.GET,
       id: "test-endpoint-id",
       instruction: "Test API call",
@@ -637,8 +636,7 @@ describe("API Utilities", () => {
 
   describe("Error Detection Modes", () => {
     const testEndpoint: ApiConfig = {
-      urlHost: "https://api.example.com",
-      urlPath: "v1/test",
+      url: "https://api.example.com/v1/test",
       method: HttpMethod.GET,
       id: "test-endpoint-id",
       instruction: "Test API call",

@@ -239,8 +239,7 @@ describe("getObjectContext edge cases for include combinations and strict budget
 describe("getWorkflowBuilderContext budget and include combinations", () => {
   const system = {
     id: "test_system",
-    urlHost: "https://api.example.com",
-    urlPath: "/v1",
+    url: "https://api.example.com/v1",
     documentation:
       "Auth: use bearer token. Pagination via page and limit. Endpoints: /items, /users",
     specificInstructions: "Respect rate limits.",

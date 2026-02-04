@@ -11,7 +11,7 @@ import {
 import { useFileUpload } from "./hooks/use-file-upload";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import { SystemCarousel } from "@/src/components/ui/rotating-icon-gallery";
-import { cn, composeUrl, inputErrorStyles } from "@/src/lib/general-utils";
+import { cn, inputErrorStyles } from "@/src/lib/general-utils";
 import { tokenRegistry } from "@/src/lib/token-registry";
 import { System, SystemInput, Tool, SuperglueClient, SystemConfig } from "@superglue/shared";
 import { ALLOWED_FILE_EXTENSIONS, generateDefaultFromSchema } from "@superglue/shared";
@@ -74,8 +74,7 @@ const INACTIVE_EMPTY_STYLE = "border-border text-muted-foreground hover:bg-accen
 
 const toSystemInput = (i: System): SystemInput => ({
   id: i.id,
-  urlHost: i.urlHost,
-  urlPath: i.urlPath,
+  url: i.url,
   documentationUrl: i.documentationUrl,
   documentation: i.documentation,
   credentials: i.credentials,
@@ -477,8 +476,7 @@ export function ToolBuilder({
                       (sys) =>
                         systemSearch === "" ||
                         sys.id.toLowerCase().includes(systemSearch.toLowerCase()) ||
-                        sys.urlHost.toLowerCase().includes(systemSearch.toLowerCase()) ||
-                        sys.urlPath.toLowerCase().includes(systemSearch.toLowerCase()),
+                        sys.url.toLowerCase().includes(systemSearch.toLowerCase()),
                     );
 
                     const colorClasses = {
@@ -513,7 +511,7 @@ export function ToolBuilder({
                                 <div className="flex flex-col min-w-0">
                                   <span className="font-medium text-sm truncate">{sys.id}</span>
                                   <span className="text-xs text-muted-foreground truncate">
-                                    {composeUrl(sys.urlHost, sys.urlPath)}
+                                    {sys.url}
                                   </span>
                                 </div>
                               </div>

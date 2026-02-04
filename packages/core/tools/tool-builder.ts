@@ -120,9 +120,9 @@ export class ToolBuilder {
             `Step ${index + 1} (${step.id}): Invalid systemId '${step.systemId}'. Available systems: ${availableSystemIds.join(", ")}`,
           );
         }
-        if (!step.apiConfig?.urlHost) {
+        if (!step.apiConfig?.url) {
           errors.push(
-            `Step ${index + 1} (${step.id}): Missing URL configuration (urlHost: '${step.apiConfig?.urlHost || "undefined"}'). Please ensure that all steps correspond to a single API call, or merge this step with the previous one.`,
+            `Step ${index + 1} (${step.id}): Missing URL configuration (url: '${step.apiConfig?.url || "undefined"}'). Please ensure that all steps correspond to a single API call, or merge this step with the previous one.`,
           );
         }
       });
@@ -220,8 +220,7 @@ export class ToolBuilder {
               steps: generatedTool.steps?.map((s) => ({
                 id: s.id,
                 systemId: s.systemId,
-                urlHost: s.apiConfig?.urlHost,
-                urlPath: s.apiConfig?.urlPath,
+                url: s.apiConfig?.url,
               })),
             },
             null,
@@ -297,10 +296,11 @@ const toolSchema = z.object({
               .describe(
                 "A concise instruction describing WHAT data this API call should retrieve or what action it should perform.",
               ),
-            urlHost: z
+            url: z
               .string()
-              .describe("The base URL host (e.g., https://api.example.com). Must not be empty."),
-            urlPath: z.string().describe("The API endpoint path (e.g., /v1/users)."),
+              .describe(
+                "Full URL for the API endpoint (e.g., https://api.example.com/v1/users). Must not be empty.",
+              ),
             method: z
               .enum(Object.values(HttpMethod) as [string, ...string[]])
               .describe(

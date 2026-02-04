@@ -33,8 +33,7 @@ describe("ToolExecutor", () => {
             apiConfig: {
               id: "config-1",
               instruction: "Fetch data",
-              urlHost: "https://api.example.com",
-              urlPath: "/data",
+              url: "https://api.example.com/data",
               method: "GET" as HttpMethod,
             },
           },
@@ -183,8 +182,7 @@ describe("ToolExecutor", () => {
       const apiConfig: ApiConfig = {
         id: "config-1",
         instruction: "Fetch users",
-        urlHost: "https://api.example.com",
-        urlPath: "/users",
+        url: "https://api.example.com/users",
         method: "GET" as HttpMethod,
       };
 
@@ -238,8 +236,7 @@ describe("ToolExecutor", () => {
             apiConfig: {
               id: "config-1",
               instruction: "Fetch data",
-              urlHost: "https://api.example.com",
-              urlPath: "/data",
+              url: "https://api.example.com/data",
               method: "GET" as HttpMethod,
             },
           },
@@ -273,8 +270,7 @@ describe("ToolExecutor", () => {
             apiConfig: {
               id: "config-1",
               instruction: "Fetch data",
-              urlHost: "https://api.example.com",
-              urlPath: "/data",
+              url: "https://api.example.com/data",
               method: "GET" as HttpMethod,
             },
             failureBehavior: "CONTINUE",
@@ -285,8 +281,7 @@ describe("ToolExecutor", () => {
             apiConfig: {
               id: "config-2",
               instruction: "Fetch more data",
-              urlHost: "https://api.example.com",
-              urlPath: "/more-data",
+              url: "https://api.example.com/more-data",
               method: "GET" as HttpMethod,
             },
           },
@@ -341,8 +336,7 @@ describe("ToolExecutor", () => {
             apiConfig: {
               id: "config-1",
               instruction: "Fetch data",
-              urlHost: "https://api.example.com",
-              urlPath: "/data",
+              url: "https://api.example.com/data",
               method: "GET" as HttpMethod,
             },
             failureBehavior: "FAIL", // Default behavior
@@ -353,8 +347,7 @@ describe("ToolExecutor", () => {
             apiConfig: {
               id: "config-2",
               instruction: "Should not run",
-              urlHost: "https://api.example.com",
-              urlPath: "/never",
+              url: "https://api.example.com/never",
               method: "GET" as HttpMethod,
             },
           },
@@ -401,8 +394,7 @@ describe("ToolExecutor", () => {
             apiConfig: {
               id: "config-1",
               instruction: "Fetch user details",
-              urlHost: "https://api.example.com",
-              urlPath: "/users/{{currentItem.id}}",
+              url: "https://api.example.com/users/{{currentItem.id}}",
               method: "GET" as HttpMethod,
             },
             loopSelector: "(data) => [{ id: 1 }, { id: 2 }, { id: 3 }]",
@@ -452,8 +444,7 @@ describe("ToolExecutor", () => {
             apiConfig: {
               id: "config-1",
               instruction: "Fetch user details",
-              urlHost: "https://api.example.com",
-              urlPath: "/users/{{currentItem.id}}",
+              url: "https://api.example.com/users/{{currentItem.id}}",
               method: "GET" as HttpMethod,
             },
             loopSelector: "(data) => [{ id: 1 }, { id: 2 }, { id: 3 }]",
@@ -507,8 +498,7 @@ describe("ToolExecutor", () => {
       const originalConfig: ApiConfig = {
         id: "config-1",
         instruction: "Fetch users",
-        urlHost: "https://api.example.com",
-        urlPath: "/v1/users",
+        url: "https://api.example.com/v1/users",
         method: "GET" as HttpMethod,
       };
 
@@ -570,8 +560,7 @@ describe("ToolExecutor", () => {
             apiConfig: {
               id: "config-1",
               instruction: "Fetch data",
-              urlHost: "https://api.example.com",
-              urlPath: "/data",
+              url: "https://api.example.com/data",
               method: "GET" as HttpMethod,
             },
           },

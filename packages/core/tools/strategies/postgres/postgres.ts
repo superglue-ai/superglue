@@ -7,7 +7,7 @@ import {
 import { Pool, PoolConfig } from "pg";
 import { server_defaults } from "../../../default.js";
 import { parseJSON } from "../../../files/index.js";
-import { composeUrl, replaceVariables } from "../../../utils/helpers.js";
+import { replaceVariables } from "../../../utils/helpers.js";
 import { logMessage } from "../../../utils/logs.js";
 import {
   StepExecutionInput,
@@ -126,10 +126,7 @@ export async function callPostgres({
   metadata: ServiceMetadata;
 }): Promise<any> {
   const requestVars = { ...payload, ...credentials };
-  let connectionString = await replaceVariables(
-    composeUrl(endpoint.urlHost, endpoint.urlPath),
-    requestVars,
-  );
+  let connectionString = await replaceVariables(endpoint.url, requestVars);
   connectionString = connectionString.replace(/\/+(\?)/, "$1").replace(/\/+$/, "");
 
   let bodyParsed: any;

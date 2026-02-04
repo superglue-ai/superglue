@@ -102,8 +102,7 @@ export class ToolFixer {
     return {
       id: config.id,
       instruction: config.instruction,
-      urlHost: config.urlHost,
-      urlPath: config.urlPath,
+      url: config.url,
       method: config.method,
       queryParams: config.queryParams,
       headers: config.headers,
@@ -271,7 +270,6 @@ ${availableSystemIds.join(", ")}
     let messages = this.prepareFixContext(serializedTool);
     let lastAttemptError: string | null = null;
     let lastAttemptedPatches: Operation[] | null = null;
-    let appliedPatches: Operation[] = [];
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
@@ -363,9 +361,6 @@ ${availableSystemIds.join(", ")}
         if (!toolValidation.valid) {
           throw new Error(toolValidation.error);
         }
-
-        appliedPatches = patches;
-
         // Preserve original metadata
         const fixedTool: Tool = {
           ...normalizedPatchedTool,
