@@ -465,6 +465,7 @@ export interface FixToolArgs {
   lastError?: string;
   stepResults?: ToolStepResult[];
   systemIds?: string[];
+  traceId?: string;
 }
 
 export interface FixToolResult {

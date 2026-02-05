@@ -91,7 +91,10 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
   });
 
   fastify.addHook("preHandler", async (request, reply) => {
-    const traceId = generateTraceId();
+    // Use client-provided trace ID if available, otherwise generate one
+    const clientTraceId = request.headers["x-trace-id"];
+    const traceId =
+      typeof clientTraceId === "string" && clientTraceId ? clientTraceId : generateTraceId();
 
     // Skip authentication for health check and public endpoints
     if (request.url === "/v1/health") {

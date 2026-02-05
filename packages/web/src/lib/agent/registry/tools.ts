@@ -117,6 +117,11 @@ const runBuildTool = async (input: any, ctx: ToolExecutionContext) => {
   }
   const resolvedPayload = fileResult.resolved;
 
+  const traceId = crypto.randomUUID();
+  if (ctx.logCallback) {
+    ctx.logCallback(`TOOL_CALL_UPDATE:build_tool:TRACE_ID:${traceId}`);
+  }
+
   try {
     const builtTool = await ctx.superglueClient.buildWorkflow({
       instruction,
@@ -124,6 +129,7 @@ const runBuildTool = async (input: any, ctx: ToolExecutionContext) => {
       payload: resolvedPayload,
       responseSchema,
       save: false,
+      traceId,
     });
 
     const draftId = `draft_${crypto.randomUUID()}`;
@@ -235,19 +241,16 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
   }
 
   try {
-    const result: ToolResult = await ctx.superglueClient.executeWorkflow(
-      isDraft
-        ? {
-            tool: toolConfig,
-            payload: resolvedPayload,
-            options: { retries: 0 },
-            traceId,
-          }
-        : {
-            id: toolId,
-            payload: resolvedPayload,
-          },
-    );
+    const result: ToolResult = isDraft
+      ? await ctx.superglueClient.runToolConfig({
+          tool: toolConfig,
+          payload: resolvedPayload,
+          traceId,
+        })
+      : await ctx.superglueClient.runTool({
+          toolId: toolId!,
+          payload: resolvedPayload,
+        });
 
     if (!result.success) {
       return {
@@ -373,11 +376,17 @@ const runEditTool = async (input: any, ctx: ToolExecutionContext) => {
     };
   }
 
+  const traceId = crypto.randomUUID();
+  if (ctx.logCallback) {
+    ctx.logCallback(`TOOL_CALL_UPDATE:edit_tool:TRACE_ID:${traceId}`);
+  }
+
   try {
     const fixResult = await ctx.superglueClient.fixWorkflow({
       tool: draft.config,
       fixInstructions,
       systemIds: draft.systemIds,
+      traceId,
     });
 
     const fixedToolForStorage = stripLegacyToolFields({

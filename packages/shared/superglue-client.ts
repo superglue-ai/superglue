@@ -245,41 +245,37 @@ export class SuperglueClient {
 
     let gqlInput: Partial<ToolInputRequest> = {};
 
-    if (id) {
-      gqlInput = { id };
-    } else if (tool) {
-      const toolInput = {
-        id: tool.id,
-        steps: tool.steps.map((step) => {
-          const apiConfigInput = {
-            id: step.apiConfig.id,
-            urlHost: step.apiConfig.urlHost,
-            instruction: step.apiConfig.instruction,
-            urlPath: step.apiConfig.urlPath,
-            method: step.apiConfig.method,
-            queryParams: step.apiConfig.queryParams,
-            headers: step.apiConfig.headers,
-            body: step.apiConfig.body,
-            pagination: step.apiConfig.pagination
-              ? {
-                  type: step.apiConfig.pagination.type,
-                  ...(step.apiConfig.pagination.pageSize !== undefined && {
-                    pageSize: step.apiConfig.pagination.pageSize,
-                  }),
-                  ...(step.apiConfig.pagination.cursorPath !== undefined && {
-                    cursorPath: step.apiConfig.pagination.cursorPath,
-                  }),
-                  ...(step.apiConfig.pagination.stopCondition !== undefined && {
-                    stopCondition: step.apiConfig.pagination.stopCondition,
-                  }),
-                }
-              : undefined,
-            version: step.apiConfig.version,
-          };
-          Object.keys(apiConfigInput).forEach(
-            (key) =>
-              (apiConfigInput as any)[key] === undefined && delete (apiConfigInput as any)[key],
-          );
+  /**
+   * Execute a tool config without saving (no run record)
+   * Used for SDK/playground testing
+   */
+  async runToolConfig(params: {
+    tool: Tool;
+    payload?: Record<string, any>;
+    credentials?: Record<string, string>;
+    options?: { timeout?: number };
+    runId?: string;
+    traceId?: string;
+  }): Promise<ToolResult> {
+    const response = await this.restRequest<{
+      runId: string;
+      success: boolean;
+      data?: any;
+      error?: string;
+      stepResults?: Array<{ stepId: string; success: boolean; data?: any; error?: string }>;
+      tool: Tool;
+    }>(
+      "POST",
+      "/v1/tools/run",
+      {
+        tool: params.tool,
+        payload: params.payload,
+        credentials: params.credentials,
+        options: params.options,
+        runId: params.runId,
+      },
+      params.traceId ? { "X-Trace-Id": params.traceId } : undefined,
+    );
 
           const executionStepInput = {
             id: step.id,
@@ -569,7 +565,8 @@ export class SuperglueClient {
     tool,
     fixInstructions,
     lastError,
-    systemIds,
+    stepResults,
+    traceId,
     verbose = true,
   }: FixToolArgs & { verbose?: boolean }): Promise<FixToolResult> {
     const mutation = `
@@ -612,39 +609,23 @@ export class SuperglueClient {
       }
     }
 
-    // Convert tool to WorkflowInput format
-    const toolInput = {
-      id: tool.id,
-      steps: tool.steps?.map((step) => {
-        const apiConfigInput = {
-          id: step.apiConfig.id,
-          urlHost: step.apiConfig.urlHost,
-          instruction: step.apiConfig.instruction,
-          urlPath: step.apiConfig.urlPath,
-          method: step.apiConfig.method,
-          queryParams: step.apiConfig.queryParams,
-          headers: step.apiConfig.headers,
-          body: step.apiConfig.body,
-          pagination: step.apiConfig.pagination
-            ? {
-                type: step.apiConfig.pagination.type,
-                ...(step.apiConfig.pagination.pageSize !== undefined && {
-                  pageSize: step.apiConfig.pagination.pageSize,
-                }),
-                ...(step.apiConfig.pagination.cursorPath !== undefined && {
-                  cursorPath: step.apiConfig.pagination.cursorPath,
-                }),
-                ...(step.apiConfig.pagination.stopCondition !== undefined && {
-                  stopCondition: step.apiConfig.pagination.stopCondition,
-                }),
-              }
-            : undefined,
-          version: step.apiConfig.version,
-        };
-        Object.keys(apiConfigInput).forEach(
-          (key) =>
-            (apiConfigInput as any)[key] === undefined && delete (apiConfigInput as any)[key],
-        );
+    try {
+      const response = await this.restRequest<{
+        success: boolean;
+        tool?: Tool;
+        diffs?: ToolDiff[];
+        error?: string;
+      }>(
+        "POST",
+        "/v1/tools/fix",
+        {
+          tool,
+          fixInstructions,
+          lastError,
+          stepResults,
+        },
+        traceId ? { "X-Trace-Id": traceId } : undefined,
+      );
 
         const executionStepInput = {
           id: step.id,
