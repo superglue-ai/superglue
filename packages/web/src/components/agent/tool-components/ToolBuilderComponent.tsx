@@ -652,7 +652,7 @@ export function ToolBuilderComponent({
                   <DropdownMenu>
                     <div className="flex">
                       <Button
-                        variant={!runResult ? "default" : "outline"}
+                        variant={!runResult ? "glass-primary" : "glass"}
                         onClick={() => handleRunTool()}
                         className="h-9 px-3 text-sm font-medium rounded-r-none"
                       >
@@ -661,7 +661,7 @@ export function ToolBuilderComponent({
                       </Button>
                       <DropdownMenuTrigger asChild>
                         <Button
-                          variant={!runResult ? "default" : "outline"}
+                          variant={!runResult ? "glass-primary" : "glass"}
                           className="h-9 px-2 text-sm font-medium rounded-l-none border-l-0"
                         >
                           <ChevronDown className="w-4 h-4" />

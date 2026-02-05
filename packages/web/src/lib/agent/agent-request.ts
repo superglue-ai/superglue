@@ -483,8 +483,12 @@ async function* executeToolWithLogs(
   let filterTraceId: string | undefined;
 
   const logCallback = (message: string) => {
-    if (message.startsWith("TOOL_CALL_UPDATE:run_tool:TRACE_ID:")) {
-      filterTraceId = message.split(":").pop();
+    // Handle TRACE_ID messages from run_tool, build_tool, and edit_tool
+    const traceIdMatch = message.match(
+      /^TOOL_CALL_UPDATE:(?:run_tool|build_tool|edit_tool):TRACE_ID:(.+)$/,
+    );
+    if (traceIdMatch) {
+      filterTraceId = traceIdMatch[1];
       return;
     }
     logUpdates.push({
