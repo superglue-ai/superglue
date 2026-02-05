@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, RequestSource, Run, RunStatus, Tool } from "@superglue/shared";
+import { HttpMethod, RequestSource, Run, RunStatus, Tool } from "@superglue/shared";
 import fs from "fs";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -46,50 +46,9 @@ describe("FileStore", () => {
     delete process.env.DISABLE_LOGS;
   });
 
-  describe("API Config", () => {
-    const testConfig: ApiConfig = {
-      id: "test-id",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      urlHost: "https://test.com",
-      method: HttpMethod.GET,
-      headers: {},
-      queryParams: {},
-      instruction: "Test API",
-    };
-
-    it("should store and retrieve API configs", async () => {
-      await store.upsertApiConfig({ id: testConfig.id, config: testConfig, orgId: testOrgId });
-      const retrieved = await store.getApiConfig({ id: testConfig.id, orgId: testOrgId });
-      expect(retrieved).toEqual(testConfig);
-    });
-
-    it("should list API configs", async () => {
-      await store.upsertApiConfig({ id: testConfig.id, config: testConfig, orgId: testOrgId });
-      const { items, total } = await store.listApiConfigs({
-        limit: 10,
-        offset: 0,
-        orgId: testOrgId,
-      });
-      expect(items).toHaveLength(1);
-      expect(total).toBe(1);
-      expect(items[0]).toEqual(testConfig);
-    });
-
-    it("should delete API configs", async () => {
-      await store.upsertApiConfig({ id: testConfig.id, config: testConfig, orgId: testOrgId });
-      await store.deleteApiConfig({ id: testConfig.id, orgId: testOrgId });
-      const retrieved = await store.getApiConfig({ id: testConfig.id, orgId: testOrgId });
-      expect(retrieved).toBeNull();
-    });
-  });
-
   describe("Run Results", () => {
-    const testApiConfig: ApiConfig = {
-      id: "test-api-id",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      urlHost: "https://test.com",
+    const testStepConfig = {
+      url: "https://test.com",
       method: HttpMethod.GET,
       headers: {},
       queryParams: {},
@@ -100,7 +59,7 @@ describe("FileStore", () => {
       runId: "test-run-id",
       toolId: "test-config-id",
       status: RunStatus.SUCCESS,
-      tool: { id: "test-config-id", steps: [{ id: "step1", apiConfig: testApiConfig }] },
+      tool: { id: "test-config-id", steps: [{ id: "step1", config: testStepConfig }] },
       metadata: {
         startedAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
@@ -332,7 +291,7 @@ describe("FileStore", () => {
       // Manually write a run without startedAt to the logs file
       const invalidRun = {
         runId: "invalid-run",
-        config: testApiConfig,
+        config: testStepConfig,
         success: true,
         completedAt: new Date(),
         error: null,
@@ -749,20 +708,9 @@ describe("FileStore", () => {
 
   describe("Clear All", () => {
     it("should clear all data", async () => {
-      const testApiConfig: ApiConfig = {
-        id: "test-clear-api",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        urlHost: "https://test.com",
-        method: HttpMethod.GET,
-        headers: {},
-        queryParams: {},
-        instruction: "Test API for clear",
-      };
-
       const testRunResult: Run = {
         runId: "test-clear-run",
-        toolId: testApiConfig.id,
+        toolId: "test-clear-tool",
         status: RunStatus.SUCCESS,
         metadata: {
           startedAt: new Date().toISOString(),
@@ -770,20 +718,12 @@ describe("FileStore", () => {
         },
       };
 
-      await store.upsertApiConfig({
-        id: testApiConfig.id,
-        config: testApiConfig,
-        orgId: testOrgId,
-      });
       await store.createRun({ run: testRunResult, orgId: testOrgId });
 
       // Clear all
       await store.clearAll();
 
       // Check that data is gone
-      const apiConfig = await store.getApiConfig({ id: testApiConfig.id, orgId: testOrgId });
-      expect(apiConfig).toBeNull();
-
       const { items: runs } = await store.listRuns({
         limit: 10,
         offset: 0,

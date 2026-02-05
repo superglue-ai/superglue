@@ -1,4 +1,4 @@
-import { ApiConfig, RequestOptions } from "@superglue/shared";
+import { RequestStepConfig, RequestOptions } from "@superglue/shared";
 import { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server_defaults } from "../../../default.js";
@@ -12,7 +12,7 @@ const mockPoolOn = vi.fn();
 let shouldSkip = true;
 
 describe("callPostgres", () => {
-  const testConfig: ApiConfig = {
+  const testConfig: RequestStepConfig = {
     id: "1",
     instruction: "test",
     urlHost: "postgres://user:password@localhost:5432",
@@ -45,7 +45,7 @@ vi.mock("pg", () => ({
 }));
 
 describe("PostgreSQL Utilities", () => {
-  const mockEndpoint: ApiConfig = {
+  const mockEndpoint: RequestStepConfig = {
     id: "1",
     instruction: "test",
     urlHost: "postgres://{user}:{password}@{host}:{port}/{database}",
@@ -129,7 +129,7 @@ describe("PostgreSQL Utilities", () => {
     });
 
     it("should handle parameterized query errors with proper context", async () => {
-      const paramEndpoint: ApiConfig = {
+      const paramEndpoint: RequestStepConfig = {
         id: "2",
         instruction: "test with params",
         urlHost: "postgres://{user}:{password}@{host}:{port}/{database}",
@@ -183,7 +183,7 @@ describe("PostgreSQL Utilities", () => {
     });
 
     it("should use parameterized queries when params are provided", async () => {
-      const paramEndpoint: ApiConfig = {
+      const paramEndpoint: RequestStepConfig = {
         id: "2",
         instruction: "test with params",
         urlHost: "postgres://{user}:{password}@{host}:{port}/{database}",
@@ -214,7 +214,7 @@ describe("PostgreSQL Utilities", () => {
     });
 
     it("should support values key as alias for params", async () => {
-      const paramEndpoint: ApiConfig = {
+      const paramEndpoint: RequestStepConfig = {
         id: "3",
         instruction: "test with values",
         urlHost: "postgres://{user}:{password}@{host}:{port}/{database}",
@@ -291,7 +291,7 @@ describe("PostgreSQL Utilities", () => {
     });
 
     it("should handle variable replacement in query", async () => {
-      const customEndpoint: ApiConfig = {
+      const customEndpoint: RequestStepConfig = {
         id: "1",
         instruction: "test",
         urlHost: "postgres://{user}@{host}/{database}",
@@ -348,7 +348,7 @@ describe("PostgreSQL Utilities", () => {
     });
 
     it("should preserve special characters in database names", async () => {
-      const endpointWithSpecialChars: ApiConfig = {
+      const endpointWithSpecialChars: RequestStepConfig = {
         id: "1",
         instruction: "test",
         urlHost: "postgres://{user}:{password}@{host}:{port}/my-test_db$123",
@@ -374,7 +374,7 @@ describe("PostgreSQL Utilities", () => {
     });
 
     it("should remove trailing slashes from connection strings", async () => {
-      const endpointWithTrailingSlash: ApiConfig = {
+      const endpointWithTrailingSlash: RequestStepConfig = {
         id: "1",
         instruction: "test",
         urlHost: "postgres://{user}:{password}@{host}:{port}/testdb///",
@@ -400,7 +400,7 @@ describe("PostgreSQL Utilities", () => {
     });
 
     it("should preserve query parameters while removing trailing slashes", async () => {
-      const endpointWithQueryParams: ApiConfig = {
+      const endpointWithQueryParams: RequestStepConfig = {
         id: "1",
         instruction: "test",
         urlHost:

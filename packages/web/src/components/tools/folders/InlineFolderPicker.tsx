@@ -24,7 +24,7 @@ export function InlineFolderPicker({ tool }: InlineFolderPickerProps) {
     setLoadingFolder(folderKey);
 
     try {
-      const client = createSuperglueClient(config.superglueEndpoint);
+      const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
       await client.upsertWorkflow(tool.id, { ...tool, folder: newFolder });
       refreshTools();
       setOpen(false);

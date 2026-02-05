@@ -1,5 +1,4 @@
 import type {
-  ApiConfig,
   DiscoveryRun,
   FileReference,
   FileStatus,
@@ -19,7 +18,6 @@ import type { DataStore, PrometheusRunMetrics, ToolScheduleInternal } from "./ty
 
 export class FileStore implements DataStore {
   private storage: {
-    apis: Map<string, ApiConfig>;
     workflows: Map<string, Tool>;
     toolSchedules: Map<string, ToolScheduleInternal>;
     systems: Map<string, System>;
@@ -39,7 +37,6 @@ export class FileStore implements DataStore {
 
   constructor(storageDir = "/data") {
     this.storage = {
-      apis: new Map(),
       workflows: new Map(),
       toolSchedules: new Map(),
       systems: new Map(),
@@ -102,7 +99,6 @@ export class FileStore implements DataStore {
         });
         this.storage = {
           ...this.storage,
-          apis: new Map(Object.entries(parsed.apis || {})),
           workflows: new Map(Object.entries(parsed.workflows || {})),
           toolSchedules: new Map(
             Object.entries(parsed.toolSchedules || parsed.workflowSchedules || {}).map(
@@ -157,7 +153,6 @@ export class FileStore implements DataStore {
       }
       this.isPersisting = true;
       const serialized = {
-        apis: Object.fromEntries(this.storage.apis),
         workflows: Object.fromEntries(this.storage.workflows),
         toolSchedules: Object.fromEntries(this.storage.toolSchedules),
         integrations: Object.fromEntries(this.storage.systems),
@@ -352,53 +347,6 @@ export class FileStore implements DataStore {
     }
   }
 
-  // API Config Methods
-  async getApiConfig(params: { id: string; orgId?: string }): Promise<ApiConfig | null> {
-    await this.ensureInitialized();
-    const { id, orgId } = params;
-    if (!id) return null;
-    const key = this.getKey("api", id, orgId);
-    const config = this.storage.apis.get(key);
-    return config ? { ...config, id } : null;
-  }
-
-  async listApiConfigs(params?: {
-    limit?: number;
-    offset?: number;
-    orgId?: string;
-  }): Promise<{ items: ApiConfig[]; total: number }> {
-    await this.ensureInitialized();
-    const { limit = 10, offset = 0, orgId } = params || {};
-    const orgItems = this.getOrgItems(this.storage.apis, "api", orgId);
-    const items = orgItems.slice(offset, offset + limit);
-    const total = orgItems.length;
-    return { items, total };
-  }
-
-  async upsertApiConfig(params: {
-    id: string;
-    config: ApiConfig;
-    orgId?: string;
-  }): Promise<ApiConfig> {
-    await this.ensureInitialized();
-    const { id, config, orgId } = params;
-    if (!id || !config) return null;
-    const key = this.getKey("api", id, orgId);
-    this.storage.apis.set(key, config);
-    await this.persist();
-    return { ...config, id };
-  }
-
-  async deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean> {
-    await this.ensureInitialized();
-    const { id, orgId } = params;
-    if (!id) return false;
-    const key = this.getKey("api", id, orgId);
-    const deleted = this.storage.apis.delete(key);
-    await this.persist();
-    return deleted;
-  }
-
   // Run Methods
   async getRun(params: { id: string; orgId?: string }): Promise<Run | null> {
     await this.ensureInitialized();
@@ -493,7 +441,6 @@ export class FileStore implements DataStore {
 
   async clearAll(): Promise<void> {
     await this.ensureInitialized();
-    this.storage.apis.clear();
     this.storage.workflows.clear();
     this.storage.toolSchedules.clear();
     this.storage.systems.clear();

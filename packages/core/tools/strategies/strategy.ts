@@ -1,4 +1,10 @@
-import { RequestOptions, ServiceMetadata, ApiConfig as StepConfig } from "@superglue/shared";
+import {
+  RequestOptions,
+  ServiceMetadata,
+  StepConfig,
+  RequestStepConfig,
+  FailureBehavior,
+} from "@superglue/shared";
 import { replaceVariables } from "../../utils/helpers.js";
 
 export interface StepStrategyExecutionResult {
@@ -12,7 +18,7 @@ export interface StepExecutionInput {
   stepInputData: any;
   credentials: Record<string, any>;
   requestOptions?: RequestOptions;
-  failureBehavior?: "FAIL" | "CONTINUE";
+  failureBehavior?: FailureBehavior;
   metadata: ServiceMetadata;
 }
 
@@ -38,9 +44,10 @@ export class StepExecutionStrategyRegistry {
   }
 
   async routeAndExecute(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
-    // Resolve urlHost template variables once for strategy selection
+    // URL-based routing for request steps (HTTP, SFTP, Postgres, etc.)
+    const requestConfig = input.stepConfig as RequestStepConfig;
     const allVars = { ...input.stepInputData, ...input.credentials };
-    const resolvedUrlHost = await replaceVariables(input.stepConfig.urlHost || "", allVars);
+    const resolvedUrl = await replaceVariables(requestConfig.url || "", allVars);
 
     for (const strategy of this.strategies) {
       if (strategy.shouldExecute(resolvedUrlHost)) {

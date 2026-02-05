@@ -9,7 +9,6 @@ import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
 import { server_defaults } from "../../default.js";
 import { logMessage } from "../../utils/logs.js";
-import { composeUrl } from "../../utils/helpers.js";
 import { DocumentationConfig, DocumentationFetchingStrategy } from "../types.js";
 
 export class GraphQLStrategy implements DocumentationFetchingStrategy {

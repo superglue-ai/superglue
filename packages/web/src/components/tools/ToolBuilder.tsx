@@ -47,7 +47,7 @@ export interface BuildContext {
   systemIds: string[];
   instruction: string;
   payload: string;
-  responseSchema: string;
+  outputSchema: string;
   inputSchema: string | null;
   enforceInputSchema: boolean;
   uploadedFiles: UploadedFileInfo[];
@@ -130,7 +130,7 @@ export function ToolBuilder({
 
   const [instruction, setInstruction] = useState(initialInstruction);
   const [payload, setPayload] = useState(initialPayload);
-  const [responseSchema, setResponseSchema] = useState(initialResponseSchema);
+  const [outputSchema, setOutputSchema] = useState(initialResponseSchema);
   const [inputSchema, setInputSchema] = useState<string | null>(initialInputSchema);
   const [enforceInputSchema, setEnforceInputSchema] = useState(true);
   const [inputSchemaMode, setInputSchemaMode] = useState<"current" | "custom">("current");
@@ -176,16 +176,9 @@ export function ToolBuilder({
     openSystemPicker();
   }, [openSystemPicker]);
 
-  const handleEditSystem = useCallback(
-    (systemId: string) => {
-      router.push(`/systems/${encodeURIComponent(systemId)}`);
-    },
-    [router],
-  );
-
   const hasMeaningfulSchema = useMemo(
-    () => isMeaningfulResponseSchema(responseSchema),
-    [responseSchema],
+    () => isMeaningfulResponseSchema(outputSchema),
+    [outputSchema],
   );
 
   const trimmedPayload = payload.trim();
@@ -322,11 +315,11 @@ export function ToolBuilder({
     } catch {
       errors.payload = true;
     }
-    if (responseSchema && responseSchema.trim()) {
+    if (outputSchema && outputSchema.trim()) {
       try {
-        JSON.parse(responseSchema);
+        JSON.parse(outputSchema);
       } catch {
-        errors.responseSchema = true;
+        errors.outputSchema = true;
       }
     }
 
@@ -352,7 +345,7 @@ export function ToolBuilder({
         instruction: instruction,
         payload: effectivePayload,
         systemIds: selectedSystemIds,
-        responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
+        outputSchema: outputSchema ? JSON.parse(outputSchema) : null,
         save: false,
       });
 
@@ -364,7 +357,7 @@ export function ToolBuilder({
         systemIds: selectedSystemIds,
         instruction,
         payload,
-        responseSchema,
+        outputSchema,
         inputSchema,
         enforceInputSchema,
         uploadedFiles,
@@ -973,18 +966,18 @@ export function ToolBuilder({
               Define a JSON Schema to validate the tool's response
             </p>
             <JsonSchemaEditor
-              value={responseSchema || null}
+              value={outputSchema || null}
               onChange={(value) => {
-                setResponseSchema(value || "");
+                setOutputSchema(value || "");
                 if (value && value.trim()) {
                   try {
                     JSON.parse(value);
-                    setValidationErrors((prev) => ({ ...prev, responseSchema: false }));
+                    setValidationErrors((prev) => ({ ...prev, outputSchema: false }));
                   } catch {
-                    setValidationErrors((prev) => ({ ...prev, responseSchema: true }));
+                    setValidationErrors((prev) => ({ ...prev, outputSchema: true }));
                   }
                 } else {
-                  setValidationErrors((prev) => ({ ...prev, responseSchema: false }));
+                  setValidationErrors((prev) => ({ ...prev, outputSchema: false }));
                 }
               }}
               isOptional={true}

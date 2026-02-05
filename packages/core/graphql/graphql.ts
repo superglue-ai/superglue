@@ -12,19 +12,12 @@ import {
   upsertSystemResolver,
 } from "./resolvers/systems.js";
 import { logsResolver } from "./resolvers/logs.js";
-import { renameWorkflowResolver } from "./resolvers/rename-workflow.js";
 import { JSONResolver, JSONSchemaResolver, JSONataResolver } from "./resolvers/scalars.js";
 import { getTenantInfoResolver, setTenantInfoResolver } from "./resolvers/tenant.js";
 import {
-  abortToolExecutionResolver,
-  buildWorkflowResolver,
-  deleteWorkflowResolver,
   executeWorkflowResolver,
-  findRelevantToolsResolver,
-  fixWorkflowResolver,
   getWorkflowResolver,
   listWorkflowsResolver,
-  upsertWorkflowResolver,
 } from "./resolvers/tools.js";
 
 export const typeDefs = fs.readFileSync("../../api.graphql", "utf8");
@@ -38,22 +31,15 @@ export const resolvers = {
     getSystem: getSystemResolver,
     listSystems: listSystemsResolver,
     searchSystemDocumentation: searchSystemDocumentationResolver,
-    findRelevantTools: findRelevantToolsResolver,
   },
   Mutation: {
     setTenantInfo: setTenantInfoResolver,
     extract: extractResolver,
     executeWorkflow: executeWorkflowResolver,
-    abortToolExecution: abortToolExecutionResolver,
-    buildWorkflow: buildWorkflowResolver,
-    upsertWorkflow: upsertWorkflowResolver,
-    deleteWorkflow: deleteWorkflowResolver,
-    renameWorkflow: renameWorkflowResolver,
     upsertSystem: upsertSystemResolver,
     cacheOauthClientCredentials: cacheOauthClientCredentialsResolver,
     getOAuthClientCredentials: getOAuthClientCredentialsResolver,
     deleteSystem: deleteSystemResolver,
-    fixWorkflow: fixWorkflowResolver,
   },
   Subscription: {
     logs: logsResolver,
@@ -71,6 +57,18 @@ export const resolvers = {
         throw new Error("Workflow.id is missing");
       }
       return parent.id;
+    },
+  },
+  ExecutionStep: {
+    // Backward compatibility: return config as apiConfig for old clients
+    apiConfig: (parent: any) => parent.config || parent.apiConfig,
+    // New field: return config directly
+    config: (parent: any) => parent.config || parent.apiConfig,
+  },
+  StepConfig: {
+    __resolveType() {
+      // Currently only request-based steps are supported
+      return "ApiConfig";
     },
   },
   Workflow: {

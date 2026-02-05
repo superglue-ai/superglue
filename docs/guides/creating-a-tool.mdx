@@ -1,0 +1,371 @@
+---
+title: "Creating a Tool"
+description: "Create tools to connect your systems and do things"
+---
+
+Tools in superglue are reusable workflows that you can execute on-demand, schedule, or trigger via webhooks. Each tool consists of sequential steps with built-in data transformations, loops, and error handling.
+
+Learn more about how tools fit into the bigger picture in our [core concepts](/getting-started/core-concepts) page.
+
+<Tabs>
+  <Tab title="Via Agent">
+    The fastest way to create a tool is by talking to our agent. Describe what you want to accomplish and the agent will build the tool for you.
+
+    <video autoPlay muted loop playsInline className="w-full rounded-lg">
+      <source src="../resources/create-tool-via-agent.mp4" type="video/mp4" />
+    </video>
+
+    **Simple example:**
+    ```
+    "Create a tool that fetches all active customers from Stripe"
+    ```
+
+    superglue will:
+    1. Identify which system to use (or create one if needed)
+    2. Find the relevant API endpoint from the documentation
+    3. Configure the API call with appropriate parameters
+    4. Test it and make it available for execution
+
+    **Complex example:**
+    ```
+    "Create a tool that loops through all contacts in HubSpot,
+    filters those with email domains matching @company.com,
+    and updates their lifecycle stage to 'customer'"
+    ```
+
+    The agent can build multi-step tools with:
+    - Sequential API calls
+    - Data transformations between steps
+    - Loops for batch processing
+    - Error handling and retries
+
+    <Card title="Try it now" icon="hammer" href="https://app.superglue.cloud">
+      Start building tools with our agent
+    </Card>
+
+  </Tab>
+  <Tab title="Via UI">
+    Build tools in the UI:
+
+    <video autoPlay muted loop playsInline className="w-full rounded-lg">
+      <source src="../resources/create-tool-via-ui.mp4" type="video/mp4" />
+    </video>
+
+    <Steps>
+      <Step title="Navigate to tools">
+        Go to Tools in your superglue dashboard and click "Create Tool"
+      </Step>
+      <Step title="Select systems">
+        Choose which systems this tool will use
+      </Step>
+      <Step title="Add instruction">
+        Describe what the tool should do in natural language. superglue will build the workflow steps automatically.
+      </Step>
+      <Step title="Test and save">
+        Run the tool with sample data to verify it works as expected. See [debugging tools](/guides/debugging-a-tool) for troubleshooting.
+      </Step>
+    </Steps>
+
+  </Tab>
+  <Tab title="Via SDK">
+    Use the REST SDK to run tools you've already created:
+
+    ```bash
+    npm install @superglue/client
+    ```
+
+    **Configure and run a tool:**
+
+    ```typescript
+    import { configure, runTool, getTool, listTools } from "@superglue/client";
+
+    // Configure the SDK with your API endpoint and token
+    configure({
+      baseUrl: "https://api.superglue.cloud", // or your self-hosted URL
+      token: "your_api_token"
+    });
+
+    // List available tools
+    const { data: tools } = await listTools();
+    console.log(tools);
+
+    // Get a specific tool
+    const { data: tool } = await getTool("my-tool-id");
+
+    // Run a tool with input payload
+    const { data: run } = await runTool("my-tool-id", {
+      inputs: {
+        userId: "user_123",
+        startDate: "2024-01-01"
+      },
+      credentials: {
+        stripe_api_key: "sk_live_xxx"
+      }
+    });
+
+    console.log(run.data); // Tool execution result
+    ```
+
+    <Note>
+      The REST SDK is for **executing existing tools**. To build new tools, use the agent interface or the UI. See the [SDK documentation](/sdk/overview) for more details.
+    </Note>
+
+  </Tab>
+</Tabs>
+
+## Tool anatomy
+
+Every tool consists of:
+
+<CardGroup cols={2}>
+  <Card title="Steps" icon="list">
+    Sequential API calls that fetch or modify data. Each step can reference data from previous steps.
+  </Card>
+  <Card title="Transformations" icon="code">
+    JavaScript functions that shape the step inputs and the final output. Ensures tool results adhere to response schemas.
+  </Card>
+  <Card title="Variables" icon="brackets-curly">
+    Access data from previous steps, credentials, and input payload using `<<variable>>` syntax.
+  </Card>
+</CardGroup>
+
+## Step configuration
+
+Each step in a tool represents a single API call with the following configuration:
+
+### Basic structure
+
+```typescript
+{
+  id: "stepId",                    // Unique identifier for this step
+  instruction: "Fetch customer data from Stripe",  // Human-readable description
+  dataSelector: "(sourceData) => { return [\"one\", \"two\"]}",  // The data selector for the current step
+  config: {
+    systemId: "stripe",            // Which system to use
+    method: "POST",                // HTTP method
+    url: "https://api.stripe.com/v1/customers",  // Full API endpoint URL
+    queryParams: {},               // URL query parameters
+    headers: { "Authorization": "Bearer <<stripe_apiKey>>" }, // Custom headers
+    body: ""                       // Request body
+  }
+}
+```
+
+### Variable syntax
+
+Use `<<variable>>` to access dynamic values:
+
+**Access credentials:**
+
+```typescript
+{
+  headers: {
+    "Authorization": "Bearer <<systemId_access_token>>"
+  }
+}
+```
+
+**Access previous step data:**
+
+```typescript
+{
+  urlPath: "/customers/<<getCustomer.data.id>>",
+  body: {
+    email: "<<getCustomer.data.email>>"
+  }
+}
+```
+
+**Access input payload:**
+
+```typescript
+{
+  queryParams: {
+    user_id: "<<userId>>",
+    date: "<<startDate>>"
+  }
+}
+```
+
+**Execute JavaScript expressions:**
+
+```typescript
+{
+  body: {
+    ids: "<<(sourceData) => JSON.stringify(sourceData.users.map(u => u.id))>>",
+    timestamp: "<<(sourceData) => new Date().toISOString()>>",
+    count: "<<(sourceData) => sourceData.items.length>>",
+    uppercaseName: "<<(sourceData) => sourceData.name.toUpperCase()>>"
+  }
+}
+```
+
+<Note>
+  JavaScript expressions must use the arrow function syntax `(sourceData) => ...`. Direct property access like `<<userId>>` works for simple variables, but not for nested properties or transformations.
+</Note>
+
+### Data selector
+
+Extract an array to iterate over:
+
+```typescript
+{
+  dataSelector: `(sourceData) => {
+    const items = sourceData.fetchItems.results || [];
+    const excludeIds = sourceData.excludeIds || [];
+    return items.filter(item => !excludeIds.includes(item.id));
+  }`;
+}
+```
+
+<Note>
+  Whether a step loops through more than one request is determined by the data selector. If the data selector returns an Array, the request will execute once for each item in that array. The item of the current iteration is available in the config as `<<currentItem>>` or accessible in code via `sourceData.currentItem`.
+</Note>
+
+### Output transform
+
+Shape the final output of the entire tool:
+
+```typescript
+{
+  outputTransform: `(sourceData) => {
+    const customers = sourceData.getCustomers.data || [];
+    const updated = sourceData.updateCustomers || [];
+    
+    return {
+      success: true,
+      total: customers.length,
+      updated: updated.length,
+      results: updated.map(r => ({
+        id: r.currentItem.id,
+        status: r.data.status
+      }))
+    };
+  }`;
+}
+```
+
+## Special systems
+
+### PostgreSQL
+
+Query databases using the postgres:// URL scheme:
+
+```typescript
+{
+  id: "queryDatabase",
+  config: {
+    systemId: "postgres_db",
+    url: "postgres://<<postgres_db_username>>:<<postgres_db_password>>@<<postgres_db_hostname>>:5432/<<postgres_db_database>>",
+    body: {
+      query: "SELECT * FROM users WHERE status = $1 AND created_at > $2",
+      params: ["active", "<<(sourceData) => sourceData.startDate>>"]
+    }
+  }
+}
+```
+
+**Always use parameterized queries** with `$1`, `$2`, etc. placeholders to prevent SQL injection. Provide values in the `params` array, which can include static values or `<<>>` expressions.
+
+### FTP/SFTP
+
+Access files on FTP servers:
+
+```typescript
+{
+  id: "listFiles",
+  config: {
+    systemId: "ftp-server",
+    url: "sftp://<<ftp-server_username>>:<<ftp-server_password>>@<<ftp-server_hostname>>:22/data",
+    body: {
+      operation: "list",
+      path: "/reports"
+    }
+  }
+}
+```
+
+**Supported operations:**
+
+- `list` - List directory contents
+- `get` - Download file (auto-parses CSV/JSON/XML)
+- `put` - Upload file
+- `delete` - Delete file
+- `rename` - Rename/move file
+- `mkdir` - Create directory
+- `rmdir` - Remove directory
+- `exists` - Check if file exists
+- `stat` - Get file metadata
+
+## Error handling
+
+<CardGroup cols={2}>
+  <Card title="Automatic retries" icon="rotate">
+    Failed steps can be automatically retried with exponential backoff
+  </Card>
+  <Card title="Validation" icon="shield-check">
+    Response data is validated against response schemas if specified
+  </Card>
+  <Card title="Graceful degradation" icon="life-ring">
+    Handle missing data with optional chaining and defaults in transformations
+  </Card>
+</CardGroup>
+
+<Tip>
+**Keep steps focused** - Each step should make a single API call. Use transformations to prepare data, not as additional steps.
+
+**Use descriptive IDs** - Step IDs are used to reference data in later steps. Use clear names like `getCustomers`, `updateOrder`, `sendEmail`.
+
+**Avoid unnecessary loops** - Don't loop over thousands of items if the API supports batch operations. Check the documentation first.
+
+**Test with real data** - Test each step incrementally with production-like data before deploying.
+</Tip>
+
+## Input and output schemas
+
+Define schemas to make your tools more robust:
+
+**Input schema** - Validates payload before execution:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "userId": { "type": "string" },
+    "startDate": { "type": "string", "format": "date" }
+  },
+  "required": ["userId"]
+}
+```
+
+**Response schema** - Validates final output:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "success": { "type": "boolean" },
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "email": { "type": "string" }
+        }
+      }
+    }
+  }
+}
+```
+
+## Next steps
+
+<CardGroup cols={1}>
+  <Card title="Debug your tool" icon="bug" href="/guides/debugging-a-tool">
+    Test, troubleshoot, and fix issues with your tools
+  </Card>
+  <Card title="Deploy to production" icon="rocket" href="/guides/deploying-a-tool">
+    Execute tools on-demand, scheduled, or via webhooks
+  </Card>
+</CardGroup>

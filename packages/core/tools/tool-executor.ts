@@ -1,14 +1,17 @@
 import {
-  ApiConfig,
-  ExecutionStep,
-  System,
+  getToolSystemIds,
+  isRequestConfig,
   maskCredentials,
   RequestOptions,
+  RequestStepConfig,
   ResponseFilter,
   ServiceMetadata,
+  StepConfig,
   Tool,
   ToolResult,
+  ToolStep,
   ToolStepResult,
+  System,
 } from "@superglue/shared";
 import { flattenAndNamespaceCredentials } from "@superglue/shared/utils";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
@@ -23,7 +26,7 @@ import { FTPStepExecutionStrategy } from "./strategies/ftp/ftp.js";
 import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
 import { PostgresStepExecutionStrategy } from "./strategies/postgres/postgres.js";
 import { StepExecutionStrategyRegistry } from "./strategies/strategy.js";
-import { executeAndEvaluateFinalTransform } from "./tool-transform.js";
+import { executeOutputTransform } from "./tool-transform.js";
 
 export interface ToolExecutorOptions {
   tool: Tool;
@@ -33,14 +36,13 @@ export interface ToolExecutorOptions {
 
 export class ToolExecutor implements Tool {
   public id: string;
-  public steps: ExecutionStep[];
-  public finalTransform?: string;
+  public steps: ToolStep[];
+  public outputTransform?: string;
   public result: ToolResult;
-  public responseSchema?: JSONSchema;
+  public outputSchema?: JSONSchema;
   public metadata: ServiceMetadata;
   public instruction?: string;
   public inputSchema?: JSONSchema;
-  public systemIds: string[];
   public responseFilters?: ResponseFilter[];
   private systems: Record<string, SystemManager>;
   private strategyRegistry: StepExecutionStrategyRegistry;
@@ -48,8 +50,8 @@ export class ToolExecutor implements Tool {
   constructor({ tool, metadata, systems }: ToolExecutorOptions) {
     this.id = tool.id;
     this.steps = tool.steps;
-    this.finalTransform = tool.finalTransform;
-    this.responseSchema = tool.responseSchema;
+    this.outputTransform = tool.outputTransform;
+    this.outputSchema = tool.outputSchema;
     this.instruction = tool.instruction;
     this.metadata = metadata;
     this.inputSchema = tool.inputSchema;
@@ -63,16 +65,11 @@ export class ToolExecutor implements Tool {
       {} as Record<string, SystemManager>,
     );
 
-    this.systemIds = tool.systemIds;
-
     this.result = {
-      id: crypto.randomUUID(),
       success: false,
       data: {},
       stepResults: [],
-      startedAt: new Date(),
-      completedAt: undefined,
-      config: tool,
+      tool: tool,
     } as ToolResult;
 
     this.strategyRegistry = new StepExecutionStrategyRegistry();
@@ -103,31 +100,31 @@ export class ToolExecutor implements Tool {
         });
         this.result.stepResults.push(stepResult.result);
 
-        step.apiConfig = stepResult.updatedStep.apiConfig;
-        step.loopSelector = stepResult.updatedStep.loopSelector;
+        step.config = stepResult.updatedStep.config;
+        step.dataSelector = stepResult.updatedStep.dataSelector;
 
-        if (!stepResult.result.success && step.failureBehavior !== "CONTINUE") {
+        if (!stepResult.result.success && step.failureBehavior !== "continue") {
           return this.completeWithFailure(stepResult.result.error || "Step execution failed");
         }
       }
 
-      if (this.finalTransform || this.responseSchema || this.responseFilters?.length) {
+      if (this.outputTransform || this.outputSchema || this.responseFilters?.length) {
         const finalAggregatedStepData = this.buildAggregatedStepData(payload);
 
-        const finalTransformResult = await executeAndEvaluateFinalTransform({
+        const transformResult = await executeOutputTransform({
           aggregatedStepData: finalAggregatedStepData,
-          finalTransform: this.finalTransform,
-          responseSchema: this.responseSchema,
+          outputTransform: this.outputTransform,
+          outputSchema: this.outputSchema,
           instruction: this.instruction,
           options: options,
           metadata: this.metadata,
         });
 
-        if (!finalTransformResult.success) {
-          return this.completeWithFailure(finalTransformResult.error);
+        if (!transformResult.success) {
+          return this.completeWithFailure(transformResult.error);
         }
 
-        let finalData = finalTransformResult.transformedData || {};
+        let finalData = transformResult.transformedData || {};
 
         // Apply response filters after transform
         if (this.responseFilters?.length) {
@@ -146,25 +143,23 @@ export class ToolExecutor implements Tool {
         }
 
         this.result.data = finalData;
-        this.result.config = {
+        this.result.tool = {
           id: this.id,
-          systemIds: this.systemIds,
           steps: this.steps,
-          finalTransform: finalTransformResult.finalTransform,
+          outputTransform: transformResult.outputTransform,
           inputSchema: this.inputSchema,
-          responseSchema: this.responseSchema,
+          outputSchema: this.outputSchema,
           instruction: this.instruction,
           responseFilters: this.responseFilters,
         } as Tool;
       } else {
-        // Always set config to propagate wrapped loopSelectors back to frontend
-        this.result.config = {
+        // Always set tool to propagate wrapped dataSelectors back to frontend
+        this.result.tool = {
           id: this.id,
           steps: this.steps,
-          systemIds: this.systemIds,
-          finalTransform: this.finalTransform,
+          outputTransform: this.outputTransform,
           inputSchema: this.inputSchema,
-          responseSchema: this.responseSchema,
+          outputSchema: this.outputSchema,
           instruction: this.instruction,
           responseFilters: this.responseFilters,
         } as Tool;
@@ -181,28 +176,30 @@ export class ToolExecutor implements Tool {
     credentials,
     options,
   }: {
-    step: ExecutionStep;
+    step: ToolStep;
     stepInput: Record<string, any>;
     credentials: Record<string, string>;
     options: RequestOptions;
-  }): Promise<{ result: ToolStepResult; updatedStep: ExecutionStep }> {
+  }): Promise<{ result: ToolStepResult; updatedStep: ToolStep }> {
     try {
       let retryCount = 0;
       let lastError: string | null = null;
       let messages: LLMMessage[] = [];
-      let currentConfig = step.apiConfig;
-      let currentDataSelector = step.loopSelector;
+      let currentConfig = step.config;
+      let currentDataSelector = step.dataSelector;
       let stepCredentials = credentials;
       let isLoopStep = false;
       let stepResults: any[] = [];
 
-      const systemManager = step.systemId ? this.systems[step.systemId] : undefined;
+      // Get systemId from config for request steps
+      const systemId = isRequestConfig(currentConfig) ? currentConfig.systemId : undefined;
+      const systemManager = systemId ? this.systems[systemId] : undefined;
       let currentSystem: System | null = null;
       let loopPayload: any = null;
 
-      if (step.systemId && !systemManager) {
+      if (systemId && !systemManager) {
         throw new Error(
-          `System '${step.systemId}' not found. Available systems: ${Object.keys(this.systems).join(", ")}`,
+          `System '${systemId}' not found. Available systems: ${Object.keys(this.systems).join(", ")}`,
         );
       }
 
@@ -287,7 +284,7 @@ export class ToolExecutor implements Tool {
 
             stepResults.push(stepResponseData);
           } catch (error) {
-            if (step.failureBehavior === "CONTINUE") {
+            if (step.failureBehavior === "continue") {
               const errorMessage = maskCredentials(
                 error?.message || String(error),
                 stepCredentials,
@@ -330,7 +327,7 @@ export class ToolExecutor implements Tool {
       logMessage("info", `Step '${step.id}' Complete`, this.metadata);
 
       const stepSuccess =
-        step.failureBehavior === "CONTINUE" || stepResults.length === 0
+        step.failureBehavior === "continue" || stepResults.length === 0
           ? true
           : stepResults.some((r) => r.success);
 
@@ -341,10 +338,10 @@ export class ToolExecutor implements Tool {
         error: this.getStepErrorMessage(stepSuccess, stepResults, isLoopStep),
       };
 
-      const updatedStep: ExecutionStep = {
+      const updatedStep: ToolStep = {
         ...step,
-        apiConfig: currentConfig,
-        loopSelector: currentDataSelector,
+        config: currentConfig,
+        dataSelector: currentDataSelector,
       };
 
       return {
@@ -362,7 +359,7 @@ export class ToolExecutor implements Tool {
           error: error.message || error,
         },
         updatedStep: step,
-      } as { result: ToolStepResult; updatedStep: ExecutionStep };
+      } as { result: ToolStepResult; updatedStep: ToolStep };
     }
   }
 
@@ -384,8 +381,12 @@ export class ToolExecutor implements Tool {
         throw new Error("Each step must have an ID");
       }
 
-      if (!step.apiConfig) {
-        throw new Error("Each step must have an API config");
+      if (!step.config) {
+        throw new Error("Each step must have a config");
+      }
+
+      if (isRequestConfig(step.config) && !(step.config as RequestStepConfig).url) {
+        throw new Error("Request steps must have a URL");
       }
     }
   }
@@ -432,14 +433,12 @@ export class ToolExecutor implements Tool {
   private completeWithSuccess(): ToolResult {
     this.result.success = true;
     this.result.error = undefined;
-    this.result.completedAt = new Date();
     return this.result;
   }
 
   private completeWithFailure(error: any): ToolResult {
     this.result.success = false;
     this.result.error = error;
-    this.result.completedAt = new Date();
     return this.result;
   }
 }

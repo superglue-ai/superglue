@@ -454,10 +454,19 @@ components:
             JavaScript function for final output transformation.
             Format: (sourceData) => expression
           example: "(sourceData) => sourceData.map(item => ({ id: item.id, title: item.name }))"
+        folder:
+          type: string
+          description: Folder path for organizing tools
+          example: "integrations/payments"
         archived:
           type: boolean
           description: Whether this tool is archived (if so, it will not be listed in the UI and cannot be run)
           default: false
+        responseFilters:
+          type: array
+          description: Filters to apply to the response data
+          items:
+            $ref: "#/components/schemas/ResponseFilter"
         createdAt:
           type: string
           format: date-time
@@ -465,23 +474,93 @@ components:
           type: string
           format: date-time
 
+    ResponseFilter:
+      type: object
+      description: Filter configuration for response data
+      required:
+        - id
+        - enabled
+        - target
+        - pattern
+        - action
+      properties:
+        id:
+          type: string
+          description: Unique identifier for this filter
+        name:
+          type: string
+          description: Human-readable name for this filter
+        enabled:
+          type: boolean
+          description: Whether this filter is active
+        target:
+          type: string
+          enum: [KEYS, VALUES, BOTH]
+          description: What to match against (keys, values, or both)
+        pattern:
+          type: string
+          description: Regex pattern to match
+        action:
+          type: string
+          enum: [REMOVE, MASK, FAIL]
+          description: Action to take when pattern matches
+        maskValue:
+          type: string
+          description: Value to use when masking (only for MASK action)
+        scope:
+          type: string
+          enum: [FIELD, ITEM, ENTRY]
+          description: Scope of removal (only for REMOVE and MASK actions)
+
     ToolStep:
       type: object
       description: |
-        A single execution step. Protocol is detected from URL scheme:
-        - HTTP/HTTPS: Standard REST API calls with query params, headers, body
-        - Postgres: postgres:// or postgresql:// URLs, body contains SQL query
-        - FTP/SFTP: ftp://, ftps://, or sftp:// URLs, body contains operation details
+        A single execution step containing a request configuration.
       required:
         - id
-        - url
-        - method
-        - systemId
+        - config
       properties:
         id:
           type: string
           description: Unique identifier for this step
           example: 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+        config:
+          $ref: "#/components/schemas/RequestStepConfig"
+        instruction:
+          type: string
+          description: Human-readable instruction describing what this step does
+          example: Fetch user details from the API
+        modify:
+          type: boolean
+          description: Whether this step modifies data on the system it operates on
+          default: false
+        dataSelector:
+          type: string
+          description: |
+            JavaScript function to select data for loop execution.
+            Format: (sourceData) => expression
+          example: "(sourceData) => sourceData.data.items"
+        failureBehavior:
+          type: string
+          enum: [fail, continue]
+          description: How to handle step failures (fail stops execution, continue proceeds to next step)
+          default: fail
+
+    RequestStepConfig:
+      type: object
+      description: |
+        Configuration for a request step. Protocol is detected from URL scheme:
+        - HTTP/HTTPS: Standard REST API calls with query params, headers, body
+        - Postgres: postgres:// or postgresql:// URLs, body contains SQL query
+        - FTP/SFTP: ftp://, ftps://, or sftp:// URLs, body contains operation details
+      required:
+        - url
+        - method
+      properties:
+        type:
+          type: string
+          enum: [request]
+          description: Optional type discriminator (defaults to request)
         url:
           type: string
           description: |
@@ -532,25 +611,6 @@ components:
           type: string
           description: System to use for stored credentials and documentation
           example: 3f7c8d9e-1a2b-4c5d-8e9f-0a1b2c3d4e5f
-        instruction:
-          type: string
-          description: Human-readable instruction describing what this step does
-          example: Fetch user details from the API
-        modify:
-          type: boolean
-          description: Whether this step can be modified by the self-healing system
-          default: false
-        dataSelector:
-          type: string
-          description: |
-            JavaScript function to select data for loop execution.
-            Format: (sourceData) => expression
-          example: "(sourceData) => sourceData.data.items"
-        failureBehavior:
-          type: string
-          enum: [fail, continue]
-          description: How to handle step failures (fail stops execution, continue proceeds to next step)
-          default: fail
 
     Pagination:
       type: object

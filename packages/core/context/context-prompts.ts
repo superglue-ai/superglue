@@ -69,7 +69,7 @@ Before configuring any API step:
 </DOCUMENTATION_FIRST_APPROACH>
 
 <LOOP_SELECTOR>
-Every step MUST have a loopSelector that determines how it executes:
+Every step can have a dataSelector that determines how it executes:
 
 1. Return an OBJECT (including empty {}) for DIRECT execution (single API call):
    - Step executes once with the object as currentItem
@@ -114,7 +114,7 @@ Every step MUST have a loopSelector that determines how it executes:
 - Note: For Basic Authentication, format as "Basic <<systemId_username>>:<<systemId_password>>" and the system will automatically convert it to Base64.
 - Headers provided starting with 'x-' are probably headers.
 - Don't hardcode pagination values - use Superglue's variables: <<page>>, <<offset>>, <<cursor>>, <<limit>>
-- Access previous step results: depends on what loopSelector returned
+- Access previous step results: depends on what dataSelector returned
   * If returned object: <<(sourceData) => sourceData.fetchUsers.data>> (single result)
   * If returned array: <<(sourceData) => sourceData.fetchUsers.map(item => item.data)>> (array of results)
 - Access initial payload via sourceData (e.g., sourceData.userId)
@@ -133,29 +133,29 @@ IMPORTANT: Modern APIs (HubSpot, Stripe, etc.) mostly expect authentication in h
 </AUTHENTICATION_PATTERNS>
 
 <LOOP_SELECTOR_EXECUTION>
-Every step has a loopSelector that determines execution mode:
-1. loopSelector returns OBJECT (including empty {}): Executes once with object as currentItem
+Every step has a dataSelector that determines execution mode:
+1. dataSelector returns OBJECT (including empty {}): Executes once with object as currentItem
    - Result: sourceData.stepId = { currentItem: <object>, data: <API response> }
    - Example: (sourceData) => {return { userId: sourceData.userId, action: 'update' }}
    
-2. loopSelector returns ARRAY: Executes once per array item
+2. dataSelector returns ARRAY: Executes once per array item
    - Result: sourceData.stepId = [{ currentItem: <item1>, data: <response1> }, ...]
    - Example: (sourceData) => sourceData.getAllContacts.data.filter(c => c.status === 'active')
    
-3. Accessing prior step results in loopSelector:
+3. Accessing prior step results in dataSelector:
    - From object result: (sourceData) => sourceData.getContacts.data.results
    - From array result: (sourceData) => sourceData.getContacts.flatMap(item => item.data.results)
 
 4. CURRENTITEM ACCESS:
    - For transformations or specific properties with operations: use <<(sourceData) => sourceData.currentItem.propertyName>>
    - Example flow:
-     * loopSelector: (sourceData) => sourceData.getAllContacts.data.filter(c => c.status === 'active')
+     * dataSelector: (sourceData) => sourceData.getAllContacts.data.filter(c => c.status === 'active')
      * URL: /contacts/<<currentItem>>/update (if currentItem is an ID string)
      * Body: {"contact": <<currentItem>>, "updatedBy": "<<userId>>"}
      * Or with transformations: {"doubledValue": <<(sourceData) => sourceData.currentItem.value * 2>>}
 
 5. Empty arrays:
-   - IMPORTANT: NEVER throw an error when the loop selector returns an empty array.
+   - IMPORTANT: NEVER throw an error when the data selector returns an empty array.
 </LOOP_SELECTOR_EXECUTION>
 
 <FINAL_TRANSFORMATION>
@@ -165,9 +165,9 @@ CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
    - Previous step results accessed by stepId (e.g., sourceData.getAllContacts.data, sourceData.fetchFriendsForEachContact[#].data)
    - DO NOT use sourceData.payload - initial payload is merged at root level
 
-2. Step result structure - depends on what the loopSelector returned:
-   - If loopSelector returned OBJECT: sourceData.stepId = { currentItem: <object>, data: <API response> }
-   - If loopSelector returned ARRAY: sourceData.stepId = [{ currentItem: <item1>, data: <response1> }, ...]
+2. Step result structure - depends on what the dataSelector returned:
+   - If dataSelector returned OBJECT: sourceData.stepId = { currentItem: <object>, data: <API response> }
+   - If dataSelector returned ARRAY: sourceData.stepId = [{ currentItem: <item1>, data: <response1> }, ...]
 
 3. Common workflow patterns:
    - Filtering arrays: contacts.filter(c => !excludeList.includes(c.company))
@@ -177,7 +177,7 @@ CRITICAL CONTEXT FOR WORKFLOW TRANSFORMATIONS:
    - Combining array results: sourceData.step1.map(item => item.data)
 
 4. For current step execution:
-   - currentItem is available and refers to the currently executing item (from loopSelector)
+   - currentItem is available and refers to the currently executing item (from dataSelector)
    - For simple access: use <<currentItem>> to access the entire item
    - For transformations or complex operations: use <<(sourceData) => sourceData.currentItem...>>
    - Example: if currentItem = { id: 123, name: "test" }:
@@ -198,6 +198,7 @@ COMMON WORKFLOW TRANSFORMATIONS:
 
 1. Loop selector (extract array to iterate):
 \`\`\`javascript
+// dataSelector function
 (sourceData) => {
   const items = sourceData.fetchItems.data;
   const excludeIds = sourceData.excludeIds.data || [];
@@ -256,12 +257,12 @@ For data access in <<>> tags:
 - Current item: <<currentItem>> for the whole item, or use arrow functions for transformations: <<(sourceData) => sourceData.currentItem.id>>
 
 For special transformation functions:
-- loopSelector returning OBJECT: (sourceData) => ({ userId: sourceData.fetchUsers.data.users[0].id, action: 'create' })
-- loopSelector returning ARRAY from object result: (sourceData) => sourceData.fetchUsers.data.users
-- loopSelector returning ARRAY from array result: (sourceData) => sourceData.fetchUsers.flatMap(item => item.data.users)
+- dataSelector returning OBJECT: (sourceData) => ({ userId: sourceData.fetchUsers.data.users[0].id, action: 'create' })
+- dataSelector returning ARRAY from object result: (sourceData) => sourceData.fetchUsers.data.users
+- dataSelector returning ARRAY from array result: (sourceData) => sourceData.fetchUsers.flatMap(item => item.data.users)
   * MUST throw error if expected array is missing rather than returning []. Exceptions can be cases if the instruction is "Get all users" and the API returns an empty array, in which case you should return [].
-- finalTransform (object result): (sourceData) => ({ results: sourceData.processItems.data })
-- finalTransform (array result): (sourceData) => ({ results: sourceData.processItems.map(item => item.data) })
+- outputTransform (object result): (sourceData) => ({ results: sourceData.processItems.data })
+- outputTransform (array result): (sourceData) => ({ results: sourceData.processItems.map(item => item.data) })
 
 CRITICAL DATA ACCESS PATTERNS:
 1. Initial payload data: Access directly in <<>> tags or via JavaScript expressions
@@ -269,7 +270,7 @@ CRITICAL DATA ACCESS PATTERNS:
    - <<companies>> or <<(sourceData) => sourceData.companies>> (NOT <<payload.companies>>)
    - <<user_access_token>> or <<(sourceData) => sourceData.user_access_token>> (NOT <<payload.user_access_token>>)
    
-2. Previous step results: depends on what loopSelector returned
+2. Previous step results: depends on what dataSelector returned
    - Object result: <<(sourceData) => sourceData.getAllContacts.data>>
    - Array result: <<(sourceData) => sourceData.getAllContacts.map(item => item.data)>>
    
@@ -375,7 +376,7 @@ You will receive the current tool as JSON and instructions for what to fix. Your
 
 Each patch operation has:
 - op: The operation type ("add", "remove", "replace", "move", "copy", "test")
-- path: JSON Pointer to the target location (e.g., "/steps/0/apiConfig/body", "/finalTransform")
+- path: JSON Pointer to the target location (e.g., "/steps/0/config/body", "/outputTransform")
 - value: The value to set (required for "add", "replace", "test")
 - from: Source path (required for "move", "copy")
 
@@ -403,23 +404,22 @@ TOP-LEVEL TOOL FIELDS (all that's sent):
 - id: string (required) - Unique identifier for the tool
 - instruction: string - Human-readable description of what the tool does
 - inputSchema: object - JSON Schema defining expected input parameters
-- responseSchema: object - JSON Schema defining expected output structure
-- finalTransform: string - JavaScript function to transform combined step results into final output
+- outputSchema: object (optional) - JSON Schema defining expected output structure. Only include this if the user explicitly requested a specific response format. Most tools should NOT have this field.
+- outputTransform: string - JavaScript function to transform combined step results into final output
 - steps: array (required) - Array of execution steps
 
 EACH STEP IN THE "steps" ARRAY HAS:
 - id: string (required) - Unique step identifier, used to access results as sourceData.stepId
-- systemId: string - Which system this step uses
-- executionMode: "DIRECT" | "LOOP" - How the step executes (derived from loopSelector return)
-- loopSelector: string - JavaScript function determining execution mode (see LOOP_SELECTOR section)
-- failureBehavior: "FAIL" | "CONTINUE" - Error handling behavior (fail on step failure or continue on step failure). When set to CONTINUE, error detection is automatically disabled.
-- apiConfig: object (required) - The API configuration for this step
+- instruction: string - Description of what this step does
+- dataSelector: string - JavaScript function determining execution mode (see DATA_SELECTOR section)
+- failureBehavior: "fail" | "continue" - Error handling behavior (fail on step failure or continue on step failure). ONLY SET TO CONTINUE IF NEEDED, default to fail.
+- modify: boolean - Whether the step modifies data on the system it operates on (writes, updates, deletes). Read-only operations should be false. Defaults to false.
+- config: object (required) - The step configuration (either request or transform config)
 
-EACH STEP'S "apiConfig" CONTAINS:
-- id: string - Config identifier
-- instruction: string - Description of what this API call does
-- urlHost: string - Base URL (e.g., "https://api.example.com")
-- urlPath: string - Path portion (e.g., "/v1/users")
+STEP CONFIG FOR REQUEST STEPS (API calls):
+- type: "request" (optional, defaults to request if url is present)
+- systemId: string - Which system this step uses (REQUIRED for request steps)
+- url: string - Full URL for the endpoint (e.g., "https://api.example.com/v1/users") - required
 - method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
 - queryParams: object - Query parameters
 - headers: object - HTTP headers (e.g., {"Authorization": "Bearer <<token>>"})
@@ -428,7 +428,7 @@ EACH STEP'S "apiConfig" CONTAINS:
 </TOOL_STRUCTURE>
 
 <LOOP_SELECTOR>
-Every step MUST have a loopSelector that determines how it executes:
+Every step can have a dataSelector that determines how it executes:
 
 1. Return an OBJECT (including empty {}) for DIRECT execution (single API call):
    - Step executes once with the object as currentItem
@@ -442,7 +442,7 @@ Every step MUST have a loopSelector that determines how it executes:
    - Example: (sourceData) => sourceData.getContacts.data.filter(c => c.active)
    - Example: (sourceData) => sourceData.userIds
 
-3. Accessing prior step results in loopSelector:
+3. Accessing prior step results in dataSelector:
    - From object result: (sourceData) => sourceData.getContacts.data.results
    - From array result: (sourceData) => sourceData.getContacts.flatMap(item => item.data.results)
 </LOOP_SELECTOR>
@@ -486,19 +486,19 @@ Common authentication patterns:
 IMPORTANT: Modern APIs mostly expect authentication in headers, NOT query parameters.
 </AUTHENTICATION_PATTERNS>
 
-<FINAL_TRANSFORMATION>
-The finalTransform is a JavaScript function that shapes the output:
+<OUTPUT_TRANSFORMATION>
+The outputTransform is a JavaScript function that shapes the output:
 - Function signature: (sourceData) => { ... }
 - sourceData contains initial payload at root level AND step results by stepId
-- Step result structure depends on loopSelector:
-  * Object loopSelector: sourceData.stepId = { currentItem, data }
-  * Array loopSelector: sourceData.stepId = [{ currentItem, data }, ...]
+- Step result structure depends on dataSelector:
+  * Object dataSelector: sourceData.stepId = { currentItem, data }
+  * Array dataSelector: sourceData.stepId = [{ currentItem, data }, ...]
 
 Common patterns:
 - Extract from object: (sourceData) => sourceData.fetchData.data
 - Extract from array: (sourceData) => sourceData.fetchData.map(item => item.data)
 - Combine results: (sourceData) => ({ ...sourceData.step1.data, items: sourceData.step2.map(i => i.data) })
-</FINAL_TRANSFORMATION>
+</OUTPUT_TRANSFORMATION>
 
 <PAGINATION>
 Only configure pagination if verified from documentation:
@@ -534,28 +534,28 @@ Body format: {"operation": "get", "path": "/file.txt"}
 Example 1 - Change API endpoint:
 {
   "op": "replace",
-  "path": "/steps/0/apiConfig/urlPath",
-  "value": "/v2/users"
+  "path": "/steps/0/config/url",
+  "value": "https://api.example.com/v2/users"
 }
 
 Example 2 - Change request body (note: value is actual string, not JSON-escaped!):
 {
   "op": "replace",
-  "path": "/steps/2/apiConfig/body",
+  "path": "/steps/2/config/body",
   "value": "<<(sourceData) => JSON.stringify({ model: 'gpt-4', messages: sourceData.messages })>>"
 }
 
-Example 3 - Fix a step's loopSelector:
+Example 3 - Fix a step's dataSelector:
 {
   "op": "replace",
-  "path": "/steps/1/loopSelector",
+  "path": "/steps/1/dataSelector",
   "value": "(sourceData) => sourceData.getUsers.data.filter(u => u.active)"
 }
 
 Example 4 - Add a new header:
 {
   "op": "add",
-  "path": "/steps/0/apiConfig/headers/X-Custom-Header",
+  "path": "/steps/0/config/headers/X-Custom-Header",
   "value": "my-value"
 }
 
@@ -565,15 +565,18 @@ Example 5 - Remove a step:
   "path": "/steps/2"
 }
 
-Example 6 - Add a new step at the end:
+Example 6 - Add a new request step at the end:
 {
   "op": "add",
   "path": "/steps/-",
   "value": {
     "id": "newStep",
-    "systemId": "api",
-    "loopSelector": "(sourceData) => ({})",
-    "apiConfig": { ... }
+    "dataSelector": "(sourceData) => ({})",
+    "config": {
+      "systemId": "api",
+      "url": "https://api.example.com/endpoint",
+      "method": "GET"
+    }
   }
 }
 
@@ -581,12 +584,12 @@ Example 7 - Multiple changes (change model in two places):
 [
   {
     "op": "replace",
-    "path": "/steps/2/apiConfig/body",
+    "path": "/steps/2/config/body",
     "value": "<<(sourceData) => JSON.stringify({ model: 'gpt-4o' })>>"
   },
   {
     "op": "replace",
-    "path": "/finalTransform",
+    "path": "/outputTransform",
     "value": "(sourceData) => ({ ...sourceData.step1.data, model: 'gpt-4o' })"
   }
 ]
@@ -601,14 +604,14 @@ Each step can have these optional properties:
 </STEP_PROPERTIES>
 
 <COMMON_FIXES>
-1. Fixing API endpoints: Use "replace" on /steps/N/apiConfig/urlPath or urlHost
-2. Fixing authentication: Use "replace" or "add" on /steps/N/apiConfig/headers/Authorization
-3. Fixing loop selectors: Use "replace" on /steps/N/loopSelector
-4. Fixing body/params: Use "replace" on /steps/N/apiConfig/body or queryParams
-5. Fixing finalTransform: Use "replace" on /finalTransform
-6. Adding missing pagination: Use "add" on /steps/N/apiConfig/pagination
+1. Fixing API endpoints: Use "replace" on /steps/N/config/url
+2. Fixing authentication: Use "replace" or "add" on /steps/N/config/headers/Authorization
+3. Fixing data selectors: Use "replace" on /steps/N/dataSelector
+4. Fixing body/params: Use "replace" on /steps/N/config/body or queryParams
+5. Fixing outputTransform: Use "replace" on /outputTransform
+6. Adding missing pagination: Use "add" on /steps/N/config/pagination
 7. Fixing step order: Use "move" from /steps/N to /steps/M
-8. Adding error handling: Use "replace" on /steps/N/failureBehavior with value "CONTINUE"
+8. Adding error handling: Use "replace" on /steps/N/failureBehavior with value "continue"
 9. Adding new fields: Use "add" with the target path and value
 10. Removing fields: Use "remove" with the target path
 </COMMON_FIXES>
@@ -617,10 +620,10 @@ Each step can have these optional properties:
 The fixed tool must:
 1. Have valid JSON Patch operations (correct paths, required fields)
 2. Result in a valid tool structure after patches are applied
-2. Have a valid 'id' field
-3. Have a 'steps' array (can be empty for transform-only tools)
-4. Have valid systemIds that match available systems (if provided)
-5. Have valid apiConfig for each step (urlHost, urlPath, method)
+3. Have a valid 'id' field
+4. Have a 'steps' array (can be empty for transform-only tools)
+5. Have valid systemIds in step.config that match available systems (if provided)
+6. Have valid config for each step with url, method, and systemId
 </VALIDATION>
 
 Output your diffs in the required format. Make the minimum number of changes needed to fix the issue.`;

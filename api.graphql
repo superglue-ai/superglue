@@ -21,6 +21,9 @@ type ApiConfig implements BaseConfig {
   createdAt: DateTime
   updatedAt: DateTime
 
+  # Step config type discriminator
+  type: String!  # "request" for URL-based steps, set by normalize on read
+
   # Specific implementation
   urlHost: String
   urlPath: String
@@ -88,6 +91,9 @@ type Pagination {
   cursorPath: String
   stopCondition: String
 }
+
+# Union type for step config (currently only request-based)
+union StepConfig = ApiConfig
 
 type RunList {
   items: [Run!]!
@@ -322,24 +328,9 @@ type Log {
   traceId: ID
 }
 
-type ToolStep {
-  systemId: String
-  instruction: String
-}
-
-type SuggestedTool {
-  id: ID!
-  instruction: String
-  inputSchema: JSON
-  steps: [ToolStep!]
-  responseSchema: JSON
-  reason: String!
-}
-
 type Query {
   listWorkflows(limit: Int = 10, offset: Int = 0): WorkflowList!
   listSystems(limit: Int = 10, offset: Int = 0): SystemList!
-  findRelevantTools(searchTerms: String): [SuggestedTool!]
 
   getWorkflow(id: ID!): Workflow
   getSystem(id: ID!): System
@@ -356,19 +347,31 @@ type TenantInfo {
 type ExecutionStep {
   id: String!
   modify: Boolean
-  apiConfig: ApiConfig!
+  apiConfig: ApiConfig # DEPRECATED - kept for backwards compatibility
+  config: StepConfig!  # Preferred field - use this for new code
   systemId: ID
-  executionMode: String # DIRECT | LOOP
   loopSelector: JSONata
   failureBehavior: FailureBehavior
+}
+
+# Input for step config - currently only request-based
+input StepConfigInput {
+  type: String  # "request" - if not provided, defaults to "request"
+  url: String
+  instruction: String
+  method: HttpMethod
+  queryParams: JSON
+  headers: JSON
+  body: String
+  pagination: PaginationInput
 }
 
 input ExecutionStepInput {
   id: String!
   modify: Boolean
-  apiConfig: ApiInput!
+  apiConfig: ApiInput    # DEPRECATED - kept for backwards compatibility
+  config: StepConfigInput  # Preferred field - use this for new code
   systemId: ID
-  executionMode: String # DIRECT | LOOP
   loopSelector: JSONata
   failureBehavior: FailureBehavior
 }
@@ -412,11 +415,6 @@ type WorkflowResult {
   stepResults: [WorkflowStepResult!]
 }
 
-type AbortToolExecutionResult {
-  success: Boolean!
-  runId: ID!
-}
-
 input WorkflowInput {
   id: String!
   steps: [ExecutionStepInput!]
@@ -450,23 +448,6 @@ type Mutation {
     traceId: ID
   ): WorkflowResult!
 
-  abortToolExecution(runId: ID!): AbortToolExecutionResult!
-
-  buildWorkflow(
-    instruction: String!
-    payload: JSON
-    systemIds: [ID!]
-    responseSchema: JSONSchema
-    traceId: ID
-  ): Workflow!
-
-  upsertWorkflow(id: ID!, input: JSON!): Workflow!
-  deleteWorkflow(id: ID!): Boolean!
-  renameWorkflow(oldId: ID!, newId: ID!): Workflow!
-
-  upsertApi(id: ID!, input: JSON!): ApiConfig!
-  deleteApi(id: ID!): Boolean!
-
   upsertSystem(
     input: SystemInput!
     mode: UpsertMode = UPSERT
@@ -489,13 +470,6 @@ type Mutation {
     body: String
     timeout: Int
   ): CallEndpointResult!
-
-  fixWorkflow(
-    workflow: WorkflowInput!
-    fixInstructions: String!
-    lastError: String
-    systemIds: [ID!]
-  ): FixWorkflowResult!
 }
 
 type Subscription {
@@ -544,9 +518,4 @@ type ToolDiff {
   path: String!
   value: JSON
   from: String
-}
-
-type FixWorkflowResult {
-  workflow: Workflow!
-  diffs: [ToolDiff!]!
 }

@@ -22,6 +22,41 @@ export function TriggersCard({ toolId, payload, compact = false }: TriggersCardP
 
   const snippets = useToolCodeSnippets(toolId, payload);
 
+  // Fetch webhook runs
+  const fetchWebhookRuns = useCallback(async () => {
+    if (!isSavedTool) return;
+
+    setWebhookRunsLoading(true);
+    setWebhookRunsError(null);
+    try {
+      const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
+      const result = await client.listRuns({
+        toolId: toolId,
+        requestSources: ["webhook"],
+        limit: 10,
+      });
+      setWebhookRuns(result.items);
+      setWebhookRunsLastUpdated(new Date());
+      setHasFetchedWebhookRuns(true);
+    } catch (err: any) {
+      setWebhookRunsError(err.message || "Failed to fetch webhook runs");
+    } finally {
+      setWebhookRunsLoading(false);
+    }
+  }, [config.superglueEndpoint, toolId, isSavedTool]);
+
+  useEffect(() => {
+    if (activeSection === "webhook" && isSavedTool && !hasFetchedWebhookRuns) {
+      fetchWebhookRuns();
+    }
+  }, [activeSection, isSavedTool, hasFetchedWebhookRuns, fetchWebhookRuns]);
+
+  useEffect(() => {
+    setHasFetchedWebhookRuns(false);
+    setWebhookRuns([]);
+    setWebhookRunsLastUpdated(null);
+  }, [toolId]);
+
   if (!isSavedTool) {
     return (
       <div className="flex flex-col items-center justify-center h-full pt-28 pb-12 text-center px-4">

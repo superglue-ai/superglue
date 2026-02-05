@@ -39,7 +39,10 @@ export function ArchiveConfigDialog({
     if (!config || activeSchedules.length > 0) return;
 
     try {
-      const client = createSuperglueClient(superglueConfig.superglueEndpoint);
+      const client = createSuperglueClient(
+        superglueConfig.superglueEndpoint,
+        superglueConfig.apiEndpoint,
+      );
       await client.archiveWorkflow(config.id, true);
 
       const archivedId = config.id;

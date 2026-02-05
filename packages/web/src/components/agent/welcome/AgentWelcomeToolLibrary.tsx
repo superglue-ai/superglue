@@ -151,9 +151,8 @@ export function AgentWelcomeToolLibrary({
         instruction: template.instruction,
         steps: template.steps,
         inputSchema: template.inputSchema,
-        systemIds: template.systemIds,
-        responseSchema: template.responseSchema,
-        finalTransform: template.finalTransform,
+        outputSchema: template.outputSchema,
+        outputTransform: template.outputTransform,
       });
 
       onDismiss?.();

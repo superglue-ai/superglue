@@ -281,7 +281,7 @@ describe("getWorkflowBuilderContext budget and include combinations", () => {
     expect(out).toMatch(/<instruction>/);
   });
 
-  it("no systems path emits transform-only hint and enforces budget", () => {
+  it("no systems path emits hint and enforces budget", () => {
     const input = { systems: [], payload: { q: 1 }, userInstruction: "Transform data" } as any;
     const out = getToolBuilderContext(input, {
       characterBudget: 500,
@@ -293,7 +293,7 @@ describe("getWorkflowBuilderContext budget and include combinations", () => {
       },
     });
     expect(out.length).toBeLessThanOrEqual(500);
-    expect(out).toMatch(/No systems provided\. Build a transform-only workflow/);
+    expect(out).toMatch(/No systems provided\. Please provide systems to build a workflow/);
   });
 
   it("available variables include system credentials and payload keys when requested", () => {

@@ -654,12 +654,16 @@ export function parseJsonSafe(value: any): any {
   }
 }
 
-export function normalizeToolSchemas<T extends { inputSchema?: any; responseSchema?: any }>(
-  tool: T,
-): T {
+export function normalizeToolSchemas<
+  T extends { inputSchema?: any; outputSchema?: any; responseSchema?: any },
+>(tool: T): T {
   const normalized = { ...tool };
   if (normalized.inputSchema) {
     normalized.inputSchema = parseJsonSafe(normalized.inputSchema);
+  }
+  // Support both outputSchema (new) and responseSchema (legacy)
+  if (normalized.outputSchema) {
+    normalized.outputSchema = parseJsonSafe(normalized.outputSchema);
   }
   if (normalized.responseSchema) {
     normalized.responseSchema = parseJsonSafe(normalized.responseSchema);

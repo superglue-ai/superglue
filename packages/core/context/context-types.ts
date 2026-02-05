@@ -37,6 +37,6 @@ export type ToolBuilderContextInput = {
   systems: System[];
   payload: any;
   userInstruction: string;
-  responseSchema?: JSONSchema;
+  outputSchema?: JSONSchema;
   metadata: ServiceMetadata;
 };

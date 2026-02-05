@@ -3035,8 +3035,8 @@ const client = new SuperglueClient({
 });
 
 async function main() {
-  const result = await client.executeWorkflow({
-      id: "${workflowId}",
+  const result = await client.runTool({
+      toolId: "${workflowId}",
       payload: ${JSON.stringify(payload, null, 2)}
   });
   console.log(result);

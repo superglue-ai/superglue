@@ -223,60 +223,78 @@ export interface BaseResult {
   completedAt: Date;
 }
 
+// Pagination type values (camelCase for OpenAPI compatibility)
+export type PaginationTypeValue = "offsetBased" | "pageBased" | "cursorBased" | "disabled";
+
 export interface Pagination {
-  type: PaginationType;
+  type: PaginationTypeValue;
   pageSize?: string;
   cursorPath?: string;
   stopCondition?: string;
 }
 
-export interface ApiConfig extends BaseConfig {
-  urlHost?: string;
-  urlPath?: string;
-  instruction: string;
-  method?: HttpMethod;
+// Step config type discriminator
+// "request" = all URL-based steps (HTTP, SFTP, Postgres, etc.)
+// "transform" = JavaScript transformation step (to be re-added later)
+// Future: may split "request" into "http" | "sftp" | "postgres" | "graphql" etc.
+export type StepConfigType = "request" | "transform";
+
+// RequestStepConfig - for HTTP, SFTP, Postgres, etc. (use step.id for identification)
+export interface RequestStepConfig {
+  type?: "request"; // Set to "request" by normalize on read, not stored in DB for URL-based steps
+  url: string;
+  method?: HttpMethod | string;
   queryParams?: Record<string, any>;
   headers?: Record<string, any>;
   body?: string;
   pagination?: Pagination;
+  systemId?: string; // System to use for stored credentials and documentation
 }
 
-export interface ExtractConfig extends BaseConfig {
-  urlHost?: string;
-  urlPath?: string;
-  instruction: string;
-  queryParams?: Record<string, any>;
-  method?: HttpMethod;
-  headers?: Record<string, any>;
-  body?: string;
-  documentationUrl?: string;
-  decompressionMethod?: DecompressionMethod;
-  authentication?: AuthType;
-  fileType?: FileType;
-  dataPath?: string;
+// Union type for step config (currently only request-based, transform steps to be added later)
+export type StepConfig = RequestStepConfig;
+
+// Type guard for step config
+export function isRequestConfig(config: StepConfig): config is RequestStepConfig {
+  // "request" type covers HTTP, SFTP, Postgres - all URL-based steps
+  // Fallback to true if no type (safety for edge cases)
+  return config?.type === "request" || !config?.type;
 }
 
-export interface ExecutionStep {
+// Failure behavior values (lowercase for OpenAPI compatibility)
+export type FailureBehavior = "fail" | "continue";
+
+export interface ToolStep {
   id: string;
+  config: StepConfig;
+  instruction?: string; // Human-readable instruction describing what this step does
   modify?: boolean;
-  apiConfig: ApiConfig;
-  systemId?: string;
-  executionMode?: "DIRECT" | "LOOP";
-  loopSelector?: string;
-  failureBehavior?: "FAIL" | "CONTINUE";
+  dataSelector?: string; // JavaScript function to select data for loop execution
+  failureBehavior?: FailureBehavior;
 }
 
 export interface Tool extends BaseConfig {
-  steps: ExecutionStep[];
-  systemIds?: string[];
-  finalTransform?: JSONata;
+  name?: string;
+  steps: ToolStep[];
+  outputTransform?: string; // JavaScript function for final output transformation
   inputSchema?: JSONSchema;
-  responseSchema?: JSONSchema;
+  outputSchema?: JSONSchema; // JSON Schema for tool outputs (after transformations applied)
   instruction?: string;
-  originalResponseSchema?: JSONSchema;
   folder?: string;
   archived?: boolean;
   responseFilters?: ResponseFilter[];
+}
+
+// Helper function to compute systemIds from steps
+export function getToolSystemIds(tool: Tool): string[] {
+  if (!tool.steps) return [];
+  const ids = new Set<string>();
+  for (const step of tool.steps) {
+    if (step.config && isRequestConfig(step.config) && step.config.systemId) {
+      ids.add(step.config.systemId);
+    }
+  }
+  return Array.from(ids);
 }
 
 export interface ToolStepResult {
@@ -286,8 +304,11 @@ export interface ToolStepResult {
   error?: string;
 }
 
-export interface ToolResult extends BaseResult {
-  config: Tool;
+export interface ToolResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  tool: Tool;
   stepResults: ToolStepResult[];
 }
 
@@ -342,7 +363,7 @@ export interface SuggestedTool {
   id: string;
   instruction?: string;
   inputSchema?: JSONSchema;
-  responseSchema?: JSONSchema;
+  outputSchema?: JSONSchema;
   steps: Array<{
     systemId?: string;
     instruction?: string;
@@ -350,20 +371,7 @@ export interface SuggestedTool {
   reason: string;
 }
 
-export type RunResult = ApiResult | ToolResult;
-
-export type ExtractResult = BaseResult & {
-  config: ExtractConfig;
-};
-
-export type ApiResult = BaseResult & {
-  config: ApiConfig;
-};
-
-export type ApiInputRequest = {
-  id?: string;
-  endpoint?: ApiConfig;
-};
+export type ExtractResult = BaseResult;
 
 export type ExtractInputRequest = {
   id?: string;
@@ -375,9 +383,6 @@ export type ToolInputRequest = {
   id?: string;
   workflow?: Tool;
 };
-
-// Legacy alias
-export type WorkflowInputRequest = ToolInputRequest;
 
 export type RequestOptions = {
   cacheMode?: CacheMode;
@@ -410,7 +415,7 @@ export interface Run {
 
 export interface ApiCallArgs {
   id?: string;
-  endpoint?: ApiConfig;
+  endpoint?: RequestStepConfig;
   payload?: Record<string, any>;
   credentials?: Record<string, string>;
   options?: RequestOptions;
@@ -436,14 +441,11 @@ export interface ToolArgs {
   traceId?: string;
 }
 
-// Legacy alias
-export type WorkflowArgs = ToolArgs;
-
 export interface BuildToolArgs {
   instruction: string;
   payload?: Record<string, any>;
   systemIds?: string[];
-  responseSchema?: JSONSchema;
+  outputSchema?: JSONSchema;
   save?: boolean;
   verbose?: boolean;
   traceId?: string;
@@ -602,43 +604,6 @@ export interface AgentRequest {
   runtimeContext?: string;
   agentParams?: Record<string, any>;
   filePayloads?: Record<string, any>;
-}
-
-// OpenAPI format types for API responses
-export interface OpenAPIPagination {
-  type: string;
-  pageSize?: string;
-  cursorPath?: string;
-  stopCondition?: string;
-}
-
-export interface OpenAPIToolStep {
-  id: string;
-  url: string;
-  method: string;
-  queryParams?: Record<string, unknown>;
-  headers?: Record<string, unknown>;
-  body?: string;
-  pagination?: OpenAPIPagination;
-  systemId?: string;
-  instruction?: string;
-  modify?: boolean;
-  dataSelector?: string;
-  failureBehavior?: "fail" | "continue";
-}
-
-export interface OpenAPITool {
-  id: string;
-  name: string;
-  version?: string;
-  instruction?: string;
-  inputSchema?: Record<string, unknown>;
-  outputSchema?: Record<string, unknown>;
-  steps: OpenAPIToolStep[];
-  outputTransform?: string;
-  archived?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 // ============================================

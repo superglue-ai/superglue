@@ -5,6 +5,8 @@ import {
   ToolDiff,
   ToolStepResult,
   normalizeToolSchemas,
+  isRequestConfig,
+  RequestStepConfig,
 } from "@superglue/shared";
 import jsonpatch from "fast-json-patch";
 import z from "zod";
@@ -38,7 +40,7 @@ const patchSchema = z.object({
         path: z
           .string()
           .describe(
-            "JSON Pointer path to the target location (e.g., '/steps/0/apiConfig/body', '/finalTransform', '/steps/-' for append)",
+            "JSON Pointer path to the target location (e.g., '/steps/0/config/body', '/outputTransform', '/steps/-' for append)",
           ),
         value: z
           .any()
@@ -80,8 +82,8 @@ export class ToolFixer {
       id: tool.id,
       instruction: tool.instruction,
       inputSchema: tool.inputSchema,
-      responseSchema: tool.responseSchema,
-      finalTransform: tool.finalTransform,
+      outputSchema: tool.outputSchema,
+      outputTransform: tool.outputTransform,
       steps: tool.steps.map((step) => this.trimStepForLLM(step)),
     };
   }
@@ -89,18 +91,19 @@ export class ToolFixer {
   private trimStepForLLM(step: any): any {
     return {
       id: step.id,
-      systemId: step.systemId,
-      executionMode: step.executionMode,
-      loopSelector: step.loopSelector,
+      instruction: step.instruction,
+      dataSelector: step.dataSelector,
       failureBehavior: step.failureBehavior,
-      apiConfig: this.trimApiConfigForLLM(step.apiConfig),
+      config: this.trimStepConfigForLLM(step.config),
     };
   }
 
-  private trimApiConfigForLLM(config: any): any {
+  private trimStepConfigForLLM(config: any): any {
     if (!config) return config;
+
+    // Request steps
     return {
-      id: config.id,
+      type: config.type,
       instruction: config.instruction,
       urlHost: config.urlHost,
       urlPath: config.urlPath,
@@ -241,17 +244,21 @@ ${availableSystemIds.join(", ")}
         if (!step.id) {
           return { valid: false, error: `Step ${i + 1}: missing 'id'` };
         }
-        if (!step.apiConfig) {
-          return { valid: false, error: `Step ${i + 1} (${step.id}): missing 'apiConfig'` };
+        if (!step.config) {
+          return { valid: false, error: `Step ${i + 1} (${step.id}): missing 'config'` };
         }
+        // systemId is now on step.config for request steps
+        const stepSystemId = isRequestConfig(step.config)
+          ? (step.config as RequestStepConfig).systemId
+          : undefined;
         if (
-          step.systemId &&
+          stepSystemId &&
           availableSystemIds.length > 0 &&
-          !availableSystemIds.includes(step.systemId)
+          !availableSystemIds.includes(stepSystemId)
         ) {
           return {
             valid: false,
-            error: `Step ${i + 1} (${step.id}): invalid systemId '${step.systemId}'. Available: ${availableSystemIds.join(", ")}`,
+            error: `Step ${i + 1} (${step.id}): invalid systemId '${stepSystemId}'. Available: ${availableSystemIds.join(", ")}`,
           };
         }
       }
@@ -370,7 +377,6 @@ ${availableSystemIds.join(", ")}
         const fixedTool: Tool = {
           ...normalizedPatchedTool,
           instruction: this.tool.instruction,
-          systemIds: this.tool.systemIds,
           createdAt: this.tool.createdAt,
           updatedAt: new Date(),
         };

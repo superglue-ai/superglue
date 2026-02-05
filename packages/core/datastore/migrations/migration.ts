@@ -1,4 +1,4 @@
-import { Run, RunStatus, Tool } from "@superglue/shared";
+import { composeUrl, Run, RunStatus, System, Tool } from "@superglue/shared";
 
 export interface LegacyRunRow {
   id: string;
@@ -82,21 +82,99 @@ export function extractRun(data: any, row: LegacyRunRow): Run {
   };
 }
 
+// Pagination type mapping from legacy UPPER_CASE to camelCase
+const PAGINATION_TYPE_MAP: Record<string, string> = {
+  OFFSET_BASED: "offsetBased",
+  PAGE_BASED: "pageBased",
+  CURSOR_BASED: "cursorBased",
+  DISABLED: "disabled",
+};
+
+function mapPaginationType(internalType?: string): string {
+  if (!internalType) return "disabled";
+  // If already camelCase, return as-is
+  if (PAGINATION_TYPE_MAP[internalType]) {
+    return PAGINATION_TYPE_MAP[internalType];
+  }
+  return internalType;
+}
+
 export function normalizeTool(tool: any): Tool {
   if (!tool) return tool;
 
   const normalizedSteps = tool.steps?.map((step: any) => {
-    const { integrationId, ...rest } = step;
+    const { integrationId, apiConfig, config, executionMode, loopSelector, systemId, ...rest } =
+      step;
+
+    // Migration: apiConfig -> config (prefer config if both exist)
+    let stepConfig = config || apiConfig;
+
+    // Extract instruction from config to step level
+    let instruction: string | undefined;
+
+    if (stepConfig) {
+      // Normalize old apiConfig format (urlHost/urlPath -> url)
+      stepConfig = normalizeApiConfig(stepConfig);
+
+      // Add type for frontend convenience (not stored in DB for URL-based steps)
+      // URL-based steps (HTTP, SFTP, Postgres) get type: "request"
+      if (!stepConfig.type) {
+        stepConfig.type = "request";
+      }
+
+      // Remove legacy config.id - step.id is used instead
+      delete stepConfig.id;
+
+      // Move instruction from config to step level
+      instruction = step.instruction ?? stepConfig.instruction;
+      delete stepConfig.instruction;
+
+      // Move systemId into config for request steps
+      const stepSystemId = systemId ?? integrationId;
+      if (stepSystemId) {
+        stepConfig.systemId = stepSystemId;
+      }
+
+      // Normalize pagination type to camelCase
+      if (stepConfig.pagination?.type) {
+        stepConfig.pagination.type = mapPaginationType(stepConfig.pagination.type);
+      }
+    }
+
+    // Normalize failureBehavior to lowercase
+    let failureBehavior: string | undefined = rest.failureBehavior;
+    if (failureBehavior) {
+      failureBehavior = failureBehavior.toLowerCase();
+    }
+
+    // Rename loopSelector -> dataSelector
+    const dataSelector = rest.dataSelector ?? loopSelector;
+
     return {
-      ...rest,
-      systemId: step.systemId ?? integrationId,
+      id: step.id,
+      config: stepConfig,
+      instruction,
+      modify: rest.modify,
+      dataSelector,
+      failureBehavior,
     };
   });
 
-  const { integrationIds, ...rest } = tool;
+  // Build the normalized tool with new field names
+  // responseSchema -> outputSchema, finalTransform -> outputTransform
   return {
-    ...rest,
-    systemIds: tool.systemIds ?? integrationIds,
+    id: tool.id,
+    name: tool.name,
+    version: tool.version,
+    instruction: tool.instruction,
+    inputSchema: tool.inputSchema,
+    outputSchema: tool.outputSchema ?? tool.responseSchema,
     steps: normalizedSteps,
+    outputTransform: tool.outputTransform ?? tool.finalTransform,
+    folder: tool.folder,
+    archived: tool.archived,
+    responseFilters: tool.responseFilters,
+    createdAt: tool.createdAt,
+    updatedAt: tool.updatedAt,
   };
 }

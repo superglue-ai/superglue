@@ -49,41 +49,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/**
- * Safe JSON.stringify that handles circular references, BigInt, and other edge cases.
- * Falls back to String(obj) on error.
- */
-export function safeStringify(obj: any, indent?: number): string {
-  try {
-    return JSON.stringify(
-      obj,
-      (_, value) => {
-        if (typeof value === "bigint") return value.toString();
-        if (typeof value === "function") return "[Function]";
-        return value;
-      },
-      indent,
-    );
-  } catch {
-    return String(obj);
-  }
-}
-
-export function composeUrl(host: string, path: string | undefined) {
-  if (!host && !path) return "";
-  if (!host) host = "";
-  if (!path) path = "";
-
-  const cleanHost = host.endsWith("/") ? host.slice(0, -1) : host;
-  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
-
-  if (!cleanPath) {
-    return cleanHost;
-  }
-
-  return `${cleanHost}/${cleanPath}`;
-}
-
 export const isEmptyData = (value: any): boolean => {
   if (value === null || value === undefined) return true;
 
@@ -480,25 +445,25 @@ export function getGroupedTimezones(): Record<string, Array<{ value: string; lab
 }
 
 /**
- * Wraps a loop selector function to limit the number of iterations
- * @param loopSelectorCode The original loop selector code
+ * Wraps a data selector function to limit the number of iterations
+ * @param dataSelectorCode The original data selector code
  * @param limit Maximum number of items to return (defaults to 1)
  * @returns Wrapped code that limits the array to specified number of items
  *
  * @example
  * const original = "(sourceData) => { return [1,2,3] }";
- * const wrapped = wrapLoopSelectorWithLimit(original, 1);
+ * const wrapped = wrapDataSelectorWithLimit(original, 1);
  * // Result: "(sourceData) => { const originalFunction = (sourceData) => { return [1,2,3] }; const out = originalFunction(sourceData); return Array.isArray(out) ? out.slice(0, 1) : out; }"
  */
-export function wrapLoopSelectorWithLimit(
-  loopSelectorCode: string | undefined | null,
+export function wrapDataSelectorWithLimit(
+  dataSelectorCode: string | undefined | null,
   limit: number = 1,
 ): string {
-  if (!loopSelectorCode || !loopSelectorCode.trim()) {
-    return loopSelectorCode || "";
+  if (!dataSelectorCode || !dataSelectorCode.trim()) {
+    return dataSelectorCode || "";
   }
 
-  const trimmedCode = assertValidArrowFunction(loopSelectorCode);
+  const trimmedCode = assertValidArrowFunction(dataSelectorCode);
 
   return `(sourceData) => {
   const originalFunction = ${trimmedCode};

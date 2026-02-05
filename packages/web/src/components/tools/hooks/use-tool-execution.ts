@@ -3,7 +3,7 @@ import { useToast } from "@/src/hooks/use-toast";
 import {
   abortExecution,
   createSuperglueClient,
-  executeFinalTransform,
+  executeOutputTransform,
   executeSingleStep,
   executeToolStepByStep,
   generateUUID,
@@ -13,7 +13,7 @@ import {
 import {
   computeStepOutput,
   isAbortError,
-  wrapLoopSelectorWithLimit,
+  wrapDataSelectorWithLimit,
 } from "@/src/lib/general-utils";
 import { Tool, ToolResult } from "@superglue/shared";
 import { useRef } from "react";
@@ -46,10 +46,10 @@ export function useToolExecution(
 
   const config = useConfig();
   const { toast } = useToast();
-  const { tool, steps, payload, setSteps, setFinalTransform, responseFilters } = useToolConfig();
+  const { tool, steps, payload, setSteps, setOutputTransform, responseFilters } = useToolConfig();
   const toolId = tool.id;
-  const finalTransform = tool.finalTransform || "";
-  const responseSchema = tool.responseSchema ? JSON.stringify(tool.responseSchema) : "";
+  const outputTransform = tool.outputTransform || "";
+  const outputSchema = tool.outputSchema ? JSON.stringify(tool.outputSchema) : "";
   const inputSchema = tool.inputSchema ? JSON.stringify(tool.inputSchema) : "";
   const instructions = tool.instruction;
   const computedPayload = payload.computedPayload;
@@ -121,20 +121,20 @@ export function useToolExecution(
       async () => {
         const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
 
-        const originalLoopSelector = steps[idx]?.loopSelector;
+        const originalDataSelector = steps[idx]?.dataSelector;
         let stepToExecute = steps[idx];
 
         if (updatedInstruction) {
           stepToExecute = {
             ...stepToExecute,
-            apiConfig: { ...stepToExecute.apiConfig, instruction: updatedInstruction },
+            instruction: updatedInstruction,
           };
         }
 
-        if (limitIterations && originalLoopSelector) {
+        if (limitIterations && originalDataSelector) {
           stepToExecute = {
             ...stepToExecute,
-            loopSelector: wrapLoopSelectorWithLimit(originalLoopSelector, limitIterations),
+            dataSelector: wrapDataSelectorWithLimit(originalDataSelector, limitIterations),
           };
         }
 
@@ -155,8 +155,8 @@ export function useToolExecution(
 
         if (single.updatedStep) {
           const updatedStep =
-            limitIterations && originalLoopSelector
-              ? { ...single.updatedStep, loopSelector: originalLoopSelector }
+            limitIterations && originalDataSelector
+              ? { ...single.updatedStep, dataSelector: originalDataSelector }
               : single.updatedStep;
           skipNextHashInvalidation();
           setSteps(steps.map((step, i) => (i === idx ? updatedStep : step)));
@@ -191,10 +191,10 @@ export function useToolExecution(
 
       const parsedSchema = schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null;
       const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
-      const result = await executeFinalTransform({
+      const result = await executeOutputTransform({
         client,
-        finalTransform: transformStr || finalTransform,
-        responseSchema: parsedSchema,
+        outputTransform: transformStr || outputTransform,
+        outputSchema: parsedSchema,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
         payload: computedPayload,
         previousResults: stepData,
@@ -210,9 +210,9 @@ export function useToolExecution(
 
         if (
           result.updatedTransform &&
-          result.updatedTransform !== (transformStr || finalTransform)
+          result.updatedTransform !== (transformStr || outputTransform)
         ) {
-          setFinalTransform(result.updatedTransform);
+          setOutputTransform(result.updatedTransform);
         }
       } else {
         const status: TransformStatus = isAbortError(result.error) ? "aborted" : "failed";
@@ -243,18 +243,18 @@ export function useToolExecution(
     let runError: string | undefined;
 
     try {
-      JSON.parse(responseSchema || "{}");
+      JSON.parse(outputSchema || "{}");
       JSON.parse(inputSchema || "{}");
 
       const executionSteps = steps;
-      const currentResponseSchema =
-        responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null;
+      const currentOutputSchema =
+        outputSchema && outputSchema.trim() ? JSON.parse(outputSchema) : null;
 
       const executionTool = {
         id: toolId,
         steps: executionSteps,
-        finalTransform,
-        responseSchema: currentResponseSchema,
+        outputTransform,
+        outputSchema: currentOutputSchema,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
         responseFilters,
       } as any;
@@ -322,13 +322,10 @@ export function useToolExecution(
 
       const finalData = state.stepResults["__final_transform__"]?.data;
 
-      const wr: ToolResult = {
-        id: generateUUID(),
+      wr = {
         success: state.failedSteps.length === 0,
         data: finalData,
         error: state.stepResults["__final_transform__"]?.error,
-        startedAt: new Date(),
-        completedAt: new Date(),
         stepResults: Object.entries(state.stepResults)
           .filter(([key]) => key !== "__final_transform__")
           .map(([stepId, result]: [string, StepExecutionResult]) => ({
@@ -337,15 +334,18 @@ export function useToolExecution(
             data: result.data,
             error: result.error,
           })),
-        config: {
+        tool: {
           id: toolId,
           steps: state.currentTool.steps,
-          finalTransform: state.currentTool.finalTransform || finalTransform,
+          outputTransform: state.currentTool.outputTransform || outputTransform,
         } as any,
       };
 
-      if (state.currentTool.finalTransform && state.currentTool.finalTransform !== finalTransform) {
-        setFinalTransform(state.currentTool.finalTransform);
+      if (
+        state.currentTool.outputTransform &&
+        state.currentTool.outputTransform !== outputTransform
+      ) {
+        setOutputTransform(state.currentTool.outputTransform);
       }
 
       if (state.failedSteps.length === 0 && state.abortedSteps.length === 0 && !state.interrupted) {
@@ -380,8 +380,8 @@ export function useToolExecution(
       finalToolConfig = {
         id: toolId,
         steps: state.currentTool.steps,
-        finalTransform: state.currentTool.finalTransform || finalTransform,
-        responseSchema: currentResponseSchema,
+        outputTransform: state.currentTool.outputTransform || outputTransform,
+        outputSchema: currentOutputSchema,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
         instruction: instructions,
       } as Tool;
@@ -412,8 +412,8 @@ export function useToolExecution(
               ({
                 id: toolId,
                 steps,
-                finalTransform,
-                responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
+                outputTransform,
+                outputSchema: outputSchema ? JSON.parse(outputSchema) : null,
                 inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
                 instruction: instructions,
               } as Tool),

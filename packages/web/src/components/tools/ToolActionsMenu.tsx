@@ -62,7 +62,7 @@ export function ToolActionsMenu({
 
   const handleUnarchive = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const client = createSuperglueClient(config.superglueEndpoint);
+    const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
     await client.archiveWorkflow(tool.id, false);
     refreshTools();
     if (onUnarchived) {

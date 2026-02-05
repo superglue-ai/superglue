@@ -3,7 +3,7 @@ import {
   PaginationType,
   RequestOptions,
   ServiceMetadata,
-  ApiConfig as StepConfig,
+  RequestStepConfig,
   SupportedFileType,
 } from "@superglue/shared";
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
@@ -36,12 +36,12 @@ export class HttpStepExecutionStrategy implements StepExecutionStrategy {
     const { stepConfig, stepInputData, credentials, requestOptions, metadata, failureBehavior } =
       input;
     const httpResult = await callHttp({
-      config: stepConfig,
+      config: stepConfig as RequestStepConfig,
       payload: stepInputData,
       credentials,
       options: requestOptions,
       metadata,
-      continueOnFailure: failureBehavior === "CONTINUE",
+      continueOnFailure: failureBehavior === "continue",
     });
     return {
       success: true,
@@ -344,7 +344,7 @@ export async function callHttp({
   metadata,
   continueOnFailure,
 }: {
-  config: StepConfig;
+  config: RequestStepConfig;
   payload: Record<string, any>;
   credentials: Record<string, any>;
   options: RequestOptions;
@@ -377,25 +377,25 @@ export async function callHttp({
 
     const requestVars = { ...paginationVars, ...allVariables };
 
-    if (config.pagination?.type === PaginationType.PAGE_BASED) {
+    if (config.pagination?.type === "pageBased") {
       const request = JSON.stringify(config);
       if (!request.includes("page")) {
         throw new Error(
-          `Pagination type is ${PaginationType.PAGE_BASED} but no page parameter is provided in the request. Please provide a page parameter in the request.`,
+          `Pagination type is pageBased but no page parameter is provided in the request. Please provide a page parameter in the request.`,
         );
       }
-    } else if (config.pagination?.type === PaginationType.OFFSET_BASED) {
+    } else if (config.pagination?.type === "offsetBased") {
       const request = JSON.stringify(config);
       if (!request.includes("offset")) {
         throw new Error(
-          `Pagination type is ${PaginationType.OFFSET_BASED} but no offset parameter is provided in the request. Please provide an offset parameter in the request.`,
+          `Pagination type is offsetBased but no offset parameter is provided in the request. Please provide an offset parameter in the request.`,
         );
       }
-    } else if (config.pagination?.type === PaginationType.CURSOR_BASED) {
+    } else if (config.pagination?.type === "cursorBased") {
       const request = JSON.stringify(config);
       if (!request.includes("cursor")) {
         throw new Error(
-          `Pagination type is ${PaginationType.CURSOR_BASED} but no cursor parameter is provided in the request. Please provide a cursor parameter in the request.`,
+          `Pagination type is cursorBased but no cursor parameter is provided in the request. Please provide a cursor parameter in the request.`,
         );
       }
     }
@@ -478,11 +478,11 @@ export async function callHttp({
     };
 
     const paginationInfo =
-      config.pagination?.type === PaginationType.PAGE_BASED
+      config.pagination?.type === "pageBased"
         ? "page: " + page
-        : config.pagination?.type === PaginationType.OFFSET_BASED
+        : config.pagination?.type === "offsetBased"
           ? "offset: " + offset
-          : config.pagination?.type === PaginationType.CURSOR_BASED
+          : config.pagination?.type === "cursorBased"
             ? "cursor: " + cursor
             : "";
     logMessage(
@@ -612,7 +612,7 @@ export async function callHttp({
     page++;
     offset += parseInt(config.pagination?.pageSize) || 50;
 
-    if (config.pagination?.type === PaginationType.CURSOR_BASED) {
+    if (config.pagination?.type === "cursorBased") {
       const cursorPath = config.pagination?.cursorPath || "next_cursor";
       const jsonPath = cursorPath.startsWith("$") ? cursorPath : `$.${cursorPath}`;
       const result = JSONPath({ path: jsonPath, json: parsedResponseData, wrap: false });

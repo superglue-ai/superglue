@@ -1,4 +1,4 @@
-import { ExecutionStep, System, ResponseFilter, SuperglueClient, Tool } from "@superglue/shared";
+import { ToolStep, System, ResponseFilter, SuperglueClient, Tool } from "@superglue/shared";
 import { isAbortError } from "./general-utils";
 import { tokenRegistry } from "./token-registry";
 
@@ -82,7 +82,7 @@ export async function executeSingleStep({
   onRunIdGenerated,
 }: {
   client: SuperglueClient;
-  step: ExecutionStep;
+  step: ToolStep;
   payload: any;
   previousResults: Record<string, any>;
   onRunIdGenerated?: (runId: string) => void;
@@ -202,11 +202,11 @@ export async function executeToolStepByStep({
     }
   }
 
-  if ((tool.finalTransform || tool.responseFilters?.length) && state.failedSteps.length === 0) {
-    const finalResult = await executeFinalTransform({
+  if ((tool.outputTransform || tool.responseFilters?.length) && state.failedSteps.length === 0) {
+    const transformResult = await executeOutputTransform({
       client,
-      finalTransform: state.currentTool.finalTransform || tool.finalTransform,
-      responseSchema: tool.responseSchema,
+      outputTransform: state.currentTool.outputTransform || tool.outputTransform,
+      outputSchema: tool.outputSchema,
       inputSchema: tool.inputSchema,
       payload,
       previousResults,
@@ -216,15 +216,15 @@ export async function executeToolStepByStep({
 
     state.stepResults["__final_transform__"] = {
       stepId: "__final_transform__",
-      success: finalResult.success,
-      data: finalResult.data,
-      error: finalResult.error,
+      success: transformResult.success,
+      data: transformResult.data,
+      error: transformResult.error,
     };
 
-    if (finalResult.success) {
+    if (transformResult.success) {
       state.completedSteps.push("__final_transform__");
     } else {
-      if (isAbortError(finalResult.error)) {
+      if (isAbortError(transformResult.error)) {
         state.abortedSteps.push("__final_transform__");
       } else {
         state.failedSteps.push("__final_transform__");
@@ -236,10 +236,10 @@ export async function executeToolStepByStep({
   return state;
 }
 
-export async function executeFinalTransform({
+export async function executeOutputTransform({
   client,
-  finalTransform,
-  responseSchema,
+  outputTransform,
+  outputSchema,
   inputSchema,
   payload,
   previousResults,
@@ -247,8 +247,8 @@ export async function executeFinalTransform({
   responseFilters,
 }: {
   client: SuperglueClient;
-  finalTransform: string;
-  responseSchema: any;
+  outputTransform: string;
+  outputSchema: any;
   inputSchema: any;
   payload: any;
   previousResults: Record<string, any>;
@@ -264,8 +264,8 @@ export async function executeFinalTransform({
   try {
     // Use the new REST endpoint that doesn't create a run
     const result = await client.executeTransformOnly({
-      finalTransform,
-      responseSchema,
+      outputTransform,
+      outputSchema,
       inputSchema,
       payload,
       stepResults: previousResults,
@@ -278,13 +278,13 @@ export async function executeFinalTransform({
       data: result.data,
       error: result.error,
       updatedTransform: result.updatedTransform,
-      updatedResponseSchema: result.updatedResponseSchema,
+      updatedResponseSchema: result.updatedOutputSchema,
       runId: transformRunId,
     };
   } catch (error: any) {
     return {
       success: false,
-      error: error.message || "Final transform execution failed",
+      error: error.message || "Output transform execution failed",
       runId: transformRunId,
     };
   }

@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, System, ExecutionStep, Tool } from "@superglue/shared";
+import { getToolSystemIds, HttpMethod, System, Tool } from "@superglue/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryStore } from "../datastore/memory.js";
 import { SystemManager } from "../systems/system-manager.js";
@@ -25,17 +25,14 @@ describe("ToolExecutor", () => {
     it("should initialize with tool configuration", () => {
       const tool: Tool = {
         id: "test-tool",
-        systemIds: ["test-system"],
         steps: [
           {
             id: "step-1",
-            systemId: "test-system",
-            apiConfig: {
-              id: "config-1",
-              instruction: "Fetch data",
-              urlHost: "https://api.example.com",
-              urlPath: "/data",
+            instruction: "Fetch data",
+            config: {
+              url: "https://api.example.com/data",
               method: "GET" as HttpMethod,
+              systemId: "test-system",
             },
           },
         ],
@@ -53,13 +50,12 @@ describe("ToolExecutor", () => {
 
       expect(executor.id).toBe("test-tool");
       expect(executor.steps).toHaveLength(1);
-      expect(executor.systemIds).toEqual(["test-system"]);
+      expect(getToolSystemIds(executor)).toEqual(["test-system"]);
     });
 
     it("should register execution strategies", () => {
       const tool: Tool = {
         id: "test-tool",
-        systemIds: [],
         steps: [],
       };
 
@@ -78,7 +74,6 @@ describe("ToolExecutor", () => {
     it("should throw error when tool has no ID", async () => {
       const tool = {
         id: "",
-        systemIds: [],
         steps: [],
       } as Tool;
 
@@ -101,7 +96,6 @@ describe("ToolExecutor", () => {
     it("should throw error when steps is not an array", async () => {
       const tool = {
         id: "test-tool",
-        systemIds: [],
         steps: null as any,
       } as Tool;
 
@@ -124,11 +118,10 @@ describe("ToolExecutor", () => {
     it("should throw error when step has no ID", async () => {
       const tool = {
         id: "test-tool",
-        systemIds: [],
         steps: [
           {
             id: "",
-            apiConfig: { id: "config-1" },
+            config: { url: "https://example.com" },
           },
         ],
       } as Tool;
@@ -149,14 +142,13 @@ describe("ToolExecutor", () => {
       expect(result.error).toContain("Each step must have an ID");
     });
 
-    it("should throw error when step has no apiConfig", async () => {
+    it("should throw error when step has no config", async () => {
       const tool = {
         id: "test-tool",
-        systemIds: [],
         steps: [
           {
             id: "step-1",
-            apiConfig: null as any,
+            config: null as any,
           },
         ],
       } as Tool;
@@ -174,28 +166,23 @@ describe("ToolExecutor", () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("Each step must have an API config");
+      expect(result.error).toContain("Each step must have a config");
     });
   });
 
   describe("step execution", () => {
     it("should execute a simple step successfully", async () => {
-      const apiConfig: ApiConfig = {
-        id: "config-1",
-        instruction: "Fetch users",
-        urlHost: "https://api.example.com",
-        urlPath: "/users",
-        method: "GET" as HttpMethod,
-      };
-
       const tool: Tool = {
         id: "test-tool",
-        systemIds: ["test-system"],
         steps: [
           {
             id: "step-1",
-            systemId: "test-system",
-            apiConfig,
+            instruction: "Fetch users",
+            config: {
+              url: "https://api.example.com/users",
+              method: "GET" as HttpMethod,
+              systemId: "test-system",
+            },
           },
         ],
       };
@@ -230,17 +217,14 @@ describe("ToolExecutor", () => {
     it("should fail when system is not found", async () => {
       const tool: Tool = {
         id: "test-tool",
-        systemIds: ["missing-system"],
         steps: [
           {
             id: "step-1",
-            systemId: "missing-system",
-            apiConfig: {
-              id: "config-1",
-              instruction: "Fetch data",
-              urlHost: "https://api.example.com",
-              urlPath: "/data",
+            instruction: "Fetch data",
+            config: {
+              url: "https://api.example.com/data",
               method: "GET" as HttpMethod,
+              systemId: "missing-system",
             },
           },
         ],
@@ -265,29 +249,24 @@ describe("ToolExecutor", () => {
     it("should handle step failure with CONTINUE behavior", async () => {
       const tool: Tool = {
         id: "test-tool",
-        systemIds: ["test-system"],
         steps: [
           {
             id: "step-1",
-            systemId: "test-system",
-            apiConfig: {
-              id: "config-1",
-              instruction: "Fetch data",
-              urlHost: "https://api.example.com",
-              urlPath: "/data",
+            instruction: "Fetch data",
+            config: {
+              url: "https://api.example.com/data",
               method: "GET" as HttpMethod,
+              systemId: "test-system",
             },
-            failureBehavior: "CONTINUE",
+            failureBehavior: "continue",
           },
           {
             id: "step-2",
-            systemId: "test-system",
-            apiConfig: {
-              id: "config-2",
-              instruction: "Fetch more data",
-              urlHost: "https://api.example.com",
-              urlPath: "/more-data",
+            instruction: "Fetch more data",
+            config: {
+              url: "https://api.example.com/more-data",
               method: "GET" as HttpMethod,
+              systemId: "test-system",
             },
           },
         ],
@@ -333,29 +312,24 @@ describe("ToolExecutor", () => {
     it("should stop execution on step failure without CONTINUE behavior", async () => {
       const tool: Tool = {
         id: "test-tool",
-        systemIds: ["test-system"],
         steps: [
           {
             id: "step-1",
-            systemId: "test-system",
-            apiConfig: {
-              id: "config-1",
-              instruction: "Fetch data",
-              urlHost: "https://api.example.com",
-              urlPath: "/data",
+            instruction: "Fetch data",
+            config: {
+              url: "https://api.example.com/data",
               method: "GET" as HttpMethod,
+              systemId: "test-system",
             },
-            failureBehavior: "FAIL", // Default behavior
+            failureBehavior: "fail", // Default behavior
           },
           {
             id: "step-2",
-            systemId: "test-system",
-            apiConfig: {
-              id: "config-2",
-              instruction: "Should not run",
-              urlHost: "https://api.example.com",
-              urlPath: "/never",
+            instruction: "Should not run",
+            config: {
+              url: "https://api.example.com/never",
               method: "GET" as HttpMethod,
+              systemId: "test-system",
             },
           },
         ],
@@ -393,20 +367,16 @@ describe("ToolExecutor", () => {
     it("should execute loop steps with array data selector output", async () => {
       const tool: Tool = {
         id: "test-tool",
-        systemIds: ["test-system"],
         steps: [
           {
             id: "step-1",
-            systemId: "test-system",
-            apiConfig: {
-              id: "config-1",
-              instruction: "Fetch user details",
-              urlHost: "https://api.example.com",
-              urlPath: "/users/{{currentItem.id}}",
+            instruction: "Fetch user details",
+            config: {
+              url: "https://api.example.com/users/{{currentItem.id}}",
               method: "GET" as HttpMethod,
+              systemId: "test-system",
             },
-            loopSelector: "(data) => [{ id: 1 }, { id: 2 }, { id: 3 }]",
-            executionMode: "LOOP",
+            dataSelector: "(data) => [{ id: 1 }, { id: 2 }, { id: 3 }]",
           },
         ],
       };
@@ -444,21 +414,17 @@ describe("ToolExecutor", () => {
     it("should handle loop iteration failures with CONTINUE behavior", async () => {
       const tool: Tool = {
         id: "test-tool",
-        systemIds: ["test-system"],
         steps: [
           {
             id: "step-1",
-            systemId: "test-system",
-            apiConfig: {
-              id: "config-1",
-              instruction: "Fetch user details",
-              urlHost: "https://api.example.com",
-              urlPath: "/users/{{currentItem.id}}",
+            instruction: "Fetch user details",
+            config: {
+              url: "https://api.example.com/users/{{currentItem.id}}",
               method: "GET" as HttpMethod,
+              systemId: "test-system",
             },
-            loopSelector: "(data) => [{ id: 1 }, { id: 2 }, { id: 3 }]",
-            executionMode: "LOOP",
-            failureBehavior: "CONTINUE",
+            dataSelector: "(data) => [{ id: 1 }, { id: 2 }, { id: 3 }]",
+            failureBehavior: "continue",
           },
         ],
       };
@@ -504,28 +470,23 @@ describe("ToolExecutor", () => {
 
   describe("config propagation", () => {
     it("should return updated config in result", async () => {
-      const originalConfig: ApiConfig = {
-        id: "config-1",
-        instruction: "Fetch users",
-        urlHost: "https://api.example.com",
-        urlPath: "/v1/users",
-        method: "GET" as HttpMethod,
-      };
-
       const tool: Tool = {
         id: "test-tool",
-        systemIds: ["test-system"],
         steps: [
           {
             id: "step-1",
-            systemId: "test-system",
-            apiConfig: originalConfig,
-            loopSelector: "(data) => data",
+            instruction: "Fetch users",
+            config: {
+              url: "https://api.example.com/v1/users",
+              method: "GET" as HttpMethod,
+              systemId: "test-system",
+            },
+            dataSelector: "(data) => data",
           },
         ],
         instruction: "Test instruction",
         inputSchema: { type: "object" },
-        responseSchema: { type: "object" },
+        outputSchema: { type: "object" },
       };
 
       const systemManager = SystemManager.fromSystem(mockSystem, dataStore, {
@@ -550,11 +511,11 @@ describe("ToolExecutor", () => {
       });
 
       expect(result.success).toBe(true);
-      expect(result.config).toBeDefined();
-      expect(result.config.id).toBe("test-tool");
-      expect(result.config.systemIds).toEqual(["test-system"]);
-      expect(result.config.steps).toHaveLength(1);
-      expect(result.config.instruction).toBe("Test instruction");
+      expect(result.tool).toBeDefined();
+      expect(result.tool.id).toBe("test-tool");
+      expect(getToolSystemIds(result.tool)).toEqual(["test-system"]);
+      expect(result.tool.steps).toHaveLength(1);
+      expect(result.tool.instruction).toBe("Test instruction");
     });
   });
 
@@ -562,17 +523,14 @@ describe("ToolExecutor", () => {
     it("should merge system credentials with provided credentials", async () => {
       const tool: Tool = {
         id: "test-tool",
-        systemIds: ["test-system"],
         steps: [
           {
             id: "step-1",
-            systemId: "test-system",
-            apiConfig: {
-              id: "config-1",
-              instruction: "Fetch data",
-              urlHost: "https://api.example.com",
-              urlPath: "/data",
+            instruction: "Fetch data",
+            config: {
+              url: "https://api.example.com/data",
               method: "GET" as HttpMethod,
+              systemId: "test-system",
             },
           },
         ],

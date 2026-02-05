@@ -1,10 +1,4 @@
-import {
-  OpenAPIPagination,
-  OpenAPITool,
-  OpenAPIToolStep,
-  ServiceMetadata,
-  UserRole,
-} from "@superglue/shared";
+import { Pagination, ServiceMetadata, Tool, ToolStep, UserRole } from "@superglue/shared";
 import { FastifyReply, FastifyRequest } from "fastify";
 import type { DataStore } from "../datastore/types.js";
 import type { WorkerPools } from "../worker/types.js";
@@ -54,8 +48,8 @@ export interface ApiModule {
   routes: RouteConfig[];
 }
 
-// Re-export OpenAPI types from shared for convenience
-export type { OpenAPIPagination, OpenAPITool, OpenAPIToolStep };
+// Re-export types from shared for convenience
+export type { Pagination, Tool, ToolStep };
 
 export interface OpenAPIStepResult {
   stepId: string;
@@ -91,7 +85,7 @@ export interface RunToolRequestOptions {
   timeout?: number;
   webhookUrl?: string;
   traceId?: string;
-  // Optional source of the request; currently only 'mcp' is honored; Other sources are derived from the request context.x
+  // Optional source of the request; 'frontend' and 'mcp' are honored; Other sources are derived from the request context.
   requestSource?: string;
 }
 

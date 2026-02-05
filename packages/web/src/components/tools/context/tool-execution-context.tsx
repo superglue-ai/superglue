@@ -29,10 +29,12 @@ import {
   buildPaginationData,
 } from "@/src/lib/templating-utils";
 import {
-  ExecutionStep,
+  ToolStep,
   flattenAndNamespaceCredentials,
   assertValidArrowFunction,
   executeWithVMHelpers,
+  RequestStepConfig,
+  isRequestConfig,
 } from "@superglue/shared";
 
 const ExecutionContext = createContext<ExecutionContextValue | null>(null);
@@ -134,11 +136,12 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
   >({});
   const dataSelectorTimersRef = useRef<Record<string, number>>({});
   const dataSelectorCacheRef = useRef<
-    Map<string, { version: number; loopSelector: string; result: DataSelectorResult }>
+    Map<string, { version: number; dataSelector: string; result: DataSelectorResult }>
   >(new Map());
 
   const setStepResult = useCallback(
     (stepId: string, result: any, status: StepStatus, error?: string) => {
+      console.log("[ExecutionContext] setStepResult:", { stepId, result, status, error });
       setStepExecutions((prev) => ({
         ...prev,
         [stepId]: { status, result, error: error ?? null, runId: null },
@@ -193,14 +196,16 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     skipNextHashInvalidationRef.current = true;
   }, []);
 
-  const hashStepConfig = (s: ExecutionStep): string => {
+  const hashStepConfig = (s: ToolStep): string => {
     try {
       return JSON.stringify({
         id: s.id,
-        executionMode: s.executionMode,
-        loopSelector: s.loopSelector,
-        systemId: s.systemId,
-        apiConfig: s.apiConfig,
+        dataSelector: s.dataSelector,
+        systemId:
+          s.config && isRequestConfig(s.config)
+            ? (s.config as RequestStepConfig).systemId
+            : undefined,
+        config: s.config,
         modify: s.modify,
         failureBehavior: s.failureBehavior,
       });
@@ -435,13 +440,12 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
   const getStepInput = useCallback(
     (stepId?: string): Record<string, any> => {
       if (!stepId) {
-        if (steps.length === 0) return payload.computedPayload;
-        const lastStepId = steps[steps.length - 1].id;
-        return stepInputs[lastStepId] ?? payload.computedPayload;
+        // Return accumulated data after ALL steps (initialPayload + all step results)
+        return buildStepInput(payload.computedPayload, steps, stepResultsMap, steps.length - 1);
       }
       return stepInputs[stepId] ?? payload.computedPayload;
     },
-    [steps, stepInputs, payload.computedPayload],
+    [steps, stepInputs, stepResultsMap, payload.computedPayload],
   );
 
   const manualPayload = useMemo(() => {
@@ -456,10 +460,10 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     for (const step of steps) {
       const stepId = step.id;
       const stepInput = stepInputs[stepId];
-      const loopSelector = step.loopSelector ?? "";
+      const dataSelector = step.dataSelector ?? "";
 
       const cached = dataSelectorCacheRef.current.get(stepId);
-      if (cached && cached.version === stepInputVersion && cached.loopSelector === loopSelector) {
+      if (cached && cached.version === stepInputVersion && cached.dataSelector === dataSelector) {
         if (
           dataSelectorResults[stepId]?.output !== cached.result.output ||
           dataSelectorResults[stepId]?.error !== cached.result.error
@@ -476,9 +480,9 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       dataSelectorTimersRef.current[stepId] = window.setTimeout(() => {
         let result: DataSelectorResult;
         try {
-          assertValidArrowFunction(loopSelector || undefined);
+          assertValidArrowFunction(dataSelector || undefined);
           const output = executeWithVMHelpers(
-            loopSelector || "(sourceData) => sourceData",
+            dataSelector || "(sourceData) => sourceData",
             stepInput || {},
           );
           if (typeof output === "function") {
@@ -492,7 +496,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
 
         dataSelectorCacheRef.current.set(stepId, {
           version: stepInputVersion,
-          loopSelector,
+          dataSelector,
           result,
         });
         dataSelectorVersionRef.current += 1;
@@ -523,11 +527,18 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       const dsResult = dataSelectorResults[stepId] || { output: null, error: null };
       const currentItemObj = deriveCurrentItem(dsResult.output);
 
+      // systemId is on step.config for request steps
+      const stepSystemId =
+        step.config && isRequestConfig(step.config) ? step.config.systemId : undefined;
       const linkedSystem =
-        step.systemId && systems ? systems.find((sys) => sys.id === step.systemId) : undefined;
+        stepSystemId && systems ? systems.find((sys) => sys.id === stepSystemId) : undefined;
 
       const systemCredentials = flattenAndNamespaceCredentials(linkedSystem ? [linkedSystem] : []);
-      const paginationData = buildPaginationData(step.apiConfig?.pagination);
+      // Only request steps have pagination data
+      const paginationData =
+        step.config && isRequestConfig(step.config)
+          ? buildPaginationData((step.config as RequestStepConfig)?.pagination)
+          : {};
 
       const sourceData: Record<string, any> = {
         ...systemCredentials,

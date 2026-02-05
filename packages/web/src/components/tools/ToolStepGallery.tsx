@@ -4,6 +4,7 @@ import { MiniCard, StatusIndicator, TriggerCard } from "@/src/components/ui/mini
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import { buildPreviousStepResults, cn } from "@/src/lib/general-utils";
 import { buildCategorizedSources } from "@/src/lib/templating-utils";
+import { isRequestConfig, RequestStepConfig } from "@superglue/shared";
 import {
   Blocks,
   ChevronLeft,
@@ -81,8 +82,8 @@ export function ToolStepGallery({
     payload,
     systems,
     inputSchema,
-    responseSchema,
-    finalTransform,
+    outputSchema,
+    outputTransform,
     setSteps,
     setInstruction,
     isPayloadReferenced,
@@ -158,10 +159,10 @@ export function ToolStepGallery({
     });
 
     // Transform
-    if (finalTransform !== undefined) {
+    if (outputTransform !== undefined) {
       items.push({
         type: "transform",
-        data: { transform: finalTransform, responseSchema },
+        data: { transform: outputTransform, outputSchema: outputSchema },
         stepResult: finalResult,
         transformError: hasTransformFailed ? stepResultsMap["__final_transform__"] : null,
         hasTransformCompleted,
@@ -179,8 +180,8 @@ export function ToolStepGallery({
     inputSchema,
     steps,
     stepResultsMap,
-    finalTransform,
-    responseSchema,
+    outputTransform,
+    outputSchema,
     finalResult,
     hasTransformCompleted,
     hasTransformFailed,
@@ -639,9 +640,13 @@ export function ToolStepGallery({
                                 animate: false,
                               };
                           const statusInfo = isRunning ? RUNNING_STATUS : baseStatusInfo;
+                          const stepSystemId =
+                            step.config && isRequestConfig(step.config)
+                              ? (step.config as RequestStepConfig).systemId
+                              : undefined;
                           const linkedSystem =
-                            step.systemId && systems
-                              ? systems.find((sys) => sys.id === step.systemId)
+                            stepSystemId && systems
+                              ? systems.find((sys) => sys.id === stepSystemId)
                               : undefined;
 
                           return (
@@ -674,12 +679,12 @@ export function ToolStepGallery({
                                       <Blocks className="h-4 w-4 text-muted-foreground" />
                                     )}
                                   </div>
-                                  {step.systemId && (
+                                  {stepSystemId && (
                                     <span
                                       className="text-[9px] text-muted-foreground mt-1 truncate max-w-[140px]"
-                                      title={step.systemId}
+                                      title={stepSystemId}
                                     >
-                                      {step.systemId}
+                                      {stepSystemId}
                                     </span>
                                   )}
                                   <span

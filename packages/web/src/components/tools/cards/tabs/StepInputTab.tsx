@@ -46,7 +46,7 @@ export function StepInputTab({ step, stepIndex, onEdit, isActive = true }: StepI
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [chipPosition, setChipPosition] = useState<ChipPosition | null>(null);
 
-  const currentItemExpression = step.loopSelector || "(sourceData) => sourceData";
+  const currentItemExpression = step.dataSelector || "(sourceData) => sourceData";
   const cannotExecuteYet = stepIndex > 0 && !canExecute;
   const templateString = currentItemExpression.startsWith("<<")
     ? currentItemExpression
@@ -123,7 +123,7 @@ export function StepInputTab({ step, stepIndex, onEdit, isActive = true }: StepI
       const expression = newTemplate.replace(/^<<|>>$/g, "");
       const latestStep = getStepConfig(step.id);
       if (latestStep) {
-        onEdit?.(step.id, { ...latestStep, loopSelector: expression }, true);
+        onEdit?.(step.id, { ...latestStep, dataSelector: expression }, true);
       }
     },
     [onEdit, step.id, getStepConfig],

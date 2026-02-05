@@ -1,5 +1,4 @@
 import type {
-  ApiConfig,
   DiscoveryRun,
   FileReference,
   FileStatus,

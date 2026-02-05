@@ -9,7 +9,7 @@ import {
   SystemPlaygroundContextData,
 } from "@/src/lib/agent/agent-context";
 import { cn } from "@/src/lib/general-utils";
-import { Tool, ExecutionStep, ToolDiff } from "@superglue/shared";
+import { Tool, ToolStep, ToolDiff, RequestStepConfig, isRequestConfig } from "@superglue/shared";
 import { BotMessageSquare, Edit2, MessagesSquare, Send, Square, User, Plus, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
@@ -49,24 +49,28 @@ function buildPlaygroundContext(
   executionSummary: string,
   initialError?: string,
 ): PlaygroundToolContext {
-  const { tool, steps, finalTransform, inputSchema, responseSchema, payload } = toolConfig;
+  const { tool, steps, outputTransform, inputSchema, outputSchema, payload } = toolConfig;
   const systemIds = [
-    ...new Set(steps.map((s: ExecutionStep) => s.systemId).filter(Boolean)),
+    ...new Set(
+      steps
+        .map((s: ToolStep) =>
+          s.config && isRequestConfig(s.config)
+            ? (s.config as RequestStepConfig).systemId
+            : undefined,
+        )
+        .filter(Boolean),
+    ),
   ] as string[];
 
   return {
     toolId: tool.id,
     instruction: tool.instruction,
-    steps: steps.map((step: ExecutionStep) => ({
+    steps: steps.map((step: ToolStep) => ({
       ...step,
-      apiConfig: {
-        ...step.apiConfig,
-        id: step.apiConfig?.id || step.id,
-      },
     })),
-    finalTransform,
+    outputTransform,
     inputSchema,
-    responseSchema,
+    outputSchema,
     systemIds,
     executionSummary,
     initialError,
@@ -422,13 +426,20 @@ function ToolPlaygroundAgentSidebar({
     (newConfig: Tool, _diffs?: ToolDiff[]) => {
       execution.skipNextHashInvalidation();
 
-      const stepsAreDifferent = (a: ExecutionStep, b: ExecutionStep): boolean => {
+      const stepsAreDifferent = (a: ToolStep, b: ToolStep): boolean => {
+        const aSystemId =
+          a.config && isRequestConfig(a.config)
+            ? (a.config as RequestStepConfig).systemId
+            : undefined;
+        const bSystemId =
+          b.config && isRequestConfig(b.config)
+            ? (b.config as RequestStepConfig).systemId
+            : undefined;
         return (
           a.id !== b.id ||
-          a.systemId !== b.systemId ||
-          a.executionMode !== b.executionMode ||
-          a.loopSelector !== b.loopSelector ||
-          JSON.stringify(a.apiConfig) !== JSON.stringify(b.apiConfig)
+          aSystemId !== bSystemId ||
+          a.dataSelector !== b.dataSelector ||
+          JSON.stringify(a.config) !== JSON.stringify(b.config)
         );
       };
 
@@ -450,26 +461,25 @@ function ToolPlaygroundAgentSidebar({
         toolConfig.setSteps(
           newSteps.map((step) => ({
             ...step,
-            apiConfig: { ...step.apiConfig, id: step.apiConfig?.id || step.id },
           })),
         );
       }
 
-      const finalTransformChanged =
-        newConfig.finalTransform !== undefined &&
-        newConfig.finalTransform !== toolConfig.finalTransform;
+      const outputTransformChanged =
+        newConfig.outputTransform !== undefined &&
+        newConfig.outputTransform !== toolConfig.outputTransform;
 
-      if (newConfig.finalTransform !== undefined) {
-        toolConfig.setFinalTransform(newConfig.finalTransform);
+      if (newConfig.outputTransform !== undefined) {
+        toolConfig.setOutputTransform(newConfig.outputTransform);
       }
 
-      if (newConfig.responseSchema !== undefined) {
-        const schemaValue = newConfig.responseSchema
-          ? typeof newConfig.responseSchema === "string"
-            ? newConfig.responseSchema
-            : JSON.stringify(newConfig.responseSchema, null, 2)
+      if (newConfig.outputSchema !== undefined) {
+        const schemaValue = newConfig.outputSchema
+          ? typeof newConfig.outputSchema === "string"
+            ? newConfig.outputSchema
+            : JSON.stringify(newConfig.outputSchema, null, 2)
           : "";
-        toolConfig.setResponseSchema(schemaValue);
+        toolConfig.setOutputSchema(schemaValue);
       }
 
       if (newConfig.inputSchema !== undefined) {
@@ -483,7 +493,7 @@ function ToolPlaygroundAgentSidebar({
 
       if (firstChangedStepIndex !== null) {
         execution.clearExecutionsFrom(firstChangedStepIndex);
-      } else if (finalTransformChanged) {
+      } else if (outputTransformChanged) {
         execution.clearFinalResult();
       }
     },
@@ -536,9 +546,9 @@ function ToolPlaygroundAgentSidebar({
           toolId: ctx.toolId,
           instruction: ctx.instruction,
           steps: ctx.steps,
-          finalTransform: ctx.finalTransform,
+          outputTransform: ctx.outputTransform,
           inputSchema: ctx.inputSchema,
-          responseSchema: ctx.responseSchema,
+          outputSchema: ctx.outputSchema,
           systemIds: ctx.systemIds,
         },
       },

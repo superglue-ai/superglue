@@ -181,9 +181,9 @@ export const toolDefinitions: Record<string, any> = {
             id: t.id,
             instruction: t.instruction,
             inputSchema: t.inputSchema?.properties?.payload,
-            responseSchema: t.outputSchema,
+            outputSchema: t.outputSchema,
             steps: (t.steps || []).map((s: any) => ({
-              systemId: s.systemId,
+              systemId: s.config?.systemId,
               stepId: s.id,
             })),
           })),

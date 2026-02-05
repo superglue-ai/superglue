@@ -1,5 +1,5 @@
 import { UploadedFileInfo } from "@/src/lib/file-utils";
-import { ExecutionStep, System, ResponseFilter } from "@superglue/shared";
+import { ToolStep, System, ResponseFilter } from "@superglue/shared";
 
 export interface PayloadState {
   manualPayloadText: string;
@@ -12,9 +12,9 @@ export interface PayloadState {
 export interface ToolDefinition {
   id: string;
   instruction: string;
-  finalTransform: string;
+  outputTransform: string;
   inputSchema: any | null;
-  responseSchema: any | null;
+  outputSchema: any | null;
   folder?: string;
   isArchived: boolean;
   responseFilters: ResponseFilter[];
@@ -22,20 +22,20 @@ export interface ToolDefinition {
 
 export interface ToolConfigContextValue {
   tool: ToolDefinition;
-  steps: ExecutionStep[];
+  steps: ToolStep[];
   payload: PayloadState;
   systems: System[];
 
   inputSchema: string | null;
-  responseSchema: string;
-  finalTransform: string;
+  outputSchema: string;
+  outputTransform: string;
   responseFilters: ResponseFilter[];
 
   setToolId: (id: string) => void;
   setInstruction: (instruction: string) => void;
-  setFinalTransform: (transform: string) => void;
+  setOutputTransform: (transform: string) => void;
   setInputSchema: (schema: string | null) => void;
-  setResponseSchema: (schema: string) => void;
+  setOutputSchema: (schema: string) => void;
   setFolder: (folder: string | undefined) => void;
   setIsArchived: (archived: boolean) => void;
   setResponseFilters: (filters: ResponseFilter[]) => void;
@@ -46,12 +46,12 @@ export interface ToolConfigContextValue {
   setFilesAndPayloads: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
   markPayloadEdited: () => void;
 
-  addStep: (step: ExecutionStep, afterIndex?: number) => void;
+  addStep: (step: ToolStep, afterIndex?: number) => void;
   removeStep: (stepId: string) => void;
-  updateStep: (stepId: string, updates: Partial<ExecutionStep>) => void;
-  setSteps: (steps: ExecutionStep[] | ((prev: ExecutionStep[]) => ExecutionStep[])) => void;
+  updateStep: (stepId: string, updates: Partial<ToolStep>) => void;
+  setSteps: (steps: ToolStep[] | ((prev: ToolStep[]) => ToolStep[])) => void;
 
-  getStepConfig: (stepId: string) => ExecutionStep | undefined;
+  getStepConfig: (stepId: string) => ToolStep | undefined;
   getStepIndex: (stepId: string) => number;
   getStepSystem: (stepId: string) => System | undefined;
 

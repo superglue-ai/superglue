@@ -4,16 +4,16 @@
  * Generates database schema documentation for PostgreSQL connections.
  */
 
-import { ApiConfig, ServiceMetadata } from "@superglue/shared";
+import { RequestStepConfig, ServiceMetadata } from "@superglue/shared";
 import { callPostgres } from "../../tools/strategies/postgres/postgres.js";
 import { composeUrl } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
-import { DocumentationProcessingStrategy } from "../types.js";
+import { DocumentationConfig, DocumentationProcessingStrategy } from "../types.js";
 
 export class PostgreSqlStrategy implements DocumentationProcessingStrategy {
   async tryProcess(
     content: string,
-    config: ApiConfig,
+    config: DocumentationConfig,
     metadata: ServiceMetadata,
     credentials?: Record<string, any>,
   ): Promise<string | null> {
@@ -32,8 +32,16 @@ WHERE table_schema = 'public'
 ORDER BY table_name, ordinal_position;`,
       };
 
+      // Build a RequestStepConfig with required url field
+      const endpoint: RequestStepConfig = {
+        url,
+        headers: config.headers,
+        queryParams: config.queryParams,
+        body: JSON.stringify(schemaQuery),
+      };
+
       const schemaResponse = await callPostgres({
-        endpoint: { ...config, body: JSON.stringify(schemaQuery) },
+        endpoint,
         payload: {},
         credentials,
         options: null,
