@@ -178,14 +178,15 @@ export function ToolCallToolDisplay({
             {/* Save Button */}
             {showSaveButton && onSaveTool && (
               <Button
-                variant="outline"
-                size="sm"
+                variant="glass-primary"
                 onClick={onSaveTool}
                 disabled={isSaving}
-                className="h-6 bg-amber-500 hover:bg-amber-400 text-black border-amber-500 hover:border-amber-400"
+                className="h-8 px-3 gap-2 rounded-xl"
               >
-                <Save className="w-4 h-4 mr-1" />
-                {isSaving ? "Saving..." : "Save Tool"}
+                <Save className="w-3.5 h-3.5" />
+                <span className="font-medium text-[13px]">
+                  {isSaving ? "Saving..." : "Save Tool"}
+                </span>
               </Button>
             )}
           </div>

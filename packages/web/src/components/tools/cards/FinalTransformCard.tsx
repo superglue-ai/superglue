@@ -251,13 +251,12 @@ export const FinalTransformMiniStepCard = ({
             <div className="flex items-center gap-2">
               {transformError && (
                 <Button
-                  variant="default"
-                  size="sm"
+                  variant="glass-primary"
                   onClick={handleAskAgentToFix}
-                  className="h-8 px-3 text-xs font-medium gap-1.5"
+                  className="h-8 px-3 gap-2 rounded-xl"
                 >
                   <MessagesSquare className="h-3.5 w-3.5" />
-                  Fix in chat
+                  <span className="font-medium text-[13px]">Fix in chat</span>
                 </Button>
               )}
               {onExecuteTransform && (

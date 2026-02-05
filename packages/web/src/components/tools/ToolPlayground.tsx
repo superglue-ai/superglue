@@ -461,16 +461,16 @@ function ToolPlaygroundInner({
               payload={computedPayload}
               onBeforeOpen={saveTool}
               size="default"
-              className="h-9 px-5"
+              className="h-9 px-5 rounded-xl"
               disabled={saving || loading}
             />
           )}
           {!isArchived && (
             <Button
-              variant="default"
+              variant="glass-primary"
               onClick={saveTool}
               disabled={saving || loading}
-              className="h-9 px-5 w-[108px] shadow-md border border-primary/40"
+              className="h-9 px-5 w-[108px] rounded-xl"
             >
               {saving ? (
                 "Saving..."

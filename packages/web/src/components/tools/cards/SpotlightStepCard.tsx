@@ -416,7 +416,11 @@ export const SpotlightStepCard = React.memo(
               </div>
               <div className="flex items-center gap-1.5">
                 {showFixButton && (
-                  <Button variant="default" onClick={handleFixInChat} className="h-8 px-3 gap-2">
+                  <Button
+                    variant="glass-primary"
+                    onClick={handleFixInChat}
+                    className="h-8 px-3 gap-2 rounded-xl"
+                  >
                     <MessagesSquare className="h-3.5 w-3.5" />
                     <span className="font-medium text-[13px]">Fix in chat</span>
                   </Button>

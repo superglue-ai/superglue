@@ -716,7 +716,7 @@ export function ToolBuilderComponent({
                 {/* Request Fix: shown if run failed */}
                 {runResult && !runResult.success && !isRunning && !fixRequested && (
                   <Button
-                    variant="default"
+                    variant="glass-primary"
                     onClick={() => {
                       setFixRequested(true);
                       const truncatedError =

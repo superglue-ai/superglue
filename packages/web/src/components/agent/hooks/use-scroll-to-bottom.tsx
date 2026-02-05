@@ -25,7 +25,7 @@ export const ScrollToBottomButton = dynamic(
 
       return function ScrollToBottomButtonInner({
         className = "absolute bottom-4 left-1/2 -translate-x-1/2 z-50",
-        buttonClassName = "h-10 w-10 p-0 rounded-full bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 border-2 border-green-400 dark:border-green-500 shadow-xl hover:shadow-2xl transition-all duration-200",
+        buttonClassName = "h-10 w-10 p-0 rounded-full shadow-xl hover:shadow-2xl transition-all duration-200",
         iconClassName = "w-5 h-5 text-white",
       }: {
         className?: string;
@@ -43,7 +43,7 @@ export const ScrollToBottomButton = dynamic(
               onClick={() => scrollToBottom({ behavior: "smooth" })}
               size="sm"
               className={buttonClassName}
-              variant="default"
+              variant="glass-primary"
             >
               <ChevronDown className={iconClassName} />
             </Button>
