@@ -1,7 +1,8 @@
 import { useConfig } from "@/src/app/config-context";
 import { useToast } from "@/src/hooks/use-toast";
 import { createSuperglueClient } from "@/src/lib/client-utils";
-import { ExecutionStep, Tool } from "@superglue/shared";
+import { deleteAllDrafts } from "@/src/lib/storage";
+import { Tool } from "@superglue/shared";
 import { useEffect, useState } from "react";
 import { useExecution, useToolConfig } from "../context";
 
@@ -25,8 +26,8 @@ export function useToolData(options: UseToolDataOptions) {
     responseFilters,
     setToolId,
     setSteps,
-    setFinalTransform,
-    setResponseSchema,
+    setOutputTransform,
+    setOutputSchema,
     setInputSchema,
     setInstruction,
     setPayloadText,
@@ -39,8 +40,8 @@ export function useToolData(options: UseToolDataOptions) {
 
   const toolId = tool.id;
   const folder = tool.folder;
-  const finalTransform = tool.finalTransform || "";
-  const responseSchema = tool.responseSchema ? JSON.stringify(tool.responseSchema) : "";
+  const outputTransform = tool.outputTransform || "";
+  const outputSchema = tool.outputSchema ? JSON.stringify(tool.outputSchema) : "";
   const inputSchema = tool.inputSchema ? JSON.stringify(tool.inputSchema) : "";
   const instructions = tool.instruction;
   const computedPayload = payload.computedPayload;
@@ -54,7 +55,8 @@ export function useToolData(options: UseToolDataOptions) {
     try {
       if (!idToLoad) return;
       setLoading(true);
-      const client = createSuperglueClient(config.superglueEndpoint);
+      setNotFound(false);
+      const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
       const loadedTool = await client.getWorkflow(idToLoad);
       if (!loadedTool) {
         throw new Error(`Tool with ID "${idToLoad}" not found.`);
@@ -65,11 +67,10 @@ export function useToolData(options: UseToolDataOptions) {
       setSteps(
         loadedTool?.steps?.map((step) => ({
           ...step,
-          apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id },
         })) || [],
       );
-      setFinalTransform(
-        loadedTool.finalTransform ||
+      setOutputTransform(
+        loadedTool.outputTransform ||
           `(sourceData) => {
         return {
           result: sourceData
@@ -78,8 +79,8 @@ export function useToolData(options: UseToolDataOptions) {
       );
 
       setInstruction(loadedTool.instruction || "");
-      setResponseSchema(
-        loadedTool.responseSchema ? JSON.stringify(loadedTool.responseSchema, null, 2) : "",
+      setOutputSchema(
+        loadedTool.outputSchema ? JSON.stringify(loadedTool.outputSchema, null, 2) : "",
       );
 
       setInputSchema(
@@ -106,21 +107,20 @@ export function useToolData(options: UseToolDataOptions) {
       setSteps(
         initialTool.steps?.map((step) => ({
           ...step,
-          apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id },
         })) || [],
       );
-      setFinalTransform(
-        initialTool.finalTransform ||
+      setOutputTransform(
+        initialTool.outputTransform ||
           `(sourceData) => {
   return {
     result: sourceData
   }
 }`,
       );
-      const schemaString = initialTool.responseSchema
-        ? JSON.stringify(initialTool.responseSchema, null, 2)
+      const schemaString = initialTool.outputSchema
+        ? JSON.stringify(initialTool.outputSchema, null, 2)
         : "";
-      setResponseSchema(schemaString);
+      setOutputSchema(schemaString);
       setInputSchema(
         initialTool.inputSchema ? JSON.stringify(initialTool.inputSchema, null, 2) : null,
       );
@@ -134,8 +134,8 @@ export function useToolData(options: UseToolDataOptions) {
     initialInstruction,
     setToolId,
     setSteps,
-    setFinalTransform,
-    setResponseSchema,
+    setOutputTransform,
+    setOutputSchema,
     setInputSchema,
     setInstruction,
     setFolder,
@@ -152,12 +152,12 @@ export function useToolData(options: UseToolDataOptions) {
       setIsArchived(false);
       setSteps([]);
       setInstruction("");
-      setFinalTransform(`(sourceData) => {
+      setOutputTransform(`(sourceData) => {
   return {
     result: sourceData
   }
 }`);
-      setResponseSchema("");
+      setOutputSchema("");
       setInputSchema(null);
       setResponseFilters([]);
       setPayloadText("{}");
@@ -168,7 +168,7 @@ export function useToolData(options: UseToolDataOptions) {
   const saveTool = async (): Promise<boolean> => {
     try {
       try {
-        JSON.parse(responseSchema || "{}");
+        JSON.parse(outputSchema || "{}");
       } catch (e) {
         throw new Error("Invalid response schema JSON");
       }
@@ -188,17 +188,10 @@ export function useToolData(options: UseToolDataOptions) {
 
       const toolToSave: Tool = {
         id: effectiveToolId,
-        steps: stepsToSave.map((step: ExecutionStep) => ({
-          ...step,
-          apiConfig: {
-            id: step.apiConfig.id || step.id,
-            ...step.apiConfig,
-            pagination: step.apiConfig.pagination || null,
-          },
-        })),
-        responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
+        steps: stepsToSave,
+        outputSchema: outputSchema && outputSchema.trim() ? JSON.parse(outputSchema) : null,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
-        finalTransform,
+        outputTransform,
         instruction: instructions,
         folder: folder ?? null,
         responseFilters: responseFilters.length > 0 ? responseFilters : undefined,
@@ -207,14 +200,14 @@ export function useToolData(options: UseToolDataOptions) {
       if (embedded && onSave) {
         await onSave(toolToSave, computedPayload);
       } else {
-        const client = createSuperglueClient(config.superglueEndpoint);
+        const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
         const savedTool = await client.upsertWorkflow(effectiveToolId, toolToSave as any);
 
         if (!savedTool) {
           throw new Error("Failed to save tool");
         }
         setToolId(savedTool.id);
-        setFinalTransform(savedTool.finalTransform);
+        setOutputTransform(savedTool.outputTransform);
         setSteps(savedTool.steps);
       }
 

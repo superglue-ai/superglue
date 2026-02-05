@@ -1,6 +1,6 @@
 import { setFileUploadDocumentationURL } from "@/src/lib/file-utils";
-import { splitUrl } from "@/src/lib/client-utils";
-import { ConfirmationAction, ToolResult, UpsertMode } from "@superglue/shared";
+import { truncateToolResult } from "@/src/lib/general-utils";
+import { ConfirmationAction, ToolResult, UpsertMode, getToolSystemIds } from "@superglue/shared";
 import { SystemConfig, systems, findTemplateForSystem } from "@superglue/shared/templates";
 import { DraftLookup, findDraftInMessages, formatDiffSummary } from "../agent-context";
 import {
@@ -99,7 +99,7 @@ const buildToolDefinition = (): ToolDefinition => ({
         description:
           'Sample JSON payload for the tool. Use file::<key> syntax for file references (e.g., { "data": "file::my_csv" })',
       },
-      responseSchema: {
+      outputSchema: {
         type: "object",
         description: "JSONSchema for the expected output structure",
       },
@@ -109,7 +109,7 @@ const buildToolDefinition = (): ToolDefinition => ({
 });
 
 const runBuildTool = async (input: any, ctx: ToolExecutionContext) => {
-  const { instruction, systemIds, payload, responseSchema } = input;
+  const { instruction, systemIds, payload, outputSchema } = input;
 
   const fileResult = resolvePayloadWithFiles(payload, ctx.filePayloads);
   if (!fileResult.success) {
@@ -122,7 +122,7 @@ const runBuildTool = async (input: any, ctx: ToolExecutionContext) => {
       instruction,
       systemIds,
       payload: resolvedPayload,
-      responseSchema,
+      outputSchema,
       save: false,
     });
 
@@ -235,19 +235,16 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
   }
 
   try {
-    const result: ToolResult = await ctx.superglueClient.executeWorkflow(
-      isDraft
-        ? {
-            tool: toolConfig,
-            payload: resolvedPayload,
-            options: { retries: 0 },
-            traceId,
-          }
-        : {
-            id: toolId,
-            payload: resolvedPayload,
-          },
-    );
+    const result: ToolResult = isDraft
+      ? await ctx.superglueClient.runToolConfig({
+          tool: toolConfig,
+          payload: resolvedPayload,
+          options: { timeout: undefined }, // retries not supported in REST
+        })
+      : await ctx.superglueClient.runTool({
+          toolId: toolId!,
+          payload: resolvedPayload,
+        });
 
     if (!result.success) {
       return {
@@ -298,7 +295,7 @@ const editToolDefinition = (): ToolDefinition => ({
       - ALWAYS use this instead of build_tool when modifying an existing tool (draft or saved).
       - Uses diff-based approach - makes minimal targeted changes rather than rebuilding from scratch.
       - Provide either draftId (from build_tool) OR toolId (for saved tools), not both.
-      - Provide specific fix instructions (e.g., "change the endpoint to /v2/users", "remove extra fields from finalTransform", "fix the response schema mapping").
+      - Provide specific fix instructions (e.g., "change the endpoint to /v2/users", "remove extra fields from outputTransform", "fix the response schema mapping").
       - The fix creates an updated draft - use run_tool to test, then save_tool to persist.
       - After fixing, use run_tool with the returned draftId to test the updated draft.
       - CRITICAL: You MUST include the payload parameter with the exact same test data that was used in build_tool. Copy it from the build_tool call in the conversation history. Without this payload, users cannot test the fixed tool. Use an empty object {} only if the tool genuinely requires no input.
@@ -344,10 +341,7 @@ const runEditTool = async (input: any, ctx: ToolExecutionContext) => {
           suggestion: "Check that the tool ID exists",
         };
       }
-      const stepSystemIds = savedTool.steps
-        .map((step: any) => step.systemId)
-        .filter((id: string) => id);
-      const systemIds = [...savedTool.systemIds, ...new Set(stepSystemIds)];
+      const systemIds = getToolSystemIds(savedTool);
       workingDraftId = `fix-${toolId}-${Date.now()}`;
       draft = {
         config: savedTool,
@@ -1053,15 +1047,13 @@ const runCallSystem = async (
 
     const step = {
       id: `call_system_${Date.now()}`,
-      apiConfig: {
-        urlHost,
-        urlPath,
+      config: {
+        url,
         method: method || "GET",
         headers,
         body,
-        instruction: "",
+        systemId,
       },
-      systemId,
     };
 
     const result = await ctx.superglueClient.executeStep({

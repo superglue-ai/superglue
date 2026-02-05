@@ -58,9 +58,9 @@
       }
     },
     "instruction": "List payments from Square API.\n\nStep 1: List payments\n- Make a GET request to https://connect.squareup.com/v2/payments\n- Use Bearer token authentication with the API key from square integration\n- Headers: \n  - Authorization: Bearer <<square_apiKey>>\n  - Content-Type: application/json\n  - Square-Version: 2024-10-17\n- Accept optional query parameters: location_id, begin_time, end_time, sort_order, cursor, limit\n- Implement cursor-based pagination if cursor is present in the response\n\nReturn the payments array and cursor for pagination.",
-    "finalTransform": "(sourceData) => {\n  const payments =\n    sourceData.listPayments?.payments || sourceData.listPayments?.results || [];\n  const cursor =\n    sourceData.listPayments?.cursor ||\n    sourceData.listPayments?.next_cursor ||\n    null;\n  return {\n    payments,\n    cursor,\n  };\n};",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  const payments =\n    sourceData.listPayments?.payments || sourceData.listPayments?.results || [];\n  const cursor =\n    sourceData.listPayments?.cursor ||\n    sourceData.listPayments?.next_cursor ||\n    null;\n  return {\n    payments,\n    cursor,\n  };\n};",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool retrieves a list of payments directly from Square, using their API to gather payment data based on specified criteria like time range and location. It returns an array of payment details along with a cursor for easy pagination of results."
   },
   "square_refund_payment": {
@@ -122,9 +122,9 @@
       }
     },
     "instruction": "Create a refund for a Square payment.\n\nStep 1: Create refund\n- Make a POST request to https://connect.squareup.com/v2/refunds\n- Use Bearer token authentication with the API key from square integration\n- Headers: \n  - Authorization: Bearer <<square_apiKey>>\n  - Content-Type: application/json\n  - Square-Version: 2024-10-17\n- Body: JSON with required fields:\n  - idempotency_key: unique string for idempotency\n  - payment_id: ID of the payment to refund\n  - amount_money: object with amount and currency (e.g., {\"amount\": 100, \"currency\": \"USD\"})\n  - Optional fields: reason, location_id\n\nReturn the refund details.",
-    "finalTransform": "(sourceData) => {\n  if (!sourceData.createRefund) throw new Error('No response from Square');\n  return sourceData.createRefund;\n}",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  if (!sourceData.createRefund) throw new Error('No response from Square');\n  return sourceData.createRefund;\n}",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool interfaces with Square to issue a payment refund by using details such as payment ID, refund amount, and reason. It will return the complete refund information, including the refund ID, amount, and status from your Square account."
   },
   "square_search_orders": {
@@ -179,9 +179,9 @@
       }
     },
     "instruction": "Search orders from Square API.\n\nStep 1: Search orders\n- Make a POST request to https://connect.squareup.com/v2/orders/search\n- Use Bearer token authentication with the API key from square integration\n- Headers: \n  - Authorization: Bearer <<square_apiKey>>\n  - Content-Type: application/json\n  - Square-Version: 2024-10-17\n- Body: JSON with optional fields:\n  - location_ids: array of location IDs to search\n  - query: object with filter and sort criteria\n  - limit: number of results per page\n  - cursor: for pagination\n- Implement cursor-based pagination if cursor is present in the response\n\nReturn the orders array and cursor for pagination.",
-    "finalTransform": "(sourceData) => {\n  if (!sourceData.searchOrders)\n    throw new Error(\"Missing searchOrders in sourceData\");\n\n  const orders = Array.isArray(sourceData.searchOrders.results)\n    ? sourceData.searchOrders.results\n    : [];\n  const cursor = sourceData.searchOrders.next_cursor || null;\n\n  return {\n    orders,\n    cursor,\n  };\n};",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  if (!sourceData.searchOrders)\n    throw new Error(\"Missing searchOrders in sourceData\");\n\n  const orders = Array.isArray(sourceData.searchOrders.results)\n    ? sourceData.searchOrders.results\n    : [];\n  const cursor = sourceData.searchOrders.next_cursor || null;\n\n  return {\n    orders,\n    cursor,\n  };\n};",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool connects to Square's API to search and retrieve a list of orders from specified locations. It returns an array of orders along with a pagination cursor to help navigate through large sets of order data."
   },
   "square_list_catalog_items": {
@@ -243,9 +243,9 @@
       }
     },
     "instruction": "List catalog items from Square API.\n\nStep 1: List catalog items\n- Make a GET request to https://connect.squareup.com/v2/catalog/list\n- Use Bearer token authentication with the API key from square integration\n- Headers: \n  - Authorization: Bearer <<square_apiKey>>\n  - Content-Type: application/json\n  - Square-Version: 2024-10-17\n- Accept optional query parameters: cursor, types (e.g., \"ITEM\"), limit\n- Implement cursor-based pagination if cursor is present in the response\n\nReturn the catalog objects array and cursor for pagination.",
-    "finalTransform": "(sourceData) => {\n  const catalogObjects =\n    sourceData.listCatalogItems?.objects ||\n    sourceData.listCatalogItems?.results ||\n    [];\n  const cursor =\n    sourceData.listCatalogItems?.cursor ||\n    sourceData.listCatalogItems?.next_cursor ||\n    null;\n  return {\n    catalogObjects,\n    cursor,\n  };\n};",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  const catalogObjects =\n    sourceData.listCatalogItems?.objects ||\n    sourceData.listCatalogItems?.results ||\n    [];\n  const cursor =\n    sourceData.listCatalogItems?.cursor ||\n    sourceData.listCatalogItems?.next_cursor ||\n    null;\n  return {\n    catalogObjects,\n    cursor,\n  };\n};",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool connects to Square to retrieve a list of items from your catalog. It returns the catalog items along with a cursor for pagination, allowing you to manage large sets of data efficiently."
   },
   "square_adjust_inventory": {
@@ -299,9 +299,9 @@
       }
     },
     "instruction": "Adjust inventory counts in Square.\n\nStep 1: Batch change inventory\n- Make a POST request to https://connect.squareup.com/v2/inventory/changes/batch-create\n- Use Bearer token authentication with the API key from square integration\n- Headers: \n  - Authorization: Bearer <<square_apiKey>>\n  - Content-Type: application/json\n  - Square-Version: 2024-10-17\n- Body: JSON with required fields:\n  - idempotency_key: unique string for idempotency\n  - changes: array of inventory change objects with:\n    - type: \"PHYSICAL_COUNT\" or \"ADJUSTMENT\"\n    - physical_count or adjustment object with catalog_object_id, location_id, quantity, occurred_at\n\nReturn the inventory changes result.",
-    "finalTransform": "(sourceData) => {\n  if (!sourceData.batchChangeInventory) throw new Error('No response from Square');\n  return sourceData.batchChangeInventory;\n}",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  if (!sourceData.batchChangeInventory) throw new Error('No response from Square');\n  return sourceData.batchChangeInventory;\n}",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool connects to Square to adjust inventory levels, allowing you to make batch changes to your stock counts. It will return the results of these inventory adjustments, directly reflecting the new counts in your Square account."
   },
   "square_create_customer": {
@@ -363,9 +363,9 @@
       }
     },
     "instruction": "Create a customer in Square.\n\nStep 1: Create customer\n- Make a POST request to https://connect.squareup.com/v2/customers\n- Use Bearer token authentication with the API key from square integration\n- Headers: \n  - Authorization: Bearer <<square_apiKey>>\n  - Content-Type: application/json\n  - Square-Version: 2024-10-17\n- Body: JSON with optional fields:\n  - idempotency_key: unique string for idempotency\n  - given_name: customer's first name\n  - family_name: customer's last name\n  - email_address: customer's email\n  - phone_number: customer's phone\n  - address: customer's address object\n  - company_name: customer's company\n  - reference_id: external reference ID\n  - note: notes about customer\n\nReturn the created customer details.",
-    "finalTransform": "(sourceData) => {\n  if (!sourceData.createCustomer) throw new Error('No response from Square');\n  return sourceData.createCustomer;\n}",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  if (!sourceData.createCustomer) throw new Error('No response from Square');\n  return sourceData.createCustomer;\n}",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool creates a new customer profile in Square by using the provided personal details and a unique identifier to ensure the request is processed only once. It returns the complete details of the newly created customer, straight from your Square account."
   },
   "slack_list_channels": {
@@ -410,8 +410,8 @@
       }
     },
     "instruction": "List Slack channels. Make a GET request to /conversations.list with Authorization header: Bearer <<slack_api_key_api_token>>. Include query parameters: types=public_channel and limit=100.",
-    "finalTransform": "(sourceData) => { return sourceData.listSlackChannels; }",
-    "integrationIds": [],
+    "outputTransform": "(sourceData) => { return sourceData.listSlackChannels; }",
+    "systemIds": [],
     "description": "This tool connects to Slack to retrieve a list of public channels within your workspace. It returns a detailed list of up to 100 public Slack channels, providing essential information such as channel names and IDs."
   },
   "coupa_list_suppliers": {
@@ -484,9 +484,9 @@
       }
     },
     "instruction": "List suppliers from Coupa using API key authentication with pagination and filtering support",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "page": {
@@ -614,8 +614,8 @@
       }
     },
     "instruction": "Sync all contacts from Salesforce",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool connects to Salesforce to either retrieve or update contact information. It will return detailed contact data, including names, emails, and phone numbers, from your Salesforce account."
   },
   "salesforce_bulk_import_leads": {
@@ -636,7 +636,7 @@
           "instruction": "Create a lead in Salesforce",
           "authentication": "HEADER"
         },
-        "loopSelector": "(sourceData) => sourceData.payload.leads",
+        "dataSelector": "(sourceData) => sourceData.payload.leads",
         "executionMode": "LOOP"
       }
     ],
@@ -678,8 +678,8 @@
       }
     },
     "instruction": "Bulk import leads into Salesforce from an array of lead objects",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool automates the process of importing multiple leads into Salesforce by creating new lead entries for each lead in your data set. It will return a confirmation of each lead successfully added to your Salesforce account, including all relevant lead details."
   },
   "netsuite_inventory_snapshot": {
@@ -726,9 +726,9 @@
       }
     },
     "instruction": "Get inventory snapshot from NetSuite using the REST API with TBA authentication",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "totalItems": {
@@ -838,8 +838,8 @@
       }
     },
     "instruction": "Update an existing Confluence page using PUT /wiki/rest/api/content/{page_id} endpoint. Accept page_id (required), title (required), body (required), and version_number (required) as inputs. The version number must be incremented from the current version. Create a JSON body with type=\"page\", title=title, body.storage.value=body, body.storage.representation=\"storage\", and version.number=version_number. Return the updated page JSON including id, title, version, status, and _links.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool updates an existing Confluence page by using the provided page ID, new title, content, and version number. It will return the updated page details, including the page ID, title, version, status, and links."
   },
   "servicenow_ticket_create": {
@@ -928,8 +928,8 @@
       }
     },
     "instruction": "Create a new incident ticket in ServiceNow. Accept short_description (required), description (optional), priority (optional, 1-5), urgency (optional, 1-3), impact (optional, 1-3), caller_id (optional sys_id), assignment_group (optional sys_id), assigned_to (optional sys_id), category (optional), and subcategory (optional) as inputs. Use POST to /api/now/table/incident endpoint. Return the created incident with sys_id, number, short_description, state, and other fields.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool seamlessly integrates with ServiceNow to create a new incident ticket, capturing important details like a brief description, priority, and category. It will return the created incident's information, including its ID, number, and current state, directly from your ServiceNow account."
   },
   "salesforce_publish_platform_event": {
@@ -978,8 +978,8 @@
       }
     },
     "instruction": "Publish a platform event in Salesforce with eventType and eventData",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool sends a platform event directly to Salesforce using the specified event type and data. It returns a confirmation of the event published, ensuring your Salesforce environment is updated with the new event information."
   },
   "netsuite_sync_invoices": {
@@ -1034,9 +1034,9 @@
       }
     },
     "instruction": "Sync invoices from NetSuite using the REST API with TBA authentication",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "invoices": {
@@ -1138,9 +1138,9 @@
       }
     },
     "instruction": "Search transactions in NetSuite using SuiteQL with TBA authentication",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "totalCount": {
@@ -1215,9 +1215,9 @@
       "properties": {}
     },
     "instruction": "List all accessible Airtable bases using the Metadata API.\n\nAPI Configuration:\n- Method: GET\n- Base URL: https://api.airtable.com\n- Path: /v0/meta/bases\n- Authentication: Bearer token in Authorization header using the access_token credential\n- Note: The access token must include the metadata scope (schema.bases:read)\n\nInput parameters:\n- None required (lists all bases accessible to the authenticated user)\n\nOutput format:\n{\n  \"bases\": [\n    {\n      \"id\": \"...\",\n      \"name\": \"...\",\n      \"permissionLevel\": \"...\"\n    }\n  ]\n}\n\nThe endpoint returns metadata about all bases the user has access to, including base IDs, names, and permission levels.",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "airtable_access_token": {
@@ -1268,13 +1268,13 @@
           "instruction": "Archive (soft delete) a Monday.com item using the GraphQL API, returning the id of the archived item.",
           "queryParams": null,
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": null,
+        "dataSelector": null,
         "executionMode": "DIRECT",
         "responseMapping": null
       }
@@ -1305,9 +1305,9 @@
       }
     },
     "instruction": "Create a Monday.com workflow to archive (soft delete) an item using the GraphQL API.\n\nPOST request:\n- Authorization header: Bearer token using the apiKey credential\n- Content-Type: application/json\n- Request body must be JSON with this exact structure:\n{\n  \"query\": \"mutation { archive_item (item_id: ITEM_ID_NUMBER) { id } }\"\n}\n\nReplace ITEM_ID_NUMBER with the item_id value from the input payload (as a number without quotes).\n\nReturn the id from the response data.archive_item object, confirming the item was archived.",
-    "finalTransform": "(sourceData) => { if (!sourceData.archiveItem?.data?.archive_item?.id) throw new Error('No id returned from archive_item'); return { id: sourceData.archiveItem.data.archive_item.id }; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { if (!sourceData.archiveItem?.data?.archive_item?.id) throw new Error('No id returned from archive_item'); return { id: sourceData.archiveItem.data.archive_item.id }; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool connects to Monday.com to archive a specified item, effectively marking it as inactive without permanently deleting it. It will return the ID of the archived item as confirmation that the action was successfully completed."
   },
   "monday_get_column_values": {
@@ -1333,13 +1333,13 @@
           "instruction": "Retrieve the columns (id, title, type, settings_str) for a specific board using the GraphQL API. The board ID is provided in the input payload.",
           "queryParams": null,
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": null,
+        "dataSelector": null,
         "executionMode": "DIRECT",
         "responseMapping": null
       }
@@ -1370,9 +1370,9 @@
       }
     },
     "instruction": "Create a Monday.com workflow to retrieve a board's column definitions and metadata using the GraphQL API.\n\nPOST request:\n- Authorization header: Bearer token using the apiKey credential\n- Content-Type: application/json\n- Request body must be JSON with this exact structure:\n{\n  \"query\": \"query { boards(ids: [BOARD_ID_NUMBER]) { columns { id title type settings_str } } }\"\n}\n\nReplace BOARD_ID_NUMBER with the board_id value from the input payload (as a number without quotes).\n\nReturn the columns array from the response data.boards[0].columns object, containing id, title, type, and settings_str fields for each column.",
-    "finalTransform": "(sourceData) => {\n  // Defensive: check for expected structure\n  const boards = sourceData.getBoardColumns?.data?.boards;\n  if (!Array.isArray(boards) || !Array.isArray(boards[0]?.columns)) {\n    throw new Error(\"No columns found for the specified board\");\n  }\n  // Only return the columns array, preserving id, title, type, settings_str for each column\n  return boards[0].columns.map((col) => ({\n    id: col.id,\n    title: col.title,\n    type: col.type,\n    settings_str: col.settings_str,\n  }));\n};\n",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  // Defensive: check for expected structure\n  const boards = sourceData.getBoardColumns?.data?.boards;\n  if (!Array.isArray(boards) || !Array.isArray(boards[0]?.columns)) {\n    throw new Error(\"No columns found for the specified board\");\n  }\n  // Only return the columns array, preserving id, title, type, settings_str for each column\n  return boards[0].columns.map((col) => ({\n    id: col.id,\n    title: col.title,\n    type: col.type,\n    settings_str: col.settings_str,\n  }));\n};\n",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool connects to Monday.com to retrieve information about the columns within a specified board. It will return details such as the column ID, title, type, and settings, providing a comprehensive overview of the board's structure."
   },
   "monday_list_groups": {
@@ -1398,13 +1398,13 @@
           "instruction": "Get all groups (id, title, archived) for a specific board using the GraphQL API. The board ID is provided as a number in the input payload.",
           "queryParams": null,
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": null,
+        "dataSelector": null,
         "executionMode": "DIRECT",
         "responseMapping": null
       }
@@ -1435,9 +1435,9 @@
       }
     },
     "instruction": "Create a Monday.com workflow to list all groups on a board using the GraphQL API.\n\nPOST request:\n- Authorization header: Bearer token using the apiKey credential\n- Content-Type: application/json\n- Request body must be JSON with this exact structure:\n{\n  \"query\": \"query { boards(ids: [BOARD_ID_NUMBER]) { groups { id title archived } } }\"\n}\n\nReplace BOARD_ID_NUMBER with the board_id value from the input payload (as a number without quotes).\n\nReturn the groups array from the response data.boards[0].groups object, containing id, title, and archived fields for each group.",
-    "finalTransform": "(sourceData) => { if (!sourceData.getBoardGroups?.data?.boards?.[0]?.groups) throw new Error('No groups found in response'); return sourceData.getBoardGroups.data.boards[0].groups; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { if (!sourceData.getBoardGroups?.data?.boards?.[0]?.groups) throw new Error('No groups found in response'); return sourceData.getBoardGroups.data.boards[0].groups; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool connects to Monday.com to retrieve all groups associated with a specific board. It will return detailed information for each group, including their ID, title, and archived status."
   },
   "asana_create_task": {
@@ -1506,9 +1506,9 @@
       }
     },
     "instruction": "Create a task in Asana using the POST /api/1.0/tasks endpoint. \n\nAPI Configuration:\n- Method: POST\n- URL: https://app.asana.com/api/1.0/tasks\n- Authentication: OAuth2 Bearer token\n- Headers: Authorization: Bearer {{asana_access_token}}\n\nRequest Body (JSON):\n{\n  \"data\": {\n    \"name\": \"{{workspace_gid.name}}\",\n    \"notes\": \"{{workspace_gid.notes}}\",\n    \"assignee\": \"{{workspace_gid.assignee_gid}}\",\n    \"due_on\": \"{{workspace_gid.due_on}}\",\n    \"projects\": [\"{{workspace_gid.project_gid}}\"],\n    \"workspace\": \"{{workspace_gid.workspace_gid}}\"\n  }\n}\n\nInput parameters:\n- workspace_gid (required): The GID of the workspace\n- name (required): Task name/title\n- notes (optional): Task description/notes\n- assignee_gid (optional): The GID of the user to assign the task to\n- due_on (optional): Due date in YYYY-MM-DD format\n- project_gid (optional): The GID of the project to add the task to\n\nReturn the complete task object from the Asana API response.",
-    "finalTransform": "(sourceData) => { if (!sourceData.createTask?.data) throw new Error('No task data returned from Asana'); return sourceData.createTask.data; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { if (!sourceData.createTask?.data) throw new Error('No task data returned from Asana'); return sourceData.createTask.data; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool creates a new task in Asana with details such as task name, notes, assignee, due date, and project. It returns the complete task information directly from Asana, ensuring all specified fields are captured."
   },
   "asana_list_projects": {
@@ -1559,9 +1559,9 @@
       }
     },
     "instruction": "List all projects in Asana workspace.\n\nStep 1: Get projects from workspace\n- Make a GET request to https://app.asana.com/api/1.0/workspaces/1211689729234704/projects\n- Query parameters: limit=100, archived=false, opt_fields=gid,name,workspace.gid,workspace.name\n- Use Bearer token authentication with asana access token\n- Implement cursor-based pagination by following next_page.uri until it's null\n\nReturn the result as:\n{\n  \"projects\": [array of all projects with gid, name, and workspace details]\n}",
-    "finalTransform": "(sourceData) => {\n  // Validate the structure\n  const results = sourceData.getAllProjectsInWorkspace?.results;\n  if (!Array.isArray(results))\n    throw new Error(\"Expected results array in getAllProjectsInWorkspace\");\n\n  // Flatten all project arrays from paginated results\n  const projects = results.flatMap((page) =>\n    Array.isArray(page?.data)\n      ? page.data.map((p) => ({\n          gid: p.gid,\n          name: p.name,\n          workspace: p.workspace\n            ? { gid: p.workspace.gid, name: p.workspace.name }\n            : undefined,\n        }))\n      : [],\n  );\n\n  return { projects };\n};\n",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  // Validate the structure\n  const results = sourceData.getAllProjectsInWorkspace?.results;\n  if (!Array.isArray(results))\n    throw new Error(\"Expected results array in getAllProjectsInWorkspace\");\n\n  // Flatten all project arrays from paginated results\n  const projects = results.flatMap((page) =>\n    Array.isArray(page?.data)\n      ? page.data.map((p) => ({\n          gid: p.gid,\n          name: p.name,\n          workspace: p.workspace\n            ? { gid: p.workspace.gid, name: p.workspace.name }\n            : undefined,\n        }))\n      : [],\n  );\n\n  return { projects };\n};\n",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "projects": {
@@ -1640,9 +1640,9 @@
       }
     },
     "instruction": "Get a specific task from Asana by its GID.\n\nAPI Configuration:\n- Method: GET\n- URL: https://app.asana.com/api/1.0/tasks/{{task_gid}}\n- Authentication: OAuth2 Bearer token\n- Headers: Authorization: Bearer {{asana_access_token}}\n- Query Parameters: opt_fields=name,notes,assignee,status,completed,due_on,projects.name,workspace.name\n\nInput parameters:\n- task_gid (required): The GID of the task to fetch\n\nReturn the complete task object with all requested fields from the Asana API response data field.",
-    "finalTransform": "(sourceData) => { if (!sourceData.getTaskByGid?.data) throw new Error('No task found for the provided GID'); return sourceData.getTaskByGid.data; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { if (!sourceData.getTaskByGid?.data) throw new Error('No task found for the provided GID'); return sourceData.getTaskByGid.data; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool retrieves detailed information about a specific task from Asana using its unique GID. It will return the task's name, notes, assignee, status, completion status, due date, associated projects, and workspace information."
   },
   "asana_update_task": {
@@ -1699,9 +1699,9 @@
       }
     },
     "instruction": "Update a task in Asana by its GID.\n\nAPI Configuration:\n- Method: PUT\n- URL: https://app.asana.com/api/1.0/tasks/{{task_gid}}\n- Authentication: OAuth2 Bearer token\n- Headers: Authorization: Bearer {{asana_access_token}}, Content-Type: application/json\n\nRequest Body (JSON):\nBuild a data object that only includes fields that are provided (not null/undefined). The structure should be:\n{\n  \"data\": {\n    // only include these fields if they are provided in the input:\n    \"name\": \"value if provided\",\n    \"notes\": \"value if provided\",\n    \"assignee\": \"value if provided\",\n    \"due_on\": \"value if provided\"\n  }\n}\n\nInput parameters:\n- task_gid (required): The GID of the task to update\n- name (optional): New task name/title\n- notes (optional): New task description/notes\n- assignee_gid (optional): The GID of the user to assign the task to\n- due_on (optional): New due date in YYYY-MM-DD format\n\nReturn the complete updated task object from the Asana API response.",
-    "finalTransform": "(sourceData) => { if (!sourceData.updateTaskByGid || !sourceData.updateTaskByGid.data) throw new Error('No task data returned from Asana'); return sourceData.updateTaskByGid.data; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { if (!sourceData.updateTaskByGid || !sourceData.updateTaskByGid.data) throw new Error('No task data returned from Asana'); return sourceData.updateTaskByGid.data; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool updates a specific task in Asana using its unique ID, allowing you to modify fields like the task's name, notes, assignee, and due date. It will return the complete details of the updated task directly from Asana."
   },
   "asana_delete_task": {
@@ -1748,9 +1748,9 @@
       }
     },
     "instruction": "Delete a task from Asana by its GID.\n\nAPI Configuration:\n- Method: DELETE\n- URL: https://app.asana.com/api/1.0/tasks/{{task_gid}}\n- Authentication: OAuth2 Bearer token\n- Headers: Authorization: Bearer {{asana_access_token}}\n\nInput parameters:\n- task_gid (required): The GID of the task to delete\n\nOutput:\nIf the deletion is successful (HTTP 200), return { \"success\": true }\nIf there's an error, forward the error message from Asana.",
-    "finalTransform": "(sourceData) => {\n  const res = sourceData.deleteTaskByGid;\n  if (res && res.data !== undefined) {\n    // Asana returns { data: {} } on success\n    return { success: true };\n  }\n  // If error, try to forward the error message\n  if (res && res.data && res.data.error) {\n    return { success: false, error: res.data.error };\n  }\n  // If error is in a different structure\n  if (res && res.error) {\n    return { success: false, error: res.error };\n  }\n  throw new Error('Unexpected response from Asana');\n}",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  const res = sourceData.deleteTaskByGid;\n  if (res && res.data !== undefined) {\n    // Asana returns { data: {} } on success\n    return { success: true };\n  }\n  // If error, try to forward the error message\n  if (res && res.data && res.data.error) {\n    return { success: false, error: res.data.error };\n  }\n  // If error is in a different structure\n  if (res && res.error) {\n    return { success: false, error: res.error };\n  }\n  throw new Error('Unexpected response from Asana');\n}",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool seamlessly connects to Asana to delete a specific task using its unique identifier. If successful, it confirms the deletion with a success message, or provides an error message if the task cannot be deleted."
   },
   "asana-add-comment-to-task": {
@@ -1803,9 +1803,9 @@
       }
     },
     "instruction": "Build an Asana tool to add a comment to a task. Use POST request to https://app.asana.com/api/1.0/tasks/{task_gid}/stories endpoint. The request body should be JSON with structure: {\"data\": {\"text\": \"{text}\"}}. Use OAuth2 authentication with Bearer token in header. Accept task_gid and text as required inputs. Return the created story data (comment object).",
-    "finalTransform": "(sourceData) => { if (!sourceData.addCommentToTask?.data) throw new Error('No story data returned'); return sourceData.addCommentToTask.data; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { if (!sourceData.addCommentToTask?.data) throw new Error('No story data returned'); return sourceData.addCommentToTask.data; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool seamlessly integrates with Asana to add a comment to a specific task. It will return the newly created comment details, allowing you to keep track of conversations directly within your Asana project."
   },
   "stripe_create_payment_intent": {
@@ -1872,9 +1872,9 @@
       }
     },
     "instruction": "Create a Stripe PaymentIntent using POST /v1/payment_intents endpoint. \n\nRequired inputs:\n- amount: integer in cents (required)\n- currency: string (required, e.g., \"usd\")\n\nOptional inputs:\n- capture_method: string (\"automatic\" or \"manual\", defaults to \"automatic\")\n- payment_method: string (optional)\n- customer: string (optional)\n- metadata: object (optional, flat key-value pairs)\n- idempotency_key: string (optional, send as Idempotency-Key header if provided)\n\nAuthentication: Use Bearer token with the api_key credential in Authorization header.\n\nBuild the request body dynamically to only include fields that are provided in the input payload. Do not send null or undefined fields.\n\nReturn the complete PaymentIntent object from Stripe's response.",
-    "finalTransform": "(sourceData) => { return sourceData.createPaymentIntent.data; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.createPaymentIntent.data; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool initiates a PaymentIntent on Stripe, allowing you to specify details like the amount, currency, and payment method. It returns the complete PaymentIntent information from Stripe, providing you with essential transaction details."
   },
   "asana-list-sections-in-project": {
@@ -1960,9 +1960,9 @@
       }
     },
     "instruction": "List sections in an Asana project. Use GET to https://app.asana.com/api/1.0/projects/{project_gid}/sections with limit=100 query param. OAuth2 Bearer token auth. Input: project_gid. Return {\"sections\": data array} where data is the sections array from response.",
-    "finalTransform": "(sourceData) => { return { sections: sourceData.getSectionsForProject?.data || [] }; }",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => { return { sections: sourceData.getSectionsForProject?.data || [] }; }",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "sections": {
@@ -2016,9 +2016,9 @@
       }
     },
     "instruction": "Retrieve details for a specific ClickUp task by its ID. Use GET request to /task/{task_id} endpoint. Return the complete task object with all details including name, status, due date, assignees, list, description, priority, tags, custom fields, etc.",
-    "finalTransform": "(sourceData) => { return sourceData.getTaskDetails; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.getTaskDetails; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool retrieves detailed information about a specific task from ClickUp using the task's ID. It will provide comprehensive task details, including its name, status, due date, assignees, and other associated information."
   },
   "clickup-list-folder-lists": {
@@ -2066,9 +2066,9 @@
       }
     },
     "instruction": "List all lists within a specified ClickUp folder. Use GET request to /folder/{folder_id}/list endpoint. Return an object with a 'lists' array where each list contains its id, name, status, and orderindex.",
-    "finalTransform": "(sourceData) => {\n  // Defensive: ensure lists is an array\n  const lists = Array.isArray(sourceData.getListsInFolder?.lists) ? sourceData.getListsInFolder.lists : [];\n  return {\n    lists: lists.map(list => ({\n      id: list.id,\n      name: list.name,\n      status: list.status,\n      orderindex: list.orderindex\n    }))\n  };\n}",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  // Defensive: ensure lists is an array\n  const lists = Array.isArray(sourceData.getListsInFolder?.lists) ? sourceData.getListsInFolder.lists : [];\n  return {\n    lists: lists.map(list => ({\n      id: list.id,\n      name: list.name,\n      status: list.status,\n      orderindex: list.orderindex\n    }))\n  };\n}",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "lists": {
@@ -2147,9 +2147,9 @@
       }
     },
     "instruction": "List Stripe customers using GET /v1/customers endpoint with pagination support.\n\nInputs (all optional):\n- limit: integer (default 100, max 100) - number of customers to return per page\n- starting_after: string (cursor for pagination) - customer ID to start after\n\nThe endpoint should:\n1. Make a GET request to /v1/customers with query parameters for limit and starting_after\n2. Use Bearer token authentication with the api_key credential\n3. Support cursor-based pagination using the 'has_more' field and last customer's 'id' as starting_after\n4. Keep fetching pages automatically if has_more is true, using the last item's id as the next starting_after cursor\n5. Return all customers collected across all pages in the format: { \"data\": [...], \"has_more\": false }\n\nAuthentication: Use Bearer token with the api_key credential in Authorization header.",
-    "finalTransform": "(sourceData) => {\n  // Collect all customers from all pages\n  let allCustomers = [];\n  if (Array.isArray(sourceData.listAllCustomers)) {\n    // If pagination returns an array of responses, flatten all data arrays\n    for (const page of sourceData.listAllCustomers) {\n      if (Array.isArray(page.data)) {\n        allCustomers = allCustomers.concat(page.data);\n      }\n    }\n    // has_more is false if the last page's has_more is false\n    const lastPage = sourceData.listAllCustomers[sourceData.listAllCustomers.length - 1];\n    return { data: allCustomers, has_more: lastPage?.has_more === true };\n  } else if (sourceData.listAllCustomers && Array.isArray(sourceData.listAllCustomers.data)) {\n    // Single page response\n    return { data: sourceData.listAllCustomers.data, has_more: sourceData.listAllCustomers.has_more === true };\n  } else {\n    return { data: [], has_more: false };\n  }\n}",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  // Collect all customers from all pages\n  let allCustomers = [];\n  if (Array.isArray(sourceData.listAllCustomers)) {\n    // If pagination returns an array of responses, flatten all data arrays\n    for (const page of sourceData.listAllCustomers) {\n      if (Array.isArray(page.data)) {\n        allCustomers = allCustomers.concat(page.data);\n      }\n    }\n    // has_more is false if the last page's has_more is false\n    const lastPage = sourceData.listAllCustomers[sourceData.listAllCustomers.length - 1];\n    return { data: allCustomers, has_more: lastPage?.has_more === true };\n  } else if (sourceData.listAllCustomers && Array.isArray(sourceData.listAllCustomers.data)) {\n    // Single page response\n    return { data: sourceData.listAllCustomers.data, has_more: sourceData.listAllCustomers.has_more === true };\n  } else {\n    return { data: [], has_more: false };\n  }\n}",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool connects to Stripe to retrieve a list of all customers associated with your account. It will return a comprehensive list of customers, including any necessary pagination to ensure all entries are collected."
   },
   "stripe_refund_payment": {
@@ -2215,9 +2215,9 @@
       }
     },
     "instruction": "Create a Stripe refund using POST /v1/refunds endpoint.\n\nInputs:\n- payment_intent: string (recommended, one of payment_intent or charge is required)\n- charge: string (alternative to payment_intent, one is required)\n- amount: integer in cents (optional, omit for full refund)\n- reason: string (optional, e.g., \"duplicate\", \"fraudulent\", \"requested_by_customer\")\n- idempotency_key: string (optional, send as Idempotency-Key header if provided)\n\nRequest rules:\n1. Build the request body dynamically to only include fields that are provided in the input payload\n2. Do not send null or undefined fields\n3. At least one of payment_intent or charge must be provided\n4. If amount is not provided, Stripe will process a full refund\n5. If idempotency_key is provided, send it as Idempotency-Key header\n6. Use application/x-www-form-urlencoded for the request body\n\nAuthentication: Use Bearer token with the api_key credential in Authorization header.\n\nOutput: Return the complete Refund object from Stripe including id, status, amount, currency, and all other refund details.",
-    "finalTransform": "(sourceData) => { return sourceData.createRefund; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.createRefund; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool facilitates issuing a refund by connecting directly to Stripe, using either a payment intent or charge identifier. It returns comprehensive details of the refund, such as the refund ID, status, and amount, directly from your Stripe account."
   },
   "clickup-delete-task": {
@@ -2264,9 +2264,9 @@
       }
     },
     "instruction": "Permanently delete a ClickUp task by its ID. Use DELETE request to /task/{task_id} endpoint. No request body required. Return {\"success\": true} on successful deletion (HTTP 200). Forward any ClickUp error message if deletion fails.",
-    "finalTransform": "(sourceData) => {\n  // ClickUp returns 204 No Content on success, error object on failure\n  const step = sourceData.deleteTaskById;\n  if (step === undefined) throw new Error('No response from ClickUp');\n  // If the API call succeeded (204), step will be an empty object or undefined\n  if (step === null || (typeof step === 'object' && Object.keys(step).length === 0)) {\n    return { success: true };\n  }\n  // If the API returned an error, forward the error message\n  if (step?.err || step?.error || step?.message) {\n    return { success: false, error: step.err || step.error || step.message };\n  }\n  // If the API returned a non-empty object, treat as error\n  return { success: false, error: step };\n}",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  // ClickUp returns 204 No Content on success, error object on failure\n  const step = sourceData.deleteTaskById;\n  if (step === undefined) throw new Error('No response from ClickUp');\n  // If the API call succeeded (204), step will be an empty object or undefined\n  if (step === null || (typeof step === 'object' && Object.keys(step).length === 0)) {\n    return { success: true };\n  }\n  // If the API returned an error, forward the error message\n  if (step?.err || step?.error || step?.message) {\n    return { success: false, error: step.err || step.error || step.message };\n  }\n  // If the API returned a non-empty object, treat as error\n  return { success: false, error: step };\n}",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "success": {
@@ -2333,9 +2333,9 @@
       }
     },
     "instruction": "Create a new task in a specified ClickUp list. Use POST request to /list/{list_id}/task endpoint. Send JSON body with name (required), description (optional), assignees (optional array of user IDs), and due_date (optional timestamp in milliseconds). Return the complete task object from ClickUp's response. Handle 400 errors if list ID is invalid.",
-    "finalTransform": "(sourceData) => {\n  if (sourceData.createTaskInList?.err && sourceData.createTaskInList.err.response?.status === 400) {\n    return { error: 'Invalid list_id', details: sourceData.createTaskInList.err.response.data };\n  }\n  if (sourceData.createTaskInList?.task) {\n    return sourceData.createTaskInList.task.data;\n  }\n  // If the response is the full task object at root\n  if (sourceData.createTaskInList && typeof sourceData.createTaskInList === 'object' && sourceData.createTaskInList.id) {\n    return sourceData.createTaskInList;\n  }\n  throw new Error('Unexpected ClickUp response');\n}",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  if (sourceData.createTaskInList?.err && sourceData.createTaskInList.err.response?.status === 400) {\n    return { error: 'Invalid list_id', details: sourceData.createTaskInList.err.response.data };\n  }\n  if (sourceData.createTaskInList?.task) {\n    return sourceData.createTaskInList.task.data;\n  }\n  // If the response is the full task object at root\n  if (sourceData.createTaskInList && typeof sourceData.createTaskInList === 'object' && sourceData.createTaskInList.id) {\n    return sourceData.createTaskInList;\n  }\n  throw new Error('Unexpected ClickUp response');\n}",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool integrates with ClickUp to create a new task in a specified list using the provided details such as task name, description, assignees, and due date. It returns the complete task information from ClickUp, ensuring the list ID is valid to prevent errors."
   },
   "clickup-list-tasks": {
@@ -2395,9 +2395,9 @@
       }
     },
     "instruction": "List all tasks in a given ClickUp list. Use GET request to /list/{list_id}/task endpoint with archived=false parameter. Support pagination with page parameter (default 0). Return {\"tasks\": [...]} where each task contains id, name, status, assignees, and due_date. Use page-based pagination with 100 tasks per page limit until no further results are returned.",
-    "finalTransform": "(sourceData) => {\n  // Collect all tasks from all pages\n  let allTasks = [];\n  if (Array.isArray(sourceData.getTasksInList)) {\n    // If paginated, array of responses\n    for (const page of sourceData.getTasksInList) {\n      if (Array.isArray(page?.tasks)) {\n        allTasks = allTasks.concat(page.tasks);\n      }\n    }\n  } else if (Array.isArray(sourceData.getTasksInList?.tasks)) {\n    // Single page\n    allTasks = sourceData.getTasksInList.tasks;\n  }\n  // Map to required fields\n  const tasks = allTasks.map(task => ({\n    id: task.id,\n    name: task.name,\n    status: task.status,\n    assignees: task.assignees,\n    due_date: task.due_date\n  }));\n  return { tasks };\n}",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  // Collect all tasks from all pages\n  let allTasks = [];\n  if (Array.isArray(sourceData.getTasksInList)) {\n    // If paginated, array of responses\n    for (const page of sourceData.getTasksInList) {\n      if (Array.isArray(page?.tasks)) {\n        allTasks = allTasks.concat(page.tasks);\n      }\n    }\n  } else if (Array.isArray(sourceData.getTasksInList?.tasks)) {\n    // Single page\n    allTasks = sourceData.getTasksInList.tasks;\n  }\n  // Map to required fields\n  const tasks = allTasks.map(task => ({\n    id: task.id,\n    name: task.name,\n    status: task.status,\n    assignees: task.assignees,\n    due_date: task.due_date\n  }));\n  return { tasks };\n}",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "tasks": {
@@ -2485,9 +2485,9 @@
       }
     },
     "instruction": "Update an existing ClickUp task by its ID. Use PUT request to /task/{task_id} endpoint. Support partial updates with optional fields: name (updated title), description (updated notes), status (new status), priority (integer 1-4), due_date (timestamp in milliseconds). Only include fields that are provided by the user - omit null or empty values. Return the updated task object from the API response.",
-    "finalTransform": "(sourceData) => { return sourceData.updateTask; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.updateTask; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool updates an existing task in ClickUp by allowing changes to its title, notes, status, priority, and due date based on the information you provide. It will return the updated task details directly from ClickUp, reflecting any modifications made."
   },
   "clickup-add-task-comment": {
@@ -2554,9 +2554,9 @@
       }
     },
     "instruction": "Add a comment to a ClickUp task. Use POST request to /task/{task_id}/comment endpoint. Send JSON body with comment_text (required text body) and assignee (optional user ID for tagging). Return the created comment object from ClickUp's response. Validate that task_id exists and return descriptive error if not found.",
-    "finalTransform": "(sourceData) => {\n  // If the task does not exist, ClickUp returns 404 or error in validateTaskExists\n  if (sourceData.validateTaskExists?.err || sourceData.validateTaskExists?.status === 404) {\n    return { error: `Task with id '${sourceData.task_id}' not found in ClickUp. Please check the task_id and try again.` };\n  }\n  // If comment creation failed, return error\n  if (sourceData.addTaskComment?.err) {\n    return { error: `Failed to add comment: ${sourceData.addTaskComment.err.message || 'Unknown error'}` };\n  }\n  // Return the created comment object from ClickUp's response\n  return sourceData.addTaskComment;\n}",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  // If the task does not exist, ClickUp returns 404 or error in validateTaskExists\n  if (sourceData.validateTaskExists?.err || sourceData.validateTaskExists?.status === 404) {\n    return { error: `Task with id '${sourceData.task_id}' not found in ClickUp. Please check the task_id and try again.` };\n  }\n  // If comment creation failed, return error\n  if (sourceData.addTaskComment?.err) {\n    return { error: `Failed to add comment: ${sourceData.addTaskComment.err.message || 'Unknown error'}` };\n  }\n  // Return the created comment object from ClickUp's response\n  return sourceData.addTaskComment;\n}",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool interfaces with ClickUp to add a comment to a specified task. It will confirm the task exists and return the details of the newly added comment, or an error if the task cannot be found or the comment addition fails."
   },
   "procore_list_projects": {
@@ -2609,9 +2609,9 @@
       }
     },
     "instruction": "Call Procore projects endpoint. GET request to /rest/v1.1/projects. Add Procore-Company-Id header with company_id value. Query params: company_id, include_inactive, page, per_page (all from input). Return full response.",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "projects": {
@@ -2666,9 +2666,9 @@
       }
     },
     "instruction": "Retrieve a Stripe PaymentIntent by ID using GET /v1/payment_intents/{payment_intent_id} endpoint.\n\nInputs:\n- payment_intent_id: string (required) - The ID of the PaymentIntent to retrieve\n\nRequest rules:\n1. Make a GET request to /v1/payment_intents/{payment_intent_id}\n2. The payment_intent_id should be inserted into the URL path\n3. Use Bearer token authentication with the api_key credential in Authorization header\n4. No request body needed for GET requests\n\nAuthentication: Use Bearer token with the api_key credential in Authorization header.\n\nOutput: Return the complete PaymentIntent object from Stripe including status, amount, customer, charges, next_action, and all other payment intent details.",
-    "finalTransform": "(sourceData) => { return sourceData.getPaymentIntentById; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.getPaymentIntentById; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool retrieves detailed information about a specific payment intent directly from Stripe using its unique ID. It will provide comprehensive payment details, including the status, amount, customer information, and any associated charges."
   },
   "stripe_confirm_payment_intent": {
@@ -2734,9 +2734,9 @@
       }
     },
     "instruction": "Confirm a Stripe PaymentIntent using POST /v1/payment_intents/{payment_intent_id}/confirm endpoint.\n\nInputs:\n- payment_intent_id: string (required) - The ID of the PaymentIntent to confirm\n- payment_method: string (optional) - Payment method ID to attach if not already attached\n- return_url: string (optional) - URL to redirect to for redirect-based payment methods\n- shipping: object (optional) - Shipping details as a JSON object\n- idempotency_key: string (optional) - Send as Idempotency-Key header if provided\n\nRequest rules:\n1. Make a POST request to /v1/payment_intents/{payment_intent_id}/confirm\n2. The payment_intent_id should be inserted into the URL path\n3. Build the request body dynamically to only include fields that are provided in the input payload\n4. Do not send null or undefined fields\n5. Use application/x-www-form-urlencoded for the request body\n6. If idempotency_key is provided, send it as Idempotency-Key header\n7. Handle shipping object by flattening it into form-encoded format (e.g., shipping[name], shipping[address][line1])\n\nAuthentication: Use Bearer token with the api_key credential in Authorization header.\n\nOutput: Return the updated PaymentIntent object from Stripe. The status may be requires_action (for 3D Secure), succeeded (payment complete), requires_payment_method (if failed), or other statuses.",
-    "finalTransform": "(sourceData) => { return sourceData.confirmPaymentIntent; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.confirmPaymentIntent; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool connects to Stripe to confirm a PaymentIntent by processing the provided payment method, return URL, and shipping details. It will return the updated PaymentIntent object, including its status, which indicates whether the payment requires further action, has succeeded, or needs a new payment method."
   },
   "stripe_capture_payment_intent": {
@@ -2794,9 +2794,9 @@
       }
     },
     "instruction": "Capture a Stripe PaymentIntent using POST /v1/payment_intents/{payment_intent_id}/capture endpoint.\n\nInputs:\n- payment_intent_id: string (required) - The ID of the PaymentIntent to capture (must be in requires_capture status)\n- amount_to_capture: integer in cents (optional) - Amount to capture for partial captures; omit for full capture\n- idempotency_key: string (optional) - Send as Idempotency-Key header if provided\n\nRequest rules:\n1. Make a POST request to /v1/payment_intents/{payment_intent_id}/capture\n2. The payment_intent_id should be inserted into the URL path\n3. Build the request body dynamically to only include fields that are provided in the input payload\n4. Do not send null or undefined fields\n5. Use application/x-www-form-urlencoded for the request body\n6. If idempotency_key is provided, send it as Idempotency-Key header\n7. If amount_to_capture is not provided, Stripe will capture the full authorized amount\n\nAuthentication: Use Bearer token with the api_key credential in Authorization header.\n\nOutput: Return the updated PaymentIntent object from Stripe after capture. The response will include:\n- status (should be succeeded after successful capture)\n- charges (updated with captured charge details)\n- amount_capturable (updated, should be 0 after full capture)\n- amount_received (updated with captured amount)\n- All other PaymentIntent details",
-    "finalTransform": "(sourceData) => { return sourceData.capturePaymentIntent; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.capturePaymentIntent; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool captures a Stripe PaymentIntent, allowing you to optionally specify an amount for partial captures. It returns the updated PaymentIntent details, including the status, captured charge information, and the captured amount."
   },
   "stripe_create_checkout_session": {
@@ -2898,9 +2898,9 @@
       }
     },
     "instruction": "Create a Stripe Checkout Session using POST /v1/checkout/sessions endpoint.\n\nRequired Inputs:\n- mode: string (required) - Either \"payment\" or \"subscription\"\n- success_url: string (required) - URL to redirect to after successful payment\n- cancel_url: string (required) - URL to redirect to if user cancels\n- line_items: array (required) - Array of line item objects\n\nOptional Inputs:\n- customer: string (optional) - Existing customer ID\n- customer_email: string (optional) - Email address for new customer\n- metadata: object (optional) - Key-value pairs for metadata\n- allow_promotion_codes: boolean (optional) - Whether to allow promotion codes\n- idempotency_key: string (optional) - Send as Idempotency-Key header if provided\n\nCRITICAL: Use proper form-urlencoded flattening. For nested objects and arrays, use bracket notation:\n- line_items[0][price] for simple values\n- line_items[0][price_data][currency] for nested objects\n- line_items[0][price_data][product_data][name] for deeply nested objects\n- metadata[order_id] for metadata keys\n\nAuthentication: Use Bearer token with the api_key credential in Authorization header.\n\nOutput: Return the complete Checkout Session object including id and url for client redirect.",
-    "finalTransform": "(sourceData) => { if (!sourceData.createCheckoutSession) throw new Error('No session returned'); return sourceData.createCheckoutSession; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { if (!sourceData.createCheckoutSession) throw new Error('No session returned'); return sourceData.createCheckoutSession; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool creates a seamless Stripe Checkout experience by generating a session for your payment or subscription process. It will return a comprehensive Checkout Session object, including the session ID and a URL for customers to complete their purchase."
   },
   "stripe_create_customer": {
@@ -2992,9 +2992,9 @@
       }
     },
     "instruction": "Create a Stripe Customer using POST /v1/customers endpoint.\n\nInputs (all optional, but at least one recommended):\n- email: string (optional) - Customer's email address\n- name: string (optional) - Customer's full name\n- phone: string (optional) - Customer's phone number\n- address: object (optional) - Customer's address with fields:\n  * line1: string\n  * line2: string (optional)\n  * city: string\n  * state: string\n  * postal_code: string\n  * country: string\n- metadata: object (optional) - Key-value pairs for custom metadata\n- description: string (optional) - Description of the customer\n- payment_method: string (optional) - Payment method to attach to customer\n- invoice_settings: object (optional) - Invoice settings\n- idempotency_key: string (optional) - Send as Idempotency-Key header if provided\n\nRequest rules:\n1. Make a POST request to /v1/customers\n2. Build the request body dynamically to only include fields that are provided\n3. Do not send null or undefined fields\n4. Use application/x-www-form-urlencoded for the request body\n5. Handle nested objects (address, metadata, invoice_settings) by flattening:\n   - address[line1], address[city], etc.\n   - metadata[key], metadata[another_key], etc.\n6. If idempotency_key is provided, send it as Idempotency-Key header\n\nAuthentication: Use Bearer token with the api_key credential in Authorization header.\n\nOutput: Return the complete Customer object from Stripe including:\n- id (customer ID)\n- email\n- name\n- phone\n- address\n- default_payment_method\n- metadata\n- All other customer details",
-    "finalTransform": "(sourceData) => { if (!sourceData.createStripeCustomer) throw new Error('No customer object returned'); return sourceData.createStripeCustomer.data; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { if (!sourceData.createStripeCustomer) throw new Error('No customer object returned'); return sourceData.createStripeCustomer.data; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool directly connects to Stripe to create a new customer profile using any provided details such as name, email, and address. It will return the complete customer information from Stripe, including customer ID and any additional details you provided."
   },
   "sumup-sales-pull": {
@@ -3044,9 +3044,9 @@
       }
     },
     "instruction": "Build a SumUp sales pull workflow that retrieves all transactions from the merchant account with pagination support. Fetch transactions from GET https://api.sumup.com/v0.1/me/transactions with limit=100 and order=descending. Handle pagination by checking if has_more is true in the response. For each transaction, extract transaction_id, timestamp, amount, currency, and payment_type (tender type). Group and aggregate the results by date to show: total sales amount per day, count of transactions per day, and breakdown by tender/payment types (card, cash, etc.) for each day.",
-    "finalTransform": "(sourceData) => {\n  // Helper to flatten all transactions from paginated responses\n  let transactions = [];\n  const paged = sourceData.fetchAllTransactions;\n  if (Array.isArray(paged?.results)) {\n    for (const page of paged.results) {\n      if (Array.isArray(page.items)) {\n        transactions = transactions.concat(page.items);\n      }\n    }\n  } else if (Array.isArray(paged?.items)) {\n    transactions = paged.items;\n  }\n\n  // Extract required fields and group by date\n  const grouped = {};\n  let globalTotalAmount = 0;\n  let minDate = null;\n  let maxDate = null;\n\n  for (const tx of transactions) {\n    const date = tx.timestamp ? tx.timestamp.slice(0, 10) : null;\n    if (!date) continue;\n    if (!grouped[date]) {\n      grouped[date] = {\n        date,\n        total_amount: 0,\n        transaction_count: 0,\n        tender_breakdown: {},\n      };\n    }\n    const amount = Number(tx.amount) || 0;\n    grouped[date].total_amount += amount;\n    grouped[date].transaction_count += 1;\n    const paymentType = tx.payment_type || tx.tender_type || \"unknown\";\n    if (!grouped[date].tender_breakdown[paymentType]) {\n      grouped[date].tender_breakdown[paymentType] = { count: 0, amount: 0 };\n    }\n    grouped[date].tender_breakdown[paymentType].count += 1;\n    grouped[date].tender_breakdown[paymentType].amount += amount;\n    globalTotalAmount += amount;\n    if (!minDate || date < minDate) minDate = date;\n    if (!maxDate || date > maxDate) maxDate = date;\n  }\n\n  // Format result as array sorted by date descending\n  const daily_sales = Object.values(grouped).sort((a, b) =>\n    b.date.localeCompare(a.date),\n  );\n\n  return {\n    daily_sales,\n    summary: {\n      total_transactions: transactions.length,\n      total_amount: globalTotalAmount,\n      date_range: {\n        from: minDate || null,\n        to: maxDate || null,\n      },\n    },\n  };\n};\n",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  // Helper to flatten all transactions from paginated responses\n  let transactions = [];\n  const paged = sourceData.fetchAllTransactions;\n  if (Array.isArray(paged?.results)) {\n    for (const page of paged.results) {\n      if (Array.isArray(page.items)) {\n        transactions = transactions.concat(page.items);\n      }\n    }\n  } else if (Array.isArray(paged?.items)) {\n    transactions = paged.items;\n  }\n\n  // Extract required fields and group by date\n  const grouped = {};\n  let globalTotalAmount = 0;\n  let minDate = null;\n  let maxDate = null;\n\n  for (const tx of transactions) {\n    const date = tx.timestamp ? tx.timestamp.slice(0, 10) : null;\n    if (!date) continue;\n    if (!grouped[date]) {\n      grouped[date] = {\n        date,\n        total_amount: 0,\n        transaction_count: 0,\n        tender_breakdown: {},\n      };\n    }\n    const amount = Number(tx.amount) || 0;\n    grouped[date].total_amount += amount;\n    grouped[date].transaction_count += 1;\n    const paymentType = tx.payment_type || tx.tender_type || \"unknown\";\n    if (!grouped[date].tender_breakdown[paymentType]) {\n      grouped[date].tender_breakdown[paymentType] = { count: 0, amount: 0 };\n    }\n    grouped[date].tender_breakdown[paymentType].count += 1;\n    grouped[date].tender_breakdown[paymentType].amount += amount;\n    globalTotalAmount += amount;\n    if (!minDate || date < minDate) minDate = date;\n    if (!maxDate || date > maxDate) maxDate = date;\n  }\n\n  // Format result as array sorted by date descending\n  const daily_sales = Object.values(grouped).sort((a, b) =>\n    b.date.localeCompare(a.date),\n  );\n\n  return {\n    daily_sales,\n    summary: {\n      total_transactions: transactions.length,\n      total_amount: globalTotalAmount,\n      date_range: {\n        from: minDate || null,\n        to: maxDate || null,\n      },\n    },\n  };\n};\n",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "summary": {
@@ -3157,9 +3157,9 @@
       }
     },
     "instruction": "Build a SumUp create refund workflow. Accept transaction_id (required, string) and amount (optional, number) in the payload. Make a POST request to https://api.sumup.com/v0.1/me/refund/{transaction_id} where {transaction_id} is dynamically inserted from payload.transaction_id into the URL path. For the request body: if payload.amount exists, send JSON body with {\"amount\": payload.amount} for partial refund. If payload.amount is not provided or null, send empty body {} for full refund. Use Authorization header with Bearer token. The response will contain refund details. Transform the response to return: refund_id (from response.id), transaction_id (echo from payload), status (from response.status or 'PENDING'), amount (from response.amount), currency (from response.currency), refund_type (if payload.amount was provided return 'partial', else 'full'), created_at (from response.timestamp or response.date), message ('Refund processed successfully'). Handle errors gracefully and return clear error messages if transaction not found.",
-    "finalTransform": "(sourceData) => {\n  const response = sourceData.createRefund || {};\n  const payload = sourceData.payload || {};\n  \n  return {\n    refund_id: response.id || response.refund_id || null,\n    transaction_id: payload.transaction_id || response.transaction_id || null,\n    status: response.status || 'PENDING',\n    amount: response.amount || payload.amount || null,\n    currency: response.currency || null,\n    refund_type: payload.amount ? 'partial' : 'full',\n    created_at: response.timestamp || response.date || response.created_at || new Date().toISOString(),\n    message: 'Refund processed successfully'\n  };\n}",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  const response = sourceData.createRefund || {};\n  const payload = sourceData.payload || {};\n  \n  return {\n    refund_id: response.id || response.refund_id || null,\n    transaction_id: payload.transaction_id || response.transaction_id || null,\n    status: response.status || 'PENDING',\n    amount: response.amount || payload.amount || null,\n    currency: response.currency || null,\n    refund_type: payload.amount ? 'partial' : 'full',\n    created_at: response.timestamp || response.date || response.created_at || new Date().toISOString(),\n    message: 'Refund processed successfully'\n  };\n}",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "amount": {
@@ -3243,9 +3243,9 @@
       }
     },
     "instruction": "Build a SumUp get transaction workflow that retrieves detailed information about a specific transaction. Accept transaction_id (required, string) in the payload. Make a GET request to https://api.sumup.com/v0.1/me/transactions/{transaction_id} where {transaction_id} is dynamically inserted from payload.transaction_id into the URL path. Use Authorization header with Bearer token. The response will contain full transaction details. Return the complete transaction information including: transaction_id (id), amount, currency, status, timestamp (date/created_at), payment_type (card, cash, etc.), card details if available, merchant info, customer info if present, product line items if available, tax information, and any other relevant transaction metadata. This is useful for reconciliation, reporting, refund verification, and analytics workflows.",
-    "finalTransform": "(sourceData) => {\n  const txn = sourceData.getTransactionDetails || {};\n  \n  return {\n    transaction_id: txn.id || txn.transaction_id || null,\n    amount: txn.amount || null,\n    currency: txn.currency || null,\n    status: txn.status || null,\n    timestamp: txn.timestamp || txn.date || txn.created_at || null,\n    payment_type: txn.payment_type || txn.type || txn.tender_type || null,\n    card: txn.card ? {\n      type: txn.card.type || txn.card.card_type || null,\n      last_4_digits: txn.card.last_4_digits || txn.card.last4 || null\n    } : null,\n    merchant_code: txn.merchant_code || txn.merchant_id || null,\n    description: txn.description || txn.entry_mode || null,\n    products: txn.products || txn.items || txn.line_items || [],\n    tax: txn.tax || txn.tax_amount || null,\n    metadata: {\n      entry_mode: txn.entry_mode || null,\n      verification_method: txn.verification_method || null,\n      installments_count: txn.installments_count || null,\n      location: txn.location || null,\n      horizontal_accuracy: txn.horizontal_accuracy || null,\n      simple_payment_type: txn.simple_payment_type || null,\n      simple_status: txn.simple_status || null\n    }\n  };\n}",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  const txn = sourceData.getTransactionDetails || {};\n  \n  return {\n    transaction_id: txn.id || txn.transaction_id || null,\n    amount: txn.amount || null,\n    currency: txn.currency || null,\n    status: txn.status || null,\n    timestamp: txn.timestamp || txn.date || txn.created_at || null,\n    payment_type: txn.payment_type || txn.type || txn.tender_type || null,\n    card: txn.card ? {\n      type: txn.card.type || txn.card.card_type || null,\n      last_4_digits: txn.card.last_4_digits || txn.card.last4 || null\n    } : null,\n    merchant_code: txn.merchant_code || txn.merchant_id || null,\n    description: txn.description || txn.entry_mode || null,\n    products: txn.products || txn.items || txn.line_items || [],\n    tax: txn.tax || txn.tax_amount || null,\n    metadata: {\n      entry_mode: txn.entry_mode || null,\n      verification_method: txn.verification_method || null,\n      installments_count: txn.installments_count || null,\n      location: txn.location || null,\n      horizontal_accuracy: txn.horizontal_accuracy || null,\n      simple_payment_type: txn.simple_payment_type || null,\n      simple_status: txn.simple_status || null\n    }\n  };\n}",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "tax": {
@@ -3368,9 +3368,9 @@
       }
     },
     "instruction": "Build a SumUp list transactions workflow that retrieves transactions for a given date range. Accept start_date (optional, ISO date string) and end_date (optional, ISO date string) in the payload. Make a GET request to https://api.sumup.com/v0.1/me/transactions with query parameters: order=descending, limit=100, and if provided: from=start_date and to=end_date. Handle pagination automatically - check for has_more or next_cursor in response and fetch all pages. Use Authorization header with Bearer token. Return a list of transactions with: transaction_id (id), timestamp (date/created_at), amount, currency, status, and payment_type. This is ideal for building dashboards, reports, and analytics. If no date range is provided, fetch recent transactions.",
-    "finalTransform": "(sourceData) => {\n  // Helper to flatten all transactions from paginated responses\n  let allTransactions = [];\n  const paged = sourceData.fetchAllTransactions;\n\n  if (Array.isArray(paged)) {\n    for (const page of paged) {\n      if (Array.isArray(page?.data?.transactions)) {\n        allTransactions = allTransactions.concat(page.data.transactions);\n      } else if (Array.isArray(page?.items)) {\n        allTransactions = allTransactions.concat(page.items);\n      }\n    }\n  } else if (Array.isArray(paged?.data?.transactions)) {\n    allTransactions = paged.data.transactions;\n  } else if (Array.isArray(paged?.results)) {\n    for (const page of paged.results) {\n      if (Array.isArray(page?.items)) {\n        allTransactions = allTransactions.concat(page.items);\n      }\n    }\n  }\n\n  // Map to required fields\n  const transactions = allTransactions.map((tx) => ({\n    transaction_id: tx.id,\n    timestamp: tx.date || tx.created_at,\n    amount: tx.amount,\n    currency: tx.currency,\n    status: tx.status,\n    payment_type: tx.payment_type,\n  }));\n\n  // Calculate summary\n  const total_count = transactions.length;\n  const total_amount = transactions.reduce(\n    (sum, tx) => sum + (typeof tx.amount === 'number' ? tx.amount : 0),\n    0,\n  );\n\n  // Extract date range from payload if present\n  const from = sourceData.payload?.start_date || null;\n  const to = sourceData.payload?.end_date || null;\n\n  return {\n    transactions,\n    summary: {\n      total_count,\n      date_range: { from, to },\n      total_amount,\n    },\n  };\n}",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  // Helper to flatten all transactions from paginated responses\n  let allTransactions = [];\n  const paged = sourceData.fetchAllTransactions;\n\n  if (Array.isArray(paged)) {\n    for (const page of paged) {\n      if (Array.isArray(page?.data?.transactions)) {\n        allTransactions = allTransactions.concat(page.data.transactions);\n      } else if (Array.isArray(page?.items)) {\n        allTransactions = allTransactions.concat(page.items);\n      }\n    }\n  } else if (Array.isArray(paged?.data?.transactions)) {\n    allTransactions = paged.data.transactions;\n  } else if (Array.isArray(paged?.results)) {\n    for (const page of paged.results) {\n      if (Array.isArray(page?.items)) {\n        allTransactions = allTransactions.concat(page.items);\n      }\n    }\n  }\n\n  // Map to required fields\n  const transactions = allTransactions.map((tx) => ({\n    transaction_id: tx.id,\n    timestamp: tx.date || tx.created_at,\n    amount: tx.amount,\n    currency: tx.currency,\n    status: tx.status,\n    payment_type: tx.payment_type,\n  }));\n\n  // Calculate summary\n  const total_count = transactions.length;\n  const total_amount = transactions.reduce(\n    (sum, tx) => sum + (typeof tx.amount === 'number' ? tx.amount : 0),\n    0,\n  );\n\n  // Extract date range from payload if present\n  const from = sourceData.payload?.start_date || null;\n  const to = sourceData.payload?.end_date || null;\n\n  return {\n    transactions,\n    summary: {\n      total_count,\n      date_range: { from, to },\n      total_amount,\n    },\n  };\n}",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "summary": {
@@ -3496,9 +3496,9 @@
       }
     },
     "instruction": "Build a Square tool that lists all payments for a given time window, optionally filtered by location_id.\n\n1. Call the Square Payments API endpoint: GET https://api.squareup.com/v2/payments\n2. Use Bearer token authentication with the access_token from the integration credentials in the Authorization header\n3. Include query parameters:\n   - begin_time: ISO-8601 formatted start time (required, from payload)\n   - end_time: ISO-8601 formatted end time (required, from payload)\n   - location_id: optional location filter (from payload if provided)\n   - limit: 100 (default pagination limit)\n   - cursor: for pagination (handled automatically)\n4. Handle pagination by following the cursor until all payments are retrieved\n5. Extract the payments array from each response\n6. Return all payments with their id, amount_money, created_at, status, location_id, and order_id fields",
-    "finalTransform": "(sourceData) => {\n  // Square returns an array of responses (pages), each with a 'payments' array\n  // Flatten all payments and map to required fields, wrap in { payments: [...] }\n  let allPayments = [];\n  if (Array.isArray(sourceData.listAllPayments)) {\n    allPayments = sourceData.listAllPayments.flatMap(\n      (page) => page.payments || [],\n    );\n  } else if (Array.isArray(sourceData.listAllPayments?.results)) {\n    // Some integrations may use 'results' as the array of pages\n    allPayments = sourceData.listAllPayments.results.flatMap(\n      (page) => page.payments || [],\n    );\n  } else if (sourceData.listAllPayments?.payments) {\n    allPayments = sourceData.listAllPayments.payments || [];\n  } else {\n    allPayments = [];\n  }\n  return {\n    payments: allPayments.map((p) => ({\n      id: p.id,\n      amount_money: p.amount_money,\n      created_at: p.created_at,\n      status: p.status,\n      location_id: p.location_id,\n      order_id: p.order_id,\n    })),\n  };\n};\n",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  // Square returns an array of responses (pages), each with a 'payments' array\n  // Flatten all payments and map to required fields, wrap in { payments: [...] }\n  let allPayments = [];\n  if (Array.isArray(sourceData.listAllPayments)) {\n    allPayments = sourceData.listAllPayments.flatMap(\n      (page) => page.payments || [],\n    );\n  } else if (Array.isArray(sourceData.listAllPayments?.results)) {\n    // Some integrations may use 'results' as the array of pages\n    allPayments = sourceData.listAllPayments.results.flatMap(\n      (page) => page.payments || [],\n    );\n  } else if (sourceData.listAllPayments?.payments) {\n    allPayments = sourceData.listAllPayments.payments || [];\n  } else {\n    allPayments = [];\n  }\n  return {\n    payments: allPayments.map((p) => ({\n      id: p.id,\n      amount_money: p.amount_money,\n      created_at: p.created_at,\n      status: p.status,\n      location_id: p.location_id,\n      order_id: p.order_id,\n    })),\n  };\n};\n",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "payments": {
@@ -3587,9 +3587,9 @@
       }
     },
     "instruction": "Build a Square tool that creates a refund for a completed payment. Requires payment_id, amount (in smallest currency unit), currency code, and optional reason. Returns refund object with id, status, location_id, amount_money, payment_id, created_at, updated_at, and reason.",
-    "finalTransform": "(sourceData) => { return sourceData.createRefund || {}; }",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => { return sourceData.createRefund || {}; }",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "refund": {
@@ -3672,8 +3672,8 @@
       }
     },
     "instruction": "Get Slack user information. Make a GET request to /users.info with Authorization header: Bearer <<slack_api_key_api_token>>. Include query parameter: user (required, the user ID).",
-    "finalTransform": "(sourceData) => { return sourceData.getSlackUserInfo; }",
-    "integrationIds": [],
+    "outputTransform": "(sourceData) => { return sourceData.getSlackUserInfo; }",
+    "systemIds": [],
     "description": "This tool retrieves detailed information about a specific Slack user directly from Slack by using their user ID. It will return the user's profile details, including their name and contact information, as provided in Slack."
   },
   "airtable_list_records": {
@@ -3727,9 +3727,9 @@
       }
     },
     "instruction": "List records from an Airtable table with pagination and optional filters.\n\nAPI Configuration:\n- Method: GET\n- Base URL: https://api.airtable.com\n- Path: /v0/{base_id}/{table_name}\n- Authentication: Bearer token in Authorization header using the access_token credential\n\nInput parameters:\n- base_id (required): The Airtable base ID\n- table_name (required): The name or ID of the table\n- view (optional): The name or ID of a view in the table\n- filterByFormula (optional): An Airtable formula to filter records\n- pageSize (optional): Number of records per page (default 100, max 100)\n- offset (optional): Pagination offset token\n\nQuery parameters: Only include parameters that are provided (not null/empty)\n- view, filterByFormula, pageSize, offset\n\nPagination handling:\n- The API returns an \"offset\" field when there are more records\n- Keep fetching pages with the returned offset until no offset is returned\n- Aggregate all records from all pages into a single array\n\nOutput format:\n{\n  \"records\": [\n    {\n      \"id\": \"rec...\",\n      \"fields\": { ... },\n      \"createdTime\": \"...\"\n    }\n  ]\n}",
-    "finalTransform": "(sourceData) => { return sourceData.listAirtableRecords.data; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.listAirtableRecords.data; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool retrieves data from a specified table in your Airtable database, allowing for optional filtering and pagination. It will return a complete list of records from the table, including each record's ID, fields, and creation time."
   },
   "square-search-orders": {
@@ -3799,9 +3799,9 @@
       }
     },
     "instruction": "Build a Square tool that searches orders for one or more location_ids within a time range. Supports optional date filtering (start_time/end_time) and state filtering. Uses cursor-based pagination to retrieve all orders. Requires ORDERS_READ scope. Returns orders with id, location_id, line_items, total_money, state, and created_at.",
-    "finalTransform": "(sourceData) => {\n  // Square returns an array of responses (pages), each with an 'orders' array\n  // Flatten all orders and map to required fields\n  let allOrders = [];\n  if (Array.isArray(sourceData.searchOrdersWithPagination)) {\n    allOrders = sourceData.searchOrdersWithPagination.flatMap(\n      (page) => page.orders || [],\n    );\n  } else if (sourceData.searchOrdersWithPagination?.orders) {\n    allOrders = sourceData.searchOrdersWithPagination.orders || [];\n  } else {\n    allOrders = [];\n  }\n  return {\n    orders: allOrders.map((order) => ({\n      id: order.id,\n      location_id: order.location_id,\n      line_items: order.line_items,\n      total_money: order.total_money,\n      state: order.state,\n      created_at: order.created_at,\n    })),\n  };\n}",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  // Square returns an array of responses (pages), each with an 'orders' array\n  // Flatten all orders and map to required fields\n  let allOrders = [];\n  if (Array.isArray(sourceData.searchOrdersWithPagination)) {\n    allOrders = sourceData.searchOrdersWithPagination.flatMap(\n      (page) => page.orders || [],\n    );\n  } else if (sourceData.searchOrdersWithPagination?.orders) {\n    allOrders = sourceData.searchOrdersWithPagination.orders || [];\n  } else {\n    allOrders = [];\n  }\n  return {\n    orders: allOrders.map((order) => ({\n      id: order.id,\n      location_id: order.location_id,\n      line_items: order.line_items,\n      total_money: order.total_money,\n      state: order.state,\n      created_at: order.created_at,\n    })),\n  };\n}",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "orders": {
@@ -3889,8 +3889,8 @@
       }
     },
     "instruction": "Build a Square tool that lists sellable catalog items and their variations with prices. Supports optional filtering by enabled_location_ids and text_filter. Uses cursor-based pagination. Requires ITEMS_READ scope. Returns items with id, name, description, and variations (with id, name, price_money, sku).",
-    "finalTransform": "(sourceData) => {\n  // Square returns an array of responses (pages), each with an 'items' array\n  // Flatten all items and extract relevant catalog data\n  let allItems = [];\n  if (Array.isArray(sourceData.searchCatalogItems)) {\n    allItems = sourceData.searchCatalogItems.flatMap(\n      (page) => page.items || [],\n    );\n  } else if (sourceData.searchCatalogItems?.items) {\n    allItems = sourceData.searchCatalogItems.items || [];\n  } else {\n    allItems = [];\n  }\n  return {\n    items: allItems.map((item) => ({\n      id: item.id,\n      name: item.item_data?.name,\n      description: item.item_data?.description,\n      variations: (item.item_data?.variations || []).map((v) => ({\n        id: v.id,\n        name: v.item_variation_data?.name,\n        price_money: v.item_variation_data?.price_money,\n        sku: v.item_variation_data?.sku,\n      })),\n    })),\n  };\n}",
-    "integrationIds": [],
+    "outputTransform": "(sourceData) => {\n  // Square returns an array of responses (pages), each with an 'items' array\n  // Flatten all items and extract relevant catalog data\n  let allItems = [];\n  if (Array.isArray(sourceData.searchCatalogItems)) {\n    allItems = sourceData.searchCatalogItems.flatMap(\n      (page) => page.items || [],\n    );\n  } else if (sourceData.searchCatalogItems?.items) {\n    allItems = sourceData.searchCatalogItems.items || [];\n  } else {\n    allItems = [];\n  }\n  return {\n    items: allItems.map((item) => ({\n      id: item.id,\n      name: item.item_data?.name,\n      description: item.item_data?.description,\n      variations: (item.item_data?.variations || []).map((v) => ({\n        id: v.id,\n        name: v.item_variation_data?.name,\n        price_money: v.item_variation_data?.price_money,\n        sku: v.item_variation_data?.sku,\n      })),\n    })),\n  };\n}",
+    "systemIds": [],
     "description": "This tool connects to Square to retrieve a list of sellable catalog items and their variations, including prices. It returns detailed information such as item IDs, names, descriptions, and variation specifics like price and SKU, allowing for optional filtering by location and text search."
   },
   "square-adjust-inventory": {
@@ -3963,8 +3963,8 @@
       }
     },
     "instruction": "Build a Square tool that applies inventory adjustments for specified catalog object IDs at a location. Accepts location_id and array of adjustments with catalog_object_id, quantity, from_state, to_state. Generates idempotency_key automatically. Requires INVENTORY_WRITE scope. Returns counts array with current calculated inventory counts after changes.",
-    "finalTransform": "(sourceData) => { return { counts: sourceData.batchInventoryAdjustments?.counts || [] }; }",
-    "integrationIds": [],
+    "outputTransform": "(sourceData) => { return { counts: sourceData.batchInventoryAdjustments?.counts || [] }; }",
+    "systemIds": [],
     "description": "This tool interacts with Square to adjust inventory levels for specific items at a given location. It will return an updated list of inventory counts, reflecting the changes made."
   },
   "square-create-customer": {
@@ -4038,9 +4038,9 @@
       }
     },
     "instruction": "Build a Square tool that creates a customer profile. Accepts optional fields: given_name, family_name, company_name, email_address, phone_number, address, note, reference_id. At least one of given_name, family_name, company_name, email_address, or phone_number must be provided. Auto-generates idempotency_key. Requires CUSTOMERS_WRITE scope. Returns customer object with id, created_at, updated_at, and provided fields.",
-    "finalTransform": "(sourceData) => {\n  const customer = sourceData.createCustomerProfile?.customer;\n  if (!customer) throw new Error(\"No customer object returned from Square\");\n  // Only include fields required by the target schema and provided in the payload\n  const schemaFields = [\n    \"id\",\n    \"created_at\",\n    \"updated_at\",\n    \"given_name\",\n    \"family_name\",\n    \"email_address\",\n    \"phone_number\",\n    \"company_name\",\n  ];\n  const result = {};\n  for (const field of schemaFields) {\n    if (\n      typeof customer[field] !== \"undefined\" &&\n      typeof sourceData[field] !== \"undefined\"\n    ) {\n      result[field] = customer[field];\n    }\n  }\n  // Always include id, created_at, updated_at\n  result.id = customer.id;\n  result.created_at = customer.created_at;\n  result.updated_at = customer.updated_at;\n  return { customer: result };\n};\n",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  const customer = sourceData.createCustomerProfile?.customer;\n  if (!customer) throw new Error(\"No customer object returned from Square\");\n  // Only include fields required by the target schema and provided in the payload\n  const schemaFields = [\n    \"id\",\n    \"created_at\",\n    \"updated_at\",\n    \"given_name\",\n    \"family_name\",\n    \"email_address\",\n    \"phone_number\",\n    \"company_name\",\n  ];\n  const result = {};\n  for (const field of schemaFields) {\n    if (\n      typeof customer[field] !== \"undefined\" &&\n      typeof sourceData[field] !== \"undefined\"\n    ) {\n      result[field] = customer[field];\n    }\n  }\n  // Always include id, created_at, updated_at\n  result.id = customer.id;\n  result.created_at = customer.created_at;\n  result.updated_at = customer.updated_at;\n  return { customer: result };\n};\n",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "customer": {
@@ -4125,9 +4125,9 @@
       }
     },
     "instruction": "Search for customers in NetSuite using the REST API with TBA authentication",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool connects to NetSuite to search for customer information based on specified criteria. It will return a list of customers, including details such as their ID, email, phone number, and company name, along with the total number of results found."
   },
   "netsuite_sync_sales_orders": {
@@ -4182,9 +4182,9 @@
       }
     },
     "instruction": "Sync sales orders from NetSuite using the REST API with TBA authentication",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "totalCount": {
@@ -4294,9 +4294,9 @@
       }
     },
     "instruction": "Update inventory levels in NetSuite using the REST API with TBA authentication",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "results": {
@@ -4432,8 +4432,8 @@
       }
     },
     "instruction": "Build a Procore daily logs tool.\n\nStep 1: Fetch manpower logs\n- GET /rest/v1.0/projects/{project_id}/manpower_logs\n- Path param: project_id from inputs\n- Query params: company_id (required), log_date, start_date, end_date, page, per_page (optional)\n- Auth: Bearer token from OAuth\n- Return response\n\nStep 2: Fetch DCR logs (conditional on include_dcr flag)\n- Only execute if inputs.include_dcr is true\n- GET /rest/v1.0/projects/{project_id}/daily_construction_report_logs\n- Path param: project_id from inputs\n- Query params: company_id (required), log_date, start_date, end_date, page, per_page (optional)\n- Auth: Bearer token from OAuth\n- Return response\n\nCombine results as: {\"manpower\": step1_response, \"dcr\": step2_response}",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool retrieves detailed manpower and, if specified, daily construction report logs directly from your Procore project. It will provide comprehensive information on workforce activities and construction reports, organized by the specified project and date range."
   },
   "airtable_get_record": {
@@ -4481,9 +4481,9 @@
       }
     },
     "instruction": "Fetch a single record by ID from an Airtable table.\n\nAPI Configuration:\n- Method: GET\n- Base URL: https://api.airtable.com\n- Path: /v0/{base_id}/{table_name}/{record_id}\n- Authentication: Bearer token in Authorization header using the access_token credential\n\nInput parameters:\n- base_id (required): The Airtable base ID\n- table_name (required): The name or ID of the table\n- record_id (required): The ID of the record to fetch (e.g., rec...)\n\nError handling:\n- If the record is not found (404), return a message indicating the record was not found\n- Handle permission errors gracefully\n\nOutput format:\n{\n  \"id\": \"rec...\",\n  \"fields\": { ... },\n  \"createdTime\": \"...\"\n}",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "id": {
@@ -4559,9 +4559,9 @@
       }
     },
     "instruction": "Create one or more records in an Airtable table.\n\nAPI Configuration:\n- Method: POST\n- Base URL: https://api.airtable.com\n- Path: /v0/{base_id}/{table_name}\n- Authentication: Bearer token in Authorization header using the access_token credential\n- Headers: Content-Type: application/json\n\nInput parameters:\n- base_id (required): The Airtable base ID\n- table_name (required): The name or ID of the table\n- records (required): Array of record objects, each with a \"fields\" property containing the field data\n  Example: [{\"fields\": {\"Name\": \"John\", \"Email\": \"john@example.com\"}}]\n- typecast (optional, boolean): Automatically convert data types. Default: false\n\nRequest body structure:\n{\n  \"records\": [array of record objects from input],\n  \"typecast\": [boolean value from input, default false if not provided]\n}\n\nOutput format:\n{\n  \"records\": [\n    {\n      \"id\": \"rec...\",\n      \"fields\": { ... },\n      \"createdTime\": \"...\"\n    }\n  ]\n}",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "records": {
@@ -4660,9 +4660,9 @@
       }
     },
     "instruction": "List purchase orders from Coupa using API key authentication with pagination and filtering support",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "page": {
@@ -4802,9 +4802,9 @@
       }
     },
     "instruction": "List invoices from Coupa using API key authentication with pagination and filtering support",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "page": {
@@ -4948,8 +4948,8 @@
       }
     },
     "instruction": "Create a new Confluence page using POST /wiki/rest/api/content endpoint. Accept space_id (required), title (required), body (required), and parent_id (optional) as inputs. Create a JSON body with type=\"page\", space.key=space_id, title=title, body.storage.value=body, body.storage.representation=\"storage\". If parent_id is provided, include ancestors array with id. Return the full page JSON including id, title, status, and _links.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool allows you to create a new page in Confluence by specifying the space, title, and content of the page, with the option to nest it under an existing page. It will return detailed information about the newly created page, including its ID, title, status, and links."
   },
   "coupa_send_supplier_invites": {
@@ -5010,9 +5010,9 @@
       }
     },
     "instruction": "Send supplier invitations in Coupa using API key authentication",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "results": {
@@ -5099,8 +5099,8 @@
       }
     },
     "instruction": "List all Confluence spaces using GET /wiki/rest/api/space endpoint. Return an array of spaces with id, key, name, type, status, and _links. Support pagination if available.",
-    "finalTransform": "(sourceData) => { return { data: (sourceData.getAllSpaces && sourceData.getAllSpaces.results) ? sourceData.getAllSpaces.results : [] }; }",
-    "integrationIds": [],
+    "outputTransform": "(sourceData) => { return { data: (sourceData.getAllSpaces && sourceData.getAllSpaces.results) ? sourceData.getAllSpaces.results : [] }; }",
+    "systemIds": [],
     "description": "This tool fetches a comprehensive list of all Confluence spaces from your Atlassian account. It will return detailed information for each space, including its ID, key, name, type, status, and relevant links."
   },
   "slack_schedule_message": {
@@ -5144,8 +5144,8 @@
       }
     },
     "instruction": "Schedule a Slack message to be sent at a specific time using the chat.scheduleMessage API endpoint. The tool should schedule a message to be posted to a channel at the specified Unix timestamp.",
-    "finalTransform": "(sourceData) => { return { scheduled_message: sourceData.scheduleSlackMessage }; }",
-    "integrationIds": [],
+    "outputTransform": "(sourceData) => { return { scheduled_message: sourceData.scheduleSlackMessage }; }",
+    "systemIds": [],
     "description": "This tool allows you to schedule a message to be sent to a specific Slack channel at a designated time. It will return details of the scheduled message, including its confirmation that it is set to be posted at your specified time."
   },
   "monday_get_board_items": {
@@ -5181,7 +5181,7 @@
           "urlPath": "",
           "instruction": "Fetch subsequent pages of items from the board using next_items_page and the cursor. Request cursor, and for each item: id, name, created_at, updated_at, column_values (id, text)."
         },
-        "loopSelector": "(sourceData) => {\n  const cursor = sourceData.fetchFirstPage?.data?.boards?.[0]?.items_page?.cursor;\n  if (!cursor) return [];\n  return [cursor];\n}",
+        "dataSelector": "(sourceData) => {\n  const cursor = sourceData.fetchFirstPage?.data?.boards?.[0]?.items_page?.cursor;\n  if (!cursor) return [];\n  return [cursor];\n}",
         "executionMode": "LOOP"
       }
     ],
@@ -5215,9 +5215,9 @@
       }
     },
     "instruction": "Build a Monday.com GraphQL tool to fetch all items from a board using cursor-based pagination.\n\n1. Make a POST request to the Monday.com GraphQL API endpoint\n2. Use Bearer token authentication with the format: \"Authorization: Bearer {apiKey from monday integration}\"\n3. Accept required input: board_id and optional input: page_limit (default 100)\n4. Build a GraphQL query using boards(ids: [board_id]) with items_page for cursor pagination\n5. Query should request: cursor, and for each item: id, name, created_at, updated_at, column_values (id, text)\n6. Set Content-Type header to \"application/json\"\n7. Use LOOP execution mode to paginate through all items using the cursor\n8. Continue looping until cursor is null or empty\n9. Accumulate all items from each page and return the complete list",
-    "finalTransform": "(sourceData) => {\n  // Helper to extract items from a page result\n  function extractItems(page) {\n    if (!page) return [];\n    if (page.data?.boards?.[0]?.items_page?.items) return page.data.boards[0].items_page.items;\n    if (page.data?.next_items_page?.items) return page.data.next_items_page.items;\n    return [];\n  }\n\n  // Collect all items from the first page\n  let allItems = extractItems(sourceData.fetchFirstPage);\n\n  // Loop to fetch all next pages using the cursor\n  let nextPage = sourceData.fetchFirstPage;\n  let cursor = nextPage?.data?.boards?.[0]?.items_page?.cursor;\n  let nextPages = [];\n  let seenCursors = new Set();\n  while (cursor) {\n    // Find the next page result in fetchNextPages\n    const nextResult = (Array.isArray(sourceData.fetchNextPages) ? sourceData.fetchNextPages : []).find(p => p?.data?.next_items_page?.cursor === cursor);\n    if (!nextResult) break;\n    const items = extractItems(nextResult);\n    allItems = allItems.concat(items);\n    seenCursors.add(cursor);\n    cursor = nextResult?.data?.next_items_page?.cursor;\n    // Prevent infinite loop if API returns same cursor again\n    if (seenCursors.has(cursor)) break;\n  }\n\n  return { items: allItems };\n}",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  // Helper to extract items from a page result\n  function extractItems(page) {\n    if (!page) return [];\n    if (page.data?.boards?.[0]?.items_page?.items) return page.data.boards[0].items_page.items;\n    if (page.data?.next_items_page?.items) return page.data.next_items_page.items;\n    return [];\n  }\n\n  // Collect all items from the first page\n  let allItems = extractItems(sourceData.fetchFirstPage);\n\n  // Loop to fetch all next pages using the cursor\n  let nextPage = sourceData.fetchFirstPage;\n  let cursor = nextPage?.data?.boards?.[0]?.items_page?.cursor;\n  let nextPages = [];\n  let seenCursors = new Set();\n  while (cursor) {\n    // Find the next page result in fetchNextPages\n    const nextResult = (Array.isArray(sourceData.fetchNextPages) ? sourceData.fetchNextPages : []).find(p => p?.data?.next_items_page?.cursor === cursor);\n    if (!nextResult) break;\n    const items = extractItems(nextResult);\n    allItems = allItems.concat(items);\n    seenCursors.add(cursor);\n    cursor = nextResult?.data?.next_items_page?.cursor;\n    // Prevent infinite loop if API returns same cursor again\n    if (seenCursors.has(cursor)) break;\n  }\n\n  return { items: allItems };\n}",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool retrieves all items from a specified board on Monday.com using a method that efficiently handles large datasets. It compiles and returns a complete list of items, including their details such as ID, name, creation date, update date, and column values."
   },
   "confluence_page_search": {
@@ -5267,8 +5267,8 @@
       }
     },
     "instruction": "Search for Confluence pages by keyword using GET /wiki/rest/api/content/search endpoint. Accept keyword (required) as input. Use CQL query parameter to search for pages with the keyword in text or title. Return array of pages with id, title, type, status, and _links.",
-    "finalTransform": "(sourceData) => { return { data: sourceData.searchPagesByCQL.data }; }",
-    "integrationIds": [],
+    "outputTransform": "(sourceData) => { return { data: sourceData.searchPagesByCQL.data }; }",
+    "systemIds": [],
     "description": "This tool allows you to search for Confluence pages by entering a specific keyword. It will return a list of pages that match your keyword, providing details such as the page ID, title, type, status, and relevant links."
   },
   "monday_create_item": {
@@ -5342,9 +5342,9 @@
       }
     },
     "instruction": "Build a Monday.com GraphQL tool to create a new item in a board/group.\n\n1. Make a POST request to the Monday.com GraphQL API endpoint\n2. Use Bearer token authentication with the format: \"Authorization: Bearer {apiKey from monday integration}\"\n3. Accept required inputs: board_id, group_id, item_name\n4. Accept optional input: column_values (JSON object that will be stringified)\n5. Build a GraphQL mutation using create_item with parameters: board_id, group_id, item_name, and column_values (as JSON string)\n6. The mutation should return: id and name of the created item\n7. Set Content-Type header to \"application/json\"\n8. Convert column_values object to JSON string before sending (Monday API requirement)\n9. Return the created item details",
-    "finalTransform": "(sourceData) => { const item = sourceData.createItem?.data?.create_item; if (!item) throw new Error('No item returned from Monday.com'); return { id: item.id, name: item.name }; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { const item = sourceData.createItem?.data?.create_item; if (!item) throw new Error('No item returned from Monday.com'); return { id: item.id, name: item.name }; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool connects to Monday.com to create a new item on your specified board and group. It will return the unique ID and name of the newly created item, allowing you to easily track and manage your projects."
   },
   "monday_update_item": {
@@ -5410,9 +5410,9 @@
       }
     },
     "instruction": "Build a Monday.com GraphQL tool to update an item's column values.\n\n1. POST to https://api.monday.com/v2\n2. Bearer token auth: \"Authorization: Bearer {monday apiKey}\"\n3. Content-Type: application/json\n4. Required inputs: board_id, item_id, column_values (object)\n5. GraphQL mutation: change_multiple_column_values(board_id: $board_id, item_id: $item_id, column_values: $column_values) { id name }\n6. Build body with query and variables where column_values is JSON.stringify(sourceData.column_values)\n7. Return the updated item's id and name from the response data",
-    "finalTransform": "(sourceData) => {\n  const data = sourceData.updateItemColumns?.data?.change_multiple_column_values;\n  if (!data) throw new Error('No data returned from monday.com mutation');\n  return { id: data.id, name: data.name };\n}",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  const data = sourceData.updateItemColumns?.data?.change_multiple_column_values;\n  if (!data) throw new Error('No data returned from monday.com mutation');\n  return { id: data.id, name: data.name };\n}",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool updates specific columns for an item within your Monday.com boards by sending a request through Monday's API. It will return the updated item's ID and name, confirming the changes made."
   },
   "airtable_update_record": {
@@ -5478,9 +5478,9 @@
       }
     },
     "instruction": "Partially update fields on one or more records in an Airtable table.\n\nAPI Configuration:\n- Method: PATCH\n- Base URL: https://api.airtable.com\n- Path: /v0/{base_id}/{table_name}\n- Authentication: Bearer token in Authorization header using the access_token credential\n- Headers: Content-Type: application/json\n\nInput parameters:\n- base_id (required): The Airtable base ID\n- table_name (required): The name or ID of the table\n- records (required): Array of record objects with id and fields to update\n  Example: [{\"id\": \"rec123\", \"fields\": {\"Name\": \"Updated Name\", \"Email\": \"updated@example.com\"}}]\n- typecast (optional, boolean): Automatically convert data types. Default: false\n\nRequest body structure:\n{\n  \"records\": [array of record objects with id and fields from input],\n  \"typecast\": [boolean value from input, default false if not provided]\n}\n\nNote: PATCH only updates the fields provided, leaving other fields unchanged.\n\nOutput format:\n{\n  \"records\": [\n    {\n      \"id\": \"rec...\",\n      \"fields\": { ... },\n      \"createdTime\": \"...\"\n    }\n  ]\n}",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "records": {
@@ -5549,9 +5549,9 @@
       }
     },
     "instruction": "Delete a single record by ID from an Airtable table.\n\nAPI Configuration:\n- Method: DELETE\n- Base URL: https://api.airtable.com\n- Path: /v0/{base_id}/{table_name}/{record_id}\n- Authentication: Bearer token in Authorization header using the access_token credential\n\nInput parameters:\n- base_id (required): The Airtable base ID\n- table_name (required): The name or ID of the table\n- record_id (required): The ID of the record to delete (e.g., rec...)\n\nOutput format:\n{\n  \"deleted\": true,\n  \"id\": \"rec...\"\n}",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "id": {
@@ -5601,9 +5601,9 @@
       }
     },
     "instruction": "List tables and their schema for an Airtable base using the Metadata API.\n\nAPI Configuration:\n- Method: GET\n- Base URL: https://api.airtable.com\n- Path: /v0/meta/bases/{base_id}/tables\n- Authentication: Bearer token in Authorization header using the access_token credential\n- Note: The access token must include the metadata scope (schema.bases:read)\n\nInput parameters:\n- base_id (required): The Airtable base ID\n\nOutput format:\n{\n  \"tables\": [\n    {\n      \"id\": \"...\",\n      \"name\": \"...\",\n      \"primaryFieldId\": \"...\",\n      \"fields\": [\n        {\n          \"id\": \"...\",\n          \"name\": \"...\",\n          \"type\": \"...\"\n        }\n      ]\n    }\n  ]\n}\n\nThe endpoint returns metadata about all tables in the base, including table IDs, names, and field schemas.",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "tables": {
@@ -5667,13 +5667,13 @@
           "instruction": "Fetch a paginated list of boards with fields: id, name, description, state, board_folder_id, board_kind, owner (id, name), workspace (id, name). Use limit and page (as offset) for pagination.",
           "queryParams": null,
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": null,
+        "dataSelector": null,
         "executionMode": "DIRECT",
         "responseMapping": null
       }
@@ -5708,9 +5708,9 @@
       }
     },
     "instruction": "Build a Monday.com GraphQL tool to list boards with pagination.\n\n1. Make a POST request to the Monday.com GraphQL API endpoint\n2. Use Bearer token authentication with the format: \"Authorization: Bearer {apiKey from monday integration}\"\n3. Accept optional input parameters: limit (default 100) and page (default 1)\n4. Build a GraphQL query to fetch boards with pagination using limit and page parameters\n5. Query should request these fields: id, name, description, state, board_folder_id, board_kind, owner (id, name), workspace (id, name)\n6. Set Content-Type header to \"application/json\"\n7. Return the boards data from the response",
-    "finalTransform": "(sourceData) => {\n  // Monday.com GraphQL returns data in { data: { boards: [...] } }\n  if (!sourceData.listBoardsWithPagination?.data?.boards) throw new Error('No boards data returned');\n  return { boards: sourceData.listBoardsWithPagination.data.boards };\n}",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  // Monday.com GraphQL returns data in { data: { boards: [...] } }\n  if (!sourceData.listBoardsWithPagination?.data?.boards) throw new Error('No boards data returned');\n  return { boards: sourceData.listBoardsWithPagination.data.boards };\n}",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool connects with Monday.com to retrieve a list of boards using pagination. It will return detailed information about each board, including their ID, name, description, state, and associated ownership and workspace details."
   },
   "notion_retrieve_page": {
@@ -5749,8 +5749,8 @@
       }
     },
     "instruction": "Retrieve a Notion page and its properties by ID. GET to /pages/{page_id} with headers: Notion-Version: 2022-06-28, Authorization: Bearer <<notion_sg_testing_api_key>>. Accept page_id as input and return the complete page object including properties, parent, and metadata.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool connects to Notion to retrieve a specific page using its unique ID. It will return the complete page details, including its properties, parent, and metadata, directly from your Notion account."
   },
   "procore_rfis": {
@@ -5829,9 +5829,9 @@
       }
     },
     "instruction": "Build a Procore RFI tool that handles listing and creating RFIs.\n\n**Step 1: List or Create RFIs based on input**\n\nIf the input does NOT contain a \"question\" field, perform LIST operation:\n- Method: GET\n- Full URL: https://api.procore.com/rest/v1.0/projects/{project_id}/rfis\n- Headers (REQUIRED):\n  * Authorization: Bearer {procore.access_token}\n  * Procore-Company-Id: {company_id}\n  * Accept: application/json\n- Query parameters: Add these from input if they exist: updated_at_from, updated_at_to, page, per_page\n- Return the response as: {\"rfis\": <response_data>}\n\nIf the input DOES contain a \"question\" field, perform CREATE operation:\n- Method: POST\n- Full URL: https://api.procore.com/rest/v1.0/projects/{project_id}/rfis\n- Headers (REQUIRED):\n  * Authorization: Bearer {procore.access_token}\n  * Procore-Company-Id: {company_id}\n  * Content-Type: application/json\n  * Accept: application/json\n- Body: {\"rfi\": {\"question\": \"{question}\", \"title\": \"{title}\", \"status\": \"{status}\", \"assignees\": {assignees}}}\n- Return as: {\"rfis\": [<created_rfi>]}\n\nCRITICAL: The Procore-Company-Id header value must come from the input payload's company_id field.",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "rfis": {
@@ -5901,9 +5901,9 @@
       }
     },
     "instruction": "Build a Procore Submittals tool (procore_submittals) to list submittals with status fields:\n\n**LIST SUBMITTALS Operation:**\n- Method: GET\n- Full URL: https://api.procore.com/rest/v1.0/projects/{project_id}/submittals\n- Headers (REQUIRED):\n  * Authorization: Bearer {procore.access_token}\n  * Procore-Company-Id: {company_id}\n  * Accept: application/json\n\n**Required Input:**\n- project_id (number): The Procore project ID\n- company_id (number): The Procore company ID\n\n**Optional Query Parameters (add if present in input):**\n- status: Filter by submittal status\n- updated_at_from: Filter submittals updated after this date\n- updated_at_to: Filter submittals updated before this date  \n- page: Page number for pagination\n- per_page: Number of results per page\n\n**Response:**\n- Return the API response transformed to: {\"submittals\": <response_array>}\n- Include all status and workflow fields from the API response",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "submittals": {
@@ -5970,9 +5970,9 @@
       }
     },
     "instruction": "Get drawing revisions for a Procore project. Make a GET request to /projects/{{project_id}}/drawing_revisions endpoint. Use Bearer token authentication. Accept these input parameters: project_id (required - used in URL path), company_id (required - added as query parameter), current (optional boolean - added as query parameter if provided), drawing_area_id (optional - added as query parameter if provided), page (optional - added as query parameter if provided), per_page (optional - added as query parameter if provided). Return the complete API response.",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "drawing_revisions": {
@@ -6037,8 +6037,8 @@
       }
     },
     "instruction": "Build a Procore project users tool to list active users for a project.\n\nFetch project users:\n- HTTP GET to https://api.procore.com/rest/v1.0/projects/{project_id}/project_users\n- Replace {project_id} with inputs.project_id\n- Query parameters: company_id (required), page, per_page, email (optional filter from inputs)\n- OAuth Bearer authentication\n- Headers: Content-Type application/json\n- Return the project users array",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool connects to Procore to retrieve a list of active users for a specific project. It will return details of these users based on the project and company IDs provided, including options to filter by email and paginate results."
   },
   "procore_change_events": {
@@ -6105,8 +6105,8 @@
       }
     },
     "instruction": "Build a Procore change events tool to list change events with optional filters.\n\nFetch change events:\n- HTTP GET to https://api.procore.com/rest/v1.0/projects/{project_id}/change_events\n- Replace {project_id} with inputs.project_id\n- Query parameters: company_id (required), status, updated_at_from, updated_at_to, page, per_page (optional from inputs)\n- OAuth Bearer authentication\n- Headers: Content-Type application/json\n- Return the change events array",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool retrieves change events from a specific Procore project, allowing you to apply various filters such as status and update dates. It will return a detailed list of these events, providing insights into project modifications based on your specified criteria."
   },
   "confluence_attachment_upload": {
@@ -6165,8 +6165,8 @@
       }
     },
     "instruction": "Upload an attachment to a Confluence page using POST /wiki/rest/api/content/{page_id}/child/attachment endpoint. Accept page_id (required), file_name (required), file_content (required), and comment (optional) as inputs. Use multipart/form-data to upload the file. Return the attachment details including id, title, type, download link, and metadata.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool allows you to upload a file as an attachment to a specific Confluence page by providing the necessary details such as page ID, file name, and file content. It will return the attachment information, including its ID, title, type, download link, and additional metadata."
   },
   "confluence_page_tree": {
@@ -6213,8 +6213,8 @@
       }
     },
     "instruction": "Fetch the page hierarchy for a Confluence page using GET /wiki/rest/api/content/{page_id}/child/page endpoint. Accept page_id (required) as input. Return the child pages with id, title, type, status, and _links. Include expand parameter to get descendants and ancestors if needed to show the full hierarchy.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool retrieves the hierarchy of pages under a specified Confluence page, giving you a structured overview of its child pages. It returns details such as the ID, title, type, status, and links of each child page, along with options to include additional hierarchical information if needed."
   },
   "servicenow_ticket_update": {
@@ -6315,8 +6315,8 @@
       }
     },
     "instruction": "Update an existing incident in ServiceNow by sys_id. Accept sys_id (required) and any fields to update including state (optional), priority (optional, 1-5), urgency (optional, 1-3), impact (optional, 1-3), assigned_to (optional sys_id), assignment_group (optional sys_id), short_description (optional), description (optional), work_notes (optional), close_notes (optional), close_code (optional), resolution_code (optional). Use PATCH to /api/now/table/incident/{sys_id} endpoint for partial updates. Return the updated incident with all fields.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool allows you to update an existing incident in your ServiceNow system by providing the incident's unique identifier and any details you wish to modify, such as its state, priority, or assigned personnel. It will return the updated incident information, reflecting all the changes made to the incident's fields."
   },
   "servicenow_ticket_list": {
@@ -6423,8 +6423,8 @@
       }
     },
     "instruction": "List incidents from ServiceNow with flexible query filtering. Accept query (optional encoded query string using ServiceNow query syntax like \"state=1^priority=1\"), state (optional), priority (optional), assigned_to (optional), assignment_group (optional), caller_id (optional), category (optional), active (optional true/false), limit (optional, default 100), offset (optional, default 0), fields (optional comma-separated field list), order_by (optional field to sort by), order_direction (optional asc/desc). Use GET to /api/now/table/incident endpoint. Build sysparm_query from individual filters if query not provided. Support pagination and field selection. Return array of incidents with requested fields.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool connects to your ServiceNow account to retrieve a list of incidents based on specific criteria you set, such as state, priority, and assigned user. It returns detailed information about each incident, including your specified fields, allowing for easy sorting and filtering to meet your needs."
   },
   "servicenow_user_lookup": {
@@ -6517,8 +6517,8 @@
       }
     },
     "instruction": "Retrieve user/employee records from ServiceNow sys_user table. Accept sys_id (optional), user_name (optional), email (optional), employee_number (optional), name (optional), active (optional true/false), query (optional custom query string), limit (optional, default 100), offset (optional, default 0), fields (optional comma-separated field list). Use GET to /api/now/table/sys_user endpoint. If sys_id is provided, fetch single user by appending /{sys_id} to URL path. Otherwise, use query parameters to filter users. Return user details including sys_id, user_name, email, name, first_name, last_name, title, department, manager, phone, mobile_phone, location, active status, roles, and other fields.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool fetches user or employee records directly from ServiceNow based on specified criteria such as name, email, or employee number. It returns detailed information about the users, including their roles, contact details, and active status."
   },
   "servicenow_asset_lookup": {
@@ -6623,8 +6623,8 @@
       }
     },
     "instruction": "Retrieve IT asset and CMDB (Configuration Management Database) records from ServiceNow cmdb_ci table. Accept sys_id (optional), asset_tag (optional), serial_number (optional), name (optional), sys_class_name (optional CI class like cmdb_ci_computer, cmdb_ci_server, cmdb_ci_network_gear), install_status (optional), operational_status (optional), assigned_to (optional user sys_id), location (optional), query (optional custom query string), limit (optional, default 100), offset (optional, default 0), fields (optional comma-separated field list). Use GET to /api/now/table/cmdb_ci endpoint. If sys_id is provided, fetch single CI by appending /{sys_id} to URL path. Otherwise, use query parameters to filter CIs. Return asset details including sys_id, name, asset_tag, serial_number, model, manufacturer, sys_class_name, install_status, operational_status, assigned_to, location, support_group, cost, purchase_date, warranty_expiration, and other fields.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool retrieves detailed IT asset and configuration records from your ServiceNow database, allowing you to filter by various criteria such as asset tag, serial number, and location. It returns comprehensive asset information, including identifiers, status, and specifics like model and manufacturer."
   },
   "servicenow_change_request": {
@@ -6765,8 +6765,8 @@
       }
     },
     "instruction": "Create a new change request or fetch existing change requests from ServiceNow change_request table. Accept action (required, 'create' or 'fetch'), and for create: short_description (required), description (optional), type (optional, 'standard', 'normal', 'emergency'), priority (optional 1-5), risk (optional 1-4), impact (optional 1-3), assignment_group (optional sys_id), assigned_to (optional sys_id), start_date (optional), end_date (optional), justification (optional), implementation_plan (optional), backout_plan (optional), test_plan (optional). For fetch: sys_id (optional), number (optional), state (optional), type (optional), priority (optional), assigned_to (optional), assignment_group (optional), query (optional custom query string), limit (optional, default 100), offset (optional, default 0), fields (optional). If action is 'create', use POST to /api/now/table/change_request. If action is 'fetch' and sys_id provided, use GET to /api/now/table/change_request/{sys_id}. If action is 'fetch' without sys_id, use GET with query parameters. Return change request details.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool allows you to create a new change request or retrieve existing change requests from ServiceNow by providing the necessary details such as description, priority, and type. It will return the complete details of the change request, including its status and identifying information, from your ServiceNow account."
   },
   "servicenow_service_catalog": {
@@ -6855,8 +6855,8 @@
       }
     },
     "instruction": "Query service catalog items from ServiceNow sc_cat_item table. Accept sys_id (optional), name (optional), category (optional sys_id), active (optional true/false), available_standalone (optional true/false), query (optional custom query string), limit (optional, default 100), offset (optional, default 0), fields (optional comma-separated field list). Use GET to /api/now/table/sc_cat_item endpoint. If sys_id is provided, fetch single catalog item by appending /{sys_id} to URL path. Otherwise, use query parameters to filter catalog items. Return catalog item details including sys_id, name, short_description, description, category, price, picture, active, available_standalone, and other fields.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool retrieves detailed information about service catalog items from your ServiceNow account, allowing you to filter results based on various criteria like name, category, and active status. It will return comprehensive details of each catalog item, such as its ID, name, description, price, and availability status."
   },
   "salesforce_query_accounts": {
@@ -6905,8 +6905,8 @@
       }
     },
     "instruction": "Query accounts from Salesforce with optional filters for industry and minRevenue",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool connects to Salesforce to retrieve information about accounts, such as their name, industry, and revenue. It can apply optional filters to narrow down the results based on specific industry types or minimum revenue, providing a list of matching accounts and their details."
   },
   "salesforce_fetch_tasks": {
@@ -6955,8 +6955,8 @@
       }
     },
     "instruction": "Fetch tasks from Salesforce with optional filters for status and assignedTo",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool retrieves tasks from your Salesforce account, allowing you to filter them by status or the person they're assigned to. It will return detailed information about each task, including its subject, status, priority, and more."
   },
   "salesforce_insert_activity": {
@@ -7017,8 +7017,8 @@
       }
     },
     "instruction": "Insert an activity (task) in Salesforce with subject, activityDate, status, priority, and relatedToId",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool seamlessly integrates with Salesforce to create a new task based on the provided details such as subject, activity date, status, priority, and a related ID. It will return the complete task information directly from your Salesforce account, ensuring all activity records are up-to-date."
   },
   "salesforce_search_records": {
@@ -7071,8 +7071,8 @@
       }
     },
     "instruction": "Search records in Salesforce using SOSL with searchTerm and objectTypes",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool searches your Salesforce database to find records that match a given search term across all fields. It returns a list of matching accounts, contacts, and leads with their IDs and names."
   },
   "salesforce_get_sobject_metadata": {
@@ -7115,8 +7115,8 @@
       }
     },
     "instruction": "Get metadata for a specific Salesforce SObject type",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool connects to Salesforce to retrieve detailed metadata about a specific SObject type. It will return comprehensive information about the SObject, including field definitions and data types, directly from your Salesforce account."
   },
   "slack_delete_message": {
@@ -7169,8 +7169,8 @@
       }
     },
     "instruction": "Delete a Slack message. Make a POST request to /chat.delete with Authorization header: Bearer <<slack_api_key_api_token>>. Headers: Content-Type: application/json. Body should accept: channel (required), ts (required, message timestamp).",
-    "finalTransform": "(sourceData) => { return sourceData.deleteSlackMessage; }",
-    "integrationIds": [],
+    "outputTransform": "(sourceData) => { return sourceData.deleteSlackMessage; }",
+    "systemIds": [],
     "description": "This tool allows you to delete a specific message from a Slack channel by providing the message's timestamp and channel details. It will confirm the deletion by returning the operation's outcome directly from your Slack account."
   },
   "slack_list_channel_members": {
@@ -7220,8 +7220,8 @@
       }
     },
     "instruction": "List members of a Slack channel. Make a GET request to /conversations.members with Authorization header: Bearer <<slack_api_key_api_token>>. Include query parameter: channel (required, the channel ID).",
-    "finalTransform": "(sourceData) => { return sourceData.getChannelMembers; }",
-    "integrationIds": [],
+    "outputTransform": "(sourceData) => { return sourceData.getChannelMembers; }",
+    "systemIds": [],
     "description": "This tool connects to Slack to retrieve a list of all members in a specified channel. It will provide detailed information about each member, such as their names and user IDs, directly from your Slack workspace."
   },
   "asana_list_tasks_in_project": {
@@ -7277,9 +7277,9 @@
       }
     },
     "instruction": "List all tasks in a specific Asana project.\n\nStep 1: Get all tasks from the project\n- Make a GET request to https://app.asana.com/api/1.0/projects/{project_id}/tasks\n- Use Bearer token authentication with the API key\n- Query parameters: opt_fields=gid,name,completed,due_on,assignee.name,notes\n- Implement cursor-based pagination using offset parameter, incrementing by 100 until we get fewer than 100 results\n\nReturn the result as an array of tasks with their details.",
-    "finalTransform": "(sourceData) => {\n  const pages = sourceData.getAllTasksInProject?.results;\n  if (!Array.isArray(pages)) return [];\n\n  const allTasks = pages.flatMap((page) =>\n    Array.isArray(page?.data) ? page.data : [],\n  );\n  return allTasks;\n};\n",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  const pages = sourceData.getAllTasksInProject?.results;\n  if (!Array.isArray(pages)) return [];\n\n  const allTasks = pages.flatMap((page) =>\n    Array.isArray(page?.data) ? page.data : [],\n  );\n  return allTasks;\n};\n",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool retrieves all tasks from a specified Asana project, providing detailed information such as task ID, name, completion status, due date, assignee's name, and notes. It returns a comprehensive list of these tasks directly from your Asana account."
   },
   "notion_create_page": {
@@ -7334,8 +7334,8 @@
       }
     },
     "instruction": "Create a page in Notion. POST to /pages with headers: Notion-Version: 2022-06-28, Authorization: Bearer <<api_key>>, Content-Type: application/json. Body: {\"parent\": {\"page_id\": parent_id}, \"properties\": {\"title\": {\"title\": [{\"text\": {\"content\": title}}]}}, \"children\": content}. Accept parent_id, title, and optional content array as input.",
-    "finalTransform": "(sourceData) => { return sourceData.createNotionPage.data; }",
-    "integrationIds": [],
+    "outputTransform": "(sourceData) => { return sourceData.createNotionPage.data; }",
+    "systemIds": [],
     "description": "This tool allows you to create a new page within your Notion workspace by specifying a parent page or database, a title, and optionally, content for the page. It will return the details of the newly created page, ensuring it's seamlessly added to your existing Notion setup."
   },
   "notion_update_page": {
@@ -7384,8 +7384,8 @@
       }
     },
     "instruction": "Update a Notion page. PATCH to /pages/{page_id} with headers: Notion-Version: 2022-06-28, Authorization: Bearer <<notion_sg_testing_api_key>>, Content-Type: application/json. Body can include: {\"properties\": properties, \"archived\": archived}. Accept page_id, optional properties object for metadata updates, and optional archived boolean as input.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool connects to Notion to update or archive a specific page. It will modify the page's properties or status and return the updated details based on your Notion account."
   },
   "notion_query_database": {
@@ -7445,8 +7445,8 @@
       }
     },
     "instruction": "Query a Notion database. POST to /databases/{database_id}/query with headers: Notion-Version: 2022-06-28, Authorization: Bearer <<notion_sg_testing_api_key>>, Content-Type: application/json. Body can include: {\"filter\": filter, \"sorts\": sorts, \"start_cursor\": start_cursor, \"page_size\": page_size}. Accept database_id as required, and optional filter object, sorts array, start_cursor string, and page_size number as inputs.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool interacts with your Notion workspace to retrieve specific database entries based on your chosen filters and sorting preferences. It will return a structured list of results from the specified database, tailored to the criteria you set, such as the number of results per page and pagination options."
   },
   "notion_search": {
@@ -7502,8 +7502,8 @@
       }
     },
     "instruction": "Search across pages and databases in a Notion workspace. POST to /search with headers: Notion-Version: 2022-06-28, Authorization: Bearer <<notion_sg_testing_api_key>>, Content-Type: application/json. Body can include: {\"query\": query, \"filter\": filter, \"sort\": sort, \"start_cursor\": start_cursor, \"page_size\": page_size}. Accept optional query string, filter object (with value \"page\" or \"database\"), sort object, start_cursor, and page_size as inputs.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool searches through pages and databases in a Notion workspace to find information based on your specified criteria. It will return a list of search results that match your query, with options to filter, sort, and paginate the data."
   },
   "notion_create_database": {
@@ -7552,8 +7552,8 @@
       }
     },
     "instruction": "Create a new database in Notion. POST to /databases with headers: Notion-Version: 2022-06-28, Authorization: Bearer <<notion_sg_testing_api_key>>, Content-Type: application/json. Body: {\"parent\": {\"page_id\": parent_id}, \"title\": [{\"type\": \"text\", \"text\": {\"content\": title}}], \"properties\": properties}. Accept parent_id (page ID where database will be created), title (database name), and properties (object defining database schema with property types) as inputs.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool seamlessly integrates with Notion to create a new database within a specified page. It will return the full details of the newly created database, including its name and schema, directly from your Notion account."
   },
   "notion_update_database": {
@@ -7612,8 +7612,8 @@
       }
     },
     "instruction": "Update a Notion database schema or properties. PATCH to /databases/{database_id} with headers: Notion-Version: 2022-06-28, Authorization: Bearer <<notion_sg_testing_api_key>>, Content-Type: application/json. Body can include: {\"title\": title, \"description\": description, \"properties\": properties}. Accept database_id as required, and optional title array, description array, and properties object to update the database schema.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool updates the structure or details of a Notion database by modifying its title, description, or properties as specified. It returns the updated database schema directly from your Notion account."
   },
   "notion_append_block": {
@@ -7661,8 +7661,8 @@
       }
     },
     "instruction": "Append blocks (text or other content) to a Notion page. PATCH to /blocks/{block_id}/children with headers: Notion-Version: 2022-06-28, Authorization: Bearer <<notion_sg_testing_api_key>>, Content-Type: application/json. Body: {\"children\": children}. Accept block_id (page ID or block ID to append to) and children (array of block objects) as inputs.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool allows you to add new content, like text or lists, to a specific section of your Notion workspace. It will update the designated page or block with the new information you provide and return the updated content details directly from Notion."
   },
   "asana_add_comment_to_task": {
@@ -7715,9 +7715,9 @@
       }
     },
     "instruction": "Add a comment (story) to an Asana task.\n\nStep 1: Create a story/comment on the task\n- Make a POST request to https://app.asana.com/api/1.0/tasks/{task_id}/stories\n- Use Bearer token authentication with the API key\n- Headers: Content-Type: application/json\n- Body: {\"data\": {\"text\": \"{comment_text}\"}}\n\nReturn the created story/comment details.",
-    "finalTransform": "(sourceData) => { return sourceData.addCommentToTask; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.addCommentToTask; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool allows you to add a comment to an Asana task directly, ensuring your team stays informed and organized. It returns the details of the newly created comment, giving you a quick overview of what was added to the task."
   },
   "asana_list_sections_in_project": {
@@ -7772,9 +7772,9 @@
       }
     },
     "instruction": "List all sections in a specific Asana project.\n\nStep 1: Get all sections from the project\n- Make a GET request to https://app.asana.com/api/1.0/projects/{project_id}/sections\n- Use Bearer token authentication with the API key\n- Query parameters: opt_fields=gid,name,created_at\n- Implement cursor-based pagination using offset parameter until we get all results\n\nReturn the result as an array of sections with their details.",
-    "finalTransform": "(sourceData) => {\n  const results = sourceData.getAllSections?.results;\n  if (!Array.isArray(results)) return [];\n\n  const sections = results.flatMap((page) =>\n    Array.isArray(page.data) ? page.data : [],\n  );\n  return sections;\n};\n",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  const results = sourceData.getAllSections?.results;\n  if (!Array.isArray(results)) return [];\n\n  const sections = results.flatMap((page) =>\n    Array.isArray(page.data) ? page.data : [],\n  );\n  return sections;\n};\n",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool connects to Asana to retrieve all the sections within a specified project. It will return a list of sections, providing details such as their unique IDs, names, and creation dates."
   },
   "slack_post_message": {
@@ -7827,8 +7827,8 @@
       }
     },
     "instruction": "Post a message to a Slack channel. Make a POST request to /chat.postMessage with Authorization header: Bearer <<slack_api_key_api_token>>. Headers: Content-Type: application/json. Body should accept: channel (required), text (required), and optional fields like thread_ts, blocks, attachments.",
-    "finalTransform": "(sourceData) => { return { ok: sourceData.postSlackMessage.ok, channel: sourceData.postSlackMessage.channel, ts: sourceData.postSlackMessage.ts, message: sourceData.postSlackMessage.message }; }",
-    "integrationIds": [],
+    "outputTransform": "(sourceData) => { return { ok: sourceData.postSlackMessage.ok, channel: sourceData.postSlackMessage.channel, ts: sourceData.postSlackMessage.ts, message: sourceData.postSlackMessage.message }; }",
+    "systemIds": [],
     "description": "This tool sends a message directly to a specified Slack channel. It will return confirmation details, including whether the message was successfully sent, the channel it was posted to, and a timestamp of the message."
   },
   "slack_add_reaction": {
@@ -7885,8 +7885,8 @@
       }
     },
     "instruction": "Add a reaction emoji to a Slack message. Make a POST request to /reactions.add with Authorization header: Bearer <<slack_api_key_api_token>>. Headers: Content-Type: application/json. Body should accept: channel (required), timestamp (required, the message ts), name (required, emoji name without colons).",
-    "finalTransform": "(sourceData) => { return sourceData.addReactionToMessage; }",
-    "integrationIds": [],
+    "outputTransform": "(sourceData) => { return sourceData.addReactionToMessage; }",
+    "systemIds": [],
     "description": "This tool allows you to add an emoji reaction to a specific message in Slack by specifying the channel, timestamp, and emoji name. It will return confirmation that the reaction has been successfully added to the message, using your Slack account credentials."
   },
   "slack_thread_reply": {
@@ -7943,8 +7943,8 @@
       }
     },
     "instruction": "Reply to a Slack thread. Make a POST request to /chat.postMessage with Authorization header: Bearer <<slack_api_key_api_token>>. Headers: Content-Type: application/json. Body should accept: channel (required), text (required), thread_ts (required, the parent message timestamp).",
-    "finalTransform": "(sourceData) => { return { result: sourceData.replyToSlackThread }; }",
-    "integrationIds": [],
+    "outputTransform": "(sourceData) => { return { result: sourceData.replyToSlackThread }; }",
+    "systemIds": [],
     "description": "This tool allows you to post a reply directly to a specific thread in a Slack channel. It will send your message and return confirmation of the successful post along with relevant details from Slack."
   },
   "slack_update_message": {
@@ -8001,8 +8001,8 @@
       }
     },
     "instruction": "Update a Slack message. Make a POST request to /chat.update with Authorization header: Bearer <<slack_api_key_api_token>>. Headers: Content-Type: application/json. Body should accept: channel (required), ts (required, message timestamp), text (required, new text).",
-    "finalTransform": "(sourceData) => { return { ok: sourceData.updateSlackMessage?.ok, message: sourceData.updateSlackMessage?.message, error: sourceData.updateSlackMessage?.error }; }",
-    "integrationIds": [],
+    "outputTransform": "(sourceData) => { return { ok: sourceData.updateSlackMessage?.ok, message: sourceData.updateSlackMessage?.message, error: sourceData.updateSlackMessage?.error }; }",
+    "systemIds": [],
     "description": "This tool allows you to update an existing message in a Slack channel by providing the channel name, message timestamp, and the new message text. It will return confirmation of the update along with any error messages if the update was not successful."
   },
   "workday_update_worker": {
@@ -8051,8 +8051,8 @@
       }
     },
     "instruction": "Update employee details or job data in Workday HCM.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool connects to Workday to update an employee's information, such as personal details or job data, in the system. It returns the updated worker's details, confirming the changes made in your Workday account."
   },
   "workday_get_worker": {
@@ -8096,8 +8096,8 @@
       }
     },
     "instruction": "Retrieve worker information by ID from Workday HCM.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool connects to Workday to fetch detailed information about a specific worker using their Worker ID. It will return comprehensive worker details, including personal information, employment data, job information, and contact details, directly from your Workday system."
   },
   "workday_create_requisition": {
@@ -8142,8 +8142,8 @@
       }
     },
     "instruction": "Create a new job requisition in Workday HCM.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool seamlessly integrates with Workday to create a new job requisition. It returns the complete details of the requisition, including job title, department, and other key information entered during the process."
   },
   "workday_get_requisition": {
@@ -8187,8 +8187,8 @@
       }
     },
     "instruction": "Get details of a specific job requisition from Workday HCM system using API key authentication.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool connects to the Workday system to retrieve detailed information about a specific job requisition. It will return the full set of requisition details, such as job title, department, and hiring status, using the provided requisition ID."
   },
   "workday_submit_time": {
@@ -8249,8 +8249,8 @@
       }
     },
     "instruction": "Submit time entry for a worker in Workday HCM system using API key authentication.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool submits a worker's time entry directly into the Workday system using an API key for secure access. It will record the date, hours worked, and type of time (such as regular or overtime), and return confirmation of the submission."
   },
   "workday_get_pay_slip": {
@@ -8294,8 +8294,8 @@
       }
     },
     "instruction": "Get pay slip information for a worker from Workday HCM system using API key authentication.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool retrieves a worker's pay slip directly from the Workday system using secure API key authentication. It will provide complete details of the pay slip, including all relevant financial information associated with the specified pay slip ID."
   },
   "workday_create_worker": {
@@ -8340,8 +8340,8 @@
       }
     },
     "instruction": "Create a new worker record in Workday HCM.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool integrates with Workday to create a new employee profile using the provided worker details. It will return the complete profile information of the newly created worker directly from your Workday system."
   },
   "workday_list_workers": {
@@ -8401,8 +8401,8 @@
       }
     },
     "instruction": "List all active workers in the organization from Workday HCM.",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool connects to Workday to retrieve a list of all active workers in your organization. It will return detailed information about each worker, which can be filtered by worker type and paginated for easier review."
   },
   "coupa_get_supplier": {
@@ -8454,9 +8454,9 @@
       }
     },
     "instruction": "Get a specific supplier by ID from Coupa using API key authentication",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "id": {
@@ -8560,9 +8560,9 @@
       }
     },
     "instruction": "List purchase order lines from Coupa using API key authentication with pagination and filtering support",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "page": {
@@ -8730,9 +8730,9 @@
       }
     },
     "instruction": "Search and list requisitions from Coupa using API key authentication with pagination and filtering support",
-    "finalTransform": "$",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "$",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "page": {
@@ -8869,8 +8869,8 @@
       }
     },
     "instruction": "Create a lead in Salesforce with firstName, lastName, company, and email",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool seamlessly integrates with Salesforce to create a new lead using the provided first name, last name, company, and email details. It will return confirmation of the newly created lead, including all entered details directly from your Salesforce account."
   },
   "salesforce_update_opportunity": {
@@ -8927,8 +8927,8 @@
       }
     },
     "instruction": "Update an opportunity in Salesforce with opportunityId, stageName, amount, and closeDate",
-    "finalTransform": "$",
-    "integrationIds": [],
+    "outputTransform": "$",
+    "systemIds": [],
     "description": "This tool seamlessly updates an existing opportunity in your Salesforce account by modifying details such as stage name, amount, and close date. It returns the updated information for the specified opportunity, ensuring your Salesforce data is current and accurate."
   },
   "elevenlabs_text_to_speech_stream": {
@@ -8989,9 +8989,9 @@
       }
     },
     "instruction": "Stream speech audio in real-time while text is being processed, reducing latency for immediate playback. This tool uses the /text-to-speech/{voice_id}/stream endpoint with POST method. Ideal for conversational AI, voice assistants, and interactive applications where low latency is critical. Provide voice_id (from elevenlabs_list_voices), text to convert, optional model_id to select the TTS model (turbo models are faster), and optional voice_settings object with stability (0-1, higher = more consistent but less expressive), similarity_boost (0-1, higher = closer to original voice), style (0-1, higher = more dramatic), and use_speaker_boost (true/false for enhanced clarity). Returns streaming audio chunks in MP3 format for progressive playback. Character usage counts toward quota.",
-    "finalTransform": "(sourceData) => { return sourceData.streamSpeechAudio; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.streamSpeechAudio; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool converts text into speech audio in real-time, allowing for immediate playback as the text is processed. It provides streaming audio in MP3 format, ideal for use in applications like chatbots and voice assistants where quick audio feedback is essential."
   },
   "elevenlabs_get_voice": {
@@ -9038,9 +9038,9 @@
       }
     },
     "instruction": "Get comprehensive detailed information about a specific voice by its ID from ElevenLabs. This tool uses the GET /voices/{voice_id} endpoint to retrieve in-depth metadata for a single voice. Provide the voice_id parameter (obtainable from elevenlabs_list_voices). The response includes: voice_id, name, category (premade/cloned/generated/professional), complete labels (gender, age, accent, language, use_case, descriptive traits), preview_url (audio sample), detailed description, fine_tuning status and capabilities across different models, current settings object (stability, similarity_boost, style, use_speaker_boost, speed values), sharing configuration, high_quality_base_model_ids (optimized models list), verified_languages array with model_id/accent/locale/preview_url per language, voice_verification status, safety_control settings, permission_on_resource, ownership flags (is_owner, is_legacy, is_mixed), and timestamps (favorited_at_unix, created_at_unix). Essential for checking voice specifications, model compatibility, and configured parameters before TTS generation.",
-    "finalTransform": "(sourceData) => { return sourceData.getVoiceDetails; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.getVoiceDetails; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool retrieves detailed information about a specific voice from ElevenLabs by using the voice's unique ID. It provides comprehensive metadata including the voice's name, category, characteristics, sample preview, and settings, helping you understand its specifications and compatibility with various models."
   },
   "elevenlabs_design_voice": {
@@ -9097,9 +9097,9 @@
       }
     },
     "instruction": "Create a new synthetic voice design based on descriptive parameters using ElevenLabs' AI voice generation. This tool uses the POST /voice-generation/generate-voice endpoint to synthesize completely new voices from scratch. Provide three key parameters: text (descriptive explanation of desired voice characteristics like 'professional narrator', 'energetic young character', 'authoritative business voice'), gender (male/female/neutral), and accent (american/british/african/australian/indian/etc.). The AI analyzes these parameters and generates a unique voice profile with a temporary generated_voice_id. The response includes audio preview data (typically in base64 or binary format) so you can evaluate the generated voice. If satisfied, use the returned generated_voice_id with elevenlabs_create_voice_from_design to permanently save this voice to your account. Ideal for creating custom branded voices, character voices for entertainment, or specialized voices for specific applications without needing actual voice recordings or samples. Generation quality and availability may depend on your subscription tier.",
-    "finalTransform": "(sourceData) => { return sourceData.designVoice; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.designVoice; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool uses ElevenLabs' AI to create a synthetic voice tailored to your specifications, including text description, gender, and accent. It generates a unique voice profile with an audio preview, allowing you to evaluate if it meets your needs before saving it permanently."
   },
   "elevenlabs_generate_sound_effects": {
@@ -9152,9 +9152,9 @@
       }
     },
     "instruction": "Generate custom sound effects, ambience, or audio from natural language text prompts using ElevenLabs' AI sound generation. This tool uses the POST /sound-generation endpoint to create realistic audio effects without recording equipment. Provide two parameters: text (descriptive prompt like 'ocean waves crashing', 'footsteps on wooden floor', 'car engine starting', 'medieval marketplace ambience', 'laser gun sound effect'), and duration_seconds (audio length, typically 1-22 seconds based on plan tier). The AI sound model interprets your prompt and synthesizes matching audio. More specific and detailed descriptions yield better results (e.g., 'slow footsteps on creaky wooden floorboards' vs just 'footsteps'). Perfect for game developers, video producers, podcasters, content creators, or anyone needing custom audio without sound effect libraries or recording sessions. Response contains generated audio in standard format (MP3/WAV). Generation capabilities, duration limits, and quality depend on subscription level. Use descriptive language and specify environmental context for best results.",
-    "finalTransform": "(sourceData) => { return sourceData.generateSoundEffect; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.generateSoundEffect; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool uses advanced AI to create custom sound effects and ambient audio from your descriptive text prompts. It will generate and return realistic audio clips, perfect for enhancing games, videos, podcasts, or any creative project, in standard formats like MP3 or WAV."
   },
   "elevenlabs_generation_history": {
@@ -9195,9 +9195,9 @@
       }
     },
     "instruction": "View the complete history of previously generated audio items with detailed metadata and usage tracking. This tool uses the GET /history endpoint to retrieve all your past audio generations. No parameters required (filtering may be available depending on plan). Returns array of history items, each containing: history_item_id (unique identifier), request_id (for support/tracking), voice_id and voice_name used, model_id that processed it, original text input, date_unix (creation timestamp), character_count_change_from/to (quota usage tracking - shows how many characters were consumed), content_type (audio format like audio/mpeg), state (created/deleted/processing), settings object (exact stability, similarity_boost, style, use_speaker_boost, speed parameters used), feedback (if provided), share_link_id (if publicly shared), source (generation type: TTS/voice_cloning/sound_generation), alignments and dialogue data (if available for synchronization). Essential for: auditing API usage and spending, tracking character quota consumption over time, reviewing past generations to avoid duplicates, debugging by examining exact parameters, monitoring team member usage patterns, maintaining compliance/billing records, and accessing previous generations for reuse. Pagination and filtering capabilities depend on subscription tier (Free/Starter/Creator/Pro/Scale).",
-    "finalTransform": "(sourceData) => { return { audioHistory: sourceData.getAudioHistory?.history || [] }; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return { audioHistory: sourceData.getAudioHistory?.history || [] }; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool retrieves a detailed history of all your audio generation activities from ElevenLabs, including text-to-speech and voice cloning requests. It provides comprehensive metadata for each request, helping you track usage, monitor team activity, and maintain records for billing and compliance."
   },
   "elevenlabs_create_voice_from_design": {
@@ -9254,9 +9254,9 @@
       }
     },
     "instruction": "Save and permanently register a new custom voice from a generated voice design. This tool uses the POST /voice-generation/create-voice endpoint to commit a voice design to your library. This is step 2 of the custom voice creation workflow (after elevenlabs_design_voice). Required parameters: generated_voice_id (the temporary ID from elevenlabs_design_voice output), voice_name (unique identifier for your library like 'Brand Narrator' or 'Character Voice 1'), and voice_description (detailed explanation of characteristics and use case). Once saved, the voice receives a permanent voice_id and becomes available in your voice library alongside premade voices. You can then use it with elevenlabs_text_to_speech, elevenlabs_text_to_speech_stream, and view it via elevenlabs_list_voices or elevenlabs_get_voice. IMPORTANT: This feature requires a paid ElevenLabs subscription - it will fail on free plans with an error indicating voice creation is restricted. The response includes the new permanent voice_id and full voice object. Voice limits depend on your subscription tier (Starter/Creator/Pro/Scale plans have different voice slot allowances).",
-    "finalTransform": "(sourceData) => { return sourceData.createVoiceFromDesign; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.createVoiceFromDesign; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool lets you permanently save a custom voice design into your voice library, giving it a unique name and description for future use. Once saved, the voice is assigned a permanent ID and can be used like any other premade voice, provided you have a paid ElevenLabs subscription."
   },
   "elevenlabs_create_dubbing_job": {
@@ -9313,9 +9313,9 @@
       }
     },
     "instruction": "Start a dubbing job to automatically translate and dub audio or video content from one language to another with voice preservation. This tool uses the POST /dubbing endpoint to initiate AI-powered dubbing that maintains the original speaker's voice characteristics, timing, and emotional tone across languages. Required parameters: source_url (publicly accessible URL to your audio/video file in formats like MP3, WAV, MP4, MOV), source_language (original language code like 'en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'zh', 'ko', 'hi', 'ar', etc.), and target_language (desired output language code). The system transcribes speech, translates content, and generates dubbed audio matching original voice identity and pacing. Returns a dubbing_id for tracking job status and retrieving completed output via elevenlabs_get_dubbed_audio. Processing duration depends on content length (minutes to hours). Perfect for international content distribution, video localization, e-learning translation, podcast multilingual expansion, or making content accessible to global audiences. Dubbing quality, supported languages, and simultaneous job limits vary by subscription tier (Free/Starter/Creator/Pro/Scale plans).",
-    "finalTransform": "(sourceData) => { return sourceData.createDubbingJob; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.createDubbingJob; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool automatically translates and dubs your audio or video content from one language to another, while preserving the original speaker's voice characteristics and emotional tone. It returns a unique dubbing ID, which you can use to track the status of your job and retrieve the completed dubbed content."
   },
   "elevenlabs_get_dubbed_audio": {
@@ -9366,9 +9366,9 @@
       }
     },
     "instruction": "Retrieve or download the completed dubbed audio or video output from a finished dubbing job. This tool uses the GET /dubbing/{dubbing_id}/audio/{language_code} endpoint to fetch the final localized content. Required parameters: dubbing_id (unique identifier from elevenlabs_create_dubbing_job response - identifies which dubbing job) and language_code (target language code like 'es', 'fr', 'de', 'it', 'pt', 'ja', 'zh' that matches the target language specified when creating the job). Returns the completed dubbed file where speech has been translated and re-voiced in the target language with preserved voice characteristics, emotional tone, timing, and lip-sync (for video). File format matches input (video returns video with dubbed audio, audio returns dubbed audio). Only call this after dubbing job completion - check job status first if uncertain. Use the output for international content distribution, multi-language platforms, global audience reach, or localized marketing campaigns. The dubbed content maintains professional quality suitable for commercial use, educational content, entertainment, or corporate communications.",
-    "finalTransform": "(sourceData) => { return sourceData.getDubbedAudio; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.getDubbedAudio; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool retrieves the completed dubbed audio or video in your chosen language from a previous dubbing job, ensuring that the original speech is accurately translated and re-voiced while maintaining the speaker's characteristics and emotional tone. It returns the finalized localized content, ready for distribution to audiences in the target language."
   },
   "elevenlabs_text_to_speech": {
@@ -9424,9 +9424,9 @@
       }
     },
     "instruction": "Convert text into high-quality speech audio using a selected voice from ElevenLabs. This tool uses the /text-to-speech/{voice_id} endpoint with POST method. Provide a voice_id (obtain from elevenlabs_list_voices), the text to convert, and optionally specify model_id for different TTS models and voice_settings object to control stability (0-1, higher = more consistent), similarity_boost (0-1, higher = closer to original voice), style (0-1, higher = more expressive), and use_speaker_boost (true/false for clarity). The response contains audio data in MP3 format. Character usage counts against your plan quota.",
-    "finalTransform": "(sourceData) => { return sourceData.convertTextToSpeech; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.convertTextToSpeech; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool converts your text into high-quality speech using ElevenLabs' advanced text-to-speech technology, allowing you to choose from different voices and customize settings like stability and style. It returns the audio in MP3 format, providing a seamless way to generate natural-sounding speech from written content."
   },
   "elevenlabs_list_voices": {
@@ -9465,9 +9465,9 @@
       }
     },
     "instruction": "Retrieve all available voices with comprehensive metadata and filtering options from your ElevenLabs account. This tool uses the GET /voices endpoint to fetch both premade ElevenLabs voices and your custom created/cloned voices. The response includes detailed information for each voice: voice_id (use this for TTS requests), name, category (premade/cloned/generated/professional), labels (gender, age, accent, language, use_case, descriptive traits like 'warm', 'authoritative', 'friendly'), preview_url (audio sample link), description, fine_tuning capabilities and status, default voice settings (stability, similarity_boost, style), high_quality_base_model_ids (compatible models), and verified_languages. This is essential for discovering available voices and obtaining the voice_id needed for elevenlabs_text_to_speech and elevenlabs_text_to_speech_stream tools. No parameters required - returns all voices accessible to your account.",
-    "finalTransform": "(sourceData) => {\n  if (!sourceData.getAllVoices || !Array.isArray(sourceData.getAllVoices.voices)) {\n    throw new Error('No voices found in response');\n  }\n  return {\n    voices: sourceData.getAllVoices.voices\n  };\n}",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => {\n  if (!sourceData.getAllVoices || !Array.isArray(sourceData.getAllVoices.voices)) {\n    throw new Error('No voices found in response');\n  }\n  return {\n    voices: sourceData.getAllVoices.voices\n  };\n}",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool retrieves a complete list of all voices available in your ElevenLabs account, including both premade and custom voices. It provides detailed information about each voice, such as its unique ID, name, category, descriptive labels, and a link to an audio sample, helping you choose the right voice for text-to-speech applications."
   },
   "elevenlabs_list_models": {
@@ -9508,9 +9508,9 @@
       }
     },
     "instruction": "List all available ElevenLabs models for text-to-speech, dubbing, sound effects generation, and other AI audio services. This tool uses the GET /models endpoint to retrieve comprehensive model information. No parameters required. Returns array of model objects containing: model_id (use this in TTS requests and other endpoints), name, description (capabilities and optimal use cases), supported_languages (array with language codes and locales), model category/type, technical specifications, quality characteristics (naturalness, accuracy, latency metrics), pricing/token cost information, version details, release dates, and special features or constraints. Models include monolingual (highest quality single language like eleven_monolingual_v1), multilingual (broad language support like eleven_multilingual_v2), turbo (faster processing for real-time like eleven_turbo_v2/eleven_turbo_v2_5), flash (quality-speed balance like eleven_flash_v2), and specialized models for sound effects or dubbing. Use this to understand which models are accessible on your plan, compare their trade-offs (quality vs speed vs language support vs cost), and select the appropriate model_id for your application requirements. Model availability depends on subscription tier.",
-    "finalTransform": "(sourceData) => { return sourceData.listModels; }",
-    "integrationIds": [],
-    "responseSchema": {},
+    "outputTransform": "(sourceData) => { return sourceData.listModels; }",
+    "systemIds": [],
+    "outputSchema": {},
     "description": "This tool connects to ElevenLabs to provide a comprehensive list of AI models available for various audio services, such as text-to-speech and sound effects generation. It returns detailed information about each model, including its capabilities, supported languages, and any special features, allowing you to select the most suitable model for your needs."
   },
   "bitbucket_comment_pull_request": {
@@ -9533,13 +9533,13 @@
           "instruction": "Add a comment to a specific pull request in the given Bitbucket workspace and repository. The comment content should be the provided text. Return the created comment details.",
           "queryParams": null,
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": "(sourceData) => ({});",
+        "dataSelector": "(sourceData) => ({});",
         "executionMode": null,
         "responseMapping": "$"
       }
@@ -9589,9 +9589,9 @@
       }
     },
     "instruction": "Create a Bitbucket pull request comment tool named 'bitbucket_comment_pull_request'.\nSteps:\n1. Add a comment to a specific pull request using POST /2.0/repositories/{workspace}/{repository}/pullrequests/{pull_request_id}/comments\n2. The comment should include the content text provided\n3. Return success status and comment details",
-    "finalTransform": "(sourceData) => { return { success: !!sourceData.addPullRequestComment.data?.id, comment: sourceData.addPullRequestComment.data }; }",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => { return { success: !!sourceData.addPullRequestComment.data?.id, comment: sourceData.addPullRequestComment.data }; }",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "message": {
@@ -9627,13 +9627,13 @@
           "instruction": "Create a new branch in the specified Bitbucket repository using the provided workspace, repository, branch name, and target (commit hash or branch name). Return the created branch details.",
           "queryParams": null,
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": "(sourceData) => ({});",
+        "dataSelector": "(sourceData) => ({});",
         "executionMode": null,
         "responseMapping": "$"
       }
@@ -9683,9 +9683,9 @@
       }
     },
     "instruction": "Create a Bitbucket branch creation tool named 'bitbucket_create_branch'.\nSteps:\n1. Create a new branch using POST /2.0/repositories/{workspace}/{repository}/refs/branches\n2. Include workspace, repository, branch name, and target commit/branch to create the branch from\n3. Return the created branch details including name and commit hash",
-    "finalTransform": "(sourceData) => {\n  const branch = sourceData.createBranch.data;\n  return {\n    name: branch?.name,\n    target_hash: branch?.target?.hash,\n    branch_details: branch\n  };\n}",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  const branch = sourceData.createBranch.data;\n  return {\n    name: branch?.name,\n    target_hash: branch?.target?.hash,\n    branch_details: branch\n  };\n}",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "message": {
@@ -9727,13 +9727,13 @@
           "instruction": "Create a new pull request in the specified Bitbucket repository using the provided title, description, source branch, destination branch, and reviewers. Return the created pull request details.",
           "queryParams": null,
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": "(sourceData) => ({});",
+        "dataSelector": "(sourceData) => ({});",
         "executionMode": null,
         "responseMapping": "$"
       }
@@ -9803,9 +9803,9 @@
       }
     },
     "instruction": "Create a Bitbucket pull request creation tool named 'bitbucket_create_pull_request'.\nSteps:\n1. Create a new pull request using POST /2.0/repositories/{workspace}/{repository}/pullrequests\n2. Include title, description, source branch, destination branch, and reviewers\n3. Return the created pull request details including ID and URL",
-    "finalTransform": "(sourceData) => {\n  const pr = sourceData.createPullRequest.data;\n  return {\n    id: pr.id || pr.uuid,\n    url: pr.links?.html?.href,\n    title: pr.title,\n    description: pr.description,\n    source_branch: pr.source?.branch?.name,\n    destination_branch: pr.destination?.branch?.name,\n    reviewers: pr.reviewers?.map(r => ({ uuid: r.uuid, display_name: r.display_name, account_id: r.account_id })),\n    raw: pr\n  };\n}",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  const pr = sourceData.createPullRequest.data;\n  return {\n    id: pr.id || pr.uuid,\n    url: pr.links?.html?.href,\n    title: pr.title,\n    description: pr.description,\n    source_branch: pr.source?.branch?.name,\n    destination_branch: pr.destination?.branch?.name,\n    reviewers: pr.reviewers?.map(r => ({ uuid: r.uuid, display_name: r.display_name, account_id: r.account_id })),\n    raw: pr\n  };\n}",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "message": {
@@ -9844,13 +9844,13 @@
           "instruction": "Create a new Bitbucket repository in the specified workspace with the provided name, description, privacy setting, and SCM type. Return the created repository details.",
           "queryParams": null,
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": "(sourceData) => ({});",
+        "dataSelector": "(sourceData) => ({});",
         "executionMode": null,
         "responseMapping": "$"
       }
@@ -9904,9 +9904,9 @@
       }
     },
     "instruction": "Create a Bitbucket repository creation tool named 'bitbucket-create-repo'.\nSteps:\n1. Create a new repository using POST /2.0/repositories/{workspace}/{repository}\n2. Include repository name, description, privacy settings, and other configuration\n3. Return the created repository details",
-    "finalTransform": "(sourceData) => sourceData.createRepository.data",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => sourceData.createRepository.data",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "message": {
@@ -9944,13 +9944,13 @@
           "instruction": "Retrieve all existing webhooks for the specified Bitbucket repository. This should return all webhook objects, including their URLs, events, and active status.",
           "queryParams": null,
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": "(sourceData) => ({});",
+        "dataSelector": "(sourceData) => ({});",
         "executionMode": null,
         "responseMapping": "$"
       },
@@ -9971,13 +9971,13 @@
           "instruction": "Create a new webhook for the repository if no existing webhook matches the target URL, events, and active status. Use the provided webhook_url, events array, and active status. Only execute if the correct webhook does not already exist.",
           "queryParams": null,
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": "(sourceData) => { return [{}]; }",
+        "dataSelector": "(sourceData) => { return [{}]; }",
         "executionMode": null,
         "responseMapping": "$"
       }
@@ -10034,9 +10034,9 @@
       }
     },
     "instruction": "Create a Bitbucket webhook management tool named 'bitbucket_create_webhook'. \nSteps:\n1. List existing webhooks for the repository using GET /2.0/repositories/{workspace}/{repository}/hooks\n2. Check if a webhook with the target URL already exists with correct events and active status\n3. If it exists properly configured, return success message\n4. If it doesn't exist, create it using POST /2.0/repositories/{workspace}/{repository}/hooks with the webhook_url, events array, and active status\n5. Return the result with webhook details",
-    "finalTransform": "(sourceData) => {\n  // Step 1: Get all webhooks\n  const hooks = sourceData.listWebhooks.data && Array.isArray(sourceData.listWebhooks.data.values) ? sourceData.listWebhooks.data.values : [];\n  const targetUrl = sourceData.webhook_url;\n  const targetEvents = Array.isArray(sourceData.events) ? sourceData.events.sort() : [];\n  const targetActive = sourceData.active;\n\n  // Find a matching webhook\n  const found = hooks.find(hook => {\n    if (hook.url !== targetUrl) return false;\n    if (!!hook.active !== !!targetActive) return false;\n    if (!Array.isArray(hook.events)) return false;\n    const eventsSorted = [...hook.events].sort();\n    if (eventsSorted.length !== targetEvents.length) return false;\n    for (let i = 0; i < eventsSorted.length; i++) {\n      if (eventsSorted[i] !== targetEvents[i]) return false;\n    }\n    return true;\n  });\n\n  if (found) {\n    return {\n      success: true,\n      message: 'Webhook already exists and is properly configured.',\n      webhook: found\n    };\n  }\n\n  // If not found, check if the createWebhookIfNeeded step succeeded\n  const created = Array.isArray(sourceData.createWebhookIfNeeded) && sourceData.createWebhookIfNeeded[0]?.data;\n  if (created && created.url === targetUrl) {\n    return {\n      success: true,\n      message: 'Webhook created successfully.',\n      webhook: created\n    };\n  }\n\n  // If neither, return error\n  return {\n    success: false,\n    message: 'Failed to find or create webhook.',\n    details: {\n      attempted_url: targetUrl,\n      attempted_events: targetEvents,\n      attempted_active: targetActive\n    }\n  };\n}",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  // Step 1: Get all webhooks\n  const hooks = sourceData.listWebhooks.data && Array.isArray(sourceData.listWebhooks.data.values) ? sourceData.listWebhooks.data.values : [];\n  const targetUrl = sourceData.webhook_url;\n  const targetEvents = Array.isArray(sourceData.events) ? sourceData.events.sort() : [];\n  const targetActive = sourceData.active;\n\n  // Find a matching webhook\n  const found = hooks.find(hook => {\n    if (hook.url !== targetUrl) return false;\n    if (!!hook.active !== !!targetActive) return false;\n    if (!Array.isArray(hook.events)) return false;\n    const eventsSorted = [...hook.events].sort();\n    if (eventsSorted.length !== targetEvents.length) return false;\n    for (let i = 0; i < eventsSorted.length; i++) {\n      if (eventsSorted[i] !== targetEvents[i]) return false;\n    }\n    return true;\n  });\n\n  if (found) {\n    return {\n      success: true,\n      message: 'Webhook already exists and is properly configured.',\n      webhook: found\n    };\n  }\n\n  // If not found, check if the createWebhookIfNeeded step succeeded\n  const created = Array.isArray(sourceData.createWebhookIfNeeded) && sourceData.createWebhookIfNeeded[0]?.data;\n  if (created && created.url === targetUrl) {\n    return {\n      success: true,\n      message: 'Webhook created successfully.',\n      webhook: created\n    };\n  }\n\n  // If neither, return error\n  return {\n    success: false,\n    message: 'Failed to find or create webhook.',\n    details: {\n      attempted_url: targetUrl,\n      attempted_events: targetEvents,\n      attempted_active: targetActive\n    }\n  };\n}",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "status": {
@@ -10074,13 +10074,13 @@
           "instruction": "Retrieve repository metadata for the given workspace and repository. This should include information about the default branch.",
           "queryParams": null,
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": "(sourceData) => ({});",
+        "dataSelector": "(sourceData) => ({});",
         "executionMode": null,
         "responseMapping": "$"
       },
@@ -10103,13 +10103,13 @@
             "pagelen": "5"
           },
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": "(sourceData) => ({})",
+        "dataSelector": "(sourceData) => ({})",
         "executionMode": null,
         "responseMapping": "$"
       }
@@ -10151,9 +10151,9 @@
       }
     },
     "instruction": "Create a Bitbucket pipeline status tool named 'bitbucket_get_pipeline_status'.\nSteps:\n1. Get repository metadata using GET /2.0/repositories/{workspace}/{repository} to find the default branch\n2. Fetch recent pipelines using GET /2.0/repositories/{workspace}/{repository}/pipelines/?sort=-created_on&pagelen=5\n3. Return the pipeline status information for the most recent pipeline",
-    "finalTransform": "(sourceData) => {\n  // Defensive: ensure pipelines array exists\n  const pipelines = sourceData.getRecentPipelines.data?.values;\n  if (!Array.isArray(pipelines) || pipelines.length === 0) {\n    return { status: 'No pipelines found', pipeline: null };\n  }\n  // Return the status info for the most recent pipeline\n  const mostRecent = pipelines[0];\n  return {\n    status: mostRecent.state?.result?.name || mostRecent.state?.name || 'UNKNOWN',\n    pipeline: {\n      uuid: mostRecent.uuid,\n      build_number: mostRecent.build_number,\n      created_on: mostRecent.created_on,\n      target: mostRecent.target,\n      state: mostRecent.state,\n      url: mostRecent.links?.web?.href || mostRecent.links?.self?.href\n    }\n  };\n}",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  // Defensive: ensure pipelines array exists\n  const pipelines = sourceData.getRecentPipelines.data?.values;\n  if (!Array.isArray(pipelines) || pipelines.length === 0) {\n    return { status: 'No pipelines found', pipeline: null };\n  }\n  // Return the status info for the most recent pipeline\n  const mostRecent = pipelines[0];\n  return {\n    status: mostRecent.state?.result?.name || mostRecent.state?.name || 'UNKNOWN',\n    pipeline: {\n      uuid: mostRecent.uuid,\n      build_number: mostRecent.build_number,\n      created_on: mostRecent.created_on,\n      target: mostRecent.target,\n      state: mostRecent.state,\n      url: mostRecent.links?.web?.href || mostRecent.links?.self?.href\n    }\n  };\n}",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "success": {
@@ -10191,13 +10191,13 @@
           "instruction": "Fetch comprehensive metadata for a specific Bitbucket repository, including details such as default branch, description, language, size, and other available metadata fields. The response should provide all available repository information.",
           "queryParams": null,
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": "(sourceData) => ({ workspace: sourceData.workspace, repository: sourceData.repository });",
+        "dataSelector": "(sourceData) => ({ workspace: sourceData.workspace, repository: sourceData.repository });",
         "executionMode": null,
         "responseMapping": "$"
       }
@@ -10239,9 +10239,9 @@
       }
     },
     "instruction": "Create a Bitbucket repository metadata tool named 'bitbucket-get-repo-metadata'.\nSteps:\n1. Fetch repository metadata using GET /2.0/repositories/{workspace}/{repository}\n2. Return comprehensive repository information including default branch, description, language, size, and other metadata",
-    "finalTransform": "(sourceData) => {\n  const repo = sourceData.fetchRepoMetadata.data;\n  if (!repo) throw new Error('No repository metadata found');\n  return {\n    name: repo.name,\n    full_name: repo.full_name,\n    uuid: repo.uuid,\n    description: repo.description,\n    is_private: repo.is_private,\n    language: repo.language,\n    size: repo.size,\n    created_on: repo.created_on,\n    updated_on: repo.updated_on,\n    mainbranch: repo.mainbranch?.name,\n    default_branch: repo.mainbranch?.name,\n    slug: repo.slug,\n    scm: repo.scm,\n    website: repo.website,\n    project: repo.project,\n    owner: repo.owner,\n    links: repo.links,\n    fork_policy: repo.fork_policy,\n    has_issues: repo.has_issues,\n    has_wiki: repo.has_wiki,\n    watchers_count: repo.watchers?.size,\n    forks_count: repo.forks?.size,\n    parent: repo.parent,\n    workspace: repo.workspace,\n    // Add any other available metadata fields as needed\n    raw: repo // include full raw object for completeness\n  };\n}",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  const repo = sourceData.fetchRepoMetadata.data;\n  if (!repo) throw new Error('No repository metadata found');\n  return {\n    name: repo.name,\n    full_name: repo.full_name,\n    uuid: repo.uuid,\n    description: repo.description,\n    is_private: repo.is_private,\n    language: repo.language,\n    size: repo.size,\n    created_on: repo.created_on,\n    updated_on: repo.updated_on,\n    mainbranch: repo.mainbranch?.name,\n    default_branch: repo.mainbranch?.name,\n    slug: repo.slug,\n    scm: repo.scm,\n    website: repo.website,\n    project: repo.project,\n    owner: repo.owner,\n    links: repo.links,\n    fork_policy: repo.fork_policy,\n    has_issues: repo.has_issues,\n    has_wiki: repo.has_wiki,\n    watchers_count: repo.watchers?.size,\n    forks_count: repo.forks?.size,\n    parent: repo.parent,\n    workspace: repo.workspace,\n    // Add any other available metadata fields as needed\n    raw: repo // include full raw object for completeness\n  };\n}",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "success": {
@@ -10287,13 +10287,13 @@
             "pagelen": "<<pagelen>>"
           },
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": "(sourceData) => ({});",
+        "dataSelector": "(sourceData) => ({});",
         "executionMode": null,
         "responseMapping": "$"
       }
@@ -10339,9 +10339,9 @@
       }
     },
     "instruction": "Create a Bitbucket repository listing tool named 'bitbucket-list-repos'.\nSteps:\n1. List repositories for a workspace using GET /2.0/repositories/{workspace}\n2. Include pagination parameters and filters if needed\n3. Return the list of repositories with basic metadata like name, full_name, description, and clone URLs",
-    "finalTransform": "(sourceData) => {\n  // Bitbucket paginated response: { values: [ ... ], next: ... }\n  // We want: [{ name, full_name, description, clone_urls: [...] }, ...]\n  const allRepos = Array.isArray(sourceData.listRepositories)\n    ? sourceData.listRepositories.flatMap(item => item.data.values || [])\n    : (sourceData.listRepositories.data?.values || []);\n  return allRepos.map(repo => ({\n    name: repo.name,\n    full_name: repo.full_name,\n    description: repo.description,\n    clone_urls: Array.isArray(repo.links?.clone) ? repo.links.clone.map(c => ({ href: c.href, name: c.name })) : []\n  }));\n}",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => {\n  // Bitbucket paginated response: { values: [ ... ], next: ... }\n  // We want: [{ name, full_name, description, clone_urls: [...] }, ...]\n  const allRepos = Array.isArray(sourceData.listRepositories)\n    ? sourceData.listRepositories.flatMap(item => item.data.values || [])\n    : (sourceData.listRepositories.data?.values || []);\n  return allRepos.map(repo => ({\n    name: repo.name,\n    full_name: repo.full_name,\n    description: repo.description,\n    clone_urls: Array.isArray(repo.links?.clone) ? repo.links.clone.map(c => ({ href: c.href, name: c.name })) : []\n  }));\n}",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "page": {
@@ -10392,13 +10392,13 @@
             "pagelen": "100"
           },
           "authentication": null,
-          "responseSchema": null,
+          "outputSchema": null,
           "responseMapping": null,
           "documentationUrl": null
         },
         "inputMapping": null,
         "loopMaxIters": null,
-        "loopSelector": "(sourceData) => ({});",
+        "dataSelector": "(sourceData) => ({});",
         "executionMode": null,
         "responseMapping": "$"
       }
@@ -10440,9 +10440,9 @@
       }
     },
     "instruction": "Create a Bitbucket tags listing tool named 'bitbucket_list_tags'.\nSteps:\n1. Fetch all tags from the repository using GET /2.0/repositories/{workspace}/{repository}/refs/tags\n2. Use pagination to get all tags (pagelen=100 and follow next cursor)\n3. Return the complete list of tags with their metadata",
-    "finalTransform": "(sourceData) => { return { tags: Array.isArray(sourceData.fetchAllTags) ? sourceData.fetchAllTags.flatMap(item => item.data.values || []) : (sourceData.fetchAllTags.data?.values || []) }; }",
-    "integrationIds": [],
-    "responseSchema": {
+    "outputTransform": "(sourceData) => { return { tags: Array.isArray(sourceData.fetchAllTags) ? sourceData.fetchAllTags.flatMap(item => item.data.values || []) : (sourceData.fetchAllTags.data?.values || []) }; }",
+    "systemIds": [],
+    "outputSchema": {
       "type": "object",
       "properties": {
         "tags": {

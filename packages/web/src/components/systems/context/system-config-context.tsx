@@ -5,7 +5,12 @@ import { useSystems } from "@/src/app/systems-context";
 import { useToast } from "@/src/hooks/use-toast";
 import { createSuperglueClient, needsUIToTriggerDocFetch } from "@/src/lib/client-utils";
 import type { System } from "@superglue/shared";
-import { CredentialMode, UpsertMode, systems as systemTemplates } from "@superglue/shared";
+import {
+  CredentialMode,
+  UpsertMode,
+  systems as systemTemplates,
+  findTemplateForSystem,
+} from "@superglue/shared";
 import {
   createContext,
   ReactNode,
@@ -112,6 +117,13 @@ function extractNonOAuthCredentials(credentials: Record<string, any>): string {
   return Object.keys(nonOAuthCreds).length > 0 ? JSON.stringify(nonOAuthCreds, null, 2) : "{}";
 }
 
+function isSystemUsingTemplateOAuth(system: System | undefined): boolean {
+  if (!system?.credentials?.client_id) return false;
+  const match = findTemplateForSystem(system);
+  const templateClientId = match?.template?.oauth?.client_id;
+  return Boolean(templateClientId && system.credentials.client_id === templateClientId);
+}
+
 interface SystemConfigProviderProps {
   initialSystem?: System;
   isNew?: boolean;
@@ -167,7 +179,10 @@ export function SystemConfigProvider({
         : JSON.stringify(initialSystem.credentials, null, 2)
       : "{}",
   );
-  const [useSuperglueOAuth, setUseSuperglueOAuth] = useState(false);
+  // Detect if system was created with superglue OAuth by comparing stored client_id with template's
+  const [useSuperglueOAuth, setUseSuperglueOAuth] = useState(() =>
+    isSystemUsingTemplateOAuth(initialSystem),
+  );
 
   const [documentationUrl, setDocumentationUrl] = useState(initialSystem?.documentationUrl || "");
   const [documentation, setDocumentation] = useState(initialSystem?.documentation || "");
@@ -217,6 +232,8 @@ export function SystemConfigProvider({
           ? extractNonOAuthCredentials(updatedSystem.credentials || {})
           : JSON.stringify(updatedSystem.credentials || {}, null, 2),
       );
+
+      setUseSuperglueOAuth(isSystemUsingTemplateOAuth(updatedSystem));
 
       initialRef.current = updatedSystem;
       setHasUnsavedChanges(false);
@@ -538,7 +555,7 @@ export function SystemConfigProvider({
         const existingSystem = systems.find((s) => s.id === systemId);
         const mode = existingSystem ? UpsertMode.UPDATE : UpsertMode.CREATE;
 
-        const client = createSuperglueClient(config.superglueEndpoint);
+        const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
         const savedSystem = await client.upsertSystem(
           systemId,
           systemData,

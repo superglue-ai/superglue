@@ -40,7 +40,7 @@ describe("Tool Fixer → Frontend Integration", () => {
         userId: { type: "string" },
       },
     },
-    responseSchema: {
+    outputSchema: {
       type: "object",
       properties: {
         result: { type: "string" },
@@ -49,16 +49,14 @@ describe("Tool Fixer → Frontend Integration", () => {
     steps: [
       {
         id: "step1",
-        systemId: "sys1",
-        apiConfig: {
-          id: "api1",
+        instruction: "Fetch users",
+        config: {
           method: "GET",
-          urlHost: "https://api.example.com",
-          urlPath: "/users",
+          url: "https://api.example.com/users",
+          systemId: "sys1",
         },
       },
     ],
-    systemIds: ["sys1"],
     createdAt: new Date("2024-01-01"),
     updatedAt: new Date("2024-01-01"),
   });
@@ -158,7 +156,7 @@ describe("Tool Fixer → Frontend Integration", () => {
       expect(result.inputSchema).toEqual(fixerResult.tool.inputSchema);
     });
 
-    it("should handle stringified responseSchema value from LLM", () => {
+    it("should handle stringified outputSchema value from LLM", () => {
       const originalTool = createOriginalTool();
 
       const newSchema = {
@@ -175,12 +173,12 @@ describe("Tool Fixer → Frontend Integration", () => {
       const fixerResult: ToolFixerResult = {
         tool: {
           ...originalTool,
-          responseSchema: newSchema,
+          outputSchema: newSchema,
         },
         diffs: [
           {
             op: "replace",
-            path: "/responseSchema",
+            path: "/outputSchema",
             value: JSON.stringify(newSchema),
           },
         ],
@@ -188,8 +186,8 @@ describe("Tool Fixer → Frontend Integration", () => {
 
       const result = applyDiffsToConfig(originalTool, fixerResult.diffs);
 
-      expect(result.responseSchema).toEqual(newSchema);
-      expect(result.responseSchema).toEqual(fixerResult.tool.responseSchema);
+      expect(result.outputSchema).toEqual(newSchema);
+      expect(result.outputSchema).toEqual(fixerResult.tool.outputSchema);
     });
   });
 
@@ -233,7 +231,7 @@ describe("Tool Fixer → Frontend Integration", () => {
       const originalTool: any = {
         ...createOriginalTool(),
         inputSchema: '{"type":"object","properties":{"id":{"type":"string"}}}',
-        responseSchema: '{"type":"object","properties":{"data":{"type":"string"}}}',
+        outputSchema: '{"type":"object","properties":{"data":{"type":"string"}}}',
       };
 
       const fixerResult: ToolFixerResult = {
@@ -245,7 +243,7 @@ describe("Tool Fixer → Frontend Integration", () => {
               id: { type: "number" },
             },
           },
-          responseSchema: {
+          outputSchema: {
             type: "object",
             properties: {
               data: { type: "array" },
@@ -260,7 +258,7 @@ describe("Tool Fixer → Frontend Integration", () => {
           },
           {
             op: "replace",
-            path: "/responseSchema/properties/data/type",
+            path: "/outputSchema/properties/data/type",
             value: "array",
           },
         ],
@@ -269,7 +267,7 @@ describe("Tool Fixer → Frontend Integration", () => {
       const result = applyDiffsToConfig(originalTool, fixerResult.diffs);
 
       expect(result.inputSchema).toEqual(fixerResult.tool.inputSchema);
-      expect(result.responseSchema).toEqual(fixerResult.tool.responseSchema);
+      expect(result.outputSchema).toEqual(fixerResult.tool.outputSchema);
     });
   });
 
@@ -325,8 +323,8 @@ describe("Tool Fixer → Frontend Integration", () => {
           steps: [
             {
               ...originalTool.steps[0],
-              apiConfig: {
-                ...originalTool.steps[0].apiConfig,
+              config: {
+                ...originalTool.steps[0].config,
                 headers: {
                   Authorization: "Bearer token",
                   "Content-Type": "application/json",
@@ -343,7 +341,7 @@ describe("Tool Fixer → Frontend Integration", () => {
           },
           {
             op: "add",
-            path: "/steps/0/apiConfig/headers",
+            path: "/steps/0/config/headers",
             value: JSON.stringify({
               Authorization: "Bearer token",
               "Content-Type": "application/json",
@@ -355,9 +353,7 @@ describe("Tool Fixer → Frontend Integration", () => {
       const result = applyDiffsToConfig(originalTool, fixerResult.diffs);
 
       expect(result.inputSchema).toEqual(fixerResult.tool.inputSchema);
-      expect(result.steps[0].apiConfig.headers).toEqual(
-        fixerResult.tool.steps[0].apiConfig.headers,
-      );
+      expect(result.steps[0].config.headers).toEqual(fixerResult.tool.steps[0].config.headers);
     });
 
     it("should handle schema replacement followed by nested modification", () => {
@@ -429,8 +425,8 @@ describe("Tool Fixer → Frontend Integration", () => {
           steps: [
             {
               ...originalTool.steps[0],
-              apiConfig: {
-                ...originalTool.steps[0].apiConfig,
+              config: {
+                ...originalTool.steps[0].config,
                 headers,
               },
             },
@@ -439,7 +435,7 @@ describe("Tool Fixer → Frontend Integration", () => {
         diffs: [
           {
             op: "add",
-            path: "/steps/0/apiConfig/headers",
+            path: "/steps/0/config/headers",
             value: JSON.stringify(headers),
           },
         ],
@@ -447,7 +443,7 @@ describe("Tool Fixer → Frontend Integration", () => {
 
       const result = applyDiffsToConfig(originalTool, fixerResult.diffs);
 
-      expect(result.steps[0].apiConfig.headers).toEqual(headers);
+      expect(result.steps[0].config.headers).toEqual(headers);
     });
 
     it("should handle stringified queryParams", () => {
@@ -465,8 +461,8 @@ describe("Tool Fixer → Frontend Integration", () => {
           steps: [
             {
               ...originalTool.steps[0],
-              apiConfig: {
-                ...originalTool.steps[0].apiConfig,
+              config: {
+                ...originalTool.steps[0].config,
                 queryParams,
               },
             },
@@ -475,7 +471,7 @@ describe("Tool Fixer → Frontend Integration", () => {
         diffs: [
           {
             op: "add",
-            path: "/steps/0/apiConfig/queryParams",
+            path: "/steps/0/config/queryParams",
             value: JSON.stringify(queryParams),
           },
         ],
@@ -483,7 +479,7 @@ describe("Tool Fixer → Frontend Integration", () => {
 
       const result = applyDiffsToConfig(originalTool, fixerResult.diffs);
 
-      expect(result.steps[0].apiConfig.queryParams).toEqual(queryParams);
+      expect(result.steps[0].config.queryParams).toEqual(queryParams);
     });
 
     it("should handle stringified pagination", () => {
@@ -501,8 +497,8 @@ describe("Tool Fixer → Frontend Integration", () => {
           steps: [
             {
               ...originalTool.steps[0],
-              apiConfig: {
-                ...originalTool.steps[0].apiConfig,
+              config: {
+                ...originalTool.steps[0].config,
                 pagination,
               },
             },
@@ -511,7 +507,7 @@ describe("Tool Fixer → Frontend Integration", () => {
         diffs: [
           {
             op: "add",
-            path: "/steps/0/apiConfig/pagination",
+            path: "/steps/0/config/pagination",
             value: JSON.stringify(pagination),
           },
         ],
@@ -519,7 +515,7 @@ describe("Tool Fixer → Frontend Integration", () => {
 
       const result = applyDiffsToConfig(originalTool, fixerResult.diffs);
 
-      expect(result.steps[0].apiConfig.pagination).toEqual(pagination);
+      expect(result.steps[0].config.pagination).toEqual(pagination);
     });
   });
 
@@ -539,8 +535,8 @@ describe("Tool Fixer → Frontend Integration", () => {
           steps: [
             {
               ...originalTool.steps[0],
-              apiConfig: {
-                ...originalTool.steps[0].apiConfig,
+              config: {
+                ...originalTool.steps[0].config,
                 headers: { "X-API-Key": "secret" },
               },
             },
@@ -559,7 +555,7 @@ describe("Tool Fixer → Frontend Integration", () => {
           },
           {
             op: "add",
-            path: "/steps/0/apiConfig/headers",
+            path: "/steps/0/config/headers",
             value: { "X-API-Key": "secret" },
           },
         ],
@@ -568,9 +564,7 @@ describe("Tool Fixer → Frontend Integration", () => {
       const result = applyDiffsToConfig(originalTool, fixerResult.diffs);
 
       expect(result.inputSchema).toEqual(fixerResult.tool.inputSchema);
-      expect(result.steps[0].apiConfig.headers).toEqual(
-        fixerResult.tool.steps[0].apiConfig.headers,
-      );
+      expect(result.steps[0].config.headers).toEqual(fixerResult.tool.steps[0].config.headers);
     });
   });
 
@@ -586,8 +580,8 @@ describe("Tool Fixer → Frontend Integration", () => {
           steps: [
             {
               ...originalTool.steps[0],
-              apiConfig: {
-                ...originalTool.steps[0].apiConfig,
+              config: {
+                ...originalTool.steps[0].config,
                 body: bodyValue,
               },
             },
@@ -596,7 +590,7 @@ describe("Tool Fixer → Frontend Integration", () => {
         diffs: [
           {
             op: "add",
-            path: "/steps/0/apiConfig/body",
+            path: "/steps/0/config/body",
             value: bodyValue,
           },
         ],
@@ -604,14 +598,14 @@ describe("Tool Fixer → Frontend Integration", () => {
 
       const result = applyDiffsToConfig(originalTool, fixerResult.diffs);
 
-      expect(result.steps[0].apiConfig.body).toBe(bodyValue);
-      expect(typeof result.steps[0].apiConfig.body).toBe("string");
+      expect(result.steps[0].config.body).toBe(bodyValue);
+      expect(typeof result.steps[0].config.body).toBe("string");
     });
 
-    it("should NOT parse loopSelector (should stay as string function)", () => {
+    it("should NOT parse dataSelector (should stay as string function)", () => {
       const originalTool = createOriginalTool();
 
-      const loopSelector = "(sourceData) => { return {} }";
+      const dataSelector = "(sourceData) => { return {} }";
 
       const fixerResult: ToolFixerResult = {
         tool: {
@@ -619,48 +613,48 @@ describe("Tool Fixer → Frontend Integration", () => {
           steps: [
             {
               ...originalTool.steps[0],
-              loopSelector,
+              dataSelector,
             },
           ],
         },
         diffs: [
           {
             op: "add",
-            path: "/steps/0/loopSelector",
-            value: loopSelector,
+            path: "/steps/0/dataSelector",
+            value: dataSelector,
           },
         ],
       };
 
       const result = applyDiffsToConfig(originalTool, fixerResult.diffs);
 
-      expect(result.steps[0].loopSelector).toBe(loopSelector);
-      expect(typeof result.steps[0].loopSelector).toBe("string");
+      expect(result.steps[0].dataSelector).toBe(dataSelector);
+      expect(typeof result.steps[0].dataSelector).toBe("string");
     });
 
-    it("should NOT parse finalTransform (should stay as string function)", () => {
+    it("should NOT parse outputTransform (should stay as string function)", () => {
       const originalTool = createOriginalTool();
 
-      const finalTransform = "(sourceData) => sourceData.step1.data";
+      const outputTransform = "(sourceData) => sourceData.step1.data";
 
       const fixerResult: ToolFixerResult = {
         tool: {
           ...originalTool,
-          finalTransform,
+          outputTransform,
         },
         diffs: [
           {
             op: "add",
-            path: "/finalTransform",
-            value: finalTransform,
+            path: "/outputTransform",
+            value: outputTransform,
           },
         ],
       };
 
       const result = applyDiffsToConfig(originalTool, fixerResult.diffs);
 
-      expect(result.finalTransform).toBe(finalTransform);
-      expect(typeof result.finalTransform).toBe("string");
+      expect(result.outputTransform).toBe(outputTransform);
+      expect(typeof result.outputTransform).toBe("string");
     });
   });
 

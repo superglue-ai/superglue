@@ -40,10 +40,10 @@ function getTargetIcon(type: DiffTargetType) {
   switch (type) {
     case "newStep":
       return <Plus className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />;
-    case "finalTransform":
+    case "outputTransform":
       return <FilePlay className="h-3.5 w-3.5 text-primary flex-shrink-0" />;
     case "inputSchema":
-    case "responseSchema":
+    case "outputSchema":
       return <FileJson className="h-3.5 w-3.5 text-primary flex-shrink-0" />;
     case "instruction":
       return <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />;

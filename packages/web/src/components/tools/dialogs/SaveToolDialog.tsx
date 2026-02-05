@@ -66,7 +66,7 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
 
     try {
       setIsSaving(true);
-      const client = createSuperglueClient(config.superglueEndpoint);
+      const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
 
       const toolToSave = { ...tool, id: trimmedName, folder: selectedFolder || undefined };
       const saved = await client.upsertWorkflow(trimmedName, toolToSave as any);

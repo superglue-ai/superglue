@@ -5,6 +5,7 @@ import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
 import { SystemIcon } from "@/src/components/ui/system-icon";
+import { RequestStepConfig, ToolStep, Tool, isRequestConfig } from "@superglue/shared";
 import {
   AlertCircle,
   CheckCircle,
@@ -250,46 +251,50 @@ export function ToolCallToolDisplay({
               <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 self-center" />
 
               {/* Tool Steps */}
-              {steps.map((step, index) => (
-                <React.Fragment key={step.id || `step-${index}`}>
-                  <Card className="p-4 w-64 flex-shrink-0 relative">
-                    <div className="mb-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        {/* System Icon - Left of Step ID */}
-                        <SystemIcon
-                          system={{ id: step.systemId, urlHost: step.apiConfig?.urlHost }}
-                          size={16}
-                        />
-                        <span className="font-medium text-sm">{step.id || "New Step"}</span>
+              {steps.map((step, index) => {
+                const stepConfig =
+                  step.config && isRequestConfig(step.config)
+                    ? (step.config as RequestStepConfig)
+                    : null;
+                const systemId = stepConfig?.systemId;
+                return (
+                  <React.Fragment key={step.id || `step-${index}`}>
+                    <Card className="p-4 w-64 flex-shrink-0 relative">
+                      <div className="mb-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          {/* System Icon - Left of Step ID */}
+                          <SystemIcon system={{ id: systemId }} size={16} />
+                          <span className="font-medium text-sm">{step.id || "New Step"}</span>
 
-                        {/* Loop Icon - Right side (if LOOP) */}
-                        {step.executionMode === "LOOP" && (
-                          <RotateCcw className="w-4 h-4 text-orange-500 ml-auto" />
+                          {/* Loop Icon - Right side (if LOOP) */}
+                          {step.dataSelector && (
+                            <RotateCcw className="w-4 h-4 text-orange-500 ml-auto" />
+                          )}
+                        </div>
+                        {stepConfig?.method && (
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded font-medium ${getMethodColor(stepConfig.method)}`}
+                          >
+                            {stepConfig.method}
+                          </span>
                         )}
                       </div>
-                      {step.apiConfig?.method && (
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded font-medium ${getMethodColor(step.apiConfig.method)}`}
-                        >
-                          {step.apiConfig.method}
-                        </span>
-                      )}
-                    </div>
 
-                    <div className="space-y-2">
-                      <div className="text-xs text-muted-foreground">
-                        <div className="font-medium">System:</div>
-                        <div className="truncate">{step.systemId || "Not configured"}</div>
+                      <div className="space-y-2">
+                        <div className="text-xs text-muted-foreground">
+                          <div className="font-medium">System:</div>
+                          <div className="truncate">{systemId || "Not configured"}</div>
+                        </div>
                       </div>
-                    </div>
-                  </Card>
+                    </Card>
 
-                  {/* Arrow after each step (except the last one) */}
-                  {index < steps.length - 1 && (
-                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 self-center" />
-                  )}
-                </React.Fragment>
-              ))}
+                    {/* Arrow after each step (except the last one) */}
+                    {index < steps.length - 1 && (
+                      <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 self-center" />
+                    )}
+                  </React.Fragment>
+                );
+              })}
 
               {/* Arrow before final transform (if there are steps) */}
               {steps.length > 0 && (
@@ -303,7 +308,7 @@ export function ToolCallToolDisplay({
                   <span className="font-medium text-sm">Final Transform</span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {displayTool.finalTransform ? "Transform applied" : "No transform configured"}
+                  {displayTool.outputTransform ? "Transform applied" : "No transform configured"}
                 </div>
               </Card>
             </div>

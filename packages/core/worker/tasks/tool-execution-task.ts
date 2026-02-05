@@ -30,7 +30,7 @@ export async function run(payload: ToolExecutionPayload): Promise<ToolExecutionR
       data: result.data,
       error: result.error,
       stepResults: result.stepResults,
-      config: result.config,
+      tool: result.tool,
       startedAt,
       completedAt: new Date(),
     };
@@ -41,7 +41,7 @@ export async function run(payload: ToolExecutionPayload): Promise<ToolExecutionR
       data: undefined,
       error: String(error),
       stepResults: [],
-      config: payload.workflow,
+      tool: payload.workflow,
       startedAt,
       completedAt: new Date(),
     };

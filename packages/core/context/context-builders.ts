@@ -194,7 +194,7 @@ export function getToolBuilderContext(
   const prompt_start = `Build a complete workflow to fulfill the user's instruction.`;
   const prompt_end = hasSystems
     ? "Ensure that the final output matches the instruction and you use ONLY the available system ids."
-    : "Since no systems are available, create a transform-only workflow with no steps, using only the finalTransform to process the payload data.";
+    : "No systems are available. Please provide systems to build a workflow.";
   const userInstructionContext = options.include.userInstruction
     ? `<instruction>${input.userInstruction}</instruction>`
     : "";
@@ -246,10 +246,7 @@ export function getToolBuilderContext(
         )
         .join("\n")
         .slice(0, systemBudget)
-    : "No systems provided. Build a transform-only workflow using finalTransform to process the payload data.".slice(
-        0,
-        systemBudget,
-      );
+    : "No systems provided. Please provide systems to build a workflow.".slice(0, systemBudget);
 
   const availableVariablesContext = options.include?.availableVariablesContext
     ? `<available_variables>${availableVariablesContent}</available_variables>`

@@ -1,4 +1,10 @@
-import { findTemplateForSystem, ServiceMetadata, System, Tool } from "@superglue/shared";
+import {
+  findTemplateForSystem,
+  ServiceMetadata,
+  System,
+  Tool,
+  getToolSystemIds,
+} from "@superglue/shared";
 import { isMainThread, parentPort } from "worker_threads";
 import { DataStore } from "../datastore/types.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
@@ -290,18 +296,7 @@ export class SystemManager {
     metadata: ServiceMetadata,
     options: { includeDocs?: boolean } = {},
   ): Promise<SystemManager[]> {
-    const allIds = new Set<string>();
-
-    if (Array.isArray(tool.systemIds)) {
-      tool.systemIds.forEach((id) => allIds.add(id));
-    }
-    if (Array.isArray(tool.steps)) {
-      tool.steps.forEach((step) => {
-        if (step.systemId) {
-          allIds.add(step.systemId);
-        }
-      });
-    }
+    const allIds = new Set(getToolSystemIds(tool));
 
     if (allIds.size === 0) {
       return [];

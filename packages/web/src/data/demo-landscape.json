@@ -1,0 +1,236 @@
+{
+  "systems": [
+    {
+      "id": "sap-erp",
+      "type": "rest",
+      "urlHost": "https://sap.company.com",
+      "urlPath": "/sap/opu/odata/sap",
+      "authMode": "basic"
+    },
+    {
+      "id": "oracle-db",
+      "type": "postgres",
+      "urlHost": "oracle-prod.company.com",
+      "authMode": "basic"
+    },
+    {
+      "id": "legacy-mes",
+      "type": "ftp",
+      "urlHost": "mes.legacy.company.com",
+      "authMode": "basic"
+    },
+    {
+      "id": "snowflake-warehouse",
+      "type": "postgres",
+      "urlHost": "company.snowflakecomputing.com",
+      "authMode": "basic"
+    },
+    {
+      "id": "netsuite",
+      "type": "rest",
+      "urlHost": "https://rest.netsuite.com",
+      "urlPath": "/record/v1",
+      "authMode": "oauth2"
+    },
+    {
+      "id": "sql-server-prod",
+      "type": "postgres",
+      "urlHost": "sqlprod.company.com",
+      "authMode": "basic"
+    },
+    {
+      "id": "s3-data-lake",
+      "type": "rest",
+      "urlHost": "https://s3.amazonaws.com",
+      "urlPath": "/company-datalake",
+      "authMode": "bearer"
+    },
+    {
+      "id": "salesforce",
+      "type": "rest",
+      "urlHost": "https://api.salesforce.com",
+      "urlPath": "/services/data/v55.0",
+      "authMode": "bearer"
+    },
+    {
+      "id": "stripe",
+      "type": "rest",
+      "urlHost": "https://api.stripe.com",
+      "urlPath": "/v1",
+      "authMode": "bearer"
+    },
+    {
+      "id": "postgres-warehouse",
+      "type": "postgres",
+      "urlHost": "warehouse.company.com",
+      "authMode": "basic"
+    },
+    {
+      "id": "redshift-analytics",
+      "type": "postgres",
+      "urlHost": "redshift.company.com",
+      "authMode": "basic"
+    }
+  ],
+  "tools": [
+    {
+      "id": "erp-to-warehouse-etl",
+      "instruction": "Extract SAP ERP data and load into Snowflake warehouse",
+      "steps": [
+        {
+          "config": { "systemId": "sap-erp" }
+        },
+        {
+          "config": { "systemId": "snowflake-warehouse" }
+        }
+      ]
+    },
+    {
+      "id": "mes-data-migration",
+      "instruction": "Migrate legacy MES data to modern data lake",
+      "steps": [
+        {
+          "config": { "systemId": "legacy-mes" }
+        },
+        {
+          "config": { "systemId": "s3-data-lake" }
+        }
+      ]
+    },
+    {
+      "id": "financial-consolidation",
+      "instruction": "Consolidate financial data from NetSuite and SAP into Redshift",
+      "steps": [
+        {
+          "config": { "systemId": "netsuite" }
+        },
+        {
+          "config": { "systemId": "sap-erp" }
+        },
+        {
+          "config": { "systemId": "redshift-analytics" }
+        }
+      ]
+    },
+    {
+      "id": "inventory-sync",
+      "instruction": "Sync inventory levels from Oracle DB to SAP ERP",
+      "steps": [
+        {
+          "config": { "systemId": "oracle-db" }
+        },
+        {
+          "config": { "systemId": "sap-erp" }
+        }
+      ]
+    },
+    {
+      "id": "revenue-analytics-pipeline",
+      "instruction": "Extract Stripe revenue data and analyze in Snowflake",
+      "steps": [
+        {
+          "config": { "systemId": "stripe" }
+        },
+        {
+          "config": { "systemId": "snowflake-warehouse" }
+        }
+      ]
+    },
+    {
+      "id": "crm-to-erp-sync",
+      "instruction": "Sync Salesforce opportunities to NetSuite for order processing",
+      "steps": [
+        {
+          "config": { "systemId": "salesforce" }
+        },
+        {
+          "config": { "systemId": "netsuite" }
+        }
+      ]
+    },
+    {
+      "id": "data-lake-aggregation",
+      "instruction": "Aggregate S3 data lake files into Postgres warehouse",
+      "steps": [
+        {
+          "config": { "systemId": "s3-data-lake" }
+        },
+        {
+          "config": { "systemId": "postgres-warehouse" }
+        }
+      ]
+    },
+    {
+      "id": "cross-db-replication",
+      "instruction": "Replicate critical data from SQL Server to Oracle DB",
+      "steps": [
+        {
+          "config": { "systemId": "sql-server-prod" }
+        },
+        {
+          "config": { "systemId": "oracle-db" }
+        }
+      ]
+    },
+    {
+      "id": "warehouse-to-analytics",
+      "instruction": "Transform Postgres warehouse data for Redshift analytics",
+      "steps": [
+        {
+          "config": { "systemId": "postgres-warehouse" }
+        },
+        {
+          "config": { "systemId": "redshift-analytics" }
+        }
+      ]
+    },
+    {
+      "id": "legacy-modernization",
+      "instruction": "Extract MES data and load into Snowflake",
+      "steps": [
+        {
+          "config": { "systemId": "legacy-mes" }
+        },
+        {
+          "config": { "systemId": "snowflake-warehouse" }
+        }
+      ]
+    },
+    {
+      "id": "master-data-sync",
+      "instruction": "Synchronize master data from SAP to NetSuite",
+      "steps": [
+        {
+          "config": { "systemId": "sap-erp" }
+        },
+        {
+          "config": { "systemId": "netsuite" }
+        }
+      ]
+    },
+    {
+      "id": "backup-to-lake",
+      "instruction": "Archive Oracle DB backups to S3 data lake",
+      "steps": [
+        {
+          "config": { "systemId": "oracle-db" }
+        },
+        {
+          "config": { "systemId": "s3-data-lake" }
+        }
+      ]
+    },
+    {
+      "id": "bi-data-prep",
+      "instruction": "Prepare Snowflake data for Redshift BI dashboards",
+      "steps": [
+        {
+          "config": { "systemId": "snowflake-warehouse" }
+        },
+        {
+          "config": { "systemId": "redshift-analytics" }
+        }
+      ]
+    }
+  ]
+}

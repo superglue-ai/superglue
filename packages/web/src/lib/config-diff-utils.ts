@@ -5,9 +5,9 @@ import * as jsonpatch from "fast-json-patch";
 export type DiffTargetType =
   | "step"
   | "newStep"
-  | "finalTransform"
+  | "outputTransform"
   | "inputSchema"
-  | "responseSchema"
+  | "outputSchema"
   | "instruction"
   | "toolInput"
   | "responseFilters"
@@ -52,11 +52,9 @@ const stringify = (v: any): string =>
         : JSON.stringify(v, null, 2);
 
 const TOP_LEVEL_TARGETS: Record<string, DiffTargetType> = {
-  finalTransform: "finalTransform",
-  outputTransform: "finalTransform", // OpenAPI alias
+  outputTransform: "outputTransform",
   inputSchema: "inputSchema",
-  responseSchema: "responseSchema",
-  outputSchema: "responseSchema", // OpenAPI alias
+  outputSchema: "outputSchema",
   instruction: "instruction",
   responseFilters: "responseFilters",
   folder: "folder",
@@ -68,9 +66,9 @@ const TOP_LEVEL_TARGETS: Record<string, DiffTargetType> = {
 const TARGET_LABELS: Record<DiffTargetType, string> = {
   step: "",
   newStep: "New Step",
-  finalTransform: "Final Transform",
+  outputTransform: "Output Transform",
   inputSchema: "Input Schema",
-  responseSchema: "Response Schema",
+  outputSchema: "Output Schema",
   instruction: "Instruction",
   toolInput: "Tool Input",
   responseFilters: "Response Filters",
@@ -107,6 +105,8 @@ export function parsePathToTarget(path: string): DiffTarget {
     let detail: string | undefined;
     if (subPath.startsWith("/apiConfig")) {
       detail = subPath.replace("/apiConfig", "").replace(/^\//, "") || "apiConfig";
+    } else if (subPath.startsWith("/config")) {
+      detail = subPath.replace("/config", "").replace(/^\//, "") || "config";
     } else if (subPath) {
       detail = subPath.replace(/^\//, "");
     }
@@ -196,22 +196,29 @@ export function enrichDiffsWithTargets(diffs: ToolDiff[], originalConfig?: Tool)
     const oldValue = originalConfig ? getValueAtPath(originalConfig, diff.path) : undefined;
 
     // Determine context path
-    const stepApiMatch = diff.path.match(/^(\/steps\/\d+\/apiConfig)(\/.*)?$/);
+    const stepConfigMatch = diff.path.match(/^(\/steps\/\d+\/config)(\/.*)?$/);
     const stepMatch = diff.path.match(/^(\/steps\/\d+)(\/.*)?$/);
     const topMatch = diff.path.match(
-      /^(\/(?:finalTransform|outputTransform|inputSchema|responseSchema|outputSchema|instruction|responseFilters|folder|name|id))(\/.*)?$/,
+      /^(\/(?:outputTransform|inputSchema|outputSchema|instruction|responseFilters|folder|name|id))(\/.*)?$/,
     );
 
     let contextPath: string;
-    if (stepApiMatch) {
-      contextPath = stepApiMatch[1];
+    if (stepConfigMatch) {
+      contextPath = stepConfigMatch[1];
     } else if (stepMatch) {
       // For OpenAPI format, no apiConfig wrapper - use step path directly
       const stepPath = stepMatch[1];
       const hasApiConfig = originalConfig
         ? getValueAtPath(originalConfig, stepPath + "/apiConfig") !== undefined
         : false;
-      contextPath = hasApiConfig ? stepPath + "/apiConfig" : stepPath;
+      const hasConfig = originalConfig
+        ? getValueAtPath(originalConfig, stepPath + "/config") !== undefined
+        : false;
+      contextPath = hasApiConfig
+        ? stepPath + "/apiConfig"
+        : hasConfig
+          ? stepPath + "/config"
+          : stepPath;
     } else if (topMatch) {
       contextPath = topMatch[1];
     } else {
@@ -253,7 +260,10 @@ export function enrichDiffsWithTargets(diffs: ToolDiff[], originalConfig?: Tool)
     ) {
       const step = originalConfig.steps[target.stepIndex];
       target.stepId = step.id;
-      target.systemId = step.systemId;
+      // systemId is now on step.config for request steps
+      if (step.config && "systemId" in step.config) {
+        target.systemId = step.config.systemId;
+      }
     }
 
     return {

@@ -30,7 +30,7 @@ import { useRightSidebar } from "../../sidebar/RightSidebarContext";
 
 export interface TransformItem {
   type: "transform";
-  data: { transform: string; responseSchema: string };
+  data: { transform: string; outputSchema: string };
   stepResult: any;
   transformError: any;
   hasTransformCompleted: boolean;
@@ -47,10 +47,10 @@ export const FinalTransformMiniStepCard = ({
   onAbort,
 }: FinalTransformMiniStepCardProps) => {
   const {
-    finalTransform,
-    responseSchema,
-    setFinalTransform,
-    setResponseSchema,
+    outputTransform,
+    outputSchema,
+    setOutputTransform,
+    setOutputSchema,
     responseFilters,
     setResponseFilters,
     steps,
@@ -66,7 +66,7 @@ export const FinalTransformMiniStepCard = ({
   } = useExecution();
   const { sendMessageToAgent } = useRightSidebar();
 
-  const transform = finalTransform;
+  const transform = outputTransform;
   const transformResult = finalResult;
   const transformError = finalError;
   const canExecute = canExecuteTransform;
@@ -75,7 +75,7 @@ export const FinalTransformMiniStepCard = ({
   const stepInputs = getStepInput();
   const [activeTab, setActiveTab] = useState("transform");
   const [localTransform, setLocalTransform] = useState(transform || "");
-  const [localSchema, setLocalSchema] = useState(responseSchema || "");
+  const [localSchema, setLocalSchema] = useState(outputSchema || "");
   const [inputViewMode, setInputViewMode] = useState<"preview" | "schema">("preview");
   const [outputViewMode, setOutputViewMode] = useState<"preview" | "schema">("preview");
   const [schemaInitialized, setSchemaInitialized] = useState(false);
@@ -98,10 +98,10 @@ export const FinalTransformMiniStepCard = ({
 
   useEffect(() => {
     if (!schemaInitialized) {
-      setLocalSchema(responseSchema || "");
+      setLocalSchema(outputSchema || "");
       setSchemaInitialized(true);
     }
-  }, [responseSchema, schemaInitialized]);
+  }, [outputSchema, schemaInitialized]);
 
   useEffect(() => {
     if (hasTransformCompleted) {
@@ -175,16 +175,16 @@ export const FinalTransformMiniStepCard = ({
   function handleTransformChange(value: string): void {
     isInternalChangeRef.current = true;
     setLocalTransform(value);
-    setFinalTransform(value);
+    setOutputTransform(value);
   }
 
   function handleSchemaChange(value: string | null): void {
     if (value === null || value === "") {
       setLocalSchema("");
-      setResponseSchema("");
+      setOutputSchema("");
     } else {
       setLocalSchema(value);
-      setResponseSchema(value);
+      setOutputSchema(value);
     }
   }
 

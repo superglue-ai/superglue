@@ -5,6 +5,8 @@ import {
   ServiceMetadata,
   toJsonSchema,
   Tool,
+  RequestStepConfig,
+  isRequestConfig,
 } from "@superglue/shared";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
 import z from "zod";
@@ -19,7 +21,7 @@ export class ToolBuilder {
   private instruction: string;
   private initialPayload: Record<string, unknown>;
   private metadata: ServiceMetadata;
-  private responseSchema: JSONSchema;
+  private outputSchema: JSONSchema;
   private inputSchema: JSONSchema;
   private toolSchema: any;
 
@@ -27,7 +29,7 @@ export class ToolBuilder {
     instruction: string,
     systems: System[],
     initialPayload: Record<string, unknown>,
-    responseSchema: JSONSchema,
+    outputSchema: JSONSchema,
     metadata: ServiceMetadata,
   ) {
     this.systems = systems.reduce(
@@ -40,7 +42,7 @@ export class ToolBuilder {
     this.instruction = instruction;
     this.initialPayload = initialPayload || {};
     this.metadata = metadata;
-    this.responseSchema = responseSchema;
+    this.outputSchema = outputSchema;
     this.toolSchema = z.toJSONSchema(toolSchema);
     try {
       const credentials = Object.values(this.systems).reduce((acc, int) => {
@@ -72,7 +74,7 @@ export class ToolBuilder {
         systems: Object.values(this.systems),
         payload: this.initialPayload,
         userInstruction: this.instruction,
-        responseSchema: this.responseSchema,
+        outputSchema: this.outputSchema,
         metadata: this.metadata,
       },
       {
@@ -96,33 +98,36 @@ export class ToolBuilder {
     const errors: string[] = [];
     const availableSystemIds = Object.keys(this.systems);
     const hasSteps = tool.steps && tool.steps.length > 0;
-    const hasFinalTransform =
-      tool.finalTransform &&
-      tool.finalTransform !== "$" &&
-      tool.finalTransform !== "(sourceData) => sourceData";
+    const hasOutputTransform =
+      tool.outputTransform &&
+      tool.outputTransform !== "$" &&
+      tool.outputTransform !== "(sourceData) => sourceData";
 
-    if (!hasSteps && !hasFinalTransform) {
-      errors.push("Tool must have either steps or a finalTransform to process data");
+    if (!hasSteps && !hasOutputTransform) {
+      errors.push("Tool must have either steps or an outputTransform to process data");
     }
 
-    if (hasSteps && availableSystemIds.length === 0) {
-      errors.push(
-        "Tool has steps but no systems are available. Either provide systems or use a transform-only tool.",
-      );
+    // Check if any steps are request steps (need systems)
+    const hasRequestSteps = hasSteps && tool.steps?.some((step) => isRequestConfig(step.config));
+
+    if (hasRequestSteps && availableSystemIds.length === 0) {
+      errors.push("Tool has request steps but no systems are available. Please provide systems.");
     }
 
     if (hasSteps) {
       tool.steps?.forEach((step, index) => {
-        if (!step.systemId) {
-          errors.push(`Step ${index + 1} (${step.id}): Missing systemId`);
-        } else if (!availableSystemIds.includes(step.systemId)) {
+        // All steps are request steps for now
+        const stepConfig = step.config as RequestStepConfig;
+        if (!stepConfig.systemId) {
+          errors.push(`Step ${index + 1} (${step.id}): Missing systemId in config`);
+        } else if (!availableSystemIds.includes(stepConfig.systemId)) {
           errors.push(
-            `Step ${index + 1} (${step.id}): Invalid systemId '${step.systemId}'. Available systems: ${availableSystemIds.join(", ")}`,
+            `Step ${index + 1} (${step.id}): Invalid systemId '${stepConfig.systemId}'. Available systems: ${availableSystemIds.join(", ")}`,
           );
         }
-        if (!step.apiConfig?.urlHost) {
+        if (!stepConfig?.url) {
           errors.push(
-            `Step ${index + 1} (${step.id}): Missing URL configuration (urlHost: '${step.apiConfig?.urlHost || "undefined"}'). Please ensure that all steps correspond to a single API call, or merge this step with the previous one.`,
+            `Step ${index + 1} (${step.id}): Missing URL configuration (url: '${stepConfig?.url || "undefined"}'). Please ensure that all steps correspond to a single API call, or merge this step with the previous one.`,
           );
         }
       });
@@ -197,19 +202,24 @@ export class ToolBuilder {
           );
         }
 
-        generatedTool.steps = generatedTool.steps.map((step) => ({
-          ...step,
-          modify: step.modify || false,
-          apiConfig: {
-            ...step.apiConfig,
-            queryParams: step.apiConfig.queryParams
-              ? Object.fromEntries(step.apiConfig.queryParams.map((p: any) => [p.key, p.value]))
-              : undefined,
-            headers: step.apiConfig.headers
-              ? Object.fromEntries(step.apiConfig.headers.map((h: any) => [h.key, h.value]))
-              : undefined,
-          },
-        }));
+        generatedTool.steps = generatedTool.steps.map((step) => {
+          const stepConfig = step.config as RequestStepConfig;
+          return {
+            ...step,
+            modify: step.modify || false,
+            config: {
+              ...stepConfig,
+              queryParams: stepConfig.queryParams
+                ? Object.fromEntries(
+                    (stepConfig.queryParams as any).map((p: any) => [p.key, p.value]),
+                  )
+                : undefined,
+              headers: stepConfig.headers
+                ? Object.fromEntries((stepConfig.headers as any).map((h: any) => [h.key, h.value]))
+                : undefined,
+            },
+          };
+        });
 
         const validation = this.validateTool(generatedTool);
         if (!validation.valid) {
@@ -219,9 +229,8 @@ export class ToolBuilder {
               id: generatedTool.id,
               steps: generatedTool.steps?.map((s) => ({
                 id: s.id,
-                systemId: s.systemId,
-                urlHost: s.apiConfig?.urlHost,
-                urlPath: s.apiConfig?.urlPath,
+                systemId: (s.config as RequestStepConfig)?.systemId,
+                url: (s.config as RequestStepConfig)?.url,
               })),
             },
             null,
@@ -234,17 +243,16 @@ export class ToolBuilder {
         }
 
         generatedTool.instruction = this.instruction;
-        generatedTool.responseSchema = this.responseSchema;
+        generatedTool.outputSchema = this.outputSchema;
 
         logMessage("info", "Tool built successfully", this.metadata);
 
         return {
           id: generatedTool.id,
           steps: generatedTool.steps,
-          systemIds: Object.keys(this.systems),
           instruction: this.instruction,
-          finalTransform: generatedTool.finalTransform,
-          responseSchema: this.responseSchema,
+          outputTransform: generatedTool.outputTransform,
+          outputSchema: this.outputSchema,
           inputSchema: this.inputSchema,
           createdAt: generatedTool.createdAt || new Date(),
           updatedAt: generatedTool.updatedAt || new Date(),
@@ -265,6 +273,77 @@ export class ToolBuilder {
   }
 }
 
+// Request step config schema - for HTTP, SFTP, Postgres, etc.
+const requestStepConfigSchema = z.object({
+  type: z.literal("request").optional().describe("Step type: 'request' for API calls"),
+  systemId: z
+    .string()
+    .describe(
+      "REQUIRED for request steps: The system ID for this step (must match one of the available system IDs)",
+    ),
+  url: z
+    .string()
+    .describe(
+      "Full URL for the API endpoint (e.g., https://api.example.com/v1/users). Must not be empty.",
+    ),
+  method: z
+    .enum(Object.values(HttpMethod) as [string, ...string[]])
+    .describe(
+      "HTTP method (MUST be a literal value, not a variable or expression): GET, POST, PUT, DELETE, or PATCH",
+    ),
+  queryParams: z
+    .array(
+      z.object({
+        key: z.string(),
+        value: z.string(),
+      }),
+    )
+    .optional()
+    .describe(
+      "Query parameters as key-value pairs. If pagination is configured, ensure you have included the right pagination parameters here or in the body.",
+    ),
+  headers: z
+    .array(
+      z.object({
+        key: z.string(),
+        value: z.string(),
+      }),
+    )
+    .optional()
+    .describe(
+      "HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions",
+    ),
+  body: z
+    .string()
+    .optional()
+    .describe(
+      "Request body. Use <<variable>> syntax for dynamic values. If pagination is configured, ensure you have included the right pagination parameters here or in the queryParams.",
+    ),
+  pagination: z
+    .object({
+      type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"]),
+      pageSize: z
+        .string()
+        .describe(
+          "Number of items per page (e.g., '50', '100'). Once set, this becomes available as <<limit>> (same as pageSize).",
+        ),
+      cursorPath: z
+        .string()
+        .describe(
+          'If cursor_based: The JSONPath to the cursor in the response. If not, set this to ""',
+        ),
+      stopCondition: z
+        .string()
+        .describe(
+          "REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number). response is the axios response object, access response data via response.data. Return true to STOP. E.g. (response, pageInfo) => !response.data.pagination.has_more",
+        ),
+    })
+    .optional()
+    .describe(
+      "OPTIONAL: Only configure if you are using pagination variables in the URL, headers, or body. For OFFSET_BASED, ALWAYS use <<offset>>. If PAGE_BASED, ALWAYS use <<page>>. If CURSOR_BASED, ALWAYS use <<cursor>>.",
+    ),
+});
+
 const toolSchema = z.object({
   id: z.string().describe("The tool ID (e.g., 'stripe-create-order')"),
   steps: z
@@ -273,13 +352,15 @@ const toolSchema = z.object({
         id: z
           .string()
           .describe("Unique camelCase identifier for the step (e.g., 'fetchCustomerDetails')"),
-        systemId: z
+        instruction: z
           .string()
+          .optional()
           .describe(
-            "REQUIRED: The system ID for this step (must match one of the available system IDs)",
+            "A concise instruction describing WHAT this step does - what data it retrieves or what action it performs.",
           ),
-        loopSelector: z
+        dataSelector: z
           .string()
+          .optional()
           .describe(
             "JavaScript function that returns OBJECT for direct execution or ARRAY for loop execution. If returns OBJECT (including {}), step executes once with object as currentItem. If returns ARRAY, step executes once per array item. Examples: (sourceData) => ({ userId: sourceData.userId }) OR (sourceData) => sourceData.getContacts.data.filter(c => c.active)",
           ),
@@ -289,82 +370,15 @@ const toolSchema = z.object({
           .describe(
             "Marks whether this operation modifies data on the system it operates on (writes, updates, deletes). Read-only operations should be false. Default is false.",
           ),
-        apiConfig: z
-          .object({
-            id: z.string().describe("Same as the step ID"),
-            instruction: z
-              .string()
-              .describe(
-                "A concise instruction describing WHAT data this API call should retrieve or what action it should perform.",
-              ),
-            urlHost: z
-              .string()
-              .describe("The base URL host (e.g., https://api.example.com). Must not be empty."),
-            urlPath: z.string().describe("The API endpoint path (e.g., /v1/users)."),
-            method: z
-              .enum(Object.values(HttpMethod) as [string, ...string[]])
-              .describe(
-                "HTTP method (MUST be a literal value, not a variable or expression): GET, POST, PUT, DELETE, or PATCH",
-              ),
-            queryParams: z
-              .array(
-                z.object({
-                  key: z.string(),
-                  value: z.string(),
-                }),
-              )
-              .optional()
-              .describe(
-                "Query parameters as key-value pairs. If pagination is configured, ensure you have included the right pagination parameters here or in the body.",
-              ),
-            headers: z
-              .array(
-                z.object({
-                  key: z.string(),
-                  value: z.string(),
-                }),
-              )
-              .optional()
-              .describe(
-                "HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions",
-              ),
-            body: z
-              .string()
-              .optional()
-              .describe(
-                "Request body. Use <<variable>> syntax for dynamic values. If pagination is configured, ensure you have included the right pagination parameters here or in the queryParams.",
-              ),
-            pagination: z
-              .object({
-                type: z.enum(["OFFSET_BASED", "PAGE_BASED", "CURSOR_BASED"]),
-                pageSize: z
-                  .string()
-                  .describe(
-                    "Number of items per page (e.g., '50', '100'). Once set, this becomes available as <<limit>> (same as pageSize).",
-                  ),
-                cursorPath: z
-                  .string()
-                  .describe(
-                    'If cursor_based: The JSONPath to the cursor in the response. If not, set this to ""',
-                  ),
-                stopCondition: z
-                  .string()
-                  .describe(
-                    "REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number). response is the axios response object, access response data via response.data. Return true to STOP. E.g. (response, pageInfo) => !response.data.pagination.has_more",
-                  ),
-              })
-              .optional()
-              .describe(
-                "OPTIONAL: Only configure if you are using pagination variables in the URL, headers, or body. For OFFSET_BASED, ALWAYS use <<offset>>. If PAGE_BASED, ALWAYS use <<page>>. If CURSOR_BASED, ALWAYS use <<cursor>>.",
-              ),
-          })
-          .describe("Complete API configuration for this step"),
+        config: requestStepConfigSchema.describe(
+          "Step configuration with systemId, url, method for API calls",
+        ),
       }),
     )
     .describe("Array of workflow steps."),
-  finalTransform: z
+  outputTransform: z
     .string()
     .describe(
-      "JavaScript function to transform the final workflow output to match responseSchema. NEVER include newlines or tabs in the code.",
+      "JavaScript function to transform the final workflow output to match outputSchema. NEVER include newlines or tabs in the code.",
     ),
 });

@@ -1,16 +1,11 @@
 import {
-  ExecutionStep,
   HttpMethod,
-  PaginationType,
   RunStatus,
   Tool,
   mapFailureBehavior,
   mapPaginationType,
-  mapStepToOpenAPI,
-  mapToolToOpenAPI,
 } from "@superglue/shared";
 import { describe, expect, it } from "vitest";
-import { ApiConfig } from "../../shared/types.js";
 import { buildRunResponse } from "./tools.js";
 
 describe("tools API helpers", () => {
@@ -26,8 +21,8 @@ describe("tools API helpers", () => {
       expect(mapPaginationType(undefined)).toBe("disabled");
     });
 
-    it("should lowercase unknown types", () => {
-      expect(mapPaginationType("CUSTOM_TYPE")).toBe("custom_type");
+    it("should return unknown types as-is", () => {
+      expect(mapPaginationType("CUSTOM_TYPE")).toBe("CUSTOM_TYPE");
     });
   });
 
@@ -44,188 +39,6 @@ describe("tools API helpers", () => {
 
     it("should return undefined for undefined input", () => {
       expect(mapFailureBehavior(undefined)).toBeUndefined();
-    });
-  });
-
-  describe("mapStepToOpenAPI", () => {
-    const baseStep: ExecutionStep = {
-      id: "step-1",
-      apiConfig: {
-        urlHost: "https://api.example.com",
-        urlPath: "/users",
-        method: HttpMethod.GET,
-        instruction: "Fetch users",
-        id: "step-1",
-      },
-    };
-
-    it("should map basic step fields", () => {
-      const result = mapStepToOpenAPI(baseStep);
-
-      expect(result.id).toBe("step-1");
-      expect(result.url).toBe("https://api.example.com/users");
-      expect(result.method).toBe("GET");
-    });
-
-    it("should default method to GET", () => {
-      const stepWithoutMethod: ExecutionStep = {
-        id: "step-1",
-        apiConfig: {
-          id: "step-1",
-          instruction: "Fetch users",
-          urlHost: "https://api.example.com",
-          urlPath: "/users",
-        },
-      };
-
-      const result = mapStepToOpenAPI(stepWithoutMethod);
-      expect(result.method).toBe("GET");
-    });
-
-    it("should include optional fields when present", () => {
-      const stepWithOptionals: ExecutionStep = {
-        ...baseStep,
-        apiConfig: {
-          ...baseStep.apiConfig,
-          queryParams: { search: "test" },
-          headers: { "X-Api-Key": "secret" },
-          body: '{"name": "test"}',
-          instruction: "Fetch users",
-        },
-        systemId: "system-123",
-        modify: true,
-        loopSelector: "$.data[*]",
-        failureBehavior: "CONTINUE",
-      };
-
-      const result = mapStepToOpenAPI(stepWithOptionals);
-
-      expect(result.queryParams).toEqual({ search: "test" });
-      expect(result.headers).toEqual({ "X-Api-Key": "secret" });
-      expect(result.body).toBe('{"name": "test"}');
-      expect(result.instruction).toBe("Fetch users");
-      expect(result.systemId).toBe("system-123");
-      expect(result.modify).toBe(true);
-      expect(result.dataSelector).toBe("$.data[*]");
-      expect(result.failureBehavior).toBe("continue");
-    });
-
-    it("should map pagination config", () => {
-      const stepWithPagination: ExecutionStep = {
-        ...baseStep,
-        apiConfig: {
-          ...baseStep.apiConfig,
-          pagination: {
-            type: PaginationType.CURSOR_BASED,
-            pageSize: "50",
-            cursorPath: "$.nextCursor",
-            stopCondition: "$.hasMore === false",
-          },
-        },
-      };
-
-      const result = mapStepToOpenAPI(stepWithPagination);
-
-      expect(result.pagination).toEqual({
-        type: "cursorBased",
-        pageSize: "50",
-        cursorPath: "$.nextCursor",
-        stopCondition: "$.hasMore === false",
-      });
-    });
-
-    it("should handle empty urlHost and urlPath", () => {
-      const stepWithEmptyUrl: ExecutionStep = {
-        id: "step-1",
-        apiConfig: {} as ApiConfig,
-      };
-
-      const result = mapStepToOpenAPI(stepWithEmptyUrl);
-      expect(result.url).toBe("");
-    });
-  });
-
-  describe("mapToolToOpenAPI", () => {
-    const baseTool: Tool = {
-      id: "tool-123",
-      instruction: "Test tool instruction",
-      inputSchema: { type: "object", properties: { name: { type: "string" } } },
-      responseSchema: { type: "object", properties: { result: { type: "string" } } },
-      steps: [
-        {
-          id: "step-1",
-          apiConfig: {
-            urlHost: "https://api.example.com",
-            urlPath: "/test",
-            method: HttpMethod.POST,
-            instruction: "Test step instruction",
-            id: "step-1",
-          },
-        },
-      ],
-      createdAt: new Date("2024-01-01T00:00:00Z"),
-      updatedAt: new Date("2024-01-02T00:00:00Z"),
-    };
-
-    it("should map basic tool fields", () => {
-      const result = mapToolToOpenAPI(baseTool);
-
-      expect(result.id).toBe("tool-123");
-      expect(result.name).toBe("tool-123");
-      expect(result.instruction).toBe("Test tool instruction");
-      expect(result.inputSchema).toEqual({
-        type: "object",
-        properties: { name: { type: "string" } },
-      });
-      expect(result.outputSchema).toEqual({
-        type: "object",
-        properties: { result: { type: "string" } },
-      });
-    });
-
-    it("should default version to 1.0.0", () => {
-      const result = mapToolToOpenAPI(baseTool);
-      expect(result.version).toBe("1.0.0");
-    });
-
-    it("should use provided version", () => {
-      const toolWithVersion = { ...baseTool, version: "2.0.0" };
-      const result = mapToolToOpenAPI(toolWithVersion);
-      expect(result.version).toBe("2.0.0");
-    });
-
-    it("should map steps", () => {
-      const result = mapToolToOpenAPI(baseTool);
-
-      expect(result.steps).toHaveLength(1);
-      expect(result.steps[0].id).toBe("step-1");
-      expect(result.steps[0].url).toBe("https://api.example.com/test");
-    });
-
-    it("should include finalTransform as outputTransform", () => {
-      const toolWithTransform = { ...baseTool, finalTransform: "$.data" };
-      const result = mapToolToOpenAPI(toolWithTransform);
-      expect(result.outputTransform).toBe("$.data");
-    });
-
-    it("should format dates as ISO strings", () => {
-      const result = mapToolToOpenAPI(baseTool);
-
-      expect(result.createdAt).toBe("2024-01-01T00:00:00.000Z");
-      expect(result.updatedAt).toBe("2024-01-02T00:00:00.000Z");
-    });
-
-    it("should handle string dates", () => {
-      const toolWithStringDates = {
-        ...baseTool,
-        createdAt: "2024-01-01T00:00:00Z" as unknown as Date,
-        updatedAt: "2024-01-02T00:00:00Z" as unknown as Date,
-      };
-
-      const result = mapToolToOpenAPI(toolWithStringDates);
-
-      expect(result.createdAt).toBe("2024-01-01T00:00:00Z");
-      expect(result.updatedAt).toBe("2024-01-02T00:00:00Z");
     });
   });
 

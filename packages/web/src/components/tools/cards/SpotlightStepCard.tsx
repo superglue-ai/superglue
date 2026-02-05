@@ -30,7 +30,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { splitUrl } from "@/src/lib/client-utils";
 import { composeUrl } from "@/src/lib/general-utils";
 import { buildCategorizedSources } from "@/src/lib/templating-utils";
-import { ExecutionStep } from "@superglue/shared";
+import { ToolStep, RequestStepConfig } from "@superglue/shared";
 import {
   Bug,
   Check,
@@ -61,16 +61,16 @@ import { useRightSidebar } from "../../sidebar/RightSidebarContext";
 
 export interface StepItem {
   type: "step";
-  data: ExecutionStep;
+  data: ToolStep;
   stepResult: any;
   transformError: undefined;
   categorizedSources: ReturnType<typeof buildCategorizedSources>;
 }
 
 interface SpotlightStepCardProps {
-  step: ExecutionStep;
+  step: ToolStep;
   stepIndex: number;
-  onEdit?: (stepId: string, updatedStep: ExecutionStep, isUserInitiated?: boolean) => void;
+  onEdit?: (stepId: string, updatedStep: ToolStep, isUserInitiated?: boolean) => void;
   onRemove?: () => void;
   onExecuteStep?: () => Promise<void>;
   onExecuteStepWithLimit?: (limit: number) => Promise<void>;
@@ -140,9 +140,9 @@ export const SpotlightStepCard = React.memo(
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [pendingAction, setPendingAction] = useState<"execute" | null>(null);
     const [isEditingInstruction, setIsEditingInstruction] = useState(false);
-    const [instructionEditValue, setInstructionEditValue] = useState(
-      step.apiConfig?.instruction || "",
-    );
+    const requestConfig = step.config as RequestStepConfig;
+    const stepInstruction = step.instruction;
+    const [instructionEditValue, setInstructionEditValue] = useState(stepInstruction || "");
     const prevShowOutputSignalRef = useRef<number | undefined>(undefined);
     const editingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const instructionTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -178,11 +178,13 @@ export const SpotlightStepCard = React.memo(
     };
 
     useEffect(() => {
-      const headers = serializeValue(step.apiConfig?.headers);
-      const queryParams = serializeValue(step.apiConfig?.queryParams);
+      // Update headers/queryParams for request steps
+      if (!requestConfig) return;
+      const headers = serializeValue(requestConfig?.headers);
+      const queryParams = serializeValue(requestConfig?.queryParams);
       setHeadersText(headers);
       setQueryParamsText(queryParams);
-    }, [step.id, step.apiConfig?.headers, step.apiConfig?.queryParams, step.apiConfig?.body]);
+    }, [step.id, requestConfig?.headers, requestConfig?.queryParams, requestConfig?.body]);
 
     useEffect(() => {
       if (
@@ -216,27 +218,29 @@ export const SpotlightStepCard = React.memo(
       if (value === "none") {
         handleImmediateEdit((s) => ({
           ...s,
-          apiConfig: { ...s.apiConfig, pagination: undefined },
+          config: { ...s.config, pagination: undefined },
         }));
       } else {
-        handleImmediateEdit((s) => ({
-          ...s,
-          apiConfig: {
-            ...s.apiConfig,
-            pagination: {
-              type: value,
-              pageSize: s.apiConfig.pagination?.pageSize || "50",
-              cursorPath: s.apiConfig.pagination?.cursorPath || "",
-              stopCondition:
-                s.apiConfig.pagination?.stopCondition || DEFAULT_PAGINATION_STOP_CONDITION,
+        handleImmediateEdit((s) => {
+          const cfg = s.config as RequestStepConfig;
+          return {
+            ...s,
+            config: {
+              ...s.config,
+              pagination: {
+                type: value,
+                pageSize: cfg.pagination?.pageSize || "50",
+                cursorPath: cfg.pagination?.cursorPath || "",
+                stopCondition: cfg.pagination?.stopCondition || DEFAULT_PAGINATION_STOP_CONDITION,
+              },
             },
-          },
-        }));
+          };
+        });
       }
     };
 
     const handleEditStepInstruction = useCallback(() => {
-      setInstructionEditValue(step.apiConfig?.instruction || "");
+      setInstructionEditValue(stepInstruction || "");
       setIsEditingInstruction(true);
       setTimeout(() => {
         if (instructionTextareaRef.current) {
@@ -245,20 +249,20 @@ export const SpotlightStepCard = React.memo(
           instructionTextareaRef.current.setSelectionRange(len, len);
         }
       }, 0);
-    }, [step.apiConfig?.instruction]);
+    }, [stepInstruction]);
 
     const handleSaveInstruction = useCallback(() => {
       handleImmediateEdit((s) => ({
         ...s,
-        apiConfig: { ...s.apiConfig, instruction: instructionEditValue },
+        config: { ...s.config, instruction: instructionEditValue },
       }));
       setIsEditingInstruction(false);
     }, [instructionEditValue, handleImmediateEdit]);
 
     const handleCancelInstructionEdit = useCallback(() => {
-      setInstructionEditValue(step.apiConfig?.instruction || "");
+      setInstructionEditValue(stepInstruction || "");
       setIsEditingInstruction(false);
-    }, [step.apiConfig?.instruction]);
+    }, [stepInstruction]);
 
     const handleInstructionKeyDown = useCallback(
       (e: React.KeyboardEvent) => {
@@ -555,10 +559,10 @@ export const SpotlightStepCard = React.memo(
                             >
                               <Pencil className="h-3 w-3 text-muted-foreground" />
                             </button>
-                            <CopyButton text={step.apiConfig.instruction || ""} />
+                            <CopyButton text={stepInstruction || ""} />
                           </div>
                           <div className="h-9 flex items-center text-xs text-muted-foreground px-3 pr-16 truncate">
-                            {step.apiConfig.instruction || (
+                            {stepInstruction || (
                               <span className="text-muted-foreground italic">
                                 Describe what this step should do...
                               </span>
@@ -576,11 +580,11 @@ export const SpotlightStepCard = React.memo(
                         <div className="flex gap-2">
                           <div className="rounded-lg border shadow-sm bg-muted/30">
                             <Select
-                              value={step.apiConfig.method}
+                              value={requestConfig?.method}
                               onValueChange={(value) =>
                                 handleImmediateEdit((s) => ({
                                   ...s,
-                                  apiConfig: { ...s.apiConfig, method: value },
+                                  config: { ...s.config, method: value },
                                 }))
                               }
                             >
@@ -597,15 +601,12 @@ export const SpotlightStepCard = React.memo(
                             </Select>
                           </div>
                           <TemplateAwareTextEditor
-                            value={composeUrl(
-                              step.apiConfig.urlHost || "",
-                              step.apiConfig.urlPath || "",
-                            )}
+                            value={requestConfig?.url || ""}
                             onChange={(newValue) => {
                               const { urlHost, urlPath } = splitUrl(newValue);
                               handleImmediateEdit((s) => ({
                                 ...s,
-                                apiConfig: { ...s.apiConfig, urlHost, urlPath },
+                                config: { ...s.config, url: newValue },
                               }));
                             }}
                             stepId={step.id}
@@ -616,10 +617,12 @@ export const SpotlightStepCard = React.memo(
                       </div>
                     </div>
                     {(() => {
-                      const showBody = ["POST", "PUT", "PATCH"].includes(step.apiConfig.method);
+                      const showBody = ["POST", "PUT", "PATCH"].includes(
+                        requestConfig?.method || "",
+                      );
                       const hasHeaders = !isEmptyValue(headersText);
                       const hasQueryParams = !isEmptyValue(queryParamsText);
-                      const hasBody = showBody && !isEmptyValue(step.apiConfig.body || "");
+                      const hasBody = showBody && !isEmptyValue(requestConfig?.body || "");
                       const hasAnyRequestOptions = hasHeaders || hasQueryParams || hasBody;
 
                       return (
@@ -664,7 +667,7 @@ export const SpotlightStepCard = React.memo(
                                     setHeadersText(val || "");
                                     handleImmediateEdit((s) => ({
                                       ...s,
-                                      apiConfig: { ...s.apiConfig, headers: val || "" },
+                                      config: { ...s.config, headers: val || "" },
                                     }));
                                   }}
                                   stepId={step.id}
@@ -684,7 +687,7 @@ export const SpotlightStepCard = React.memo(
                                     setQueryParamsText(val || "");
                                     handleImmediateEdit((s) => ({
                                       ...s,
-                                      apiConfig: { ...s.apiConfig, queryParams: val || "" },
+                                      config: { ...s.config, queryParams: val || "" },
                                     }));
                                   }}
                                   stepId={step.id}
@@ -700,11 +703,11 @@ export const SpotlightStepCard = React.memo(
                                     Body
                                   </Label>
                                   <TemplateAwareJsonEditor
-                                    value={step.apiConfig.body || ""}
+                                    value={requestConfig?.body || ""}
                                     onChange={(val) =>
                                       handleImmediateEdit((s) => ({
                                         ...s,
-                                        apiConfig: { ...s.apiConfig, body: val || "" },
+                                        config: { ...s.config, body: val || "" },
                                       }))
                                     }
                                     stepId={step.id}
@@ -749,7 +752,7 @@ export const SpotlightStepCard = React.memo(
                           <div className="pl-2 mb-1">
                             <div className="rounded-lg border shadow-sm bg-muted/30">
                               <Select
-                                value={step.apiConfig.pagination?.type || "none"}
+                                value={requestConfig?.pagination?.type || "none"}
                                 onValueChange={handlePaginationTypeChange}
                               >
                                 <SelectTrigger className="h-9 border-0 bg-transparent shadow-none">
@@ -757,61 +760,67 @@ export const SpotlightStepCard = React.memo(
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="none">No pagination</SelectItem>
-                                  <SelectItem value="OFFSET_BASED">
+                                  <SelectItem value="offsetBased">
                                     Offset-based (uses {"<<offset>>"})
                                   </SelectItem>
-                                  <SelectItem value="PAGE_BASED">
+                                  <SelectItem value="pageBased">
                                     Page-based (uses {"<<page>>"})
                                   </SelectItem>
-                                  <SelectItem value="CURSOR_BASED">
+                                  <SelectItem value="cursorBased">
                                     Cursor-based (uses {"<<cursor>>"})
                                   </SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
                           </div>
-                          {step.apiConfig.pagination && (
+                          {requestConfig?.pagination && (
                             <div className="mt-2 gap-2 pl-2">
                               <div className="flex gap-2">
                                 <div className="flex-1">
                                   <Label className="text-xs">Page Size</Label>
                                   <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
                                     <Input
-                                      value={step.apiConfig.pagination.pageSize || "50"}
+                                      value={requestConfig?.pagination?.pageSize || "50"}
                                       onChange={(e) =>
-                                        handleImmediateEdit((s) => ({
-                                          ...s,
-                                          apiConfig: {
-                                            ...s.apiConfig,
-                                            pagination: {
-                                              ...(s.apiConfig.pagination || {}),
-                                              pageSize: e.target.value,
+                                        handleImmediateEdit((s) => {
+                                          const cfg = s.config as RequestStepConfig;
+                                          return {
+                                            ...s,
+                                            config: {
+                                              ...s.config,
+                                              pagination: {
+                                                ...(cfg.pagination || {}),
+                                                pageSize: e.target.value,
+                                              },
                                             },
-                                          },
-                                        }))
+                                          };
+                                        })
                                       }
                                       className="h-9 text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0"
                                       placeholder="50"
                                     />
                                   </div>
                                 </div>
-                                {step.apiConfig.pagination.type === "CURSOR_BASED" && (
+                                {requestConfig?.pagination?.type === "cursorBased" && (
                                   <div className="flex-1">
                                     <Label className="text-xs">Cursor Path</Label>
                                     <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
                                       <Input
-                                        value={step.apiConfig.pagination.cursorPath || ""}
+                                        value={requestConfig?.pagination?.cursorPath || ""}
                                         onChange={(e) =>
-                                          handleImmediateEdit((s) => ({
-                                            ...s,
-                                            apiConfig: {
-                                              ...s.apiConfig,
-                                              pagination: {
-                                                ...(s.apiConfig.pagination || {}),
-                                                cursorPath: e.target.value,
+                                          handleImmediateEdit((s) => {
+                                            const cfg = s.config as RequestStepConfig;
+                                            return {
+                                              ...s,
+                                              config: {
+                                                ...s.config,
+                                                pagination: {
+                                                  ...(cfg.pagination || {}),
+                                                  cursorPath: e.target.value,
+                                                },
                                               },
-                                            },
-                                          }))
+                                            };
+                                          })
                                         }
                                         className="h-9 text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0"
                                         placeholder="e.g., response.nextCursor"
@@ -828,20 +837,23 @@ export const SpotlightStepCard = React.memo(
                                 <div className="mt-1">
                                   <JavaScriptCodeEditor
                                     value={
-                                      step.apiConfig.pagination.stopCondition ||
+                                      requestConfig?.pagination?.stopCondition ||
                                       DEFAULT_PAGINATION_STOP_CONDITION
                                     }
                                     onChange={(val) =>
-                                      handleImmediateEdit((s) => ({
-                                        ...s,
-                                        apiConfig: {
-                                          ...s.apiConfig,
-                                          pagination: {
-                                            ...(s.apiConfig.pagination || {}),
-                                            stopCondition: val,
+                                      handleImmediateEdit((s) => {
+                                        const cfg = s.config as RequestStepConfig;
+                                        return {
+                                          ...s,
+                                          config: {
+                                            ...s.config,
+                                            pagination: {
+                                              ...(cfg.pagination || {}),
+                                              stopCondition: val,
+                                            },
                                           },
-                                        },
-                                      }))
+                                        };
+                                      })
                                     }
                                     minHeight="50px"
                                     maxHeight="300px"
@@ -922,11 +934,11 @@ export const SpotlightStepCard = React.memo(
                             </div>
                             <Switch
                               id={`continue-on-failure-${step.id}`}
-                              checked={step.failureBehavior === "CONTINUE"}
+                              checked={step.failureBehavior === "continue"}
                               onCheckedChange={(checked) => {
                                 handleImmediateEdit((s) => ({
                                   ...s,
-                                  failureBehavior: checked === true ? "CONTINUE" : "FAIL",
+                                  failureBehavior: checked === true ? "continue" : "fail",
                                 }));
                               }}
                             />

@@ -1,5 +1,4 @@
 import {
-  ApiConfig,
   DiscoveryRun,
   FileReference,
   FileStatus,
@@ -16,7 +15,6 @@ import type { DataStore, PrometheusRunMetrics, ToolScheduleInternal } from "./ty
 
 export class MemoryStore implements DataStore {
   private storage: {
-    apis: Map<string, ApiConfig>;
     runs: Map<string, Run>;
     runsIndex: Map<string, { id: string; timestamp: number; configId: string }[]>;
     workflows: Map<string, Tool>;
@@ -34,7 +32,6 @@ export class MemoryStore implements DataStore {
 
   constructor() {
     this.storage = {
-      apis: new Map(),
       runs: new Map(),
       runsIndex: new Map(),
       workflows: new Map(),
@@ -58,45 +55,6 @@ export class MemoryStore implements DataStore {
 
   private generateHash(data: any): string {
     return createHash("md5").update(JSON.stringify(data)).digest("hex");
-  }
-
-  // API Config Methods
-  async getApiConfig(params: { id: string; orgId?: string }): Promise<ApiConfig | null> {
-    const { id, orgId } = params;
-    if (!id) return null;
-    const key = this.getKey("api", id, orgId);
-    const config = this.storage.apis.get(key);
-    return config ? { ...config, id } : null;
-  }
-
-  async listApiConfigs(params?: {
-    limit?: number;
-    offset?: number;
-    orgId?: string;
-  }): Promise<{ items: ApiConfig[]; total: number }> {
-    const { limit = 10, offset = 0, orgId } = params || {};
-    const items = this.getOrgItems(this.storage.apis, "api", orgId).slice(offset, offset + limit);
-    const total = this.getOrgItems(this.storage.apis, "api", orgId).length;
-    return { items, total };
-  }
-
-  async upsertApiConfig(params: {
-    id: string;
-    config: ApiConfig;
-    orgId?: string;
-  }): Promise<ApiConfig> {
-    const { id, config, orgId } = params;
-    if (!id || !config) return null;
-    const key = this.getKey("api", id, orgId);
-    this.storage.apis.set(key, config);
-    return { ...config, id };
-  }
-
-  async deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean> {
-    const { id, orgId } = params;
-    if (!id) return false;
-    const key = this.getKey("api", id, orgId);
-    return this.storage.apis.delete(key);
   }
 
   // Run Methods
@@ -210,7 +168,6 @@ export class MemoryStore implements DataStore {
   }
 
   async clearAll(): Promise<void> {
-    this.storage.apis.clear();
     this.storage.runs.clear();
     this.storage.runsIndex.clear();
     this.storage.workflows.clear();

@@ -1,4 +1,4 @@
-import { Tool } from "@superglue/shared";
+import { Tool, isRequestConfig, RequestStepConfig } from "@superglue/shared";
 import { ServiceMetadata } from "@superglue/shared";
 
 export interface FoundTool {
@@ -9,7 +9,7 @@ export interface FoundTool {
     systemId?: string;
     instruction?: string;
   }>;
-  responseSchema?: any;
+  outputSchema?: any;
   reason: string;
 }
 
@@ -25,10 +25,13 @@ export class ToolFinder {
       id: tool.id,
       instruction: tool.instruction,
       inputSchema: tool.inputSchema,
-      responseSchema: tool.responseSchema,
+      outputSchema: tool.outputSchema,
       steps: tool.steps.map((s) => ({
-        systemId: s.systemId,
-        instruction: s.apiConfig?.instruction,
+        systemId:
+          s.config && isRequestConfig(s.config)
+            ? (s.config as RequestStepConfig).systemId
+            : undefined,
+        instruction: s.instruction,
       })),
       reason,
     };
@@ -44,8 +47,12 @@ export class ToolFinder {
       const searchableText = [
         tool.id,
         tool.instruction,
-        ...tool.steps.map((s) => s.apiConfig?.instruction),
-        ...tool.steps.map((s) => s.systemId),
+        ...tool.steps.map((s) => s.instruction),
+        ...tool.steps.map((s) =>
+          s.config && isRequestConfig(s.config)
+            ? (s.config as RequestStepConfig).systemId
+            : undefined,
+        ),
       ]
         .filter(Boolean)
         .join(" ")

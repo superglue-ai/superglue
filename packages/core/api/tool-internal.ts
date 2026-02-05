@@ -1,5 +1,6 @@
-import { ExecutionStep, RequestOptions, ResponseFilter, Tool } from "@superglue/shared";
+import { ToolStep, RequestOptions, ResponseFilter, Tool, ToolDiff } from "@superglue/shared";
 import { SystemManager } from "../systems/system-manager.js";
+import { ToolFixer } from "../tools/tool-fixer.js";
 import { logMessage } from "../utils/logs.js";
 import type { ToolExecutionPayload } from "../worker/types.js";
 import { registerApiModule } from "./registry.js";
@@ -12,7 +13,7 @@ interface RunStepRequestOptions {
 }
 
 interface RunStepRequestBody {
-  step: Record<string, unknown>; // ExecutionStep
+  step: Record<string, unknown>; // ToolStep
   payload?: Record<string, unknown>;
   previousResults?: Record<string, unknown>;
   credentials?: Record<string, unknown>;
@@ -25,13 +26,13 @@ interface RunStepResponse {
   success: boolean;
   data?: unknown;
   error?: string;
-  updatedStep?: Record<string, unknown>; // ExecutionStep if self-healed
+  updatedStep?: Record<string, unknown>; // ToolStep if self-healed
 }
 
 // Transform execution types (internal only, not in OpenAPI spec)
 interface RunTransformRequestBody {
-  finalTransform: string;
-  responseSchema?: Record<string, unknown>;
+  outputTransform: string;
+  outputSchema?: Record<string, unknown>;
   inputSchema?: Record<string, unknown>;
   payload?: Record<string, unknown>;
   stepResults?: Record<string, unknown>;
@@ -45,7 +46,7 @@ interface RunTransformResponse {
   data?: unknown;
   error?: string;
   updatedTransform?: string;
-  updatedResponseSchema?: Record<string, unknown>;
+  updatedOutputSchema?: Record<string, unknown>;
 }
 
 // POST /tools/step/run - Execute a single step without creating a run
@@ -60,7 +61,7 @@ const runStep: RouteHandler = async (request, reply) => {
     return sendError(reply, 400, "Step configuration is required");
   }
 
-  const step = body.step as unknown as ExecutionStep;
+  const step = body.step as unknown as ToolStep;
   const clientRunId = body.runId || crypto.randomUUID();
   const runId = `${authReq.authInfo.orgId}:${clientRunId}`;
 
@@ -72,7 +73,7 @@ const runStep: RouteHandler = async (request, reply) => {
   const tempTool: Tool = {
     id: `temp_step_${step.id}`,
     steps: [step],
-    finalTransform: "",
+    outputTransform: "",
   } as Tool;
 
   // Build the execution payload combining tool input and previous results
@@ -108,7 +109,7 @@ const runStep: RouteHandler = async (request, reply) => {
       success: result.success,
       data: stepResult?.data,
       error: result.error,
-      updatedStep: result.config?.steps?.[0] as unknown as Record<string, unknown> | undefined,
+      updatedStep: result.tool?.steps?.[0] as unknown as Record<string, unknown> | undefined,
     };
 
     return addTraceHeader(reply, traceId).code(200).send(response);
@@ -133,8 +134,8 @@ const runTransform: RouteHandler = async (request, reply) => {
   const traceId = authReq.traceId;
   const metadata = { orgId: authReq.authInfo.orgId, traceId };
 
-  if (!body.finalTransform && !body.responseFilters?.length) {
-    return sendError(reply, 400, "Either finalTransform or responseFilters is required");
+  if (!body.outputTransform && !body.responseFilters?.length) {
+    return sendError(reply, 400, "Either outputTransform or responseFilters is required");
   }
 
   const clientRunId = body.runId || crypto.randomUUID();
@@ -148,8 +149,8 @@ const runTransform: RouteHandler = async (request, reply) => {
   const tempTool: Tool = {
     id: `temp_transform`,
     steps: [],
-    finalTransform: body.finalTransform || "",
-    responseSchema: body.responseSchema,
+    outputTransform: body.outputTransform || "",
+    outputSchema: body.outputSchema,
     inputSchema: body.inputSchema,
     responseFilters: body.responseFilters as unknown as ResponseFilter[] | undefined,
   } as Tool;
@@ -178,8 +179,8 @@ const runTransform: RouteHandler = async (request, reply) => {
       success: result.success,
       data: result.data,
       error: result.error,
-      updatedTransform: result.config?.finalTransform,
-      updatedResponseSchema: result.config?.responseSchema as Record<string, unknown> | undefined,
+      updatedTransform: result.tool?.outputTransform,
+      updatedOutputSchema: result.tool?.outputSchema as Record<string, unknown> | undefined,
     };
 
     return addTraceHeader(reply, traceId).code(200).send(response);
@@ -207,6 +208,79 @@ const abortStep: RouteHandler = async (request, reply) => {
   const internalRunId = `${authReq.authInfo.orgId}:${runId}`;
   authReq.workerPools.toolExecution.abortTask(internalRunId);
   return addTraceHeader(reply, authReq.traceId).code(200).send({ success: true, runId });
+};
+
+// Fix tool types (internal only, not in OpenAPI spec)
+interface FixToolRequestBody {
+  tool: Tool;
+  fixInstructions: string;
+  lastError?: string;
+  stepResults?: Array<{
+    stepId: string;
+    success: boolean;
+    data?: unknown;
+    error?: string;
+  }>;
+}
+
+interface FixToolResponse {
+  success: boolean;
+  tool?: Tool;
+  diffs?: ToolDiff[];
+  error?: string;
+}
+
+// POST /tools/fix - Fix a tool using LLM-generated patches
+const fixTool: RouteHandler = async (request, reply) => {
+  const authReq = request as AuthenticatedFastifyRequest;
+  const body = request.body as FixToolRequestBody;
+  const metadata = authReq.toMetadata();
+
+  if (!body.tool) {
+    return sendError(reply, 400, "Tool configuration is required");
+  }
+
+  if (!body.fixInstructions || body.fixInstructions.trim() === "") {
+    return sendError(reply, 400, "Fix instructions are required");
+  }
+
+  try {
+    // Fetch system IDs for validation and LLM context (no need for full docs)
+    const allSystems = await authReq.datastore.listSystems({
+      limit: 1000,
+      offset: 0,
+      includeDocs: false,
+      orgId: authReq.authInfo.orgId,
+    });
+
+    const fixer = new ToolFixer({
+      tool: body.tool,
+      fixInstructions: body.fixInstructions,
+      systems: allSystems.items || [],
+      lastError: body.lastError,
+      stepResults: body.stepResults,
+      metadata,
+    });
+
+    const result = await fixer.fixTool();
+
+    const response: FixToolResponse = {
+      success: true,
+      tool: result.tool,
+      diffs: result.diffs,
+    };
+
+    return addTraceHeader(reply, authReq.traceId).code(200).send(response);
+  } catch (error: any) {
+    logMessage("error", `Tool fix error: ${String(error)}`, metadata);
+
+    const response: FixToolResponse = {
+      success: false,
+      error: String(error),
+    };
+
+    return addTraceHeader(reply, authReq.traceId).code(200).send(response);
+  }
 };
 
 registerApiModule({
@@ -238,6 +312,16 @@ registerApiModule({
       handler: abortStep,
       permissions: {
         type: "execute",
+        resource: "tool",
+        allowRestricted: false,
+      },
+    },
+    {
+      method: "POST",
+      path: "/tools/fix",
+      handler: fixTool,
+      permissions: {
+        type: "write",
         resource: "tool",
         allowRestricted: false,
       },

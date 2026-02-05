@@ -1,9 +1,4 @@
-import {
-  HttpMethod,
-  RequestOptions,
-  ServiceMetadata,
-  ApiConfig as StepConfig,
-} from "@superglue/shared";
+import { HttpMethod, RequestOptions, ServiceMetadata, RequestStepConfig } from "@superglue/shared";
 import { Pool, PoolConfig } from "pg";
 import { server_defaults } from "../../../default.js";
 import { parseJSON } from "../../../files/index.js";
@@ -25,7 +20,7 @@ export class PostgresStepExecutionStrategy implements StepExecutionStrategy {
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
     const { stepConfig, stepInputData, credentials, requestOptions, metadata } = input;
     const rows = await callPostgres({
-      endpoint: stepConfig,
+      endpoint: stepConfig as RequestStepConfig,
       payload: stepInputData,
       credentials,
       options: requestOptions,
@@ -119,7 +114,7 @@ export async function callPostgres({
   options,
   metadata,
 }: {
-  endpoint: StepConfig;
+  endpoint: RequestStepConfig;
   payload: Record<string, any>;
   credentials: Record<string, any>;
   options: RequestOptions;

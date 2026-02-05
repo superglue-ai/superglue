@@ -6,11 +6,13 @@ import { createSuperglueClient } from "@/src/lib/client-utils";
 import { type UploadedFileInfo } from "@/src/lib/file-utils";
 import { buildStepInput } from "@/src/lib/general-utils";
 import {
-  ExecutionStep,
+  ToolStep,
   generateDefaultFromSchema,
   System,
   Tool,
   ToolResult,
+  ToolStepResult,
+  isRequestConfig,
 } from "@superglue/shared";
 import { useFileUpload } from "./hooks/use-file-upload";
 import { usePayloadValidation } from "./hooks/use-payload-validation";
@@ -116,9 +118,9 @@ function ToolPlaygroundInner({
     payload,
     setToolId,
     setInstruction,
-    setFinalTransform,
+    setOutputTransform,
     setInputSchema,
-    setResponseSchema,
+    setOutputSchema,
     setPayloadText,
     setUploadedFiles: setContextUploadedFiles,
     setFilePayloads: setContextFilePayloads,
@@ -151,10 +153,51 @@ function ToolPlaygroundInner({
     return () => setShowAgent(false);
   }, [isArchived, setShowAgent, renderAgentInline, AgentSidebarComponent]);
 
-  const finalTransform = toolConfig.finalTransform;
-  const responseSchema = toolConfig.responseSchema;
+  const outputTransform = toolConfig.outputTransform;
+  const outputSchema = toolConfig.outputSchema;
   const inputSchema = toolConfig.inputSchema;
   const instructions = tool.instruction;
+
+  // Register saved tool with sidebar for history panel
+  useEffect(() => {
+    if (!embedded && toolId) {
+      const toolFromContext = tools.find((t) => t.id === toolId);
+      setSavedTool(toolFromContext || null);
+    } else {
+      setSavedTool(null);
+    }
+    return () => {
+      setSavedTool(null);
+    };
+  }, [embedded, toolId, tools, setSavedTool]);
+
+  useEffect(() => {
+    if (!embedded && toolId) {
+      setOnRestoreDraft((draft) => {
+        if (!draft) return;
+        setSteps(draft.steps);
+        setInstruction(draft.instruction);
+        setOutputTransform(draft.outputTransform);
+        setInputSchema(draft.inputSchema);
+        setOutputSchema(draft.outputSchema);
+        // Payload is not part of the draft - it's saved separately
+        setTimeout(markCurrentStateAsBaseline, 0);
+      });
+    }
+    return () => {
+      setOnRestoreDraft(undefined);
+    };
+  }, [
+    embedded,
+    toolId,
+    setOnRestoreDraft,
+    setSteps,
+    setInstruction,
+    setOutputTransform,
+    setInputSchema,
+    setOutputSchema,
+    markCurrentStateAsBaseline,
+  ]);
   const manualPayloadText = payload.manualPayloadText;
   const hasUserEditedPayload = payload.hasUserEdited;
   const computedPayload = payload.computedPayload;
@@ -185,6 +228,95 @@ function ToolPlaygroundInner({
   const [navigateToFinalSignal, setNavigateToFinalSignal] = useState<number>(0);
   const [showStepOutputSignal, setShowStepOutputSignal] = useState<number>(0);
   const [focusStepId, setFocusStepId] = useState<string | null>(null);
+  const [isRestoringRun, setIsRestoringRun] = useState<boolean>(!!restoreRunId);
+  const prevRestoreRunIdRef = useRef<string | null>(null);
+
+  // Hook to restore a specific run by ID
+  const restoreRun = useRestoreRun();
+
+  // Handle restoreRunId on mount
+  useEffect(() => {
+    if (restoreRunId && restoreRunId !== prevRestoreRunIdRef.current) {
+      setIsRestoringRun(true);
+      restoreRun(restoreRunId).then((result) => {
+        if (result) {
+          // Apply tool config from the run if available
+          if (result.tool) {
+            if (result.tool.id) {
+              setToolId(result.tool.id);
+            }
+            if (result.tool.steps) {
+              setSteps(result.tool.steps);
+            }
+            if (result.tool.outputTransform !== undefined) {
+              setOutputTransform(result.tool.outputTransform || "");
+            }
+            if (result.tool.inputSchema !== undefined) {
+              setInputSchema(
+                result.tool.inputSchema ? JSON.stringify(result.tool.inputSchema, null, 2) : "",
+              );
+            }
+            if (result.tool.outputSchema !== undefined) {
+              setOutputSchema(
+                result.tool.outputSchema ? JSON.stringify(result.tool.outputSchema, null, 2) : "",
+              );
+            }
+            if (result.tool.instruction !== undefined) {
+              setInstruction(result.tool.instruction || "");
+            }
+            if (result.tool.folder !== undefined) {
+              setFolder(result.tool.folder);
+            }
+          }
+
+          // Set the payload
+          setPayloadText(JSON.stringify(result.payload, null, 2));
+          markPayloadEdited();
+          prevRestoreRunIdRef.current = restoreRunId;
+
+          // Clear executions first, then populate step results
+          execution.clearAllExecutions();
+          requestAnimationFrame(() => {
+            // Populate step results if available
+            if (result.stepResults && result.stepResults.length > 0) {
+              result.stepResults.forEach((stepResult) => {
+                const status = stepResult.success ? "completed" : "failed";
+                execution.setStepResult(
+                  stepResult.stepId,
+                  stepResult.data,
+                  status,
+                  stepResult.error,
+                );
+              });
+            }
+
+            // Set the final tool result if available
+            if (result.data !== undefined) {
+              const status = result.success ? "completed" : "failed";
+              execution.setFinalResult(result.data, status);
+            }
+
+            setIsRestoringRun(false);
+          });
+        } else {
+          setIsRestoringRun(false);
+        }
+      });
+    }
+  }, [
+    restoreRunId,
+    restoreRun,
+    setToolId,
+    setSteps,
+    setOutputTransform,
+    setInputSchema,
+    setOutputSchema,
+    setInstruction,
+    setFolder,
+    setPayloadText,
+    markPayloadEdited,
+    execution,
+  ]);
 
   type DialogState =
     | { type: "none" }
@@ -329,23 +461,22 @@ function ToolPlaygroundInner({
     (): Tool =>
       ({
         id: toolId,
-        steps: steps.map((step: ExecutionStep) => ({
-          ...step,
-          apiConfig: {
-            id: step.apiConfig.id || step.id,
-            ...step.apiConfig,
-            pagination: step.apiConfig.pagination || null,
-          },
-        })),
-        responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
+        steps: steps.map((step: ToolStep) => {
+          // Only request steps need pagination handling, transform steps pass through as-is
+          if (!isRequestConfig(step.config)) {
+            return step;
+          }
+          return step;
+        }),
+        outputSchema: outputSchema && outputSchema.trim() ? JSON.parse(outputSchema) : null,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
-        finalTransform,
+        outputTransform,
         instruction: instructions,
         folder,
         createdAt: initialTool?.createdAt,
         updatedAt: initialTool?.updatedAt,
       }) as Tool,
-    [toolId, steps, responseSchema, inputSchema, finalTransform, instructions, folder, initialTool],
+    [toolId, steps, outputSchema, inputSchema, outputTransform, instructions, folder, initialTool],
   );
 
   useImperativeHandle(
@@ -364,10 +495,7 @@ function ToolPlaygroundInner({
         step.id === stepId
           ? {
               ...updatedStep,
-              apiConfig: {
-                ...updatedStep.apiConfig,
-                id: updatedStep.apiConfig.id || updatedStep.id,
-              },
+              config: updatedStep.config,
             }
           : step,
       ),
@@ -387,7 +515,7 @@ function ToolPlaygroundInner({
 
   const handleUnarchive = async () => {
     try {
-      const client = createSuperglueClient(config.superglueEndpoint);
+      const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
       await client.archiveWorkflow(toolId, false);
       setIsArchived(false);
       refreshTools();

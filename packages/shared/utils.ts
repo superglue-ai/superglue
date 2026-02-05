@@ -493,12 +493,12 @@ export function normalizeToolDiff<T extends { op: string; path: string; value?: 
 
   const shouldAlwaysBeObject =
     diff.path === "/inputSchema" ||
-    diff.path === "/responseSchema" ||
+    diff.path === "/outputSchema" ||
     diff.path.startsWith("/inputSchema/properties/") ||
-    diff.path.startsWith("/responseSchema/properties/") ||
-    diff.path.match(/^\/steps\/\d+\/apiConfig\/pagination$/) ||
-    diff.path.match(/^\/steps\/\d+\/apiConfig\/headers$/) ||
-    diff.path.match(/^\/steps\/\d+\/apiConfig\/queryParams$/);
+    diff.path.startsWith("/outputSchema/properties/") ||
+    diff.path.match(/^\/steps\/\d+\/config\/pagination$/) ||
+    diff.path.match(/^\/steps\/\d+\/config\/headers$/) ||
+    diff.path.match(/^\/steps\/\d+\/config\/queryParams$/);
 
   if (shouldAlwaysBeObject) {
     try {
@@ -515,4 +515,21 @@ export function normalizeToolDiffs<T extends { op: string; path: string; value?:
   diffs: T[],
 ): T[] {
   return diffs.map((diff) => normalizeToolDiff(diff));
+}
+
+export function composeUrl(host: string, path: string) {
+  // Handle empty/undefined inputs
+  if (!host) host = "";
+  if (!path) path = "";
+
+  // Add https:// if protocol is missing
+  if (!/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//i.test(host)) {
+    host = `https://${host}`;
+  }
+
+  // Trim slashes in one pass
+  const cleanHost = host.endsWith("/") ? host.slice(0, -1) : host;
+  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+
+  return `${cleanHost}/${cleanPath}`;
 }

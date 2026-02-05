@@ -1,11 +1,11 @@
-import { ApiConfig, ExecutionStep, HttpMethod, Tool } from "@superglue/shared";
+import { RequestStepConfig, ToolStep, HttpMethod, Tool } from "@superglue/shared";
 import { describe, expect, it } from "vitest";
 import { ToolExecutor } from "./tool-executor.js";
 
 describe("ToolExecutor - Failure Behavior", () => {
   describe("Loop Steps with FAIL behavior (default)", () => {
     it("should stop execution on first failure in loop", async () => {
-      const mockApiConfig: ApiConfig = {
+      const mockApiConfig: RequestStepConfig = {
         id: "test-api",
         urlHost: "https://api.example.com",
         urlPath: "/test",
@@ -13,17 +13,17 @@ describe("ToolExecutor - Failure Behavior", () => {
         instruction: "Test endpoint that fails on second iteration",
       };
 
-      const step: ExecutionStep = {
+      const step: ToolStep = {
         id: "testStep",
-        apiConfig: mockApiConfig,
-        loopSelector: "(sourceData) => [1, 2, 3]", // Will try 3 iterations
-        failureBehavior: "FAIL", // Explicit default
+        config: mockApiConfig,
+        dataSelector: "(sourceData) => [1, 2, 3]", // Will try 3 iterations
+        failureBehavior: "fail", // Explicit default
       };
 
       const tool: Tool = {
         id: "test-tool",
         steps: [step],
-        finalTransform: "(sourceData) => sourceData",
+        outputTransform: "(sourceData) => sourceData",
         systemIds: [],
       };
 
@@ -59,7 +59,7 @@ describe("ToolExecutor - Failure Behavior", () => {
 
   describe("Loop Steps with CONTINUE behavior", () => {
     it("should continue execution through all iterations despite failures", async () => {
-      const mockApiConfig: ApiConfig = {
+      const mockApiConfig: RequestStepConfig = {
         id: "test-api",
         urlHost: "https://api.example.com",
         urlPath: "/test",
@@ -67,17 +67,17 @@ describe("ToolExecutor - Failure Behavior", () => {
         instruction: "Test endpoint that fails on some iterations",
       };
 
-      const step: ExecutionStep = {
+      const step: ToolStep = {
         id: "testStep",
-        apiConfig: mockApiConfig,
-        loopSelector: "(sourceData) => [1, 2, 3, 4, 5]",
-        failureBehavior: "CONTINUE",
+        config: mockApiConfig,
+        dataSelector: "(sourceData) => [1, 2, 3, 4, 5]",
+        failureBehavior: "continue",
       };
 
       const tool: Tool = {
         id: "test-tool",
         steps: [step],
-        finalTransform: "(sourceData) => sourceData",
+        outputTransform: "(sourceData) => sourceData",
         systemIds: [],
       };
 
@@ -143,7 +143,7 @@ describe("ToolExecutor - Failure Behavior", () => {
     });
 
     it("should include currentItem in both successful and failed iterations", async () => {
-      const mockApiConfig: ApiConfig = {
+      const mockApiConfig: RequestStepConfig = {
         id: "test-api",
         urlHost: "https://api.example.com",
         urlPath: "/test",
@@ -151,18 +151,18 @@ describe("ToolExecutor - Failure Behavior", () => {
         instruction: "Test endpoint",
       };
 
-      const step: ExecutionStep = {
+      const step: ToolStep = {
         id: "testStep",
-        apiConfig: mockApiConfig,
-        loopSelector:
+        config: mockApiConfig,
+        dataSelector:
           '(sourceData) => [{id: 1, name: "Alice"}, {id: 2, name: "Bob"}, {id: 3, name: "Charlie"}]',
-        failureBehavior: "CONTINUE",
+        failureBehavior: "continue",
       };
 
       const tool: Tool = {
         id: "test-tool",
         steps: [step],
-        finalTransform: "(sourceData) => sourceData",
+        outputTransform: "(sourceData) => sourceData",
         systemIds: [],
       };
 
@@ -207,7 +207,7 @@ describe("ToolExecutor - Failure Behavior", () => {
 
   describe("Direct Steps with CONTINUE behavior", () => {
     it("should mark step as successful even when execution fails", async () => {
-      const mockApiConfig: ApiConfig = {
+      const mockApiConfig: RequestStepConfig = {
         id: "test-api",
         urlHost: "https://api.example.com",
         urlPath: "/test",
@@ -215,17 +215,17 @@ describe("ToolExecutor - Failure Behavior", () => {
         instruction: "Test endpoint that will fail",
       };
 
-      const step: ExecutionStep = {
+      const step: ToolStep = {
         id: "testStep",
-        apiConfig: mockApiConfig,
-        loopSelector: "(sourceData) => ({})", // Returns object for direct execution
-        failureBehavior: "CONTINUE",
+        config: mockApiConfig,
+        dataSelector: "(sourceData) => ({})", // Returns object for direct execution
+        failureBehavior: "continue",
       };
 
       const tool: Tool = {
         id: "test-tool",
         steps: [step],
-        finalTransform: "(sourceData) => sourceData",
+        outputTransform: "(sourceData) => sourceData",
         systemIds: [],
       };
 
@@ -263,7 +263,7 @@ describe("ToolExecutor - Failure Behavior", () => {
 
   describe("Multi-step workflows with mixed failure behaviors", () => {
     it("should continue workflow when first step has CONTINUE behavior and fails", async () => {
-      const mockApiConfig1: ApiConfig = {
+      const mockApiConfig1: RequestStepConfig = {
         id: "test-api-1",
         urlHost: "https://api.example.com",
         urlPath: "/test1",
@@ -271,7 +271,7 @@ describe("ToolExecutor - Failure Behavior", () => {
         instruction: "First step that may fail",
       };
 
-      const mockApiConfig2: ApiConfig = {
+      const mockApiConfig2: RequestStepConfig = {
         id: "test-api-2",
         urlHost: "https://api.example.com",
         urlPath: "/test2",
@@ -279,24 +279,24 @@ describe("ToolExecutor - Failure Behavior", () => {
         instruction: "Second step",
       };
 
-      const step1: ExecutionStep = {
+      const step1: ToolStep = {
         id: "step1",
-        apiConfig: mockApiConfig1,
-        loopSelector: "(sourceData) => ({})",
-        failureBehavior: "CONTINUE",
+        config: mockApiConfig1,
+        dataSelector: "(sourceData) => ({})",
+        failureBehavior: "continue",
       };
 
-      const step2: ExecutionStep = {
+      const step2: ToolStep = {
         id: "step2",
-        apiConfig: mockApiConfig2,
-        loopSelector: "(sourceData) => ({})",
-        failureBehavior: "FAIL", // Default behavior
+        config: mockApiConfig2,
+        dataSelector: "(sourceData) => ({})",
+        failureBehavior: "fail", // Default behavior
       };
 
       const tool: Tool = {
         id: "test-tool",
         steps: [step1, step2],
-        finalTransform: "(sourceData) => sourceData",
+        outputTransform: "(sourceData) => sourceData",
         systemIds: [],
       };
 
@@ -340,7 +340,7 @@ describe("ToolExecutor - Failure Behavior", () => {
     });
 
     it("should stop workflow when step with FAIL behavior fails", async () => {
-      const mockApiConfig1: ApiConfig = {
+      const mockApiConfig1: RequestStepConfig = {
         id: "test-api-1",
         urlHost: "https://api.example.com",
         urlPath: "/test1",
@@ -348,7 +348,7 @@ describe("ToolExecutor - Failure Behavior", () => {
         instruction: "First step",
       };
 
-      const mockApiConfig2: ApiConfig = {
+      const mockApiConfig2: RequestStepConfig = {
         id: "test-api-2",
         urlHost: "https://api.example.com",
         urlPath: "/test2",
@@ -356,24 +356,24 @@ describe("ToolExecutor - Failure Behavior", () => {
         instruction: "Second step that will fail",
       };
 
-      const step1: ExecutionStep = {
+      const step1: ToolStep = {
         id: "step1",
-        apiConfig: mockApiConfig1,
-        loopSelector: "(sourceData) => ({})",
-        failureBehavior: "CONTINUE",
+        config: mockApiConfig1,
+        dataSelector: "(sourceData) => ({})",
+        failureBehavior: "continue",
       };
 
-      const step2: ExecutionStep = {
+      const step2: ToolStep = {
         id: "step2",
-        apiConfig: mockApiConfig2,
-        loopSelector: "(sourceData) => ({})",
-        failureBehavior: "FAIL",
+        config: mockApiConfig2,
+        dataSelector: "(sourceData) => ({})",
+        failureBehavior: "fail",
       };
 
       const tool: Tool = {
         id: "test-tool",
         steps: [step1, step2],
-        finalTransform: "(sourceData) => sourceData",
+        outputTransform: "(sourceData) => sourceData",
         systemIds: [],
       };
 
@@ -412,7 +412,7 @@ describe("ToolExecutor - Failure Behavior", () => {
 
   describe("Empty loops with CONTINUE behavior", () => {
     it("should handle empty loop arrays gracefully", async () => {
-      const mockApiConfig: ApiConfig = {
+      const mockApiConfig: RequestStepConfig = {
         id: "test-api",
         urlHost: "https://api.example.com",
         urlPath: "/test",
@@ -420,17 +420,17 @@ describe("ToolExecutor - Failure Behavior", () => {
         instruction: "Test endpoint",
       };
 
-      const step: ExecutionStep = {
+      const step: ToolStep = {
         id: "testStep",
-        apiConfig: mockApiConfig,
-        loopSelector: "(sourceData) => []", // Empty array
-        failureBehavior: "CONTINUE",
+        config: mockApiConfig,
+        dataSelector: "(sourceData) => []", // Empty array
+        failureBehavior: "continue",
       };
 
       const tool: Tool = {
         id: "test-tool",
         steps: [step],
-        finalTransform: "(sourceData) => sourceData",
+        outputTransform: "(sourceData) => sourceData",
         systemIds: [],
       };
 

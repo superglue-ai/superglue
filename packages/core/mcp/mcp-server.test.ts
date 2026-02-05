@@ -108,14 +108,14 @@ describe("superglue_find_relevant_tools", () => {
         instruction: "Fetch users",
         inputSchema: {},
         outputSchema: {},
-        steps: [{ systemId: "crm", instruction: "Get users" }],
+        steps: [{ id: "step-1", config: { systemId: "crm" }, instruction: "Get users" }],
       },
       {
         id: "tool-2",
         instruction: "Send email",
         inputSchema: {},
         outputSchema: {},
-        steps: [{ systemId: "email", instruction: "Send message" }],
+        steps: [{ id: "step-2", config: { systemId: "email" }, instruction: "Send message" }],
       },
     ];
     const client = {
@@ -140,7 +140,7 @@ describe("superglue_find_relevant_tools", () => {
         instruction: "Post to Slack",
         inputSchema: {},
         outputSchema: {},
-        steps: [{ systemId: "slack" }],
+        steps: [{ id: "step-1", config: { systemId: "slack" } }],
       },
     ];
     const client = {

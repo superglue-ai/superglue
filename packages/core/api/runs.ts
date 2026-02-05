@@ -259,7 +259,7 @@ registerApiModule({
       method: "POST",
       path: "/runs/:runId/cancel",
       handler: cancelRun,
-      permissions: { type: "write", resource: "run", allowRestricted: true },
+      permissions: { type: "execute", resource: "run", allowRestricted: true },
     },
     {
       method: "POST",

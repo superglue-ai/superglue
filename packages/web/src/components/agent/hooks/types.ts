@@ -94,9 +94,9 @@ export interface PlaygroundToolContext {
   toolId: string;
   instruction: string;
   steps: any[];
-  finalTransform: string;
+  outputTransform: string;
   inputSchema: string | null;
-  responseSchema: string | null;
+  outputSchema: string | null;
   systemIds: string[];
   executionSummary: string;
   initialError?: string;

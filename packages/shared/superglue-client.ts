@@ -7,15 +7,14 @@ import {
   ExtractResult,
   FixToolArgs,
   FixToolResult,
+  getToolSystemIds,
   Log,
   Run,
   RunStatus,
   SuggestedTool,
   System,
   Tool,
-  ToolArgs,
   ToolDiff,
-  ToolInputRequest,
   ToolResult,
   ToolStepResult,
   UpsertMode,
@@ -31,82 +30,6 @@ export class SuperglueClient {
   private apiKey: string;
   private wsManager: WebSocketManager;
   public readonly apiEndpoint: string;
-
-  private static workflowQL = `
-        id
-        version
-        createdAt
-        updatedAt
-        steps {
-          id
-          modify
-          apiConfig {
-            id
-            urlHost
-            urlPath
-            instruction
-            method
-            queryParams
-            headers
-            body
-            pagination {
-              type
-              pageSize
-              cursorPath
-              stopCondition
-            }
-          }
-          systemId
-          executionMode
-          loopSelector
-          failureBehavior
-        }
-        systemIds
-        responseSchema
-        originalResponseSchema
-        finalTransform
-        inputSchema
-        instruction
-        folder
-        archived
-        responseFilters {
-          id
-          name
-          enabled
-          target
-          pattern
-          action
-          maskValue
-          scope
-        }
-    `;
-
-  private static configQL = `
-    config {
-      ... on ApiConfig {
-        id
-        version
-        createdAt
-        updatedAt
-        urlHost
-        urlPath
-        instruction
-        method
-        queryParams
-        headers
-        body
-        pagination {
-          type
-          pageSize
-          cursorPath
-          stopCondition
-        }
-      }
-      ... on Workflow {
-        ${SuperglueClient.workflowQL}
-      }
-    }
-    `;
 
   constructor({
     endpoint,
@@ -127,11 +50,13 @@ export class SuperglueClient {
     method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
     path: string,
     body?: any,
+    extraHeaders?: Record<string, string>,
   ): Promise<T> {
     const url = `${this.apiEndpoint.replace(/\/$/, "")}${path}`;
 
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.apiKey}`,
+      ...extraHeaders,
     };
 
     if (body && method !== "GET") {
@@ -149,7 +74,12 @@ export class SuperglueClient {
       let errorMessage = `HTTP ${response.status}: ${errorText}`;
       try {
         const errorJson = JSON.parse(errorText);
-        errorMessage = (errorJson as any).error || errorMessage;
+        const error = (errorJson as any).error;
+        if (typeof error === "string") {
+          errorMessage = error;
+        } else if (error && typeof error === "object") {
+          errorMessage = error.message || JSON.stringify(error);
+        }
       } catch {
         // ignore
       }
@@ -212,177 +142,98 @@ export class SuperglueClient {
     return this.wsManager.disconnect();
   }
 
-  async executeWorkflow<T = any>({
-    id,
-    tool,
-    payload,
-    credentials,
-    options,
-    verbose = true,
-    runId,
-    traceId,
-  }: ToolArgs): Promise<ToolResult & { data?: T }> {
-    const mutation = `
-        mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON, $credentials: JSON, $options: RequestOptions, $runId: ID, $traceId: ID) {
-          executeWorkflow(input: $input, payload: $payload, credentials: $credentials, options: $options, runId: $runId, traceId: $traceId) {
-            id
-            success
-            data
-            config {${SuperglueClient.workflowQL}}
-            stepResults {
-              stepId
-              success
-              rawData
-              transformedData
-              error
-            }
-            error
-            startedAt
-            completedAt
-          }
-        }
-      `;
+  /**
+   * Execute a saved tool by ID (creates run record)
+   */
+  async runTool(params: {
+    toolId: string;
+    payload?: Record<string, any>;
+    credentials?: Record<string, string>;
+    options?: {
+      timeout?: number;
+      traceId?: string;
+      webhookUrl?: string;
+      async?: boolean;
+      requestSource?: "frontend" | "mcp";
+    };
+    runId?: string;
+  }): Promise<ToolResult> {
+    const response = await this.restRequest<{
+      runId: string;
+      toolId: string;
+      status: "running" | "success" | "failed" | "aborted";
+      tool: Tool;
+      toolPayload?: Record<string, any>;
+      data?: any;
+      error?: string;
+      stepResults?: Array<{ stepId: string; success: boolean; data?: any; error?: string }>;
+    }>("POST", `/v1/tools/${encodeURIComponent(params.toolId)}/run`, {
+      inputs: params.payload,
+      credentials: params.credentials,
+      options: params.options,
+      runId: params.runId,
+    });
 
-    let gqlInput: Partial<ToolInputRequest> = {};
+    return {
+      success: response.status === "success",
+      data: response.data,
+      error: response.error,
+      tool: response.tool,
+      stepResults: response.stepResults?.map((sr) => ({
+        stepId: sr.stepId,
+        success: sr.success,
+        data: sr.data,
+        error: sr.error,
+      })),
+    };
+  }
 
-    if (id) {
-      gqlInput = { id };
-    } else if (tool) {
-      const toolInput = {
-        id: tool.id,
-        steps: tool.steps.map((step) => {
-          const apiConfigInput = {
-            id: step.apiConfig.id,
-            urlHost: step.apiConfig.urlHost,
-            instruction: step.apiConfig.instruction,
-            urlPath: step.apiConfig.urlPath,
-            method: step.apiConfig.method,
-            queryParams: step.apiConfig.queryParams,
-            headers: step.apiConfig.headers,
-            body: step.apiConfig.body,
-            pagination: step.apiConfig.pagination
-              ? {
-                  type: step.apiConfig.pagination.type,
-                  ...(step.apiConfig.pagination.pageSize !== undefined && {
-                    pageSize: step.apiConfig.pagination.pageSize,
-                  }),
-                  ...(step.apiConfig.pagination.cursorPath !== undefined && {
-                    cursorPath: step.apiConfig.pagination.cursorPath,
-                  }),
-                  ...(step.apiConfig.pagination.stopCondition !== undefined && {
-                    stopCondition: step.apiConfig.pagination.stopCondition,
-                  }),
-                }
-              : undefined,
-            version: step.apiConfig.version,
-          };
-          Object.keys(apiConfigInput).forEach(
-            (key) =>
-              (apiConfigInput as any)[key] === undefined && delete (apiConfigInput as any)[key],
-          );
+  /**
+   * Execute a tool config without saving (no run record)
+   * Used for SDK/playground testing
+   */
+  async runToolConfig(params: {
+    tool: Tool;
+    payload?: Record<string, any>;
+    credentials?: Record<string, string>;
+    options?: { timeout?: number };
+    runId?: string;
+  }): Promise<ToolResult> {
+    const response = await this.restRequest<{
+      runId: string;
+      success: boolean;
+      data?: any;
+      error?: string;
+      stepResults?: Array<{ stepId: string; success: boolean; data?: any; error?: string }>;
+      tool: Tool;
+    }>("POST", "/v1/tools/run", {
+      tool: params.tool,
+      payload: params.payload,
+      credentials: params.credentials,
+      options: params.options,
+      runId: params.runId,
+    });
 
-          const executionStepInput = {
-            id: step.id,
-            modify: step.modify,
-            apiConfig: apiConfigInput,
-            systemId: step.systemId,
-            executionMode: step.executionMode,
-            loopSelector: step.loopSelector,
-            failureBehavior: step.failureBehavior,
-          };
-          Object.keys(executionStepInput).forEach(
-            (key) =>
-              (executionStepInput as any)[key] === undefined &&
-              delete (executionStepInput as any)[key],
-          );
-          return executionStepInput;
-        }),
-        systemIds: tool.systemIds,
-        finalTransform: tool.finalTransform,
-        inputSchema: tool.inputSchema,
-        responseSchema: tool.responseSchema,
-        instruction: tool.instruction,
-        responseFilters: tool.responseFilters,
-      };
-      Object.keys(toolInput).forEach(
-        (key) => (toolInput as any)[key] === undefined && delete (toolInput as any)[key],
-      );
-      gqlInput = { workflow: toolInput };
-    } else {
-      throw new Error("Either id or tool must be provided for executeWorkflow.");
-    }
-
-    let logSubscription: WebSocketSubscription | undefined;
-    if (verbose) {
-      try {
-        logSubscription = await this.subscribeToLogs({
-          onLog: (log: Log) => {
-            const timestamp = log.timestamp.toLocaleTimeString();
-            const levelColor =
-              log.level === "ERROR"
-                ? "\x1b[31m"
-                : log.level === "WARN"
-                  ? "\x1b[33m"
-                  : log.level === "DEBUG"
-                    ? "\x1b[36m"
-                    : "\x1b[0m";
-            console.log(`${levelColor}[${timestamp}] ${log.level}\x1b[0m: ${log.message}`);
-          },
-          onError: (error: Error) => {
-            console.error("Log subscription error:", error);
-          },
-          includeDebug: true,
-        });
-      } catch (error) {
-        console.error("Log subscription error:", error);
-      }
-    }
-
-    try {
-      type GraphQLWorkflowResult = Omit<ToolResult, "stepResults"> & {
-        data?: any;
-        stepResults: (ToolStepResult & { rawData: any; transformedData: any })[];
-      };
-      const result = await this.request<{ executeWorkflow: GraphQLWorkflowResult }>(mutation, {
-        input: gqlInput,
-        payload,
-        credentials,
-        options,
-        runId,
-        traceId,
-      }).then((data) => data.executeWorkflow);
-
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      result.stepResults.forEach((stepResult) => {
-        stepResult.data = stepResult.transformedData;
-      });
-
-      return result as ToolResult & { data?: T };
-    } finally {
-      if (logSubscription) {
-        setTimeout(() => {
-          logSubscription.unsubscribe();
-        }, 1000);
-      }
-    }
+    return {
+      success: response.success,
+      data: response.data,
+      error: response.error,
+      tool: response.tool,
+      stepResults: response.stepResults?.map((sr) => ({
+        stepId: sr.stepId,
+        success: sr.success,
+        data: sr.data,
+        error: sr.error,
+      })),
+    };
   }
 
   async abortToolExecution(runId: string): Promise<{ success: boolean; runId: string }> {
-    const mutation = `
-        mutation AbortToolExecution($runId: ID!) {
-          abortToolExecution(runId: $runId) {
-            success
-            runId
-          }
-        }
-      `;
-    const response = await this.request<{
-      abortToolExecution: { success: boolean; runId: string };
-    }>(mutation, { runId });
-    return response.abortToolExecution;
+    const response = await this.restRequest<any>(
+      "POST",
+      `/v1/runs/${encodeURIComponent(runId)}/cancel`,
+    );
+    return { success: true, runId: response.runId };
   }
 
   /**
@@ -432,8 +283,8 @@ export class SuperglueClient {
    * Used for transform testing in the playground.
    */
   async executeTransformOnly({
-    finalTransform,
-    responseSchema,
+    outputTransform,
+    outputSchema,
     inputSchema,
     payload,
     stepResults,
@@ -441,8 +292,8 @@ export class SuperglueClient {
     options,
     runId,
   }: {
-    finalTransform: string;
-    responseSchema?: any;
+    outputTransform: string;
+    outputSchema?: any;
     inputSchema?: any;
     payload?: Record<string, any>;
     stepResults?: Record<string, any>;
@@ -454,11 +305,11 @@ export class SuperglueClient {
     data?: any;
     error?: string;
     updatedTransform?: string;
-    updatedResponseSchema?: any;
+    updatedOutputSchema?: any;
   }> {
     return this.restRequest("POST", "/v1/tools/transform/run", {
-      finalTransform,
-      responseSchema,
+      outputTransform,
+      outputSchema,
       inputSchema,
       payload,
       stepResults,
@@ -505,17 +356,11 @@ export class SuperglueClient {
     instruction,
     payload,
     systemIds,
-    responseSchema,
+    outputSchema,
     save = true,
     verbose = true,
     traceId,
   }: BuildToolArgs): Promise<Tool> {
-    const mutation = `
-        mutation BuildWorkflow($instruction: String!, $payload: JSON, $systemIds: [ID!], $responseSchema: JSONSchema, $traceId: ID) {
-          buildWorkflow(instruction: $instruction, payload: $payload, systemIds: $systemIds, responseSchema: $responseSchema, traceId: $traceId) {${SuperglueClient.workflowQL}}
-        }
-      `;
-
     let logSubscription: WebSocketSubscription | undefined;
     if (verbose) {
       try {
@@ -543,13 +388,23 @@ export class SuperglueClient {
     }
 
     try {
-      const workflow = await this.request<{ buildWorkflow: Tool }>(mutation, {
-        instruction,
-        payload,
-        systemIds,
-        responseSchema: responseSchema ?? {},
-        traceId,
-      }).then((data) => data.buildWorkflow);
+      const response = await this.restRequest<Tool & { error?: string }>(
+        "POST",
+        "/v1/tools/build",
+        {
+          instruction,
+          payload,
+          systemIds,
+          outputSchema: outputSchema ?? {},
+        },
+        traceId ? { "X-Trace-Id": traceId } : undefined,
+      );
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      const workflow = response;
 
       if (save) {
         await this.upsertWorkflow(workflow.id, workflow);
@@ -569,23 +424,9 @@ export class SuperglueClient {
     tool,
     fixInstructions,
     lastError,
-    systemIds,
+    stepResults,
     verbose = true,
   }: FixToolArgs & { verbose?: boolean }): Promise<FixToolResult> {
-    const mutation = `
-        mutation FixWorkflow($workflow: WorkflowInput!, $fixInstructions: String!, $lastError: String, $systemIds: [ID!]) {
-          fixWorkflow(workflow: $workflow, fixInstructions: $fixInstructions, lastError: $lastError, systemIds: $systemIds) {
-            workflow {${SuperglueClient.workflowQL}}
-            diffs {
-              op
-              path
-              value
-              from
-            }
-          }
-        }
-      `;
-
     let logSubscription: WebSocketSubscription | undefined;
     if (verbose) {
       try {
@@ -612,81 +453,26 @@ export class SuperglueClient {
       }
     }
 
-    // Convert tool to WorkflowInput format
-    const toolInput = {
-      id: tool.id,
-      steps: tool.steps?.map((step) => {
-        const apiConfigInput = {
-          id: step.apiConfig.id,
-          urlHost: step.apiConfig.urlHost,
-          instruction: step.apiConfig.instruction,
-          urlPath: step.apiConfig.urlPath,
-          method: step.apiConfig.method,
-          queryParams: step.apiConfig.queryParams,
-          headers: step.apiConfig.headers,
-          body: step.apiConfig.body,
-          pagination: step.apiConfig.pagination
-            ? {
-                type: step.apiConfig.pagination.type,
-                ...(step.apiConfig.pagination.pageSize !== undefined && {
-                  pageSize: step.apiConfig.pagination.pageSize,
-                }),
-                ...(step.apiConfig.pagination.cursorPath !== undefined && {
-                  cursorPath: step.apiConfig.pagination.cursorPath,
-                }),
-                ...(step.apiConfig.pagination.stopCondition !== undefined && {
-                  stopCondition: step.apiConfig.pagination.stopCondition,
-                }),
-              }
-            : undefined,
-          version: step.apiConfig.version,
-        };
-        Object.keys(apiConfigInput).forEach(
-          (key) =>
-            (apiConfigInput as any)[key] === undefined && delete (apiConfigInput as any)[key],
-        );
-
-        const executionStepInput = {
-          id: step.id,
-          modify: step.modify,
-          apiConfig: apiConfigInput,
-          systemId: step.systemId,
-          executionMode: step.executionMode,
-          loopSelector: step.loopSelector,
-          failureBehavior: step.failureBehavior,
-        };
-        Object.keys(executionStepInput).forEach(
-          (key) =>
-            (executionStepInput as any)[key] === undefined &&
-            delete (executionStepInput as any)[key],
-        );
-        return executionStepInput;
-      }),
-      systemIds: tool.systemIds,
-      finalTransform: tool.finalTransform,
-      inputSchema: tool.inputSchema,
-      responseSchema: tool.responseSchema,
-      instruction: tool.instruction,
-      responseFilters: tool.responseFilters,
-    };
-    Object.keys(toolInput).forEach(
-      (key) => (toolInput as any)[key] === undefined && delete (toolInput as any)[key],
-    );
-
     try {
-      const result = await this.request<{ fixWorkflow: { workflow: Tool; diffs: ToolDiff[] } }>(
-        mutation,
-        {
-          workflow: toolInput,
-          fixInstructions,
-          lastError,
-          systemIds,
-        },
-      ).then((data) => data.fixWorkflow);
+      const response = await this.restRequest<{
+        success: boolean;
+        tool?: Tool;
+        diffs?: ToolDiff[];
+        error?: string;
+      }>("POST", "/v1/tools/fix", {
+        tool,
+        fixInstructions,
+        lastError,
+        stepResults,
+      });
+
+      if (!response.success) {
+        throw new Error(response.error || "Fix tool failed");
+      }
 
       return {
-        tool: result.workflow,
-        diffs: result.diffs,
+        tool: response.tool!,
+        diffs: response.diffs || [],
       };
     } finally {
       if (logSubscription) {
@@ -837,14 +623,15 @@ export class SuperglueClient {
     return this.mapOpenAPIRunToRun(response);
   }
 
-  async getWorkflow(id: string): Promise<Tool> {
-    const query = `
-        query GetWorkflow($id: ID!) {
-          getWorkflow(id: $id) {${SuperglueClient.workflowQL}}
-        }
-      `;
-    const response = await this.request<{ getWorkflow: Tool }>(query, { id });
-    return response.getWorkflow;
+  async getWorkflow(id: string): Promise<Tool | null> {
+    try {
+      return await this.restRequest<Tool>("GET", `/v1/tools/${encodeURIComponent(id)}`);
+    } catch (err: any) {
+      if (err.message?.includes("404") || err.message?.includes("not found")) {
+        return null;
+      }
+      throw err;
+    }
   }
 
   async archiveWorkflow(id: string, archived: boolean = true): Promise<Tool> {
@@ -855,53 +642,46 @@ export class SuperglueClient {
     limit: number = 10,
     offset: number = 0,
   ): Promise<{ items: Tool[]; total: number }> {
-    const query = `
-        query ListWorkflows($limit: Int!, $offset: Int!) {
-          listWorkflows(limit: $limit, offset: $offset) {
-            items {${SuperglueClient.workflowQL}}
-            total
-          }
-        }
-      `;
-    const response = await this.request<{ listWorkflows: { items: Tool[]; total: number } }>(
-      query,
-      { limit, offset },
-    );
-    return response.listWorkflows;
+    // Convert offset to page number (1-indexed)
+    const page = Math.floor(offset / limit) + 1;
+    const response = await this.restRequest<{
+      data: Tool[];
+      total: number;
+      page: number;
+      limit: number;
+      hasMore: boolean;
+    }>("GET", `/v1/tools?limit=${limit}&page=${page}`);
+    return { items: response.data, total: response.total };
   }
 
   async upsertWorkflow(id: string, input: Partial<Tool>): Promise<Tool> {
-    const mutation = `
-        mutation UpsertWorkflow($id: ID!, $input: JSON!) {
-          upsertWorkflow(id: $id, input: $input) {${SuperglueClient.workflowQL}}
-        }
-      `;
-
-    return this.request<{ upsertWorkflow: Tool }>(mutation, { id, input }).then(
-      (data) => data.upsertWorkflow,
-    );
+    // Check if tool exists to determine create vs update
+    const existing = await this.getWorkflow(id);
+    if (existing) {
+      // Update existing tool
+      return this.restRequest<Tool>("PUT", `/v1/tools/${encodeURIComponent(id)}`, input);
+    } else {
+      // Create new tool
+      return this.restRequest<Tool>("POST", "/v1/tools", { id, ...input });
+    }
   }
 
   async deleteWorkflow(id: string): Promise<boolean> {
-    const mutation = `
-      mutation DeleteWorkflow($id: ID!) {
-        deleteWorkflow(id: $id)
+    try {
+      await this.restRequest<{ success: boolean }>("DELETE", `/v1/tools/${encodeURIComponent(id)}`);
+      return true;
+    } catch (err: any) {
+      if (err.message?.includes("404")) {
+        return false;
       }
-    `;
-    return this.request<{ deleteWorkflow: boolean }>(mutation, { id }).then(
-      (data) => data.deleteWorkflow,
-    );
+      throw err;
+    }
   }
 
   async renameWorkflow(oldId: string, newId: string): Promise<Tool> {
-    const mutation = `
-      mutation RenameWorkflow($oldId: ID!, $newId: ID!) {
-        renameWorkflow(oldId: $oldId, newId: $newId) {${SuperglueClient.workflowQL}}
-      }
-    `;
-    return this.request<{ renameWorkflow: Tool }>(mutation, { oldId, newId }).then(
-      (data) => data.renameWorkflow,
-    );
+    return this.restRequest<Tool>("POST", `/v1/tools/${encodeURIComponent(oldId)}/rename`, {
+      newId,
+    });
   }
 
   async listSystems(
@@ -927,25 +707,12 @@ export class SuperglueClient {
   }
 
   async findRelevantTools(searchTerms?: string): Promise<SuggestedTool[]> {
-    const query = `
-        query FindRelevantTools($searchTerms: String) {
-          findRelevantTools(searchTerms: $searchTerms) {
-            id
-            instruction
-            inputSchema
-            responseSchema
-            steps {
-              systemId
-              instruction
-            }
-            reason
-          }
-        }
-      `;
-    const response = await this.request<{ findRelevantTools: SuggestedTool[] }>(query, {
-      searchTerms,
-    });
-    return response.findRelevantTools;
+    const params = searchTerms ? `?q=${encodeURIComponent(searchTerms)}` : "";
+    const response = await this.restRequest<{ data: SuggestedTool[] }>(
+      "GET",
+      `/v1/tools/search${params}`,
+    );
+    return response.data;
   }
 
   async getSystem(id: string, options?: { includeDocs?: boolean }): Promise<System> {

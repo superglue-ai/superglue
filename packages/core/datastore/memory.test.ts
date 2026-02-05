@@ -1,12 +1,4 @@
-import {
-  ApiConfig,
-  HttpMethod,
-  RequestSource,
-  System,
-  Run,
-  RunStatus,
-  Tool,
-} from "@superglue/shared";
+import { HttpMethod, RequestSource, System, Run, RunStatus, Tool } from "@superglue/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryStore } from "./memory.js";
 import { ToolScheduleInternal } from "./types.js";
@@ -20,46 +12,9 @@ describe("MemoryStore", () => {
     store = new MemoryStore();
   });
 
-  describe("API Config", () => {
-    const testConfig: ApiConfig = {
-      id: "test-id",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      urlHost: "https://test.com",
-      method: HttpMethod.GET,
-      headers: {},
-      queryParams: {},
-      instruction: "Test API",
-    };
-
-    it("should store and retrieve API configs", async () => {
-      await store.upsertApiConfig({ id: testConfig.id, config: testConfig });
-      const retrieved = await store.getApiConfig({ id: testConfig.id });
-      expect(retrieved).toEqual(testConfig);
-    });
-
-    it("should list API configs", async () => {
-      await store.upsertApiConfig({ id: testConfig.id, config: testConfig });
-      const { items, total } = await store.listApiConfigs({ limit: 10, offset: 0 });
-      expect(items).toHaveLength(1);
-      expect(total).toBe(1);
-      expect(items[0]).toEqual(testConfig);
-    });
-
-    it("should delete API configs", async () => {
-      await store.upsertApiConfig({ id: testConfig.id, config: testConfig });
-      await store.deleteApiConfig({ id: testConfig.id });
-      const retrieved = await store.getApiConfig({ id: testConfig.id });
-      expect(retrieved).toBeNull();
-    });
-  });
-
   describe("Run Results", () => {
-    const testApiConfig: ApiConfig = {
-      id: "test-api-id",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      urlHost: "https://test.com",
+    const testStepConfig = {
+      url: "https://test.com",
       method: HttpMethod.GET,
       headers: {},
       queryParams: {},
@@ -74,7 +29,7 @@ describe("MemoryStore", () => {
         startedAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
       },
-      tool: testApiConfig as any,
+      tool: { id: "test-api-id", steps: [{ id: "step1", config: testStepConfig }] } as any,
       error: undefined,
     };
 
@@ -668,11 +623,8 @@ describe("MemoryStore", () => {
   });
   describe("Clear All", () => {
     it("should clear all data", async () => {
-      const testApiConfig: ApiConfig = {
-        id: "test-api",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        urlHost: "https://test.com",
+      const testStepConfig = {
+        url: "https://test.com",
         method: HttpMethod.GET,
         headers: {},
         queryParams: {},
@@ -687,7 +639,7 @@ describe("MemoryStore", () => {
           startedAt: new Date().toISOString(),
           completedAt: new Date().toISOString(),
         },
-        tool: testApiConfig as any,
+        tool: { id: "test-api-id", steps: [{ id: "step1", config: testStepConfig }] } as any,
         error: undefined,
       };
 
@@ -724,7 +676,6 @@ describe("MemoryStore", () => {
         updatedAt: new Date(),
       };
 
-      await store.upsertApiConfig({ id: "test-api", config: testApiConfig });
       await store.createRun({ run: testRunResult, orgId: testOrgId });
       await store.upsertSystem({ id: testSystem.id, system: testSystem });
       await store.upsertWorkflow({ id: testWorkflow.id, workflow: testWorkflow });
@@ -732,7 +683,6 @@ describe("MemoryStore", () => {
 
       await store.clearAll();
 
-      const { total: apiTotal } = await store.listApiConfigs({ limit: 10, offset: 0 });
       const { total: runTotal } = await store.listRuns({ limit: 10, offset: 0, orgId: testOrgId });
       const { total: systemTotal } = await store.listSystems({
         limit: 10,
@@ -745,7 +695,6 @@ describe("MemoryStore", () => {
         orgId: testOrgId,
       });
 
-      expect(apiTotal).toBe(0);
       expect(runTotal).toBe(0);
       expect(systemTotal).toBe(0);
       expect(workflowTotal).toBe(0);

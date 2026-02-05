@@ -25,6 +25,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
+import { getToolSystemIds } from "@superglue/shared";
 import {
   ArrowDown,
   ArrowUp,
@@ -286,21 +287,7 @@ const ToolsTable = () => {
               </TableRow>
             ) : (
               currentConfigs.map((tool) => {
-                const allSystemIds = new Set<string>();
-
-                if (tool.systemIds) {
-                  tool.systemIds.forEach((id) => allSystemIds.add(id));
-                }
-
-                if (tool.steps) {
-                  tool.steps.forEach((step: any) => {
-                    if (step.systemId) {
-                      allSystemIds.add(step.systemId);
-                    }
-                  });
-                }
-
-                const systemIdsArray = Array.from(allSystemIds);
+                const systemIdsArray = getToolSystemIds(tool);
 
                 return (
                   <TableRow key={tool.id} className="hover:bg-secondary">

@@ -61,12 +61,12 @@ find_system_templates:
 
 edit_tool:
 - Whenever you add new steps, always make sure that every step has the right systemId for an existing, available system.
-- If you add a response schema, do not forget to update the finalTransform to map step data to the new response schema.
+- If you add a response schema, do not forget to update the outputTransform to map step data to the new response schema.
 - When you edit a pre-saved tool, edits are not automatically persisted. Call save_tool to ensure changes are saved.
 
 build_tool:
 - Only include a response schema if the user is explicit about a certain response structure
-- If you add a response schema, do not forget to update the finalTransform to map step data to the new response schema.
+- If you add a response schema, do not forget to update the outputTransform to map step data to the new response schema.
 - If build_tool fails (any error, validation errors, step failures, etc.), IMMEDIATELY use search_documentation with relevant systemId(s) and keywords, then web_search if needed.
 - When building a tool, keep instructions focused on user intent, required data retrieval steps, transformations and final response structure.
 
@@ -190,7 +190,7 @@ edit_tool
   - "Change the URL path in step 1 from /users to /v2/users"
   - "Update the data selector in step 2 to extract the 'items' array instead of 'data'"
   - "Add a new header 'X-Custom-Header' with value 'test' to step 1"
-  - "Fix the finalTransform to include only id, name, and email fields"
+  - "Fix the outputTransform to include only id, name, and email fields"
   - "Change the HTTP method from GET to POST and add a request body"
 - The tool uses diff-based editing - it makes minimal targeted changes
 - Before calling edit_tool, ensure the tool is not already doing what the user wants it to. Only use edit_tool if the tool config actually needs to be changed.

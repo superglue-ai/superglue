@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, Tool } from "@superglue/shared";
+import { HttpMethod, Tool } from "@superglue/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as logs from "../utils/logs.js";
 import { ToolFinder } from "./tool-finder.js";
@@ -22,13 +22,11 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            systemId: "gmail",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Send email via Gmail API",
+            instruction: "Send email via Gmail API",
+            config: {
               method: HttpMethod.POST,
-              urlHost: "https://gmail.googleapis.com",
-              urlPath: "/send",
+              url: "https://gmail.googleapis.com/send",
+              systemId: "gmail",
             },
           },
         ],
@@ -39,13 +37,11 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            systemId: "postgres",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Query users table",
+            instruction: "Query users table",
+            config: {
               method: HttpMethod.GET,
-              urlHost: "https://db.example.com",
-              urlPath: "/users",
+              url: "https://db.example.com/users",
+              systemId: "postgres",
             },
           },
         ],
@@ -56,13 +52,11 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            systemId: "slack",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Post message to Slack",
+            instruction: "Post message to Slack",
+            config: {
               method: HttpMethod.POST,
-              urlHost: "https://slack.com",
-              urlPath: "/api/chat.postMessage",
+              url: "https://slack.com/api/chat.postMessage",
+              systemId: "slack",
             },
           },
         ],
@@ -73,13 +67,11 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            systemId: "github",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Create GitHub issue",
+            instruction: "Create GitHub issue",
+            config: {
               method: HttpMethod.POST,
-              urlHost: "https://api.github.com",
-              urlPath: "/repos/owner/repo/issues",
+              url: "https://api.github.com/repos/owner/repo/issues",
+              systemId: "github",
             },
           },
         ],
@@ -198,7 +190,7 @@ describe("ToolFinder", () => {
         id: "send-email",
         instruction: "Send an email notification",
         inputSchema: undefined,
-        responseSchema: undefined,
+        outputSchema: undefined,
         steps: [
           {
             systemId: "gmail",
@@ -216,24 +208,20 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            systemId: "github",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Fetch GitHub data",
+            instruction: "Fetch GitHub data",
+            config: {
               method: HttpMethod.GET,
-              urlHost: "https://api.github.com",
-              urlPath: "/repos",
+              url: "https://api.github.com/repos",
+              systemId: "github",
             },
           },
           {
             id: "step-2",
-            systemId: "slack",
-            apiConfig: {
-              id: "step-2",
-              instruction: "Send notification to Slack",
+            instruction: "Send notification to Slack",
+            config: {
               method: HttpMethod.POST,
-              urlHost: "https://slack.com",
-              urlPath: "/api/chat.postMessage",
+              url: "https://slack.com/api/chat.postMessage",
+              systemId: "slack",
             },
           },
         ],
@@ -256,9 +244,8 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Call external API",
+            instruction: "Call external API",
+            config: {
               method: HttpMethod.GET,
               urlHost: "https://api.example.com",
               urlPath: "/data",
@@ -295,13 +282,11 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            systemId: "notification-service",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Send alert via notification system",
+            instruction: "Send alert via notification system",
+            config: {
               method: HttpMethod.POST,
-              urlHost: "https://api.notification.com",
-              urlPath: "/send",
+              url: "https://api.notification.com/send",
+              systemId: "notification-service",
             },
           },
         ],
@@ -313,9 +298,8 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Handle notification",
+            instruction: "Handle notification",
+            config: {
               method: HttpMethod.POST,
               urlHost: "https://api.example.com",
               urlPath: "/process",
@@ -346,13 +330,11 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            systemId: "test-system",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Do something",
+            instruction: "Do something",
+            config: {
               method: HttpMethod.GET,
-              urlHost: "https://api.example.com",
-              urlPath: "/test",
+              url: "https://api.example.com/test",
+              systemId: "test-system",
             },
           },
         ],
@@ -379,39 +361,36 @@ describe("ToolFinder", () => {
       expect(results[0].steps).toHaveLength(0);
     });
 
-    it("should handle steps with null apiConfig", async () => {
+    it("should handle steps with null config", async () => {
       const toolWithNullConfig: Tool = {
         id: "null-config-tool",
         instruction: "Tool with null config",
         steps: [
           {
             id: "step-1",
-            systemId: "test",
-            apiConfig: null as any,
+            config: null as any,
           },
         ],
       };
 
-      const results = await toolFinder.findTools("test", [toolWithNullConfig]);
+      const results = await toolFinder.findTools("null", [toolWithNullConfig]);
 
       expect(results).toHaveLength(1);
       expect(results[0].steps[0].instruction).toBeUndefined();
     });
 
-    it("should handle steps with undefined apiConfig instruction", async () => {
+    it("should handle steps with undefined config instruction", async () => {
       const toolWithUndefinedInstruction: Tool = {
         id: "undefined-instruction-tool",
         instruction: "Tool with undefined step instruction",
         steps: [
           {
             id: "step-1",
-            systemId: "test",
-            apiConfig: {
-              id: "step-1",
+            config: {
               method: HttpMethod.GET,
-              urlHost: "https://api.example.com",
-              urlPath: "/test",
-            } as unknown as ApiConfig,
+              url: "https://api.example.com/test",
+              systemId: "test",
+            },
           },
         ],
       } as Tool;
@@ -428,9 +407,8 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Process data",
+            instruction: "Process data",
+            config: {
               method: HttpMethod.POST,
               urlHost: "https://api.example.com",
               urlPath: "/process",
@@ -464,9 +442,8 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Enviar mensaje",
+            instruction: "Enviar mensaje",
+            config: {
               method: HttpMethod.POST,
               urlHost: "https://api.example.com",
               urlPath: "/send",
@@ -489,9 +466,8 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Match pattern",
+            instruction: "Match pattern",
+            config: {
               method: HttpMethod.POST,
               urlHost: "https://api.example.com",
               urlPath: "/match",
@@ -511,17 +487,15 @@ describe("ToolFinder", () => {
         id: "null-fields-tool",
         instruction: null as any,
         inputSchema: null as any,
-        responseSchema: null as any,
+        outputSchema: null as any,
         steps: [
           {
             id: "step-1",
-            systemId: null as any,
-            apiConfig: {
-              id: "step-1",
-              instruction: null as any,
+            instruction: null as any,
+            config: {
               method: HttpMethod.GET,
-              urlHost: "https://api.example.com",
-              urlPath: "/test",
+              url: "https://api.example.com/test",
+              systemId: null as any,
             },
           },
         ],
@@ -542,9 +516,8 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Short instruction",
+            instruction: "Short instruction",
+            config: {
               method: HttpMethod.GET,
               urlHost: "https://api.example.com",
               urlPath: "/test",
@@ -566,13 +539,11 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            systemId: "",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Do something",
+            instruction: "Do something",
+            config: {
               method: HttpMethod.GET,
-              urlHost: "https://api.example.com",
-              urlPath: "/test",
+              url: "https://api.example.com/test",
+              systemId: "",
             },
           },
         ],
@@ -621,7 +592,7 @@ describe("ToolFinder", () => {
             },
           },
         },
-        responseSchema: {
+        outputSchema: {
           type: "object",
           properties: {
             result: { type: "string" },
@@ -630,9 +601,8 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Process",
+            instruction: "Process",
+            config: {
               method: HttpMethod.POST,
               urlHost: "https://api.example.com",
               urlPath: "/process",
@@ -645,7 +615,7 @@ describe("ToolFinder", () => {
 
       expect(results).toHaveLength(1);
       expect(results[0].inputSchema).toBeDefined();
-      expect(results[0].responseSchema).toBeDefined();
+      expect(results[0].outputSchema).toBeDefined();
     });
 
     it("should handle multiple tools with same score (stable sort)", async () => {
@@ -655,9 +625,8 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Step 1",
+            instruction: "Step 1",
+            config: {
               method: HttpMethod.GET,
               urlHost: "https://api.example.com",
               urlPath: "/test",
@@ -672,9 +641,8 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Step 1",
+            instruction: "Step 1",
+            config: {
               method: HttpMethod.GET,
               urlHost: "https://api.example.com",
               urlPath: "/test",
@@ -689,9 +657,8 @@ describe("ToolFinder", () => {
         steps: [
           {
             id: "step-1",
-            apiConfig: {
-              id: "step-1",
-              instruction: "Step 1",
+            instruction: "Step 1",
+            config: {
               method: HttpMethod.GET,
               urlHost: "https://api.example.com",
               urlPath: "/test",
@@ -738,9 +705,8 @@ describe("ToolFinder", () => {
           steps: [
             {
               id: "step-1",
-              apiConfig: {
-                id: "step-1",
-                instruction: `Process ${i}`,
+              instruction: `Process ${i}`,
+              config: {
                 method: HttpMethod.GET,
                 urlHost: "https://api.example.com",
                 urlPath: `/test/${i}`,

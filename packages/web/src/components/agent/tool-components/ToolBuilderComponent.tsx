@@ -185,7 +185,7 @@ export function ToolBuilderComponent({
     if (!currentRunIdRef.current) return;
 
     lastAbortTimeRef.current = Date.now();
-    const client = createSuperglueClient(config.superglueEndpoint);
+    const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
     const success = await abortExecution(client, currentRunIdRef.current);
 
     if (success) {
@@ -299,11 +299,22 @@ export function ToolBuilderComponent({
 
       // Execute
       try {
-        const result = await client.executeWorkflow({
+        console.log("[ToolBuilderComponent] Executing workflow:", {
+          toolConfigId: toolConfig?.id,
+          hasToolConfig: !!toolConfig,
+          runId,
+        });
+        const result = await client.runToolConfig({
           tool: toolConfig,
           payload: runPayload,
           runId,
-          traceId: runId,
+        });
+        console.log("[ToolBuilderComponent] runToolConfig result:", {
+          success: result.success,
+          hasData: !!result.data,
+          error: result.error,
+          hasTool: !!result.tool,
+          toolId: result.tool?.id,
         });
 
         setRunResult({
@@ -335,6 +346,8 @@ export function ToolBuilderComponent({
           });
         }
       } catch (error: any) {
+        console.error("[ToolBuilderComponent] runToolConfig error:", error);
+        console.error("[ToolBuilderComponent] error stack:", error.stack);
         const errorMsg = error.message || "Execution failed";
         setRunResult({ success: false, error: errorMsg });
         bufferFailure(errorMsg);

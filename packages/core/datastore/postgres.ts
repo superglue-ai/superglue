@@ -1,5 +1,5 @@
-import type {
-  ApiConfig,
+import {
+  composeUrl,
   DiscoveryRun,
   FileReference,
   FileStatus,
@@ -23,9 +23,6 @@ import type {
   ToolHistoryEntry,
   ToolScheduleInternal,
 } from "./types.js";
-
-type ConfigType = "api" | "workflow";
-type ConfigData = ApiConfig | Tool;
 
 export class PostgresService implements DataStore {
   private pool: Pool;
@@ -410,8 +407,8 @@ export class PostgresService implements DataStore {
     }
   }
 
-  private extractVersion(config: ConfigData): string | null {
-    return (config as any)?.version || null;
+  private extractVersion(config: Tool): string | null {
+    return config?.version || null;
   }
 
   private parseDates(data: any): any {
@@ -432,25 +429,21 @@ export class PostgresService implements DataStore {
       result.completedAt = new Date(result.completedAt);
     }
 
-    // Parse dates in nested config object
-    if (result.config) {
-      result.config = this.parseDates(result.config);
+    // Parse dates in nested tool object
+    if (result.tool) {
+      result.tool = this.parseDates(result.tool);
     }
 
     return result;
   }
 
-  private async getConfig<T extends ConfigData>(
-    id: string,
-    type: ConfigType,
-    orgId?: string,
-  ): Promise<T | null> {
+  private async getWorkflowConfig(id: string, orgId?: string): Promise<Tool | null> {
     if (!id) return null;
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        "SELECT data FROM configurations WHERE id = $1 AND type = $2 AND org_id = $3",
-        [id, type, orgId || ""],
+        "SELECT data FROM configurations WHERE id = $1 AND type = 'workflow' AND org_id = $2",
+        [id, orgId || ""],
       );
       return result.rows[0] ? { ...this.parseDates(result.rows[0].data), id } : null;
     } finally {
@@ -458,23 +451,22 @@ export class PostgresService implements DataStore {
     }
   }
 
-  private async listConfigs<T extends ConfigData>(
-    type: ConfigType,
+  private async listWorkflowConfigs(
     limit = 10,
     offset = 0,
     orgId?: string,
-  ): Promise<{ items: T[]; total: number }> {
+  ): Promise<{ items: Tool[]; total: number }> {
     const client = await this.pool.connect();
     try {
       const countResult = await client.query(
-        "SELECT COUNT(*) FROM configurations WHERE type = $1 AND org_id = $2",
-        [type, orgId || ""],
+        "SELECT COUNT(*) FROM configurations WHERE type = 'workflow' AND org_id = $1",
+        [orgId || ""],
       );
       const total = parseInt(countResult.rows[0].count);
 
       const result = await client.query(
-        "SELECT id, data FROM configurations WHERE type = $1 AND org_id = $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4",
-        [type, orgId || "", limit, offset],
+        "SELECT id, data FROM configurations WHERE type = 'workflow' AND org_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+        [orgId || "", limit, offset],
       );
 
       const items = result.rows.map((row) => ({ ...this.parseDates(row.data), id: row.id }));
@@ -484,40 +476,13 @@ export class PostgresService implements DataStore {
     }
   }
 
-  private async upsertConfig<T extends ConfigData>(
-    id: string,
-    config: T,
-    type: ConfigType,
-    orgId?: string,
-    integrationIds: string[] = [],
-  ): Promise<T> {
-    if (!id || !config) return null;
-    const client = await this.pool.connect();
-    try {
-      const version = this.extractVersion(config);
-      await client.query(
-        `
-        INSERT INTO configurations (id, org_id, type, version, data, integration_ids, updated_at) 
-        VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
-        ON CONFLICT (id, type, org_id) 
-        DO UPDATE SET data = $5, version = $4, integration_ids = $6, updated_at = CURRENT_TIMESTAMP
-      `,
-        [id, orgId || "", type, version, JSON.stringify(config), integrationIds],
-      );
-
-      return { ...config, id };
-    } finally {
-      client.release();
-    }
-  }
-
-  private async deleteConfig(id: string, type: ConfigType, orgId?: string): Promise<boolean> {
+  private async deleteWorkflowConfig(id: string, orgId?: string): Promise<boolean> {
     if (!id) return false;
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        "DELETE FROM configurations WHERE id = $1 AND type = $2 AND org_id = $3",
-        [id, type, orgId || ""],
+        "DELETE FROM configurations WHERE id = $1 AND type = 'workflow' AND org_id = $2",
+        [id, orgId || ""],
       );
       return result.rowCount > 0;
     } finally {
@@ -804,7 +769,7 @@ export class PostgresService implements DataStore {
 
   async getWorkflow(params: { id: string; orgId?: string }): Promise<Tool | null> {
     const { id, orgId } = params;
-    const workflow = await this.getConfig<Tool>(id, "workflow", orgId);
+    const workflow = await this.getWorkflowConfig(id, orgId);
     return workflow ? normalizeTool(workflow) : null;
   }
 
@@ -814,7 +779,7 @@ export class PostgresService implements DataStore {
     orgId?: string;
   }): Promise<{ items: Tool[]; total: number }> {
     const { limit = 10, offset = 0, orgId } = params || {};
-    const result = await this.listConfigs<Tool>("workflow", limit, offset, orgId);
+    const result = await this.listWorkflowConfigs(limit, offset, orgId);
     return { items: result.items.map(normalizeTool), total: result.total };
   }
 
@@ -891,7 +856,7 @@ export class PostgresService implements DataStore {
 
   async deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean> {
     const { id, orgId } = params;
-    return this.deleteConfig(id, "workflow", orgId);
+    return this.deleteWorkflowConfig(id, orgId);
   }
 
   async renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Tool> {

@@ -30,7 +30,7 @@ describe("ToolFixer", () => {
         userId: { type: "string" },
       },
     },
-    responseSchema: {
+    outputSchema: {
       type: "object",
       properties: {
         result: { type: "string" },
@@ -39,17 +39,14 @@ describe("ToolFixer", () => {
     steps: [
       {
         id: "step1",
-        systemId: "sys1",
-        apiConfig: {
-          id: "api1",
-          instruction: "Test API",
+        instruction: "Test API",
+        config: {
           method: "GET",
-          urlHost: "https://api.example.com",
-          urlPath: "/users",
+          url: "https://api.example.com/users",
+          systemId: "sys1",
         },
       },
     ],
-    systemIds: ["sys1"],
     createdAt: new Date("2024-01-01"),
     updatedAt: new Date("2024-01-01"),
   });
@@ -80,10 +77,10 @@ describe("ToolFixer", () => {
       });
     });
 
-    it("should normalize stringified responseSchema on construction", () => {
+    it("should normalize stringified outputSchema on construction", () => {
       const tool: any = {
         ...createBaseTool(),
-        responseSchema: '{"type":"array","items":{"type":"string"}}',
+        outputSchema: '{"type":"array","items":{"type":"string"}}',
       };
 
       const fixer = new ToolFixer({
@@ -93,7 +90,7 @@ describe("ToolFixer", () => {
         metadata: mockMetadata,
       });
 
-      expect(fixer["tool"].responseSchema).toEqual({
+      expect(fixer["tool"].outputSchema).toEqual({
         type: "array",
         items: { type: "string" },
       });
@@ -103,7 +100,7 @@ describe("ToolFixer", () => {
       const tool: any = {
         ...createBaseTool(),
         inputSchema: '{"type":"object","properties":{"input":{"type":"string"}}}',
-        responseSchema: '{"type":"object","properties":{"output":{"type":"number"}}}',
+        outputSchema: '{"type":"object","properties":{"output":{"type":"number"}}}',
       };
 
       const fixer = new ToolFixer({
@@ -119,7 +116,7 @@ describe("ToolFixer", () => {
           input: { type: "string" },
         },
       });
-      expect(fixer["tool"].responseSchema).toEqual({
+      expect(fixer["tool"].outputSchema).toEqual({
         type: "object",
         properties: {
           output: { type: "number" },
@@ -253,7 +250,7 @@ describe("ToolFixer", () => {
             },
             {
               op: "replace",
-              path: "/responseSchema",
+              path: "/outputSchema",
               value: {
                 type: "array",
                 items: { type: "object" },
@@ -275,7 +272,7 @@ describe("ToolFixer", () => {
 
       expect(result.tool.inputSchema.properties.userId.type).toBe("number");
       expect(result.tool.inputSchema.properties.email).toEqual({ type: "string" });
-      expect(result.tool.responseSchema).toEqual({
+      expect(result.tool.outputSchema).toEqual({
         type: "array",
         items: { type: "object" },
       });
@@ -291,7 +288,7 @@ describe("ToolFixer", () => {
           patches: [
             {
               op: "add",
-              path: "/steps/0/apiConfig/headers",
+              path: "/steps/0/config/headers",
               value: {
                 Authorization: "Bearer token",
                 "Content-Type": "application/json",
@@ -311,7 +308,7 @@ describe("ToolFixer", () => {
 
       const result = await fixer.fixTool();
 
-      expect(result.tool.steps[0].apiConfig.headers).toEqual({
+      expect(result.tool.steps[0].config.headers).toEqual({
         Authorization: "Bearer token",
         "Content-Type": "application/json",
       });
@@ -326,7 +323,7 @@ describe("ToolFixer", () => {
           patches: [
             {
               op: "add",
-              path: "/steps/0/apiConfig/pagination",
+              path: "/steps/0/config/pagination",
               value: {
                 type: "offset",
                 limit: 100,
@@ -346,7 +343,7 @@ describe("ToolFixer", () => {
 
       const result = await fixer.fixTool();
 
-      expect(result.tool.steps[0].apiConfig.pagination).toEqual({
+      expect(result.tool.steps[0].config.pagination).toEqual({
         type: "offset",
         limit: 100,
       });
@@ -633,12 +630,12 @@ describe("ToolFixer", () => {
             },
             {
               op: "add",
-              path: "/steps/0/apiConfig/headers",
+              path: "/steps/0/config/headers",
               value: { "X-API-Key": "secret" },
             },
             {
               op: "replace",
-              path: "/responseSchema",
+              path: "/outputSchema",
               value: { type: "array", items: { type: "string" } },
             },
           ],
@@ -658,8 +655,8 @@ describe("ToolFixer", () => {
         type: "object",
         properties: { id: { type: "string" } },
       });
-      expect(result.tool.steps[0].apiConfig.headers).toEqual({ "X-API-Key": "secret" });
-      expect(result.tool.responseSchema).toEqual({
+      expect(result.tool.steps[0].config.headers).toEqual({ "X-API-Key": "secret" });
+      expect(result.tool.outputSchema).toEqual({
         type: "array",
         items: { type: "string" },
       });

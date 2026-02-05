@@ -2,7 +2,7 @@ import {
   HttpMethod,
   RequestOptions,
   ServiceMetadata,
-  ApiConfig as StepConfig,
+  RequestStepConfig,
   SupportedFileType,
 } from "@superglue/shared";
 import { Client as FTPClient } from "basic-ftp";
@@ -33,7 +33,7 @@ export class FTPStepExecutionStrategy implements StepExecutionStrategy {
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
     const { stepConfig, stepInputData, credentials, requestOptions, metadata } = input;
     const ftpResult = await callFTP({
-      endpoint: stepConfig,
+      endpoint: stepConfig as RequestStepConfig,
       stepInputData,
       credentials,
       options: requestOptions,
@@ -394,7 +394,7 @@ export async function callFTP({
   options,
   metadata,
 }: {
-  endpoint: StepConfig;
+  endpoint: RequestStepConfig;
   stepInputData?: Record<string, any>;
   credentials: Record<string, any>;
   options: RequestOptions;

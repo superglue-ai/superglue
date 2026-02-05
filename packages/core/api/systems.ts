@@ -78,13 +78,31 @@ registerApiModule({
       method: "GET",
       path: "/systems/:systemId",
       handler: getSystem,
-      permissions: { type: "read", resource: "system" },
+      permissions: { type: "read", resource: "system", allowRestricted: false },
     },
     {
       method: "GET",
       path: "/systems",
       handler: listSystems,
-      permissions: { type: "read", resource: "system" },
+      permissions: { type: "read", resource: "system", allowRestricted: false },
+    },
+    {
+      method: "POST",
+      path: "/systems",
+      handler: createSystem,
+      permissions: { type: "write", resource: "system", allowRestricted: false },
+    },
+    {
+      method: "PUT",
+      path: "/systems/:systemId",
+      handler: updateSystem,
+      permissions: { type: "write", resource: "system", allowRestricted: false },
+    },
+    {
+      method: "DELETE",
+      path: "/systems/:systemId",
+      handler: deleteSystem,
+      permissions: { type: "delete", resource: "system", allowRestricted: false },
     },
   ],
 });

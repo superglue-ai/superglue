@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, PaginationType } from "@superglue/shared";
+import { RequestStepConfig, HttpMethod, PaginationType } from "@superglue/shared";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server_defaults } from "../../../default.js";
@@ -78,9 +78,8 @@ describe("API Utilities", () => {
   });
 
   describe("runStepConfig", () => {
-    const testEndpoint: ApiConfig = {
-      urlHost: "https://api.example.com",
-      urlPath: "v1/test",
+    const testEndpoint: RequestStepConfig = {
+      url: "https://api.example.com/v1/test",
       method: HttpMethod.GET,
       id: "test-endpoint-id",
       instruction: "Test API call",
@@ -117,7 +116,7 @@ describe("API Utilities", () => {
           type: PaginationType.PAGE_BASED,
           pageSize: "2",
         },
-      } as ApiConfig;
+      } as RequestStepConfig;
 
       const mockResponses = [
         {
@@ -164,7 +163,7 @@ describe("API Utilities", () => {
           type: PaginationType.OFFSET_BASED,
           pageSize: "2",
         },
-      } as ApiConfig;
+      } as RequestStepConfig;
 
       const mockResponses = [
         {
@@ -219,7 +218,7 @@ describe("API Utilities", () => {
           cursorPath: "meta.next_cursor",
           stopCondition: "!response.data.meta.next_cursor",
         },
-      } as ApiConfig;
+      } as RequestStepConfig;
 
       const mockResponses = [
         {
@@ -273,7 +272,7 @@ describe("API Utilities", () => {
           type: PaginationType.PAGE_BASED,
           pageSize: "2",
         },
-      } as ApiConfig;
+      } as RequestStepConfig;
 
       const sameResponse = {
         status: 200,
@@ -307,7 +306,7 @@ describe("API Utilities", () => {
         headers: {
           "x-superglue-test": "<<offset>>",
         },
-      } as ApiConfig;
+      } as RequestStepConfig;
 
       for (let i = 0; i < 505; i++) {
         (axios as any).mockResolvedValueOnce({
@@ -338,7 +337,7 @@ describe("API Utilities", () => {
         headers: {
           "x-superglue-test": "<<offset>>",
         },
-      } as ApiConfig;
+      } as RequestStepConfig;
 
       const mockResponse = {
         status: 200,
@@ -387,7 +386,7 @@ describe("API Utilities", () => {
         ...testEndpoint,
         method: HttpMethod.POST,
         body: "query { test }",
-      } as ApiConfig;
+      } as RequestStepConfig;
 
       const graphqlErrorResponse = {
         status: 200,
@@ -636,9 +635,8 @@ describe("API Utilities", () => {
   });
 
   describe("Error Detection Modes", () => {
-    const testEndpoint: ApiConfig = {
-      urlHost: "https://api.example.com",
-      urlPath: "v1/test",
+    const testEndpoint: RequestStepConfig = {
+      url: "https://api.example.com/v1/test",
       method: HttpMethod.GET,
       id: "test-endpoint-id",
       instruction: "Test API call",
