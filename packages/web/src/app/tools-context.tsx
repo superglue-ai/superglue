@@ -76,3 +76,7 @@ export function useTools(): ToolsContext {
 
   return context;
 }
+
+export function useToolsOptional(): ToolsContext | null {
+  return useContext(ToolsContext);
+}

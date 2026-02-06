@@ -16,4 +16,10 @@ export interface AuthResult {
 
 export interface AuthManager {
   authenticate(token: string): Promise<AuthResult>;
+  createApiKey?(
+    orgId: string,
+    userId?: string,
+    userEmail?: string,
+    mode?: "frontend" | "backend",
+  ): Promise<string | null>;
 }
