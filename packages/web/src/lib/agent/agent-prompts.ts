@@ -291,6 +291,42 @@ KEY CONCEPTS:
         - Stored credentials (API keys, OAuth tokens)
         - Documentation, OpenAPI schemas and system-specific instructions
 
+TOOL STEP CONFIGURATION:
+- Each step has a config with: url, method, headers, body, queryParams, pagination
+- Use <<variable>> syntax for dynamic values: <<userId>>, <<apiKey>>, <<systemId_credential>>
+- JavaScript expressions: <<(sourceData) => sourceData.users.map(u => u.id)>>
+- Current item in loops: <<currentItem>> or <<(sourceData) => sourceData.currentItem.property>>
+
+AUTHENTICATION:
+- Bearer Token: headers: { "Authorization": "Bearer <<access_token>>" }
+- Basic Auth: headers: { "Authorization": "Basic <<username>>:<<password>>" }, auto-encodes "Basic user:password" to Base64. Do NOT manually encode.
+
+DATA SELECTORS (dataSelector):
+- Return OBJECT for single execution: (sourceData) => ({ userId: sourceData.userId })
+- Return ARRAY for loop execution: (sourceData) => sourceData.getContacts.data.filter(c => c.active)
+- Object result access: sourceData.stepId.data
+- Array result access: sourceData.stepId.map(item => item.data)
+
+PAGINATION:
+- Types: "offsetBased", "pageBased", "cursorBased"
+- Config: { type, pageSize, cursorPath (for cursor), stopCondition }
+- cursorPath: JSONPath to extract next cursor from response (e.g., "meta.next_cursor", "paging.next.after", "nextPageToken")
+- Variables: <<offset>>, <<page>>, <<cursor>>, <<limit>>
+- stopCondition receives (response, pageInfo) where response.data is the parsed API body:
+  - "!response.data.meta.next_cursor" (stop when no cursor)
+  - "response.data.items.length === 0" (stop when empty)
+  - "response.data.hasMore === false" (stop when flag false)
+
+POSTGRES:
+- url: Use postgres:// protocol with <<user>>, <<password>>, <<host>>, <<port>>, <<database>> variables
+- body: { query: "SELECT * FROM users WHERE id = $1", params: [<<userId>>] }
+- Always use parameterized queries ($1, $2, etc.)
+
+FTP/SFTP:
+- url: "sftp://<<user>>:<<password>>@<<host>>:<<port>>/"
+- Operations: list, get, put, delete, rename, mkdir, rmdir, exists, stat
+- body: { "operation": "get", "path": "/file.txt" }
+
 DEPLOYING SUPERGLUE TOOLS TO PROD:
     - Tools can only be deployed to production if they are saved.
     - Tools can be executed programmatically using the REST API directly or by using our TypeScript/Python SDK.
